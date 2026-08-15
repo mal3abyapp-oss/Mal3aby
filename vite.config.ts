@@ -9,7 +9,7 @@ export default defineConfig({
     react(),
     VitePWA({
       registerType: 'autoUpdate',
-      includeAssets: ['favicon.ico'],
+      includeAssets: ['favicon.svg', 'icons.svg'],
       manifest: {
         name: 'ملعبي | Mala3by',
         short_name: 'Mala3by',

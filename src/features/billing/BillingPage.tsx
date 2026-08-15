@@ -80,6 +80,7 @@ export function BillingPage() {
   const [selectedInvoiceId, setSelectedInvoiceId] = useState<string | null>(null)
   const [paymentAmount, setPaymentAmount] = useState('')
   const [paymentMethod, setPaymentMethod] = useState('cash')
+  const [printSize, setPrintSize] = useState<'a4' | '80mm'>('a4')
   const [refundPaymentId, setRefundPaymentId] = useState<string | null>(null)
   const [refundAmount, setRefundAmount] = useState('')
   const [refundReason, setRefundReason] = useState('')
@@ -182,7 +183,7 @@ export function BillingPage() {
           </DialogHeader>
           {detail && (
             <div className="flex flex-col gap-4">
-              <div id="invoice-print" className="rounded-md border border-border p-4 text-sm print:border-0">
+              <div id="invoice-print" data-print-size={printSize} className="rounded-md border border-border p-4 text-sm print:border-0">
                 <div className="mb-3 flex justify-between">
                   <div>
                     <p className="font-bold">فاتورة رقم {detail.invoice_number}</p>
@@ -220,9 +221,18 @@ export function BillingPage() {
                 </div>
               </div>
 
-              <Button variant="outline" size="sm" className="w-fit print:hidden" onClick={() => window.print()}>
-                طباعة
-              </Button>
+              <div className="flex items-center gap-2 print:hidden">
+                <Select value={printSize} onValueChange={(v) => setPrintSize(v as 'a4' | '80mm')}>
+                  <SelectTrigger className="w-32"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="a4">A4</SelectItem>
+                    <SelectItem value="80mm">إيصال 80mm</SelectItem>
+                  </SelectContent>
+                </Select>
+                <Button variant="outline" size="sm" className="w-fit" onClick={() => window.print()}>
+                  طباعة
+                </Button>
+              </div>
 
               <div className="print:hidden">
                 <p className="mb-2 font-medium">المدفوعات</p>

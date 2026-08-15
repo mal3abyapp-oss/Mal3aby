@@ -41,7 +41,7 @@ export function HomePage() {
             <Button size="lg" className="bg-accent text-accent-foreground hover:bg-accent/90" asChild>
               <Link to="/signup">ابدأ تجربتك المجانية</Link>
             </Button>
-            <Button size="lg" variant="outline" className="border-white/30 text-white hover:bg-white/10" asChild>
+            <Button size="lg" variant="outline" className="border-white/30 bg-transparent text-white hover:bg-white/10" asChild>
               <Link to="/login">تسجيل الدخول</Link>
             </Button>
           </div>
