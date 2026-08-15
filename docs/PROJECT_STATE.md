@@ -4,15 +4,21 @@ Updated after every phase closes. See [IMPLEMENTATION_PLAN.md](IMPLEMENTATION_PL
 
 ---
 
-**Last updated:** 2026-08-15
+**Last updated:** 2026-08-16
 
 ## Current Phase
 
-**Implementation through Phase 16: COMPLETE.** 20 / 22 actual planned phases complete (Phases 0–16 = 17 numbered phases + 3b + 3c + 3d = 20 executed phases). Not executed: Phase 17 (Stable GitHub Release), Phase 18 (Cloudflare + Production Deployment) — both remain explicitly NOT authorized under current LOCAL-ONLY policy. Do not describe this state as bare "16/16 phases" — that phrasing implies total scope and undercounts the 3b/3c/3d sub-phases already delivered.
+**Implementation through Phase 16: COMPLETE.** 20 / 22 actual planned phases complete (Phases 0–16 = 17 numbered phases + 3b + 3c + 3d = 20 executed phases). **Phase 17 (GitHub Release): COMPLETE.** Phase 18 (Cloudflare + Production Deployment): NOT STARTED — remains explicitly NOT authorized. Do not describe this state as bare "16/16 phases" — that phrasing implies total scope and undercounts the 3b/3c/3d sub-phases already delivered.
 
-**Pre-release verification: PASS**, completed 2026-08-15 against the live connected Supabase project (read-only wherever possible, one migration-parity remediation + one broken-flow fix applied and committed — see "Final Pre-Release Verification" entry below). Phase 17: NOT STARTED. Phase 18: NOT STARTED.
+**Pre-release verification: PASS** (2026-08-15). **Final Release Gate: PASS** (2026-08-15/16) — see entries below. **Phase 17: COMPLETE** (2026-08-16) — repository pushed to GitHub at [mal3abyapp-oss/Mal3aby](https://github.com/mal3abyapp-oss/Mal3aby), full local commit and migration history preserved, no history rewrite. **Phase 18: NOT STARTED.**
 
-Phase 6 hardening applied post-commit per user security review; two pre-existing Phase 6 defects and one Phase 8 schema-fit issue found and fixed during Phase 8 testing; Phase 14's independent audit found and closed 2 more real defects; Phase 15's PWA/responsive/print QA found and closed 3 more real defects; Phase 16's end-to-end flow chaining found and closed 1 more real implementation gap (missing `ensure_player_qr`, blocking the documented Flow 3→4→6 path entirely) — see Phase 8/14/15/16 entries below. No `git push`, no GitHub repo creation, no production deployment has occurred or will occur without separate explicit authorization.
+Phase 6 hardening applied post-commit per user security review; two pre-existing Phase 6 defects and one Phase 8 schema-fit issue found and fixed during Phase 8 testing; Phase 14's independent audit found and closed 2 more real defects; Phase 15's PWA/responsive/print QA found and closed 3 more real defects; Phase 16's end-to-end flow chaining found and closed 1 more real implementation gap (missing `ensure_player_qr`, blocking the documented Flow 3→4→6 path entirely) — see Phase 8/14/15/16 entries below. No Cloudflare deployment, no production Supabase project, no DNS/domain changes has occurred or will occur without separate explicit authorization.
+
+### Phase 17 — Stable GitHub Release: COMPLETE (2026-08-16)
+- Pre-push sweep: full secrets re-scan (tracked files + full history) clean; confirmed `.env.local`/`dist/`/`node_modules/` correctly gitignored and never tracked; no debug/temp artifacts tracked.
+- Docs pass: README's stale "LOCAL ONLY" Git Policy section and stale "Phase 0 not yet started" Status section corrected to reflect actual state.
+- Pushed the existing local history as-is to `mal3abyapp-oss/Mal3aby` (`main` branch) — no rebase, no squash, no force-push, no history rewrite. All 33 local migration files preserved.
+- Post-push verification: fetched the pushed branch's tree via the GitHub API and confirmed commit count, HEAD SHA, and migration file count match local exactly.
 
 ### Final Pre-Release Verification (2026-08-15): PASS
 - **Migration parity remediation**: found local migration history was missing 4 files for migrations already applied to the remote project (`phase2_lockdown_function_execute_grants`, `enable_btree_gist`, `phase3d_fix_anon_public_plans_access`, `phase3d_anon_clean_deny_on_tenant_tables`) — recovered byte-accurate from `supabase_migrations.schema_migrations`, filed under synthetic timestamps preserving dependency-safe replay order (not their literal remote timestamps, which would break a fresh `db push`). Local migration count 26 → 30, matching remote's 30 applied migrations exactly. No live schema drift found beyond this bookkeeping gap — the previously-suspected `platform_plans` anon/authenticated policies were already correctly present in `20260815140000_phase3b_platform_billing.sql`'s content.

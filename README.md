@@ -26,11 +26,11 @@ No `organizations` layer above clubs (fully removed, not a placeholder — see [
 - **Frontend:** React, TypeScript, Vite, Tailwind CSS, shadcn/ui, TanStack Query
 - **Backend:** Supabase (Postgres, Auth, Storage, RLS, RPC) — no custom server
 - **Deployment:** Cloudflare Pages (target end-state — not yet authorized, see Git Policy below)
-- **Source control:** Git (local only for now)
+- **Source control:** Git, hosted on GitHub ([mal3abyapp-oss/Mal3aby](https://github.com/mal3abyapp-oss/Mal3aby))
 
-## Git Policy — LOCAL ONLY
+## Git Policy
 
-Current status: **local-only development.** `git init`, local commits, local branches, and local history are in use. `git push`, GitHub repository creation, GitHub Actions, Cloudflare deployment, and production Supabase are all blocked until a separate, explicit go-ahead. See [docs/PROJECT_RULES.md](docs/PROJECT_RULES.md) rule 5b.
+**Phase 17 (GitHub release) complete:** the repository is pushed to GitHub with its full local commit and migration history preserved, no rewriting. **Phase 18 (Cloudflare + production deployment) is still blocked** until a separate, explicit go-ahead — no Cloudflare Pages connection, no production Supabase project, no DNS/domain changes, no deployment secrets. See [docs/PROJECT_RULES.md](docs/PROJECT_RULES.md) rule 5b.
 
 ## Documentation
 
@@ -58,8 +58,8 @@ npm install
 npm run dev
 ```
 
-See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md#local-development-workflow) for the full loop (test → build → commit → **stop**, no push under current policy).
+See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md#local-development-workflow) for the full loop (test → build → commit → push).
 
 ## Status
 
-Planning complete, including a Mandatory Architecture Corrections pass, a Final Platform SaaS Corrections pass, a Public Website + Signup + Free Trial addition, and the Final Pre-Implementation Directive (all 2026-08-15) — security/anti-fraud controls and the visual design system are now fully specified. Phase 0 not yet started. See [docs/PROJECT_STATE.md](docs/PROJECT_STATE.md).
+Implementation through Phase 16 complete (20 / 22 actual planned phases — Phases 0–16 plus 3b/3c/3d), Final Pre-Release Verification and Final Release Gate both passed, Phase 17 (GitHub release) complete. Phase 18 (Cloudflare + production deployment) not started — blocked pending separate explicit authorization. See [docs/PROJECT_STATE.md](docs/PROJECT_STATE.md).
