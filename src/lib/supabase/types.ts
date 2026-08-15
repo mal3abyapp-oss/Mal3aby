@@ -19,6 +19,44 @@ export type Database = {
   }
   public: {
     Tables: {
+      age_groups: {
+        Row: {
+          club_id: string
+          created_at: string
+          created_by: string | null
+          id: string
+          max_age: number | null
+          min_age: number | null
+          name: string
+        }
+        Insert: {
+          club_id: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          max_age?: number | null
+          min_age?: number | null
+          name: string
+        }
+        Update: {
+          club_id?: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          max_age?: number | null
+          min_age?: number | null
+          name?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "age_groups_club_id_fkey"
+            columns: ["club_id"]
+            isOneToOne: false
+            referencedRelation: "clubs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       audit_logs: {
         Row: {
           action: string
@@ -724,6 +762,138 @@ export type Database = {
             columns: ["club_id"]
             isOneToOne: false
             referencedRelation: "clubs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      group_schedule_slots: {
+        Row: {
+          created_at: string
+          day_of_week: number
+          end_time: string
+          group_id: string
+          id: string
+          start_time: string
+        }
+        Insert: {
+          created_at?: string
+          day_of_week: number
+          end_time: string
+          group_id: string
+          id?: string
+          start_time: string
+        }
+        Update: {
+          created_at?: string
+          day_of_week?: number
+          end_time?: string
+          group_id?: string
+          id?: string
+          start_time?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "group_schedule_slots_group_id_fkey"
+            columns: ["group_id"]
+            isOneToOne: false
+            referencedRelation: "groups"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      groups: {
+        Row: {
+          age_group_id: string | null
+          assistant_coach_id: string | null
+          branch_id: string
+          capacity: number
+          club_id: string
+          coach_id: string | null
+          created_at: string
+          created_by: string | null
+          field_id: string | null
+          id: string
+          name: string
+          program_id: string
+          season_id: string
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          age_group_id?: string | null
+          assistant_coach_id?: string | null
+          branch_id: string
+          capacity: number
+          club_id: string
+          coach_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          field_id?: string | null
+          id?: string
+          name: string
+          program_id: string
+          season_id: string
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          age_group_id?: string | null
+          assistant_coach_id?: string | null
+          branch_id?: string
+          capacity?: number
+          club_id?: string
+          coach_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          field_id?: string | null
+          id?: string
+          name?: string
+          program_id?: string
+          season_id?: string
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "groups_age_group_id_fkey"
+            columns: ["age_group_id"]
+            isOneToOne: false
+            referencedRelation: "age_groups"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "groups_branch_id_fkey"
+            columns: ["branch_id"]
+            isOneToOne: false
+            referencedRelation: "branches"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "groups_club_id_fkey"
+            columns: ["club_id"]
+            isOneToOne: false
+            referencedRelation: "clubs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "groups_field_id_fkey"
+            columns: ["field_id"]
+            isOneToOne: false
+            referencedRelation: "fields"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "groups_program_id_fkey"
+            columns: ["program_id"]
+            isOneToOne: false
+            referencedRelation: "programs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "groups_season_id_fkey"
+            columns: ["season_id"]
+            isOneToOne: false
+            referencedRelation: "seasons"
             referencedColumns: ["id"]
           },
         ]
@@ -1498,6 +1668,50 @@ export type Database = {
         }
         Relationships: []
       }
+      programs: {
+        Row: {
+          club_id: string
+          created_at: string
+          created_by: string | null
+          id: string
+          name: string
+          name_ar: string
+          sport: string | null
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          club_id: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          name: string
+          name_ar: string
+          sport?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          club_id?: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          name?: string
+          name_ar?: string
+          sport?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "programs_club_id_fkey"
+            columns: ["club_id"]
+            isOneToOne: false
+            referencedRelation: "clubs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       qr_credentials: {
         Row: {
           club_id: string
@@ -1693,6 +1907,54 @@ export type Database = {
           name_ar?: string
         }
         Relationships: []
+      }
+      seasons: {
+        Row: {
+          club_id: string
+          created_at: string
+          created_by: string | null
+          end_date: string
+          id: string
+          name: string
+          program_id: string | null
+          start_date: string
+        }
+        Insert: {
+          club_id: string
+          created_at?: string
+          created_by?: string | null
+          end_date: string
+          id?: string
+          name: string
+          program_id?: string | null
+          start_date: string
+        }
+        Update: {
+          club_id?: string
+          created_at?: string
+          created_by?: string | null
+          end_date?: string
+          id?: string
+          name?: string
+          program_id?: string | null
+          start_date?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "seasons_club_id_fkey"
+            columns: ["club_id"]
+            isOneToOne: false
+            referencedRelation: "clubs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "seasons_program_id_fkey"
+            columns: ["program_id"]
+            isOneToOne: false
+            referencedRelation: "programs"
+            referencedColumns: ["id"]
+          },
+        ]
       }
     }
     Views: {

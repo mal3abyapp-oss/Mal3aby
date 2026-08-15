@@ -3,7 +3,6 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '@/lib/supabase/client'
 import { useAuth } from '@/app/providers/AuthProvider'
 import { PageHeader } from '@/components/ui/page-header'
-import { PlaceholderPage } from '@/components/ui/placeholder-page'
 import { DataTable, type DataTableColumn } from '@/components/ui/data-table'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -21,6 +20,8 @@ import {
   DialogTitle,
   DialogTrigger,
 } from '@/components/ui/dialog'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { ProgramsGroupsSection } from '@/features/academy/ProgramsGroupsSection'
 import type { PlayerRow, GuardianLinkRow } from '@/lib/domain/people'
 
 // Player Profile lives under /app/academy per SCREEN_MAP.md. Full
@@ -180,126 +181,130 @@ export function AcademyPage() {
 
   return (
     <div>
-      <PageHeader
-        title="الأكاديمية"
-        description="إدارة اللاعبين وأولياء الأمور"
-        actions={
-          <Dialog open={createDialogOpen} onOpenChange={setCreateDialogOpen}>
-            <DialogTrigger asChild>
-              <Button>إضافة لاعب</Button>
-            </DialogTrigger>
+      <PageHeader title="الأكاديمية" description="إدارة اللاعبين والبرامج والمجموعات" />
+
+      <Tabs defaultValue="players">
+        <TabsList>
+          <TabsTrigger value="players">اللاعبون</TabsTrigger>
+          <TabsTrigger value="structure">البرامج والمجموعات</TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="players">
+          <div className="mb-4 mt-4 flex items-center justify-between gap-3">
+            <Input
+              placeholder="بحث بالاسم"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="max-w-sm"
+            />
+            <Dialog open={createDialogOpen} onOpenChange={setCreateDialogOpen}>
+              <DialogTrigger asChild>
+                <Button>إضافة لاعب</Button>
+              </DialogTrigger>
+              <DialogContent>
+                <DialogHeader>
+                  <DialogTitle>إضافة لاعب</DialogTitle>
+                </DialogHeader>
+                <form onSubmit={handleCreateSubmit} className="flex flex-col gap-4">
+                  <div className="flex flex-col gap-1.5">
+                    <label className="text-sm font-medium text-text-secondary">الاسم الكامل</label>
+                    <Input required value={playerName} onChange={(e) => setPlayerName(e.target.value)} />
+                  </div>
+                  <div className="flex flex-col gap-1.5">
+                    <label className="text-sm font-medium text-text-secondary">تاريخ الميلاد</label>
+                    <Input type="date" value={playerDob} onChange={(e) => setPlayerDob(e.target.value)} />
+                  </div>
+                  {formError && (
+                    <p role="alert" className="text-sm text-status-danger">
+                      {formError}
+                    </p>
+                  )}
+                  <Button type="submit" disabled={createPlayerMutation.isPending}>
+                    {createPlayerMutation.isPending ? 'جارٍ الإضافة...' : 'إضافة'}
+                  </Button>
+                </form>
+              </DialogContent>
+            </Dialog>
+          </div>
+
+          <DataTable
+            columns={columns}
+            rows={players}
+            rowKey={(p) => p.id}
+            isLoading={isLoading}
+            emptyTitle="لا يوجد لاعبون"
+            emptyDescription="أضف أول لاعب لبدء إدارة الأكاديمية"
+          />
+
+          <Dialog open={!!selectedPlayer} onOpenChange={(open) => !open && setSelectedPlayer(null)}>
             <DialogContent>
               <DialogHeader>
-                <DialogTitle>إضافة لاعب</DialogTitle>
+                <DialogTitle>أولياء أمر {selectedPlayer?.fullName}</DialogTitle>
               </DialogHeader>
-              <form onSubmit={handleCreateSubmit} className="flex flex-col gap-4">
-                <div className="flex flex-col gap-1.5">
-                  <label className="text-sm font-medium text-text-secondary">الاسم الكامل</label>
-                  <Input required value={playerName} onChange={(e) => setPlayerName(e.target.value)} />
-                </div>
-                <div className="flex flex-col gap-1.5">
-                  <label className="text-sm font-medium text-text-secondary">تاريخ الميلاد</label>
-                  <Input type="date" value={playerDob} onChange={(e) => setPlayerDob(e.target.value)} />
-                </div>
-                {formError && (
-                  <p role="alert" className="text-sm text-status-danger">
-                    {formError}
-                  </p>
+              <div className="flex flex-col gap-4">
+                {guardianLinks.length === 0 ? (
+                  <p className="text-sm text-text-secondary">لا يوجد أولياء أمور مرتبطون بعد.</p>
+                ) : (
+                  <ul className="flex flex-col gap-2">
+                    {guardianLinks.map((g) => (
+                      <li key={g.id} className="flex items-center justify-between rounded-md border border-border p-2 text-sm">
+                        <span>{g.customerName}</span>
+                        <span className="text-text-secondary">
+                          {RELATIONSHIP_LABELS[g.relationship] ?? g.relationship}
+                          {g.isPrimary && ' (أساسي)'}
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
                 )}
-                <Button type="submit" disabled={createPlayerMutation.isPending}>
-                  {createPlayerMutation.isPending ? 'جارٍ الإضافة...' : 'إضافة'}
-                </Button>
-              </form>
+
+                <div className="flex flex-col gap-2 border-t border-border pt-4">
+                  <label className="text-sm font-medium text-text-secondary">ربط ولي أمر جديد</label>
+                  <Input
+                    placeholder="بحث عن عميل بالاسم"
+                    value={guardianSearch}
+                    onChange={(e) => {
+                      setGuardianSearch(e.target.value)
+                      setSelectedGuardianId('')
+                    }}
+                  />
+                  {guardianCandidates.length > 0 && (
+                    <Select value={selectedGuardianId} onValueChange={setSelectedGuardianId}>
+                      <SelectTrigger><SelectValue placeholder="اختر عميلاً" /></SelectTrigger>
+                      <SelectContent>
+                        {guardianCandidates.map((c) => (
+                          <SelectItem key={c.id} value={c.id}>
+                            {c.full_name} {c.mobile_display ? `(${c.mobile_display})` : ''}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  )}
+                  <Select value={relationship} onValueChange={setRelationship}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      {Object.entries(RELATIONSHIP_LABELS).map(([key, label]) => (
+                        <SelectItem key={key} value={key}>{label}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <Button
+                    size="sm"
+                    disabled={!selectedGuardianId || linkGuardianMutation.isPending}
+                    onClick={() => linkGuardianMutation.mutate()}
+                  >
+                    ربط
+                  </Button>
+                </div>
+              </div>
             </DialogContent>
           </Dialog>
-        }
-      />
+        </TabsContent>
 
-      <div className="mb-4">
-        <Input
-          placeholder="بحث بالاسم"
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          className="max-w-sm"
-        />
-      </div>
-
-      <DataTable
-        columns={columns}
-        rows={players}
-        rowKey={(p) => p.id}
-        isLoading={isLoading}
-        emptyTitle="لا يوجد لاعبون"
-        emptyDescription="أضف أول لاعب لبدء إدارة الأكاديمية"
-      />
-
-      <Dialog open={!!selectedPlayer} onOpenChange={(open) => !open && setSelectedPlayer(null)}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>أولياء أمر {selectedPlayer?.fullName}</DialogTitle>
-          </DialogHeader>
-          <div className="flex flex-col gap-4">
-            {guardianLinks.length === 0 ? (
-              <p className="text-sm text-text-secondary">لا يوجد أولياء أمور مرتبطون بعد.</p>
-            ) : (
-              <ul className="flex flex-col gap-2">
-                {guardianLinks.map((g) => (
-                  <li key={g.id} className="flex items-center justify-between rounded-md border border-border p-2 text-sm">
-                    <span>{g.customerName}</span>
-                    <span className="text-text-secondary">
-                      {RELATIONSHIP_LABELS[g.relationship] ?? g.relationship}
-                      {g.isPrimary && ' (أساسي)'}
-                    </span>
-                  </li>
-                ))}
-              </ul>
-            )}
-
-            <div className="flex flex-col gap-2 border-t border-border pt-4">
-              <label className="text-sm font-medium text-text-secondary">ربط ولي أمر جديد</label>
-              <Input
-                placeholder="بحث عن عميل بالاسم"
-                value={guardianSearch}
-                onChange={(e) => {
-                  setGuardianSearch(e.target.value)
-                  setSelectedGuardianId('')
-                }}
-              />
-              {guardianCandidates.length > 0 && (
-                <Select value={selectedGuardianId} onValueChange={setSelectedGuardianId}>
-                  <SelectTrigger><SelectValue placeholder="اختر عميلاً" /></SelectTrigger>
-                  <SelectContent>
-                    {guardianCandidates.map((c) => (
-                      <SelectItem key={c.id} value={c.id}>
-                        {c.full_name} {c.mobile_display ? `(${c.mobile_display})` : ''}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              )}
-              <Select value={relationship} onValueChange={setRelationship}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  {Object.entries(RELATIONSHIP_LABELS).map(([key, label]) => (
-                    <SelectItem key={key} value={key}>{label}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              <Button
-                size="sm"
-                disabled={!selectedGuardianId || linkGuardianMutation.isPending}
-                onClick={() => linkGuardianMutation.mutate()}
-              >
-                ربط
-              </Button>
-            </div>
-          </div>
-        </DialogContent>
-      </Dialog>
-
-      <div className="mt-6">
-        <PlaceholderPage title="البرامج والمجموعات والجلسات" phase="Phase 10-12" />
-      </div>
+        <TabsContent value="structure">
+          <ProgramsGroupsSection />
+        </TabsContent>
+      </Tabs>
     </div>
   )
 }
