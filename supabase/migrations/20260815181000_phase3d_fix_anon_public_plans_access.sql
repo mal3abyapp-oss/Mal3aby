@@ -1,0 +1,23 @@
+-- Recovered during Final Pre-Release Verification (2026-08-15): applied to
+-- the remote Mala3by Supabase project (recorded in
+-- supabase_migrations.schema_migrations as version 20260815130228, name
+-- phase3d_fix_anon_public_plans_access -- the real apply-time timestamp)
+-- but had no corresponding local file. Content is byte-accurate to the
+-- remote-recorded statement.
+--
+-- Filed here under a local timestamp (20260815181000, immediately after
+-- 20260815180000_phase3d_onboarding.sql) rather than its literal remote
+-- timestamp, for the same synthetic-ordering reason documented in
+-- 20260815125000_phase2_lockdown_function_execute_grants.sql -- this fix
+-- depends on is_platform_owner() (phase2) and the platform_plans table +
+-- policies (phase3b), both of which already precede it in this ordering.
+
+-- Bug found via live browser smoke test: anon requests to public_plans
+-- (and any other table with a "..._platform_owner_full_access" ALL policy
+-- applying to role {public}) failed with "permission denied for function
+-- is_platform_owner" -- Postgres RLS evaluates every applicable policy's
+-- USING expression for the querying role, even ones whose access it will
+-- end up denying, so anon needs EXECUTE on is_platform_owner() itself (not
+-- on what it gates) to even be evaluated. Safe: the function is stable,
+-- read-only, and returns false cheaply for anon (auth.uid() is null).
+grant execute on function public.is_platform_owner() to anon;
