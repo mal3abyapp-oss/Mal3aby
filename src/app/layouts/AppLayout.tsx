@@ -1,6 +1,8 @@
 import { NavLink, Outlet } from 'react-router-dom'
+import { useQuery } from '@tanstack/react-query'
 import { cn } from '@/lib/utils'
 import { useAuth } from '@/app/providers/AuthProvider'
+import { supabase } from '@/lib/supabase/client'
 import {
   CalendarDays,
   GraduationCap,
@@ -48,8 +50,27 @@ const mobileNavItems: NavItem[] = [
   { to: '/app/more', label: 'المزيد', icon: MoreHorizontal },
 ]
 
+async function fetchSubscriptionSummary(clubId: string) {
+  const { data, error } = await supabase
+    .from('club_platform_subscription_summary')
+    .select('*')
+    .eq('club_id', clubId)
+    .maybeSingle()
+  if (error) throw error
+  return data
+}
+
 export function AppLayout() {
-  const { memberships, currentMembership, setCurrentClubId, signOut } = useAuth()
+  const { memberships, currentMembership, currentClubId, setCurrentClubId, signOut } = useAuth()
+  const { data: subSummary } = useQuery({
+    queryKey: ['app-subscription-summary', currentClubId],
+    queryFn: () => fetchSubscriptionSummary(currentClubId!),
+    enabled: !!currentClubId,
+  })
+
+  const daysRemaining = subSummary?.end_at
+    ? Math.ceil((new Date(subSummary.end_at).getTime() - Date.now()) / (24 * 60 * 60 * 1000))
+    : null
 
   return (
     <div className="flex min-h-screen bg-page-bg">
@@ -109,6 +130,35 @@ export function AppLayout() {
         <header className="flex h-14 items-center border-b border-border bg-surface px-4 md:hidden">
           <span className="font-bold text-text-primary">ملعبي | Mala3by</span>
         </header>
+
+        {subSummary?.subscription_kind === 'trial' && subSummary.effective_access === 'full' && (
+          <div className="flex items-center justify-between gap-3 bg-status-info/10 px-4 py-2 text-sm text-status-info">
+            <span>تجربتك المجانية تنتهي خلال {daysRemaining} يوم</span>
+            <NavLink to="/app/subscription" className="font-medium hover:underline">
+              عرض الاشتراك
+            </NavLink>
+          </div>
+        )}
+        {subSummary?.effective_access === 'blocked' && (
+          <div className="flex items-center justify-between gap-3 bg-status-danger/10 px-4 py-2 text-sm text-status-danger">
+            <span>
+              {subSummary.subscription_kind === 'trial'
+                ? 'انتهت التجربة المجانية — تواصل معنا لتفعيل الاشتراك'
+                : 'الاشتراك منتهٍ — تواصل معنا لتفعيل الاشتراك'}
+            </span>
+            <NavLink to="/app/subscription" className="font-medium hover:underline">
+              عرض الاشتراك
+            </NavLink>
+          </div>
+        )}
+        {subSummary?.effective_access === 'grace' && (
+          <div className="flex items-center justify-between gap-3 bg-status-warning/10 px-4 py-2 text-sm text-status-warning">
+            <span>اشتراكك في فترة السماح — العمليات الجديدة موقوفة مؤقتًا</span>
+            <NavLink to="/app/subscription" className="font-medium hover:underline">
+              عرض الاشتراك
+            </NavLink>
+          </div>
+        )}
 
         <main className="flex-1 p-4 pb-20 md:pb-4">
           <Outlet />

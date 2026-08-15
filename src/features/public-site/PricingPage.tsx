@@ -1,6 +1,48 @@
-import { PlaceholderPage } from '@/components/ui/placeholder-page'
-// Real content reads docs/DATABASE_BLUEPRINT.md#public_plans-view — never
-// hardcoded prices. Built in Phase 3d.
+import { Link } from 'react-router-dom'
+import { useQuery } from '@tanstack/react-query'
+import { supabase } from '@/lib/supabase/client'
+import { PageHeader } from '@/components/ui/page-header'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { MoneyDisplay } from '@/components/ui/money-display'
+import { Button } from '@/components/ui/button'
+
+// public_plans-sourced only, no hardcoded prices, no "Buy"/"Checkout"
+// language anywhere on this page — see docs/ARCHITECTURE.md
+// #public-website--layout-strategy.
+async function fetchPlans() {
+  const { data, error } = await supabase.from('public_plans').select('*').order('price')
+  if (error) throw error
+  return data ?? []
+}
+
 export function PricingPage() {
-  return <PlaceholderPage title="الأسعار" phase="Phase 3d" />
+  const { data: plans = [], isLoading } = useQuery({ queryKey: ['public-plans-pricing'], queryFn: fetchPlans })
+
+  return (
+    <div className="mx-auto max-w-5xl px-4 py-12">
+      <PageHeader title="الأسعار" description="خطط اشتراك واضحة، بدون رسوم خفية" />
+      {isLoading ? null : plans.length === 0 ? (
+        <p className="text-center text-text-secondary">الخطط غير متاحة حاليًا.</p>
+      ) : (
+        <div className="grid gap-4 sm:grid-cols-2 md:grid-cols-4">
+          {plans.map((p) => (
+            <Card key={p.name_ar}>
+              <CardHeader>
+                <CardTitle>{p.name_ar}</CardTitle>
+                {p.description_ar && <p className="text-sm text-text-secondary">{p.description_ar}</p>}
+              </CardHeader>
+              <CardContent className="flex flex-col gap-3">
+                <MoneyDisplay amount={Number(p.price)} currency={p.currency ?? 'EGP'} size="lg" />
+                {p.discount_label && <p className="text-sm text-status-success">{p.discount_label}</p>}
+                {p.features_summary && <p className="text-sm text-text-secondary">{p.features_summary}</p>}
+                <Button asChild className="mt-2">
+                  <Link to="/signup">ابدأ تجربتك المجانية</Link>
+                </Button>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      )}
+    </div>
+  )
 }

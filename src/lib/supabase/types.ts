@@ -210,6 +210,8 @@ export type Database = {
           created_at: string
           created_by: string | null
           currency: string
+          flagged_duplicate: boolean
+          flagged_duplicate_reason: string | null
           id: string
           invoice_settings: Json | null
           logo_url: string | null
@@ -227,6 +229,8 @@ export type Database = {
           created_at?: string
           created_by?: string | null
           currency?: string
+          flagged_duplicate?: boolean
+          flagged_duplicate_reason?: string | null
           id?: string
           invoice_settings?: Json | null
           logo_url?: string | null
@@ -244,6 +248,8 @@ export type Database = {
           created_at?: string
           created_by?: string | null
           currency?: string
+          flagged_duplicate?: boolean
+          flagged_duplicate_reason?: string | null
           id?: string
           invoice_settings?: Json | null
           logo_url?: string | null
@@ -787,6 +793,22 @@ export type Database = {
         Args: { p_action_category: string; p_club_id: string }
         Returns: boolean
       }
+      complete_new_club_onboarding: {
+        Args: {
+          p_branch_name: string
+          p_business_type: string
+          p_city: string
+          p_club_name: string
+          p_club_name_ar: string
+          p_owner_email: string
+          p_owner_mobile: string
+          p_phone: string
+        }
+        Returns: {
+          club_id: string
+          trial_granted: boolean
+        }[]
+      }
       create_platform_subscription: {
         Args: {
           p_club_id: string
@@ -823,6 +845,7 @@ export type Database = {
         Returns: string
       }
       is_platform_owner: { Args: Record<PropertyKey, never>; Returns: boolean }
+      normalize_mobile: { Args: { p_mobile: string }; Returns: string }
       record_platform_payment: {
         Args: {
           p_amount: number

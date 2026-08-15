@@ -1,10 +1,14 @@
 import { Link } from 'react-router-dom'
+import { useQuery } from '@tanstack/react-query'
+import { supabase } from '@/lib/supabase/client'
 import { Button } from '@/components/ui/button'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { MoneyDisplay } from '@/components/ui/money-display'
 import { CalendarDays, GraduationCap, Receipt, ScanLine, BarChart3, UserCog } from 'lucide-react'
 
-// Full marketing content (public_plans-sourced pricing, FAQ, etc.) lands in
-// Phase 3d — see docs/USER_FLOWS.md Flow 8, docs/SCREEN_MAP.md Home.
-// This is the Phase-1 shell verifying PublicLayout renders correctly.
+// See docs/USER_FLOWS.md Flow 8, docs/SCREEN_MAP.md Home. Pricing preview
+// reads only the public_plans view (never platform_plans directly) — see
+// docs/ARCHITECTURE.md#public-website--layout-strategy.
 const features = [
   { icon: CalendarDays, label: 'الحجوزات' },
   { icon: GraduationCap, label: 'الأكاديمية' },
@@ -14,7 +18,15 @@ const features = [
   { icon: UserCog, label: 'إدارة الموظفين' },
 ]
 
+async function fetchPublicPlans() {
+  const { data, error } = await supabase.from('public_plans').select('*')
+  if (error) throw error
+  return data ?? []
+}
+
 export function HomePage() {
+  const { data: plans = [] } = useQuery({ queryKey: ['public-plans-home'], queryFn: fetchPublicPlans })
+
   return (
     <>
       <section className="bg-dark-base text-white">
@@ -48,6 +60,30 @@ export function HomePage() {
           ))}
         </div>
       </section>
+
+      {plans.length > 0 && (
+        <section id="pricing-preview" className="bg-muted/30 px-4 py-16">
+          <h2 className="text-center text-2xl font-bold text-text-primary">الأسعار</h2>
+          <div className="mx-auto mt-8 grid max-w-4xl gap-4 sm:grid-cols-2 md:grid-cols-4">
+            {plans.map((p) => (
+              <Card key={p.name_ar}>
+                <CardHeader>
+                  <CardTitle className="text-base">{p.name_ar}</CardTitle>
+                </CardHeader>
+                <CardContent className="flex flex-col gap-2">
+                  <MoneyDisplay amount={Number(p.price)} currency={p.currency ?? 'EGP'} size="lg" />
+                  {p.discount_label && <p className="text-sm text-status-success">{p.discount_label}</p>}
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+          <div className="mt-8 flex justify-center">
+            <Button size="lg" asChild>
+              <Link to="/signup">ابدأ تجربتك المجانية</Link>
+            </Button>
+          </div>
+        </section>
+      )}
     </>
   )
 }
