@@ -2572,6 +2572,7 @@ export type Database = {
         Returns: undefined
       }
       ensure_booking_qr: { Args: { p_booking_id: string }; Returns: string }
+      ensure_player_qr: { Args: { p_player_id: string }; Returns: string }
       extend_grace_period: {
         Args: { p_grace_period_days: number; p_subscription_id: string }
         Returns: undefined

@@ -1,5 +1,6 @@
 import { useState, type FormEvent } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import QRCode from 'qrcode'
 import { supabase } from '@/lib/supabase/client'
 import { useAuth } from '@/app/providers/AuthProvider'
 import { PageHeader } from '@/components/ui/page-header'
@@ -103,6 +104,7 @@ export function AcademyPage() {
   const [formError, setFormError] = useState<string | null>(null)
 
   const [selectedPlayer, setSelectedPlayer] = useState<PlayerRow | null>(null)
+  const [playerQrDataUrl, setPlayerQrDataUrl] = useState<string | null>(null)
   const [guardianSearch, setGuardianSearch] = useState('')
   const [selectedGuardianId, setSelectedGuardianId] = useState('')
   const [relationship, setRelationship] = useState('father')
@@ -158,6 +160,19 @@ export function AcademyPage() {
       setGuardianSearch('')
       setSelectedGuardianId('')
       void queryClient.invalidateQueries({ queryKey: ['guardian-links', selectedPlayer?.id] })
+    },
+  })
+
+  const playerQrMutation = useMutation({
+    mutationFn: async () => {
+      if (!selectedPlayer) throw new Error('no player selected')
+      const { data, error } = await supabase.rpc('ensure_player_qr', { p_player_id: selectedPlayer.id })
+      if (error) throw error
+      return data as string
+    },
+    onSuccess: async (rawToken) => {
+      const dataUrl = await QRCode.toDataURL(rawToken, { width: 220, margin: 1 })
+      setPlayerQrDataUrl(dataUrl)
     },
   })
 
@@ -243,12 +258,30 @@ export function AcademyPage() {
             emptyDescription="أضف أول لاعب لبدء إدارة الأكاديمية"
           />
 
-          <Dialog open={!!selectedPlayer} onOpenChange={(open) => !open && setSelectedPlayer(null)}>
+          <Dialog
+            open={!!selectedPlayer}
+            onOpenChange={(open) => {
+              if (!open) {
+                setSelectedPlayer(null)
+                setPlayerQrDataUrl(null)
+              }
+            }}
+          >
             <DialogContent>
               <DialogHeader>
-                <DialogTitle>أولياء أمر {selectedPlayer?.fullName}</DialogTitle>
+                <DialogTitle>{selectedPlayer?.fullName}</DialogTitle>
               </DialogHeader>
               <div className="flex flex-col gap-4">
+                <div className="flex flex-col items-center gap-2 border-b border-border pb-4">
+                  {playerQrDataUrl ? (
+                    <img src={playerQrDataUrl} alt="بطاقة QR للاعب" className="size-40" />
+                  ) : (
+                    <Button variant="outline" size="sm" disabled={playerQrMutation.isPending} onClick={() => playerQrMutation.mutate()}>
+                      {playerQrMutation.isPending ? 'جارٍ الإنشاء...' : 'عرض بطاقة QR'}
+                    </Button>
+                  )}
+                </div>
+                <p className="text-sm font-medium text-text-secondary">أولياء الأمر</p>
                 {guardianLinks.length === 0 ? (
                   <p className="text-sm text-text-secondary">لا يوجد أولياء أمور مرتبطون بعد.</p>
                 ) : (
