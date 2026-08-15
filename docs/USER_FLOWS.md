@@ -5,6 +5,8 @@
 > **Added 2026-08-15 (public site)** per Public Website + Signup + Free Trial addition. New Flow 8 (Signup & Onboarding) and Flow 9 (Trial Expiry) — see [DECISIONS.md ADR-036](DECISIONS.md#adr-036--free-trial-requires-no-payment-method-zero-financial-exposure-by-construction) through ADR-046. This is the end-to-end flow the Phase 3d exit gate (see [IMPLEMENTATION_PLAN.md](IMPLEMENTATION_PLAN.md)) is verified against.
 >
 > **Added 2026-08-15 (final pre-implementation)** per the Final Pre-Implementation Directive. Flow 1 (Booking) gains a Recurring Booking variant (Flow 1b) and every flow that touches money/authorization is cross-referenced against [SECURITY_ANTI_FRAUD.md](SECURITY_ANTI_FRAUD.md)'s controls — no flow's steps change, but each now states which abuse scenario its ordering defends against.
+>
+> **Corrected 2026-08-15 (final two decisions)** per the Final Two Decisions Closure. Flow 8 corrected: a user is never blocked from creating additional clubs — `complete_new_club_onboarding()` always creates club/branch/membership, and separately returns `trial_granted: true/false` depending on whether the calling user has already consumed their one automatic trial (see [DECISIONS.md ADR-051](DECISIONS.md#adr-051--automatic-trial-entitlement-is-one-per-user-account-enforced-via-a-dedicated-concurrency-safe-entitlement-table)). Flow 1b's previously-open invoice-granularity question is now closed: one independent financial lifecycle per occurrence, no series-level invoice (see [DECISIONS.md ADR-052](DECISIONS.md#adr-052--recurring-booking-billing-granularity-one-financial-lifecycle-per-occurrence-no-series-level-invoice-in-v1)).
 
 Each flow is optimized for fewest steps — the receptionist/coach is the primary persona, not a power user browsing menus. See [ARCHITECTURE.md](ARCHITECTURE.md) for the RPCs backing the atomic steps.
 
@@ -34,16 +36,24 @@ Search/Create Customer
   → Result shown explicitly: "8 requested, 7 available, 1 conflict"
   → User chooses: create available occurrences only, OR cancel and review conflicts
   → Confirm  ──▶  create_recurring_booking RPC:
-      creates 1 booking_series row (bookkeeping/linking only)
+      creates 1 booking_series row (bookkeeping/linking only, never a financial
+        source of truth)
       creates N real bookings rows, each independently passing the exclusion
         constraint, pricing recomputation, and permission checks — never a
         series-level bypass of any single-booking control
-  → Invoices generated per booking (or per policy — TBD at implementation:
-      one invoice per occurrence vs. one invoice for the series; either way,
-      each booking's own price is still individually computed and correct)
+  → No invoices are generated automatically at series-creation time. Each
+      occurrence gets its own independent invoice through the normal billing
+      flow (create_booking's invoice step) exactly when that occurrence is
+      actually processed — confirmed final per DECISIONS.md ADR-052, one
+      financial lifecycle per occurrence, no series-level invoice in V1
+  → If the customer prepays for several occurrences up front: one payments
+      row + N payment_allocations rows (one per occurrence's invoice) —
+      the existing allocation model, unchanged, no new financial concept
+  → Each occurrence can later be paid, cancelled, marked no-show, or refunded
+      completely independently — no effect on any other occurrence in the series
 ```
 
-Never creates a partial series silently — see [DECISIONS.md ADR-047](DECISIONS.md#adr-047--recurring-booking-is-a-linking-table-over-real-individual-booking-rows-never-a-shortcut-around-conflict-checking).
+Never creates a partial series silently — see [DECISIONS.md ADR-047](DECISIONS.md#adr-047--recurring-booking-is-a-linking-table-over-real-individual-booking-rows-never-a-shortcut-around-conflict-checking). Billing granularity confirmed final, not an open implementation detail — see [DECISIONS.md ADR-052](DECISIONS.md#adr-052--recurring-booking-billing-granularity-one-financial-lifecycle-per-occurrence-no-series-level-invoice-in-v1).
 
 ## 2. Check-in (at the field, on arrival)
 
@@ -156,7 +166,7 @@ Type in search bar (customer name, mobile, player name, booking number, invoice 
 
 Starts as straightforward indexed `ILIKE`/trigram search on the columns above, scoped by `club_id` via RLS (never a separate unscoped search index) — expandable to Postgres full-text search later without a redesign. See [ARCHITECTURE.md](ARCHITECTURE.md#performance-principles).
 
-## 8. Signup & Onboarding (anonymous visitor → operating club)
+## 8. Signup & Onboarding (anonymous visitor → operating club, with trial entitlement outcome)
 
 ```
 Anonymous visitor
@@ -170,22 +180,31 @@ Anonymous visitor
   → Step 2: Basic Details (club name, phone, city, address optional)
   → Step 3: First Branch (branch name, city — can reuse club details)
   → Step 4: Confirm  ──▶  complete_new_club_onboarding() RPC (atomic, single transaction):
-      create clubs row
-      create first branches row
-      create club_memberships row (role = club_owner, hardcoded — never client-supplied)
-      create platform_subscriptions row (subscription_kind = 'trial', hardcoded;
-        duration = platform_settings.default_trial_days; grace_period_days_snapshot = 0)
-  → Onboarding Success screen: "تم إنشاء ناديك بنجاح" + "تم تفعيل التجربة المجانية لمدة 7 أيام"
-  → "ابدأ الإعداد" CTA  ──▶  enters /app
-  → Trial banner visible: "التجربة المجانية: متبقي 7 أيام"
-  → First-Run Checklist visible on dashboard (add field / add staff / add customer / first booking —
-      each independently completable, not a forced sequence, see DECISIONS.md ADR-043)
-  → Club can operate fully (get_club_platform_access() returns 'full') during the trial
+      create clubs row                                        (always succeeds)
+      create first branches row                                 (always succeeds)
+      create club_memberships row (role = club_owner, hardcoded) (always succeeds)
+      attempt to consume automatic_trial_entitlements (unique on user_id)
+        → succeeds  → create platform_subscriptions row (subscription_kind='trial',
+                        trial_origin='automatic', duration=platform_settings.default_trial_days,
+                        grace_period_days_snapshot=0)  →  trial_granted = true
+        → fails (already consumed on an earlier club)  →  trial_granted = false,
+                        no platform_subscriptions row created, club/branch/membership still committed
+  → Onboarding outcome, one of two known business outcomes (neither is an error):
+      trial_granted = true:
+        "تم إنشاء ناديك بنجاح" + "تم تفعيل التجربة المجانية لمدة 7 أيام"
+        → "ابدأ الإعداد" CTA → enters /app → Trial banner: "التجربة المجانية: متبقي 7 أيام"
+        → Club operates fully (get_club_platform_access() returns 'full') during the trial
+      trial_granted = false:
+        "تم إنشاء النادي" + "الاشتراك مطلوب" (Club Created — Subscription Required)
+        → "اختر خطة / تواصل معنا" CTA → enters /app in 'blocked' access until Platform
+          Owner activates a subscription (manual trial, complimentary, or paid)
+  → First-Run Checklist visible on dashboard either way (add field / add staff / add customer /
+      first booking — each independently completable, not a forced sequence, see DECISIONS.md ADR-043)
 ```
 
 Target: from "Start Free Trial" click to "operating club" in well under a minute of actual data entry — this is the single most important conversion path in the product. See [DECISIONS.md ADR-042](DECISIONS.md#adr-042--onboarding-finalization-is-one-atomic-rpc-client-never-sets-privileged-values) for why the finalization step is one atomic RPC rather than several client-driven inserts.
 
-**Existing club staff cannot reach this flow to create a second club** — `complete_new_club_onboarding()` rejects any caller who already holds an active `club_memberships` row. Creating an additional club for an existing operator is a separate, Platform-Owner-mediated action, not self-service (see [DECISIONS.md ADR-042](DECISIONS.md#adr-042--onboarding-finalization-is-one-atomic-rpc-client-never-sets-privileged-values)).
+**A user who already has a club is never blocked from creating another one.** Club/branch/owner-membership creation in `complete_new_club_onboarding()` is unconditional — only the *automatic trial* is limited, via the separate `automatic_trial_entitlements` unique-per-user constraint (see [DECISIONS.md ADR-051](DECISIONS.md#adr-051--automatic-trial-entitlement-is-one-per-user-account-enforced-via-a-dedicated-concurrency-safe-entitlement-table)). A returning club owner going through this flow again for a second club sees the same 4-step wizard and lands on the `trial_granted = false` outcome above, not a rejection.
 
 ## 9. Trial Expiry & Reminder
 

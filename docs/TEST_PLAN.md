@@ -7,6 +7,8 @@
 > **Added 2026-08-15 (public site)** per Public Website + Signup + Free Trial addition. New coverage: public plan/settings exposure boundaries, `contact_requests` insert-only enforcement, atomic onboarding RPC privilege-escalation tests, one-trial-per-club enforcement, trial-specific `get_club_platform_access()` derivation (zero-width grace). See [DECISIONS.md](DECISIONS.md) ADR-036 through ADR-046.
 >
 > **Added 2026-08-15 (final pre-implementation)** per the Final Pre-Implementation Directive. The full [SECURITY_ANTI_FRAUD.md](SECURITY_ANTI_FRAUD.md#abuse-test-catalogue) Abuse Test Catalogue (13 items) is now the canonical cross-domain abuse test list — referenced from every phase's Security Gate, not just listed once. New coverage: Recurring Booking conflict-reporting correctness, Quick Field Block conflict-surfacing, Outstanding Payments ledger-match, CSV export scoping, issued-invoice-lock enforcement, severity-classified findings (P0–P3) gating Exit Gates.
+>
+> **Added 2026-08-15 (final two decisions)** per the Final Two Decisions Closure. Abuse Test Catalogue extended to 19 items (#14–#19: one-automatic-trial-per-user, `user_id`/`trial_origin` spoofing rejection, concurrent double-onboarding, Platform-Owner-manual-grant independence, per-occurrence recurring-booking financial independence). New coverage: `automatic_trial_entitlements` concurrency-safety, per-occurrence recurring-booking billing isolation, second-club-no-automatic-trial outcome.
 
 Not aiming for 100% coverage as a formal goal. Aiming to make the critical, hard-to-reverse business logic provably correct — especially anything touching money, availability, or tenant isolation. Everything below runs locally against `supabase start` — no test ever depends on production. See [PROJECT_RULES.md](PROJECT_RULES.md) rule 5.
 
@@ -49,6 +51,15 @@ Pure functions in `lib/domain/` only — no Supabase client, no DOM. Price calcu
 - **Trial duration comes from platform setting** — changing `platform_settings.default_trial_days` to a different value before onboarding changes the resulting trial's length; the RPC never has `7` hardcoded
 - **Trial belongs to club, not user** — confirmed via the schema itself (`platform_subscriptions.club_id`, no `user_id` column) plus a behavioral test below
 - **Second user in same club does not create another trial** — adding a second `club_memberships` row to an existing club (e.g. an invited Receptionist) never inserts a new `platform_subscriptions` row; only `complete_new_club_onboarding()` (new-club creation) can create a trial, and only once per club (unique partial index)
+- **User A creates Club 1 → automatic 7-day trial created; User A creates Club 2 → club created, no automatic trial created** — the two-rule model (one trial per club, one automatic trial per user) confirmed via a full behavioral test, not just schema inspection: `trial_granted = true` on the first onboarding call, `trial_granted = false` on the second, both clubs exist with correct `club_memberships` rows regardless of trial outcome
+- **User B (a different user) creates Club 3 → automatic trial created if otherwise eligible** — confirms the per-user limit doesn't leak across users
+- **Club with a previous trial cannot receive another trial automatically** — even a long-expired or cancelled trial on a club blocks a second automatic trial for that same club (existing unique partial index on `platform_subscriptions`, re-confirmed here in combination with the new entitlement table)
+- **`automatic_trial_entitlements` concurrency safety** — two simultaneous `complete_new_club_onboarding()` calls from the same brand-new user (different clubs) result in exactly one `trial_granted = true` and one `trial_granted = false`, never two trials, regardless of call timing; verified via simulated concurrent transactions, not just sequential calls
+- **Client cannot spoof another user's `user_id` to obtain or block a trial** — `auth.uid()` is the only identity source inside the entitlement-consumption logic; a payload-supplied `user_id` has no effect
+- **Client cannot set `trial_days`** — unchanged from prior coverage, re-confirmed against the corrected RPC shape
+- **Client cannot set trial mode to `manual`** — a self-service `complete_new_club_onboarding()` call always produces `trial_origin = 'automatic'` when a trial is granted at all; no payload field can request `'manual'`
+- **Platform Owner can create a manual trial** — via the separate grant RPC, for any club, including one whose owner already consumed their automatic trial elsewhere
+- **Manual trial creation is audited** — every manual/complimentary grant produces an `audit_logs` row with actor/club/reason/`start_at`/`end_at`/`subscription_kind`, no silent path
 - **Expired trial blocks new bookings** — a trial with `end_at` in the past → `get_club_platform_access()` returns `blocked` → `create_booking` RPC rejects with the `'new_commitment'` category check
 - **Expired trial does not delete data** — after simulating expiry, all previously-created club/branch/customer/booking rows remain fully queryable via `SELECT`
 - **Trial converts to paid subscription without rewriting trial history** — activating a paid plan for a club with an expired trial creates a *new* `platform_subscriptions` row (`subscription_kind = 'paid'`, `previous_subscription_id` pointing at the trial row); the trial row itself is never updated or deleted
@@ -115,11 +126,18 @@ Every item below must have a passing automated test (pgTAP or Vitest/integration
 - Public user cannot read `contact_requests`; Platform Owner can
 - Club Owner sees own subscription status only — never other clubs or platform revenue
 - Recurring booking never creates a partial series silently; never bypasses per-occurrence conflict checking
+- 8-occurrence recurring series creates exactly 8 real `bookings` rows, correctly linked via `booking_series_id`
+- Each occurrence in a series can be cancelled independently with zero effect on the others
+- Each occurrence can have an independent invoice; series creation auto-generates zero invoices
+- One payment can allocate across multiple occurrences' invoices via `payment_allocations`
+- Refund or invoice-void on one occurrence has zero effect on any other occurrence in the series
 - Quick Field Block never silently cancels an existing booking
 - Outstanding Payments figures match the ledger exactly, no separate stored value
 - CSV export respects the same scoping as the on-screen view under URL/parameter manipulation
 - Issued invoice cannot be freely edited outside void/reissue
-- Full Abuse Test Catalogue (13 items, [SECURITY_ANTI_FRAUD.md](SECURITY_ANTI_FRAUD.md#abuse-test-catalogue)) passes as a regression suite
+- One automatic trial per user account, enforced concurrency-safely by `automatic_trial_entitlements`, independent of the one-trial-per-club rule
+- Additional club creation always succeeds regardless of prior automatic-trial consumption; only the automatic trial grant is skipped
+- Full Abuse Test Catalogue (19 items, [SECURITY_ANTI_FRAUD.md](SECURITY_ANTI_FRAUD.md#abuse-test-catalogue)) passes as a regression suite
 
 ## What Is Explicitly Not Tested Formally in V1
 

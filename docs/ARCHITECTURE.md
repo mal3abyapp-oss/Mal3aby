@@ -5,6 +5,8 @@
 > **Added 2026-08-15 (public site)** per Public Website + Signup + Free Trial addition. New sections: [Public Website & Layout Strategy](#public-website--layout-strategy), [Signup & Onboarding Strategy](#signup--onboarding-strategy). Trial is folded into the existing [Platform Access Strategy](#platform-access-strategy) as a `subscription_kind`, not a new system. See [DECISIONS.md](DECISIONS.md) ADR-036 through ADR-046.
 >
 > **Added 2026-08-15 (final pre-implementation)** per the Final Pre-Implementation Directive. Security and anti-fraud controls consolidated into [SECURITY_ANTI_FRAUD.md](SECURITY_ANTI_FRAUD.md) — read alongside [RLS_SECURITY.md](RLS_SECURITY.md) before implementing any domain, not only at hardening time (see [DECISIONS.md ADR-050](DECISIONS.md#adr-050--security-and-design-are-built-with-each-domain-not-deferred-to-a-late-hardeningpolish-phase)). Visual design system established in [DESIGN_SYSTEM.md](DESIGN_SYSTEM.md), built in Phase 1 before real screens. New sections: [Recurring Booking Strategy](#recurring-booking-strategy), [Outstanding Payments Strategy](#outstanding-payments-strategy), [Quick Field Block Strategy](#quick-field-block-strategy).
+>
+> **Corrected 2026-08-15 (final two decisions)** per the Final Two Decisions Closure. `complete_new_club_onboarding()` corrected: a user is **never** blocked from creating additional clubs — only the *automatic trial* is limited to one per user account, via a new `automatic_trial_entitlements` table, independent of the existing one-trial-per-club rule (see [DECISIONS.md ADR-051](DECISIONS.md#adr-051--automatic-trial-entitlement-is-one-per-user-account-enforced-via-a-dedicated-concurrency-safe-entitlement-table)). Recurring Booking Strategy confirmed final: one independent financial lifecycle per occurrence, no series-level invoice (see [DECISIONS.md ADR-052](DECISIONS.md#adr-052--recurring-booking-billing-granularity-one-financial-lifecycle-per-occurrence-no-series-level-invoice-in-v1)).
 
 ## System Architecture
 
@@ -190,7 +192,7 @@ A user who is both a Platform Owner and a club member (uncommon but possible) sw
 
 ## Signup & Onboarding Strategy
 
-**Atomic finalization via one RPC** — `complete_new_club_onboarding()` (see [DECISIONS.md ADR-042](DECISIONS.md#adr-042--onboarding-finalization-is-one-atomic-rpc-client-never-sets-privileged-values)) — creates `clubs`, the first `branches` row, the `club_memberships` row (role hardcoded to `club_owner`), and the trial `platform_subscriptions` row, all in one transaction:
+**Atomic finalization via one RPC** — `complete_new_club_onboarding()` (see [DECISIONS.md ADR-042](DECISIONS.md#adr-042--onboarding-finalization-is-one-atomic-rpc-client-never-sets-privileged-values)) — creates `clubs`, the first `branches` row, and the `club_memberships` row (role hardcoded to `club_owner`) **unconditionally** — a user is never blocked from creating an additional club. The trial `platform_subscriptions` row, by contrast, is created **only if the calling user has never consumed an automatic trial before** (see [DECISIONS.md ADR-051](DECISIONS.md#adr-051--automatic-trial-entitlement-is-one-per-user-account-enforced-via-a-dedicated-concurrency-safe-entitlement-table)) — club creation succeeding and trial creation succeeding are two independent outcomes of the same transaction, not one combined pass/fail:
 
 ```sql
 create or replace function complete_new_club_onboarding(
@@ -199,28 +201,26 @@ create or replace function complete_new_club_onboarding(
   p_club_name_ar text,
   p_branch_name text,
   p_city text,
-  p_phone text
-) returns uuid  -- returns new club_id
+  p_phone text,
+  p_owner_email text,      -- for the entitlement snapshot only, not for auth
+  p_owner_mobile text       -- for the entitlement snapshot only, not for auth
+) returns table(club_id uuid, trial_granted boolean)
 language plpgsql security definer
 set search_path = public, pg_temp as $$
 declare
   v_club_id uuid;
   v_branch_id uuid;
   v_trial_days int;
+  v_trial_granted boolean := false;
 begin
   -- caller must be authenticated; auth.uid() is the only identity source, never a parameter
   if auth.uid() is null then
     raise exception 'authentication required';
   end if;
 
-  -- a user with an existing club membership cannot self-service another club this way
-  -- (see DECISIONS.md ADR on separating public signup from platform-owner club creation)
-  if exists (select 1 from club_memberships where user_id = auth.uid() and status = 'active') then
-    raise exception 'user already has an active club membership';
-  end if;
-
-  select default_trial_days into v_trial_days from platform_settings limit 1;
-
+  -- club + branch + owner membership: always created, unconditionally.
+  -- Owning multiple clubs is explicitly allowed (see DECISIONS.md ADR-051) --
+  -- this is not a "does the user already have a club" gate.
   insert into clubs (name, name_ar, status) values (p_club_name, p_club_name_ar, 'active')
     returning id into v_club_id;
 
@@ -230,28 +230,52 @@ begin
   insert into club_memberships (user_id, club_id, role_id, status)
     values (auth.uid(), v_club_id, (select id from roles where key = 'club_owner'), 'active');
 
-  insert into platform_subscriptions (
-    club_id, subscription_kind, plan_name_snapshot, price_snapshot,
-    grace_period_days_snapshot, start_at, end_at, lifecycle_status
-  ) values (
-    v_club_id, 'trial', 'تجربة مجانية', 0,
-    0, now(), now() + (v_trial_days || ' days')::interval, 'trial'
-  );
+  -- Automatic trial: attempt to consume the one-per-user entitlement.
+  -- The unique constraint on automatic_trial_entitlements.user_id IS the
+  -- concurrency guard -- no separate SELECT-then-INSERT check beforehand.
+  begin
+    insert into automatic_trial_entitlements (
+      user_id, club_id, owner_normalized_mobile_snapshot, owner_email_snapshot, consumed_at
+    ) values (
+      auth.uid(), v_club_id, normalize_mobile(p_owner_mobile), lower(p_owner_email), now()
+    );
+    v_trial_granted := true;
+  exception when unique_violation then
+    -- user already consumed their one automatic trial on an earlier club.
+    -- This is NOT a transaction failure -- club creation still succeeds.
+    v_trial_granted := false;
+  end;
 
-  return v_club_id;
+  if v_trial_granted then
+    select default_trial_days into v_trial_days from platform_settings limit 1;
+
+    insert into platform_subscriptions (
+      club_id, subscription_kind, trial_origin, plan_name_snapshot, price_snapshot,
+      grace_period_days_snapshot, start_at, end_at, lifecycle_status
+    ) values (
+      v_club_id, 'trial', 'automatic', 'تجربة مجانية', 0,
+      0, now(), now() + (v_trial_days || ' days')::interval, 'trial'
+    );
+  end if;
+
+  return query select v_club_id, v_trial_granted;
 end;
 $$;
 ```
 
-Every privileged value — `role_id = club_owner`, `subscription_kind = 'trial'`, `grace_period_days_snapshot = 0`, trial duration from `platform_settings` — is **derived inside the function, never accepted as a client parameter**. This is the critical security property: unlike every other privileged RPC in this system, this one is reachable by a user with *no* existing `club_memberships` row to validate against, so the function body itself is the entire trust boundary (see [DECISIONS.md ADR-042](DECISIONS.md#adr-042--onboarding-finalization-is-one-atomic-rpc-client-never-sets-privileged-values) and [RLS_SECURITY.md](RLS_SECURITY.md) for the general `SECURITY DEFINER` discipline this follows).
+Every privileged value — `role_id = club_owner`, `subscription_kind = 'trial'`, `trial_origin = 'automatic'`, `grace_period_days_snapshot = 0`, trial duration from `platform_settings`, and trial eligibility itself — is **derived inside the function, never accepted as a client parameter**. This is the critical security property: unlike every other privileged RPC in this system, this one is reachable by a user with *no* existing `club_memberships` row to validate against, so the function body itself is the entire trust boundary (see [DECISIONS.md ADR-042](DECISIONS.md#adr-042--onboarding-finalization-is-one-atomic-rpc-client-never-sets-privileged-values) and [RLS_SECURITY.md](RLS_SECURITY.md) for the general `SECURITY DEFINER` discipline this follows).
+
+**The function returns an explicit `trial_granted` flag** rather than only a `club_id` — the frontend uses this to show one of two onboarding-completion states, never inferring it from a subsequent query: `trial_granted = true` → "تم إنشاء ناديك بنجاح، تم تفعيل التجربة المجانية" (Trial Activated); `trial_granted = false` → "تم إنشاء النادي — الاشتراك مطلوب" (Club Created — Subscription Required), with a "Choose a plan / Contact Mala3by" action. Neither outcome is an error state — both are successful, known business outcomes.
 
 **Business type is a classification label only** (`نادي`/`أكاديمية`/`ملاعب`/`مركز رياضي`) — stored for reporting/segmentation, never branches Core Architecture. A club of any business type gets the identical schema, RLS, and feature set.
 
-**Duplicate detection is advisory, not blocking** (see [DECISIONS.md ADR-045](DECISIONS.md#adr-045--duplicate-club-detection-flags-for-review-never-hard-blocks-signup)) — a normalized-name/phone/email match sets a flag visible to Platform Owner, never rejects the signup.
+**Duplicate detection is advisory, not blocking** (see [DECISIONS.md ADR-045](DECISIONS.md#adr-045--duplicate-club-detection-flags-for-review-never-hard-blocks-signup)) — a normalized-name/phone/email match sets a flag visible to Platform Owner, never rejects the signup. This is separate from the trial entitlement check: a flagged club still creates normally, and its automatic-trial outcome is decided purely by the user's entitlement state.
 
 **First-run setup is a dismissible checklist**, not a continuation of the mandatory wizard (see [DECISIONS.md ADR-043](DECISIONS.md#adr-043--first-run-setup-is-a-checklist-not-a-multi-step-wizard)): add a field, add a staff member, add a first customer, create a first booking — each independently completable in any order, sourced from simple existence checks (`EXISTS (SELECT 1 FROM fields WHERE club_id = ...)`, etc.) rather than a stored progress state.
 
 **The trial clock starts at club creation, not first use** — `platform_subscriptions.start_at = now()` inside the onboarding RPC, regardless of whether the club immediately creates a booking or waits three days to explore the product.
+
+**Platform Owner manual override** — a club that didn't receive an automatic trial (or any club at all) can still be granted a trial or complimentary access by Platform Owner via the existing `create_platform_subscription(...)` RPC (see [Platform Access Strategy](#platform-access-strategy)) with `subscription_kind = 'trial'` and `trial_origin = 'manual'`, or `subscription_kind = 'complimentary'`. This path is entirely independent of `automatic_trial_entitlements` — Platform Owner can grant a manual trial to a club whose owner already consumed their automatic trial elsewhere, since the entitlement table only ever gates the *automatic* signup path. Every manual grant is logged to `audit_logs` with actor/club/reason/`start_at`/`end_at`/`subscription_kind` — never silent (see [SECURITY_ANTI_FRAUD.md](SECURITY_ANTI_FRAUD.md#audit-log-coverage)).
 
 ## Booking Engine Strategy
 
@@ -283,6 +307,8 @@ A recurring booking (e.g. "every Tuesday 20:00–21:00 for 8 weeks") produces **
 **Conflict handling is explicit, never silent:** before confirming, the creation RPC checks all N requested occurrences against the exclusion constraint and returns the result to the UI (e.g. "8 requested, 7 available, 1 conflict"). The user then explicitly chooses — create the available occurrences only, or cancel and review conflicts first — but the system never silently creates a partial series without the user knowing exactly what happened.
 
 Cancelling a series does not cascade a silent bulk mutation — each linked booking is cancelled individually through the normal cancellation flow (permission check, mandatory reason, audit entry per booking), even when initiated "for the whole series" from a UI convenience action.
+
+**Billing granularity: one independent financial lifecycle per occurrence, confirmed final** (see [DECISIONS.md ADR-052](DECISIONS.md#adr-052--recurring-booking-billing-granularity-one-financial-lifecycle-per-occurrence-no-series-level-invoice-in-v1)). Series creation does **not** auto-generate N invoices as a side effect — each occurrence's invoice is issued through the normal `create_booking`/billing flow, whenever that occurrence is actually processed, exactly like a standalone booking. Each occurrence can independently be paid, cancelled, marked no-show, or refunded with zero effect on any other occurrence in the series. No `series_invoice` concept exists in V1. If a customer prepays for multiple occurrences, the existing `payment_allocations` many-to-many model handles it without any schema change: one `payments` row, N `payment_allocations` rows (one per occurrence's invoice) — `payment_allocations` remains the sole payment↔invoice relationship, `payments.invoice_id` is never reintroduced.
 
 ## Outstanding Payments Strategy
 
@@ -472,7 +498,8 @@ Loop: edit → local test (`vitest` + `supabase test db`) → local build (`npm 
 - **Sensitive field exposure:** `players.medical_notes` is gated behind `player.medical_notes.view`/`.update`, not visible to Receptionist by default, never in global search results (see [DECISIONS.md ADR-019](DECISIONS.md#adr-019--medical-notes-are-a-permission-gated-field-not-a-default-visible-one) and [RLS_SECURITY.md](RLS_SECURITY.md#sensitive-column-protection-medical_notes)).
 - **Accidental QR check-in:** scanning a booking QR never mutates state by itself — an explicit staff "Confirm Check-in" is required, preventing an accidental camera pass from silently checking a customer in (see [DECISIONS.md ADR-011e](DECISIONS.md#adr-011e--qr-scan-validates-explicit-staff-confirmation-performs-the-check-in-mutation)).
 - **Public signup privilege escalation:** `complete_new_club_onboarding()` derives `role_id = club_owner`, `subscription_kind = 'trial'`, `grace_period_days_snapshot = 0`, and trial duration entirely server-side — no client-supplied value can request `platform_owner`, a `paid`/`complimentary` subscription, or a non-default trial length (see [DECISIONS.md ADR-042](DECISIONS.md#adr-042--onboarding-finalization-is-one-atomic-rpc-client-never-sets-privileged-values)).
-- **Trial abuse:** a database-level unique partial index guarantees at most one trial per club, ever — adding a second user to a club cannot create a second trial (see [DECISIONS.md ADR-039](DECISIONS.md#adr-039--trial-belongs-to-the-club-not-the-user-one-trial-per-club-ever)). Lightweight rate limiting and advisory duplicate-detection (never a hard block) cover the mass-fake-signup case at V1's proportional risk level (see [DECISIONS.md ADR-046](DECISIONS.md#adr-046--signup-rate-limiting-and-duplicate-club-flagging-are-lightweight-not-blocking)).
+- **Trial abuse (per club):** a database-level unique partial index guarantees at most one trial per club, ever — adding a second user to a club cannot create a second trial (see [DECISIONS.md ADR-039](DECISIONS.md#adr-039--trial-belongs-to-the-club-not-the-user-one-trial-per-club-ever)).
+- **Trial abuse (per user, via multiple clubs):** a single user creating unlimited clubs to harvest unlimited automatic trials is closed by `automatic_trial_entitlements`' unique `user_id` constraint — the second onboarding call from the same user still creates a club successfully but never a second automatic trial (see [DECISIONS.md ADR-051](DECISIONS.md#adr-051--automatic-trial-entitlement-is-one-per-user-account-enforced-via-a-dedicated-concurrency-safe-entitlement-table)). **Residual risk, explicitly accepted for V1**: a determined abuser can still create new user accounts (new email/auth identity) to reset this — defending against that requires device/phone/CAPTCHA-level tooling explicitly out of scope; this is a known, bounded gap, not an unaddressed one. Lightweight rate limiting and advisory duplicate-detection (never a hard block) cover the mass-fake-signup case at V1's proportional risk level (see [DECISIONS.md ADR-046](DECISIONS.md#adr-046--signup-rate-limiting-and-duplicate-club-flagging-are-lightweight-not-blocking)).
 - **Public data leakage:** anonymous/public roles can `SELECT` only `public_plans` (an explicit narrow-column view, never the base `platform_plans` table) and `INSERT`-only on `contact_requests` (no `SELECT` — a submitter cannot enumerate other leads). No public role ever reads `clubs`, `platform_subscriptions`, or any club-side operational table (see [DECISIONS.md ADR-040](DECISIONS.md#adr-040--public-plan-data-is-exposed-through-a-restricted-viewrpc-never-the-raw-platform_plans-table)).
 
 ## Failure & Recovery Strategy

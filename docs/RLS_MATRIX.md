@@ -7,6 +7,8 @@
 > **Added 2026-08-15 (public site)** per Public Website + Signup + Free Trial addition. New `anon` (unauthenticated) role added to the matrix — read-only on `public_plans`, insert-only on `contact_requests`, nothing else. `platform_settings` and `platform_plans.is_public`/`display_order` added. See [DECISIONS.md ADR-037](DECISIONS.md#adr-037--trial-length-is-a-platform-setting-not-hardcoded) through ADR-046.
 >
 > **Added 2026-08-15 (final pre-implementation)** per the Final Pre-Implementation Directive. `booking_series` and `outstanding_invoices` (view) added to the matrix. See [SECURITY_ANTI_FRAUD.md](SECURITY_ANTI_FRAUD.md) for the full abuse-test catalogue and Security Gate checklist that this matrix's Verification Checklist below now explicitly cross-references.
+>
+> **Corrected 2026-08-15 (final two decisions)** per the Final Two Decisions Closure. Verification Checklist items for `complete_new_club_onboarding()` corrected: a user with an existing club membership calling it again now **succeeds** at club creation (only the automatic trial grant is skipped) — the prior checklist wording implying full rejection was stale and has been fixed. `automatic_trial_entitlements` added to the matrix.
 
 ## Policy Pattern
 
@@ -106,6 +108,7 @@ Legend: **S**=Select, **I**=Insert, **U**=Update, **D**=Void/Reverse (status tra
 | `platform_plans` (base table, incl. `is_public`/`display_order`) / `platform_subscriptions` / `platform_invoices` / `platform_payments` | S,I,U | S (own club summary only, via restricted view — not these tables directly) | – | – | – | – | – | – | – |
 | `platform_settings` | S,U | – (own club's `default_trial_days` reference only via signup RPC, not direct read) | – | – | – | – | – | – | – |
 | `contact_requests` | S,U (progress `status`) | – | – | – | – | – | – | – | – |
+| `automatic_trial_entitlements` (written only inside `complete_new_club_onboarding()`, never a direct client insert — see [DECISIONS.md ADR-051](DECISIONS.md#adr-051--automatic-trial-entitlement-is-one-per-user-account-enforced-via-a-dedicated-concurrency-safe-entitlement-table)) | S (abuse review) | – | – | – | – | – | – | – | – |
 | `get_club_platform_access()` / `auth.club_write_allowed()` (functions, not tables) | Bypassed — never gated | Return value only, not directly callable to inspect other clubs | (called internally by RLS policies on gated tables) | | | | | | |
 | `branches` | S,I,U | S,I,U | S,I,U | S,U (own) | S | S | S | – | – |
 | `profiles` (own row only, or any user with a shared club membership — see [DATABASE_BLUEPRINT.md](DATABASE_BLUEPRINT.md#profiles)) | S,U (own) | S (own club's staff), U (own) | S (own club's staff), U (own) | S (own branch's staff), U (own) | S,U (own only) | S,U (own only) | S,U (own only) | S,U (own only) | S,U (own only) |
@@ -202,7 +205,10 @@ For at least `bookings`, `invoices`, `payments`, and `customers`:
 - [ ] `anon` role SELECT attempt on `platform_plans` directly (bypassing the view) → rejected
 - [ ] `anon` role INSERT on `contact_requests` → succeeds; subsequent `anon` SELECT attempt (even against the row just inserted) → returns 0 rows
 - [ ] `anon` role (no `auth.uid()`) calling `complete_new_club_onboarding()` → rejected before any table is touched
-- [ ] Authenticated user with an existing active `club_memberships` row calling `complete_new_club_onboarding()` again → rejected, no second club/trial created
-- [ ] Signup payload attempting to set `role_id`, `subscription_kind`, or trial duration directly (bypassing the RPC's internal derivation) → has no effect; the RPC's hardcoded/derived values are what land in the database regardless of any such payload field
-- [ ] Two concurrent `complete_new_club_onboarding()` calls from the same brand-new user (e.g. double-click) → the second is rejected by the "already has an active membership" check inside the same or an immediately following transaction, never resulting in two clubs
+- [ ] Authenticated user with an existing active `club_memberships` row calling `complete_new_club_onboarding()` again → **succeeds** (new club, branch, and owner membership all created) but returns `trial_granted = false` — no second automatic trial created, per [DECISIONS.md ADR-051](DECISIONS.md#adr-051--automatic-trial-entitlement-is-one-per-user-account-enforced-via-a-dedicated-concurrency-safe-entitlement-table)
+- [ ] Signup payload attempting to set `role_id`, `subscription_kind`, `trial_origin`, or trial duration directly (bypassing the RPC's internal derivation) → has no effect; the RPC's hardcoded/derived values are what land in the database regardless of any such payload field
+- [ ] Two concurrent `complete_new_club_onboarding()` calls from the same brand-new user for two different clubs (e.g. double-click) → both clubs are created successfully; exactly one call returns `trial_granted = true`, the other `false` — the `automatic_trial_entitlements` unique constraint on `user_id` is the sole concurrency guard, no `SELECT`-then-`INSERT` race window, never resulting in two automatic trials
+- [ ] Client-supplied `user_id` in the onboarding payload attempting to consume or block another user's trial entitlement → ignored; `auth.uid()` is the only identity source
+- [ ] Attempting to insert a second row into `automatic_trial_entitlements` for a `user_id` that already has one → rejected by the unique constraint
+- [ ] Platform Owner granting a manual trial to a club whose owner already has a consumed `automatic_trial_entitlements` row → succeeds (the manual path never checks this table), and is logged to `audit_logs`
 - [ ] Attempting to insert a second non-cancelled `platform_subscriptions` row with `subscription_kind = 'trial'` for a club that already has one (even a long-expired one) → rejected by the unique partial index

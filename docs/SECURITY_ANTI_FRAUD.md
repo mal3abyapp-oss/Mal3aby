@@ -168,6 +168,13 @@ Every club operational write depends on `get_club_platform_access(club_id)` (see
 
 Public signup cannot specify `trial_days`, platform role, a paid subscription, subscription price, or `subscription_kind` — `complete_new_club_onboarding()` derives every one of these values server-side from `platform_settings`/hardcoded logic, never from the request payload. See [DECISIONS.md ADR-042](DECISIONS.md#adr-042--onboarding-finalization-is-one-atomic-rpc-client-never-sets-privileged-values).
 
+**Automatic trial entitlement — two independent limits, both DB-enforced** (see [DECISIONS.md ADR-051](DECISIONS.md#adr-051--automatic-trial-entitlement-is-one-per-user-account-enforced-via-a-dedicated-concurrency-safe-entitlement-table)):
+- **One trial per club, ever** — unchanged, the existing unique partial index on `platform_subscriptions`.
+- **One *automatic* trial per user account, ever** — new `automatic_trial_entitlements` table, unique on `user_id`. A user can create any number of additional clubs (club ownership is never limited), but only the first one they onboard through `complete_new_club_onboarding()` receives an automatic trial; every subsequent club they create still succeeds — club, branch, and owner membership are all created — but with `trial_granted = false`, landing that club in `blocked` access until a subscription is activated.
+- **Concurrency-safe by construction**: the entitlement is consumed via a plain `INSERT` into a single-column-unique table, inside the same transaction as club creation. Two simultaneous onboarding attempts by the same user cannot both succeed at granting a trial — the second `INSERT` fails on the unique constraint atomically, with no `SELECT`-then-`INSERT` race window (unlike a naive "check then insert" pattern, which this project has rejected everywhere else, e.g. bookings, refunds, group capacity).
+- **Platform Owner override is separate and always available**: a manual trial or complimentary grant (`trial_origin = 'manual'` or `subscription_kind = 'complimentary'`) never checks `automatic_trial_entitlements` — Platform Owner can grant access to any club regardless of that club owner's automatic-trial history, and every such grant is logged to `audit_logs` with actor/club/reason/dates/`subscription_kind`.
+- **Residual risk, explicitly accepted**: a user willing to create a new account (new email/auth identity) can still obtain another automatic trial. Closing this fully requires device fingerprinting, phone verification, or similar — explicitly out of scope for V1 per [DECISIONS.md ADR-046](DECISIONS.md#adr-046--signup-rate-limiting-and-duplicate-club-flagging-are-lightweight-not-blocking), and now restated as a deliberate, bounded trade-off rather than an oversight.
+
 ## Abuse Test Catalogue
 
 Every item below is a required test — not aspirational, not "nice to have." Each maps to a specific control described above and must have a passing automated test before the owning phase's Security Gate passes (see [TEST_PLAN.md](TEST_PLAN.md) for how these integrate into the pgTAP/integration suite):
@@ -187,6 +194,12 @@ Every item below is a required test — not aspirational, not "nice to have." Ea
 | 11 | Read another club's data via direct API/PostgREST call | Rejected — RLS enforced regardless of client path, not just through the app UI |
 | 12 | Public signup attempts to set `platform_owner` | Rejected — `complete_new_club_onboarding()` hardcodes `club_owner` |
 | 13 | Public signup attempts a 365-day trial | Ignored — trial length always read from `platform_settings.default_trial_days`, never a client-supplied value |
+| 14 | User A creates Club 1, then creates Club 2 | Club 1 gets an automatic trial (`trial_granted = true`); Club 2 is created successfully but receives no automatic trial (`trial_granted = false`) — Club 2's access is `blocked` until a subscription is activated |
+| 15 | User A attempts to spoof another user's `user_id` to consume that user's trial entitlement or bypass their own | Rejected — `auth.uid()` is the only identity source inside `complete_new_club_onboarding()`, never a client-supplied `user_id` |
+| 16 | Client attempts to set `trial_origin = 'manual'` on a self-service signup | Ignored — the automatic path always hardcodes `trial_origin = 'automatic'`; `'manual'` is only ever set by the separate Platform-Owner-only grant RPC |
+| 17 | Two concurrent `complete_new_club_onboarding()` calls from the same brand-new user, each for a different club | Both clubs are created; at most one receives an automatic trial — the second `automatic_trial_entitlements` insert fails on the unique constraint regardless of timing, no race window |
+| 18 | Platform Owner grants a manual trial to a club whose owner already consumed their automatic trial elsewhere | Succeeds — the manual grant path is independent of `automatic_trial_entitlements`; the grant is logged to `audit_logs` with actor/club/reason/dates |
+| 19 | Refund or cancel one occurrence in an 8-booking recurring series | Only that occurrence's `bookings`/`invoices`/`payments` state changes — the other 7 occurrences' status, invoices, and payment records are entirely unaffected |
 
 ## Security Findings Severity
 
