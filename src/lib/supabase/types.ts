@@ -591,6 +591,75 @@ export type Database = {
           },
         ]
       }
+      enrollments: {
+        Row: {
+          club_id: string
+          created_by: string | null
+          enrolled_at: string
+          group_id: string
+          guardian_id: string | null
+          id: string
+          player_id: string
+          status: string
+        }
+        Insert: {
+          club_id: string
+          created_by?: string | null
+          enrolled_at?: string
+          group_id: string
+          guardian_id?: string | null
+          id?: string
+          player_id: string
+          status?: string
+        }
+        Update: {
+          club_id?: string
+          created_by?: string | null
+          enrolled_at?: string
+          group_id?: string
+          guardian_id?: string | null
+          id?: string
+          player_id?: string
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "enrollments_club_id_fkey"
+            columns: ["club_id"]
+            isOneToOne: false
+            referencedRelation: "clubs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "enrollments_group_id_fkey"
+            columns: ["group_id"]
+            isOneToOne: false
+            referencedRelation: "groups"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "enrollments_guardian_id_fkey"
+            columns: ["guardian_id"]
+            isOneToOne: false
+            referencedRelation: "customers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "enrollments_player_id_fkey"
+            columns: ["player_id"]
+            isOneToOne: false
+            referencedRelation: "players"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "enrollments_player_id_fkey"
+            columns: ["player_id"]
+            isOneToOne: false
+            referencedRelation: "players_safe"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       field_blocks: {
         Row: {
           club_id: string
@@ -1956,6 +2025,131 @@ export type Database = {
           },
         ]
       }
+      subscription_freezes: {
+        Row: {
+          club_id: string
+          created_at: string
+          created_by: string | null
+          end_date: string
+          extends_expiry: boolean
+          id: string
+          reason: string | null
+          start_date: string
+          subscription_id: string
+        }
+        Insert: {
+          club_id: string
+          created_at?: string
+          created_by?: string | null
+          end_date: string
+          extends_expiry?: boolean
+          id?: string
+          reason?: string | null
+          start_date: string
+          subscription_id: string
+        }
+        Update: {
+          club_id?: string
+          created_at?: string
+          created_by?: string | null
+          end_date?: string
+          extends_expiry?: boolean
+          id?: string
+          reason?: string | null
+          start_date?: string
+          subscription_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "subscription_freezes_club_id_fkey"
+            columns: ["club_id"]
+            isOneToOne: false
+            referencedRelation: "clubs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "subscription_freezes_subscription_id_fkey"
+            columns: ["subscription_id"]
+            isOneToOne: false
+            referencedRelation: "subscriptions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      subscriptions: {
+        Row: {
+          club_id: string
+          created_at: string
+          created_by: string | null
+          discount: number
+          end_date: string
+          enrollment_id: string
+          id: string
+          invoice_id: string | null
+          plan_type: string
+          price: number
+          start_date: string
+          status: string
+        }
+        Insert: {
+          club_id: string
+          created_at?: string
+          created_by?: string | null
+          discount?: number
+          end_date: string
+          enrollment_id: string
+          id?: string
+          invoice_id?: string | null
+          plan_type: string
+          price: number
+          start_date: string
+          status?: string
+        }
+        Update: {
+          club_id?: string
+          created_at?: string
+          created_by?: string | null
+          discount?: number
+          end_date?: string
+          enrollment_id?: string
+          id?: string
+          invoice_id?: string | null
+          plan_type?: string
+          price?: number
+          start_date?: string
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "subscriptions_club_id_fkey"
+            columns: ["club_id"]
+            isOneToOne: false
+            referencedRelation: "clubs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "subscriptions_enrollment_id_fkey"
+            columns: ["enrollment_id"]
+            isOneToOne: true
+            referencedRelation: "enrollments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "subscriptions_invoice_id_fkey"
+            columns: ["invoice_id"]
+            isOneToOne: false
+            referencedRelation: "invoices"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "subscriptions_invoice_id_fkey"
+            columns: ["invoice_id"]
+            isOneToOne: false
+            referencedRelation: "outstanding_invoices"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       club_platform_subscription_summary: {
@@ -2118,6 +2312,10 @@ export type Database = {
       }
     }
     Functions: {
+      _activate_subscription_if_due_internal: {
+        Args: { p_subscription_id: string }
+        Returns: boolean
+      }
       _create_booking_internal: {
         Args: {
           p_booking_series_id: string
@@ -2132,6 +2330,10 @@ export type Database = {
           p_start_at: string
         }
         Returns: string
+      }
+      activate_subscription_if_due: {
+        Args: { p_subscription_id: string }
+        Returns: boolean
       }
       cancel_booking: {
         Args: { p_booking_id: string; p_reason: string }
@@ -2182,6 +2384,23 @@ export type Database = {
           p_start_at: string
         }
         Returns: string
+      }
+      create_enrollment_with_subscription: {
+        Args: {
+          p_discount?: number
+          p_end_date: string
+          p_group_id: string
+          p_guardian_id: string
+          p_plan_type: string
+          p_player_id: string
+          p_price: number
+          p_start_date: string
+        }
+        Returns: {
+          enrollment_id: string
+          invoice_id: string
+          subscription_id: string
+        }[]
       }
       create_field_block: {
         Args: {
@@ -2234,7 +2453,21 @@ export type Database = {
         Args: { p_grace_period_days: number; p_subscription_id: string }
         Returns: undefined
       }
+      freeze_subscription: {
+        Args: {
+          p_end_date: string
+          p_extends_expiry?: boolean
+          p_reason?: string
+          p_start_date: string
+          p_subscription_id: string
+        }
+        Returns: string
+      }
       get_club_platform_access: { Args: { p_club_id: string }; Returns: string }
+      get_subscription_effective_end_date: {
+        Args: { p_subscription_id: string }
+        Returns: string
+      }
       get_today_dashboard: { Args: { p_club_id: string }; Returns: Json }
       has_branch_access: {
         Args: { p_branch_id: string; p_membership_id: string }

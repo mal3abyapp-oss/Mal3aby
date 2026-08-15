@@ -22,6 +22,7 @@ import {
 } from '@/components/ui/dialog'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { ProgramsGroupsSection } from '@/features/academy/ProgramsGroupsSection'
+import { EnrollmentSection, ActivationPolicySetting } from '@/features/academy/EnrollmentSection'
 import type { PlayerRow, GuardianLinkRow } from '@/lib/domain/people'
 
 // Player Profile lives under /app/academy per SCREEN_MAP.md. Full
@@ -187,6 +188,7 @@ export function AcademyPage() {
         <TabsList>
           <TabsTrigger value="players">اللاعبون</TabsTrigger>
           <TabsTrigger value="structure">البرامج والمجموعات</TabsTrigger>
+          <TabsTrigger value="enrollments">التسجيلات والاشتراكات</TabsTrigger>
         </TabsList>
 
         <TabsContent value="players">
@@ -303,6 +305,13 @@ export function AcademyPage() {
 
         <TabsContent value="structure">
           <ProgramsGroupsSection />
+        </TabsContent>
+
+        <TabsContent value="enrollments">
+          <div className="mt-4">
+            <ActivationPolicySetting />
+          </div>
+          <EnrollmentSection />
         </TabsContent>
       </Tabs>
     </div>

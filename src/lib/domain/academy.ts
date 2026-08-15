@@ -63,3 +63,46 @@ export const GROUP_STATUS_LABELS: Record<string, string> = {
   full: 'مكتملة',
   closed: 'مغلقة',
 }
+
+export interface EnrollmentRow {
+  id: string
+  playerId: string
+  groupId: string
+  status: string
+  enrolledAt: string
+  playerName?: string
+  groupName?: string
+}
+
+export interface SubscriptionRow {
+  id: string
+  enrollmentId: string
+  planType: string
+  startDate: string
+  endDate: string
+  price: number
+  discount: number
+  status: string
+  invoiceId: string | null
+}
+
+export const SUBSCRIPTION_PLAN_LABELS: Record<string, string> = {
+  monthly: 'شهري',
+  quarterly: 'ربع سنوي',
+  season: 'موسم كامل',
+  package: 'باقة',
+}
+
+export const SUBSCRIPTION_STATUS_LABELS: Record<string, string> = {
+  pending: 'بانتظار التفعيل',
+  active: 'نشط',
+  frozen: 'مجمّد',
+  expired: 'منتهي',
+  cancelled: 'ملغى',
+}
+
+export const ACTIVATION_POLICY_LABELS: Record<string, string> = {
+  manual: 'تفعيل يدوي',
+  first_payment: 'عند أول دفعة',
+  full_payment: 'عند السداد الكامل',
+}
