@@ -279,6 +279,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "bookings_invoice_id_fkey"
+            columns: ["invoice_id"]
+            isOneToOne: false
+            referencedRelation: "outstanding_invoices"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "bookings_series_fkey"
             columns: ["booking_series_id"]
             isOneToOne: false
@@ -812,6 +819,13 @@ export type Database = {
             referencedRelation: "invoices"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "invoice_items_invoice_id_fkey"
+            columns: ["invoice_id"]
+            isOneToOne: false
+            referencedRelation: "outstanding_invoices"
+            referencedColumns: ["id"]
+          },
         ]
       }
       invoice_number_sequences: {
@@ -980,6 +994,13 @@ export type Database = {
             columns: ["invoice_id"]
             isOneToOne: false
             referencedRelation: "invoices"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "payment_allocations_invoice_id_fkey"
+            columns: ["invoice_id"]
+            isOneToOne: false
+            referencedRelation: "outstanding_invoices"
             referencedColumns: ["id"]
           },
           {
@@ -1477,6 +1498,44 @@ export type Database = {
         }
         Relationships: []
       }
+      refunds: {
+        Row: {
+          amount: number
+          id: string
+          payment_id: string
+          reason: string
+          refunded_at: string
+          refunded_by: string | null
+          status: string
+        }
+        Insert: {
+          amount: number
+          id?: string
+          payment_id: string
+          reason: string
+          refunded_at?: string
+          refunded_by?: string | null
+          status?: string
+        }
+        Update: {
+          amount?: number
+          id?: string
+          payment_id?: string
+          reason?: string
+          refunded_at?: string
+          refunded_by?: string | null
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "refunds_payment_id_fkey"
+            columns: ["payment_id"]
+            isOneToOne: false
+            referencedRelation: "payments"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       role_permissions: {
         Row: {
           permission_id: string
@@ -1564,6 +1623,46 @@ export type Database = {
             columns: ["club_id"]
             isOneToOne: false
             referencedRelation: "clubs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      outstanding_invoices: {
+        Row: {
+          branch_id: string | null
+          club_id: string | null
+          customer_id: string | null
+          customer_name: string | null
+          days_overdue: number | null
+          due_date: string | null
+          id: string | null
+          invoice_number: string | null
+          issued_at: string | null
+          normalized_mobile: string | null
+          outstanding: number | null
+          status: string | null
+          total: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "invoices_branch_id_fkey"
+            columns: ["branch_id"]
+            isOneToOne: false
+            referencedRelation: "branches"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "invoices_club_id_fkey"
+            columns: ["club_id"]
+            isOneToOne: false
+            referencedRelation: "clubs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "invoices_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "customers"
             referencedColumns: ["id"]
           },
         ]
@@ -1753,6 +1852,10 @@ export type Database = {
           series_id: string
         }[]
       }
+      create_refund: {
+        Args: { p_amount: number; p_payment_id: string; p_reason: string }
+        Returns: string
+      }
       deactivate_staff_member: {
         Args: { p_membership_id: string }
         Returns: undefined
@@ -1789,6 +1892,15 @@ export type Database = {
         Returns: undefined
       }
       normalize_mobile: { Args: { p_mobile: string }; Returns: string }
+      record_payment: {
+        Args: {
+          p_amount: number
+          p_invoice_id: string
+          p_method: string
+          p_reference?: string
+        }
+        Returns: string
+      }
       record_platform_payment: {
         Args: {
           p_amount: number
@@ -1820,6 +1932,10 @@ export type Database = {
         Returns: undefined
       }
       user_club_ids: { Args: never; Returns: string[] }
+      void_invoice: {
+        Args: { p_invoice_id: string; p_reason: string }
+        Returns: undefined
+      }
       write_audit_log: {
         Args: {
           p_action: string

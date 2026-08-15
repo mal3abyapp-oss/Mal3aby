@@ -50,3 +50,42 @@
     color: var(--color-text-primary);
   }
 }
+
+/* Invoice print CSS — A4 default; #invoice-print[data-print-size="80mm"]
+   switches to receipt width. Phase 7 (invoice view + print). Everything
+   outside #invoice-print (dialogs chrome, buttons, nav) is hidden via
+   .print:hidden utility classes already applied at the call sites. */
+@media print {
+  @page {
+    size: A4;
+    margin: 12mm;
+  }
+
+  #invoice-print[data-print-size='80mm'] {
+    width: 80mm;
+  }
+
+  @page receipt {
+    size: 80mm auto;
+    margin: 4mm;
+  }
+
+  #invoice-print[data-print-size='80mm'] {
+    page: receipt;
+  }
+
+  body * {
+    visibility: hidden;
+  }
+
+  #invoice-print,
+  #invoice-print * {
+    visibility: visible;
+  }
+
+  #invoice-print {
+    position: absolute;
+    inset-inline-start: 0;
+    top: 0;
+  }
+}

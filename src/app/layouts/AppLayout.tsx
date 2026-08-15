@@ -3,6 +3,7 @@ import { useQuery } from '@tanstack/react-query'
 import { cn } from '@/lib/utils'
 import { useAuth } from '@/app/providers/AuthProvider'
 import { supabase } from '@/lib/supabase/client'
+import { GlobalSearch } from '@/features/search/GlobalSearch'
 import {
   CalendarDays,
   GraduationCap,
@@ -126,9 +127,12 @@ export function AppLayout() {
       </aside>
 
       <div className="flex flex-1 flex-col">
-        {/* Top bar (mobile: shows brand; desktop: reserved for search/actions in later phases) */}
+        {/* Top bar: mobile shows brand, desktop shows Global Search */}
         <header className="flex h-14 items-center border-b border-border bg-surface px-4 md:hidden">
           <span className="font-bold text-text-primary">ملعبي | Mala3by</span>
+        </header>
+        <header className="hidden h-14 items-center border-b border-border bg-surface px-4 md:flex">
+          <GlobalSearch />
         </header>
 
         {subSummary?.subscription_kind === 'trial' && subSummary.effective_access === 'full' && (
