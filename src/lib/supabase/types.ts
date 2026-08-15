@@ -12,6 +12,8 @@ export type Json =
   | Json[]
 
 export type Database = {
+  // Allows to automatically instantiate createClient with right options
+  // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
   __InternalSupabase: {
     PostgrestVersion: "14.15"
   }
@@ -105,6 +107,182 @@ export type Database = {
             columns: ["club_id"]
             isOneToOne: false
             referencedRelation: "clubs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      booking_series: {
+        Row: {
+          club_id: string
+          created_at: string
+          created_by: string | null
+          created_occurrences: number
+          customer_id: string
+          field_id: string
+          id: string
+          pattern_description: string | null
+          requested_occurrences: number
+        }
+        Insert: {
+          club_id: string
+          created_at?: string
+          created_by?: string | null
+          created_occurrences?: number
+          customer_id: string
+          field_id: string
+          id?: string
+          pattern_description?: string | null
+          requested_occurrences: number
+        }
+        Update: {
+          club_id?: string
+          created_at?: string
+          created_by?: string | null
+          created_occurrences?: number
+          customer_id?: string
+          field_id?: string
+          id?: string
+          pattern_description?: string | null
+          requested_occurrences?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "booking_series_club_id_fkey"
+            columns: ["club_id"]
+            isOneToOne: false
+            referencedRelation: "clubs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "booking_series_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "customers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "booking_series_field_id_fkey"
+            columns: ["field_id"]
+            isOneToOne: false
+            referencedRelation: "fields"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      bookings: {
+        Row: {
+          booking_series_id: string | null
+          branch_id: string
+          cancelled_at: string | null
+          cancelled_by: string | null
+          cancelled_reason: string | null
+          club_id: string
+          created_at: string
+          created_by: string | null
+          customer_id: string
+          discount_amount: number
+          during: unknown
+          end_at: string
+          field_id: string
+          id: string
+          invoice_id: string | null
+          marked_at: string | null
+          marked_by: string | null
+          notes: string | null
+          start_at: string
+          status: string
+          total_price: number
+          updated_at: string | null
+        }
+        Insert: {
+          booking_series_id?: string | null
+          branch_id: string
+          cancelled_at?: string | null
+          cancelled_by?: string | null
+          cancelled_reason?: string | null
+          club_id: string
+          created_at?: string
+          created_by?: string | null
+          customer_id: string
+          discount_amount?: number
+          during?: unknown
+          end_at: string
+          field_id: string
+          id?: string
+          invoice_id?: string | null
+          marked_at?: string | null
+          marked_by?: string | null
+          notes?: string | null
+          start_at: string
+          status?: string
+          total_price: number
+          updated_at?: string | null
+        }
+        Update: {
+          booking_series_id?: string | null
+          branch_id?: string
+          cancelled_at?: string | null
+          cancelled_by?: string | null
+          cancelled_reason?: string | null
+          club_id?: string
+          created_at?: string
+          created_by?: string | null
+          customer_id?: string
+          discount_amount?: number
+          during?: unknown
+          end_at?: string
+          field_id?: string
+          id?: string
+          invoice_id?: string | null
+          marked_at?: string | null
+          marked_by?: string | null
+          notes?: string | null
+          start_at?: string
+          status?: string
+          total_price?: number
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "bookings_branch_id_fkey"
+            columns: ["branch_id"]
+            isOneToOne: false
+            referencedRelation: "branches"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "bookings_club_id_fkey"
+            columns: ["club_id"]
+            isOneToOne: false
+            referencedRelation: "clubs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "bookings_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "customers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "bookings_field_id_fkey"
+            columns: ["field_id"]
+            isOneToOne: false
+            referencedRelation: "fields"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "bookings_invoice_id_fkey"
+            columns: ["invoice_id"]
+            isOneToOne: false
+            referencedRelation: "invoices"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "bookings_series_fkey"
+            columns: ["booking_series_id"]
+            isOneToOne: false
+            referencedRelation: "booking_series"
             referencedColumns: ["id"]
           },
         ]
@@ -592,52 +770,151 @@ export type Database = {
           },
         ]
       }
-      players: {
+      invoice_items: {
         Row: {
+          created_at: string
+          description: string
+          id: string
+          invoice_id: string
+          line_total: number
+          quantity: number
+          reference_id: string | null
+          reference_type: string
+          unit_price: number
+        }
+        Insert: {
+          created_at?: string
+          description: string
+          id?: string
+          invoice_id: string
+          line_total: number
+          quantity?: number
+          reference_id?: string | null
+          reference_type: string
+          unit_price: number
+        }
+        Update: {
+          created_at?: string
+          description?: string
+          id?: string
+          invoice_id?: string
+          line_total?: number
+          quantity?: number
+          reference_id?: string | null
+          reference_type?: string
+          unit_price?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "invoice_items_invoice_id_fkey"
+            columns: ["invoice_id"]
+            isOneToOne: false
+            referencedRelation: "invoices"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      invoice_number_sequences: {
+        Row: {
+          branch_id: string
+          id: string
+          last_number: number
+          year: number
+        }
+        Insert: {
+          branch_id: string
+          id?: string
+          last_number?: number
+          year: number
+        }
+        Update: {
+          branch_id?: string
+          id?: string
+          last_number?: number
+          year?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "invoice_number_sequences_branch_id_fkey"
+            columns: ["branch_id"]
+            isOneToOne: false
+            referencedRelation: "branches"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      invoices: {
+        Row: {
+          branch_id: string
           club_id: string
           created_at: string
           created_by: string | null
-          date_of_birth: string | null
-          full_name: string
-          gender: string | null
+          customer_id: string
+          discount: number
+          due_date: string | null
           id: string
-          medical_notes: string | null
-          photo_url: string | null
+          invoice_number: string
+          issued_at: string | null
           status: string
+          subtotal: number
+          tax: number
+          total: number
           updated_at: string | null
         }
         Insert: {
+          branch_id: string
           club_id: string
           created_at?: string
           created_by?: string | null
-          date_of_birth?: string | null
-          full_name: string
-          gender?: string | null
+          customer_id: string
+          discount?: number
+          due_date?: string | null
           id?: string
-          medical_notes?: string | null
-          photo_url?: string | null
+          invoice_number: string
+          issued_at?: string | null
           status?: string
+          subtotal?: number
+          tax?: number
+          total?: number
           updated_at?: string | null
         }
         Update: {
+          branch_id?: string
           club_id?: string
           created_at?: string
           created_by?: string | null
-          date_of_birth?: string | null
-          full_name?: string
-          gender?: string | null
+          customer_id?: string
+          discount?: number
+          due_date?: string | null
           id?: string
-          medical_notes?: string | null
-          photo_url?: string | null
+          invoice_number?: string
+          issued_at?: string | null
           status?: string
+          subtotal?: number
+          tax?: number
+          total?: number
           updated_at?: string | null
         }
         Relationships: [
           {
-            foreignKeyName: "players_club_id_fkey"
+            foreignKeyName: "invoices_branch_id_fkey"
+            columns: ["branch_id"]
+            isOneToOne: false
+            referencedRelation: "branches"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "invoices_club_id_fkey"
             columns: ["club_id"]
             isOneToOne: false
             referencedRelation: "clubs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "invoices_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "customers"
             referencedColumns: ["id"]
           },
         ]
@@ -671,6 +948,106 @@ export type Database = {
             columns: ["membership_id"]
             isOneToOne: false
             referencedRelation: "club_memberships"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      payment_allocations: {
+        Row: {
+          amount: number
+          created_at: string
+          id: string
+          invoice_id: string
+          payment_id: string
+        }
+        Insert: {
+          amount: number
+          created_at?: string
+          id?: string
+          invoice_id: string
+          payment_id: string
+        }
+        Update: {
+          amount?: number
+          created_at?: string
+          id?: string
+          invoice_id?: string
+          payment_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "payment_allocations_invoice_id_fkey"
+            columns: ["invoice_id"]
+            isOneToOne: false
+            referencedRelation: "invoices"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "payment_allocations_payment_id_fkey"
+            columns: ["payment_id"]
+            isOneToOne: false
+            referencedRelation: "payments"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      payments: {
+        Row: {
+          amount: number
+          branch_id: string
+          club_id: string
+          customer_id: string
+          id: string
+          method: string
+          received_at: string
+          received_by: string | null
+          reference: string | null
+          status: string
+        }
+        Insert: {
+          amount: number
+          branch_id: string
+          club_id: string
+          customer_id: string
+          id?: string
+          method: string
+          received_at?: string
+          received_by?: string | null
+          reference?: string | null
+          status?: string
+        }
+        Update: {
+          amount?: number
+          branch_id?: string
+          club_id?: string
+          customer_id?: string
+          id?: string
+          method?: string
+          received_at?: string
+          received_by?: string | null
+          reference?: string | null
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "payments_branch_id_fkey"
+            columns: ["branch_id"]
+            isOneToOne: false
+            referencedRelation: "branches"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "payments_club_id_fkey"
+            columns: ["club_id"]
+            isOneToOne: false
+            referencedRelation: "clubs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "payments_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "customers"
             referencedColumns: ["id"]
           },
         ]
@@ -963,6 +1340,56 @@ export type Database = {
           },
         ]
       }
+      players: {
+        Row: {
+          club_id: string
+          created_at: string
+          created_by: string | null
+          date_of_birth: string | null
+          full_name: string
+          gender: string | null
+          id: string
+          medical_notes: string | null
+          photo_url: string | null
+          status: string
+          updated_at: string | null
+        }
+        Insert: {
+          club_id: string
+          created_at?: string
+          created_by?: string | null
+          date_of_birth?: string | null
+          full_name: string
+          gender?: string | null
+          id?: string
+          medical_notes?: string | null
+          photo_url?: string | null
+          status?: string
+          updated_at?: string | null
+        }
+        Update: {
+          club_id?: string
+          created_at?: string
+          created_by?: string | null
+          date_of_birth?: string | null
+          full_name?: string
+          gender?: string | null
+          id?: string
+          medical_notes?: string | null
+          photo_url?: string | null
+          status?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "players_club_id_fkey"
+            columns: ["club_id"]
+            isOneToOne: false
+            referencedRelation: "clubs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       pricing_rules: {
         Row: {
           club_id: string
@@ -1223,6 +1650,10 @@ export type Database = {
       }
     }
     Functions: {
+      cancel_booking: {
+        Args: { p_booking_id: string; p_reason: string }
+        Returns: undefined
+      }
       cancel_platform_subscription: {
         Args: { p_reason: string; p_subscription_id: string }
         Returns: undefined
@@ -1255,6 +1686,34 @@ export type Database = {
           trial_granted: boolean
         }[]
       }
+      create_booking: {
+        Args: {
+          p_booking_series_id?: string
+          p_customer_id: string
+          p_discount_amount?: number
+          p_end_at: string
+          p_field_id: string
+          p_notes?: string
+          p_payment_amount?: number
+          p_payment_method?: string
+          p_record_payment?: boolean
+          p_start_at: string
+        }
+        Returns: string
+      }
+      create_field_block: {
+        Args: {
+          p_end_at: string
+          p_field_id: string
+          p_reason?: string
+          p_start_at: string
+          p_type: string
+        }
+        Returns: {
+          block_id: string
+          conflicting_booking_ids: string[]
+        }[]
+      }
       create_platform_subscription: {
         Args: {
           p_club_id: string
@@ -1263,6 +1722,22 @@ export type Database = {
           p_trial_origin?: string
         }
         Returns: string
+      }
+      create_recurring_booking: {
+        Args: {
+          p_customer_id: string
+          p_field_id: string
+          p_first_end_at: string
+          p_first_start_at: string
+          p_interval_days?: number
+          p_occurrence_count: number
+        }
+        Returns: {
+          conflicted_occurrences: string[]
+          created: number
+          requested: number
+          series_id: string
+        }[]
       }
       deactivate_staff_member: {
         Args: { p_membership_id: string }
@@ -1290,7 +1765,15 @@ export type Database = {
         }
         Returns: string
       }
-      is_platform_owner: { Args: Record<PropertyKey, never>; Returns: boolean }
+      is_platform_owner: { Args: never; Returns: boolean }
+      issue_invoice_number: {
+        Args: { p_branch_id: string; p_club_id: string }
+        Returns: string
+      }
+      mark_booking_no_show: {
+        Args: { p_booking_id: string; p_reason?: string }
+        Returns: undefined
+      }
       normalize_mobile: { Args: { p_mobile: string }; Returns: string }
       record_platform_payment: {
         Args: {
@@ -1322,7 +1805,7 @@ export type Database = {
         Args: { p_is_public: boolean; p_plan_id: string }
         Returns: undefined
       }
-      user_club_ids: { Args: Record<PropertyKey, never>; Returns: string[] }
+      user_club_ids: { Args: never; Returns: string[] }
       write_audit_log: {
         Args: {
           p_action: string
@@ -1467,3 +1950,4 @@ export const Constants = {
     Enums: {},
   },
 } as const
+
