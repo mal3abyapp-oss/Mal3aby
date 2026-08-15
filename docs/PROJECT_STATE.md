@@ -8,7 +8,18 @@ Updated after every phase closes. See [IMPLEMENTATION_PLAN.md](IMPLEMENTATION_PL
 
 ## Current Phase
 
-**Autonomous execution underway** (go-ahead received). Phase 0 + Phase 1 **complete**. Phase 2 next (blocked on Supabase credentials, see below).
+**Autonomous execution underway.** Phase 0 + Phase 1 **complete**. Phase 2 database/RLS/security/frontend work **complete and verified**; one item outstanding (see below).
+
+### Phase 2 — Auth + Multi-Tenant Core + RLS: DB/RLS/SECURITY COMPLETE, test-user login pending external unblock
+- Confirmed real Supabase Cloud project `gxkrtlvpjwxhcqdisyob` (mal3abyapp-oss's Project, eu-central-1, Postgres 17.6.1.155) as the approved final database via Supabase MCP `list_projects`/`list_tables`/`list_migrations` (was empty, 0 tables, 0 migrations before this phase).
+- Migration `supabase/migrations/20260815120000_phase2_identity_multitenant_rls.sql` applied: `clubs`, `branches`, `profiles`, `roles`, `permissions`, `role_permissions`, `club_memberships`, `membership_branches` — all 8 tables, RLS enabled on every one.
+- **Deviation from RLS_SECURITY.md naming (forced, documented):** helper functions (`user_club_ids`, `has_permission`, `has_branch_access`, `is_platform_owner`) live in `public.*`, not `auth.*` — the migration role gets `permission denied for schema auth` on CREATE FUNCTION (Supabase reserves that schema). Functionally identical; every actual checklist item (pinned `search_path`, `auth.uid()`-only identity, no trusted client `club_id`, per-role `EXECUTE` grants) is unaffected by the schema name. Docs (`RLS_SECURITY.md`, `DECISIONS.md`) still need a follow-up note recording this as a platform constraint, not a design change — do that at the next docs pass, not urgent enough to block progression.
+- `get_advisors(security)` run twice: first pass flagged `anon`-executable SECURITY DEFINER functions (schema-level default grants on `public` survive an explicit `revoke ... from public`); fixed with explicit `revoke ... from anon` on all 4 helpers + full lockdown of `handle_new_user` (trigger-only, now uncallable by anyone via RPC). Second pass: clean except the 4 expected `authenticated`-only warnings, which are correct-by-design (any signed-in user checks their own `auth.uid()`-scoped access).
+- Seed data applied: 9 roles, 5 baseline permissions, 10 role→permission grants (club_owner/club_manager/branch_manager), verified via `list_tables` row counts.
+- TypeScript types regenerated from live schema → `src/lib/supabase/types.ts`.
+- Frontend: `AuthProvider` (session + club_memberships join, localStorage-persisted current-club selection), `RequireAuth`/`RequirePlatformOwner` route guards wired into `router.tsx`, real `/login` page (`supabase.auth.signInWithPassword`, generic error message per error-state pattern), club-switcher + sign-out wired into `AppLayout` sidebar.
+- Verified: build ✅ (`tsc -b && vite build`), lint ✅ (0 errors, pre-existing fast-refresh warnings only), tests ✅ (2/2).
+- **Outstanding, external, non-security:** Supabase's built-in mailer is rate-limiting confirmation emails (`email rate limit exceeded`, 0 rows in `auth.users` after 2 real `signUp()` attempts ~5 min apart) — blocks creating the two real seeded test users needed to prove `/login` end-to-end per this phase's Functional Gate. No MCP tool exposes Auth-config management (can't toggle "Confirm email" off programmatically). User confirmed: wait and retry later rather than have me hand-insert rows into `auth.users` directly (rejected as unsupported/fragile — bypasses GoTrue's own invariants and wouldn't actually prove the real login flow works). Will retry signup periodically; once it succeeds, seed `club_memberships` for 2 test clubs and close this phase's Functional Gate, then proceed immediately to Phase 3 without further pause.
 
 ### Phase 1 — Design System + Shells: COMPLETE
 - Shared component foundation on shadcn/ui: Button, Input, Select, Card, Dialog, Sheet, Tabs, Badge, DropdownMenu, Separator, Skeleton, Avatar + custom StatusBadge/MoneyDisplay/StatCard/EmptyState/ErrorState/PageHeader/DataTable per DESIGN_SYSTEM.md
@@ -29,9 +40,6 @@ Updated after every phase closes. See [IMPLEMENTATION_PLAN.md](IMPLEMENTATION_PL
 - Dev server verified in-browser: renders Arabic RTL shell, zero console errors
 - **Known gap (non-blocking):** Docker Desktop not running locally, so `supabase start` (local Postgres stack) has not been verified end-to-end yet. Will retry when Phase 2 needs local RLS testing; not required for Phase 0/1 (no schema work yet).
 - **Deferred, low-risk:** react-router-dom has an unpatched moderate CVE (open-redirect) pending an upstream non-breaking fix; not exploitable in this app's server-authoritative model. Re-check when upgrading.
-
-### Blocking item for Phase 2+
-Real Supabase Cloud project ref/anon key not yet provided — user confirmed a project exists and will share it. Phase 1 (pure frontend, no DB) proceeds now; Phase 2 (Auth + RLS) is blocked until credentials arrive.
 
 ## Completed
 

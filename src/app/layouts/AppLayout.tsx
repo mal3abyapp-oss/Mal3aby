@@ -1,5 +1,6 @@
 import { NavLink, Outlet } from 'react-router-dom'
 import { cn } from '@/lib/utils'
+import { useAuth } from '@/app/providers/AuthProvider'
 import {
   CalendarDays,
   GraduationCap,
@@ -12,6 +13,7 @@ import {
   LayoutDashboard,
   ScanLine,
   MoreHorizontal,
+  LogOut,
 } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 
@@ -47,11 +49,33 @@ const mobileNavItems: NavItem[] = [
 ]
 
 export function AppLayout() {
+  const { memberships, currentMembership, setCurrentClubId, signOut } = useAuth()
+
   return (
     <div className="flex min-h-screen bg-page-bg">
       {/* Desktop sidebar */}
       <aside className="hidden w-60 shrink-0 border-e border-border bg-dark-base text-white md:flex md:flex-col">
         <div className="px-4 py-5 text-lg font-bold">ملعبي | Mala3by</div>
+
+        {memberships.length > 0 && (
+          <div className="px-2 pb-3">
+            <select
+              className="w-full rounded-md border border-white/10 bg-white/5 px-2 py-1.5 text-sm text-white"
+              value={currentMembership?.clubId ?? ''}
+              onChange={(e) => setCurrentClubId(e.target.value)}
+            >
+              {memberships.map((m) => (
+                <option key={m.clubId} value={m.clubId} className="text-black">
+                  {m.clubNameAr}
+                </option>
+              ))}
+            </select>
+            {currentMembership && (
+              <p className="mt-1 px-1 text-xs text-white/50">{currentMembership.roleNameAr}</p>
+            )}
+          </div>
+        )}
+
         <nav className="flex flex-1 flex-col gap-1 px-2">
           {sidebarItems.map((item) => (
             <NavLink
@@ -70,6 +94,14 @@ export function AppLayout() {
             </NavLink>
           ))}
         </nav>
+
+        <button
+          onClick={() => void signOut()}
+          className="flex items-center gap-3 px-5 py-4 text-sm font-medium text-white/60 hover:text-white"
+        >
+          <LogOut className="size-4" />
+          تسجيل الخروج
+        </button>
       </aside>
 
       <div className="flex flex-1 flex-col">

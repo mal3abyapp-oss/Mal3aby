@@ -2,6 +2,7 @@ import { createBrowserRouter } from 'react-router-dom'
 import { PublicLayout } from '@/app/layouts/PublicLayout'
 import { AppLayout } from '@/app/layouts/AppLayout'
 import { PlatformLayout } from '@/app/layouts/PlatformLayout'
+import { RequireAuth, RequirePlatformOwner } from '@/app/routing/RequireAuth'
 
 import { HomePage } from '@/features/public-site/HomePage'
 import { PricingPage } from '@/features/public-site/PricingPage'
@@ -45,10 +46,10 @@ import {
   PlatformSettingsPage,
 } from '@/features/platform/pages'
 
-// Route guards (auth required / permission checks) land in Phase 2/3d —
-// see docs/SCREEN_MAP.md#route-guards and
-// docs/IMPLEMENTATION_PLAN.md Phase 1's Functional Gate: "no route guards
-// yet." This file is the route *shape*, matching the confirmed route map.
+// Route guards: RequireAuth gates /app (any active membership),
+// RequirePlatformOwner gates /platform (a platform_owner-role membership).
+// Client-side only — the real boundary is always server-side RLS
+// (docs/SECURITY_ANTI_FRAUD.md). See docs/SCREEN_MAP.md#route-guards.
 export const router = createBrowserRouter([
   {
     element: <PublicLayout />,
@@ -73,39 +74,49 @@ export const router = createBrowserRouter([
     element: <ScanPage />,
   },
   {
-    path: '/app',
-    element: <AppLayout />,
+    element: <RequireAuth />,
     children: [
-      { index: true, element: <TodayPage /> },
-      { path: 'bookings', element: <BookingsPage /> },
-      { path: 'academy', element: <AcademyPage /> },
-      { path: 'customers', element: <CustomersPage /> },
-      { path: 'billing', element: <BillingPage /> },
-      { path: 'subscription', element: <SubscriptionPage /> },
-      { path: 'outstanding', element: <OutstandingPage /> },
-      { path: 'reports', element: <ReportsPage /> },
-      { path: 'club', element: <ClubPage /> },
-      { path: 'staff', element: <StaffPage /> },
-      { path: 'settings', element: <SettingsPage /> },
-      { path: 'settings/audit', element: <AuditLogPage /> },
+      {
+        path: '/app',
+        element: <AppLayout />,
+        children: [
+          { index: true, element: <TodayPage /> },
+          { path: 'bookings', element: <BookingsPage /> },
+          { path: 'academy', element: <AcademyPage /> },
+          { path: 'customers', element: <CustomersPage /> },
+          { path: 'billing', element: <BillingPage /> },
+          { path: 'subscription', element: <SubscriptionPage /> },
+          { path: 'outstanding', element: <OutstandingPage /> },
+          { path: 'reports', element: <ReportsPage /> },
+          { path: 'club', element: <ClubPage /> },
+          { path: 'staff', element: <StaffPage /> },
+          { path: 'settings', element: <SettingsPage /> },
+          { path: 'settings/audit', element: <AuditLogPage /> },
+        ],
+      },
     ],
   },
   {
-    path: '/platform',
-    element: <PlatformLayout />,
+    element: <RequirePlatformOwner />,
     children: [
-      { index: true, element: <PlatformOverviewPage /> },
-      { path: 'clubs', element: <PlatformClubsPage /> },
-      { path: 'subscriptions', element: <PlatformSubscriptionsPage /> },
-      { path: 'plans', element: <PlatformPlansPage /> },
-      { path: 'payments', element: <PlatformPaymentsPage /> },
-      { path: 'renewals', element: <PlatformRenewalsPage /> },
-      { path: 'trials', element: <PlatformTrialsPage /> },
-      { path: 'leads', element: <PlatformLeadsPage /> },
-      { path: 'reports', element: <PlatformReportsPage /> },
-      { path: 'alerts', element: <PlatformAlertsPage /> },
-      { path: 'audit', element: <PlatformAuditPage /> },
-      { path: 'settings', element: <PlatformSettingsPage /> },
+      {
+        path: '/platform',
+        element: <PlatformLayout />,
+        children: [
+          { index: true, element: <PlatformOverviewPage /> },
+          { path: 'clubs', element: <PlatformClubsPage /> },
+          { path: 'subscriptions', element: <PlatformSubscriptionsPage /> },
+          { path: 'plans', element: <PlatformPlansPage /> },
+          { path: 'payments', element: <PlatformPaymentsPage /> },
+          { path: 'renewals', element: <PlatformRenewalsPage /> },
+          { path: 'trials', element: <PlatformTrialsPage /> },
+          { path: 'leads', element: <PlatformLeadsPage /> },
+          { path: 'reports', element: <PlatformReportsPage /> },
+          { path: 'alerts', element: <PlatformAlertsPage /> },
+          { path: 'audit', element: <PlatformAuditPage /> },
+          { path: 'settings', element: <PlatformSettingsPage /> },
+        ],
+      },
     ],
   },
 ])
