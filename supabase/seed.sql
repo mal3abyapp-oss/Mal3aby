@@ -1,0 +1,5 @@
+-- Seed data for local development. Applied automatically by `supabase start`
+-- / `supabase db reset`. Populated as each phase's migrations land
+-- (roles/permissions in Phase 2, platform_plans in Phase 3b, etc.).
+-- See docs/PROJECT_RULES.md rule 7: migrations + this seed file are the
+-- only schema/reference-data authority — no manual Dashboard edits.

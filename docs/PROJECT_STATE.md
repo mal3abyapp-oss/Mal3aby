@@ -8,7 +8,22 @@ Updated after every phase closes. See [IMPLEMENTATION_PLAN.md](IMPLEMENTATION_PL
 
 ## Current Phase
 
-Planning complete, including a Mandatory Architecture Corrections pass. Phase 0 (Foundations) not yet started — **explicit separate go-ahead required before starting**, per standing instruction (see [PROJECT_RULES.md](PROJECT_RULES.md) rule 5b and 14).
+**Autonomous execution underway** (go-ahead received). Phase 0 (Foundations) **complete**. Phase 1 next.
+
+### Phase 0 — Foundations: COMPLETE
+- Vite + React 18 + TypeScript (strict) + Tailwind + shadcn/ui (`new-york` style) scaffolded at repo root
+- Domain-based `src/` layout per ARCHITECTURE.md (`app/{layouts,routing,providers}`, `components/ui`, `features/`, `lib/{supabase,domain}`, `hooks/`)
+- Dependencies installed: react-router-dom, @tanstack/react-query, @supabase/supabase-js, qrcode, @zxing/browser, vite-plugin-pwa, vitest + testing-library
+- Design tokens from DESIGN_SYSTEM.md wired into `tailwind.config.ts` + `src/index.css` (CSS vars, HSL-mapped for shadcn component compatibility)
+- `.env.example` / `.gitignore` verified — no secrets committed, service_role key never referenced client-side
+- `supabase init` run — `supabase/{config.toml,migrations/,seed.sql,tests/}` scaffolded, no migrations yet (Phase 2)
+- Build/typecheck/lint/test all pass: `npm run build` ✅, `tsc -b` ✅, `eslint` (0 errors, 1 benign shadcn-file warning) ✅, `vitest run` (1/1) ✅
+- Dev server verified in-browser: renders Arabic RTL shell, zero console errors
+- **Known gap (non-blocking):** Docker Desktop not running locally, so `supabase start` (local Postgres stack) has not been verified end-to-end yet. Will retry when Phase 2 needs local RLS testing; not required for Phase 0/1 (no schema work yet).
+- **Deferred, low-risk:** react-router-dom has an unpatched moderate CVE (open-redirect) pending an upstream non-breaking fix; not exploitable in this app's server-authoritative model. Re-check when upgrading.
+
+### Blocking item for Phase 2+
+Real Supabase Cloud project ref/anon key not yet provided — user confirmed a project exists and will share it. Phase 1 (pure frontend, no DB) proceeds now; Phase 2 (Auth + RLS) is blocked until credentials arrive.
 
 ## Completed
 
