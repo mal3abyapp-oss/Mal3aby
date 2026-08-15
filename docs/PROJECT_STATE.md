@@ -8,7 +8,15 @@ Updated after every phase closes. See [IMPLEMENTATION_PLAN.md](IMPLEMENTATION_PL
 
 ## Current Phase
 
-**Autonomous execution underway** (go-ahead received). Phase 0 (Foundations) **complete**. Phase 1 next.
+**Autonomous execution underway** (go-ahead received). Phase 0 + Phase 1 **complete**. Phase 2 next (blocked on Supabase credentials, see below).
+
+### Phase 1 — Design System + Shells: COMPLETE
+- Shared component foundation on shadcn/ui: Button, Input, Select, Card, Dialog, Sheet, Tabs, Badge, DropdownMenu, Separator, Skeleton, Avatar + custom StatusBadge/MoneyDisplay/StatCard/EmptyState/ErrorState/PageHeader/DataTable per DESIGN_SYSTEM.md
+- Three layout shells built and verified in-browser: `PublicLayout` (header/footer, marketing nav), `AppLayout` (dark sidebar desktop + bottom nav mobile), `PlatformLayout` (dark console sidebar, full Overview/Clubs/.../Settings nav)
+- Full route map wired in `src/app/routing/router.tsx` matching SCREEN_MAP.md exactly — all public/auth/onboarding/app/platform routes present as placeholder pages tagged with their owning phase
+- `DirectionProvider` — Arabic/RTL is the default (`dir="rtl"`, `lang="ar"` on `<html>`), toggle-ready for LTR
+- Verified: build ✅, typecheck ✅, lint (0 errors) ✅, tests (2/2) ✅; in-browser smoke test confirmed `/`, `/app`, `/platform`, `/pricing` all render correct content inside the correct layout with no client-side routing errors
+- No route guards yet (by design — Phase 2/3d), no real data (by design)
 
 ### Phase 0 — Foundations: COMPLETE
 - Vite + React 18 + TypeScript (strict) + Tailwind + shadcn/ui (`new-york` style) scaffolded at repo root

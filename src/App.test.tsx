@@ -3,8 +3,13 @@ import { render, screen } from '@testing-library/react'
 import { App } from './App'
 
 describe('App', () => {
-  it('renders the Phase-0 placeholder shell in Arabic RTL', () => {
+  it('renders the public homepage by default', () => {
     render(<App />)
-    expect(screen.getByText('ملعبي | Mala3by — قيد الإعداد')).toBeInTheDocument()
+    expect(screen.getByText('إدارة ناديك وأكاديميتك وملاعبك من مكان واحد')).toBeInTheDocument()
+  })
+
+  it('sets document direction to rtl by default', () => {
+    render(<App />)
+    expect(document.documentElement.dir).toBe('rtl')
   })
 })
