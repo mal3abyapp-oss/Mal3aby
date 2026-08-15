@@ -1,6 +1,8 @@
 # Critical User Flows
 
 > **Corrected 2026-08-15** per Mandatory Architecture Corrections. Flow 2 (Check-in) and Flow 6 (QR Scan) are updated: scanning a booking QR now only validates — it never consumes the credential or mutates booking state by itself. A separate, explicit staff confirmation performs the atomic consume + check-in (see [DECISIONS.md ADR-011e](DECISIONS.md#adr-011e--qr-scan-validates-explicit-staff-confirmation-performs-the-check-in-mutation)). Flow 5 (Refund) is unchanged in shape but now explicitly reflects that `payments` has no `invoice_id` — the reversing entry only ever touches `payment_allocations`.
+>
+> **Added 2026-08-15 (public site)** per Public Website + Signup + Free Trial addition. New Flow 8 (Signup & Onboarding) and Flow 9 (Trial Expiry) — see [DECISIONS.md ADR-036](DECISIONS.md#adr-036--free-trial-requires-no-payment-method-zero-financial-exposure-by-construction) through ADR-046. This is the end-to-end flow the Phase 3d exit gate (see [IMPLEMENTATION_PLAN.md](IMPLEMENTATION_PLAN.md)) is verified against.
 
 Each flow is optimized for fewest steps — the receptionist/coach is the primary persona, not a power user browsing menus. See [ARCHITECTURE.md](ARCHITECTURE.md) for the RPCs backing the atomic steps.
 
@@ -114,3 +116,62 @@ Type in search bar (customer name, mobile, player name, booking number, invoice 
 ```
 
 Starts as straightforward indexed `ILIKE`/trigram search on the columns above, scoped by `club_id` via RLS (never a separate unscoped search index) — expandable to Postgres full-text search later without a redesign. See [ARCHITECTURE.md](ARCHITECTURE.md#performance-principles).
+
+## 8. Signup & Onboarding (anonymous visitor → operating club)
+
+```
+Anonymous visitor
+  → Opens homepage (/)
+  → Sees current public plans (from public_plans, never hardcoded)
+  → Clicks "ابدأ تجربتك المجانية"
+  → /signup: Full Name, Mobile, Email, Password, Confirm Password, Accept Terms
+  → Create Account  ──▶  Supabase Auth signup (auth.users + profiles row via trigger)
+  → No club membership yet → redirected to /onboarding
+  → Step 1: Business Type (نادي / أكاديمية / ملاعب / مركز رياضي — classification only)
+  → Step 2: Basic Details (club name, phone, city, address optional)
+  → Step 3: First Branch (branch name, city — can reuse club details)
+  → Step 4: Confirm  ──▶  complete_new_club_onboarding() RPC (atomic, single transaction):
+      create clubs row
+      create first branches row
+      create club_memberships row (role = club_owner, hardcoded — never client-supplied)
+      create platform_subscriptions row (subscription_kind = 'trial', hardcoded;
+        duration = platform_settings.default_trial_days; grace_period_days_snapshot = 0)
+  → Onboarding Success screen: "تم إنشاء ناديك بنجاح" + "تم تفعيل التجربة المجانية لمدة 7 أيام"
+  → "ابدأ الإعداد" CTA  ──▶  enters /app
+  → Trial banner visible: "التجربة المجانية: متبقي 7 أيام"
+  → First-Run Checklist visible on dashboard (add field / add staff / add customer / first booking —
+      each independently completable, not a forced sequence, see DECISIONS.md ADR-043)
+  → Club can operate fully (get_club_platform_access() returns 'full') during the trial
+```
+
+Target: from "Start Free Trial" click to "operating club" in well under a minute of actual data entry — this is the single most important conversion path in the product. See [DECISIONS.md ADR-042](DECISIONS.md#adr-042--onboarding-finalization-is-one-atomic-rpc-client-never-sets-privileged-values) for why the finalization step is one atomic RPC rather than several client-driven inserts.
+
+**Existing club staff cannot reach this flow to create a second club** — `complete_new_club_onboarding()` rejects any caller who already holds an active `club_memberships` row. Creating an additional club for an existing operator is a separate, Platform-Owner-mediated action, not self-service (see [DECISIONS.md ADR-042](DECISIONS.md#adr-042--onboarding-finalization-is-one-atomic-rpc-client-never-sets-privileged-values)).
+
+## 9. Trial Expiry & Reminder
+
+```
+During trial (get_club_platform_access() = 'full', subscription_kind = 'trial'):
+  → In-app alerts appear at fixed thresholds (dashboard banner, notification center,
+      subscription page — no external notification service):
+      "باقي 3 أيام على انتهاء التجربة"
+      "باقي يوم واحد"
+      "انتهت التجربة المجانية" (at/after expiry)
+
+At end_at (start_at + platform_settings.default_trial_days):
+  → get_club_platform_access() returns 'blocked' immediately — no grace window for trials
+      (grace_period_days_snapshot = 0 by convention, see DECISIONS.md ADR-038)
+  → Staff seeking a new operational commitment (new booking, new enrollment, new subscription)
+      see a clear "trial expired, contact us to activate" state
+  → All existing data remains fully readable and intact — nothing is deleted or hidden
+  → Club Owner sees this on /app/subscription: "تجربة منتهية" + "تواصل لتفعيل الاشتراك" CTA
+  → Platform Owner sees the club in /platform/trials as "expired," can activate a paid
+      plan at any time via the Club Detail Actions panel (see SCREEN_MAP.md)
+  → Activation creates a new platform_subscriptions row (subscription_kind = 'paid',
+      previous_subscription_id pointing at the trial) — the trial's own row is never
+      deleted or overwritten, preserving full history (same renewal-chain mechanism
+      as any paid-to-paid renewal, see DECISIONS.md ADR-031)
+  → get_club_platform_access() returns 'full' again on the very next request
+```
+
+Trial does **not** auto-convert to a paid subscription — there is no payment gateway in V1 for it to convert through. See [DECISIONS.md ADR-038](DECISIONS.md#adr-038--trial-is-a-subscription_kind-not-a-new-concept-trial-expiry-defaults-to-blocked-not-automatic-conversion).

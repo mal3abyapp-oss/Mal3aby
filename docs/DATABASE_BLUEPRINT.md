@@ -5,6 +5,8 @@ This is a table-by-table blueprint, not a migration file. Migrations are written
 > **Corrected 2026-08-15** per Mandatory Architecture Corrections. See [DECISIONS.md](DECISIONS.md) ADR-011 through ADR-020 for the reasoning behind every change in this revision.
 >
 > **Corrected 2026-08-15 (final)** per Final Platform SaaS Corrections. `clubs.status` is now `active` | `suspended` | `closed` only — `grace_period` is never a club status, it lives on `platform_subscriptions` as a derived effective status. `platform_subscriptions` is now period-based (one row per billing cycle, with plan/price snapshots and real billing intervals), not a single mutable row per club. See [DECISIONS.md](DECISIONS.md) ADR-027 through ADR-035.
+>
+> **Added 2026-08-15 (public site)** per Public Website + Signup + Free Trial addition. `platform_plans` gains `is_public`/`display_order` for safe public exposure; `platform_subscriptions` gains `subscription_kind` (`trial`/`paid`/`complimentary`) — **trial is not a new table, it's a value on the existing period model** (see [DECISIONS.md ADR-038](DECISIONS.md#adr-038--trial-is-a-subscription_kind-not-a-new-concept-trial-expiry-defaults-to-blocked-not-automatic-conversion)). New tables: `platform_settings` (singleton, holds `default_trial_days`), `contact_requests` (public leads).
 
 ## Conventions (apply to every table unless noted)
 
@@ -42,29 +44,33 @@ PK: `id`. FK: `club_id → clubs`. RLS: scoped by `club_id`.
 
 ### `platform_plans`
 Purpose: catalogue of platform subscription plans, each with a real billing interval (see [DECISIONS.md ADR-029](DECISIONS.md#adr-029--platform-plan-supports-real-billing-intervals-monthly-quarterly-semi-annual-annual)). V1 seeds four rows covering Monthly/Quarterly/Semi-Annual/Annual; the table supports any future interval without a migration. All plans offer the same feature set in V1 — the only variation is duration, price, and discount (no feature-tier gating yet).
-Columns: `name` (e.g. `Monthly`, `Quarterly`, `Semi-Annual`, `Annual`), `billing_interval` (`month` | `year`), `billing_interval_count int` (e.g. `1` for monthly, `3` for quarterly, `6` for semi-annual, `1` with `year` for annual), `price numeric(12,2)`, `currency` (matches platform's own operating currency), `default_grace_period_days int` (default `7`), `status` (`active` | `archived`).
-PK: `id`. Platform-Owner-only RLS (no `club_id` — this table is not tenant-scoped, it's platform-owned reference data). **Editable by Platform Owner at any time — edits never retroactively change an already-created `platform_subscriptions` row**, see next table.
+Columns: `name` (e.g. `Monthly`, `Quarterly`, `Semi-Annual`, `Annual`), `name_ar`, `description_ar` (nullable), `billing_interval` (`month` | `year`), `billing_interval_count int` (e.g. `1` for monthly, `3` for quarterly, `6` for semi-annual, `1` with `year` for annual), `price numeric(12,2)`, `currency` (matches platform's own operating currency), `discount_label` (nullable text, e.g. `"وفر 15%"`), `features_summary` (nullable text/jsonb — a short marketing bullet list, not a real feature-gating matrix), `default_grace_period_days int` (default `7`), `is_public boolean` (default `false` — see [DECISIONS.md ADR-040](DECISIONS.md#adr-040--public-plan-data-is-exposed-through-a-restricted-viewrpc-never-the-raw-platform_plans-table)), `display_order int` (default `0`), `status` (`active` | `archived`).
+PK: `id`. Platform-Owner-only RLS (no `club_id` — this table is not tenant-scoped, it's platform-owned reference data). **Editable by Platform Owner at any time — edits never retroactively change an already-created `platform_subscriptions` row**, see next table. **No anonymous/public role ever queries this table directly** — see `public_plans` view below.
 
 ### `platform_subscriptions`
-Purpose: **one row per billing period**, not one row per club mutated forever (see [DECISIONS.md ADR-031](DECISIONS.md#adr-031--renewal-creates-a-new-subscription-period-row-periods-are-never-mutatedextended-in-place)). A club's full subscription history is the full set of rows for that `club_id`, ordered by `start_at`.
-Columns: `club_id`, `plan_id` (the plan chosen for this period — for reference/reporting; the period's actual terms are captured below, not read live from this FK), `plan_name_snapshot`, `price_snapshot numeric(12,2)`, `currency_snapshot`, `interval_snapshot` (`month` | `year`), `interval_count_snapshot int`, `grace_period_days_snapshot int` (all snapshotted at creation — see [DECISIONS.md ADR-030](DECISIONS.md#adr-030--platform-plan-pricing-is-snapshotted-onto-each-subscription-period)), `start_at`, `end_at` (computed as `start_at + interval_snapshot * interval_count_snapshot` at creation, then fixed), `during tstzrange` (generated, stored — `tstzrange(start_at, end_at, '[)')`), `previous_subscription_id` (nullable, self-referencing FK — links a renewal to the period it renewed from), `lifecycle_status` (`trial` | `active` | `cancelled` — **manual/structural states only**; `grace_period`/`expired` are never stored here, they are derived — see below), `cancelled_at` (nullable), `cancelled_reason` (nullable), `cancelled_by` (nullable).
-PK: `id`. FKs: `club_id → clubs`, `plan_id → platform_plans`, `previous_subscription_id → platform_subscriptions`. **Exclusion constraint** preventing overlapping periods for the same club while allowing back-to-back renewals (see [DECISIONS.md ADR-032](DECISIONS.md#adr-032--overlapping-subscription-periods-are-prevented-adjacent-renewal-periods-are-allowed)):
+Purpose: **one row per billing period**, not one row per club mutated forever (see [DECISIONS.md ADR-031](DECISIONS.md#adr-031--renewal-creates-a-new-subscription-period-row-periods-are-never-mutatedextended-in-place)). A club's full subscription history is the full set of rows for that `club_id`, ordered by `start_at`. **A trial is a row in this same table** — see [DECISIONS.md ADR-038](DECISIONS.md#adr-038--trial-is-a-subscription_kind-not-a-new-concept-trial-expiry-defaults-to-blocked-not-automatic-conversion). No separate `trials` table exists.
+Columns: `club_id`, `plan_id` (nullable — a trial may have no associated plan; the period's actual terms are captured below, not read live from this FK), `subscription_kind` (`trial` | `paid` | `complimentary` — see [DECISIONS.md ADR-038](DECISIONS.md#adr-038--trial-is-a-subscription_kind-not-a-new-concept-trial-expiry-defaults-to-blocked-not-automatic-conversion)), `plan_name_snapshot` (nullable for trial — e.g. `"تجربة مجانية"`), `price_snapshot numeric(12,2)` (`0` for trial/complimentary), `currency_snapshot`, `interval_snapshot` (`month` | `year`, nullable for trial), `interval_count_snapshot int` (nullable for trial), `grace_period_days_snapshot int` (**`0` by default for `subscription_kind = 'trial'`** — trial expiry has no grace window, see ADR-038; nonzero for `paid`, sourced from the chosen plan's `default_grace_period_days`), `start_at`, `end_at` (for trial: `start_at + platform_settings.default_trial_days`; for paid: `start_at + interval_snapshot * interval_count_snapshot`, computed at creation, then fixed), `during tstzrange` (generated, stored — `tstzrange(start_at, end_at, '[)')`), `previous_subscription_id` (nullable, self-referencing FK — links a renewal, or a trial-to-paid conversion, to the period before it), `lifecycle_status` (`trial` | `active` | `cancelled` — **manual/structural states only**; `grace_period`/`expired` are never stored here, they are derived — see below), `cancelled_at` (nullable), `cancelled_reason` (nullable), `cancelled_by` (nullable).
+PK: `id`. FKs: `club_id → clubs`, `plan_id → platform_plans` (nullable), `previous_subscription_id → platform_subscriptions`. **Exclusion constraint** preventing overlapping periods for the same club while allowing back-to-back renewals — applies identically to trial and paid periods, since both are just rows in this table (see [DECISIONS.md ADR-032](DECISIONS.md#adr-032--overlapping-subscription-periods-are-prevented-adjacent-renewal-periods-are-allowed)):
 ```sql
 EXCLUDE USING gist (club_id WITH =, during WITH &&)
   WHERE (lifecycle_status != 'cancelled')
 ```
-Platform-Owner-only RLS (club-side sees only the restricted summary view, never this table).
+Platform-Owner-only RLS (club-side sees only the restricted summary view, never this table). **Unique partial constraint: at most one non-cancelled row with `subscription_kind = 'trial'` per `club_id`, ever** — enforced at the database level (not just RPC discipline) so a club can never accumulate a second trial (see [DECISIONS.md ADR-039](DECISIONS.md#adr-039--trial-belongs-to-the-club-not-the-user-one-trial-per-club-ever)):
+```sql
+CREATE UNIQUE INDEX one_trial_per_club ON platform_subscriptions (club_id)
+  WHERE subscription_kind = 'trial';
+```
 **Effective subscription status** (`trial`/`active`/`grace_period`/`expired`/`cancelled`) is **derived, not stored**, from `lifecycle_status` + `start_at`/`end_at`/`grace_period_days_snapshot` + `now()` — see the `get_club_platform_access()` derivation in [ARCHITECTURE.md](ARCHITECTURE.md#platform-access-strategy):
 ```
 lifecycle_status = 'cancelled'          → effective status: cancelled
 lifecycle_status = 'trial'              → effective status: trial (trial has its own end_at, same derivation shape)
 now() < end_at                          → effective status: active
-end_at <= now() < end_at + grace_days   → effective status: grace_period
+end_at <= now() < end_at + grace_days   → effective status: grace_period (grace_days = 0 for trial by convention — see ADR-038)
 now() >= end_at + grace_days            → effective status: expired
 ```
 
 ### `platform_invoices`
-Purpose: what a club owes the platform for a specific billing period.
+Purpose: what a club owes the platform for a specific billing period. **Trials never generate a `platform_invoices` row** — there is nothing to invoice for a free period (see [DECISIONS.md ADR-036](DECISIONS.md#adr-036--free-trial-requires-no-payment-method-zero-financial-exposure-by-construction)).
 Columns: `club_id`, `platform_subscription_id` (the specific period this invoice bills for), `invoice_number` (globally sequential, platform-wide — not per-branch, since this is Mala3by's own numbering, not a club's), `amount numeric(12,2)`, `due_date`, `status` (`pending` | `paid` | `overdue` | `void`).
 PK: `id`. Unique: `invoice_number`. FKs: `club_id → clubs`, `platform_subscription_id → platform_subscriptions`. Platform-Owner-only RLS. No hard delete once issued — same no-hard-delete rule as club-level financial records (see [PROJECT_RULES.md](PROJECT_RULES.md) rule 3).
 
@@ -72,6 +78,25 @@ PK: `id`. Unique: `invoice_number`. FKs: `club_id → clubs`, `platform_subscrip
 Purpose: manual/offline record of a club's payment to Mala3by (see [DECISIONS.md ADR-028](DECISIONS.md#adr-028--platform-billing-is-a-structurally-separate-domain-from-club-billing) for why this is separate from club-level `payments`) — no payment gateway in V1.
 Columns: `platform_invoice_id`, `amount numeric(12,2)`, `method` (`bank_transfer` | `cash` | `other`), `reference` (nullable text), `recorded_by` (references `auth.users` — always a Platform Owner), `recorded_at`, `reversed_at` (nullable), `reversed_by` (nullable), `reversal_reason` (nullable).
 PK: `id`. FK: `platform_invoice_id → platform_invoices`. Platform-Owner-only RLS. **No hard delete — a mistaken payment record is reversed (`reversed_at`/`reversed_by`/`reversal_reason` populated), never deleted, matching the no-hard-delete-on-financial-records rule.** Recording a payment here marks its `platform_invoices.status = 'paid'`; the subscription's *effective status* returns to `active` on the very next access-check, computed live — no separate status field to update on `platform_subscriptions` itself (see [ARCHITECTURE.md](ARCHITECTURE.md#platform-access-strategy)).
+
+### `platform_settings`
+Purpose: singleton configuration table (one row) — the single source of truth for values that would otherwise be hardcoded in multiple places (see [DECISIONS.md ADR-037](DECISIONS.md#adr-037--trial-length-is-a-platform-setting-not-hardcoded)).
+Columns: `default_trial_days int` (default `7`), `default_grace_period_days int` (default `7`, used as the fallback when a plan doesn't specify its own).
+PK: `id`. Enforced-singleton via a check constraint or a fixed well-known `id`. Platform-Owner-only write; **readable via the same public-safe RPC/view used for plan data** (see `public_plans`/`public_settings` below), since marketing copy needs to display the current trial length without hardcoding it.
+
+### `public_plans` (view)
+Purpose: the only surface anonymous/public users ever query for plan data — see [DECISIONS.md ADR-040](DECISIONS.md#adr-040--public-plan-data-is-exposed-through-a-restricted-viewrpc-never-the-raw-platform_plans-table).
+Definition: `SELECT name_ar, description_ar, billing_interval, billing_interval_count, price, currency, discount_label, features_summary FROM platform_plans WHERE is_public = true AND status = 'active' ORDER BY display_order`.
+RLS: `SELECT` granted to the `anon` role, restricted to exactly this column set — no internal fields (cost basis, id relationships to subscriptions, etc.) are ever exposed through this view.
+
+---
+
+## Public Website
+
+### `contact_requests`
+Purpose: leads submitted via the public `/contact` form — a lightweight leads inbox, not a CRM (see [DECISIONS.md ADR-044](DECISIONS.md#adr-044--platform-owner-reports-gain-trial-specific-metrics-public-leads-get-their-own-report)).
+Columns: `name`, `phone`, `email`, `business_name` (nullable), `message`, `status` (`new` | `contacted` | `converted` | `closed`).
+PK: `id`. RLS: **anonymous `INSERT` only** (no `SELECT`, `UPDATE`, or `DELETE` for the `anon` role) — a public submitter can create a request but never read any request, their own or anyone else's. Platform Owner has full `SELECT`/`UPDATE` (to progress `status`); no hard delete.
 
 ---
 
@@ -316,3 +341,5 @@ PK: `id`. RLS: **`SELECT` only, scoped by `club_id`** (branch-scoped roles see o
 - ✅ `platform_subscriptions.previous_subscription_id`, plan/price/interval/grace snapshots, exclusion constraint on `(club_id, during)` — added
 - ✅ `get_club_platform_access(club_id)` central access function — added, see [ARCHITECTURE.md](ARCHITECTURE.md#platform-access-strategy)
 - **Platform billing tables never reuse `invoices`/`payments`/`payment_allocations`** — those remain exclusively for a club's own customer billing.
+- ❌ A separate `trials` table — **does not exist.** Trial is `platform_subscriptions.subscription_kind = 'trial'`, a row in the same period-based table as any paid subscription, not a parallel structure — see [DECISIONS.md ADR-038](DECISIONS.md#adr-038--trial-is-a-subscription_kind-not-a-new-concept-trial-expiry-defaults-to-blocked-not-automatic-conversion)
+- ✅ `platform_subscriptions.subscription_kind` (`trial`/`paid`/`complimentary`), `platform_plans.is_public`/`display_order`/`name_ar`/`description_ar`/`discount_label`/`features_summary`, `platform_settings` (singleton), `contact_requests`, `public_plans` view — added

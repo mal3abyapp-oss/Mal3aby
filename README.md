@@ -13,6 +13,7 @@ Mala3by is a multi-tenant operations system for sports clubs and football academ
 - Secure QR check-in for bookings and academy attendance
 - Arabic RTL first, English toggle, installable PWA, works on desktop/tablet/mobile
 - Platform billing: Mala3by charges clubs a real subscription (Monthly/Quarterly/Semi-Annual/Annual) to use the platform — period-based with full renewal history, structurally separate from a club's own customer billing, and fully independent of club account status (see [docs/DECISIONS.md ADR-027](docs/DECISIONS.md#adr-027--clubsstatus-and-platform-subscription-status-are-fully-independent-grace_period-is-never-a-club-status) through ADR-035)
+- Public marketing site + self-service signup + 7-day free trial (no card required) — a club can go from anonymous visitor to an operating trial club in one short flow, with trial modeled as a value on the same subscription system above, not a separate mechanism (see [docs/DECISIONS.md ADR-036](docs/DECISIONS.md#adr-036--free-trial-requires-no-payment-method-zero-financial-exposure-by-construction) through ADR-046)
 
 ## What this is not (V1)
 
@@ -57,4 +58,4 @@ See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md#local-development-workflow) for 
 
 ## Status
 
-Planning complete, including a Mandatory Architecture Corrections pass and a Final Platform SaaS Corrections pass (both 2026-08-15). Phase 0 not yet started. See [docs/PROJECT_STATE.md](docs/PROJECT_STATE.md).
+Planning complete, including a Mandatory Architecture Corrections pass, a Final Platform SaaS Corrections pass, and a Public Website + Signup + Free Trial addition (all 2026-08-15). Phase 0 not yet started. See [docs/PROJECT_STATE.md](docs/PROJECT_STATE.md).

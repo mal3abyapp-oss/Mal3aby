@@ -3,6 +3,8 @@
 > **Corrected 2026-08-15** per Mandatory Architecture Corrections. `club_memberships.branch_id` is replaced by the `membership_branches` join table (see [DECISIONS.md ADR-015](DECISIONS.md#adr-015--membership-branch-scope-is-a-join-table-not-a-single-column)); `qr_credentials` access rows are split into validate vs. confirm actions; `audit_logs` has no UPDATE policy for any role. See [RLS_SECURITY.md](RLS_SECURITY.md) for the mandatory `SECURITY DEFINER` function discipline this matrix assumes.
 >
 > **Corrected 2026-08-15 (final)** per Final Platform SaaS Corrections. `clubs.status` no longer includes `grace_period` — it is `active` | `suspended` | `closed` only. Grace period is a **derived platform subscription status**, computed by `get_club_platform_access(club_id)` (`full`/`grace`/`blocked`), never a `clubs` column. `auth.club_write_allowed()` now wraps that central function rather than reading `clubs.status` directly. See [ARCHITECTURE.md](ARCHITECTURE.md#platform-access-strategy) and [DECISIONS.md ADR-027](DECISIONS.md#adr-027--clubsstatus-and-platform-subscription-status-are-fully-independent-grace_period-is-never-a-club-status) through ADR-035.
+>
+> **Added 2026-08-15 (public site)** per Public Website + Signup + Free Trial addition. New `anon` (unauthenticated) role added to the matrix — read-only on `public_plans`, insert-only on `contact_requests`, nothing else. `platform_settings` and `platform_plans.is_public`/`display_order` added. See [DECISIONS.md ADR-037](DECISIONS.md#adr-037--trial-length-is-a-platform-setting-not-hardcoded) through ADR-046.
 
 ## Policy Pattern
 
@@ -75,14 +77,33 @@ create policy "insert_with_permission_and_platform_access" on <table>
 
 ---
 
+## Public / Anonymous Access
+
+The `anon` role (no authentication at all — a visitor on the public marketing site) is deliberately excluded from the main matrix below since it has access to only two tables, both narrowly scoped:
+
+| Table | `anon` (unauthenticated) |
+|---|---|
+| `public_plans` (view over `platform_plans`, `is_public = true` only) | S — narrow column set only, see [DATABASE_BLUEPRINT.md](DATABASE_BLUEPRINT.md#public_plans-view) |
+| `platform_settings.default_trial_days` (via a public-safe RPC/view, not the raw table) | S — this one field only |
+| `contact_requests` | I only — **no S, U, or D**. A submitter cannot read back their own or any other submission. |
+| Every other table in this document | – (no access whatsoever) |
+
+`anon` is never granted access to `clubs`, `platform_plans` directly (only via `public_plans`), `platform_subscriptions`, or any club-side operational table. See [DECISIONS.md ADR-040](DECISIONS.md#adr-040--public-plan-data-is-exposed-through-a-restricted-viewrpc-never-the-raw-platform_plans-table).
+
+**Signup** does not grant `anon` any new table access — `complete_new_club_onboarding()` requires `auth.uid()` to be non-null (i.e. the user has already completed Supabase Auth signup and holds a valid session) before it does anything; an anonymous visitor cannot call it. See [ARCHITECTURE.md](ARCHITECTURE.md#signup--onboarding-strategy) for the RPC.
+
+---
+
 ## Role × Table Matrix
 
-Legend: **S**=Select, **I**=Insert, **U**=Update, **D**=Void/Reverse (status transition — never a hard `DELETE`, see [PROJECT_RULES.md](PROJECT_RULES.md) rule 3). `–` = no access. `(own)` = restricted to their own club/branch/assignment.
+Legend: **S**=Select, **I**=Insert, **U**=Update, **D**=Void/Reverse (status transition — never a hard `DELETE`, see [PROJECT_RULES.md](PROJECT_RULES.md) rule 3). `–` = no access. `(own)` = restricted to their own club/branch/assignment. (Authenticated roles only — see Public/Anonymous Access above for `anon`.)
 
 | Table | Platform Owner | Club Owner | Club Manager | Branch Manager | Receptionist | Accountant | Academy Manager | Coach | Scanner |
 |---|---|---|---|---|---|---|---|---|---|
 | `clubs` (`status`: `active`\|`suspended`\|`closed` — no `grace_period` value) | S,I,U | S,U (own, excl. `status`) | S | S | S | S | S | – | – |
-| `platform_plans` / `platform_subscriptions` / `platform_invoices` / `platform_payments` | S,I,U | S (own club summary only, via restricted view — not these tables directly) | – | – | – | – | – | – | – |
+| `platform_plans` (base table, incl. `is_public`/`display_order`) / `platform_subscriptions` / `platform_invoices` / `platform_payments` | S,I,U | S (own club summary only, via restricted view — not these tables directly) | – | – | – | – | – | – | – |
+| `platform_settings` | S,U | – (own club's `default_trial_days` reference only via signup RPC, not direct read) | – | – | – | – | – | – | – |
+| `contact_requests` | S,U (progress `status`) | – | – | – | – | – | – | – | – |
 | `get_club_platform_access()` / `auth.club_write_allowed()` (functions, not tables) | Bypassed — never gated | Return value only, not directly callable to inspect other clubs | (called internally by RLS policies on gated tables) | | | | | | |
 | `branches` | S,I,U | S,I,U | S,I,U | S,U (own) | S | S | S | – | – |
 | `club_memberships` (staff) | S,I,U,D | S,I,U,D | S,I,U | S (branch) | – | – | – | – | – |
@@ -133,6 +154,7 @@ Per [PROJECT_BRIEF](../README.md) Section 58, these actions always write an `aud
 - Club suspension/reactivation/closure (`clubs.status` change — administrative, independent of billing)
 - Platform subscription lifecycle actions: activate, start trial, renew, change plan, extend grace period, cancel (`platform_subscriptions` insert/update)
 - Platform payment recorded or reversed (`platform_payments` insert/reversal — who at Mala3by recorded it, against which club/invoice)
+- New club onboarding completed (`complete_new_club_onboarding()` success — club/branch/membership/trial all created together, logged as one audit entry referencing the new `club_id`)
 - Manual QR override (offline fail-closed fallback — see [ARCHITECTURE.md](ARCHITECTURE.md#qr-strategy))
 
 Implementation: table triggers for simple before/after captures on direct mutations; explicit `audit_logs` inserts inside RPCs for business actions that don't map to a single row UPDATE (e.g. refund, freeze). **`audit_logs` itself accepts `INSERT` only from these trusted triggers/RPCs (`SECURITY DEFINER`) — never a direct client insert, and never any `UPDATE`/`DELETE` from any role** (see [DECISIONS.md ADR-020](DECISIONS.md#adr-020--audit-logs-are-immutable-no-role-can-update-or-delete-them)).
@@ -165,3 +187,11 @@ For at least `bookings`, `invoices`, `payments`, and `customers`:
 - [ ] Club with `clubs.status = 'suspended'` → `get_club_platform_access()` returns `blocked` regardless of subscription standing (administrative block overrides billing standing)
 - [ ] Recording a `platform_payments` row against the current period's invoice → `get_club_platform_access()` returns `full` on the very next call, without any other manual step or stored-status update
 - [ ] Attempting to create a second `platform_subscriptions` row for a club with dates overlapping an existing non-cancelled period → rejected by the exclusion constraint; creating one starting exactly at the prior period's `end_at` → succeeds
+- [ ] `anon` role SELECT on `public_plans` → returns only `is_public = true` rows, only the safe column set, never internal `platform_plans` fields
+- [ ] `anon` role SELECT attempt on `platform_plans` directly (bypassing the view) → rejected
+- [ ] `anon` role INSERT on `contact_requests` → succeeds; subsequent `anon` SELECT attempt (even against the row just inserted) → returns 0 rows
+- [ ] `anon` role (no `auth.uid()`) calling `complete_new_club_onboarding()` → rejected before any table is touched
+- [ ] Authenticated user with an existing active `club_memberships` row calling `complete_new_club_onboarding()` again → rejected, no second club/trial created
+- [ ] Signup payload attempting to set `role_id`, `subscription_kind`, or trial duration directly (bypassing the RPC's internal derivation) → has no effect; the RPC's hardcoded/derived values are what land in the database regardless of any such payload field
+- [ ] Two concurrent `complete_new_club_onboarding()` calls from the same brand-new user (e.g. double-click) → the second is rejected by the "already has an active membership" check inside the same or an immediately following transaction, never resulting in two clubs
+- [ ] Attempting to insert a second non-cancelled `platform_subscriptions` row with `subscription_kind = 'trial'` for a club that already has one (even a long-expired one) → rejected by the unique partial index

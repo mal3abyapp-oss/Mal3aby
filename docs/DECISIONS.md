@@ -2,9 +2,143 @@
 
 Architecture Decision Records for Mala3by. Each entry: Decision, Reason, Alternatives considered, Trade-offs accepted. Newest first.
 
+> **2026-08-15 (public site) — Public Website + Signup + Free Trial added.** ADR-036 through ADR-046 introduce the public marketing site, self-service signup, first-time onboarding, and a 7-day free trial. The trial is **not** a new concept or table — it is `platform_subscriptions.subscription_kind = 'trial'`, a value on the exact same period-based subscription model built in the prior corrections pass. This is the key design decision: everything already built (snapshots, exclusion constraint, renewal chain, `get_club_platform_access()`) applies to trials for free, because a trial is just a subscription period like any other, distinguished only by `subscription_kind` and how it started.
+>
 > **2026-08-15 (final) — Final Platform SaaS Corrections applied.** The first Platform Billing pass (originally ADR-022 through ADR-026) is fully replaced by ADR-027 through ADR-035 below — the original entries' text has been superseded in place, not preserved as separate historical records, since the correction is a structural redesign of the same domain rather than an addable refinement. The core fix: `grace_period` was wrongly modeled as a `clubs.status` value — it is a **subscription** status, not a **club** status, and the two are now fully independent. Subscriptions are now period-based (one row per billing cycle, not one row mutated forever), with price/plan snapshots, real billing intervals (monthly/quarterly/semi-annual/annual), and a single centralized access-derivation function.
 >
 > **2026-08-15 — Mandatory Architecture Corrections applied.** ADR-011 through ADR-021 below were added in a dedicated correction pass before any production code was written. ADR-006 (organizations) is **superseded** by ADR-011 — its original nullable-placeholder approach was rejected in favor of full removal. See each entry for details.
+
+---
+
+## ADR-046 — Signup rate limiting and duplicate-club flagging are lightweight, not blocking
+
+**Decision:** Basic trial-abuse protections only, all free-tier: Supabase Auth's built-in email verification (if usable without a paid email provider — see ADR-041), normalized-phone/email duplicate *detection* (flag, don't hard-block — see ADR-045), and simple rate limiting on the signup RPC (e.g. N signups per IP per hour, enforced at the RPC/DB level, no external service). No CAPTCHA service, no device fingerprinting, no manual approval queue in V1.
+
+**Reason:** A real fraud-prevention system is disproportionate scope for a product with no paying customers yet and no evidence of abuse. The brief explicitly asks for "basic protection," not a fraud engine, and explicitly defers phone verification/device fingerprinting/manual approval to when they're actually needed. Cloudflare Turnstile is noted as a possible free future addition, not a V1 requirement.
+
+**Alternatives considered:** Full KYC-style verification before trial start (rejected — kills self-service conversion, the whole point of a public trial signup). No protection at all (rejected — leaves an obvious mass-fake-account vector with zero cost to the attacker).
+
+**Trade-offs:** Some fake trials will get through in V1 — acceptable, since they cost nothing (no payment involved) and are visible/prunable by Platform Owner via the Trials report (see ADR-044).
+
+---
+
+## ADR-045 — Duplicate club detection flags for review, never hard-blocks signup
+
+**Decision:** Before finalizing onboarding, a lightweight check compares normalized club name, normalized owner phone, and owner email against existing clubs. A match sets a `flagged_duplicate` marker (visible to Platform Owner in the Clubs list) but **never** prevents the signup from completing.
+
+**Reason:** Same reasoning already established for `customers.normalized_mobile` (see ADR-012) — name/phone similarity has too many legitimate false-positive cases (a franchise's second branch signing up separately, a common club name, a family member registering a related-but-distinct club) to justify blocking a real customer's self-service signup. Flagging for Platform Owner review captures the suspicious case without costing a legitimate signup its trial.
+
+**Alternatives considered:** Hard block on exact match (rejected — blocks legitimate re-registration after a mistake, or a genuinely separate club with a common name). No detection at all (rejected — leaves an easy trial-abuse path: repeatedly signing up under trivially varied details).
+
+**Trade-offs:** Requires Platform Owner to occasionally review flagged signups — acceptable at V1 volume, and this is exactly what the Contact Requests / Trials sections of the Platform Owner console already require reviewing anyway.
+
+---
+
+## ADR-044 — Platform Owner reports gain trial-specific metrics; public leads get their own report
+
+**Decision:** The Platform Reports set (Subscription/Revenue/Renewal/Growth/Usage, from ADR-034's Control Center) gains trial-specific figures woven into Growth and a new lightweight view: Trials Started, Trials Active, Trials Expired, Trials Converted to Paid, Trial Conversion Rate. `contact_requests` gets its own simple status pipeline (`new`/`contacted`/`converted`/`closed`) surfaced as a Leads view under Platform Reports, not a separate CRM module.
+
+**Reason:** Trial conversion rate is the single most important business metric for a self-service-trial SaaS product — Platform Owner needs it without building a BI tool. Contact requests are a legitimate second lead-generation channel (a prospect who wants to talk before self-serving) and deserve visibility, but a full CRM (pipelines, follow-up scheduling, assignment) is explicitly out of scope — see [PROJECT_BRIEF](../README.md) Section 56's "no CRM Marketing Engine in V1" and Section 51 of this brief, "no full CRM."
+
+**Alternatives considered:** No trial/lead reporting in V1 (rejected — Platform Owner explicitly needs this to run the business, it's cheap to add since the underlying data already exists from Phase 3b/3c). Full CRM (rejected — explicitly out of scope, same reasoning as the original brief's CRM deferral).
+
+**Trade-offs:** None significant — this is read-only reporting over data that already exists.
+
+---
+
+## ADR-043 — First-run setup is a checklist, not a multi-step wizard
+
+**Decision:** After the 4-step onboarding wizard (business type → basic details → first branch → trial activation) completes and creates the club, subsequent setup (add a field, add a staff member, add a first customer, create a first booking) is presented as a dismissible checklist inside the app dashboard, not a continuation of the wizard.
+
+**Reason:** A long linear wizard forces a rigid order and blocks a club owner from exploring the product; a checklist lets them do these steps in whatever order makes sense for their business, or skip some entirely (a club with no staff yet doesn't need to be forced through "add a staff member" before seeing their booking calendar). This matches the brief's own explicit preference (Section 46: "this is better than a long Wizard").
+
+**Alternatives considered:** Continue the wizard through all setup steps (rejected — the brief explicitly prefers a checklist, and forcing order here has no correctness benefit unlike, say, forcing club-before-branch in the *required* onboarding steps).
+
+**Trade-offs:** None — this is strictly more flexible for the user with no loss of correctness, since the checklist items are all genuinely optional/reorderable unlike the mandatory onboarding steps.
+
+---
+
+## ADR-042 — Onboarding finalization is one atomic RPC; client never sets privileged values
+
+**Decision:** `complete_new_club_onboarding(p_full_name, p_mobile, p_business_type, p_club_name, p_branch_name, p_city, ...)` is a single `SECURITY DEFINER` RPC that, in one transaction: creates the `clubs` row, creates the first `branches` row, creates a `club_memberships` row with `role_id` hardcoded to the `club_owner` role (never accepted as a parameter), and creates the trial `platform_subscriptions` row with `subscription_kind` hardcoded to `'trial'` and duration read from `platform_settings.default_trial_days` (never accepted as a parameter). If any step fails, the whole transaction rolls back — never a state with a club but no membership, or a membership but no trial.
+
+**Reason:** This is the same atomicity discipline already applied to booking creation (ADR-007) and refunds (ADR-011c), extended to onboarding — a multi-table operation that must succeed completely or not at all. The "client never sets privileged values" rule is critical specifically here because this RPC is reachable by an anonymous/newly-authenticated user with no existing permissions to check against — unlike every other privileged RPC in this system, there's no existing `club_memberships` row yet to validate the caller against. The RPC itself is the entire trust boundary: it must derive `role = club_owner`, `subscription_kind = trial`, and `trial_days = platform_settings.default_trial_days` internally, never from client input, or a malicious signup payload could grant itself `platform_owner`, a `paid` subscription, or a 365-day trial.
+
+**Alternatives considered:** Separate client-driven inserts for club/branch/membership/subscription (rejected — exactly the partial-failure risk described above, and each individual insert would need its own privilege-escalation defense instead of one RPC bearing that responsibility once).
+
+**Trade-offs:** None — this is strictly safer than the alternative with no functional cost.
+
+---
+
+## ADR-041 — Email verification uses Supabase Auth's built-in flow; no paid email provider dependency
+
+**Decision:** If Supabase's free-tier email delivery (via its built-in Auth email templates) is sufficient to send verification/password-reset emails without a paid provider, use it. If Supabase free-tier email sending proves unreliable or rate-limited in practice, **email verification is not a hard gate on trial start** — a new club can begin its trial immediately upon signup, with verification treated as a soft prompt rather than a blocker. Password reset always uses Supabase Auth's built-in flow — no custom reset system is ever built (see [PROJECT_BRIEF](../README.md) Section 18: use Supabase Auth, don't build custom).
+
+**Reason:** The brief is explicit: don't let V1 depend on a paid email provider, and don't build a custom password-reset system. Supabase's free tier includes basic transactional auth email, which is likely sufficient for V1's volume (one pilot club growing slowly) — but making verification a hard blocker on trial start risks losing a legitimate signup to an email delivery hiccup outside our control, which is a worse outcome than occasionally allowing an unverified email to start a free trial (a trial has no financial exposure — see ADR-036).
+
+**Alternatives considered:** Hard-block trial start until email verified (rejected — couples trial activation, a core conversion moment, to email deliverability, an external dependency with failure modes outside V1's control). Add a paid transactional email provider now (rejected — explicitly against the zero-cost-first rule with no current justification).
+
+**Trade-offs:** An unverified email can start a trial. Acceptable given a trial carries no payment obligation and is visible/monitorable by Platform Owner regardless.
+
+---
+
+## ADR-040 — Public plan data is exposed through a restricted view/RPC, never the raw `platform_plans` table
+
+**Decision:** `platform_plans` gains `is_public boolean` (default `false`) and `display_order int`. Anonymous/public read access is granted only to a view (e.g. `public_plans`) selecting a fixed, safe column set (`name_ar`, `description_ar`, `billing_interval`, `billing_interval_count`, `price`, `currency`, `discount_label`, `features_summary`) filtered to `is_public = true`, ordered by `display_order`. The base `platform_plans` table itself remains Platform-Owner-only — no anonymous or authenticated-non-platform-owner role ever queries it directly.
+
+**Reason:** `platform_plans` may eventually carry internal fields (cost basis, internal notes, unpublished draft plans) that must never be exposed publicly. A view with an explicit, narrow column allowlist is the same defense-in-depth pattern already used for `players.medical_notes` (ADR-019) and the Club Owner subscription summary (ADR-035) — expose only what's safe, through a boundary that can't accidentally leak a new sensitive column added to the base table later.
+
+**Alternatives considered:** RLS policy on `platform_plans` directly allowing anonymous `SELECT` filtered to `is_public = true` (rejected — still exposes every column on that table to anonymous users for any published row, including columns not yet designed but added later without remembering to re-audit public exposure; a view's column list is an explicit, reviewable allowlist).
+
+**Trade-offs:** One additional view to keep in sync if `platform_plans`' public-safe column set changes — minor, and worth the safety margin.
+
+---
+
+## ADR-039 — Trial belongs to the club, not the user; one trial per club, ever
+
+**Decision:** A trial subscription period is tied to `platform_subscriptions.club_id`, exactly like any paid period. Adding a second user to a club that already has (or has ever had) a trial does not grant a new trial. The onboarding RPC creates a trial only as part of creating a *new* club — there is no path to create a second trial for an existing club.
+
+**Reason:** The brief is explicit and this matches the natural shape of the existing model: a trial is a `platform_subscriptions` row like any other, and that table's exclusion constraint already prevents a club from having two overlapping periods — extending "trial" to be per-user instead of per-club would require an entirely parallel structure for no benefit, and would trivially allow trial-abuse by adding new user accounts to bypass a one-trial-per-club limit.
+
+**Alternatives considered:** Trial per user account (rejected — explicitly wrong per the brief, and it's also just a worse design: it decouples the trial from the entity actually using the product, the club).
+
+**Trade-offs:** None — this falls out for free from the existing period-based subscription model; no new enforcement code beyond checking "does this club already have any non-cancelled `platform_subscriptions` row" before allowing onboarding to create a trial.
+
+---
+
+## ADR-038 — Trial is a `subscription_kind`, not a new concept; trial expiry defaults to `blocked`, not automatic conversion
+
+**Decision:** `platform_subscriptions` gains `subscription_kind` (`trial` | `paid` | `complimentary`, see ADR-054 in the original numbered brief — folded in here). A signup creates a `platform_subscriptions` row exactly like a renewal or a Platform-Owner-initiated activation would, with `subscription_kind = 'trial'`, `start_at = now()`, `end_at = now() + platform_settings.default_trial_days` (see ADR-037), and `grace_period_days_snapshot` — **trials get their own grace policy, which the brief sets to 0 by default** (trial expiry goes straight to `blocked`, not through a grace window, since "grace" exists to protect a paying customer's operational continuity during a billing hiccup — a concept that doesn't apply to an never-yet-paying trial). `get_club_platform_access()` (from ADR-033) needs no new logic — a trial period is just a period, and the same `full`/`grace`/`blocked` derivation already applies, with `grace = 0 days` for `subscription_kind = 'trial'` simply collapsing the `grace` window to zero width. Trial does **not** auto-convert to paid at expiry — expiry moves access to `blocked` (per ADR-033's existing derivation) until Platform Owner (or, later, an actual payment flow) creates the next period.
+
+**Reason:** This is the central design insight of this addition: because the platform subscription model from the prior corrections pass is already period-based with snapshots and a derived-access function, "trial" requires **zero new architecture** — it's a value in an already-existing enum plus a zero-length grace window, not a new table, new state machine, or new access-derivation logic. This is exactly the kind of reuse the project's own rules reward (see [PROJECT_RULES.md](PROJECT_RULES.md) rule 6, no premature abstraction — the inverse insight applies here too: no premature *new* structure when the existing one already fits).
+
+**Alternatives considered:** A separate `trials` table (rejected — the brief itself says "do not create a separate trial table if trial itself is a subscription period," and a separate table would need its own overlap-prevention, its own history-linking, its own access-derivation branch — pure duplication of what `platform_subscriptions` already does). Auto-converting trial to a paid subscription at expiry (rejected — there is no online payment gateway in V1, so there is nothing for it to auto-convert *into*; a club must be manually activated onto a paid plan by Platform Owner, exactly like any other activation).
+
+**Trade-offs:** `get_club_platform_access()`'s grace-window calculation needs to read `grace_period_days_snapshot` (which is `0` for trials by convention) rather than assuming a nonzero grace always applies — already true of the existing derivation, just confirming trials naturally produce a zero-width grace window rather than needing a special case.
+
+---
+
+## ADR-037 — Trial length is a platform setting, not hardcoded
+
+**Decision:** New table `platform_settings` (singleton — one row, or a simple key-value table) holds `default_trial_days` (default `7`). Every place that would otherwise hardcode "7 days" — the onboarding RPC, the marketing copy's "7 days free" claim, the trial reminder thresholds — reads this value at the point of use rather than embedding the literal `7`.
+
+**Reason:** The number 7 appears in at least three independent places in this brief (RPC logic, landing page copy, in-app messaging) — hardcoding it in each means a future change to trial length requires finding and updating every occurrence, with real risk of missing one and shipping inconsistent messaging (marketing says "7 days," the RPC grants 10). One setting, read everywhere, eliminates that class of bug entirely. This is the same "single source of truth" principle already applied to pricing (ADR-030's snapshot-from-plan pattern) and financial figures (rule 8's "dashboards and reports share one RPC/view definition").
+
+**Alternatives considered:** Hardcode `7` in the RPC and separately hardcode `7` in marketing copy with a manual "keep these in sync" discipline (rejected — exactly the fragile-consistency risk described above, easily avoided).
+
+**Trade-offs:** Marketing copy (e.g. static landing page text) still needs to *read* this value somehow if it's server-rendered or fetched at build/runtime rather than hand-typed — handled by exposing `default_trial_days` through the same public-safe RPC/view used for plan data (see ADR-040), not by a separate mechanism.
+
+---
+
+## ADR-036 — Free trial requires no payment method; zero financial exposure by construction
+
+**Decision:** Trial signup collects only Full Name, Mobile, Email, Password (plus club/branch details in onboarding) — no credit card, no payment gateway touchpoint of any kind, anywhere in the trial flow. This is not merely a UX choice; it's architecturally enforced by the fact that `platform_payments` has no relationship to trial creation at all — a trial `platform_subscriptions` row is created directly by the onboarding RPC, with no `platform_invoices` or `platform_payments` row involved.
+
+**Reason:** Matches the brief's explicit requirement and the project's standing zero-cost/no-payment-gateway rule (see [PROJECT_RULES.md](PROJECT_RULES.md) rule 4) — there is no payment gateway in V1 at all, so a "free trial, no card required" design isn't a marketing choice layered on top of payment infrastructure, it's the *only* option available, which conveniently also happens to be the better conversion-optimized choice for a self-service SaaS trial.
+
+**Alternatives considered:** None seriously — collecting card details with no gateway to actually charge them would be actively worse (security liability for storing/transmitting card data with no functional payment capability behind it) and directly contradicts explicit instruction.
+
+**Trade-offs:** No "convert automatically at trial end" capability (see ADR-038) — accepted, consistent with the rest of V1's manual billing model.
 
 ---
 
@@ -120,6 +254,8 @@ Architecture Decision Records for Mala3by. Each entry: Decision, Reason, Alterna
 **Trade-offs:** Access-control logic now reads two independent signals (`clubs.status` and the derived subscription status) instead of one — handled by centralizing both into `get_club_platform_access()` (see [ADR-033](#adr-033--platform-access-is-full--grace--blocked-derived-by-one-centralized-db-function)) so nothing downstream needs to know there are two signals being combined.
 
 ---
+
+## ADR-021 — Exclusion constraint covers `pending_payment`, `confirmed`, and `checked_in`
 
 **Decision:** The `bookings` double-booking exclusion constraint's `WHERE` clause is `status IN ('pending_payment', 'confirmed', 'checked_in')` — i.e. it blocks overlap for any non-terminal booking state. `completed`, `cancelled`, and `no_show` are excluded from the constraint.
 

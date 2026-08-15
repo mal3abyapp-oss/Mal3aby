@@ -1,6 +1,8 @@
 # Architecture
 
 > **Corrected 2026-08-15** per Mandatory Architecture Corrections. See [DECISIONS.md](DECISIONS.md) ADR-011 through ADR-021 for full reasoning behind changes in this revision.
+>
+> **Added 2026-08-15 (public site)** per Public Website + Signup + Free Trial addition. New sections: [Public Website & Layout Strategy](#public-website--layout-strategy), [Signup & Onboarding Strategy](#signup--onboarding-strategy). Trial is folded into the existing [Platform Access Strategy](#platform-access-strategy) as a `subscription_kind`, not a new system. See [DECISIONS.md](DECISIONS.md) ADR-036 through ADR-046.
 
 ## System Architecture
 
@@ -18,10 +20,18 @@ Feature-based structure. Each `features/*` module owns its queries, mutations, a
 
 ```
 src/
-  app/                    # routing, providers, layout shells
+  app/
+    layouts/
+      PublicLayout/         # public site header/footer shell — see Public Website strategy below
+      AppLayout/             # authenticated club-side shell (existing sidebar/bottom-nav)
+      PlatformLayout/        # /platform Control Center shell
+    routing/                # route guards per layout — see Route Guards below
+    providers/
   components/             # shared/dumb UI (shadcn-based)
   features/
-    auth/
+    public-site/            # home, pricing, contact, FAQ — reads public_plans/platform_settings only
+    auth/                   # login, signup, forgot/reset password
+    onboarding/              # complete_new_club_onboarding wizard + first-run checklist
     clubs/                # club + branch admin
     staff/                # roles, permissions, memberships
     customers/             # customers + guardian_links
@@ -30,10 +40,12 @@ src/
     bookings/              # calendar, booking engine, check-in
     academy/                # programs, groups, enrollments, sessions, attendance
     billing/                # invoices, payments, refunds
+    subscription/            # club-side /app/subscription screen (own-club summary view)
     scanner/                # QR generation + /scan
     reports/
     dashboard/
     settings/
+    platform/                # /platform Control Center — clubs, subscriptions, payments, reports, leads
   lib/
     supabase/              # client, generated types
     domain/                 # pure business logic, testable, UI-agnostic
@@ -157,6 +169,87 @@ $$;
 `p_action_category` is `'new_commitment'` (blocked in `grace` — new `bookings`, `enrollments`, `subscriptions`, `groups`/`programs`, new field/branch expansion), `'settle_existing'` (allowed in `grace` — `payments`, `payment_allocations`, `refunds` against existing invoices/subscriptions), or `'operational_continuity'` (allowed in `grace` — `attendance` marking for already-scheduled sessions, completing already-created bookings). `SELECT` access is never restricted by this helper — `grace` and `full` read identically. Platform Owner is never subject to `get_club_platform_access()` — they retain full access to every club regardless of that club's own status, by a separate bypass policy (see [RLS_MATRIX.md](RLS_MATRIX.md)).
 
 A manual `platform_payments` record, marking its `platform_invoices.status = 'paid'`, restores `full` access on the very next request — no separate status field to flip, since access is derived live from the period's dates each time.
+
+**Trial is a `subscription_kind`, not a separate system** (see [DECISIONS.md ADR-038](DECISIONS.md#adr-038--trial-is-a-subscription_kind-not-a-new-concept-trial-expiry-defaults-to-blocked-not-automatic-conversion)). A trial period is a `platform_subscriptions` row exactly like a paid period — same exclusion constraint, same `get_club_platform_access()` derivation, same renewal-chain mechanism if it later converts to paid. The only differences: `subscription_kind = 'trial'`, `grace_period_days_snapshot = 0` (trial expiry goes straight from `full` to `blocked` — there is no "grace" concept for a period that was never paid for), `plan_id` is nullable (a trial has no underlying plan), and it never has a `platform_invoices`/`platform_payments` row. `end_at` is computed from `platform_settings.default_trial_days`, not a plan's interval. A database-level unique partial index (`WHERE subscription_kind = 'trial'`) guarantees a club can never have more than one non-cancelled trial, ever — enforced independently of the general exclusion constraint, which only prevents *overlapping* periods, not a second non-overlapping trial after the first one expired.
+
+## Public Website & Layout Strategy
+
+**Three fully separate layouts, never merged**, matching three fully separate authorization contexts:
+
+- `PublicLayout` — the marketing site (`/`, `/pricing`, `/contact`, `/login`, `/signup`, `/forgot-password`, `/reset-password`, `/terms`, `/privacy`). No authentication required. Reads only `public_plans` and `platform_settings.default_trial_days` — never any tenant-scoped or Platform-Owner-only table.
+- `AppLayout` — the authenticated club-side application (`/app/*`). Requires an authenticated user with an active `club_memberships` row and `full`/`grace` platform access (see Route Guards below).
+- `PlatformLayout` — the Platform Owner console (`/platform/*`). Requires an authenticated user holding the `platform_owner` role, independent of any club membership.
+
+A user who is both a Platform Owner and a club member (uncommon but possible) switches between `AppLayout` and `PlatformLayout` explicitly — the two contexts are never blended into one navigation.
+
+**Public data exposure is minimal and view-gated**: the public site never queries `platform_plans`, `clubs`, `platform_subscriptions`, or any club-side table directly — only `public_plans` (a narrow, explicit-column view — see [DECISIONS.md ADR-040](DECISIONS.md#adr-040--public-plan-data-is-exposed-through-a-restricted-viewrpc-never-the-raw-platform_plans-table)) and a similarly narrow read of `platform_settings.default_trial_days`. The `contact_requests` table accepts anonymous `INSERT` only — no anonymous `SELECT`, so a submitter can never enumerate other submissions.
+
+**No fake checkout language** (see [DECISIONS.md brief](../README.md) Section 44): the public site never presents "Buy Now"/"Checkout"/"Pay" — every plan CTA is "ابدأ تجربتك المجانية" (Start your free trial), since there is no online payment gateway to check out through. Post-trial, the messaging is "تواصل معنا لتفعيل الاشتراك" (contact us to activate) or an in-app "renewal pending Platform Owner activation" state — never an implied self-service purchase flow that doesn't exist.
+
+## Signup & Onboarding Strategy
+
+**Atomic finalization via one RPC** — `complete_new_club_onboarding()` (see [DECISIONS.md ADR-042](DECISIONS.md#adr-042--onboarding-finalization-is-one-atomic-rpc-client-never-sets-privileged-values)) — creates `clubs`, the first `branches` row, the `club_memberships` row (role hardcoded to `club_owner`), and the trial `platform_subscriptions` row, all in one transaction:
+
+```sql
+create or replace function complete_new_club_onboarding(
+  p_business_type text,
+  p_club_name text,
+  p_club_name_ar text,
+  p_branch_name text,
+  p_city text,
+  p_phone text
+) returns uuid  -- returns new club_id
+language plpgsql security definer
+set search_path = public, pg_temp as $$
+declare
+  v_club_id uuid;
+  v_branch_id uuid;
+  v_trial_days int;
+begin
+  -- caller must be authenticated; auth.uid() is the only identity source, never a parameter
+  if auth.uid() is null then
+    raise exception 'authentication required';
+  end if;
+
+  -- a user with an existing club membership cannot self-service another club this way
+  -- (see DECISIONS.md ADR on separating public signup from platform-owner club creation)
+  if exists (select 1 from club_memberships where user_id = auth.uid() and status = 'active') then
+    raise exception 'user already has an active club membership';
+  end if;
+
+  select default_trial_days into v_trial_days from platform_settings limit 1;
+
+  insert into clubs (name, name_ar, status) values (p_club_name, p_club_name_ar, 'active')
+    returning id into v_club_id;
+
+  insert into branches (club_id, name, address, status)
+    values (v_club_id, p_branch_name, p_city, 'active') returning id into v_branch_id;
+
+  insert into club_memberships (user_id, club_id, role_id, status)
+    values (auth.uid(), v_club_id, (select id from roles where key = 'club_owner'), 'active');
+
+  insert into platform_subscriptions (
+    club_id, subscription_kind, plan_name_snapshot, price_snapshot,
+    grace_period_days_snapshot, start_at, end_at, lifecycle_status
+  ) values (
+    v_club_id, 'trial', 'تجربة مجانية', 0,
+    0, now(), now() + (v_trial_days || ' days')::interval, 'trial'
+  );
+
+  return v_club_id;
+end;
+$$;
+```
+
+Every privileged value — `role_id = club_owner`, `subscription_kind = 'trial'`, `grace_period_days_snapshot = 0`, trial duration from `platform_settings` — is **derived inside the function, never accepted as a client parameter**. This is the critical security property: unlike every other privileged RPC in this system, this one is reachable by a user with *no* existing `club_memberships` row to validate against, so the function body itself is the entire trust boundary (see [DECISIONS.md ADR-042](DECISIONS.md#adr-042--onboarding-finalization-is-one-atomic-rpc-client-never-sets-privileged-values) and [RLS_SECURITY.md](RLS_SECURITY.md) for the general `SECURITY DEFINER` discipline this follows).
+
+**Business type is a classification label only** (`نادي`/`أكاديمية`/`ملاعب`/`مركز رياضي`) — stored for reporting/segmentation, never branches Core Architecture. A club of any business type gets the identical schema, RLS, and feature set.
+
+**Duplicate detection is advisory, not blocking** (see [DECISIONS.md ADR-045](DECISIONS.md#adr-045--duplicate-club-detection-flags-for-review-never-hard-blocks-signup)) — a normalized-name/phone/email match sets a flag visible to Platform Owner, never rejects the signup.
+
+**First-run setup is a dismissible checklist**, not a continuation of the mandatory wizard (see [DECISIONS.md ADR-043](DECISIONS.md#adr-043--first-run-setup-is-a-checklist-not-a-multi-step-wizard)): add a field, add a staff member, add a first customer, create a first booking — each independently completable in any order, sourced from simple existence checks (`EXISTS (SELECT 1 FROM fields WHERE club_id = ...)`, etc.) rather than a stored progress state.
+
+**The trial clock starts at club creation, not first use** — `platform_subscriptions.start_at = now()` inside the onboarding RPC, regardless of whether the club immediately creates a booking or waits three days to explore the product.
 
 ## Booking Engine Strategy
 
@@ -334,8 +427,10 @@ Loop: edit → local test (`vitest` + `supabase test db`) → local build (`npm 
 | `vite-plugin-pwa` | PWA/offline shell | Open source | N/A | N/A | — |
 | GitHub | Source control | Free for private repos | N/A | No | — |
 | Browser print (`window.print`) | Invoices, A4 + 80mm | Native, free | N/A | No | — |
+| Supabase Auth built-in email (verification, password reset) | Signup verification, forgot-password flow | Included free with Supabase Auth, rate-limited | If limits are hit or delivery proves unreliable, verification becomes a soft prompt, never a hard gate (see [DECISIONS.md ADR-041](DECISIONS.md#adr-041--email-verification-uses-supabase-auths-built-in-flow-no-paid-email-provider-dependency)) | Yes — verification is never load-bearing for trial start | No paid provider added; degrade gracefully instead |
+| Signup rate limiting | Trial-abuse mitigation | DB-level checks (per-IP/per-time-window counts via a table or Postgres logic), no external service | N/A | N/A — this is DB logic, not a service | Cloudflare Turnstile noted as a possible free future addition, not a V1 dependency |
 
-**Projected V1 monthly cost: 0 EGP**, until Supabase free-tier limits are hit — comfortably beyond a single pilot club's real usage. First paid step, when it arrives, is Supabase Pro (~$25/mo), never earlier than actually needed.
+**Projected V1 monthly cost: 0 EGP**, until Supabase free-tier limits are hit — comfortably beyond a single pilot club's real usage. First paid step, when it arrives, is Supabase Pro (~$25/mo), never earlier than actually needed. The public site and trial signup add zero new paid dependencies — every new capability (public plan display, contact form, email verification, rate limiting) is either pure database logic or already-included Supabase Auth functionality.
 
 ## Security Threat Review
 
@@ -348,6 +443,9 @@ Loop: edit → local test (`vitest` + `supabase test db`) → local build (`npm 
 - **Audit log tampering:** no `UPDATE`/`DELETE` policy exists on `audit_logs` for any role, including Club Owner and Platform Owner — the trail is immutable through every client-facing path (see [DECISIONS.md ADR-020](DECISIONS.md#adr-020--audit-logs-are-immutable-no-role-can-update-or-delete-them)).
 - **Sensitive field exposure:** `players.medical_notes` is gated behind `player.medical_notes.view`/`.update`, not visible to Receptionist by default, never in global search results (see [DECISIONS.md ADR-019](DECISIONS.md#adr-019--medical-notes-are-a-permission-gated-field-not-a-default-visible-one) and [RLS_SECURITY.md](RLS_SECURITY.md#sensitive-column-protection-medical_notes)).
 - **Accidental QR check-in:** scanning a booking QR never mutates state by itself — an explicit staff "Confirm Check-in" is required, preventing an accidental camera pass from silently checking a customer in (see [DECISIONS.md ADR-011e](DECISIONS.md#adr-011e--qr-scan-validates-explicit-staff-confirmation-performs-the-check-in-mutation)).
+- **Public signup privilege escalation:** `complete_new_club_onboarding()` derives `role_id = club_owner`, `subscription_kind = 'trial'`, `grace_period_days_snapshot = 0`, and trial duration entirely server-side — no client-supplied value can request `platform_owner`, a `paid`/`complimentary` subscription, or a non-default trial length (see [DECISIONS.md ADR-042](DECISIONS.md#adr-042--onboarding-finalization-is-one-atomic-rpc-client-never-sets-privileged-values)).
+- **Trial abuse:** a database-level unique partial index guarantees at most one trial per club, ever — adding a second user to a club cannot create a second trial (see [DECISIONS.md ADR-039](DECISIONS.md#adr-039--trial-belongs-to-the-club-not-the-user-one-trial-per-club-ever)). Lightweight rate limiting and advisory duplicate-detection (never a hard block) cover the mass-fake-signup case at V1's proportional risk level (see [DECISIONS.md ADR-046](DECISIONS.md#adr-046--signup-rate-limiting-and-duplicate-club-flagging-are-lightweight-not-blocking)).
+- **Public data leakage:** anonymous/public roles can `SELECT` only `public_plans` (an explicit narrow-column view, never the base `platform_plans` table) and `INSERT`-only on `contact_requests` (no `SELECT` — a submitter cannot enumerate other leads). No public role ever reads `clubs`, `platform_subscriptions`, or any club-side operational table (see [DECISIONS.md ADR-040](DECISIONS.md#adr-040--public-plan-data-is-exposed-through-a-restricted-viewrpc-never-the-raw-platform_plans-table)).
 
 ## Failure & Recovery Strategy
 
@@ -364,3 +462,6 @@ Loop: edit → local test (`vitest` + `supabase test db`) → local build (`npm 
 | Club's platform subscription lapses (unpaid, `clubs.status` unaffected) | `get_club_platform_access()` returns `grace` for up to the period's `grace_period_days_snapshot` (default 7, per-club/period overridable) past `end_at` — staff retain read access and can still settle existing payments/attendance/complete existing bookings but cannot create new bookings/enrollments/subscriptions (see [Platform Access Strategy](#platform-access-strategy)); returns `blocked` (full operational lockout, `clubs.status` itself still unchanged) once the grace window elapses, computed live on every access, not via a scheduled job; a manual `platform_payments` record at any point restores `full` access immediately, next request |
 | Subscription expires mid-session | The in-progress session's attendance is unaffected; the *next* session's enrollment check flags expired status (via the derived `effective_end_date`) and blocks further attendance until renewed |
 | Two receptionists enroll the last group spot simultaneously | Enrollment RPC locks the `groups` row (`SELECT ... FOR UPDATE`) and re-checks capacity inside the same transaction as the insert — only one enrollment succeeds, the second sees "Group is full" |
+| Club's 7-day trial expires with no paid plan activated | `get_club_platform_access()` returns `blocked` immediately at `end_at` — trial's `grace_period_days_snapshot = 0` means no grace window, unlike a paid subscription; data fully retained, staff see a clear "trial expired, contact us to activate" state, Platform Owner sees it in the Trials report and can activate a paid plan at any time to restore access |
+| Onboarding RPC fails partway through (e.g. trial insert violates the one-trial-per-club constraint on a retry) | The entire `complete_new_club_onboarding()` transaction rolls back — never a state with a `clubs` row but no membership, or a membership but no trial; the user sees a clear error and can retry safely (retry is itself safe because nothing partial was committed) |
+| Email verification never arrives (delivery failure) | Trial start is not blocked by this — verification is a soft prompt, not a gate (see [DECISIONS.md ADR-041](DECISIONS.md#adr-041--email-verification-uses-supabase-auths-built-in-flow-no-paid-email-provider-dependency)); the club operates normally, verification can be re-sent or the user can proceed unverified |
