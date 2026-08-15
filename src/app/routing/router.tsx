@@ -31,18 +31,19 @@ import { SettingsPage } from '@/features/settings/SettingsPage'
 import { AuditLogPage } from '@/features/settings/AuditLogPage'
 import { ScanPage } from '@/features/scanner/ScanPage'
 
+import { PlatformOverviewPage } from '@/features/platform/PlatformOverviewPage'
+import { PlatformClubsPage } from '@/features/platform/PlatformClubsPage'
+import { PlatformClubDetailPage } from '@/features/platform/PlatformClubDetailPage'
+import { PlatformPlansPage } from '@/features/platform/PlatformPlansPage'
+import { PlatformTrialsPage } from '@/features/platform/PlatformTrialsPage'
+import { PlatformLeadsPage } from '@/features/platform/PlatformLeadsPage'
+import { PlatformReportsPage } from '@/features/platform/PlatformReportsPage'
+import { PlatformAlertsPage } from '@/features/platform/PlatformAlertsPage'
+import { PlatformAuditPage } from '@/features/platform/PlatformAuditPage'
 import {
-  PlatformOverviewPage,
-  PlatformClubsPage,
   PlatformSubscriptionsPage,
-  PlatformPlansPage,
   PlatformPaymentsPage,
   PlatformRenewalsPage,
-  PlatformTrialsPage,
-  PlatformLeadsPage,
-  PlatformReportsPage,
-  PlatformAlertsPage,
-  PlatformAuditPage,
   PlatformSettingsPage,
 } from '@/features/platform/pages'
 
@@ -105,6 +106,7 @@ export const router = createBrowserRouter([
         children: [
           { index: true, element: <PlatformOverviewPage /> },
           { path: 'clubs', element: <PlatformClubsPage /> },
+          { path: 'clubs/:clubId', element: <PlatformClubDetailPage /> },
           { path: 'subscriptions', element: <PlatformSubscriptionsPage /> },
           { path: 'plans', element: <PlatformPlansPage /> },
           { path: 'payments', element: <PlatformPaymentsPage /> },

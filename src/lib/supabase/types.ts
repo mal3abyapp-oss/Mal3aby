@@ -17,6 +17,63 @@ export type Database = {
   }
   public: {
     Tables: {
+      audit_logs: {
+        Row: {
+          action: string
+          actor_id: string | null
+          after: Json | null
+          before: Json | null
+          branch_id: string | null
+          club_id: string | null
+          created_at: string
+          entity_id: string | null
+          entity_type: string
+          id: string
+          reason: string | null
+        }
+        Insert: {
+          action: string
+          actor_id?: string | null
+          after?: Json | null
+          before?: Json | null
+          branch_id?: string | null
+          club_id?: string | null
+          created_at?: string
+          entity_id?: string | null
+          entity_type: string
+          id?: string
+          reason?: string | null
+        }
+        Update: {
+          action?: string
+          actor_id?: string | null
+          after?: Json | null
+          before?: Json | null
+          branch_id?: string | null
+          club_id?: string | null
+          created_at?: string
+          entity_id?: string | null
+          entity_type?: string
+          id?: string
+          reason?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "audit_logs_branch_id_fkey"
+            columns: ["branch_id"]
+            isOneToOne: false
+            referencedRelation: "branches"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "audit_logs_club_id_fkey"
+            columns: ["club_id"]
+            isOneToOne: false
+            referencedRelation: "clubs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       automatic_trial_entitlements: {
         Row: {
           club_id: string
@@ -783,7 +840,23 @@ export type Database = {
         Args: { p_payment_id: string; p_reason: string }
         Returns: undefined
       }
+      set_plan_publish_status: {
+        Args: { p_is_public: boolean; p_plan_id: string }
+        Returns: undefined
+      }
       user_club_ids: { Args: Record<PropertyKey, never>; Returns: string[] }
+      write_audit_log: {
+        Args: {
+          p_action: string
+          p_after: Json
+          p_before: Json
+          p_club_id: string
+          p_entity_id: string
+          p_entity_type: string
+          p_reason: string
+        }
+        Returns: undefined
+      }
     }
     Enums: {
       [_ in never]: never
