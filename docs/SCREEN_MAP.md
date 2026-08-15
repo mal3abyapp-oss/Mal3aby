@@ -77,6 +77,8 @@ Today · Bookings · **Scan** · Academy · More
 
 | Screen | Domain | Devices | Primary roles |
 |---|---|---|---|
+| Global Search (results grouped: Customers/Players/Bookings/Invoices) | search | All | Everyone (club-side, scoped by permission) |
+| Quick Actions palette (Ctrl/Cmd+K: New Booking, New Customer, Collect Payment, Scan QR, Find Invoice) | search | Desktop only | Receptionist, Manager, Accountant |
 | Today / Ops Center | dashboard | All | Manager, Owner |
 | Reception Operational View (Now/Next/Quick Actions) | dashboard | All | Receptionist |
 | Booking Calendar (day grid) | bookings | Desktop, Tablet | Receptionist, Manager |

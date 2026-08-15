@@ -122,11 +122,12 @@ At minimum, these actions always write an `audit_logs` row (actor, action, entit
 
 ```
 booking created · booking cancelled · booking price override · discount applied
+field block created (Quick Field Block)
 invoice issued · invoice voided
 payment recorded · payment reversed · refund
 subscription activated · subscription cancelled · subscription frozen · subscription renewed
 platform subscription changed
-role/permission changes · club suspension · trial extension
+role/permission changes · club suspension · trial extension · new club onboarding completed
 ```
 
 **Immutability** (restated from [DECISIONS.md ADR-020](DECISIONS.md#adr-020--audit-logs-are-immutable-no-role-can-update-or-delete-them)): `INSERT` only via trusted trigger/RPC; `SELECT` by authorized users; `UPDATE` and `DELETE` — never, for any role, including Platform Owner. History is not editable by anyone.

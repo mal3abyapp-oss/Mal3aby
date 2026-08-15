@@ -14,7 +14,7 @@ Each flow is optimized for fewest steps — the receptionist/coach is the primar
 Search/Create Customer
   → Tap available slot on calendar grid
   → Price auto-calculated from pricing_rules
-  → Optional discount (permission-gated: booking.discount)
+  → Optional discount (permission-gated: booking.discount.apply, see SECURITY_ANTI_FRAUD.md#discount-security)
   → Payment (method + amount)
   → Confirm  ──▶  create_booking RPC (atomic: booking + invoice + invoice_item)
   → Invoice generated (sequential number)

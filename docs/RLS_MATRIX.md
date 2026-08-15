@@ -108,6 +108,8 @@ Legend: **S**=Select, **I**=Insert, **U**=Update, **D**=Void/Reverse (status tra
 | `contact_requests` | S,U (progress `status`) | – | – | – | – | – | – | – | – |
 | `get_club_platform_access()` / `auth.club_write_allowed()` (functions, not tables) | Bypassed — never gated | Return value only, not directly callable to inspect other clubs | (called internally by RLS policies on gated tables) | | | | | | |
 | `branches` | S,I,U | S,I,U | S,I,U | S,U (own) | S | S | S | – | – |
+| `profiles` (own row only, or any user with a shared club membership — see [DATABASE_BLUEPRINT.md](DATABASE_BLUEPRINT.md#profiles)) | S,U (own) | S (own club's staff), U (own) | S (own club's staff), U (own) | S (own branch's staff), U (own) | S,U (own only) | S,U (own only) | S,U (own only) | S,U (own only) | S,U (own only) |
+| `roles` / `permissions` / `role_permissions` (seed/reference — not user-editable in V1) | S | S | S | S | S | S | S | S | S |
 | `club_memberships` (staff) | S,I,U,D | S,I,U,D | S,I,U | S (branch) | – | – | – | – | – |
 | `membership_branches` | S,I,U,D | S,I,U,D | S,I,U | S (own) | – | – | – | – | – |
 | `customers` | S | S,I,U | S,I,U | S,I,U | S,I,U | S | S,I,U | – | – |
@@ -122,6 +124,7 @@ Legend: **S**=Select, **I**=Insert, **U**=Update, **D**=Void/Reverse (status tra
 | `outstanding_invoices` (view, read-only, same scoping as `invoices`) | S | S | S | S (own branch) | S | S | – | – | – |
 | `invoices` | S | S | S,I,U | S,I | S,I | S,I,U,D | S,I | – | – |
 | `invoice_items` | S | S | S,I,U | S,I | S,I | S,I,U | S,I | – | – |
+| `invoice_number_sequences` (written only via the invoice-numbering RPC's `UPDATE ... RETURNING`, never a direct client write) | S | S | S | S (own branch) | – | S | – | – | – |
 | `payments` (no `invoice_id` column) | S | S | S | S | S,I | S,I,U,D | – | – | – |
 | `payment_allocations` | S | S | S | S | S | S,I,U | – | – | – |
 | `refunds` | S | S | S,I | S | – | S,I | – | – | – |
@@ -150,10 +153,12 @@ Per [PROJECT_BRIEF](../README.md) Section 58, these actions always write an `aud
 
 - Booking cancellation
 - Price / discount edits
+- Invoice voided (issued-invoice-lock correction path — see [SECURITY_ANTI_FRAUD.md](SECURITY_ANTI_FRAUD.md#issued-invoice-lock))
 - Payment void
 - Refund
 - Subscription freeze
 - Manual status change (booking, subscription, enrollment)
+- Field block created (Quick Field Block — surfaces booking conflicts, worth an audit trail since it affects field availability/revenue)
 - Permission / role changes (`club_memberships`, `membership_branches`, `role_permissions`)
 - Club suspension/reactivation/closure (`clubs.status` change — administrative, independent of billing)
 - Platform subscription lifecycle actions: activate, start trial, renew, change plan, extend grace period, cancel (`platform_subscriptions` insert/update)
