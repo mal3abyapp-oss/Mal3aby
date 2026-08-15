@@ -27,7 +27,6 @@ import { OutstandingPage } from '@/features/billing/OutstandingPage'
 import { ReportsPage } from '@/features/reports/ReportsPage'
 import { ClubPage } from '@/features/clubs/ClubPage'
 import { StaffPage } from '@/features/staff/StaffPage'
-import { SettingsPage } from '@/features/settings/SettingsPage'
 import { AuditLogPage } from '@/features/settings/AuditLogPage'
 import { ScanPage } from '@/features/scanner/ScanPage'
 
@@ -91,8 +90,14 @@ export const router = createBrowserRouter([
           { path: 'reports', element: <ReportsPage /> },
           { path: 'club', element: <ClubPage /> },
           { path: 'staff', element: <StaffPage /> },
-          { path: 'settings', element: <SettingsPage /> },
-          { path: 'settings/audit', element: <AuditLogPage /> },
+          // "الإعدادات" per docs/SCREEN_MAP.md's own screen table (row:
+          // "Audit Log Viewer | settings | ... Owner, Manager") -- the
+          // club-side Settings nav entry's real V1 content was always the
+          // Audit Log Viewer, not a separate general-settings screen (no
+          // such screen appears anywhere else in the spec). SettingsPage's
+          // placeholder claiming "Phase 5" would build a different screen
+          // was stale -- removed in favor of routing directly here.
+          { path: 'settings', element: <AuditLogPage /> },
         ],
       },
     ],
