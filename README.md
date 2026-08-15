@@ -12,6 +12,7 @@ Mala3by is a multi-tenant operations system for sports clubs and football academ
 - Real financial ledger: invoices, payments, allocations, refunds — no deletes, only void/reverse
 - Secure QR check-in for bookings and academy attendance
 - Arabic RTL first, English toggle, installable PWA, works on desktop/tablet/mobile
+- Platform billing: Mala3by charges clubs a subscription to use the platform — structurally separate from a club's own customer billing (see [docs/DECISIONS.md ADR-022](docs/DECISIONS.md#adr-022--platform-billing-is-a-structurally-separate-domain-from-club-billing))
 
 ## What this is not (V1)
 

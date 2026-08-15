@@ -37,6 +37,8 @@ Today · Bookings · **Scan** · Academy · More
 | Reports Hub (revenue, occupancy, academy, customers) | reports | Desktop | Manager, Owner, Accountant, Academy Manager |
 | Staff & Roles | staff | Desktop | Club Owner, Club Manager |
 | Club/Branch Settings | clubs | Desktop | Club Owner |
+| Platform Billing Console (list clubs, record payment, edit price/grace override) | platform-billing | Desktop | Platform Owner |
+| Platform Subscription Summary (read-only card: status, next due date) | platform-billing | Desktop | Club Owner (own club only) |
 | Audit Log Viewer | settings | Desktop | Owner, Manager |
 | Login / Club Switcher | auth | All | Everyone |
 

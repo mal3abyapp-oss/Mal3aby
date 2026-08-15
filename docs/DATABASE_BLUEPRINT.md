@@ -22,14 +22,41 @@ This is a table-by-table blueprint, not a migration file. Migrations are written
 
 ### `clubs`
 Purpose: top-level tenant. **No `organizations` layer above this in V1** — see [DECISIONS.md ADR-011](DECISIONS.md#adr-011--organizations-removed-entirely-from-v1-schema).
-Columns: `name`, `name_ar`, `name_en` (nullable), `logo_url` (nullable), `club_code` (unique, short slug used in invoice numbering — e.g. `MAL`), `currency` (single operating currency, e.g. `EGP` — see [DECISIONS.md ADR-017](DECISIONS.md#adr-017--single-currency-per-club-no-multi-currency-in-v1)), `timezone` (default `Africa/Cairo`), `tax_info jsonb` (nullable), `invoice_settings jsonb`, `subscription_activation_policy` (`manual` | `first_payment` | `full_payment`, default `first_payment` — see [DECISIONS.md ADR-013](DECISIONS.md#adr-013--subscription-activation-policy-is-a-club-setting-not-a-hardcoded-rule)), `status` (`active` | `suspended`).
+Columns: `name`, `name_ar`, `name_en` (nullable), `logo_url` (nullable), `club_code` (unique, short slug used in invoice numbering — e.g. `MAL`), `currency` (single operating currency, e.g. `EGP` — see [DECISIONS.md ADR-017](DECISIONS.md#adr-017--single-currency-per-club-no-multi-currency-in-v1)), `timezone` (default `Africa/Cairo`), `tax_info jsonb` (nullable), `invoice_settings jsonb`, `subscription_activation_policy` (`manual` | `first_payment` | `full_payment`, default `first_payment` — see [DECISIONS.md ADR-013](DECISIONS.md#adr-013--subscription-activation-policy-is-a-club-setting-not-a-hardcoded-rule)), `status` (`active` | `grace_period` | `suspended` — see [DECISIONS.md ADR-025](DECISIONS.md#adr-025--grace-period-is-7-days-by-default-per-club-overridable-ends-early-on-manual-payment-confirmation) and [ADR-026](DECISIONS.md#adr-026--grace-period-blocks-new-commitments-but-allows-collecting-on-existing-ones)).
 PK: `id`. No FK (top of tenant hierarchy). RLS ownership: root of `club_id` scoping for everything below.
 **No `organization_id` column exists anywhere in this schema.**
+**`status` is not a manually-flipped flag alone** — `grace_period`/`suspended` transitions are computed from `platform_subscriptions` at query time (lazy, on-access — see ADR-025), not exclusively driven by a scheduled job.
 
 ### `branches`
 Purpose: physical locations under a club.
 Columns: `club_id`, `branch_code` (unique per club, used in invoice numbering — e.g. `FAY`), `name`, `address`, `phone`, `opening_hours jsonb`, `status` (`active` | `inactive`).
 PK: `id`. FK: `club_id → clubs`. RLS: scoped by `club_id`.
+
+---
+
+## Platform Billing
+
+**Structurally separate from club billing** (`invoices`/`payments`/`payment_allocations`/`subscriptions` below, which represent a club's own customer transactions). This section represents money flowing from a **club to Mala3by** — see [DECISIONS.md ADR-022](DECISIONS.md#adr-022--platform-billing-is-a-structurally-separate-domain-from-club-billing). All four tables here are **Platform Owner only** — no club-side role has write access, and club-side roles see only a read-only summary of their own club's platform subscription status (via a restricted view), never these tables directly.
+
+### `platform_plans`
+Purpose: catalogue of platform subscription plans. **V1 has exactly one seeded row** (see [DECISIONS.md ADR-023](DECISIONS.md#adr-023--single-flat-platform-plan-manually-managed-in-v1)) — the table exists so a second plan is additive later, not a schema change.
+Columns: `name` (e.g. `Standard`), `default_price numeric(12,2)`, `default_grace_period_days int` (default `7`), `status` (`active` | `archived`).
+PK: `id`. Platform-Owner-only RLS (no `club_id` — this table is not tenant-scoped, it's platform-owned reference data).
+
+### `platform_subscriptions`
+Purpose: the billing relationship between one club and the platform — one row per club (a club has exactly one active platform subscription at a time).
+Columns: `club_id`, `plan_id`, `price_override numeric(12,2)` (nullable — falls back to `platform_plans.default_price` when null), `grace_period_days` (nullable — falls back to `platform_plans.default_grace_period_days` when null, see [DECISIONS.md ADR-025](DECISIONS.md#adr-025--grace-period-is-7-days-by-default-per-club-overridable-ends-early-on-manual-payment-confirmation)), `billing_cycle` (`monthly` | `annual`), `current_period_start`, `current_period_end`, `grace_period_started_at` (nullable — set when the club first enters grace_period, cleared on return to active), `status` (`active` | `grace_period` | `suspended` | `cancelled`).
+PK: `id`. Unique: `club_id`. FKs: `club_id → clubs`, `plan_id → platform_plans`. Platform-Owner-only RLS.
+
+### `platform_invoices`
+Purpose: what a club owes the platform for a billing period.
+Columns: `club_id`, `platform_subscription_id`, `invoice_number` (globally sequential, platform-wide — not per-branch, since this is Mala3by's own numbering, not a club's), `period_start`, `period_end`, `amount numeric(12,2)`, `due_date`, `status` (`pending` | `paid` | `overdue` | `void`).
+PK: `id`. Unique: `invoice_number`. FKs: `club_id → clubs`, `platform_subscription_id → platform_subscriptions`. Platform-Owner-only RLS. No hard delete once issued — same no-hard-delete rule as club-level financial records (see [PROJECT_RULES.md](PROJECT_RULES.md) rule 3).
+
+### `platform_payments`
+Purpose: manual/offline record of a club's payment to Mala3by (see [DECISIONS.md ADR-024](DECISIONS.md#adr-024--platform-subscription-payment-is-manualoffline-in-v1)) — no payment gateway in V1.
+Columns: `platform_invoice_id`, `amount numeric(12,2)`, `method` (`bank_transfer` | `cash` | `other`), `reference` (nullable text), `recorded_by` (references `auth.users` — always a Platform Owner), `recorded_at`.
+PK: `id`. FK: `platform_invoice_id → platform_invoices`. Platform-Owner-only RLS. Recording a payment here is the trigger that moves the club's `platform_subscriptions.status` (and `clubs.status`) back to `active` — see the activation RPC in [ARCHITECTURE.md](ARCHITECTURE.md#platform-billing-strategy).
 
 ---
 
@@ -267,3 +294,6 @@ PK: `id`. RLS: **`SELECT` only, scoped by `club_id`** (branch-scoped roles see o
 - ✅ `membership_branches` — added
 - ✅ `qr_scan_events` — added
 - ✅ `qr_credentials.type` — narrowed to `booking` | `player_membership` (was previously also listing `subscription`)
+- ✅ `platform_plans`, `platform_subscriptions`, `platform_invoices`, `platform_payments` — added (Platform Billing domain, structurally separate from club billing, see [DECISIONS.md ADR-022](DECISIONS.md#adr-022--platform-billing-is-a-structurally-separate-domain-from-club-billing))
+- ✅ `clubs.status` — widened from `active | suspended` to `active | grace_period | suspended` (see [DECISIONS.md ADR-025](DECISIONS.md#adr-025--grace-period-is-7-days-by-default-per-club-overridable-ends-early-on-manual-payment-confirmation))
+- **Platform billing tables never reuse `invoices`/`payments`/`payment_allocations`** — those remain exclusively for a club's own customer billing.

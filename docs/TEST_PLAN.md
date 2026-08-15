@@ -1,6 +1,8 @@
 # Test Plan
 
 > **Corrected 2026-08-15** per Mandatory Architecture Corrections. New coverage added: `SECURITY DEFINER` cross-tenant tests, group capacity race test, refund-exceeds-balance rejection, `qr_scan_events` completeness, exclusion-constraint boundary/state tests, phone normalization, medical_notes column protection, audit log immutability. See [DECISIONS.md](DECISIONS.md) ADR-011 through ADR-021.
+>
+> **Added 2026-08-15 (later):** Platform Billing coverage — `grace_period`/`suspended` status transitions, per-action-category write-gating (`auth.club_write_allowed()`), platform billing table isolation from all non-Platform-Owner roles. See [DECISIONS.md](DECISIONS.md) ADR-022 through ADR-026.
 
 Not aiming for 100% coverage as a formal goal. Aiming to make the critical, hard-to-reverse business logic provably correct — especially anything touching money, availability, or tenant isolation. Everything below runs locally against `supabase start` — no test ever depends on production. See [PROJECT_RULES.md](PROJECT_RULES.md) rule 5.
 
@@ -27,9 +29,13 @@ Pure functions in `lib/domain/` only — no Supabase client, no DOM. Price calcu
 - `players.medical_notes` column protection — a role without `player.medical_notes.view` never receives the column in any query result, including a raw PostgREST call; never present in global search results
 - Role/permission checks — a role without a given permission is rejected on INSERT/UPDATE at the RLS layer, not just hidden in the UI
 - Branch scope via `membership_branches` — a membership with explicit rows is restricted to exactly those branches; a membership with zero rows has access to all branches of its club
+- Platform Billing table isolation — `platform_plans`/`platform_subscriptions`/`platform_invoices`/`platform_payments` inaccessible to every non-`platform_owner` role, including Club Owner querying their own club's rows directly
+- Effective club status derivation — a club with an overdue `platform_invoices` row and unpaid `platform_subscriptions` computes as `grace_period` within its `grace_period_days` window and `suspended` after, purely from querying `platform_subscriptions` + `now()` (no reliance on a scheduled job having run)
+- `auth.club_write_allowed()` per-category correctness — `'new_commitment'` rejected in `grace_period`, `'settle_existing'` and `'operational_continuity'` allowed in `grace_period`, all three rejected in `suspended`, all three allowed in `active`
+- Recording a `platform_payments` row immediately flips effective status back to `active` on the next request, regardless of prior grace-period elapsed time
 
 ### Integration
-End-to-end against a local Supabase instance (not mocked): booking creation (slot search → price calc → RPC → invoice → QR), QR scan-then-confirm check-in as two distinct steps, subscription lifecycle (enroll → pay → activate per policy → freeze → derive effective expiry → expire), refund end-to-end, academy enrollment under simulated capacity contention.
+End-to-end against a local Supabase instance (not mocked): booking creation (slot search → price calc → RPC → invoice → QR), QR scan-then-confirm check-in as two distinct steps, subscription lifecycle (enroll → pay → activate per policy → freeze → derive effective expiry → expire), refund end-to-end, academy enrollment under simulated capacity contention, platform billing lifecycle (club overdue → grace_period → attempt new booking [rejected] → attempt payment collection [succeeds] → suspended → platform payment recorded → active again).
 
 ### Manual QA
 Responsive pass across mobile/tablet/desktop breakpoints; print QA (A4 + 80mm thermal — real printer if available, otherwise accurate print-preview); camera QA for `/scan` on an actual phone (desktop browser camera permission behavior differs from mobile); verify a QR scan alone never checks a booking in without the explicit confirm tap.
@@ -60,6 +66,9 @@ Every item below must have a passing automated test (pgTAP or Vitest/integration
 - Audit log immutability (no role can UPDATE/DELETE)
 - `medical_notes` column protection
 - Phone normalization correctness (multiple input formats resolve to the same `normalized_mobile`)
+- Platform Billing table isolation from all non-Platform-Owner roles
+- `active` → `grace_period` → `suspended` → `active` transition correctness, computed lazily from `platform_subscriptions`, not a stored-and-trusted flag alone
+- `auth.club_write_allowed()` per-category gating correct in all three club statuses × all three action categories
 
 ## What Is Explicitly Not Tested Formally in V1
 
