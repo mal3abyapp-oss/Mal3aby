@@ -303,6 +303,10 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      deactivate_staff_member: {
+        Args: { p_membership_id: string }
+        Returns: undefined
+      }
       has_branch_access: {
         Args: { p_branch_id: string; p_membership_id: string }
         Returns: boolean
@@ -310,6 +314,15 @@ export type Database = {
       has_permission: {
         Args: { p_club_id: string; p_key: string }
         Returns: boolean
+      }
+      invite_staff_member: {
+        Args: {
+          p_branch_ids?: string[]
+          p_club_id: string
+          p_email: string
+          p_role_key: string
+        }
+        Returns: string
       }
       is_platform_owner: { Args: Record<PropertyKey, never>; Returns: boolean }
       user_club_ids: { Args: Record<PropertyKey, never>; Returns: string[] }

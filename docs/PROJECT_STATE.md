@@ -10,6 +10,15 @@ Updated after every phase closes. See [IMPLEMENTATION_PLAN.md](IMPLEMENTATION_PL
 
 **Autonomous execution underway.** Phase 0 + Phase 1 **complete**. Phase 2 database/RLS/security/frontend work **complete and verified**; one item outstanding (see below).
 
+### Phase 3 — Staff & Permissions Management: COMPLETE
+- Migration `20260815130000_phase3_staff_permissions.sql`: `invite_staff_member(club_id, email, role_key, branch_ids)` and `deactivate_staff_member(membership_id)` RPCs. No new tables (CRUD on Phase 2 tables via SECURITY DEFINER RPCs, per plan).
+- **Documented inference:** "invite" can only attach an *existing* `auth.users` account — `club_memberships.user_id` is a hard FK, and no invitation-token table exists in the approved schema. `invite_staff_member` looks up by email and raises a safe error if no account exists yet; it cannot create one (would need the Auth Admin API, unavailable to a SQL function). UI copy reflects this ("لحساب موجود بالفعل").
+- `invite_staff_member` re-derives the caller's own permission via `has_permission('staff.create', p_club_id)` inside the function (never trusts `p_club_id` alone); explicitly rejects granting `platform_owner` through this path.
+- `get_advisors(security)` clean (only expected `authenticated`-only warnings). New informational finding: `auth_leaked_password_protection` disabled — dashboard-only toggle, no MCP tool exposes it; logged as P2 for the final security pass, not blocking.
+- **Both Exit Gate tests proven directly against the live DB via `execute_sql` role/JWT-claim simulation:** (1) permission boundary — a `receptionist` membership calling `invite_staff_member` is rejected (`not authorized`) while a `club_owner` succeeds; (2) branch scoping — a membership with an explicit `membership_branches` row for Branch 1 only returns `has_branch_access = true` for Branch 1 and `false` for Branch 2.
+- Frontend: real `StaffPage` (list via `club_memberships` join, invite dialog, role select, deactivate action), wired to `currentClubId` from `AuthProvider`.
+- Verified: build ✅, lint ✅ (0 errors), tests ✅ (2/2). TS types regenerated.
+
 ### Phase 2 — Auth + Multi-Tenant Core + RLS: COMPLETE (DB/RLS/security/frontend/cross-tenant proof); UI login click-through open as logged gap
 - Confirmed real Supabase Cloud project `gxkrtlvpjwxhcqdisyob` (mal3abyapp-oss's Project, eu-central-1, Postgres 17.6.1.155) as the approved final database via Supabase MCP `list_projects`/`list_tables`/`list_migrations` (was empty, 0 tables, 0 migrations before this phase).
 - Migration `supabase/migrations/20260815120000_phase2_identity_multitenant_rls.sql` applied: `clubs`, `branches`, `profiles`, `roles`, `permissions`, `role_permissions`, `club_memberships`, `membership_branches` — all 8 tables, RLS enabled on every one.
