@@ -3,6 +3,8 @@
 > **Corrected 2026-08-15 (final)** per Final Platform SaaS Corrections. Added the full `/platform` navigation (Overview/Clubs/Subscriptions/Payments/Renewals/Reports/Alerts/Audit/Settings) replacing the single "Platform Billing Console" row — see [DECISIONS.md ADR-034](DECISIONS.md#adr-034--platform-owner-control-center-full-navigation-not-a-single-billing-screen).
 >
 > **Added 2026-08-15 (public site)** per Public Website + Signup + Free Trial addition. New Public navigation/screens, Onboarding flow, `/app/subscription` club-side screen, `/platform/plans`/`/platform/trials`/`/platform/leads`. See [DECISIONS.md ADR-036](DECISIONS.md#adr-036--free-trial-requires-no-payment-method-zero-financial-exposure-by-construction) through ADR-046.
+>
+> **Added 2026-08-15 (final pre-implementation)** per the Final Pre-Implementation Directive. New `/app/outstanding` screen, Recurring Booking UI (within New Booking), Quick Field Block action (within Booking Calendar), Global Search + Quick Actions (Ctrl/Cmd+K, desktop). Full visual/interaction rules for every screen here live in the new [DESIGN_SYSTEM.md](DESIGN_SYSTEM.md) — this file remains the screen *inventory*, DESIGN_SYSTEM.md is the visual/responsive *rulebook*.
 
 ## Public Navigation (unauthenticated, `PublicLayout`)
 
@@ -79,7 +81,8 @@ Today · Bookings · **Scan** · Academy · More
 | Reception Operational View (Now/Next/Quick Actions) | dashboard | All | Receptionist |
 | Booking Calendar (day grid) | bookings | Desktop, Tablet | Receptionist, Manager |
 | Booking List/Search | bookings | Mobile | Receptionist |
-| New Booking (drawer/modal) | bookings | All | Receptionist |
+| New Booking (drawer/modal, incl. Recurring Booking option) | bookings | All | Receptionist |
+| Quick Field Block (from Booking Calendar) | bookings | Desktop, Tablet | Club/Branch Manager |
 | Customer Search/Profile | customers | All | Receptionist, Manager, Accountant |
 | Player Profile | players | All | Academy Manager, Coach (assigned) |
 | Field Management | fields | Desktop | Club/Branch Manager |
@@ -93,6 +96,7 @@ Today · Bookings · **Scan** · Academy · More
 | Subscription Detail (incl. freeze, installments) | billing | All | Academy Manager, Accountant |
 | Invoice View/Print (A4 + 80mm) | billing | All | Receptionist, Accountant |
 | Payment Collection | billing | All | Receptionist, Accountant |
+| Outstanding Payments (`/app/outstanding`) | billing | All | Receptionist, Accountant, Manager |
 | Refund | billing | Desktop, Tablet | Accountant, Club Owner |
 | /scan | scanner | Mobile, Tablet | Receptionist, Scanner, Coach |
 | Reports Hub (revenue, occupancy, academy, customers) | reports | Desktop | Manager, Owner, Accountant, Academy Manager |

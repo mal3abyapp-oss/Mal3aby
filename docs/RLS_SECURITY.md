@@ -1,6 +1,6 @@
 # RLS & Security Definer Discipline
 
-This file documents the specific, mandatory rules for any PostgreSQL function that runs with elevated privilege, and for protecting sensitive columns that RLS alone cannot restrict at the column level. Added as part of the Mandatory Architecture Corrections pass (2026-08-15). Read together with [RLS_MATRIX.md](RLS_MATRIX.md) (the policy pattern and per-table permission matrix) and [ARCHITECTURE.md](ARCHITECTURE.md#rls-strategy).
+This file documents the specific, mandatory rules for any PostgreSQL function that runs with elevated privilege, and for protecting sensitive columns that RLS alone cannot restrict at the column level. Added as part of the Mandatory Architecture Corrections pass (2026-08-15). Read together with [RLS_MATRIX.md](RLS_MATRIX.md) (the policy pattern and per-table permission matrix), [ARCHITECTURE.md](ARCHITECTURE.md#rls-strategy), and [SECURITY_ANTI_FRAUD.md](SECURITY_ANTI_FRAUD.md) (the business-abuse threat catalogue and the Security Gate every phase must pass — added 2026-08-15, final pre-implementation pass).
 
 ## Why this file exists
 

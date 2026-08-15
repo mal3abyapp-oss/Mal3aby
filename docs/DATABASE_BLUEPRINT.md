@@ -7,6 +7,8 @@ This is a table-by-table blueprint, not a migration file. Migrations are written
 > **Corrected 2026-08-15 (final)** per Final Platform SaaS Corrections. `clubs.status` is now `active` | `suspended` | `closed` only — `grace_period` is never a club status, it lives on `platform_subscriptions` as a derived effective status. `platform_subscriptions` is now period-based (one row per billing cycle, with plan/price snapshots and real billing intervals), not a single mutable row per club. See [DECISIONS.md](DECISIONS.md) ADR-027 through ADR-035.
 >
 > **Added 2026-08-15 (public site)** per Public Website + Signup + Free Trial addition. `platform_plans` gains `is_public`/`display_order` for safe public exposure; `platform_subscriptions` gains `subscription_kind` (`trial`/`paid`/`complimentary`) — **trial is not a new table, it's a value on the existing period model** (see [DECISIONS.md ADR-038](DECISIONS.md#adr-038--trial-is-a-subscription_kind-not-a-new-concept-trial-expiry-defaults-to-blocked-not-automatic-conversion)). New tables: `platform_settings` (singleton, holds `default_trial_days`), `contact_requests` (public leads).
+>
+> **Added 2026-08-15 (final pre-implementation)** per the Final Pre-Implementation Directive. New tables: `booking_series` (recurring booking grouping, never conflict-checking-load-bearing — see [DECISIONS.md ADR-047](DECISIONS.md#adr-047--recurring-booking-is-a-linking-table-over-real-individual-booking-rows-never-a-shortcut-around-conflict-checking)). `bookings` gains nullable `booking_series_id`. `field_blocks.type` finalized to `maintenance`/`weather`/`private_event`/`manual`/`holiday`. No new tables for Outstanding Payments — it's a read-only view derived from the existing ledger (see [DECISIONS.md ADR-048](DECISIONS.md#adr-048--outstanding-payments-is-a-single-ledger-derived-view-not-a-new-stored-value)). See also new [SECURITY_ANTI_FRAUD.md](SECURITY_ANTI_FRAUD.md) and [DESIGN_SYSTEM.md](DESIGN_SYSTEM.md).
 
 ## Conventions (apply to every table unless noted)
 
@@ -167,9 +169,9 @@ Columns: `club_id`, `branch_id` (nullable), `field_id` (nullable — null applie
 PK: `id`. RLS: scoped by `club_id`.
 
 ### `field_blocks`
-Purpose: maintenance windows, holidays, manual closures.
-Columns: `club_id`, `field_id`, `start_at`, `end_at`, `reason`, `type` (`maintenance` | `holiday` | `manual`), `created_by`.
-PK: `id`. FK: `field_id → fields`. RLS: scoped by `club_id`.
+Purpose: maintenance windows, holidays, manual closures — including the "Quick Field Block" action from the Booking Calendar (see [DECISIONS.md ADR-049](DECISIONS.md#adr-049--quick-field-block-requires-explicit-confirmation-when-existing-bookings-conflict)).
+Columns: `club_id`, `field_id`, `start_at`, `end_at`, `reason`, `type` (`maintenance` | `weather` | `private_event` | `manual` | `holiday`), `created_by`.
+PK: `id`. FK: `field_id → fields`. RLS: scoped by `club_id`. **Creating a block never cancels or otherwise mutates an existing booking that falls within the block window** — the creation RPC checks for overlapping non-cancelled `bookings` first and surfaces them for an explicit decision; it does not auto-cancel. See [SECURITY_ANTI_FRAUD.md](SECURITY_ANTI_FRAUD.md) for why this is treated as a fraud/trust-prevention concern, not just a UX one.
 
 ---
 
@@ -185,16 +187,21 @@ PK: `id`. FK: `field_id → fields`. RLS: scoped by `club_id`.
 ## Booking
 
 ### `bookings`
-Purpose: the core operational record.
-Columns: `club_id`, `branch_id`, `field_id`, `customer_id`, `start_at`, `end_at`, `during tstzrange` (generated, stored — `tstzrange(start_at, end_at, '[)')`), `status` (`pending_payment` | `confirmed` | `checked_in` | `completed` | `cancelled` | `no_show`), `total_price numeric(12,2)`, `discount_amount numeric(12,2)` (default `0`), `notes` (nullable), `cancelled_reason` (nullable), `created_by`.
-PK: `id`. FKs: `field_id → fields`, `customer_id → customers`.
-**Exclusion constraint** (confirmed scope per [DECISIONS.md ADR-021](DECISIONS.md#adr-021--exclusion-constraint-covers-pending_payment-confirmed-and-checked_in)):
+Purpose: the core operational record. **A recurring booking is N real rows here — never a single row with an expanded pattern** (see `booking_series` below and [DECISIONS.md ADR-047](DECISIONS.md#adr-047--recurring-booking-is-a-linking-table-over-real-individual-booking-rows-never-a-shortcut-around-conflict-checking)).
+Columns: `club_id`, `branch_id`, `field_id`, `customer_id`, `start_at`, `end_at`, `during tstzrange` (generated, stored — `tstzrange(start_at, end_at, '[)')`), `status` (`pending_payment` | `confirmed` | `checked_in` | `completed` | `cancelled` | `no_show`), `total_price numeric(12,2)`, `discount_amount numeric(12,2)` (default `0`), `notes` (nullable), `cancelled_reason` (nullable), `booking_series_id` (nullable FK — see below), `created_by`.
+PK: `id`. FKs: `field_id → fields`, `customer_id → customers`, `booking_series_id → booking_series` (nullable).
+**Exclusion constraint** (confirmed scope per [DECISIONS.md ADR-021](DECISIONS.md#adr-021--exclusion-constraint-covers-pending_payment-confirmed-and-checked_in)) — **applies identically whether a booking is part of a series or standalone; a series never bypasses this constraint**:
 ```sql
 EXCLUDE USING gist (field_id WITH =, during WITH &&)
   WHERE (status IN ('pending_payment', 'confirmed', 'checked_in'))
 ```
-`completed` is excluded from the constraint's `WHERE` clause because a completed booking is historical — its time range is in the past and cannot conflict with a new booking being created (the DB doesn't need to guard against something that can no longer be scheduled into). `cancelled`/`no_show` are excluded because they explicitly freed the slot. `[)` range semantics confirmed: a booking `10:00–11:00` and one `11:00–12:00` do not overlap.
+`completed` is excluded from the constraint's `WHERE` clause because a completed booking is historical — its time range is in the past and cannot conflict with a new booking being created (the DB doesn't need to guard against something that can no longer be scheduled into). `cancelled`/`no_show` are excluded because they explicitly freed the slot. `[)` range semantics confirmed: a booking `10:00–11:00` and one `11:00–12:00` do not overlap; `10:00–11:00` and `10:30–11:30` do (genuine overlap, rejected).
 RLS: scoped by `club_id`, no DELETE policy.
+
+### `booking_series`
+Purpose: optional grouping/management link for a recurring booking pattern — **bookkeeping only, never a data-integrity or conflict-checking load-bearing structure**. See [DECISIONS.md ADR-047](DECISIONS.md#adr-047--recurring-booking-is-a-linking-table-over-real-individual-booking-rows-never-a-shortcut-around-conflict-checking).
+Columns: `club_id`, `field_id`, `customer_id`, `pattern_description` (e.g. `"كل ثلاثاء 20:00–21:00 لمدة 8 أسابيع"` — human-readable, not machine-parsed for anything load-bearing), `requested_occurrences int`, `created_occurrences int` (may be less than requested if some occurrences conflicted and the user chose to create only the available ones), `created_by`.
+PK: `id`. FK: `field_id → fields`, `customer_id → customers`. RLS: scoped by `club_id`. Individual `bookings.booking_series_id` rows reference this for "view/cancel the rest of this series" UX; deleting or cancelling the series never cascades a silent bulk mutation — each linked booking is still cancelled individually through the normal cancellation flow (permission + reason + audit).
 
 ---
 
@@ -232,6 +239,11 @@ Invariant enforced by the refund RPC (not by trigger alone, since it must be ato
 Purpose: concurrency-safe per-branch invoice numbering.
 Columns: `branch_id`, `year`, `last_number` (default `0`).
 PK: `id`. Unique: `(branch_id, year)`. Updated only via `UPDATE ... RETURNING` inside the invoice-creation RPC.
+
+### `outstanding_invoices` (view)
+Purpose: backs the `/app/outstanding` screen. **Not a new financial concept — a read-only projection of the existing ledger**, computing the same outstanding-balance formula already used everywhere else (see [DECISIONS.md ADR-048](DECISIONS.md#adr-048--outstanding-payments-is-a-single-ledger-derived-view-not-a-new-stored-value)). No new stored column.
+Definition (conceptual): `SELECT i.*, c.name AS customer_name, c.normalized_mobile, i.total - COALESCE(SUM(pa.amount), 0) + COALESCE(SUM(r.amount) FILTER (...), 0) AS outstanding, i.due_date, (CURRENT_DATE - i.due_date) AS days_overdue FROM invoices i JOIN customers c ON ... LEFT JOIN payment_allocations pa ON ... LEFT JOIN refunds r ON ... WHERE i.status = 'issued' GROUP BY ... HAVING outstanding > 0`.
+RLS: scoped by `club_id`/`branch_id` exactly like `invoices` itself — a Branch Manager sees only their branch's outstanding invoices, matching the base `invoices` RLS row.
 
 ---
 
@@ -343,3 +355,6 @@ PK: `id`. RLS: **`SELECT` only, scoped by `club_id`** (branch-scoped roles see o
 - **Platform billing tables never reuse `invoices`/`payments`/`payment_allocations`** — those remain exclusively for a club's own customer billing.
 - ❌ A separate `trials` table — **does not exist.** Trial is `platform_subscriptions.subscription_kind = 'trial'`, a row in the same period-based table as any paid subscription, not a parallel structure — see [DECISIONS.md ADR-038](DECISIONS.md#adr-038--trial-is-a-subscription_kind-not-a-new-concept-trial-expiry-defaults-to-blocked-not-automatic-conversion)
 - ✅ `platform_subscriptions.subscription_kind` (`trial`/`paid`/`complimentary`), `platform_plans.is_public`/`display_order`/`name_ar`/`description_ar`/`discount_label`/`features_summary`, `platform_settings` (singleton), `contact_requests`, `public_plans` view — added
+- ✅ `booking_series`, `bookings.booking_series_id` (nullable), `outstanding_invoices` view — added, per the Final Pre-Implementation Directive
+- ❌ A "series-level" override of the booking exclusion constraint — **does not exist.** Every occurrence in a recurring booking is a real, independently conflict-checked `bookings` row — see [DECISIONS.md ADR-047](DECISIONS.md#adr-047--recurring-booking-is-a-linking-table-over-real-individual-booking-rows-never-a-shortcut-around-conflict-checking)
+- ❌ A stored `outstanding_balance`/similar column anywhere — **does not exist.** Always derived live from `invoices`/`payment_allocations`/`refunds` via the `outstanding_invoices` view — see [DECISIONS.md ADR-048](DECISIONS.md#adr-048--outstanding-payments-is-a-single-ledger-derived-view-not-a-new-stored-value)

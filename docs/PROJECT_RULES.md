@@ -3,6 +3,8 @@
 Non-negotiable engineering rules for Mala3by. If a change conflicts with one of these, the change is wrong, not the rule — raise it as a new entry in [DECISIONS.md](DECISIONS.md) instead of silently working around it.
 
 > **Corrected 2026-08-15** per Mandatory Architecture Corrections — rules 3, 5, 6, 8, 11 updated; new rules 5b, 13, 14, 15 added. See [DECISIONS.md](DECISIONS.md) for full reasoning.
+>
+> **Added 2026-08-15 (final pre-implementation)** per the Final Pre-Implementation Directive — new rules 16, 17, 18 added. See [SECURITY_ANTI_FRAUD.md](SECURITY_ANTI_FRAUD.md) and [DESIGN_SYSTEM.md](DESIGN_SYSTEM.md).
 
 ## 1. The database is the authority
 
@@ -76,3 +78,15 @@ Work on one phase at a time (see [IMPLEMENTATION_PLAN.md](IMPLEMENTATION_PLAN.md
 ## 15. `SECURITY DEFINER` functions follow a fixed checklist
 
 Every function using `SECURITY DEFINER` must: pin `search_path` explicitly, never trust a client-supplied `club_id`/user-id without re-verifying against actual membership, resolve identity only via `auth.uid()`, check the specific required permission internally (not rely solely on the outer RLS policy, which the function itself bypasses), grant `EXECUTE` only to the roles that need it, and ship with a cross-tenant rejection test. Full checklist and reasoning: [RLS_SECURITY.md](RLS_SECURITY.md).
+
+## 16. Trust nothing from the frontend
+
+Design assuming any user may attempt an unauthorized operation, tamper with any frontend-supplied value, or call the API/RPC directly, bypassing the UI entirely. The frontend is never the security boundary — real protection is, in order: PostgreSQL constraints → RLS → permissions → secure RPCs → transactions → audit logs. Specific values that are never trusted as client input when they should be database-derived: `club_id`, `branch_id`, `price`, `discount`, `role`, `permission`, `status` (of any entity), `trial_days`, `subscription_kind`, `invoice_total`, `payment_status`, `booking_status`. Full threat model and the mandatory Abuse Test Catalogue: [SECURITY_ANTI_FRAUD.md](SECURITY_ANTI_FRAUD.md).
+
+## 17. Security and design are built with each domain, not deferred to a late phase
+
+RLS, permission checks, database constraints, secure RPCs, and audit requirements ship **as part of** the phase that introduces the domain they protect — never retrofitted in a later "hardening" phase. The Design System ([DESIGN_SYSTEM.md](DESIGN_SYSTEM.md)) is established in Phase 1, before any real screen is built. A late Security Hardening phase (Phase 14) and a late Responsive/Print QA phase (Phase 15) still exist — their job is independent re-verification and fine polish, not the first time these concerns are addressed. See [DECISIONS.md ADR-050](DECISIONS.md#adr-050--security-and-design-are-built-with-each-domain-not-deferred-to-a-late-hardeningpolish-phase).
+
+## 18. Every phase has both a Functional Gate and a Security Gate
+
+A phase is not COMPLETE until both pass. The Security Gate checks: tenant isolation, permission checks, direct API abuse tests (the relevant rows from the Abuse Test Catalogue), business constraints under concurrency, financial integrity, audit coverage, no secret exposure, RLS enabled and tested. Findings are severity-classified P0 (Critical) through P3 (Low) — any open P0 or P1 blocks the Exit Gate outright. Full checklist: [SECURITY_ANTI_FRAUD.md](SECURITY_ANTI_FRAUD.md#security-gate-checklist-applied-per-phase-where-applicable).

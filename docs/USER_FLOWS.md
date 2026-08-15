@@ -3,6 +3,8 @@
 > **Corrected 2026-08-15** per Mandatory Architecture Corrections. Flow 2 (Check-in) and Flow 6 (QR Scan) are updated: scanning a booking QR now only validates — it never consumes the credential or mutates booking state by itself. A separate, explicit staff confirmation performs the atomic consume + check-in (see [DECISIONS.md ADR-011e](DECISIONS.md#adr-011e--qr-scan-validates-explicit-staff-confirmation-performs-the-check-in-mutation)). Flow 5 (Refund) is unchanged in shape but now explicitly reflects that `payments` has no `invoice_id` — the reversing entry only ever touches `payment_allocations`.
 >
 > **Added 2026-08-15 (public site)** per Public Website + Signup + Free Trial addition. New Flow 8 (Signup & Onboarding) and Flow 9 (Trial Expiry) — see [DECISIONS.md ADR-036](DECISIONS.md#adr-036--free-trial-requires-no-payment-method-zero-financial-exposure-by-construction) through ADR-046. This is the end-to-end flow the Phase 3d exit gate (see [IMPLEMENTATION_PLAN.md](IMPLEMENTATION_PLAN.md)) is verified against.
+>
+> **Added 2026-08-15 (final pre-implementation)** per the Final Pre-Implementation Directive. Flow 1 (Booking) gains a Recurring Booking variant (Flow 1b) and every flow that touches money/authorization is cross-referenced against [SECURITY_ANTI_FRAUD.md](SECURITY_ANTI_FRAUD.md)'s controls — no flow's steps change, but each now states which abuse scenario its ordering defends against.
 
 Each flow is optimized for fewest steps — the receptionist/coach is the primary persona, not a power user browsing menus. See [ARCHITECTURE.md](ARCHITECTURE.md) for the RPCs backing the atomic steps.
 
@@ -20,7 +22,28 @@ Search/Create Customer
   → Print (A4 or 80mm)
 ```
 
-Target: under 60 seconds for a repeat customer. Booking is created in `confirmed` status directly if payment is collected at creation; `pending_payment` only if payment is deferred.
+Target: under 60 seconds for a repeat customer. Booking is created in `confirmed` status directly if payment is collected at creation; `pending_payment` only if payment is deferred. Price shown during slot selection is a preview; `create_booking` recomputes the final price server-side at confirm — see [SECURITY_ANTI_FRAUD.md](SECURITY_ANTI_FRAUD.md#price-security).
+
+## 1b. Recurring Booking (Reception/Manager)
+
+```
+Search/Create Customer
+  → Select field + start time + duration
+  → Choose "Recurring" → set pattern (e.g. every Tuesday, 20:00–21:00, 8 weeks)
+  → System checks all 8 requested occurrences against existing bookings/blocks
+  → Result shown explicitly: "8 requested, 7 available, 1 conflict"
+  → User chooses: create available occurrences only, OR cancel and review conflicts
+  → Confirm  ──▶  create_recurring_booking RPC:
+      creates 1 booking_series row (bookkeeping/linking only)
+      creates N real bookings rows, each independently passing the exclusion
+        constraint, pricing recomputation, and permission checks — never a
+        series-level bypass of any single-booking control
+  → Invoices generated per booking (or per policy — TBD at implementation:
+      one invoice per occurrence vs. one invoice for the series; either way,
+      each booking's own price is still individually computed and correct)
+```
+
+Never creates a partial series silently — see [DECISIONS.md ADR-047](DECISIONS.md#adr-047--recurring-booking-is-a-linking-table-over-real-individual-booking-rows-never-a-shortcut-around-conflict-checking).
 
 ## 2. Check-in (at the field, on arrival)
 
@@ -105,6 +128,22 @@ Scan
 ```
 
 **`qr_credentials.used_at`/`used_by` are a convenience "last use" snapshot only.** The actual audit/replay/attendance history lives in `qr_scan_events`, which records every scan attempt regardless of outcome — see [DECISIONS.md ADR-011d](DECISIONS.md#adr-011d--player-qr-is-reusable-booking-qr-is-consumable-scans-are-a-separate-log).
+
+## 6b. Quick Field Block (Manager)
+
+```
+From Booking Calendar → "Block Field"
+  → Enter Start, End, Reason, Type (maintenance/weather/private_event/manual)
+  → System checks the window against existing non-cancelled bookings
+  → If conflicts exist: shown explicitly ("3 existing bookings conflict"),
+      manager must adjust the window or cancel the conflicting bookings
+      individually (normal cancellation flow: permission + reason + audit)
+      before the block can be created — never silently auto-cancelled
+  → If no conflicts: block created immediately, field unavailable for new
+      bookings in that window
+```
+
+See [DECISIONS.md ADR-049](DECISIONS.md#adr-049--quick-field-block-requires-explicit-confirmation-when-existing-bookings-conflict).
 
 ## 7. Global Search
 

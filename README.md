@@ -14,6 +14,8 @@ Mala3by is a multi-tenant operations system for sports clubs and football academ
 - Arabic RTL first, English toggle, installable PWA, works on desktop/tablet/mobile
 - Platform billing: Mala3by charges clubs a real subscription (Monthly/Quarterly/Semi-Annual/Annual) to use the platform — period-based with full renewal history, structurally separate from a club's own customer billing, and fully independent of club account status (see [docs/DECISIONS.md ADR-027](docs/DECISIONS.md#adr-027--clubsstatus-and-platform-subscription-status-are-fully-independent-grace_period-is-never-a-club-status) through ADR-035)
 - Public marketing site + self-service signup + 7-day free trial (no card required) — a club can go from anonymous visitor to an operating trial club in one short flow, with trial modeled as a value on the same subscription system above, not a separate mechanism (see [docs/DECISIONS.md ADR-036](docs/DECISIONS.md#adr-036--free-trial-requires-no-payment-method-zero-financial-exposure-by-construction) through ADR-046)
+- Security-first by design: the frontend is never trusted for authorization or financial values — every mutation is re-verified server-side, with a documented Abuse Test Catalogue and a Security Gate on every implementation phase (see [docs/SECURITY_ANTI_FRAUD.md](docs/SECURITY_ANTI_FRAUD.md))
+- A real, documented visual identity (Modern Sports Operations SaaS, not an old-style ERP) — see [docs/DESIGN_SYSTEM.md](docs/DESIGN_SYSTEM.md)
 
 ## What this is not (V1)
 
@@ -39,6 +41,8 @@ Current status: **local-only development.** `git init`, local commits, local bra
 | [docs/DATABASE_BLUEPRINT.md](docs/DATABASE_BLUEPRINT.md) | Full table-by-table database design |
 | [docs/RLS_MATRIX.md](docs/RLS_MATRIX.md) | Role × table × permission matrix and RLS policy patterns |
 | [docs/RLS_SECURITY.md](docs/RLS_SECURITY.md) | Mandatory `SECURITY DEFINER` function discipline and sensitive-column protection |
+| [docs/SECURITY_ANTI_FRAUD.md](docs/SECURITY_ANTI_FRAUD.md) | Business-abuse threat model, Abuse Test Catalogue, per-phase Security Gate |
+| [docs/DESIGN_SYSTEM.md](docs/DESIGN_SYSTEM.md) | Visual identity, design tokens, component foundation, responsive rules |
 | [docs/USER_FLOWS.md](docs/USER_FLOWS.md) | Critical end-to-end user flows |
 | [docs/SCREEN_MAP.md](docs/SCREEN_MAP.md) | Full screen inventory by device |
 | [docs/IMPLEMENTATION_PLAN.md](docs/IMPLEMENTATION_PLAN.md) | Phase-by-phase build plan with exit gates |
@@ -58,4 +62,4 @@ See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md#local-development-workflow) for 
 
 ## Status
 
-Planning complete, including a Mandatory Architecture Corrections pass, a Final Platform SaaS Corrections pass, and a Public Website + Signup + Free Trial addition (all 2026-08-15). Phase 0 not yet started. See [docs/PROJECT_STATE.md](docs/PROJECT_STATE.md).
+Planning complete, including a Mandatory Architecture Corrections pass, a Final Platform SaaS Corrections pass, a Public Website + Signup + Free Trial addition, and the Final Pre-Implementation Directive (all 2026-08-15) — security/anti-fraud controls and the visual design system are now fully specified. Phase 0 not yet started. See [docs/PROJECT_STATE.md](docs/PROJECT_STATE.md).

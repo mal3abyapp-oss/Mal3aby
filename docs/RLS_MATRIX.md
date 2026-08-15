@@ -5,6 +5,8 @@
 > **Corrected 2026-08-15 (final)** per Final Platform SaaS Corrections. `clubs.status` no longer includes `grace_period` — it is `active` | `suspended` | `closed` only. Grace period is a **derived platform subscription status**, computed by `get_club_platform_access(club_id)` (`full`/`grace`/`blocked`), never a `clubs` column. `auth.club_write_allowed()` now wraps that central function rather than reading `clubs.status` directly. See [ARCHITECTURE.md](ARCHITECTURE.md#platform-access-strategy) and [DECISIONS.md ADR-027](DECISIONS.md#adr-027--clubsstatus-and-platform-subscription-status-are-fully-independent-grace_period-is-never-a-club-status) through ADR-035.
 >
 > **Added 2026-08-15 (public site)** per Public Website + Signup + Free Trial addition. New `anon` (unauthenticated) role added to the matrix — read-only on `public_plans`, insert-only on `contact_requests`, nothing else. `platform_settings` and `platform_plans.is_public`/`display_order` added. See [DECISIONS.md ADR-037](DECISIONS.md#adr-037--trial-length-is-a-platform-setting-not-hardcoded) through ADR-046.
+>
+> **Added 2026-08-15 (final pre-implementation)** per the Final Pre-Implementation Directive. `booking_series` and `outstanding_invoices` (view) added to the matrix. See [SECURITY_ANTI_FRAUD.md](SECURITY_ANTI_FRAUD.md) for the full abuse-test catalogue and Security Gate checklist that this matrix's Verification Checklist below now explicitly cross-references.
 
 ## Policy Pattern
 
@@ -115,7 +117,9 @@ Legend: **S**=Select, **I**=Insert, **U**=Update, **D**=Void/Reverse (status tra
 | `fields` | S | S,I,U | S,I,U | S,U | S | S | S | S | – |
 | `field_operating_hours` / `field_blocks` | S | S,I,U | S,I,U | S,U | S | S | S | S | – |
 | `pricing_rules` | S | S,I,U | S,I,U | S,U | S | S | – | – | – |
-| `bookings` | S | S | S,I,U,D | S,I,U,D | S,I,U,D | S | – | – | – |
+| `bookings` (no direct client INSERT for the primary flow — via `create_booking` RPC, see [SECURITY_ANTI_FRAUD.md](SECURITY_ANTI_FRAUD.md#booking-security)) | S | S | S,I,U,D | S,I,U,D | S,I,U,D | S | – | – | – |
+| `booking_series` (bookkeeping only — see [DECISIONS.md ADR-047](DECISIONS.md#adr-047--recurring-booking-is-a-linking-table-over-real-individual-booking-rows-never-a-shortcut-around-conflict-checking)) | S | S | S,I,U | S,I,U | S,I,U | S | – | – | – |
+| `outstanding_invoices` (view, read-only, same scoping as `invoices`) | S | S | S | S (own branch) | S | S | – | – | – |
 | `invoices` | S | S | S,I,U | S,I | S,I | S,I,U,D | S,I | – | – |
 | `invoice_items` | S | S | S,I,U | S,I | S,I | S,I,U | S,I | – | – |
 | `payments` (no `invoice_id` column) | S | S | S | S | S,I | S,I,U,D | – | – | – |
@@ -164,6 +168,8 @@ Implementation: table triggers for simple before/after captures on direct mutati
 ---
 
 ## Verification Checklist (Phase 2 gate)
+
+> **See also [SECURITY_ANTI_FRAUD.md](SECURITY_ANTI_FRAUD.md#abuse-test-catalogue) and its [Security Gate checklist](SECURITY_ANTI_FRAUD.md#security-gate-checklist-applied-per-phase-where-applicable)** — this checklist covers Phase 2's tenant-isolation gate specifically; the abuse catalogue applies per-domain across every subsequent phase.
 
 For at least `bookings`, `invoices`, `payments`, and `customers`:
 

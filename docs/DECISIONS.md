@@ -2,11 +2,63 @@
 
 Architecture Decision Records for Mala3by. Each entry: Decision, Reason, Alternatives considered, Trade-offs accepted. Newest first.
 
+> **2026-08-15 (final pre-implementation) — Final Pre-Implementation Directive applied.** ADR-047 through ADR-050 add the last operational necessities (Recurring Booking, Outstanding Payments view, Quick Field Block) and formalize security/design as first-class, always-applied concerns rather than late-phase hardening — see the new [SECURITY_ANTI_FRAUD.md](SECURITY_ANTI_FRAUD.md) and [DESIGN_SYSTEM.md](DESIGN_SYSTEM.md). No prior decision is reopened; this pass is additive and clarifying only.
+>
 > **2026-08-15 (public site) — Public Website + Signup + Free Trial added.** ADR-036 through ADR-046 introduce the public marketing site, self-service signup, first-time onboarding, and a 7-day free trial. The trial is **not** a new concept or table — it is `platform_subscriptions.subscription_kind = 'trial'`, a value on the exact same period-based subscription model built in the prior corrections pass. This is the key design decision: everything already built (snapshots, exclusion constraint, renewal chain, `get_club_platform_access()`) applies to trials for free, because a trial is just a subscription period like any other, distinguished only by `subscription_kind` and how it started.
 >
 > **2026-08-15 (final) — Final Platform SaaS Corrections applied.** The first Platform Billing pass (originally ADR-022 through ADR-026) is fully replaced by ADR-027 through ADR-035 below — the original entries' text has been superseded in place, not preserved as separate historical records, since the correction is a structural redesign of the same domain rather than an addable refinement. The core fix: `grace_period` was wrongly modeled as a `clubs.status` value — it is a **subscription** status, not a **club** status, and the two are now fully independent. Subscriptions are now period-based (one row per billing cycle, not one row mutated forever), with price/plan snapshots, real billing intervals (monthly/quarterly/semi-annual/annual), and a single centralized access-derivation function.
 >
 > **2026-08-15 — Mandatory Architecture Corrections applied.** ADR-011 through ADR-021 below were added in a dedicated correction pass before any production code was written. ADR-006 (organizations) is **superseded** by ADR-011 — its original nullable-placeholder approach was rejected in favor of full removal. See each entry for details.
+
+---
+
+## ADR-050 — Security and Design are built with each domain, not deferred to a late hardening/polish phase
+
+**Decision:** RLS, permission checks, database constraints, secure RPCs, and audit requirements are built **as part of** each domain's phase (e.g. `bookings`' exclusion constraint and RLS ship in the Booking Engine phase, not retrofitted in a later "security hardening" phase). Similarly, the Design System (see [DESIGN_SYSTEM.md](DESIGN_SYSTEM.md)) is established in Phase 1, before any real screen is built, not polished-in after screens already exist. A dedicated hardening/QA phase still exists late in the plan (Phase 14 for security, Phase 15 for responsive/print QA) — but its job is an *independent verification pass* and fine polish, not the first time these concerns are addressed.
+
+**Reason:** Security and visual consistency retrofitted after the fact are both expensive and unreliable — a booking system built without RLS from day one, then "secured later," risks shipping real functionality on an insecure foundation in the interim and requires re-auditing everything rather than building it right once. The same logic applies to design: screens built without a design system, then "made consistent later," produce visible seams and rework. This restates and makes explicit a principle that was already implicit in every phase's structure throughout this plan (every phase already includes RLS/security/test work, not just feature work) — this ADR exists so the principle is never accidentally violated as new phases get added.
+
+**Alternatives considered:** A single late "Security Hardening" phase doing all RLS/permission/audit work at once (rejected — this is explicitly the anti-pattern being guarded against; also already rejected implicitly by the phase structure in [IMPLEMENTATION_PLAN.md](IMPLEMENTATION_PLAN.md), which has always embedded RLS/tests in every phase). A late "Visual Polish" phase doing all design work at once (rejected — same reasoning, and screens without a shared design system from the start produce real rework, not just missed polish).
+
+**Trade-offs:** None — this codifies what the phase plan already does; it does not add scope, it prevents scope from silently drifting toward the anti-pattern in future phases.
+
+---
+
+## ADR-049 — Quick Field Block requires explicit confirmation when existing bookings conflict
+
+**Decision:** From the Booking Calendar, a "Block Field" quick action (Start, End, Reason, Type — `maintenance`/`weather`/`private_event`/`manual`) inserts a `field_blocks` row, which prevents new bookings in that window. If the requested block window overlaps one or more existing (non-cancelled) bookings, the system **never silently cancels them** — it surfaces "3 existing bookings conflict" (with the specific bookings listed) and requires the manager to make an explicit decision (e.g. cancel the conflicting bookings individually with the normal cancellation flow, or adjust the block window) before the block is created.
+
+**Reason:** Silently invalidating a customer's paid booking because a manager wanted to block the field for maintenance is a serious operational and trust failure — a customer could show up to a booking that was cancelled without anyone telling them. Requiring an explicit decision when a conflict exists costs the manager one extra confirmation step in the (presumably rare) case of an actual conflict, in exchange for eliminating a real risk of silently breaking a paying customer's booking.
+
+**Alternatives considered:** Silently cancel conflicting bookings when a block is created (rejected — the failure mode described above). Simply disallow blocking any window with existing bookings (rejected — too rigid; sometimes a field genuinely needs to close and existing bookings must be moved/cancelled, the system just shouldn't do that invisibly).
+
+**Trade-offs:** None significant — the confirmation step only appears when a real conflict exists, which should be the uncommon case for a block created with reasonable notice.
+
+---
+
+## ADR-048 — Outstanding Payments is a single ledger-derived view, not a new stored value
+
+**Decision:** `/app/outstanding` (or an equivalent location within Billing) surfaces customers/invoices with `outstanding = invoice.total − valid payment_allocations + refund/reversal effect` — computed live from the existing financial ledger (`invoices`, `payment_allocations`, `refunds`), exactly the same derivation already used everywhere else outstanding balance is shown (booking detail, subscription detail, reports). No new stored "outstanding" column is introduced anywhere.
+
+**Reason:** This restates [PROJECT_RULES.md](PROJECT_RULES.md) rule 8 (derived financial values are never stored as fact) applied to a new screen — introducing a second, screen-specific computation or stored value for the same concept "outstanding balance" that already has a canonical definition would create exactly the risk that rule exists to prevent: two numbers, in two places, that can silently disagree. The screen is a new *view* over existing data, not a new financial concept.
+
+**Alternatives considered:** A materialized/cached `outstanding_balance` column updated by triggers (rejected — same reasoning as every other financial-value derivation decision in this project: a cache that can drift from the ledger is a bug waiting to happen, and V1's data volume doesn't need the query-performance trade-off a cache would buy).
+
+**Trade-offs:** None — this is a read-only reporting screen with no new write path, following the exact same pattern already established for every other financial figure in the product.
+
+---
+
+## ADR-047 — Recurring Booking is a linking table over real individual booking rows, never a shortcut around conflict-checking
+
+**Decision:** A "recurring booking" (e.g. every Tuesday 20:00–21:00 for 8 weeks) is created via an optional `booking_series` table (linking rows for grouping/management purposes only) plus **N real individual `bookings` rows**, one per occurrence — each subject to the exact same pricing, exclusion constraint, permission checks, and audit trail as a manually-created single booking. The series itself is never permitted to bypass the exclusion constraint — there is no "series-level" override of conflict checking.
+
+**Before confirming**, the system checks all N requested occurrences against existing bookings/blocks and shows the result explicitly (e.g. "8 requested, 7 available, 1 conflict") — it never silently creates a partial series. The user chooses explicitly between creating only the available occurrences or cancelling to review conflicts first; either way, the outcome is shown, not assumed.
+
+**Reason:** A recurring booking is fundamentally N bookings that happen to share an origin — modeling it as anything other than N real rows (e.g. a single "recurring booking" row with a pattern description that the system expands lazily) would mean every downstream piece of functionality that already works on `bookings` (the calendar, the exclusion constraint, invoicing, cancellation, audit, reports) would need a parallel implementation aware of recurrence. Real individual rows mean recurring bookings get all of that for free, and the `booking_series` link is purely optional bookkeeping for "show me/cancel the rest of this series" UX, never a data-integrity load-bearing structure.
+
+**Alternatives considered:** A single row representing the whole series with a recurrence pattern, expanded virtually at read time (rejected — this is the parallel-implementation problem described above: pricing, conflict-checking, invoicing, and audit would all need recurrence-aware logic instead of reusing what already exists for a single booking). Silently creating only the available occurrences without surfacing the conflict count (rejected — a user must know they got 7 of 8 requested slots, not discover it later).
+
+**Trade-offs:** N inserts instead of one for a recurring series — irrelevant at this data scale, and it's the correct trade for reusing all existing booking infrastructure unchanged.
 
 ---
 
