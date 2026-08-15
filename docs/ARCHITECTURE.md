@@ -77,42 +77,86 @@ Full matrix: [RLS_MATRIX.md](RLS_MATRIX.md). Full `SECURITY DEFINER` discipline:
 
 ## Club Suspension Enforcement
 
-`clubs.status = 'suspended'` blocks all non-platform-owner access to that club's data. **This check happens at the RLS/RPC layer on every request, never by mutating or trusting a claim baked into the JWT** — a JWT issued before suspension remains structurally valid; what changes is that `auth.user_club_ids()` (and every downstream RLS policy and RPC permission check) re-evaluates the club's live `status` against the database on every call. A staff member with a still-valid session is locked out on their very next request after suspension, not just at their next login. `clubs.status = 'grace_period'` (see [Platform Billing Strategy](#platform-billing-strategy) below) applies the same on-every-request enforcement pattern but with a finer-grained per-action rule rather than a blanket lockout. See [ARCHITECTURE.md](ARCHITECTURE.md#failure--recovery-strategy) for the full suspension behavior table.
+`clubs.status` is `active` | `suspended` | `closed` — **an administrative decision only, never derived from or set based on platform billing lateness** (see [DECISIONS.md ADR-027](DECISIONS.md#adr-027--clubsstatus-and-platform-subscription-status-are-fully-independent-grace_period-is-never-a-club-status)). `clubs.status = 'suspended'` blocks all non-platform-owner access to that club's data; `closed` is a permanent, deliberate shutdown (data retained, not deleted). **This check happens at the RLS/RPC layer on every request, never by mutating or trusting a claim baked into the JWT** — a JWT issued before suspension remains structurally valid; what changes is that `auth.user_club_ids()` (and every downstream RLS policy and RPC permission check) re-evaluates the club's live `status` against the database on every call. A staff member with a still-valid session is locked out on their very next request after suspension, not just at their next login.
 
-## Platform Billing Strategy
+Platform subscription standing (`trial`/`active`/`grace_period`/`expired`/`cancelled`) is a **completely separate signal**, layered on top of `clubs.status` by `get_club_platform_access()` below — see [ARCHITECTURE.md](ARCHITECTURE.md#failure--recovery-strategy) for the full combined behavior table.
 
-Mala3by charging a club to use the platform is a **structurally separate domain** from a club's own customer billing — `platform_plans`/`platform_subscriptions`/`platform_invoices`/`platform_payments`, never `invoices`/`payments`/`payment_allocations` (see [DECISIONS.md ADR-022](DECISIONS.md#adr-022--platform-billing-is-a-structurally-separate-domain-from-club-billing)). Platform-Owner-only access; club-side roles see only a read-only summary of their own club's subscription status via a restricted view, never the underlying tables.
+## Platform Access Strategy
 
-**Single flat plan, manual billing** (see [DECISIONS.md ADR-023](DECISIONS.md#adr-023--single-flat-platform-plan-manually-managed-in-v1) and [ADR-024](DECISIONS.md#adr-024--platform-subscription-payment-is-manualoffline-in-v1)): one seeded `platform_plans` row, price optionally overridden per club, payment collected offline and manually recorded by Platform Owner. Recording a `platform_payments` row against a `platform_invoices` row moves the club back to `active`.
+Mala3by charging a club to use the platform is a **structurally separate domain** from a club's own customer billing — `platform_plans`/`platform_subscriptions`/`platform_invoices`/`platform_payments`, never `invoices`/`payments`/`payment_allocations` (see [DECISIONS.md ADR-028](DECISIONS.md#adr-028--platform-billing-is-a-structurally-separate-domain-from-club-billing)). Platform-Owner-only access; club-side roles (Club Owner only) see a read-only summary of their own club's subscription status via a restricted view, never the underlying tables (see [DECISIONS.md ADR-035](DECISIONS.md#adr-035--club-owner-subscription-visibility-is-scoped-own-clubs-commercial-summary-only)).
 
-**Status transitions are computed lazily, on access — not by a scheduled job** (V1 has no cron/scheduled-function infrastructure, deliberately, to stay zero-cost). `auth.user_club_ids()` and related RLS helpers derive the club's *effective* status from `platform_subscriptions` (due date, `grace_period_started_at`, `grace_period_days`) and `now()` at query time:
+**Real billing intervals, snapshotted pricing** (see [DECISIONS.md ADR-029](DECISIONS.md#adr-029--platform-plan-supports-real-billing-intervals-monthly-quarterly-semi-annual-annual) and [ADR-030](DECISIONS.md#adr-030--platform-plan-pricing-is-snapshotted-onto-each-subscription-period)): `platform_plans` seeds Monthly/Quarterly/Semi-Annual/Annual (`interval` + `interval_count`, e.g. quarterly = `month × 3`), editable by Platform Owner at any time. Every `platform_subscriptions` row snapshots the plan's terms at creation (`plan_name_snapshot`, `price_snapshot`, `currency_snapshot`, `interval_snapshot`, `interval_count_snapshot`, `grace_period_days_snapshot`) — editing `platform_plans` later never changes an already-created period's terms.
+
+**One subscription row per billing period, not one mutable row per club** (see [DECISIONS.md ADR-031](DECISIONS.md#adr-031--renewal-creates-a-new-subscription-period-row-periods-are-never-mutatedextended-in-place)): a renewal inserts a new `platform_subscriptions` row with `previous_subscription_id` pointing at the prior period, preserving full renewal history. Overlapping periods for the same club are prevented by the same exclusion-constraint pattern already used for `bookings`, while adjacent back-to-back renewals remain legal under `[)` range semantics (see [DECISIONS.md ADR-032](DECISIONS.md#adr-032--overlapping-subscription-periods-are-prevented-adjacent-renewal-periods-are-allowed)):
 
 ```sql
--- effective status, computed not stored-and-trusted blindly:
--- active        : no overdue platform_invoices, or within current_period_end
--- grace_period   : overdue, and now() - grace_period_started_at < grace_period_days
--- suspended      : overdue, and now() - grace_period_started_at >= grace_period_days
+alter table platform_subscriptions add column during tstzrange
+  generated always as (tstzrange(start_at, end_at, '[)')) stored;
+
+alter table platform_subscriptions add constraint no_overlapping_subscription_periods
+  exclude using gist (club_id with =, during with &&)
+  where (lifecycle_status != 'cancelled');
 ```
 
-`grace_period_days` defaults to 7, per-club overridable via `platform_subscriptions.grace_period_days` (see [DECISIONS.md ADR-025](DECISIONS.md#adr-025--grace-period-is-7-days-by-default-per-club-overridable-ends-early-on-manual-payment-confirmation)). A manual payment recorded at any point immediately restores `active`, regardless of where the club was in the countdown.
-
-**Grace period is not a blanket read-only switch** (see [DECISIONS.md ADR-026](DECISIONS.md#adr-026--grace-period-blocks-new-commitments-but-allows-collecting-on-existing-ones)). A single helper centralizes the distinction so it isn't duplicated ad hoc across every table's RLS policy:
+**Effective subscription status is derived, never a scheduled-job-maintained flag** (V1 has no cron/scheduled-function infrastructure, deliberately, to stay zero-cost):
 
 ```sql
+-- effective subscription status, computed from the current period row + now():
+-- lifecycle_status = 'cancelled'            → cancelled
+-- lifecycle_status = 'trial'                → trial
+-- now() < end_at                            → active
+-- end_at <= now() < end_at + grace_days     → grace_period
+-- now() >= end_at + grace_days              → expired
+```
+
+**A single centralized function combines both signals** — `clubs.status` (administrative) and the derived subscription status (billing) — into one access level, so no table's RLS policy re-derives this logic independently (see [DECISIONS.md ADR-033](DECISIONS.md#adr-033--platform-access-is-full--grace--blocked-derived-by-one-centralized-db-function)):
+
+```sql
+create or replace function get_club_platform_access(p_club_id uuid)
+returns text  -- 'full' | 'grace' | 'blocked'
+language plpgsql security definer stable
+set search_path = public, pg_temp as $$
+declare
+  v_club_status text;
+  v_sub record;
+begin
+  select status into v_club_status from clubs where id = p_club_id;
+  if v_club_status in ('suspended', 'closed') then
+    return 'blocked';
+  end if;
+
+  select * into v_sub from platform_subscriptions
+    where club_id = p_club_id and lifecycle_status != 'cancelled'
+    order by start_at desc limit 1;
+
+  if v_sub is null or v_sub.lifecycle_status = 'cancelled' then
+    return 'blocked';
+  elsif now() < v_sub.end_at or v_sub.lifecycle_status = 'trial' then
+    return 'full';
+  elsif now() < v_sub.end_at + (v_sub.grace_period_days_snapshot || ' days')::interval then
+    return 'grace';
+  else
+    return 'blocked';  -- expired past grace
+  end if;
+end;
+$$;
+
+-- thin wrapper used by grace-gated write policies:
 create or replace function auth.club_write_allowed(p_club_id uuid, p_action_category text)
 returns boolean
 language sql security definer stable
 set search_path = public, pg_temp as $$
-  select case
-    when (select status from clubs where id = p_club_id) = 'active' then true
-    when (select status from clubs where id = p_club_id) = 'grace_period'
-      then p_action_category in ('settle_existing', 'operational_continuity')
-    else false  -- suspended: no writes at all
+  select case get_club_platform_access(p_club_id)
+    when 'full' then true
+    when 'grace' then p_action_category in ('settle_existing', 'operational_continuity')
+    else false  -- blocked
   end
 $$;
 ```
 
-`p_action_category` is `'new_commitment'` (blocked in grace period — new `bookings`, `enrollments`, `subscriptions`, `groups`/`programs`), `'settle_existing'` (allowed — `payments`, `payment_allocations`, `refunds` against existing invoices/subscriptions), or `'operational_continuity'` (allowed — `attendance` marking for already-scheduled sessions, since a training session happening today shouldn't be unrecordable over a billing lapse). `SELECT` access is never restricted by this helper — grace period and active read identically.
+`p_action_category` is `'new_commitment'` (blocked in `grace` — new `bookings`, `enrollments`, `subscriptions`, `groups`/`programs`, new field/branch expansion), `'settle_existing'` (allowed in `grace` — `payments`, `payment_allocations`, `refunds` against existing invoices/subscriptions), or `'operational_continuity'` (allowed in `grace` — `attendance` marking for already-scheduled sessions, completing already-created bookings). `SELECT` access is never restricted by this helper — `grace` and `full` read identically. Platform Owner is never subject to `get_club_platform_access()` — they retain full access to every club regardless of that club's own status, by a separate bypass policy (see [RLS_MATRIX.md](RLS_MATRIX.md)).
+
+A manual `platform_payments` record, marking its `platform_invoices.status = 'paid'`, restores `full` access on the very next request — no separate status field to flip, since access is derived live from the period's dates each time.
 
 ## Booking Engine Strategy
 
@@ -316,7 +360,7 @@ Loop: edit → local test (`vitest` + `supabase test db`) → local build (`npm 
 | Two devices scan the same booking QR | Scan itself never mutates — only "Confirm Check-in" does, atomically (`UPDATE ... WHERE status = 'active'`); only the first confirm succeeds, the second sees "Already Checked In" with original timestamp + staff member, and both scan attempts are recorded in `qr_scan_events` regardless of outcome |
 | Network disconnect during payment | UI shows pending/unconfirmed until the RPC response returns; no optimistic success state for money |
 | User's permission is revoked mid-session | Every mutation re-checks RLS/RPC permission server-side using current `auth.uid()` state — a stale frontend session cannot act on a revoked permission |
-| Club is disabled by Platform Owner (manual suspension) | `clubs.status = 'suspended'`; RLS for non-platform-owner roles requires `status = 'active'`, re-checked on every request (not via JWT mutation) — all staff of that club are locked out on their next request, data retained (no deletes), reactivation available |
-| Club's platform subscription lapses (unpaid) | `clubs.status` computed as `grace_period` for up to `grace_period_days` (default 7, per-club overridable) — staff retain read access and can still settle existing payments/attendance but cannot create new bookings/enrollments/subscriptions (see [Platform Billing Strategy](#platform-billing-strategy)); auto-transitions to `suspended` (full lockout) once the grace period elapses, computed lazily on next access, not via a scheduled job; a manual `platform_payments` record at any point restores `active` immediately |
+| Club is disabled by Platform Owner (manual suspension or closure) | `clubs.status = 'suspended'` or `'closed'` — an administrative decision, independent of billing; RLS for non-platform-owner roles requires `status = 'active'`, re-checked on every request (not via JWT mutation) — all staff of that club are locked out on their next request, data retained (no deletes), reactivation available for `suspended` |
+| Club's platform subscription lapses (unpaid, `clubs.status` unaffected) | `get_club_platform_access()` returns `grace` for up to the period's `grace_period_days_snapshot` (default 7, per-club/period overridable) past `end_at` — staff retain read access and can still settle existing payments/attendance/complete existing bookings but cannot create new bookings/enrollments/subscriptions (see [Platform Access Strategy](#platform-access-strategy)); returns `blocked` (full operational lockout, `clubs.status` itself still unchanged) once the grace window elapses, computed live on every access, not via a scheduled job; a manual `platform_payments` record at any point restores `full` access immediately, next request |
 | Subscription expires mid-session | The in-progress session's attendance is unaffected; the *next* session's enrollment check flags expired status (via the derived `effective_end_date`) and blocks further attendance until renewed |
 | Two receptionists enroll the last group spot simultaneously | Enrollment RPC locks the `groups` row (`SELECT ... FOR UPDATE`) and re-checks capacity inside the same transaction as the insert — only one enrollment succeeds, the second sees "Group is full" |

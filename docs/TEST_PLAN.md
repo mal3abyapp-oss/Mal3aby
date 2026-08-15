@@ -2,7 +2,7 @@
 
 > **Corrected 2026-08-15** per Mandatory Architecture Corrections. New coverage added: `SECURITY DEFINER` cross-tenant tests, group capacity race test, refund-exceeds-balance rejection, `qr_scan_events` completeness, exclusion-constraint boundary/state tests, phone normalization, medical_notes column protection, audit log immutability. See [DECISIONS.md](DECISIONS.md) ADR-011 through ADR-021.
 >
-> **Added 2026-08-15 (later):** Platform Billing coverage — `grace_period`/`suspended` status transitions, per-action-category write-gating (`auth.club_write_allowed()`), platform billing table isolation from all non-Platform-Owner roles. See [DECISIONS.md](DECISIONS.md) ADR-022 through ADR-026.
+> **Corrected 2026-08-15 (final)** per Final Platform SaaS Corrections. `clubs.status` never contains `grace_period` — replaced coverage below with `get_club_platform_access()` derivation tests, period-based subscription/renewal/overlap tests, and plan-price-snapshot immutability tests. See [DECISIONS.md](DECISIONS.md) ADR-027 through ADR-035.
 
 Not aiming for 100% coverage as a formal goal. Aiming to make the critical, hard-to-reverse business logic provably correct — especially anything touching money, availability, or tenant isolation. Everything below runs locally against `supabase start` — no test ever depends on production. See [PROJECT_RULES.md](PROJECT_RULES.md) rule 5.
 
@@ -30,12 +30,16 @@ Pure functions in `lib/domain/` only — no Supabase client, no DOM. Price calcu
 - Role/permission checks — a role without a given permission is rejected on INSERT/UPDATE at the RLS layer, not just hidden in the UI
 - Branch scope via `membership_branches` — a membership with explicit rows is restricted to exactly those branches; a membership with zero rows has access to all branches of its club
 - Platform Billing table isolation — `platform_plans`/`platform_subscriptions`/`platform_invoices`/`platform_payments` inaccessible to every non-`platform_owner` role, including Club Owner querying their own club's rows directly
-- Effective club status derivation — a club with an overdue `platform_invoices` row and unpaid `platform_subscriptions` computes as `grace_period` within its `grace_period_days` window and `suspended` after, purely from querying `platform_subscriptions` + `now()` (no reliance on a scheduled job having run)
-- `auth.club_write_allowed()` per-category correctness — `'new_commitment'` rejected in `grace_period`, `'settle_existing'` and `'operational_continuity'` allowed in `grace_period`, all three rejected in `suspended`, all three allowed in `active`
-- Recording a `platform_payments` row immediately flips effective status back to `active` on the next request, regardless of prior grace-period elapsed time
+- `clubs.status` constraint enforcement — attempting to write `'grace_period'` (or any value outside `active`/`suspended`/`closed`) into `clubs.status` is rejected at the check-constraint level, not just by application discipline
+- `get_club_platform_access()` derivation correctness — for a club whose current period's `now() < end_at` returns `full`; `end_at <= now() < end_at + grace_days_snapshot` returns `grace`; `now() >= end_at + grace_days_snapshot` returns `blocked`; `lifecycle_status = 'cancelled'` returns `blocked` regardless of dates; `clubs.status IN ('suspended','closed')` returns `blocked` regardless of subscription standing — all purely from querying `platform_subscriptions` + `clubs.status` + `now()`, no reliance on a scheduled job having run
+- `auth.club_write_allowed()` per-category correctness — `'new_commitment'` rejected in `grace`, `'settle_existing'` and `'operational_continuity'` allowed in `grace`, all three rejected in `blocked`, all three allowed in `full`
+- Recording a `platform_payments` row immediately flips `get_club_platform_access()` to `full` on the next call, regardless of prior grace-period elapsed time, without any stored status column being updated
+- Subscription period overlap prevention — two `platform_subscriptions` rows for the same club with overlapping `[start_at, end_at)` ranges → the second insert rejected by the exclusion constraint (tested both via direct SQL and simulated concurrent RPC calls); a renewal starting exactly at the prior period's `end_at` → succeeds
+- Plan price/interval snapshot immutability — editing `platform_plans.price` after a subscription period was created does not change that period's `price_snapshot`; a new period created afterward reflects the new price
+- Renewal history correctness — `renew_platform_subscription` creates a new row with `previous_subscription_id` correctly pointing at the prior period; walking the `previous_subscription_id` chain for a club reconstructs its full renewal history in order
 
 ### Integration
-End-to-end against a local Supabase instance (not mocked): booking creation (slot search → price calc → RPC → invoice → QR), QR scan-then-confirm check-in as two distinct steps, subscription lifecycle (enroll → pay → activate per policy → freeze → derive effective expiry → expire), refund end-to-end, academy enrollment under simulated capacity contention, platform billing lifecycle (club overdue → grace_period → attempt new booking [rejected] → attempt payment collection [succeeds] → suspended → platform payment recorded → active again).
+End-to-end against a local Supabase instance (not mocked): booking creation (slot search → price calc → RPC → invoice → QR), QR scan-then-confirm check-in as two distinct steps, subscription lifecycle (enroll → pay → activate per policy → freeze → derive effective expiry → expire), refund end-to-end, academy enrollment under simulated capacity contention, platform billing lifecycle (club subscription period lapses → `get_club_platform_access()` returns `grace` → attempt new booking [rejected] → attempt payment collection [succeeds] → grace window elapses → `blocked` → platform payment recorded against a renewal → `full` again, with `clubs.status` unchanged throughout), platform subscription renewal (create period 1 → renew into period 2 → verify no overlap, correct `previous_subscription_id`, correct snapshot values on period 2 if plan price changed between periods).
 
 ### Manual QA
 Responsive pass across mobile/tablet/desktop breakpoints; print QA (A4 + 80mm thermal — real printer if available, otherwise accurate print-preview); camera QA for `/scan` on an actual phone (desktop browser camera permission behavior differs from mobile); verify a QR scan alone never checks a booking in without the explicit confirm tap.
@@ -67,8 +71,12 @@ Every item below must have a passing automated test (pgTAP or Vitest/integration
 - `medical_notes` column protection
 - Phone normalization correctness (multiple input formats resolve to the same `normalized_mobile`)
 - Platform Billing table isolation from all non-Platform-Owner roles
-- `active` → `grace_period` → `suspended` → `active` transition correctness, computed lazily from `platform_subscriptions`, not a stored-and-trusted flag alone
-- `auth.club_write_allowed()` per-category gating correct in all three club statuses × all three action categories
+- `clubs.status` never accepts `'grace_period'` — check constraint enforced
+- `get_club_platform_access()` (`full`/`grace`/`blocked`) correctness across all boundary conditions, computed live from `platform_subscriptions` + `clubs.status` + `now()`, not a stored-and-trusted flag alone
+- `auth.club_write_allowed()` per-category gating correct in all three access levels × all three action categories
+- Subscription period overlap prevention + adjacent-renewal legality
+- Plan price/interval snapshot immutability across plan edits
+- Renewal creates a correctly-linked new period row, never mutates the prior one
 
 ## What Is Explicitly Not Tested Formally in V1
 

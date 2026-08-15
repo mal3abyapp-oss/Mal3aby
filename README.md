@@ -12,7 +12,7 @@ Mala3by is a multi-tenant operations system for sports clubs and football academ
 - Real financial ledger: invoices, payments, allocations, refunds — no deletes, only void/reverse
 - Secure QR check-in for bookings and academy attendance
 - Arabic RTL first, English toggle, installable PWA, works on desktop/tablet/mobile
-- Platform billing: Mala3by charges clubs a subscription to use the platform — structurally separate from a club's own customer billing (see [docs/DECISIONS.md ADR-022](docs/DECISIONS.md#adr-022--platform-billing-is-a-structurally-separate-domain-from-club-billing))
+- Platform billing: Mala3by charges clubs a real subscription (Monthly/Quarterly/Semi-Annual/Annual) to use the platform — period-based with full renewal history, structurally separate from a club's own customer billing, and fully independent of club account status (see [docs/DECISIONS.md ADR-027](docs/DECISIONS.md#adr-027--clubsstatus-and-platform-subscription-status-are-fully-independent-grace_period-is-never-a-club-status) through ADR-035)
 
 ## What this is not (V1)
 
@@ -57,4 +57,4 @@ See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md#local-development-workflow) for 
 
 ## Status
 
-Planning complete, including a Mandatory Architecture Corrections pass (2026-08-15). Phase 0 not yet started. See [docs/PROJECT_STATE.md](docs/PROJECT_STATE.md).
+Planning complete, including a Mandatory Architecture Corrections pass and a Final Platform SaaS Corrections pass (both 2026-08-15). Phase 0 not yet started. See [docs/PROJECT_STATE.md](docs/PROJECT_STATE.md).

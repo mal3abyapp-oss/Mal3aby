@@ -15,7 +15,8 @@ Planning complete, including a Mandatory Architecture Corrections pass. Phase 0 
 - Full initial planning pass: product analysis, architecture, database blueprint, RLS matrix, user flows, screen map, phased implementation plan, test plan
 - Three initial blocking business decisions resolved ([DECISIONS.md](DECISIONS.md) ADR-008, ADR-009, ADR-010): freeze extends expiry, per-branch invoice numbering, Arabic-first content
 - **Mandatory Architecture Corrections pass (2026-08-15)** — 21 corrections applied across all docs, 11 new ADRs recorded (ADR-011 through ADR-021), new [RLS_SECURITY.md](RLS_SECURITY.md) file created. See "Mandatory Architecture Corrections Log" below for the full list.
-- **Platform Billing domain added (2026-08-15, later same day)** — new V1 scope: Mala3by charges clubs a subscription to use the platform, structurally separate from a club's own customer billing. 5 new ADRs (ADR-022 through ADR-026), new Phase 3b in [IMPLEMENTATION_PLAN.md](IMPLEMENTATION_PLAN.md), 4 new tables (`platform_plans`/`platform_subscriptions`/`platform_invoices`/`platform_payments`), `clubs.status` widened to include `grace_period`, new `auth.club_write_allowed()` RLS helper. Three business decisions resolved: single flat plan (manually priced per club), manual/offline platform payment collection, grace period is read+settle-existing (not full read-only) for 7 days default before full suspension.
+- **Platform Billing domain added (2026-08-15, later same day) — [SUPERSEDED, see next entry]** — first pass introduced platform-level billing with `clubs.status` including `grace_period`. This design was corrected in the same day's final pass below.
+- **Final Platform SaaS Corrections applied (2026-08-15, final)** — the first Platform Billing pass's core flaw (`grace_period` modeled as a `clubs.status` value) fixed: `clubs.status` is now `active`/`suspended`/`closed` only, fully independent of platform subscription standing. Subscriptions are now period-based (one row per billing cycle with `previous_subscription_id` renewal chain), with snapshotted plan/price/interval terms and real billing durations (Monthly/Quarterly/Semi-Annual/Annual). A single `get_club_platform_access()` function centralizes access derivation. Platform Owner Control Center expanded into a full `/platform` navigation with 5 report types. 9 ADRs (ADR-027 through ADR-035) replace the original 5 (ADR-022 through ADR-026). Phase 3b split into 3b (data model) + 3c (Control Center UI). See "Final Platform SaaS Corrections Log" below for the full list.
 - Local git repository initialized (`D:\Ai Projects\Mal3aby`, independent of any other repo)
 
 ## In Progress
@@ -75,18 +76,33 @@ Applied before any production code was written, per explicit instruction. Full d
 29. Git policy corrected to LOCAL ONLY — `git push`/GitHub/Cloudflare/production Supabase all blocked pending separate authorization
 30. Phase discipline formalized: one phase at a time, stop-and-report after each, no opportunistic out-of-scope refactors
 
-## Platform Billing Addition Log (2026-08-15, later same day)
+## Platform Billing Addition Log (2026-08-15, later same day) — SUPERSEDED
 
-New V1 scope, not a correction — a revenue-model layer added on top of the already-corrected architecture. Full detail in [DECISIONS.md](DECISIONS.md) ADR-022 through ADR-026.
+**⚠️ Superseded by the Final Platform SaaS Corrections Log below.** Kept for historical record only — do not implement against this list.
 
-1. Platform billing modeled as a structurally separate domain (`platform_plans`/`platform_subscriptions`/`platform_invoices`/`platform_payments`), never reusing `invoices`/`payments`/`payment_allocations` — ADR-022
-2. Single flat plan in V1, price optionally overridden per club — ADR-023
-3. Platform subscription payment collected manually/offline, recorded by Platform Owner — ADR-024
-4. `clubs.status` widened to `active` | `grace_period` | `suspended`; grace period defaults to 7 days, per-club overridable, ends immediately on manual payment — ADR-025
-5. Grace period is not blanket read-only: new commitments (`bookings`/`enrollments`/`subscriptions`) blocked, settling existing obligations (`payments`/`refunds`) and operational continuity (`attendance`) remain allowed — ADR-026
-6. New `auth.club_write_allowed(p_club_id, p_action_category)` RLS helper centralizes the per-category distinction, used by every affected table's write policies
-7. New Phase 3b in [IMPLEMENTATION_PLAN.md](IMPLEMENTATION_PLAN.md), sequenced immediately after Staff/Permissions (Phase 3) and before any customer-facing domain, since later phases' RPCs depend on `auth.club_write_allowed()` existing first
-8. Effective club status computed lazily on every request from `platform_subscriptions` + `now()` — no scheduled job/cron dependency, keeping V1 zero-cost
+1. ~~Platform billing modeled as a structurally separate domain — ADR-022~~ (concept retained, restated as ADR-028)
+2. ~~Single flat plan in V1 — ADR-023~~ (superseded: real billing intervals required, see ADR-029)
+3. ~~Platform subscription payment collected manually/offline — ADR-024~~ (concept retained, restated as part of ADR-028's neighborhood)
+4. ~~`clubs.status` widened to `active` | `grace_period` | `suspended` — ADR-025~~ (**superseded — this was the core flaw corrected below**)
+5. ~~Grace period write-gating — ADR-026~~ (concept retained, redesigned around the corrected access model as ADR-033)
+
+## Final Platform SaaS Corrections Log (2026-08-15, final)
+
+Applied before any production code was written. Full detail in [DECISIONS.md](DECISIONS.md) ADR-027 through ADR-035.
+
+1. **Core fix:** `clubs.status` reverted to `active` | `suspended` | `closed` — `grace_period` removed entirely from this column. It is an administrative-only field, never derived from or set based on billing lateness — ADR-027
+2. Platform subscription *effective status* (`trial`/`active`/`grace_period`/`expired`/`cancelled`) is a fully independent, time-derived concept living on `platform_subscriptions`, never on `clubs`
+3. Platform billing remains a structurally separate domain from club billing (restated, unchanged concept) — ADR-028
+4. Platform plans now support real billing intervals: Monthly (`month×1`), Quarterly (`month×3`), Semi-Annual (`month×6`), Annual (`year×1`), via `billing_interval`+`billing_interval_count` — ADR-029
+5. Plan pricing is snapshotted onto each subscription period (`plan_name_snapshot`/`price_snapshot`/`currency_snapshot`/`interval_snapshot`/`interval_count_snapshot`/`grace_period_days_snapshot`) — editing `platform_plans` never retroactively changes an existing period — ADR-030
+6. `platform_subscriptions` is now period-based: **one row per billing cycle**, never a single row mutated forever. Renewal creates a new row with `previous_subscription_id` linking to the prior period, preserving full history — ADR-031
+7. Overlapping subscription periods for one club are prevented via a GIST exclusion constraint on `(club_id, during)`; adjacent renewal periods (new period starts exactly when old one ends) remain legal under `[)` semantics — ADR-032
+8. New `get_club_platform_access(club_id)` function returns `full`/`grace`/`blocked`, combining `clubs.status` + the derived subscription status into one centralized decision — no table re-derives this logic independently — ADR-033
+9. Platform Owner Control Center expanded from a single billing screen into a full `/platform` navigation: Overview, Clubs, Subscriptions, Payments, Renewals, Reports, Alerts, Audit, Settings — ADR-034
+10. Platform Reports added: Subscription Report, Revenue Report, Renewal Report, Growth Report, Usage Report (per club)
+11. Club Owner subscription visibility formally scoped: own club's commercial summary only, never other clubs/platform revenue/internal reports/platform audit — ADR-035
+12. `platform_payments` gained reversal columns (`reversed_at`/`reversed_by`/`reversal_reason`) — a mistaken payment record is reversed, never hard-deleted
+13. Implementation phase split: Phase 3b (data model + access control) and Phase 3c (Control Center UI + reports), so each stays a manageable single-sitting unit of work
 
 ## Next Task
 

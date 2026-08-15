@@ -2,76 +2,124 @@
 
 Architecture Decision Records for Mala3by. Each entry: Decision, Reason, Alternatives considered, Trade-offs accepted. Newest first.
 
-> **2026-08-15 (later) — Platform Billing domain added.** ADR-022 through ADR-026 introduce platform-level billing (Mala3by charging clubs to use the platform) as a new domain, structurally separate from a club's own customer billing. This is additive V1 scope, not a correction — see [IMPLEMENTATION_PLAN.md](IMPLEMENTATION_PLAN.md) Phase 3b.
+> **2026-08-15 (final) — Final Platform SaaS Corrections applied.** The first Platform Billing pass (originally ADR-022 through ADR-026) is fully replaced by ADR-027 through ADR-035 below — the original entries' text has been superseded in place, not preserved as separate historical records, since the correction is a structural redesign of the same domain rather than an addable refinement. The core fix: `grace_period` was wrongly modeled as a `clubs.status` value — it is a **subscription** status, not a **club** status, and the two are now fully independent. Subscriptions are now period-based (one row per billing cycle, not one row mutated forever), with price/plan snapshots, real billing intervals (monthly/quarterly/semi-annual/annual), and a single centralized access-derivation function.
 >
 > **2026-08-15 — Mandatory Architecture Corrections applied.** ADR-011 through ADR-021 below were added in a dedicated correction pass before any production code was written. ADR-006 (organizations) is **superseded** by ADR-011 — its original nullable-placeholder approach was rejected in favor of full removal. See each entry for details.
 
 ---
 
-## ADR-026 — Grace period blocks new commitments but allows collecting on existing ones
+## ADR-035 — Club Owner subscription visibility is scoped: own club's commercial summary only
 
-**Decision:** While `clubs.status = 'grace_period'`, RLS is **not** a single blanket read-only switch. Per-table, per-action distinction:
-- **Blocked (INSERT/UPDATE):** `bookings` (no new bookings), `enrollments` (no new enrollments), `subscriptions` (no new subscriptions), `groups`/`programs` creation, anything that creates a *new* future commitment.
-- **Still allowed (INSERT):** `payments`, `payment_allocations`, `refunds` against *existing* `invoices`/`subscriptions` — the club can still collect money it's owed on obligations already in motion. `attendance` marking for already-scheduled `training_sessions` also remains allowed, since blocking it would strand players already mid-program with no way to record a session that's happening regardless.
-- **Always allowed (SELECT):** everything, unchanged — full read access to bookings, customers, reports, invoices, exactly as in `active` status.
+**Decision:** Club Owner can see, for their own club only: current plan, start date, expiry, grace status, days remaining, renewal status, payment summary. Club Owner cannot see other clubs, platform-wide revenue, internal platform financial reports, or the Platform Owner audit trail. This is exposed via a restricted read-only view (`club_platform_subscription_summary` or equivalent), never direct access to `platform_subscriptions`/`platform_invoices`/`platform_payments`.
 
-**Reason:** A hard read-only lockout the moment a club's platform payment is a day late is disproportionate and commercially hostile — a club with 40 kids mid-season shouldn't be unable to record that Ahmed showed up to training or collect a parent's cash payment because Mala3by's own invoice is pending. But grace period must still meaningfully restrict *new* business the club is transacting on top of the platform — otherwise grace period is functionally identical to `active` and has no teeth. The dividing line is "does this create a new forward-looking commitment the platform is being asked to support" (blocked) vs "does this settle an obligation that already exists" (allowed).
+**Reason:** A club legitimately needs to know its own commercial standing with Mala3by (it affects their own planning — e.g. "renew before the season starts"). It has no legitimate need to see Mala3by's business performance across other customers. This mirrors the same pattern already used for `players.medical_notes` — a summary view for broad-but-limited consumption, full table access reserved for the party with a legitimate need for the whole picture.
 
-**Alternatives considered:** Full read-only (rejected by explicit choice — see conversation). Full read-write with only a banner warning (rejected — grace period would have no actual enforcement, defeating its purpose as a step before suspension).
+**Alternatives considered:** No visibility at all (rejected — a club genuinely needs to know when its own subscription is expiring, this is basic transparency). Direct table access with RLS filtering to own club (rejected — same reasoning as ADR-028's structural separation: a restricted view is simpler to reason about and audit than table-level RLS with a "but only these columns" carve-out).
 
-**Trade-offs:** This is a materially larger RLS surface than a single status check — every write-permission policy on `bookings`/`enrollments`/`subscriptions`/`payments`/`attendance` needs an additional `clubs.status != 'grace_period' OR <this specific action is allowed in grace period>` condition, rather than one shared helper. Mitigated by a single `auth.club_write_allowed(p_club_id, p_action_category)` helper (`'new_commitment'` | `'settle_existing'` | `'operational_continuity'`) that centralizes the distinction — see [ARCHITECTURE.md](ARCHITECTURE.md#platform-billing-strategy).
+**Trade-offs:** One additional view to maintain in step with `platform_subscriptions`' shape. Worth it for a clean, auditable boundary.
 
 ---
 
-## ADR-025 — Grace period is 7 days by default, per-club overridable, ends early on manual payment confirmation
+## ADR-034 — Platform Owner Control Center: full navigation, not a single billing screen
 
-**Decision:** `platform_subscriptions.grace_period_days` (default `7`, nullable override per club). When a platform invoice's due date passes unpaid, `clubs.status` moves from `active` to `grace_period`; a scheduled check (or on-access lazy check — see trade-off below) moves it from `grace_period` to `suspended` once `grace_period_days` have elapsed from the transition into grace period. Platform Owner recording a platform payment at any point immediately moves the club back to `active`, regardless of where it was in the countdown.
+**Decision:** Platform Owner gets a dedicated `/platform` area with: Overview, Clubs, Subscriptions, Payments, Renewals, Reports, Alerts, Audit, Settings — not a single flat "Billing" screen. Each club has a detail view (`/platform/clubs/:clubId`) with Overview, Current Subscription, Subscription History, Platform Payment History, Usage, Access Status, Audit, and an Actions panel (Activate, Start Trial, Renew, Change Plan, Extend Grace Period, Suspend Club, Reactivate Club, Cancel Subscription, Record Payment, Reverse Payment).
 
-**Reason:** A fixed default with a per-club override gives predictable behavior for the common case while leaving room for Platform Owner to extend grace for a specific club relationship (e.g. a known-good club going through a temporary issue) without needing a special-cased workflow — it's just a different number in the same column.
+**Reason:** Managing a growing base of paying club customers is Platform Owner's actual day-to-day job in this product — it deserves a real operational console, not an afterthought screen bolted onto club administration. This mirrors the same reasoning already applied to Reception's operational dashboard (Section 50/51 of the original brief) — the primary user of a screen should get a screen shaped around their actual workflow, not a generic CRUD table.
 
-**Alternatives considered:** No auto-expiry, Platform Owner manually suspends (rejected by explicit choice — risks unpaid clubs sitting in grace_period indefinitely with no enforcement pressure).
+**Alternatives considered:** A single flat billing list with inline actions (rejected — doesn't scale past a handful of clubs, and conflates distinct concerns — overview/monitoring vs. per-club management vs. reporting vs. audit — into one crowded view).
 
-**Trade-offs:** The grace-period-to-suspended transition needs *something* to evaluate the elapsed time and flip the status — V1 has no scheduled job infrastructure (deliberately, to stay zero-cost — see [PROJECT_RULES.md](PROJECT_RULES.md) rule 4). Resolved as a **lazy, on-access check**: `auth.user_club_ids()` and related RLS helpers compute the effective status (`active`/`grace_period`/`suspended`) from `platform_subscriptions` + `clubs.status` + `now()` at query time rather than relying on a stored status that only a cron job would keep current. This means the transition takes effect on the next request after the deadline passes, not proactively — acceptable since the only consequence of a few extra minutes/hours in a stale `grace_period` label is staff correctly continuing to have grace-period-level access a bit longer, not a security gap.
-
----
-
-## ADR-024 — Platform subscription payment is manual/offline in V1
-
-**Decision:** A club's platform subscription payment happens outside the system (bank transfer, cash, etc., between the club and Mala3by's operator). Platform Owner manually records the receipt as a `platform_payments` row against the club's `platform_invoices`, which moves the club's status back to `active`.
-
-**Reason:** Consistent with the already-established zero-cost-first, no-online-payment-gateway V1 rule (Stripe/Paymob explicitly deferred for club-level billing — see [PROJECT_BRIEF](../README.md) Section 43). Extending that same rule to platform-level billing avoids reopening a settled decision and avoids adding a payment gateway integration for a product with one pilot club.
-
-**Alternatives considered:** Build a payment gateway integration for platform billing now (rejected — directly contradicts the existing zero-cost-first rule; would need its own explicit decision to reopen, which wasn't requested).
-
-**Trade-offs:** Platform Owner must manually reconcile and record every club's platform payment — acceptable at V1's scale (one pilot club, a handful at most before this would need revisiting).
+**Trade-offs:** More screens to build than a single billing table (see [IMPLEMENTATION_PLAN.md](IMPLEMENTATION_PLAN.md) Phase 3b's expanded frontend scope). Judged worth it since this is the Platform Owner's primary working surface, not a rarely-touched settings page.
 
 ---
 
-## ADR-023 — Single flat platform plan, manually managed, in V1
+## ADR-033 — Platform access is `full` / `grace` / `blocked`, derived by one centralized DB function
 
-**Decision:** V1 has exactly one `platform_plans` row (e.g. "Standard"), with a price set per club on `platform_subscriptions.price_override` (nullable — falls back to the plan's default price) rather than building multiple tiers with feature gating.
+**Decision:** A single function, `get_club_platform_access(club_id) returns text` (`'full'` | `'grace'` | `'blocked'`), is the **only** place that combines `clubs.status` + the club's current/most-recent `platform_subscriptions` row + `now()` into an access decision. Every RLS policy and RPC that needs to know "can this club do X right now" calls this function (directly or via a thin wrapper like `auth.club_write_allowed()`) rather than re-deriving the logic inline.
 
-**Reason:** A tiered plan/entitlement engine (different branch limits, staff seat counts, feature flags per tier) is real, non-trivial scope with no current justification — there's one pilot club, and no product signal yet about what tiers should even contain. A single plan with a per-club price override covers "charge different clubs different amounts" (the actual near-term need, e.g. an early-adopter discount) without building a gating system nothing uses yet.
+**Full policy** (see [ARCHITECTURE.md](ARCHITECTURE.md#platform-access-strategy)):
+- `full`: all operations permitted (subject to normal role/permission checks).
+- `grace`: read existing data, collect existing outstanding payments, mark attendance for already-created academy sessions, complete existing bookings — but cannot create a new booking, new enrollment, new academy subscription, or new field/branch expansion (treated as a new commitment).
+- `blocked`: no new operational writes; data is never deleted; Platform Owner retains full access regardless.
 
-**Alternatives considered:** Tiered plans with feature gating (rejected for V1 — premature, no current signal on what should differ between tiers; see [PROJECT_RULES.md](PROJECT_RULES.md) rule 6 on no premature abstraction). Usage-based pricing (rejected — most complex to build and reconcile, no justified need).
+**Reason:** The first Platform Billing pass's original ADR-026 (superseded, see the note at the top of this file — its text has been replaced in place by this entry, not kept as a separate historical record) scattered the "is this club's subscription in good standing" logic across every affected table's RLS policy as an inline condition. That's exactly the kind of duplicated business logic this project's own rules reject (see [PROJECT_RULES.md](PROJECT_RULES.md) rule 13's spirit — one source of truth, checked everywhere, not reimplemented everywhere). A single function makes the access rule auditable in one place and guarantees every table applies the identical rule.
 
-**Trade-offs:** If/when real tiering is needed, `platform_plans` already exists as a table (not a hardcoded constant), so adding a second plan row and wiring feature checks to `platform_subscriptions.plan_id` is additive — the schema doesn't block it, it just isn't built out in V1.
+**Alternatives considered:** Inline per-policy checks (the original, superseded approach — rejected: duplicated logic is a correctness and maintenance hazard, and a future change to the grace-period rule would require touching every policy instead of one function).
 
----
-
-## ADR-022 — Platform billing is a structurally separate domain from club billing
-
-**Decision:** Mala3by charging a club to use the platform is modeled with its own tables — `platform_plans`, `platform_subscriptions`, `platform_invoices`, `platform_payments` — entirely distinct from `invoices`/`payments`/`payment_allocations`/`subscriptions`, which represent money flowing between a club and *its own* customers.
-
-**Reason:** These are two unrelated financial relationships that happen to both be called "billing": one is Mala3by↔Club (platform revenue), the other is Club↔Customer (club revenue). Conflating them into the same tables — e.g. adding a `payer_type` discriminator to `invoices` — would repeat exactly the kind of dual-purpose-table hazard already corrected once in this project (see [ADR-011b](#adr-011b--paymentsinvoice_id-removed-payment_allocations-is-the-only-payment-invoice-relationship)): RLS policies would need to branch on payer type everywhere, reports would need to filter it out everywhere, and a bug conflating the two is a bug that either overbills a customer or underbills a club's platform account. Separate tables make the two ledgers impossible to accidentally cross.
-
-**Alternatives considered:** Reuse `invoices`/`payments` with a `scope` or `payer_type` column distinguishing platform vs. club billing (rejected — the exact anti-pattern this project already corrected once with the `payments.invoice_id` issue; two genuinely different relationships belong in two genuinely different tables).
-
-**Trade-offs:** Some structural duplication (platform billing needs its own numbering, its own status enum, its own "payment" concept) rather than reusing club-billing machinery. Accepted because the duplication is small (4 tables, Platform-Owner-only access) and the isolation is the actual safety property being bought.
+**Trade-offs:** Every grace-gated write now does one extra function call (`get_club_platform_access`) before its permission check — negligible cost, and it's `STABLE` so the planner can avoid re-evaluating it redundantly within a single statement.
 
 ---
 
-## ADR-021 — Exclusion constraint covers `pending_payment`, `confirmed`, and `checked_in`
+## ADR-032 — Overlapping subscription periods are prevented; adjacent renewal periods are allowed
+
+**Decision:** `platform_subscriptions` gets the same category of protection as `bookings`: a generated `during tstzrange` column and a `GIST` exclusion constraint on `(club_id, during)`, excluding `cancelled` rows, using `[)` range semantics — so a period ending `2026-03-31` and the next starting `2026-04-01`... wait, more precisely `end_at` of period 1 equals `start_at` of period 2 exactly, which is legal under `[)` semantics (period 1 covers `[start1, end1)`, period 2 covers `[end1, end2)` — no overlap, back-to-back is fine).
+
+**Reason:** A club must never end up with two genuinely overlapping active/planned billing periods by accident (double-charged, ambiguous which period's status governs access) — but a renewal must be creatable *before* the current period ends (e.g. Platform Owner processes next quarter's renewal a few days early), which requires the new period to start exactly when the old one ends, not strictly after. The `[)` exclusion pattern already proven correct for `bookings` (see [ADR-021](#adr-021--exclusion-constraint-covers-pending_payment-confirmed-and-checked_in)) handles this identically.
+
+**Alternatives considered:** Application-level check-then-insert (rejected — same TOCTOU race already rejected for bookings). Requiring a strict gap between periods (rejected — makes same-day renewal impossible, an artificial restriction with no business reason).
+
+**Trade-offs:** None beyond the `btree_gist` extension dependency already accepted for `bookings`.
+
+---
+
+## ADR-031 — Renewal creates a new subscription-period row; periods are never mutated/extended in place
+
+**Decision:** `platform_subscriptions` is **one row per billing period**, not one row per club that gets its dates pushed forward on renewal. A renewal inserts a new row with `previous_subscription_id` pointing at the prior period's row. Example: Subscription #1 (`01 Jan`–`31 Mar`), Subscription #2 (`01 Apr`–`30 Jun`, `previous_subscription_id` = #1's id).
+
+**Reason:** Mutating one row's `end_at` forward on every renewal destroys the club's billing history — there would be no record of when each period actually started/ended, what was charged for period 2 vs period 5, or how many times the club has renewed. A period-based model preserves full renewal history for free (it's just the row history), which directly enables the Subscription History view (Section 9) and the Renewal/Growth reports (Section 10) without needing a separate audit-log reconstruction.
+
+**Alternatives considered:** Single mutable row per club, dates extended on renewal (rejected — the original, now-corrected approach; loses history, and doesn't support "one subscription row per billing period" as explicitly required).
+
+**Trade-offs:** Slightly more rows over a club's lifetime (one per billing period, e.g. 4/year for quarterly) — trivial at this data scale. Querying "the club's current subscription" requires finding the period where `now()` falls within `[start_at, end_at)` (or the most recent one if none currently active) rather than a flat single-row lookup — handled by `get_club_platform_access()` and a `current_platform_subscription` view, not scattered ad hoc queries.
+
+---
+
+## ADR-030 — Platform plan pricing is snapshotted onto each subscription period
+
+**Decision:** `platform_plans` remains editable by Platform Owner (price changes over time are normal business reality). Every `platform_subscriptions` row captures a **snapshot** at creation time: `plan_name_snapshot`, `price_snapshot`, `currency_snapshot`, `interval_snapshot`, `interval_count_snapshot`, `grace_period_days_snapshot`. Editing `platform_plans` later never changes any existing subscription period's snapshotted values.
+
+**Reason:** If a subscription read its price live from `platform_plans` and Platform Owner later raised the price, every historical period's invoice/report would retroactively show the new price — corrupting financial history in exactly the way [PROJECT_RULES.md](PROJECT_RULES.md) rule 3/8 already forbids for club-level billing. The same principle applies here: a financial record must reflect what was actually agreed and charged at the time, permanently.
+
+**Alternatives considered:** Always read current plan price live (rejected — corrupts historical financial accuracy, see reasoning above). Store only a `plan_id` FK with no snapshot (rejected — same problem, just one join away instead of zero).
+
+**Trade-offs:** Minor denormalization (the same plan name/price/interval values are duplicated across every period row for a club on an unchanged plan). Accepted — this is the standard, correct pattern for any subscription billing system (Stripe, for reference, does the same thing with invoice line item snapshots).
+
+---
+
+## ADR-029 — Platform plan supports real billing intervals: monthly, quarterly, semi-annual, annual
+
+**Decision:** `platform_plans` (and the snapshot on `platform_subscriptions`) uses `billing_interval` (`month` | `year`) + `billing_interval_count` (int) rather than a single flat "the plan" concept with no duration structure. Monthly = `month × 1`, Quarterly = `month × 3`, Semi-Annual = `month × 6`, Annual = `year × 1`. All plans can offer the same feature set in V1 — the only variation is duration, price, and discount.
+
+**Reason:** A real subscription product needs real billing periods — a club choosing "pay annually for a discount" vs "pay monthly" is a normal, expected commercial choice, and the schema needs to represent an arbitrary future duration (not just today's four options) without a migration. `interval` + `interval_count` is the standard two-column pattern (same shape Stripe uses) that covers today's four durations and any future one (e.g. bi-monthly = `month × 2`) with no schema change.
+
+**Alternatives considered:** A single hardcoded duration with no concept of interval (the original, now-corrected "single flat plan" approach — rejected: explicitly insufficient per this correction). An enum of named periods (`monthly`/`quarterly`/`semi_annual`/`annual`) with no way to add a new one without a migration (rejected — `interval`+`interval_count` covers the same four values today and any future value for free).
+
+**Trade-offs:** Slightly more computation to turn `interval`+`interval_count` into an actual `end_at` date (`start_at + (interval_count * interval)`) versus reading a flat duration — trivial, handled once in the renewal RPC.
+
+---
+
+## ADR-028 — Platform billing is a structurally separate domain from club billing
+
+**Decision:** Mala3by charging a club to use the platform is modeled with its own tables — `platform_plans`, `platform_subscriptions`, `platform_invoices`, `platform_payments` — entirely distinct from `invoices`/`payments`/`payment_allocations`/`subscriptions`, which represent money flowing between a club and *its own* customers. (Unchanged from the original ADR-022 — restated here as the still-current decision since ADR-022 itself is superseded below along with the rest of the original pass.)
+
+**Reason:** These are two unrelated financial relationships that happen to both be called "billing": one is Mala3by↔Club (platform revenue), the other is Club↔Customer (club revenue). Conflating them into the same tables — e.g. adding a `payer_type` discriminator to `invoices` — would repeat exactly the kind of dual-purpose-table hazard already corrected once in this project (see [ADR-011b](#adr-011b--paymentsinvoice_id-removed-payment_allocations-is-the-only-payment-invoice-relationship)). Separate tables make the two ledgers impossible to accidentally cross.
+
+**Alternatives considered:** Reuse `invoices`/`payments` with a `scope`/`payer_type` discriminator (rejected — same anti-pattern already corrected once).
+
+**Trade-offs:** Some structural duplication (platform billing needs its own numbering, its own status concepts, its own "payment" concept) rather than reusing club-billing machinery. Accepted because the duplication is small and isolation is the actual safety property being bought.
+
+---
+
+## ADR-027 — `clubs.status` and platform subscription status are fully independent; `grace_period` is never a club status
+
+**Decision:** `clubs.status` is `active` | `suspended` | `closed` — and **nothing else**. It answers "is this club allowed to operate at all," a decision Platform Owner makes deliberately (suspend for cause, close permanently). It has no `grace_period` value and is never set based on billing lateness. Platform subscription standing is a **separate** concept entirely: the *effective subscription status* — `trial` | `active` | `grace_period` | `expired` | `cancelled` — lives on/is derived from `platform_subscriptions`, never on `clubs`.
+
+**Reason:** The first Platform Billing pass's original decision put `grace_period` inside `clubs.status`, conflating two genuinely different questions: "is this club account allowed to exist/operate" (an administrative decision) vs. "is this club's Mala3by subscription currently paid up" (a billing/time-derived fact). Conflating them means a club that's perfectly fine operationally but has a subscription hiccup gets the same status field mutated as a club Platform Owner deliberately suspended for cause — two unrelated reasons producing the same-looking state, which is confusing to reason about, audit, and query. Keeping them separate means `clubs.status = 'active'` always simply means "this club account is allowed to exist and operate," full stop — the subscription's own state answers the billing question independently.
+
+**Alternatives considered:** Keep `grace_period` on `clubs.status` (the original, now-corrected approach — rejected per explicit correction). A single combined status enum covering both dimensions (rejected — conflates two independent axes into one enum, the same problem in different clothing).
+
+**Trade-offs:** Access-control logic now reads two independent signals (`clubs.status` and the derived subscription status) instead of one — handled by centralizing both into `get_club_platform_access()` (see [ADR-033](#adr-033--platform-access-is-full--grace--blocked-derived-by-one-centralized-db-function)) so nothing downstream needs to know there are two signals being combined.
+
+---
 
 **Decision:** The `bookings` double-booking exclusion constraint's `WHERE` clause is `status IN ('pending_payment', 'confirmed', 'checked_in')` — i.e. it blocks overlap for any non-terminal booking state. `completed`, `cancelled`, and `no_show` are excluded from the constraint.
 
