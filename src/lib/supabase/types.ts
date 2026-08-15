@@ -17,6 +17,41 @@ export type Database = {
   }
   public: {
     Tables: {
+      automatic_trial_entitlements: {
+        Row: {
+          club_id: string
+          consumed_at: string
+          id: string
+          owner_email_snapshot: string | null
+          owner_normalized_mobile_snapshot: string | null
+          user_id: string
+        }
+        Insert: {
+          club_id: string
+          consumed_at?: string
+          id?: string
+          owner_email_snapshot?: string | null
+          owner_normalized_mobile_snapshot?: string | null
+          user_id: string
+        }
+        Update: {
+          club_id?: string
+          consumed_at?: string
+          id?: string
+          owner_email_snapshot?: string | null
+          owner_normalized_mobile_snapshot?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "automatic_trial_entitlements_club_id_fkey"
+            columns: ["club_id"]
+            isOneToOne: false
+            referencedRelation: "clubs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       branches: {
         Row: {
           address: string | null
@@ -166,6 +201,42 @@ export type Database = {
         }
         Relationships: []
       }
+      contact_requests: {
+        Row: {
+          business_name: string | null
+          created_at: string
+          email: string | null
+          id: string
+          message: string | null
+          name: string
+          phone: string
+          status: string
+          updated_at: string | null
+        }
+        Insert: {
+          business_name?: string | null
+          created_at?: string
+          email?: string | null
+          id?: string
+          message?: string | null
+          name: string
+          phone: string
+          status?: string
+          updated_at?: string | null
+        }
+        Update: {
+          business_name?: string | null
+          created_at?: string
+          email?: string | null
+          id?: string
+          message?: string | null
+          name?: string
+          phone?: string
+          status?: string
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
       membership_branches: {
         Row: {
           branch_id: string
@@ -216,6 +287,276 @@ export type Database = {
           key?: string
         }
         Relationships: []
+      }
+      platform_invoices: {
+        Row: {
+          amount: number
+          club_id: string
+          created_at: string
+          due_date: string
+          id: string
+          invoice_number: number
+          platform_subscription_id: string
+          status: string
+          updated_at: string | null
+        }
+        Insert: {
+          amount: number
+          club_id: string
+          created_at?: string
+          due_date: string
+          id?: string
+          invoice_number?: number
+          platform_subscription_id: string
+          status?: string
+          updated_at?: string | null
+        }
+        Update: {
+          amount?: number
+          club_id?: string
+          created_at?: string
+          due_date?: string
+          id?: string
+          invoice_number?: number
+          platform_subscription_id?: string
+          status?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "platform_invoices_club_id_fkey"
+            columns: ["club_id"]
+            isOneToOne: false
+            referencedRelation: "clubs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "platform_invoices_platform_subscription_id_fkey"
+            columns: ["platform_subscription_id"]
+            isOneToOne: false
+            referencedRelation: "platform_subscriptions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      platform_payments: {
+        Row: {
+          amount: number
+          id: string
+          method: string
+          platform_invoice_id: string
+          recorded_at: string
+          recorded_by: string | null
+          reference: string | null
+          reversal_reason: string | null
+          reversed_at: string | null
+          reversed_by: string | null
+        }
+        Insert: {
+          amount: number
+          id?: string
+          method: string
+          platform_invoice_id: string
+          recorded_at?: string
+          recorded_by?: string | null
+          reference?: string | null
+          reversal_reason?: string | null
+          reversed_at?: string | null
+          reversed_by?: string | null
+        }
+        Update: {
+          amount?: number
+          id?: string
+          method?: string
+          platform_invoice_id?: string
+          recorded_at?: string
+          recorded_by?: string | null
+          reference?: string | null
+          reversal_reason?: string | null
+          reversed_at?: string | null
+          reversed_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "platform_payments_platform_invoice_id_fkey"
+            columns: ["platform_invoice_id"]
+            isOneToOne: false
+            referencedRelation: "platform_invoices"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      platform_plans: {
+        Row: {
+          billing_interval: string
+          billing_interval_count: number
+          created_at: string
+          currency: string
+          default_grace_period_days: number
+          description_ar: string | null
+          discount_label: string | null
+          display_order: number
+          features_summary: string | null
+          id: string
+          is_public: boolean
+          name: string
+          name_ar: string
+          price: number
+          status: string
+          updated_at: string | null
+        }
+        Insert: {
+          billing_interval: string
+          billing_interval_count: number
+          created_at?: string
+          currency?: string
+          default_grace_period_days?: number
+          description_ar?: string | null
+          discount_label?: string | null
+          display_order?: number
+          features_summary?: string | null
+          id?: string
+          is_public?: boolean
+          name: string
+          name_ar: string
+          price: number
+          status?: string
+          updated_at?: string | null
+        }
+        Update: {
+          billing_interval?: string
+          billing_interval_count?: number
+          created_at?: string
+          currency?: string
+          default_grace_period_days?: number
+          description_ar?: string | null
+          discount_label?: string | null
+          display_order?: number
+          features_summary?: string | null
+          id?: string
+          is_public?: boolean
+          name?: string
+          name_ar?: string
+          price?: number
+          status?: string
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
+      platform_settings: {
+        Row: {
+          default_grace_period_days: number
+          default_trial_days: number
+          id: boolean
+          updated_at: string | null
+        }
+        Insert: {
+          default_grace_period_days?: number
+          default_trial_days?: number
+          id?: boolean
+          updated_at?: string | null
+        }
+        Update: {
+          default_grace_period_days?: number
+          default_trial_days?: number
+          id?: boolean
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
+      platform_subscriptions: {
+        Row: {
+          cancelled_at: string | null
+          cancelled_by: string | null
+          cancelled_reason: string | null
+          club_id: string
+          created_at: string
+          currency_snapshot: string | null
+          during: unknown
+          end_at: string
+          grace_period_days_snapshot: number
+          id: string
+          interval_count_snapshot: number | null
+          interval_snapshot: string | null
+          lifecycle_status: string
+          plan_id: string | null
+          plan_name_snapshot: string | null
+          previous_subscription_id: string | null
+          price_snapshot: number
+          start_at: string
+          subscription_kind: string
+          trial_origin: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          cancelled_at?: string | null
+          cancelled_by?: string | null
+          cancelled_reason?: string | null
+          club_id: string
+          created_at?: string
+          currency_snapshot?: string | null
+          during?: unknown
+          end_at: string
+          grace_period_days_snapshot?: number
+          id?: string
+          interval_count_snapshot?: number | null
+          interval_snapshot?: string | null
+          lifecycle_status: string
+          plan_id?: string | null
+          plan_name_snapshot?: string | null
+          previous_subscription_id?: string | null
+          price_snapshot?: number
+          start_at: string
+          subscription_kind: string
+          trial_origin?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          cancelled_at?: string | null
+          cancelled_by?: string | null
+          cancelled_reason?: string | null
+          club_id?: string
+          created_at?: string
+          currency_snapshot?: string | null
+          during?: unknown
+          end_at?: string
+          grace_period_days_snapshot?: number
+          id?: string
+          interval_count_snapshot?: number | null
+          interval_snapshot?: string | null
+          lifecycle_status?: string
+          plan_id?: string | null
+          plan_name_snapshot?: string | null
+          previous_subscription_id?: string | null
+          price_snapshot?: number
+          start_at?: string
+          subscription_kind?: string
+          trial_origin?: string | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "platform_subscriptions_club_id_fkey"
+            columns: ["club_id"]
+            isOneToOne: false
+            referencedRelation: "clubs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "platform_subscriptions_plan_id_fkey"
+            columns: ["plan_id"]
+            isOneToOne: false
+            referencedRelation: "platform_plans"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "platform_subscriptions_previous_subscription_id_fkey"
+            columns: ["previous_subscription_id"]
+            isOneToOne: false
+            referencedRelation: "platform_subscriptions"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       profiles: {
         Row: {
@@ -300,13 +641,113 @@ export type Database = {
       }
     }
     Views: {
-      [_ in never]: never
+      club_platform_subscription_summary: {
+        Row: {
+          club_id: string | null
+          effective_access: string | null
+          end_at: string | null
+          lifecycle_status: string | null
+          plan_name_snapshot: string | null
+          start_at: string | null
+          subscription_kind: string | null
+        }
+        Insert: {
+          club_id?: string | null
+          effective_access?: never
+          end_at?: string | null
+          lifecycle_status?: string | null
+          plan_name_snapshot?: string | null
+          start_at?: string | null
+          subscription_kind?: string | null
+        }
+        Update: {
+          club_id?: string | null
+          effective_access?: never
+          end_at?: string | null
+          lifecycle_status?: string | null
+          plan_name_snapshot?: string | null
+          start_at?: string | null
+          subscription_kind?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "platform_subscriptions_club_id_fkey"
+            columns: ["club_id"]
+            isOneToOne: false
+            referencedRelation: "clubs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      public_plans: {
+        Row: {
+          billing_interval: string | null
+          billing_interval_count: number | null
+          currency: string | null
+          description_ar: string | null
+          discount_label: string | null
+          features_summary: string | null
+          name_ar: string | null
+          price: number | null
+        }
+        Insert: {
+          billing_interval?: string | null
+          billing_interval_count?: number | null
+          currency?: string | null
+          description_ar?: string | null
+          discount_label?: string | null
+          features_summary?: string | null
+          name_ar?: string | null
+          price?: number | null
+        }
+        Update: {
+          billing_interval?: string | null
+          billing_interval_count?: number | null
+          currency?: string | null
+          description_ar?: string | null
+          discount_label?: string | null
+          features_summary?: string | null
+          name_ar?: string | null
+          price?: number | null
+        }
+        Relationships: []
+      }
     }
     Functions: {
+      cancel_platform_subscription: {
+        Args: { p_reason: string; p_subscription_id: string }
+        Returns: undefined
+      }
+      change_platform_plan: {
+        Args: {
+          p_current_subscription_id: string
+          p_new_plan_id: string
+          p_reason?: string
+        }
+        Returns: string
+      }
+      club_write_allowed: {
+        Args: { p_action_category: string; p_club_id: string }
+        Returns: boolean
+      }
+      create_platform_subscription: {
+        Args: {
+          p_club_id: string
+          p_plan_id?: string
+          p_subscription_kind: string
+          p_trial_origin?: string
+        }
+        Returns: string
+      }
       deactivate_staff_member: {
         Args: { p_membership_id: string }
         Returns: undefined
       }
+      extend_grace_period: {
+        Args: { p_grace_period_days: number; p_subscription_id: string }
+        Returns: undefined
+      }
+      get_club_platform_access: { Args: { p_club_id: string }; Returns: string }
       has_branch_access: {
         Args: { p_branch_id: string; p_membership_id: string }
         Returns: boolean
@@ -325,6 +766,23 @@ export type Database = {
         Returns: string
       }
       is_platform_owner: { Args: Record<PropertyKey, never>; Returns: boolean }
+      record_platform_payment: {
+        Args: {
+          p_amount: number
+          p_invoice_id: string
+          p_method: string
+          p_reference?: string
+        }
+        Returns: string
+      }
+      renew_platform_subscription: {
+        Args: { p_plan_id?: string; p_previous_subscription_id: string }
+        Returns: string
+      }
+      reverse_platform_payment: {
+        Args: { p_payment_id: string; p_reason: string }
+        Returns: undefined
+      }
       user_club_ids: { Args: Record<PropertyKey, never>; Returns: string[] }
     }
     Enums: {
