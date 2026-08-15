@@ -23,9 +23,9 @@ export function StatCard({ label, value, icon: Icon, tone = 'default', className
   return (
     <Card className={cn('p-4', className)}>
       <CardContent className="flex items-center justify-between gap-3 p-0">
-        <div>
-          <p className="text-sm text-text-secondary">{label}</p>
-          <p className={cn('mt-1 text-2xl font-bold tabular-nums', toneClass[tone])}>{value}</p>
+        <div className="min-w-0 flex-1">
+          <p className="truncate text-sm text-text-secondary">{label}</p>
+          <p className={cn('mt-1 break-words text-2xl font-bold tabular-nums', toneClass[tone])}>{value}</p>
         </div>
         {Icon && <Icon className="size-8 shrink-0 text-text-secondary/50" aria-hidden="true" />}
       </CardContent>

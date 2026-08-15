@@ -48,11 +48,20 @@ export function DataTable<T>({
 
   return (
     <div className={cn('w-full overflow-x-auto rounded-md border border-border', className)}>
-      <table className="w-full text-sm">
+      {/* min-w-max + whitespace-nowrap on cells: on a narrow viewport,
+          without this the browser shrinks/wraps each cell to fit instead
+          of triggering this container's own overflow-x-auto, producing
+          multi-line wrapped cells (e.g. a long invoice number breaking
+          across 4 lines) instead of a clean horizontal scroll -- found
+          during the stabilization pass's mobile responsive check. */}
+      <table className="w-full min-w-max text-sm">
         <thead>
           <tr className="border-b border-border bg-muted/50 text-start">
             {columns.map((col) => (
-              <th key={col.key} className={cn('px-3 py-2 text-start font-medium text-text-secondary', col.className)}>
+              <th
+                key={col.key}
+                className={cn('whitespace-nowrap px-3 py-2 text-start font-medium text-text-secondary', col.className)}
+              >
                 {col.header}
               </th>
             ))}
@@ -62,7 +71,7 @@ export function DataTable<T>({
           {rows.map((row) => (
             <tr key={rowKey(row)} className="border-b border-border last:border-0 hover:bg-muted/30">
               {columns.map((col) => (
-                <td key={col.key} className={cn('px-3 py-2', col.className)}>
+                <td key={col.key} className={cn('whitespace-nowrap px-3 py-2', col.className)}>
                   {col.render(row)}
                 </td>
               ))}
