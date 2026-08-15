@@ -22,7 +22,7 @@ export function RequireAuth() {
 // (public.is_platform_owner() SECURITY DEFINER + RLS policies); this only
 // prevents rendering the console shell for non-owners.
 export function RequirePlatformOwner() {
-  const { session, loading, memberships } = useAuth()
+  const { session, loading, isPlatformOwner } = useAuth()
   const location = useLocation()
 
   if (loading) return null
@@ -31,7 +31,6 @@ export function RequirePlatformOwner() {
     return <Navigate to="/login" state={{ from: location }} replace />
   }
 
-  const isPlatformOwner = memberships.some((m) => m.roleKey === 'platform_owner')
   if (!isPlatformOwner) {
     return <Navigate to="/app" replace />
   }
