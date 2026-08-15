@@ -300,6 +300,173 @@ export type Database = {
         }
         Relationships: []
       }
+      customers: {
+        Row: {
+          address: string | null
+          club_id: string
+          created_at: string
+          created_by: string | null
+          date_of_birth: string | null
+          email: string | null
+          emergency_contact: Json | null
+          full_name: string
+          gender: string | null
+          id: string
+          mobile_display: string | null
+          national_id: string | null
+          normalized_mobile: string | null
+          notes: string | null
+          photo_url: string | null
+          updated_at: string | null
+          whatsapp: string | null
+        }
+        Insert: {
+          address?: string | null
+          club_id: string
+          created_at?: string
+          created_by?: string | null
+          date_of_birth?: string | null
+          email?: string | null
+          emergency_contact?: Json | null
+          full_name: string
+          gender?: string | null
+          id?: string
+          mobile_display?: string | null
+          national_id?: string | null
+          normalized_mobile?: string | null
+          notes?: string | null
+          photo_url?: string | null
+          updated_at?: string | null
+          whatsapp?: string | null
+        }
+        Update: {
+          address?: string | null
+          club_id?: string
+          created_at?: string
+          created_by?: string | null
+          date_of_birth?: string | null
+          email?: string | null
+          emergency_contact?: Json | null
+          full_name?: string
+          gender?: string | null
+          id?: string
+          mobile_display?: string | null
+          national_id?: string | null
+          normalized_mobile?: string | null
+          notes?: string | null
+          photo_url?: string | null
+          updated_at?: string | null
+          whatsapp?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "customers_club_id_fkey"
+            columns: ["club_id"]
+            isOneToOne: false
+            referencedRelation: "clubs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      guardian_links: {
+        Row: {
+          created_at: string
+          customer_id: string
+          id: string
+          is_primary: boolean
+          player_id: string
+          relationship: string
+        }
+        Insert: {
+          created_at?: string
+          customer_id: string
+          id?: string
+          is_primary?: boolean
+          player_id: string
+          relationship: string
+        }
+        Update: {
+          created_at?: string
+          customer_id?: string
+          id?: string
+          is_primary?: boolean
+          player_id?: string
+          relationship?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "guardian_links_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "customers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "guardian_links_player_id_fkey"
+            columns: ["player_id"]
+            isOneToOne: false
+            referencedRelation: "players"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "guardian_links_player_id_fkey"
+            columns: ["player_id"]
+            isOneToOne: false
+            referencedRelation: "players_safe"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      players: {
+        Row: {
+          club_id: string
+          created_at: string
+          created_by: string | null
+          date_of_birth: string | null
+          full_name: string
+          gender: string | null
+          id: string
+          medical_notes: string | null
+          photo_url: string | null
+          status: string
+          updated_at: string | null
+        }
+        Insert: {
+          club_id: string
+          created_at?: string
+          created_by?: string | null
+          date_of_birth?: string | null
+          full_name: string
+          gender?: string | null
+          id?: string
+          medical_notes?: string | null
+          photo_url?: string | null
+          status?: string
+          updated_at?: string | null
+        }
+        Update: {
+          club_id?: string
+          created_at?: string
+          created_by?: string | null
+          date_of_birth?: string | null
+          full_name?: string
+          gender?: string | null
+          id?: string
+          medical_notes?: string | null
+          photo_url?: string | null
+          status?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "players_club_id_fkey"
+            columns: ["club_id"]
+            isOneToOne: false
+            referencedRelation: "clubs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       membership_branches: {
         Row: {
           branch_id: string
@@ -735,6 +902,53 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "platform_subscriptions_club_id_fkey"
+            columns: ["club_id"]
+            isOneToOne: false
+            referencedRelation: "clubs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      players_safe: {
+        Row: {
+          club_id: string | null
+          created_at: string | null
+          created_by: string | null
+          date_of_birth: string | null
+          full_name: string | null
+          gender: string | null
+          id: string | null
+          photo_url: string | null
+          status: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          club_id?: string | null
+          created_at?: string | null
+          created_by?: string | null
+          date_of_birth?: string | null
+          full_name?: string | null
+          gender?: string | null
+          id?: string | null
+          photo_url?: string | null
+          status?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          club_id?: string | null
+          created_at?: string | null
+          created_by?: string | null
+          date_of_birth?: string | null
+          full_name?: string | null
+          gender?: string | null
+          id?: string | null
+          photo_url?: string | null
+          status?: string | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "players_club_id_fkey"
             columns: ["club_id"]
             isOneToOne: false
             referencedRelation: "clubs"
