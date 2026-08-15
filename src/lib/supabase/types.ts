@@ -1650,6 +1650,21 @@ export type Database = {
       }
     }
     Functions: {
+      _create_booking_internal: {
+        Args: {
+          p_booking_series_id: string
+          p_customer_id: string
+          p_discount_amount: number
+          p_end_at: string
+          p_field_id: string
+          p_notes: string
+          p_payment_amount: number
+          p_payment_method: string
+          p_record_payment: boolean
+          p_start_at: string
+        }
+        Returns: string
+      }
       cancel_booking: {
         Args: { p_booking_id: string; p_reason: string }
         Returns: undefined
@@ -1688,7 +1703,6 @@ export type Database = {
       }
       create_booking: {
         Args: {
-          p_booking_series_id?: string
           p_customer_id: string
           p_discount_amount?: number
           p_end_at: string
