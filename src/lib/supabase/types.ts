@@ -368,6 +368,181 @@ export type Database = {
           },
         ]
       }
+      field_blocks: {
+        Row: {
+          club_id: string
+          created_at: string
+          created_by: string | null
+          end_at: string
+          field_id: string
+          id: string
+          reason: string | null
+          start_at: string
+          type: string
+        }
+        Insert: {
+          club_id: string
+          created_at?: string
+          created_by?: string | null
+          end_at: string
+          field_id: string
+          id?: string
+          reason?: string | null
+          start_at: string
+          type: string
+        }
+        Update: {
+          club_id?: string
+          created_at?: string
+          created_by?: string | null
+          end_at?: string
+          field_id?: string
+          id?: string
+          reason?: string | null
+          start_at?: string
+          type?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "field_blocks_club_id_fkey"
+            columns: ["club_id"]
+            isOneToOne: false
+            referencedRelation: "clubs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "field_blocks_field_id_fkey"
+            columns: ["field_id"]
+            isOneToOne: false
+            referencedRelation: "fields"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      field_operating_hours: {
+        Row: {
+          branch_id: string | null
+          close_time: string
+          club_id: string
+          created_at: string
+          day_of_week: number
+          field_id: string | null
+          id: string
+          open_time: string
+        }
+        Insert: {
+          branch_id?: string | null
+          close_time: string
+          club_id: string
+          created_at?: string
+          day_of_week: number
+          field_id?: string | null
+          id?: string
+          open_time: string
+        }
+        Update: {
+          branch_id?: string | null
+          close_time?: string
+          club_id?: string
+          created_at?: string
+          day_of_week?: number
+          field_id?: string | null
+          id?: string
+          open_time?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "field_operating_hours_branch_id_fkey"
+            columns: ["branch_id"]
+            isOneToOne: false
+            referencedRelation: "branches"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "field_operating_hours_club_id_fkey"
+            columns: ["club_id"]
+            isOneToOne: false
+            referencedRelation: "clubs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "field_operating_hours_field_id_fkey"
+            columns: ["field_id"]
+            isOneToOne: false
+            referencedRelation: "fields"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      fields: {
+        Row: {
+          branch_id: string
+          capacity: number | null
+          club_id: string
+          created_at: string
+          created_by: string | null
+          default_duration_minutes: number
+          id: string
+          images: Json | null
+          indoor: boolean
+          maintenance_status: string | null
+          name: string
+          notes: string | null
+          sport: string
+          status: string
+          updated_at: string | null
+        }
+        Insert: {
+          branch_id: string
+          capacity?: number | null
+          club_id: string
+          created_at?: string
+          created_by?: string | null
+          default_duration_minutes?: number
+          id?: string
+          images?: Json | null
+          indoor?: boolean
+          maintenance_status?: string | null
+          name: string
+          notes?: string | null
+          sport: string
+          status?: string
+          updated_at?: string | null
+        }
+        Update: {
+          branch_id?: string
+          capacity?: number | null
+          club_id?: string
+          created_at?: string
+          created_by?: string | null
+          default_duration_minutes?: number
+          id?: string
+          images?: Json | null
+          indoor?: boolean
+          maintenance_status?: string | null
+          name?: string
+          notes?: string | null
+          sport?: string
+          status?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "fields_branch_id_fkey"
+            columns: ["branch_id"]
+            isOneToOne: false
+            referencedRelation: "branches"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fields_club_id_fkey"
+            columns: ["club_id"]
+            isOneToOne: false
+            referencedRelation: "clubs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       guardian_links: {
         Row: {
           created_at: string
@@ -788,6 +963,63 @@ export type Database = {
           },
         ]
       }
+      pricing_rules: {
+        Row: {
+          club_id: string
+          created_at: string
+          date_specific: string | null
+          day_of_week: number | null
+          end_time: string
+          field_id: string | null
+          id: string
+          price_per_hour: number
+          priority: number
+          start_time: string
+          updated_at: string | null
+        }
+        Insert: {
+          club_id: string
+          created_at?: string
+          date_specific?: string | null
+          day_of_week?: number | null
+          end_time: string
+          field_id?: string | null
+          id?: string
+          price_per_hour: number
+          priority?: number
+          start_time: string
+          updated_at?: string | null
+        }
+        Update: {
+          club_id?: string
+          created_at?: string
+          date_specific?: string | null
+          day_of_week?: number | null
+          end_time?: string
+          field_id?: string | null
+          id?: string
+          price_per_hour?: number
+          priority?: number
+          start_time?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "pricing_rules_club_id_fkey"
+            columns: ["club_id"]
+            isOneToOne: false
+            referencedRelation: "clubs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pricing_rules_field_id_fkey"
+            columns: ["field_id"]
+            isOneToOne: false
+            referencedRelation: "fields"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       profiles: {
         Row: {
           avatar_url: string | null
@@ -1072,6 +1304,15 @@ export type Database = {
       renew_platform_subscription: {
         Args: { p_plan_id?: string; p_previous_subscription_id: string }
         Returns: string
+      }
+      resolve_field_price: {
+        Args: {
+          p_date: string
+          p_end_time: string
+          p_field_id: string
+          p_start_time: string
+        }
+        Returns: number
       }
       reverse_platform_payment: {
         Args: { p_payment_id: string; p_reason: string }
