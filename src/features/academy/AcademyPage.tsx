@@ -23,6 +23,7 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { ProgramsGroupsSection } from '@/features/academy/ProgramsGroupsSection'
 import { EnrollmentSection, ActivationPolicySetting } from '@/features/academy/EnrollmentSection'
+import { CoachTodayView } from '@/features/academy/CoachTodayView'
 import type { PlayerRow, GuardianLinkRow } from '@/lib/domain/people'
 
 // Player Profile lives under /app/academy per SCREEN_MAP.md. Full
@@ -93,7 +94,7 @@ async function searchCustomers(clubId: string, search: string) {
 }
 
 export function AcademyPage() {
-  const { currentClubId } = useAuth()
+  const { currentClubId, currentMembership } = useAuth()
   const queryClient = useQueryClient()
   const [search, setSearch] = useState('')
   const [createDialogOpen, setCreateDialogOpen] = useState(false)
@@ -179,6 +180,10 @@ export function AcademyPage() {
     { key: 'dob', header: 'تاريخ الميلاد', render: (p) => p.dateOfBirth ?? '—' },
     { key: 'status', header: 'الحالة', render: (p) => (p.status === 'active' ? 'نشط' : 'غير نشط') },
   ]
+
+  if (currentMembership?.roleKey === 'coach') {
+    return <CoachTodayView />
+  }
 
   return (
     <div>

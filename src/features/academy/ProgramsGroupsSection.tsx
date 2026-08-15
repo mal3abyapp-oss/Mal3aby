@@ -250,6 +250,20 @@ export function ProgramsGroupsSection() {
     },
   })
 
+  const generateSessionsMutation = useMutation({
+    mutationFn: async () => {
+      if (!selectedGroup) throw new Error('no group selected')
+      const through = new Date()
+      through.setDate(through.getDate() + 28)
+      const { data, error } = await supabase.rpc('generate_training_sessions', {
+        p_group_id: selectedGroup.id,
+        p_through_date: through.toISOString().slice(0, 10),
+      })
+      if (error) throw error
+      return data as number
+    },
+  })
+
   function handleCreateProgram(e: FormEvent) {
     e.preventDefault()
     createProgramMutation.mutate()
@@ -419,6 +433,21 @@ export function ProgramsGroupsSection() {
                 إضافة موعد
               </Button>
             </div>
+            {scheduleSlots.length > 0 && (
+              <div className="border-t border-border pt-3">
+                <Button
+                  size="sm"
+                  variant="outline"
+                  disabled={generateSessionsMutation.isPending}
+                  onClick={() => generateSessionsMutation.mutate()}
+                >
+                  {generateSessionsMutation.isPending ? 'جارٍ التوليد...' : 'توليد جلسات الأسابيع الأربعة القادمة'}
+                </Button>
+                {generateSessionsMutation.data !== undefined && (
+                  <p className="mt-2 text-sm text-text-secondary">تم إنشاء {generateSessionsMutation.data} جلسة جديدة.</p>
+                )}
+              </div>
+            )}
           </div>
         </DialogContent>
       </Dialog>

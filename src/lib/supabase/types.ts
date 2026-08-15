@@ -57,6 +57,68 @@ export type Database = {
           },
         ]
       }
+      attendance: {
+        Row: {
+          club_id: string
+          id: string
+          marked_at: string
+          marked_by: string | null
+          method: string
+          player_id: string
+          session_id: string
+          status: string
+        }
+        Insert: {
+          club_id: string
+          id?: string
+          marked_at?: string
+          marked_by?: string | null
+          method?: string
+          player_id: string
+          session_id: string
+          status: string
+        }
+        Update: {
+          club_id?: string
+          id?: string
+          marked_at?: string
+          marked_by?: string | null
+          method?: string
+          player_id?: string
+          session_id?: string
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "attendance_club_id_fkey"
+            columns: ["club_id"]
+            isOneToOne: false
+            referencedRelation: "clubs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "attendance_player_id_fkey"
+            columns: ["player_id"]
+            isOneToOne: false
+            referencedRelation: "players"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "attendance_player_id_fkey"
+            columns: ["player_id"]
+            isOneToOne: false
+            referencedRelation: "players_safe"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "attendance_session_id_fkey"
+            columns: ["session_id"]
+            isOneToOne: false
+            referencedRelation: "training_sessions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       audit_logs: {
         Row: {
           action: string
@@ -2150,6 +2212,67 @@ export type Database = {
           },
         ]
       }
+      training_sessions: {
+        Row: {
+          club_id: string
+          coach_id: string | null
+          created_at: string
+          end_time: string
+          field_id: string | null
+          group_id: string
+          id: string
+          session_date: string
+          start_time: string
+          status: string
+        }
+        Insert: {
+          club_id: string
+          coach_id?: string | null
+          created_at?: string
+          end_time: string
+          field_id?: string | null
+          group_id: string
+          id?: string
+          session_date: string
+          start_time: string
+          status?: string
+        }
+        Update: {
+          club_id?: string
+          coach_id?: string | null
+          created_at?: string
+          end_time?: string
+          field_id?: string | null
+          group_id?: string
+          id?: string
+          session_date?: string
+          start_time?: string
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "training_sessions_club_id_fkey"
+            columns: ["club_id"]
+            isOneToOne: false
+            referencedRelation: "clubs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "training_sessions_field_id_fkey"
+            columns: ["field_id"]
+            isOneToOne: false
+            referencedRelation: "fields"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "training_sessions_group_id_fkey"
+            columns: ["group_id"]
+            isOneToOne: false
+            referencedRelation: "groups"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       club_platform_subscription_summary: {
@@ -2463,6 +2586,10 @@ export type Database = {
         }
         Returns: string
       }
+      generate_training_sessions: {
+        Args: { p_group_id: string; p_through_date: string }
+        Returns: number
+      }
       get_club_platform_access: { Args: { p_club_id: string }; Returns: string }
       get_subscription_effective_end_date: {
         Args: { p_subscription_id: string }
@@ -2491,6 +2618,10 @@ export type Database = {
         Args: { p_branch_id: string; p_club_id: string }
         Returns: string
       }
+      mark_attendance: {
+        Args: { p_player_id: string; p_session_id: string; p_status: string }
+        Returns: string
+      }
       mark_booking_no_show: {
         Args: { p_booking_id: string; p_reason?: string }
         Returns: undefined
@@ -2500,6 +2631,13 @@ export type Database = {
         Args: { p_token: string }
         Returns: {
           booking_id: string
+          result: string
+        }[]
+      }
+      qr_mark_attendance: {
+        Args: { p_session_id: string; p_token: string }
+        Returns: {
+          attendance_id: string
           result: string
         }[]
       }
