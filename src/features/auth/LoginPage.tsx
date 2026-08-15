@@ -5,6 +5,24 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 
+// Bug found during Final Pre-Release Verification (2026-08-15): a
+// confirmed user with zero club_memberships (never completed onboarding)
+// was landing on /app's bare shell with no path forward -- RequireAuth
+// only checks for a session, and AppLayout/TodayPage silently no-op when
+// currentClubId is null (see docs/ARCHITECTURE.md#signup--onboarding-strategy,
+// which already establishes /onboarding as ungated -- the gap was only in
+// LoginPage never checking membership count before redirecting). This
+// single post-login membership check closes that gap without touching
+// the route guards themselves (RequireAuth intentionally stays session-only
+// per its own comment -- the real boundary is RLS, not this check).
+async function hasAnyActiveMembership(): Promise<boolean> {
+  const { count } = await supabase
+    .from('club_memberships')
+    .select('id', { count: 'exact', head: true })
+    .eq('status', 'active')
+  return (count ?? 0) > 0
+}
+
 export function LoginPage() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
@@ -29,8 +47,16 @@ export function LoginPage() {
       return
     }
 
-    const from = (location.state as { from?: Location })?.from?.pathname ?? '/app'
-    navigate(from, { replace: true })
+    const from = (location.state as { from?: Location })?.from?.pathname
+    if (from) {
+      // Came from a specific protected route (RequireAuth's redirect state)
+      // -- honor it as-is, same as before.
+      navigate(from, { replace: true })
+      return
+    }
+
+    const hasClub = await hasAnyActiveMembership()
+    navigate(hasClub ? '/app' : '/onboarding', { replace: true })
   }
 
   return (
