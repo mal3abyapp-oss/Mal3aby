@@ -2590,7 +2590,34 @@ export type Database = {
         Args: { p_group_id: string; p_through_date: string }
         Returns: number
       }
+      get_academy_report: {
+        Args: { p_club_id: string; p_end_date: string; p_start_date: string }
+        Returns: Json
+      }
       get_club_platform_access: { Args: { p_club_id: string }; Returns: string }
+      get_customer_activity_report: {
+        Args: { p_club_id: string; p_end_date: string; p_start_date: string }
+        Returns: Json
+      }
+      get_field_occupancy_report: {
+        Args: {
+          p_club_id: string
+          p_end_date: string
+          p_field_id?: string
+          p_start_date: string
+        }
+        Returns: Json
+      }
+      get_revenue_report: {
+        Args: {
+          p_branch_id?: string
+          p_club_id: string
+          p_end_date: string
+          p_method?: string
+          p_start_date: string
+        }
+        Returns: Json
+      }
       get_subscription_effective_end_date: {
         Args: { p_subscription_id: string }
         Returns: string
