@@ -1973,6 +1973,7 @@ export type Database = {
         Returns: undefined
       }
       get_club_platform_access: { Args: { p_club_id: string }; Returns: string }
+      get_today_dashboard: { Args: { p_club_id: string }; Returns: Json }
       has_branch_access: {
         Args: { p_branch_id: string; p_membership_id: string }
         Returns: boolean

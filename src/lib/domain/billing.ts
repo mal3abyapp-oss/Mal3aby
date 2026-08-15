@@ -27,3 +27,14 @@ export const PAYMENT_METHOD_LABELS: Record<string, string> = {
   wallet: 'محفظة إلكترونية',
   other: 'أخرى',
 }
+
+// Plain-string money formatting for contexts that need a string value
+// (e.g. StatCard's value prop), as opposed to <MoneyDisplay> which renders
+// its own styled element.
+export function formatMoney(amount: number, currency = 'EGP'): string {
+  const formatted = new Intl.NumberFormat('ar-EG', {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  }).format(amount)
+  return `${formatted} ${currency}`
+}

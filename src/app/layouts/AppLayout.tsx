@@ -4,6 +4,7 @@ import { cn } from '@/lib/utils'
 import { useAuth } from '@/app/providers/AuthProvider'
 import { supabase } from '@/lib/supabase/client'
 import { GlobalSearch } from '@/features/search/GlobalSearch'
+import { QuickActionsPalette } from '@/features/dashboard/QuickActionsPalette'
 import {
   CalendarDays,
   GraduationCap,
@@ -133,6 +134,7 @@ export function AppLayout() {
         </header>
         <header className="hidden h-14 items-center border-b border-border bg-surface px-4 md:flex">
           <GlobalSearch />
+          <QuickActionsPalette />
         </header>
 
         {subSummary?.subscription_kind === 'trial' && subSummary.effective_access === 'full' && (
