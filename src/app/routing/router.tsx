@@ -71,12 +71,12 @@ export const router = createBrowserRouter([
     element: <OnboardingPage />,
   },
   {
-    path: '/scan',
-    element: <ScanPage />,
-  },
-  {
     element: <RequireAuth />,
     children: [
+      {
+        path: '/scan',
+        element: <ScanPage />,
+      },
       {
         path: '/app',
         element: <AppLayout />,

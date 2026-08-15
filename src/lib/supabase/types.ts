@@ -1498,6 +1498,113 @@ export type Database = {
         }
         Relationships: []
       }
+      qr_credentials: {
+        Row: {
+          club_id: string
+          created_at: string
+          created_by: string | null
+          expires_at: string | null
+          id: string
+          reference_id: string
+          single_use: boolean
+          status: string
+          token_hash: string
+          type: string
+          used_at: string | null
+          used_by: string | null
+        }
+        Insert: {
+          club_id: string
+          created_at?: string
+          created_by?: string | null
+          expires_at?: string | null
+          id?: string
+          reference_id: string
+          single_use: boolean
+          status?: string
+          token_hash: string
+          type: string
+          used_at?: string | null
+          used_by?: string | null
+        }
+        Update: {
+          club_id?: string
+          created_at?: string
+          created_by?: string | null
+          expires_at?: string | null
+          id?: string
+          reference_id?: string
+          single_use?: boolean
+          status?: string
+          token_hash?: string
+          type?: string
+          used_at?: string | null
+          used_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "qr_credentials_club_id_fkey"
+            columns: ["club_id"]
+            isOneToOne: false
+            referencedRelation: "clubs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      qr_scan_events: {
+        Row: {
+          action: string
+          club_id: string | null
+          credential_id: string | null
+          device_metadata: Json | null
+          id: string
+          reference_id: string | null
+          reference_type: string | null
+          result: string
+          scanned_at: string
+          scanner_user_id: string | null
+        }
+        Insert: {
+          action: string
+          club_id?: string | null
+          credential_id?: string | null
+          device_metadata?: Json | null
+          id?: string
+          reference_id?: string | null
+          reference_type?: string | null
+          result: string
+          scanned_at?: string
+          scanner_user_id?: string | null
+        }
+        Update: {
+          action?: string
+          club_id?: string | null
+          credential_id?: string | null
+          device_metadata?: Json | null
+          id?: string
+          reference_id?: string | null
+          reference_type?: string | null
+          result?: string
+          scanned_at?: string
+          scanner_user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "qr_scan_events_club_id_fkey"
+            columns: ["club_id"]
+            isOneToOne: false
+            referencedRelation: "clubs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "qr_scan_events_credential_id_fkey"
+            columns: ["credential_id"]
+            isOneToOne: false
+            referencedRelation: "qr_credentials"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       refunds: {
         Row: {
           amount: number
@@ -1860,6 +1967,7 @@ export type Database = {
         Args: { p_membership_id: string }
         Returns: undefined
       }
+      ensure_booking_qr: { Args: { p_booking_id: string }; Returns: string }
       extend_grace_period: {
         Args: { p_grace_period_days: number; p_subscription_id: string }
         Returns: undefined
@@ -1892,6 +2000,23 @@ export type Database = {
         Returns: undefined
       }
       normalize_mobile: { Args: { p_mobile: string }; Returns: string }
+      qr_confirm_checkin: {
+        Args: { p_token: string }
+        Returns: {
+          booking_id: string
+          result: string
+        }[]
+      }
+      qr_validate: {
+        Args: { p_token: string }
+        Returns: {
+          club_id: string
+          credential_id: string
+          reference_id: string
+          reference_type: string
+          result: string
+        }[]
+      }
       record_payment: {
         Args: {
           p_amount: number

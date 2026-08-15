@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import QRCode from 'qrcode'
 import { supabase } from '@/lib/supabase/client'
 import { useAuth } from '@/app/providers/AuthProvider'
 import { PageHeader } from '@/components/ui/page-header'
@@ -97,6 +98,7 @@ export function BookingsPage() {
   const [occurrenceCount, setOccurrenceCount] = useState('4')
   const [formError, setFormError] = useState<string | null>(null)
   const [cancelReason, setCancelReason] = useState('')
+  const [qrDataUrl, setQrDataUrl] = useState<string | null>(null)
 
   const { data: fields = [] } = useQuery({ queryKey: ['fields-for-bookings', currentClubId], queryFn: () => fetchFields(currentClubId!), enabled: !!currentClubId })
   const { data: customers = [] } = useQuery({ queryKey: ['customers-for-bookings', currentClubId], queryFn: () => fetchCustomers(currentClubId!), enabled: !!currentClubId })
@@ -149,6 +151,20 @@ export function BookingsPage() {
       invalidateGrid()
     },
     onError: () => setFormError('تعذّر إنشاء الحجز — قد يكون الموعد محجوزًا بالفعل أو غير مصرّح به.'),
+  })
+
+  const qrMutation = useMutation({
+    mutationFn: async () => {
+      if (!selectedBooking) throw new Error('no booking selected')
+      const { data, error } = await supabase.rpc('ensure_booking_qr', { p_booking_id: selectedBooking.id })
+      if (error) throw error
+      return data as string
+    },
+    onSuccess: async (rawToken) => {
+      const dataUrl = await QRCode.toDataURL(rawToken, { width: 240, margin: 1 })
+      setQrDataUrl(dataUrl)
+    },
+    onError: () => setFormError('تعذّر إنشاء رمز QR.'),
   })
 
   const cancelMutation = useMutation({
@@ -331,8 +347,16 @@ export function BookingsPage() {
         </DialogContent>
       </Dialog>
 
-      {/* Booking detail / cancel */}
-      <Dialog open={!!selectedBooking} onOpenChange={(open) => !open && setSelectedBooking(null)}>
+      {/* Booking detail / cancel / QR */}
+      <Dialog
+        open={!!selectedBooking}
+        onOpenChange={(open) => {
+          if (!open) {
+            setSelectedBooking(null)
+            setQrDataUrl(null)
+          }
+        }}
+      >
         <DialogContent>
           <DialogHeader>
             <DialogTitle>تفاصيل الحجز</DialogTitle>
@@ -343,6 +367,19 @@ export function BookingsPage() {
               <p>الوقت: {new Date(selectedBooking.startAt).toLocaleString('ar-EG')}</p>
               <p>السعر: {selectedBooking.totalPrice} EGP</p>
               <StatusBadge tone="info" label={BOOKING_STATUS_LABELS[selectedBooking.status] ?? selectedBooking.status} />
+
+              {(selectedBooking.status === 'pending_payment' || selectedBooking.status === 'confirmed') && (
+                <div className="flex flex-col items-center gap-2 border-t border-border pt-3">
+                  {qrDataUrl ? (
+                    <img src={qrDataUrl} alt="رمز QR للحجز" className="size-48" />
+                  ) : (
+                    <Button variant="outline" size="sm" disabled={qrMutation.isPending} onClick={() => qrMutation.mutate()}>
+                      {qrMutation.isPending ? 'جارٍ الإنشاء...' : 'عرض رمز QR'}
+                    </Button>
+                  )}
+                </div>
+              )}
+
               {selectedBooking.status !== 'cancelled' && (
                 <div className="flex flex-col gap-2 border-t border-border pt-3">
                   <Input placeholder="سبب الإلغاء" value={cancelReason} onChange={(e) => setCancelReason(e.target.value)} />
@@ -350,6 +387,10 @@ export function BookingsPage() {
                     إلغاء الحجز
                   </Button>
                 </div>
+              )}
+
+              {formError && (
+                <p role="alert" className="text-sm text-status-danger">{formError}</p>
               )}
             </div>
           )}
