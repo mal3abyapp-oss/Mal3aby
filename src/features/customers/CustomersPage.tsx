@@ -35,22 +35,25 @@ async function fetchCustomers(clubId: string, search: string) {
   const { data, error } = await query
   if (error) throw error
 
+  // Gate 11 (2026-08-16): outstanding balance is a shared KPI -- it must be
+  // computed in exactly one place (Doc 3's single-source-of-truth rule).
+  // This used to be reimplemented here via a manual invoices+payment_allocations
+  // join that never accounted for refunds (a refund on an already-paid invoice
+  // re-opens the debt), silently understating what customers actually owed.
+  // OutstandingPage.tsx already reads the correct `outstanding_invoices` view,
+  // which nets out completed refunds -- read the same view here instead of
+  // recomputing the concept independently.
   const customerIds = (data ?? []).map((row) => row.id)
   const outstandingByCustomer = new Map<string, number>()
   if (customerIds.length > 0) {
-    const { data: invoices } = await supabase.from('invoices').select('id, customer_id, total').in('customer_id', customerIds).eq('status', 'issued')
-    if (invoices && invoices.length > 0) {
-      const invoiceIds = invoices.map((i) => i.id)
-      const { data: allocations } = await supabase.from('payment_allocations').select('invoice_id, amount').in('invoice_id', invoiceIds)
-      const paidByInvoice = new Map<string, number>()
-      for (const a of allocations ?? []) {
-        paidByInvoice.set(a.invoice_id, (paidByInvoice.get(a.invoice_id) ?? 0) + Number(a.amount))
-      }
-      for (const inv of invoices) {
-        const outstanding = Math.max(Number(inv.total) - (paidByInvoice.get(inv.id) ?? 0), 0)
-        if (outstanding > 0) {
-          outstandingByCustomer.set(inv.customer_id, (outstandingByCustomer.get(inv.customer_id) ?? 0) + outstanding)
-        }
+    const { data: outstandingRows } = await supabase
+      .from('outstanding_invoices')
+      .select('customer_id, outstanding')
+      .in('customer_id', customerIds)
+    for (const row of outstandingRows ?? []) {
+      const amount = Number(row.outstanding)
+      if (amount > 0) {
+        outstandingByCustomer.set(row.customer_id, (outstandingByCustomer.get(row.customer_id) ?? 0) + amount)
       }
     }
   }
