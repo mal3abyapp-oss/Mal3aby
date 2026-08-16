@@ -124,9 +124,32 @@ a genuine contradiction.
     WhatsApp tabs, portal screens, reports) still renders hardcoded
     Arabic text directly, correct by default but not yet
     switchable to English.
-11. Gate 11 — Reporting Rebuild — not started (current reports are
-    basic; task #12/Phase 13 in the original plan, not the full
-    Doc 3 KPI-drill-down spec).
+11. ✅ **Gate 11 — Reporting Rebuild** — foundational slice DONE (see
+    D-011). Audited existing reporting layer first: found 4 real RPC-
+    backed reports already existed (revenue/occupancy/academy/customer)
+    against Doc 3's 14-report list. Found and fixed a real
+    single-source-of-truth violation: `CustomersPage.tsx` independently
+    recomputed "outstanding balance" via a manual client-side join that
+    never netted out completed refunds (silently understating debt
+    whenever a refund existed on an already-paid invoice), while
+    `OutstandingPage.tsx` already correctly read the `outstanding_invoices`
+    view. Rewired `CustomersPage.tsx` to read the same view — verified
+    live that both screens now reconcile exactly against real seeded
+    data. Then built the two report types Doc 3 emphasizes as
+    foundational: `get_executive_dashboard` (top-level KPI summary,
+    reusing the exact same payments/refunds/bookings predicates as the
+    existing report RPCs, not reinventing them) and `get_booking_report`
+    (status mix/by-branch/cancellation-rate/avg-booking-value — distinct
+    from occupancy's booked-hours focus). Both wired into a rebuilt
+    `ReportsPage.tsx` (now 6 tabs) and verified live against real data
+    with cross-reconciliation (dashboard's outstanding_total matches
+    direct SQL sum; booking report's status counts reconcile with its
+    own cancellation rate and with the dashboard's bookings_count).
+    Remaining 9 Doc 3 report types (Field Performance, Group Report,
+    Player Report, Subscription Report, Attendance Report, Collections
+    Report, Employee Activity, Discounts/Refunds/Voids, WhatsApp/
+    Notification Report) are explicit tracked follow-up, not shallow
+    stubs — see the Follow-up section below.
 12. Gate 12 — Full Regression/Security/Tenant QA — not started as a
     dedicated pass for the Doc 3 scope (earlier V1/P1 passes exist but
     predate the unified-account/QR/WhatsApp scope). Should include a
@@ -141,7 +164,7 @@ a genuine contradiction.
     (branch/field/academy limits) is DONE and verified; only the UI
     wiring (task #51 types regen onward) remains, deliberately paused.
 
-## Current gate: Gate 11 (Reporting Rebuild) — starting next
+## Current gate: Gate 12 (Full Regression/Security/Tenant QA) — starting next
 
 ## IMPORTANT — pending external QA (not a blocker, tracked explicitly)
 **REAL PHONE QR SCAN QA PENDING** (Gate 8): the WhatsApp connector
@@ -169,6 +192,30 @@ changes can complete.
 - Gate 3 (Unified Accounts): built customer self-service auth linking +
   RLS + identity-column guard + full portal frontend, verified via
   black-box testing with a real test account. See D-003.
+- Gate 4 (Memberships/Subscriptions/Entitlements): lifecycle RPCs +
+  audit trigger + circular-RLS fix, verified end-to-end. See D-004.
+- Gate 5 (Bookings/Activities/Seats): recurring bookings wired +
+  verified, double-booking constraint confirmed already correct. See
+  D-005.
+- Gate 6 (Secure QR/Identity/Attendance): scanner UI + identity data +
+  active-entitlement check fixed and verified via real coach RPCs. See
+  D-006.
+- Gate 7 (Notification Core): event/queue/consent tables + entry-point
+  functions built, wired into booking creation, verified live. See
+  D-007.
+- Gate 8 (WhatsApp): real persistent Node/TS Baileys connector service
+  built per explicit user directive, verified via a real WebSocket
+  handshake reaching a genuine scannable QR. IMPLEMENTED — EXTERNAL
+  SCAN QA PENDING. See D-008.
+- Gate 9 (RTL sweep): confirmed feature code already correct; fixed 4
+  shared UI primitives at the root, verified live. See D-009.
+- Gate 10 (i18n foundation): react-i18next + LanguageSwitcher + no-
+  reload RTL/LTR flip, verified live on authenticated and public
+  pages. See D-010.
+- Gate 11 (Reporting Rebuild): audited existing reports, found and
+  fixed a real single-source-of-truth violation (CustomersPage.tsx's
+  outstanding calc), built Executive Dashboard + Booking Report,
+  verified live with cross-reconciled real numbers. See D-011.
 
 ## Migrations applied this run
 - `20260816110000_fix_booking_venue_timezone.sql` — venue-timezone-aware
@@ -197,6 +244,14 @@ changes can complete.
   from Gate 2's signature change; revoked `anon`/`authenticated` direct
   EXECUTE on `_activate_subscription_if_due_internal` (security fix
   caught via `get_advisors`).
+- (Gates 4-10 migrations: see D-004 through D-010 in the decision log
+  for the full per-gate migration list — omitted here for brevity,
+  not because they didn't happen.)
+- `20260816280000_notification_core.sql`,
+  `20260816290000_notification_view_permission.sql`,
+  `20260816300000_wire_booking_notification_events.sql` — Gate 7.
+- `20260816310000_gate11_executive_and_booking_reports.sql` —
+  `get_executive_dashboard()` + `get_booking_report()`, Gate 11.
 
 ## Files changed this run
 - `src/lib/domain/time.ts` (new) — Time Model utility (Gate 1).
@@ -253,34 +308,48 @@ changes can complete.
   own comment. A customer can see but not create/cancel their own
   bookings yet; this needs payment-collection/deposit design before
   it's safe to build.
+- Gate 8: `notification_queue` has no consuming worker yet — the send
+  path is callable but nothing polls the queue. Quiet-hours/rate-limit
+  columns exist without enforcement code. Also flagged via spawn_task:
+  `validate_whatsapp_template_variables()` (a trigger function) is
+  missing its `revoke execute from anon/authenticated` — low severity
+  (only validates row shape, no reads/writes) but should be closed to
+  match the codebase convention. task_caf4163d.
+- Gate 11: 9 of Doc 3's 14 report types remain unbuilt — Field
+  Performance (distinct from Occupancy: needs revenue-per-hour/
+  realized-rate, not just booked hours), Group Report, Player Report,
+  Subscription Report, Attendance Report, Collections Report, Employee
+  Activity, Discounts/Refunds/Voids, WhatsApp/Notification Report.
+  Each needs its own scoping pass on top-level KPI definition before
+  building — not appropriate to stub shallowly just to hit a count.
+  `OutstandingPage.tsx` (billing screen) already satisfies the
+  Receivables-with-aging requirement's data layer; whether it also
+  needs a presence as its own Reports-tab entry (vs. staying a billing
+  screen) is an open product decision, not a technical gap.
 
 ## Last commit
-199d776 — "feat: customer self-service portal -- claim flow, My
-Bookings/Academy/QR/Profile (Gate 3)" (see `git log` for the full
-chronological commit history of this run: Gate 1 fix, Gate 2 fix, Gate
-3 schema, Gate 3 frontend, this state-file update to follow).
+16bc55c — "feat: Executive Dashboard + Booking Report (Gate 11)" (see
+`git log` for the full chronological commit history of this run).
 Local-first — not pushed to any remote per standing project policy.
 
 ## Next exact task
-Start Gate 11 — Reporting Rebuild. Doc 3 requires every KPI expose its
-definition/period/filters/source/drill-down/comparison/export, a full
-required-report list (Executive Dashboard, Booking Report, Field
-Performance, Academy Report, Group Report, Player Report, Subscription
-Report, Attendance Report, Financial Report, Collections Report,
-Receivables/Outstanding with aging, Customer Report, Employee Activity,
-Discounts/Refunds/Voids, WhatsApp/Notification Report), no fake/
-estimated data, and — critically — a SINGLE reporting layer (RPCs/
-views/shared query service) as the sole source for each KPI so it's
-never computed differently in different components. Before building:
-(a) read the current `src/features/reports/ReportsPage.tsx` and any
-existing report RPCs/views to see what already exists vs. what's
-genuinely missing (this session's pattern has repeatedly found more
-already built than expected — audit first); (b) check whether
-different screens already independently compute the same numbers
-differently (e.g. "outstanding" appears in `CustomersPage.tsx`,
-`BillingPage.tsx`, and would appear in a Receivables report — verify
-these already agree or don't); (c) given the size of the full 14-report
-list, prioritize the reports Doc 3 emphasizes as foundational
-(Executive Dashboard, Financial Report, Booking Report) for real build-
-out, and explicitly document the rest as follow-up rather than
-attempting shallow stubs for all 14 in one pass.
+Start Gate 12 — Full Regression/Security/Tenant QA. This is the last
+gate before Gate 13 (resuming the frozen Commercial Entitlements
+phase) can unfreeze. Scope per Doc 3: (a) run a fresh
+`get_advisors(security)` pass across the whole project — this tool has
+a proven hit rate this run (caught real regressions in Gates 2 and 3)
+and hasn't been run as a dedicated full pass since; close or
+explicitly triage every finding, including the already-flagged
+`validate_whatsapp_template_variables` grant gap (task_caf4163d); (b)
+run `get_advisors(performance)` at least once — not yet done this run;
+(c) real black-box multi-tenant isolation testing across the gates
+built this run (Gates 3-11 all touched RLS or added new tables/RPCs) —
+confirm a user/session scoped to one club can never read, write, or
+invoke an RPC affecting another club's data, the same black-box
+methodology (real accounts, real tokens, real REST/RPC calls) that
+already caught real bugs in Gate 3; (d) a build/lint/typecheck gate
+across the whole repo (not just incremental per-gate checks); (e) once
+this gate is substantially clean, formally unfreeze Gate 13 and resume
+task #51 (regenerate Supabase TS types — the JSON-unwrap-via-python
+technique noted below is needed since the direct MCP call previously
+hit its output-size limit).

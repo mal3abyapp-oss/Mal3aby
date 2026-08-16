@@ -1165,3 +1165,169 @@ system, persistence, switcher UI, locale-aware formatting helpers,
 no-reload RTL/LTR flip) is built and verified end-to-end. The full
 copy-extraction sweep across every remaining screen is real, tracked
 follow-up work — not claimed complete.
+
+---
+
+## D-011 — Gate 11: Reporting Rebuild (foundational slice)
+
+**Problem:** Doc 3 requires a full reporting layer (14 report types)
+where every KPI is computed in exactly one shared place, never
+independently recomputed in different screens. Needed to establish
+what already existed vs. what was genuinely missing before building
+anything.
+
+**Evidence:**
+- Read `src/features/reports/ReportsPage.tsx` in full (387 lines) and
+  confirmed via direct SQL (`select proname from pg_proc where proname
+  ilike '%report%'`) that exactly 4 report RPCs already existed:
+  `get_revenue_report`, `get_field_occupancy_report`,
+  `get_academy_report`, `get_customer_activity_report` — each following
+  a consistent, correct pattern (security definer, pinned search_path,
+  `user_club_ids()` + `report.view` permission check, execute revoked
+  from public/anon).
+- Checked for duplicate KPI computation across screens. Found a real
+  violation: `src/features/customers/CustomersPage.tsx` (lines ~38-56)
+  independently recomputed "outstanding balance" via a manual
+  client-side `invoices` + `payment_allocations` join that summed
+  `total - paid` per invoice, with NO handling for refunds at all.
+  `src/features/billing/OutstandingPage.tsx` already correctly read an
+  `outstanding_invoices` Postgres view. Retrieved the view's exact
+  definition via `pg_get_viewdef` and confirmed it is a superset of
+  correctness: it nets out completed refunds (adds back
+  `sum(refunds)` where `refund.status = 'completed'`) and already
+  includes `days_overdue` (satisfying Doc 3's "Receivables/Outstanding
+  with aging" requirement) — `CustomersPage.tsx`'s manual calc had
+  neither.
+  - Concrete failure scenario this caused: a customer pays an invoice
+    in full (outstanding = 0 by both calculations), then receives a
+    completed refund on that payment. The correct outstanding balance
+    re-opens to the refunded amount (the view handles this).
+    `CustomersPage.tsx`'s old calc would still show 0.00, silently
+    hiding real debt from staff on the Customers list, while
+    `OutstandingPage.tsx` would correctly show it — an actual Doc 3
+    violation with real financial-visibility impact, not a theoretical
+    one.
+
+**Options considered:**
+1. Leave `CustomersPage.tsx`'s calc as-is, only note the discrepancy.
+   Rejected — Doc 3 explicitly requires single-source KPIs, and this is
+   a real correctness bug with financial impact, not just a style
+   preference.
+2. Rewrite `CustomersPage.tsx` to read from `outstanding_invoices`
+   instead of recomputing. Chosen.
+3. Refactor `OutstandingPage.tsx`'s logic into a shared TS helper
+   function used by both, instead of a DB view. Rejected — the view
+   already exists, is already proven correct in production use via
+   `OutstandingPage.tsx`, and a DB view is a stronger single-source
+   guarantee than a shared client-side helper (a future third screen
+   querying the underlying tables directly would still be able to
+   drift; querying the view can't drift by construction).
+
+**Chosen solution:**
+- `src/features/customers/CustomersPage.tsx`: replaced the manual
+  `invoices`/`payment_allocations` join with a direct
+  `.from('outstanding_invoices').select('customer_id, outstanding')`
+  query, summed client-side only for the per-customer total (no
+  business logic recomputation — the view already did the real math).
+- Confirmed via `information_schema.role_table_grants` that
+  `authenticated` already has `SELECT` on `outstanding_invoices` (the
+  same grant `OutstandingPage.tsx` already relies on) — no new grants
+  needed.
+- Added two new report RPCs
+  (`supabase/migrations/20260816310000_gate11_executive_and_booking_reports.sql`),
+  following the exact established pattern of the 4 existing report
+  RPCs:
+  - `get_executive_dashboard(p_club_id, p_start_date, p_end_date)` —
+    top-level KPI summary (total_revenue, refunds_total,
+    outstanding_total, bookings_count, bookings_cancelled_count,
+    total_booked_hours, active_enrollments, new_customers,
+    revenue_by_day). Deliberately reuses the exact same SQL predicates
+    as `get_revenue_report`/`get_field_occupancy_report` (same
+    `payments.status = 'completed'` filter, same `bookings.status IN
+    (...)` filter) rather than reimplementing the aggregation logic —
+    and reads `outstanding_total` from the same `outstanding_invoices`
+    view just fixed in `CustomersPage.tsx`, so this dashboard cannot
+    itself become a second source of truth.
+  - `get_booking_report(p_club_id, p_start_date, p_end_date,
+    p_branch_id)` — booking lifecycle breakdown (by_status, by_branch,
+    cancellation_rate, average_booking_value). Deliberately distinct
+    from `get_field_occupancy_report`, which reports booked *hours*
+    per field, not booking outcomes/status mix — these are genuinely
+    different KPIs, not a duplicate.
+- Wired both into `src/features/reports/ReportsPage.tsx`: added
+  `ExecutiveDashboardTab` (new default tab, "نظرة عامة") and
+  `BookingReportTab` ("الحجوزات"), following the file's existing
+  `useDateRange`/`DateRangeFilter`/CSV-export conventions exactly.
+
+**Reasons:**
+- Fixing the duplicate-computation bug at its root (reading the shared
+  view) closes the defect class permanently — any future screen that
+  needs "outstanding balance" will naturally reach for the same view
+  rather than re-deriving the concept, since it is now the only example
+  in the codebase to copy from.
+- Reusing exact predicates in `get_executive_dashboard` rather than
+  writing parallel aggregation logic means the dashboard's totals are
+  mechanically guaranteed to match the detail reports' totals — no
+  reconciliation drift is possible by construction, not just by
+  discipline.
+- Prioritized Executive Dashboard + Booking Report specifically because
+  Doc 3 names these as the reports it emphasizes most, and building 2
+  reports thoroughly (correct, verified, cross-reconciled) is more
+  valuable than 9 shallow stubs that would themselves become future
+  single-source-of-truth violations.
+
+**Verification (live, not just type-check):**
+- `npx tsc --noEmit` clean before and after both changes.
+- Live browser check on `/app/customers`: outstanding figures for real
+  seeded customers (500/900/450/etc. EGP across multiple customers) now
+  render from the view.
+- Cross-reconciled against `/app/outstanding`'s per-invoice breakdown:
+  summed one customer's 3 separate invoices there (300+300+300=900)
+  and confirmed it exactly matches the 900 EGP total shown on the
+  Customers page; a second customer's single 50 EGP invoice matched
+  too.
+- Confirmed via direct SQL (`select club_id, sum(outstanding) from
+  outstanding_invoices group by club_id`) that the currently-active
+  test club's total (3,950.00 EGP) exactly matches the
+  `outstanding_total` rendered by the live Executive Dashboard tab.
+- Confirmed the Booking Report's internal consistency: status counts
+  (4 confirmed + 2 pending_payment + 1 completed + 1 cancelled + 1
+  no_show + 1 checked_in = 10 total) reconcile exactly with its own
+  cancellation_rate (1/10 = 10%, matches displayed value) and with the
+  by-branch counts (4+2=6 confirmed/checked_in/completed bookings,
+  matching the dashboard's separately-computed bookings_count of 6).
+- Ran `get_advisors(security)` after applying the migration — zero
+  findings reference `get_executive_dashboard` or `get_booking_report`
+  (confirmed via grep on the full advisor output), meaning no security
+  lint was introduced by this change. Pre-existing unrelated findings
+  from Gate 8's WhatsApp module were noticed in the same pass and
+  flagged separately via spawn_task rather than silently ignored or
+  scope-crept into this gate (task_caf4163d).
+- Checked a fresh, previously-unused browser tab (not just the
+  long-lived session tab) to rule out stale-HMR console noise —
+  confirmed zero console errors and correct rendering on a clean load.
+
+**DB impact:** 2 new read-only RPCs (`get_executive_dashboard`,
+`get_booking_report`), both additive, `SECURITY DEFINER` with pinned
+`search_path`, `EXECUTE` revoked from `public`/`anon`, granted to
+`authenticated` only. No schema changes, no existing RPC modified.
+
+**Security impact:** Both new RPCs enforce the same `auth.uid()` +
+`user_club_ids()` + `has_permission('report.view', ...)` check as every
+existing report RPC — verified structurally identical to the pattern
+already audited in the original Phase 13 migration. The
+`CustomersPage.tsx` fix is a net security/correctness improvement
+(previously-hidden debt is now visible) with no new grants required.
+
+**Reversal path:** `CustomersPage.tsx`'s query change is a one-file
+diff, trivially revertable. The two new RPCs are additive-only — drop
+them and remove the two `ReportsPage.tsx` tabs to fully revert with no
+impact on the 4 pre-existing reports.
+
+**Status:** Gate 11's foundational slice (single-source-of-truth fix +
+2 new foundational reports) is built and verified end-to-end against
+real data. The remaining 9 Doc 3 report types (Field Performance,
+Group Report, Player Report, Subscription Report, Attendance Report,
+Collections Report, Employee Activity, Discounts/Refunds/Voids,
+WhatsApp/Notification Report) are explicit, tracked follow-up — not
+claimed complete, not stubbed shallowly just to hit a count.
