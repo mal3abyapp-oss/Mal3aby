@@ -19,4 +19,13 @@ export interface PricingRuleRow {
   priority: number
 }
 
+export interface OperatingHoursRow {
+  id: string
+  fieldId: string | null
+  branchId: string | null
+  dayOfWeek: number
+  openTime: string
+  closeTime: string
+}
+
 export const DAY_NAMES_AR = ['الأحد', 'الإثنين', 'الثلاثاء', 'الأربعاء', 'الخميس', 'الجمعة', 'السبت']
