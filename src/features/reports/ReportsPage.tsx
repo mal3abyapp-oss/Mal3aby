@@ -4,8 +4,10 @@ import { supabase } from '@/lib/supabase/client'
 import { useAuth } from '@/app/providers/AuthProvider'
 import { PageHeader } from '@/components/ui/page-header'
 import { Input } from '@/components/ui/input'
+import { Button } from '@/components/ui/button'
 import { StatCard } from '@/components/ui/stat-card'
 import { formatMoney } from '@/lib/domain/billing'
+import { rowsToCsv, downloadCsv } from '@/lib/csv'
 import {
   Select,
   SelectContent,
@@ -14,7 +16,12 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { Wallet, Landmark, GraduationCap, Users } from 'lucide-react'
+import { Wallet, Landmark, GraduationCap, Users, Download } from 'lucide-react'
+
+// V1 Implementation Gap Audit (2026-08-16): docs/IMPLEMENTATION_PLAN.md's
+// Phase 7 scope was explicit -- "CSV export on this [Outstanding] AND
+// OTHER APPLICABLE REPORTS" -- but only OutstandingPage ever got one.
+// Added export buttons to each report tab's tabular data.
 
 // Reports Hub -- revenue, field occupancy, academy, customer activity.
 // Desktop-first (Manager/Owner/Accountant/Academy Manager), per
@@ -122,7 +129,24 @@ function RevenueReportTab() {
               )}
             </div>
             <div>
-              <p className="mb-2 font-medium">حسب اليوم</p>
+              <div className="mb-2 flex items-center justify-between">
+                <p className="font-medium">حسب اليوم</p>
+                {data.by_day.length > 0 && (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() =>
+                      downloadCsv(
+                        `revenue-${startDate}-${endDate}.csv`,
+                        rowsToCsv(data.by_day, { date: 'التاريخ', revenue: 'الإيرادات' }),
+                      )
+                    }
+                  >
+                    <Download className="me-1 size-4" />
+                    تصدير CSV
+                  </Button>
+                )}
+              </div>
               {data.by_day.length === 0 ? (
                 <p className="text-sm text-text-secondary">لا توجد بيانات</p>
               ) : (
@@ -169,14 +193,31 @@ function OccupancyReportTab() {
         data.by_field.length === 0 ? (
           <p className="text-sm text-text-secondary">لا توجد ملاعب</p>
         ) : (
-          <ul className="flex flex-col gap-2">
-            {data.by_field.map((f) => (
-              <li key={f.field_id} className="flex items-center justify-between rounded-md border border-border p-3 text-sm">
-                <span className="font-medium">{f.field_name}</span>
-                <span className="text-text-secondary">{f.booked_hours} ساعة — {f.booking_count} حجز</span>
-              </li>
-            ))}
-          </ul>
+          <>
+            <div className="mb-2 flex justify-end">
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() =>
+                  downloadCsv(
+                    `occupancy-${startDate}-${endDate}.csv`,
+                    rowsToCsv(data.by_field, { field_name: 'الملعب', booked_hours: 'ساعات محجوزة', booking_count: 'عدد الحجوزات' }),
+                  )
+                }
+              >
+                <Download className="me-1 size-4" />
+                تصدير CSV
+              </Button>
+            </div>
+            <ul className="flex flex-col gap-2">
+              {data.by_field.map((f) => (
+                <li key={f.field_id} className="flex items-center justify-between rounded-md border border-border p-3 text-sm">
+                  <span className="font-medium">{f.field_name}</span>
+                  <span className="text-text-secondary">{f.booked_hours} ساعة — {f.booking_count} حجز</span>
+                </li>
+              ))}
+            </ul>
+          </>
         )
       )}
     </div>
@@ -276,7 +317,24 @@ function CustomerReportTab() {
           <div className="mb-6">
             <StatCard label="عملاء جدد" value={data.new_customers} icon={Users} />
           </div>
-          <p className="mb-2 font-medium">أعلى العملاء إنفاقًا</p>
+          <div className="mb-2 flex items-center justify-between">
+            <p className="font-medium">أعلى العملاء إنفاقًا</p>
+            {data.top_customers.length > 0 && (
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() =>
+                  downloadCsv(
+                    `customers-${startDate}-${endDate}.csv`,
+                    rowsToCsv(data.top_customers, { customer_name: 'العميل', total_spend: 'إجمالي الإنفاق', booking_count: 'عدد الحجوزات' }),
+                  )
+                }
+              >
+                <Download className="me-1 size-4" />
+                تصدير CSV
+              </Button>
+            )}
+          </div>
           {data.top_customers.length === 0 ? (
             <p className="text-sm text-text-secondary">لا توجد بيانات</p>
           ) : (
