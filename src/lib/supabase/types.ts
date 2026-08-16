@@ -488,6 +488,76 @@ export type Database = {
           },
         ]
       }
+      cash_shifts: {
+        Row: {
+          branch_id: string
+          closed_at: string | null
+          closed_by: string | null
+          closing_count: number | null
+          club_id: string
+          expected_cash: number | null
+          id: string
+          notes: string | null
+          opened_at: string
+          opened_by: string
+          opening_float: number
+          status: string
+          variance: number | null
+        }
+        Insert: {
+          branch_id: string
+          closed_at?: string | null
+          closed_by?: string | null
+          closing_count?: number | null
+          club_id: string
+          expected_cash?: number | null
+          id?: string
+          notes?: string | null
+          opened_at?: string
+          opened_by: string
+          opening_float: number
+          status?: string
+          variance?: number | null
+        }
+        Update: {
+          branch_id?: string
+          closed_at?: string | null
+          closed_by?: string | null
+          closing_count?: number | null
+          club_id?: string
+          expected_cash?: number | null
+          id?: string
+          notes?: string | null
+          opened_at?: string
+          opened_by?: string
+          opening_float?: number
+          status?: string
+          variance?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "cash_shifts_branch_id_fkey"
+            columns: ["branch_id"]
+            isOneToOne: false
+            referencedRelation: "branches"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cash_shifts_club_id_fkey"
+            columns: ["club_id"]
+            isOneToOne: false
+            referencedRelation: "clubs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cash_shifts_club_id_fkey"
+            columns: ["club_id"]
+            isOneToOne: false
+            referencedRelation: "commercial_entitlements_usage"
+            referencedColumns: ["club_id"]
+          },
+        ]
+      }
       club_memberships: {
         Row: {
           club_id: string
@@ -3096,6 +3166,10 @@ export type Database = {
         Args: { p_club_id: string; p_customer_id: string }
         Returns: string
       }
+      close_cash_shift: {
+        Args: { p_closing_count: number; p_notes?: string; p_shift_id: string }
+        Returns: Json
+      }
       club_write_allowed: {
         Args: { p_action_category: string; p_club_id: string }
         Returns: boolean
@@ -3292,6 +3366,10 @@ export type Database = {
         Args: { p_club_id: string; p_end_date: string; p_start_date: string }
         Returns: Json
       }
+      get_open_cash_shift_status: {
+        Args: { p_shift_id: string }
+        Returns: Json
+      }
       get_platform_club_owners: {
         Args: never
         Returns: {
@@ -3355,6 +3433,14 @@ export type Database = {
         Returns: undefined
       }
       normalize_mobile: { Args: { p_mobile: string }; Returns: string }
+      open_cash_shift: {
+        Args: {
+          p_branch_id: string
+          p_club_id: string
+          p_opening_float: number
+        }
+        Returns: string
+      }
       qr_confirm_checkin: {
         Args: { p_token: string }
         Returns: {

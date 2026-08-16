@@ -39,6 +39,8 @@ const ACTION_LABELS: Record<string, string> = {
   'customer.photo.approve': 'الموافقة على تغيير صورة',
   'customer.photo.reject': 'رفض تغيير صورة',
   'customer.self_service_claim': 'ربط حساب عميل تلقائيًا',
+  'cash_shift.open': 'فتح وردية نقدية',
+  'cash_shift.close': 'إغلاق وردية نقدية',
 }
 
 const ENTITY_LABELS: Record<string, string> = {
@@ -53,6 +55,7 @@ const ENTITY_LABELS: Record<string, string> = {
   subscription: 'اشتراك أكاديمية',
   customer: 'عميل',
   player: 'لاعب',
+  cash_shift: 'وردية نقدية',
 }
 
 function describeAuditLog(r: AuditLogRow): string {
@@ -71,6 +74,11 @@ function describeAuditLog(r: AuditLogRow): string {
   }
   if (r.action === 'payment.record' && typeof after.amount === 'number') {
     return `${label} بقيمة ${formatMoney(after.amount)}`
+  }
+  if (r.action === 'cash_shift.close' && typeof after.variance === 'number') {
+    const variance = after.variance
+    if (variance === 0) return `${label} — مطابقة تمامًا`
+    return `${label} — فرق ${variance > 0 ? '+' : ''}${formatMoney(variance)}`
   }
 
   return `${label} — ${entity}`

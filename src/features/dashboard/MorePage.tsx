@@ -1,7 +1,7 @@
 import { Link } from 'react-router-dom'
 import { PageHeader } from '@/components/ui/page-header'
 import { Card, CardContent } from '@/components/ui/card'
-import { Users, Receipt, BarChart3, UserCog, Settings, ChevronLeft } from 'lucide-react'
+import { Users, Receipt, Wallet, BarChart3, UserCog, Settings, ChevronLeft } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 
 // Section M: mobile bottom nav stays minimal (اليوم/الحجوزات/مسح/
@@ -18,6 +18,7 @@ interface MoreItem {
 const ITEMS: MoreItem[] = [
   { to: '/app/customers', label: 'العملاء', description: 'البحث عن العملاء وإدارة بياناتهم', icon: Users },
   { to: '/app/billing', label: 'الفواتير والمدفوعات', description: 'سجل الفواتير والمدفوعات والمستحقات', icon: Receipt },
+  { to: '/app/cash-shift', label: 'وردية النقدية', description: 'فتح وإغلاق وردية الصندوق النقدي', icon: Wallet },
   { to: '/app/reports', label: 'التقارير', description: 'تقارير الإيرادات والإشغال والأكاديمية', icon: BarChart3 },
   { to: '/app/staff', label: 'الموظفون', description: 'إدارة الموظفين وأدوارهم', icon: UserCog },
   { to: '/app/settings', label: 'الإعدادات', description: 'النادي والفروع والملاعب والأكاديمية', icon: Settings },

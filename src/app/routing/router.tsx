@@ -24,6 +24,7 @@ import { BookingsPage } from '@/features/bookings/BookingsPage'
 import { AcademyPage } from '@/features/academy/AcademyPage'
 import { CustomersPage } from '@/features/customers/CustomersPage'
 import { BillingPage } from '@/features/billing/BillingPage'
+import { CashShiftPage } from '@/features/billing/CashShiftPage'
 import { SubscriptionPage } from '@/features/billing/SubscriptionPage'
 import { OutstandingPage } from '@/features/billing/OutstandingPage'
 import { ReportsPage } from '@/features/reports/ReportsPage'
@@ -92,6 +93,7 @@ export const router = createBrowserRouter([
           { path: 'academy', element: <AcademyPage /> },
           { path: 'customers', element: <CustomersPage /> },
           { path: 'billing', element: <BillingPage /> },
+          { path: 'cash-shift', element: <CashShiftPage /> },
           { path: 'subscription', element: <SubscriptionPage /> },
           { path: 'outstanding', element: <OutstandingPage /> },
           { path: 'reports', element: <ReportsPage /> },
