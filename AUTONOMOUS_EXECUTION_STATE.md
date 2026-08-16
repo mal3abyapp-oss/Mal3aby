@@ -46,13 +46,19 @@ a genuine contradiction.
    is still a simple enum with no structured usage-tracking) — needs
    its own scoping pass on how `package`-type plans currently track
    usage (if at all) before adding columns.
-5. Gate 5 — Bookings / Activities / Seats — booking CORE already exists
-   (V1 rebuild, tasks #23-27); this gate is about recurring bookings,
-   seat/activity booking, waitlist — not yet built. NOTE:
-   `create_recurring_booking`/`create_field_block` RPCs already exist in
-   the generated types but have NO frontend caller yet (confirmed
-   during Gate 1 investigation) — check whether they're actually wired
-   server-side correctly before building new UI for them.
+5. ✅ **Gate 5 — Bookings / Activities / Seats** — recurring-bookings
+   slice DONE (see D-005). `create_recurring_booking()` audited (no
+   bug — inherits Gate 1's timezone fix via `_create_booking_internal`),
+   wired into `QuickBookingSheet.tsx`, verified live end-to-end. Also
+   verified Doc 3's double-booking requirement was ALREADY fully
+   satisfied at the DB level via a real Postgres `EXCLUDE USING gist`
+   constraint (`no_overlapping_field_bookings`) — confirmed via a direct
+   overlapping-INSERT test that correctly raised `23P01`. NOT built:
+   seat/activity/event booking + waitlist — confirmed via
+   `information_schema.tables` that no such schema exists at all
+   (genuinely new product surface, not a bug — needs its own design
+   pass for event definition/seat inventory/capacity/waitlist-promotion
+   policy before building).
 6. Gate 6 — Secure QR / Identity / Attendance — `ensure_booking_qr`
    exists and was extended in Gate 3 for self-service use, but has NOT
    been fully audited against Doc 3's security requirements (opaque
@@ -89,7 +95,7 @@ a genuine contradiction.
     (branch/field/academy limits) is DONE and verified; only the UI
     wiring (task #51 types regen onward) remains, deliberately paused.
 
-## Current gate: Gate 5 (Bookings / Activities / Seats) — starting next
+## Current gate: Gate 6 (Secure QR / Identity / Attendance) — starting next
 
 ## Completed this run (chronological)
 - Resolved 3-way directive conflict via AskUserQuestion → user chose
@@ -195,22 +201,23 @@ chronological commit history of this run: Gate 1 fix, Gate 2 fix, Gate
 Local-first — not pushed to any remote per standing project policy.
 
 ## Next exact task
-Start Gate 5 — Bookings / Activities / Seats. Per the Gate 1
-investigation, `create_recurring_booking()` and `create_field_block()`
-RPCs already exist in the generated Supabase types but have NO frontend
-caller anywhere in `src/` (confirmed via grep during Gate 1). Before
-building new UI: (a) read both RPC definitions directly from the DB to
-confirm they're actually correctly implemented server-side (apply the
-same rigor as Gate 1's booking-time trace — check they use
-`clubs.timezone`/`AT TIME ZONE` correctly for local-day/time derivation,
-not the same UTC-implicit-cast bug Gate 1 fixed in
-`_create_booking_internal`, since these are separate functions that may
-not have inherited that fix); (b) check whether a "recurring booking"
-UI concept was ever partially built and abandoned, or never started;
-(c) design seat/activity booking + waitlist as genuinely new schema if
-no `event_seats`/`waitlist`-shaped tables exist yet (check
-`information_schema.tables` first rather than assuming). Given this
-session's now-repeated pattern (Gates 1/2/4 all found real
-timezone/permission/RLS bugs hiding in seemingly-complete code), audit
-`create_recurring_booking`/`create_field_block` for the same class of
-defect before writing any new frontend against them.
+Start Gate 6 — Secure QR / Identity / Attendance. `ensure_booking_qr()`
+already exists (extended in Gate 3 for self-service use) and generates
+an opaque random token (`gen_random_bytes(32)` + sha256 hash stored,
+raw token only returned once) with `expires_at` and `single_use` — this
+looks architecturally sound at a glance but has NOT been audited
+against Doc 3's full requirement list: (a) find and read the actual
+QR-scan verification RPC (search for `scan`/`verify` in function names)
+to confirm it checks single-use/expiry/revocation correctly and can't
+be replayed; (b) confirm the scanner-side UI actually shows the
+identity-verification screen Doc 3 requires (photo + name + membership
+status) rather than just "valid/invalid"; (c) audit whether there's an
+equivalent secure QR mechanism for ACADEMY check-in (membership-based,
+not booking-based) — Doc 3 treats these as two different QR types
+(booking QR vs. academy membership QR) and only the booking one has
+been touched so far in this session; (d) confirm attendance records are
+written as an independent Check-in Event (per Doc 3) rather than
+directly mutating membership/subscription state. Given this session's
+now-repeated pattern (Gates 1/2/4/5 all found at least one real defect
+hiding in seemingly-complete code), apply the same rigor here — audit
+before assuming either "it's broken" or "it's fine."
