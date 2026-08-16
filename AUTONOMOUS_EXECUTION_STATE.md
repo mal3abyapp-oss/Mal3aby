@@ -109,10 +109,21 @@ a genuine contradiction.
    position/padding, DropdownMenu insets/shortcuts/sub-menu chevron,
    Dialog/Sheet header text alignment. Fixed at the root (shared
    component), verified live via screenshot in the running app.
-10. Gate 10 — Arabic/English i18n — not started (Arabic-only currently,
-    including all Gate 3 portal screens — they inherit the same
-    hardcoded-Arabic-string pattern as the rest of the app, to be swept
-    together in this gate).
+10. ✅ **Gate 10 — Arabic/English i18n** — foundation DONE (see D-010).
+    Installed react-i18next, built resource-file system
+    (`src/lib/i18n/resources/{ar,en}/common.json`), wired
+    `DirectionProvider` as the single source of truth for both language
+    and direction (no-reload RTL/LTR flip + localStorage persistence),
+    added a `LanguageSwitcher` to every layout (App/Portal/Public), and
+    locale-aware `formatNumber`/`formatCurrency`/`formatDate` helpers.
+    Verified live in browser: switching language correctly flips the
+    whole layout with no reload, persists correctly, works on both
+    authenticated and public pages. Swept the staff app's nav labels as
+    the representative slice — explicit, tracked follow-up: every
+    feature screen's own body copy (bookings, academy, billing,
+    WhatsApp tabs, portal screens, reports) still renders hardcoded
+    Arabic text directly, correct by default but not yet
+    switchable to English.
 11. Gate 11 — Reporting Rebuild — not started (current reports are
     basic; task #12/Phase 13 in the original plan, not the full
     Doc 3 KPI-drill-down spec).
@@ -130,7 +141,7 @@ a genuine contradiction.
     (branch/field/academy limits) is DONE and verified; only the UI
     wiring (task #51 types regen onward) remains, deliberately paused.
 
-## Current gate: Gate 10 (Arabic/English i18n) — starting next
+## Current gate: Gate 11 (Reporting Rebuild) — starting next
 
 ## IMPORTANT — pending external QA (not a blocker, tracked explicitly)
 **REAL PHONE QR SCAN QA PENDING** (Gate 8): the WhatsApp connector
@@ -251,25 +262,25 @@ chronological commit history of this run: Gate 1 fix, Gate 2 fix, Gate
 Local-first — not pushed to any remote per standing project policy.
 
 ## Next exact task
-Start Gate 10 — Arabic/English i18n. Doc 3 requires a full i18n
-foundation (translation resources, language switcher, persistence,
-fallback, interpolation, pluralization, RTL/LTR switching without page
-reload, locale-aware numbers/dates/times/currency) and a sweep of all
-hardcoded UI copy into that system. Current state (confirmed in Gate 9):
-`DirectionProvider` has a `locale`/`setLocale` state shape already but
-NO visible switcher UI anywhere, and the entire app's UI text is
-hardcoded Arabic strings inline in every component (not extracted into
-resource files at all) — this is a large, genuinely-from-scratch build,
-not a partial gap. Given the sheer volume of hardcoded strings across
-every screen built this session and prior sessions, full extraction to
-i18n resource files for 100% of UI copy in one pass is unrealistic;
-recommend: (a) pick and wire a real i18n library (e.g. i18next/
-react-i18next, check what's already in package.json first) with ar/en
-resource namespaces, (b) build the actual language switcher UI +
-persistence (localStorage) + wire it to `DirectionProvider` so
-switching language also correctly flips `dir` without a page reload,
-(c) extract a representative, high-traffic slice of screens (nav,
-auth, dashboard, one or two feature areas) as the proven pattern, (d)
-document remaining unswept screens explicitly as follow-up rather than
-claiming full coverage. Explicitly forbidden per Doc 3: duplicate
-per-language pages/components for the same screen.
+Start Gate 11 — Reporting Rebuild. Doc 3 requires every KPI expose its
+definition/period/filters/source/drill-down/comparison/export, a full
+required-report list (Executive Dashboard, Booking Report, Field
+Performance, Academy Report, Group Report, Player Report, Subscription
+Report, Attendance Report, Financial Report, Collections Report,
+Receivables/Outstanding with aging, Customer Report, Employee Activity,
+Discounts/Refunds/Voids, WhatsApp/Notification Report), no fake/
+estimated data, and — critically — a SINGLE reporting layer (RPCs/
+views/shared query service) as the sole source for each KPI so it's
+never computed differently in different components. Before building:
+(a) read the current `src/features/reports/ReportsPage.tsx` and any
+existing report RPCs/views to see what already exists vs. what's
+genuinely missing (this session's pattern has repeatedly found more
+already built than expected — audit first); (b) check whether
+different screens already independently compute the same numbers
+differently (e.g. "outstanding" appears in `CustomersPage.tsx`,
+`BillingPage.tsx`, and would appear in a Receivables report — verify
+these already agree or don't); (c) given the size of the full 14-report
+list, prioritize the reports Doc 3 emphasizes as foundational
+(Executive Dashboard, Financial Report, Booking Report) for real build-
+out, and explicitly document the rest as follow-up rather than
+attempting shallow stubs for all 14 in one pass.
