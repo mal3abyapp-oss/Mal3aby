@@ -18,6 +18,7 @@ import { ResetPasswordPage } from '@/features/auth/ResetPasswordPage'
 import { OnboardingPage } from '@/features/onboarding/OnboardingPage'
 
 import { TodayPage } from '@/features/dashboard/TodayPage'
+import { MorePage } from '@/features/dashboard/MorePage'
 import { BookingsPage } from '@/features/bookings/BookingsPage'
 import { AcademyPage } from '@/features/academy/AcademyPage'
 import { CustomersPage } from '@/features/customers/CustomersPage'
@@ -102,6 +103,7 @@ export const router = createBrowserRouter([
           // settings, a link out to staff, platform subscription, and
           // (owner/manager only) the audit log.
           { path: 'settings', element: <SettingsPage /> },
+          { path: 'more', element: <MorePage /> },
         ],
       },
     ],
