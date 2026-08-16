@@ -16,7 +16,7 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { Wallet, Landmark, GraduationCap, Users, Download } from 'lucide-react'
+import { Wallet, Landmark, GraduationCap, Users, Download, LayoutDashboard, CalendarCheck2 } from 'lucide-react'
 
 // V1 Implementation Gap Audit (2026-08-16): docs/IMPLEMENTATION_PLAN.md's
 // Phase 7 scope was explicit -- "CSV export on this [Outstanding] AND
@@ -27,6 +27,25 @@ import { Wallet, Landmark, GraduationCap, Users, Download } from 'lucide-react'
 // Desktop-first (Manager/Owner/Accountant/Academy Manager), per
 // SCREEN_MAP.md. Filters: date range (all reports), branch + payment
 // method (revenue), field (occupancy).
+interface ExecutiveDashboard {
+  total_revenue: number
+  refunds_total: number
+  outstanding_total: number
+  bookings_count: number
+  bookings_cancelled_count: number
+  total_booked_hours: number
+  active_enrollments: number
+  new_customers: number
+  revenue_by_day: { date: string; revenue: number }[]
+}
+
+interface BookingReport {
+  by_status: { status: string; count: number }[]
+  by_branch: { branch_id: string; branch_name: string; booking_count: number }[]
+  cancellation_rate: number | null
+  average_booking_value: number | null
+}
+
 interface RevenueReport {
   total_revenue: number
   by_day: { date: string; revenue: number }[]
@@ -65,6 +84,175 @@ function DateRangeFilter({ startDate, endDate, onStart, onEnd }: { startDate: st
     <div className="mb-4 flex gap-2">
       <Input type="date" value={startDate} onChange={(e) => onStart(e.target.value)} />
       <Input type="date" value={endDate} onChange={(e) => onEnd(e.target.value)} />
+    </div>
+  )
+}
+
+const BOOKING_STATUS_LABELS: Record<string, string> = {
+  pending_payment: 'بانتظار الدفع',
+  confirmed: 'مؤكد',
+  checked_in: 'تم تسجيل الحضور',
+  completed: 'مكتمل',
+  cancelled: 'ملغي',
+  no_show: 'لم يحضر',
+}
+
+function ExecutiveDashboardTab() {
+  const { currentClubId } = useAuth()
+  const { startDate, setStartDate, endDate, setEndDate } = useDateRange()
+
+  const { data, isLoading } = useQuery({
+    queryKey: ['executive-dashboard', currentClubId, startDate, endDate],
+    queryFn: async () => {
+      const { data, error } = await supabase.rpc('get_executive_dashboard', {
+        p_club_id: currentClubId!,
+        p_start_date: startDate,
+        p_end_date: endDate,
+      })
+      if (error) throw error
+      return data as unknown as ExecutiveDashboard
+    },
+    enabled: !!currentClubId,
+  })
+
+  return (
+    <div>
+      <DateRangeFilter startDate={startDate} endDate={endDate} onStart={setStartDate} onEnd={setEndDate} />
+      {isLoading && <p className="text-sm text-text-secondary">جارٍ التحميل...</p>}
+      {data && (
+        <>
+          <div className="mb-6 grid grid-cols-2 gap-3 md:grid-cols-4">
+            <StatCard label="إجمالي الإيرادات" value={formatMoney(data.total_revenue)} icon={Wallet} />
+            <StatCard label="المستحقات الحالية" value={formatMoney(data.outstanding_total)} tone={data.outstanding_total > 0 ? 'warning' : undefined} />
+            <StatCard label="المستردات" value={formatMoney(data.refunds_total)} tone="danger" />
+            <StatCard label="حجوزات مؤكدة" value={data.bookings_count} icon={CalendarCheck2} />
+            <StatCard label="حجوزات ملغاة" value={data.bookings_cancelled_count} />
+            <StatCard label="ساعات محجوزة" value={data.total_booked_hours} />
+            <StatCard label="تسجيلات نشطة بالأكاديمية" value={data.active_enrollments} icon={GraduationCap} />
+            <StatCard label="عملاء جدد" value={data.new_customers} icon={Users} />
+          </div>
+          <div className="mb-2 flex items-center justify-between">
+            <p className="font-medium">الإيرادات حسب اليوم</p>
+            {data.revenue_by_day.length > 0 && (
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() =>
+                  downloadCsv(
+                    `executive-dashboard-${startDate}-${endDate}.csv`,
+                    rowsToCsv(data.revenue_by_day, { date: 'التاريخ', revenue: 'الإيرادات' }),
+                  )
+                }
+              >
+                <Download className="me-1 size-4" />
+                تصدير CSV
+              </Button>
+            )}
+          </div>
+          {data.revenue_by_day.length === 0 ? (
+            <p className="text-sm text-text-secondary">لا توجد بيانات</p>
+          ) : (
+            <ul className="flex flex-col gap-1">
+              {data.revenue_by_day.map((d) => (
+                <li key={d.date} className="flex justify-between rounded-md border border-border p-2 text-sm">
+                  <span className="tabular-nums">{d.date}</span>
+                  <span>{formatMoney(d.revenue)}</span>
+                </li>
+              ))}
+            </ul>
+          )}
+        </>
+      )}
+    </div>
+  )
+}
+
+function BookingReportTab() {
+  const { currentClubId } = useAuth()
+  const { startDate, setStartDate, endDate, setEndDate } = useDateRange()
+
+  const { data, isLoading } = useQuery({
+    queryKey: ['booking-report', currentClubId, startDate, endDate],
+    queryFn: async () => {
+      const { data, error } = await supabase.rpc('get_booking_report', {
+        p_club_id: currentClubId!,
+        p_start_date: startDate,
+        p_end_date: endDate,
+      })
+      if (error) throw error
+      return data as unknown as BookingReport
+    },
+    enabled: !!currentClubId,
+  })
+
+  return (
+    <div>
+      <DateRangeFilter startDate={startDate} endDate={endDate} onStart={setStartDate} onEnd={setEndDate} />
+      {isLoading && <p className="text-sm text-text-secondary">جارٍ التحميل...</p>}
+      {data && (
+        <>
+          <div className="mb-6 grid grid-cols-2 gap-3 md:grid-cols-3">
+            <StatCard
+              label="نسبة الإلغاء"
+              value={data.cancellation_rate !== null ? `${data.cancellation_rate}%` : '—'}
+              tone={data.cancellation_rate !== null && data.cancellation_rate > 15 ? 'danger' : undefined}
+            />
+            <StatCard label="متوسط قيمة الحجز" value={data.average_booking_value !== null ? formatMoney(data.average_booking_value) : '—'} />
+          </div>
+          <div className="grid gap-4 md:grid-cols-2">
+            <div>
+              <div className="mb-2 flex items-center justify-between">
+                <p className="font-medium">حسب الحالة</p>
+                {data.by_status.length > 0 && (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() =>
+                      downloadCsv(
+                        `bookings-by-status-${startDate}-${endDate}.csv`,
+                        rowsToCsv(
+                          data.by_status.map((s) => ({ status: BOOKING_STATUS_LABELS[s.status] ?? s.status, count: s.count })),
+                          { status: 'الحالة', count: 'العدد' },
+                        ),
+                      )
+                    }
+                  >
+                    <Download className="me-1 size-4" />
+                    تصدير CSV
+                  </Button>
+                )}
+              </div>
+              {data.by_status.length === 0 ? (
+                <p className="text-sm text-text-secondary">لا توجد بيانات</p>
+              ) : (
+                <ul className="flex flex-col gap-1">
+                  {data.by_status.map((s) => (
+                    <li key={s.status} className="flex justify-between rounded-md border border-border p-2 text-sm">
+                      <span>{BOOKING_STATUS_LABELS[s.status] ?? s.status}</span>
+                      <span className="tabular-nums">{s.count}</span>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+            <div>
+              <p className="mb-2 font-medium">حسب الفرع</p>
+              {data.by_branch.length === 0 ? (
+                <p className="text-sm text-text-secondary">لا توجد فروع</p>
+              ) : (
+                <ul className="flex flex-col gap-1">
+                  {data.by_branch.map((b) => (
+                    <li key={b.branch_id} className="flex justify-between rounded-md border border-border p-2 text-sm">
+                      <span>{b.branch_name}</span>
+                      <span className="tabular-nums">{b.booking_count} حجز</span>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          </div>
+        </>
+      )}
     </div>
   )
 }
@@ -357,11 +545,19 @@ export function ReportsPage() {
   return (
     <div>
       <PageHeader title="التقارير" description="تقارير الإيرادات والملاعب والأكاديمية والعملاء" />
-      <Tabs defaultValue="revenue">
+      <Tabs defaultValue="dashboard">
         <TabsList>
+          <TabsTrigger value="dashboard">
+            <LayoutDashboard className="me-1 size-4" />
+            نظرة عامة
+          </TabsTrigger>
           <TabsTrigger value="revenue">
             <Wallet className="me-1 size-4" />
             الإيرادات
+          </TabsTrigger>
+          <TabsTrigger value="bookings">
+            <CalendarCheck2 className="me-1 size-4" />
+            الحجوزات
           </TabsTrigger>
           <TabsTrigger value="occupancy">
             <Landmark className="me-1 size-4" />
@@ -376,7 +572,9 @@ export function ReportsPage() {
             العملاء
           </TabsTrigger>
         </TabsList>
+        <TabsContent value="dashboard"><ExecutiveDashboardTab /></TabsContent>
         <TabsContent value="revenue"><RevenueReportTab /></TabsContent>
+        <TabsContent value="bookings"><BookingReportTab /></TabsContent>
         <TabsContent value="occupancy"><OccupancyReportTab /></TabsContent>
         <TabsContent value="academy"><AcademyReportTab /></TabsContent>
         <TabsContent value="customers"><CustomerReportTab /></TabsContent>
