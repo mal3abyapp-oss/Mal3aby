@@ -56,42 +56,82 @@ export function CustomersPage() {
   const [email, setEmail] = useState('')
   const [formError, setFormError] = useState<string | null>(null)
 
+  // V1 Implementation Gap Audit (2026-08-16): this file's own original
+  // comment said "Phase 4: search, create, edit customers" but edit was
+  // never actually built -- a typo in a customer's name/phone had no
+  // correction path through the product. editingCustomer !== null reuses
+  // the same dialog/form as create, pre-filled, submitting an update
+  // instead of an insert.
+  const [editingCustomer, setEditingCustomer] = useState<CustomerRow | null>(null)
+
   const { data: customers = [], isLoading } = useQuery({
     queryKey: ['customers', currentClubId, search],
     queryFn: () => fetchCustomers(currentClubId!, search),
     enabled: !!currentClubId,
   })
 
-  const createMutation = useMutation({
+  function openCreateDialog() {
+    setEditingCustomer(null)
+    setFullName('')
+    setMobile('')
+    setEmail('')
+    setFormError(null)
+    setDialogOpen(true)
+  }
+
+  function openEditDialog(c: CustomerRow) {
+    setEditingCustomer(c)
+    setFullName(c.fullName)
+    setMobile(c.mobileDisplay ?? '')
+    setEmail(c.email ?? '')
+    setFormError(null)
+    setDialogOpen(true)
+  }
+
+  const saveMutation = useMutation({
     mutationFn: async () => {
-      const { error } = await supabase.from('customers').insert({
-        club_id: currentClubId as string,
+      const payload = {
         full_name: fullName,
         mobile_display: mobile || null,
         normalized_mobile: mobile ? normalizeMobile(mobile) : null,
         email: email || null,
-      })
-      if (error) throw error
+      }
+      if (editingCustomer) {
+        const { error } = await supabase.from('customers').update(payload).eq('id', editingCustomer.id)
+        if (error) throw error
+      } else {
+        const { error } = await supabase.from('customers').insert({ club_id: currentClubId as string, ...payload })
+        if (error) throw error
+      }
     },
     onSuccess: () => {
       setDialogOpen(false)
+      setEditingCustomer(null)
       setFullName('')
       setMobile('')
       setEmail('')
       setFormError(null)
       void queryClient.invalidateQueries({ queryKey: ['customers', currentClubId] })
     },
-    onError: () => setFormError('تعذّرت الإضافة، حاول مرة أخرى.'),
+    onError: () => setFormError(editingCustomer ? 'تعذّر حفظ التعديلات، حاول مرة أخرى.' : 'تعذّرت الإضافة، حاول مرة أخرى.'),
   })
 
   function handleSubmit(e: FormEvent) {
     e.preventDefault()
     setFormError(null)
-    createMutation.mutate()
+    saveMutation.mutate()
   }
 
   const columns: DataTableColumn<CustomerRow>[] = [
-    { key: 'name', header: 'الاسم', render: (c) => c.fullName },
+    {
+      key: 'name',
+      header: 'الاسم',
+      render: (c) => (
+        <button className="text-accent-foreground hover:underline" onClick={() => openEditDialog(c)}>
+          {c.fullName}
+        </button>
+      ),
+    },
     { key: 'mobile', header: 'الهاتف', render: (c) => c.mobileDisplay ?? '—' },
     { key: 'email', header: 'البريد الإلكتروني', render: (c) => c.email ?? '—' },
   ]
@@ -102,13 +142,13 @@ export function CustomersPage() {
         title="العملاء"
         description="البحث عن العملاء وإضافتهم"
         actions={
-          <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+          <Dialog open={dialogOpen} onOpenChange={(open) => { setDialogOpen(open); if (!open) setEditingCustomer(null) }}>
             <DialogTrigger asChild>
-              <Button>إضافة عميل</Button>
+              <Button onClick={openCreateDialog}>إضافة عميل</Button>
             </DialogTrigger>
             <DialogContent>
               <DialogHeader>
-                <DialogTitle>إضافة عميل</DialogTitle>
+                <DialogTitle>{editingCustomer ? 'تعديل بيانات العميل' : 'إضافة عميل'}</DialogTitle>
               </DialogHeader>
               <form onSubmit={handleSubmit} className="flex flex-col gap-4">
                 <div className="flex flex-col gap-1.5">
@@ -128,8 +168,8 @@ export function CustomersPage() {
                     {formError}
                   </p>
                 )}
-                <Button type="submit" disabled={createMutation.isPending}>
-                  {createMutation.isPending ? 'جارٍ الإضافة...' : 'إضافة'}
+                <Button type="submit" disabled={saveMutation.isPending}>
+                  {saveMutation.isPending ? 'جارٍ الحفظ...' : editingCustomer ? 'حفظ التعديلات' : 'إضافة'}
                 </Button>
               </form>
             </DialogContent>

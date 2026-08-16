@@ -250,6 +250,35 @@ export function ProgramsGroupsSection() {
     },
   })
 
+  // V1 Implementation Gap Audit (2026-08-16): a group's capacity/coach/
+  // field could be set at creation but never changed afterward -- no way
+  // to raise/lower capacity as real enrollment demand changed, or
+  // reassign a coach/field. Reuses the same group-creation form fields,
+  // pre-filled when a group is selected, submitting an update.
+  const [editGroupCapacity, setEditGroupCapacity] = useState('')
+  const [editGroupCoachId, setEditGroupCoachId] = useState('')
+  const [editGroupFieldId, setEditGroupFieldId] = useState('')
+  const [editGroupStatus, setEditGroupStatus] = useState('active')
+
+  const updateGroupMutation = useMutation({
+    mutationFn: async () => {
+      if (!selectedGroup) throw new Error('no group selected')
+      const { error } = await supabase
+        .from('groups')
+        .update({
+          capacity: Number(editGroupCapacity),
+          coach_id: editGroupCoachId || null,
+          field_id: editGroupFieldId || null,
+          status: editGroupStatus,
+        })
+        .eq('id', selectedGroup.id)
+      if (error) throw error
+    },
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ['groups', currentClubId] })
+    },
+  })
+
   const generateSessionsMutation = useMutation({
     mutationFn: async () => {
       if (!selectedGroup) throw new Error('no group selected')
@@ -289,7 +318,16 @@ export function ProgramsGroupsSection() {
       key: 'name',
       header: 'المجموعة',
       render: (g) => (
-        <button className="text-accent-foreground hover:underline" onClick={() => setSelectedGroup(g)}>
+        <button
+          className="text-accent-foreground hover:underline"
+          onClick={() => {
+            setSelectedGroup(g)
+            setEditGroupCapacity(String(g.capacity))
+            setEditGroupCoachId(g.coachId ?? '')
+            setEditGroupFieldId(g.fieldId ?? '')
+            setEditGroupStatus(g.status)
+          }}
+        >
           {g.name}
         </button>
       ),
@@ -403,8 +441,40 @@ export function ProgramsGroupsSection() {
 
       <Dialog open={!!selectedGroup} onOpenChange={(open) => !open && setSelectedGroup(null)}>
         <DialogContent>
-          <DialogHeader><DialogTitle>الجدول الأسبوعي — {selectedGroup?.name}</DialogTitle></DialogHeader>
+          <DialogHeader><DialogTitle>إعداد {selectedGroup?.name}</DialogTitle></DialogHeader>
           <div className="flex flex-col gap-3">
+            <div className="flex flex-col gap-2 border-b border-border pb-3">
+              <p className="text-sm font-medium text-text-secondary">السعة والتعيينات</p>
+              <Input type="number" min={1} value={editGroupCapacity} onChange={(e) => setEditGroupCapacity(e.target.value)} placeholder="السعة" />
+              <Select value={editGroupCoachId || 'none'} onValueChange={(v) => setEditGroupCoachId(v === 'none' ? '' : v)}>
+                <SelectTrigger><SelectValue placeholder="المدرب" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">بدون مدرب</SelectItem>
+                  {coaches.map((c) => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
+                </SelectContent>
+              </Select>
+              <Select value={editGroupFieldId || 'none'} onValueChange={(v) => setEditGroupFieldId(v === 'none' ? '' : v)}>
+                <SelectTrigger><SelectValue placeholder="الملعب" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">بدون ملعب محدد</SelectItem>
+                  {fields.map((f) => <SelectItem key={f.id} value={f.id}>{f.name}</SelectItem>)}
+                </SelectContent>
+              </Select>
+              <div className="flex items-center justify-between">
+                <Select value={editGroupStatus} onValueChange={setEditGroupStatus}>
+                  <SelectTrigger className="w-32"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="active">نشط</SelectItem>
+                    <SelectItem value="inactive">غير نشط</SelectItem>
+                  </SelectContent>
+                </Select>
+                <Button size="sm" disabled={!editGroupCapacity || updateGroupMutation.isPending} onClick={() => updateGroupMutation.mutate()}>
+                  {updateGroupMutation.isPending ? 'جارٍ الحفظ...' : 'حفظ'}
+                </Button>
+              </div>
+            </div>
+
+            <p className="text-sm font-medium text-text-secondary">الجدول الأسبوعي</p>
             {scheduleSlots.length === 0 ? (
               <p className="text-sm text-text-secondary">لا يوجد مواعيد بعد.</p>
             ) : (

@@ -109,6 +109,16 @@ export function AcademyPage() {
   const [selectedGuardianId, setSelectedGuardianId] = useState('')
   const [relationship, setRelationship] = useState('father')
 
+  // V1 Implementation Gap Audit (2026-08-16): the player detail dialog
+  // showed only guardians + QR -- no way to correct a player's own name/
+  // DOB/gender, or reactivate one marked inactive. Editable fields
+  // populated from selectedPlayer whenever it changes (see the dialog's
+  // onOpenChange below).
+  const [editName, setEditName] = useState('')
+  const [editDob, setEditDob] = useState('')
+  const [editGender, setEditGender] = useState('')
+  const [editStatus, setEditStatus] = useState('active')
+
   const { data: players = [], isLoading } = useQuery({
     queryKey: ['players', currentClubId, search],
     queryFn: () => fetchPlayers(currentClubId!, search),
@@ -163,6 +173,26 @@ export function AcademyPage() {
     },
   })
 
+  const updatePlayerMutation = useMutation({
+    mutationFn: async () => {
+      if (!selectedPlayer) throw new Error('no player selected')
+      const { error } = await supabase
+        .from('players')
+        .update({
+          full_name: editName,
+          date_of_birth: editDob || null,
+          gender: editGender || null,
+          status: editStatus,
+        })
+        .eq('id', selectedPlayer.id)
+      if (error) throw error
+    },
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ['players', currentClubId] })
+      setSelectedPlayer(null)
+    },
+  })
+
   const playerQrMutation = useMutation({
     mutationFn: async () => {
       if (!selectedPlayer) throw new Error('no player selected')
@@ -187,7 +217,16 @@ export function AcademyPage() {
       key: 'name',
       header: 'الاسم',
       render: (p) => (
-        <button className="text-accent-foreground hover:underline" onClick={() => setSelectedPlayer(p)}>
+        <button
+          className="text-accent-foreground hover:underline"
+          onClick={() => {
+            setSelectedPlayer(p)
+            setEditName(p.fullName)
+            setEditDob(p.dateOfBirth ?? '')
+            setEditGender(p.gender ?? '')
+            setEditStatus(p.status)
+          }}
+        >
           {p.fullName}
         </button>
       ),
@@ -272,6 +311,39 @@ export function AcademyPage() {
                 <DialogTitle>{selectedPlayer?.fullName}</DialogTitle>
               </DialogHeader>
               <div className="flex flex-col gap-4">
+                <div className="flex flex-col gap-2 border-b border-border pb-4">
+                  <label className="text-sm font-medium text-text-secondary">الاسم الكامل</label>
+                  <Input value={editName} onChange={(e) => setEditName(e.target.value)} />
+                  <div className="flex gap-2">
+                    <div className="flex flex-1 flex-col gap-1">
+                      <label className="text-xs text-text-secondary">تاريخ الميلاد</label>
+                      <Input type="date" value={editDob} onChange={(e) => setEditDob(e.target.value)} />
+                    </div>
+                    <div className="flex flex-1 flex-col gap-1">
+                      <label className="text-xs text-text-secondary">الجنس</label>
+                      <Select value={editGender || 'unspecified'} onValueChange={(v) => setEditGender(v === 'unspecified' ? '' : v)}>
+                        <SelectTrigger><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="unspecified">غير محدد</SelectItem>
+                          <SelectItem value="male">ذكر</SelectItem>
+                          <SelectItem value="female">أنثى</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <Select value={editStatus} onValueChange={setEditStatus}>
+                      <SelectTrigger className="w-32"><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="active">نشط</SelectItem>
+                        <SelectItem value="inactive">غير نشط</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <Button size="sm" disabled={!editName.trim() || updatePlayerMutation.isPending} onClick={() => updatePlayerMutation.mutate()}>
+                      {updatePlayerMutation.isPending ? 'جارٍ الحفظ...' : 'حفظ'}
+                    </Button>
+                  </div>
+                </div>
                 <div className="flex flex-col items-center gap-2 border-b border-border pb-4">
                   {playerQrDataUrl ? (
                     <img src={playerQrDataUrl} alt="بطاقة QR للاعب" className="size-40" />
