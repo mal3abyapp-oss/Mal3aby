@@ -3366,6 +3366,17 @@ export type Database = {
         Args: { p_club_id: string; p_end_date: string; p_start_date: string }
         Returns: Json
       }
+      get_invoice_payment_summary: {
+        Args: { p_invoice_ids: string[] }
+        Returns: {
+          invoice_id: string
+          outstanding: number
+          paid: number
+          payment_status: string
+          refunded: number
+          total: number
+        }[]
+      }
       get_open_cash_shift_status: {
         Args: { p_shift_id: string }
         Returns: Json

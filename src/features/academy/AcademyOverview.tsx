@@ -6,6 +6,7 @@ import { StatCard } from '@/components/ui/stat-card'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { UserPlus, ClipboardList, CheckSquare } from 'lucide-react'
+import { fetchInvoicePaymentSummaries } from '@/lib/domain/billing'
 
 // Section I1 — Academy Overview: the metrics a manager/academy_manager
 // needs at a glance without opening Players/Structure/Enrollments
@@ -43,7 +44,13 @@ async function fetchOverview(clubId: string): Promise<OverviewData> {
     sessionsUnmarked = sessionIds.filter((id) => !markedSessionIds.has(id)).length
   }
 
-  // Outstanding academy invoices: invoices whose items reference a subscription and aren't fully paid.
+  // Outstanding academy invoices: invoices whose items reference a
+  // subscription and aren't fully paid. Master Payment Directive task
+  // #81: was `paid < total` computed from a local payment_allocations
+  // sum, missing refund netting -- a subscription invoice paid in full
+  // then refunded was silently NOT counted as outstanding. Now reads
+  // get_invoice_payment_summary(), the single source of truth (see
+  // AUTONOMOUS_DECISION_LOG.md D-015).
   const { data: subInvoices } = await supabase
     .from('invoice_items')
     .select('invoice_id')
@@ -53,19 +60,12 @@ async function fetchOverview(clubId: string): Promise<OverviewData> {
   if (subInvoiceIds.length > 0) {
     const { data: invoices } = await supabase
       .from('invoices')
-      .select('id, total')
+      .select('id')
       .eq('club_id', clubId)
       .in('id', subInvoiceIds)
     if (invoices && invoices.length > 0) {
-      const { data: allocations } = await supabase
-        .from('payment_allocations')
-        .select('invoice_id, amount')
-        .in('invoice_id', invoices.map((i) => i.id))
-      const paidByInvoice = new Map<string, number>()
-      for (const a of allocations ?? []) {
-        paidByInvoice.set(a.invoice_id, (paidByInvoice.get(a.invoice_id) ?? 0) + Number(a.amount))
-      }
-      outstandingCount = invoices.filter((inv) => (paidByInvoice.get(inv.id) ?? 0) < Number(inv.total)).length
+      const summaries = await fetchInvoicePaymentSummaries(invoices.map((i) => i.id))
+      outstandingCount = [...summaries.values()].filter((s) => s.outstanding > 0).length
     }
   }
 

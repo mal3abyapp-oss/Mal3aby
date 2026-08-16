@@ -9,6 +9,7 @@ import {
 import { StatusBadge } from '@/components/ui/status-badge'
 import { MoneyDisplay } from '@/components/ui/money-display'
 import { BOOKING_STATUS_LABELS, BOOKING_STATUS_TONE } from '@/lib/domain/booking'
+import { fetchInvoicePaymentSummaries } from '@/lib/domain/billing'
 
 // Section K: Customer detail must not be CRUD-only -- identity, recent
 // bookings, invoices/outstanding, and linked players/guardian
@@ -41,14 +42,15 @@ async function fetchCustomerActivity(customerId: string): Promise<CustomerActivi
       .eq('customer_id', customerId),
   ])
 
+  // Master Payment Directive task #81: was total - sum(payment_allocations)
+  // computed locally, missing refund netting -- this customer's own detail
+  // dialog could show a different (too-low) outstanding balance than
+  // CustomersPage.tsx's list row for the exact same customer, since that
+  // screen already correctly reads outstanding_invoices. Now both read
+  // the same single source of truth (see AUTONOMOUS_DECISION_LOG.md
+  // D-015): get_invoice_payment_summary().
   const invoiceIds = (invoicesRes.data ?? []).map((i) => i.id)
-  const paidByInvoice = new Map<string, number>()
-  if (invoiceIds.length > 0) {
-    const { data: allocations } = await supabase.from('payment_allocations').select('invoice_id, amount').in('invoice_id', invoiceIds)
-    for (const a of allocations ?? []) {
-      paidByInvoice.set(a.invoice_id, (paidByInvoice.get(a.invoice_id) ?? 0) + Number(a.amount))
-    }
-  }
+  const summaries = await fetchInvoicePaymentSummaries(invoiceIds)
 
   return {
     bookings: (bookingsRes.data ?? []).map((b) => ({
@@ -62,7 +64,7 @@ async function fetchCustomerActivity(customerId: string): Promise<CustomerActivi
       id: i.id,
       invoiceNumber: i.invoice_number,
       total: Number(i.total),
-      outstanding: Math.max(Number(i.total) - (paidByInvoice.get(i.id) ?? 0), 0),
+      outstanding: summaries.get(i.id)?.outstanding ?? Number(i.total),
       status: i.status,
     })),
     linkedPlayers: (guardianLinksRes.data ?? []).map((g) => ({

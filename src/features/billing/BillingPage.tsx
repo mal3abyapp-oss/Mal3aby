@@ -21,7 +21,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
-import { PAYMENT_METHOD_LABELS, type PaymentRow } from '@/lib/domain/billing'
+import { PAYMENT_METHOD_LABELS, type PaymentRow, fetchInvoicePaymentSummaries, type PaymentStatus } from '@/lib/domain/billing'
 import { translateSupabaseError } from '@/lib/errors'
 
 // Invoice list, invoice detail (view + print), payment collection form,
@@ -34,12 +34,19 @@ interface InvoiceListRow {
   total: number
   paid: number
   outstanding: number
+  paymentStatus: PaymentStatus
   source: string
   issuedAt: string | null
 }
 
 const SOURCE_LABELS: Record<string, string> = { booking: 'حجز', subscription: 'اشتراك أكاديمية' }
 
+// Master Payment Directive task #81: was total - sum(payment_allocations)
+// computed locally, missing refund netting -- the primary invoice list
+// every club employee sees daily showed too-LOW an outstanding balance
+// for any invoice paid then refunded. Now reads
+// get_invoice_payment_summary(), the single source of truth (see
+// AUTONOMOUS_DECISION_LOG.md D-015).
 async function fetchInvoices(clubId: string) {
   const { data, error } = await supabase
     .from('invoices')
@@ -50,17 +57,11 @@ async function fetchInvoices(clubId: string) {
   if (error) throw error
 
   const invoiceIds = (data ?? []).map((row) => row.id)
-  const paidByInvoice = new Map<string, number>()
-  if (invoiceIds.length > 0) {
-    const { data: allocations } = await supabase.from('payment_allocations').select('invoice_id, amount').in('invoice_id', invoiceIds)
-    for (const a of allocations ?? []) {
-      paidByInvoice.set(a.invoice_id, (paidByInvoice.get(a.invoice_id) ?? 0) + Number(a.amount))
-    }
-  }
+  const summaries = await fetchInvoicePaymentSummaries(invoiceIds)
 
   return (data ?? []).map<InvoiceListRow>((row) => {
+    const summary = summaries.get(row.id)
     const total = Number(row.total)
-    const paid = paidByInvoice.get(row.id) ?? 0
     const items = (row.invoice_items as unknown as { reference_type: string }[] | null) ?? []
     return {
       id: row.id,
@@ -68,8 +69,9 @@ async function fetchInvoices(clubId: string) {
       customerName: (row.customers as unknown as { full_name: string } | null)?.full_name ?? '—',
       status: row.status,
       total,
-      paid,
-      outstanding: Math.max(total - paid, 0),
+      paid: summary?.paid ?? 0,
+      outstanding: summary?.outstanding ?? total,
+      paymentStatus: summary?.paymentStatus ?? 'unpaid',
       source: SOURCE_LABELS[items[0]?.reference_type ?? ''] ?? 'أخرى',
       issuedAt: row.issued_at,
     }

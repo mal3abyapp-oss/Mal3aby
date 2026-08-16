@@ -14,33 +14,21 @@ import { StatusBadge } from '@/components/ui/status-badge'
 import { Separator } from '@/components/ui/separator'
 import { BOOKING_STATUS_LABELS, BOOKING_STATUS_TONE, type BookingRow } from '@/lib/domain/booking'
 import { formatInstant } from '@/lib/domain/time'
+import { fetchInvoicePaymentSummaries, PAYMENT_STATUS_LABELS, type InvoicePaymentSummary } from '@/lib/domain/billing'
 
 // Section E4 — Booking Detail: everything an employee needs to act on a
 // booking, surfaced directly (not behind further navigation): customer,
 // field, time, price, payment status, and every permitted action.
-
-interface InvoiceSummary {
-  id: string
-  total: number
-  paidAmount: number
-  status: string
-}
-
-async function fetchInvoiceSummary(invoiceId: string): Promise<InvoiceSummary | null> {
-  const { data: invoice, error } = await supabase
-    .from('invoices')
-    .select('id, total, status')
-    .eq('id', invoiceId)
-    .maybeSingle()
-  if (error) throw error
-  if (!invoice) return null
-  const { data: allocations, error: allocError } = await supabase
-    .from('payment_allocations')
-    .select('amount')
-    .eq('invoice_id', invoiceId)
-  if (allocError) throw allocError
-  const paidAmount = (allocations ?? []).reduce((sum, a) => sum + Number(a.amount), 0)
-  return { id: invoice.id, total: Number(invoice.total), paidAmount, status: invoice.status }
+//
+// Master Payment Directive task #81: this used to compute
+// total - sum(payment_allocations) locally, missing refund netting --
+// a booking paid in full then partially refunded showed too-LOW an
+// outstanding balance here vs. the correct figure on OutstandingPage/
+// CustomersPage. Now reads get_invoice_payment_summary(), the single
+// source of truth (see AUTONOMOUS_DECISION_LOG.md D-015).
+async function fetchInvoiceSummary(invoiceId: string): Promise<InvoicePaymentSummary | null> {
+  const summaries = await fetchInvoicePaymentSummaries([invoiceId])
+  return summaries.get(invoiceId) ?? null
 }
 
 export function BookingDetailSheet({
@@ -107,7 +95,7 @@ export function BookingDetailSheet({
     onError: () => setActionError('تعذّر تسجيل عدم الحضور.'),
   })
 
-  const outstanding = invoiceSummary ? invoiceSummary.total - invoiceSummary.paidAmount : booking?.totalPrice ?? 0
+  const outstanding = invoiceSummary ? invoiceSummary.outstanding : booking?.totalPrice ?? 0
 
   return (
     <Sheet
@@ -168,11 +156,21 @@ export function BookingDetailSheet({
                 <>
                   <div className="flex justify-between">
                     <span className="text-text-secondary">المدفوع</span>
-                    <span className="tabular-nums text-status-success">{invoiceSummary.paidAmount.toFixed(0)} ج.م</span>
+                    <span className="tabular-nums text-status-success">{invoiceSummary.paid.toFixed(0)} ج.م</span>
                   </div>
+                  {invoiceSummary.refunded > 0 && (
+                    <div className="flex justify-between">
+                      <span className="text-text-secondary">مسترد</span>
+                      <span className="tabular-nums text-status-warning">{invoiceSummary.refunded.toFixed(0)} ج.م</span>
+                    </div>
+                  )}
                   <div className="flex justify-between font-semibold">
                     <span>المتبقي</span>
                     <span className={outstanding > 0 ? 'text-status-danger tabular-nums' : 'tabular-nums'}>{outstanding.toFixed(0)} ج.م</span>
+                  </div>
+                  <div className="flex justify-between text-xs text-text-secondary">
+                    <span>حالة الدفع</span>
+                    <span>{PAYMENT_STATUS_LABELS[invoiceSummary.paymentStatus]}</span>
                   </div>
                 </>
               )}

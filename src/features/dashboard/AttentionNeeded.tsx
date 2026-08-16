@@ -4,12 +4,22 @@ import { supabase } from '@/lib/supabase/client'
 import { useAuth } from '@/app/providers/AuthProvider'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { StatusBadge } from '@/components/ui/status-badge'
+import { fetchInvoicePaymentSummaries } from '@/lib/domain/billing'
 
 // Section D1 "ATTENTION NEEDED": a receptionist/manager must be able to
 // see, in one place, everything that needs a decision right now --
 // unpaid confirmed bookings, bookings starting soon with no check-in
 // yet, and academy subscriptions expiring within 3 days. Each row is
 // clickable straight into the screen that can act on it.
+//
+// Master Payment Directive task #81 (Section 19: operational status !=
+// payment status): the "unpaid" query used to trust
+// bookings.status = 'confirmed' alone, with zero join against actual
+// payment state -- a confirmed booking that was ALREADY fully paid
+// still showed up here as needing payment, confirmed against real data
+// in AUTONOMOUS_DECISION_LOG.md D-015. Now filters through
+// get_invoice_payment_summary() so only bookings with a genuinely
+// nonzero outstanding balance appear.
 
 interface AttentionItem {
   id: string
@@ -27,7 +37,7 @@ async function fetchAttentionItems(clubId: string): Promise<AttentionItem[]> {
   const [unpaidRes, soonRes, expiringRes] = await Promise.all([
     supabase
       .from('bookings')
-      .select('id, start_at, total_price, customers(full_name)')
+      .select('id, start_at, total_price, invoice_id, customers(full_name)')
       .eq('club_id', clubId)
       .eq('status', 'confirmed')
       .gte('start_at', `${today}T00:00:00`)
@@ -53,13 +63,23 @@ async function fetchAttentionItems(clubId: string): Promise<AttentionItem[]> {
 
   const items: AttentionItem[] = []
 
-  for (const b of unpaidRes.data ?? []) {
+  const unpaidBookings = unpaidRes.data ?? []
+  const unpaidInvoiceIds = unpaidBookings.map((b) => b.invoice_id).filter((id): id is string => !!id)
+  const unpaidSummaries = await fetchInvoicePaymentSummaries(unpaidInvoiceIds)
+
+  for (const b of unpaidBookings) {
+    // A confirmed booking with no invoice yet is definitionally unpaid;
+    // one with an invoice is only genuinely unpaid if its real
+    // outstanding balance (net of refunds) is still > 0 -- not just
+    // because its operational status happens to be 'confirmed'.
+    const outstanding = b.invoice_id ? (unpaidSummaries.get(b.invoice_id)?.outstanding ?? 0) : Number(b.total_price)
+    if (outstanding <= 0) continue
     const name = (b.customers as unknown as { full_name: string } | null)?.full_name ?? '—'
     items.push({
       id: `unpaid-${b.id}`,
       kind: 'unpaid',
       label: `حجز مؤكد بدون دفع كامل — ${name}`,
-      detail: `${Number(b.total_price).toFixed(0)} ج.م`,
+      detail: `${outstanding.toFixed(0)} ج.م`,
       to: '/app/bookings',
     })
   }

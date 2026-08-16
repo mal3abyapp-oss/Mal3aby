@@ -3,6 +3,7 @@ import { supabase } from '@/lib/supabase/client'
 import { StatusBadge } from '@/components/ui/status-badge'
 import { MoneyDisplay } from '@/components/ui/money-display'
 import { SUBSCRIPTION_STATUS_LABELS } from '@/lib/domain/academy'
+import { fetchInvoicePaymentSummaries } from '@/lib/domain/billing'
 
 // Section I4 — Player Profile: a player's own detail dialog previously
 // showed only name/DOB/gender/status + guardians + QR -- none of the
@@ -51,11 +52,15 @@ async function fetchPlayerStatus(playerId: string): Promise<PlayerStatus> {
       const { data: effectiveEnd } = await supabase.rpc('get_subscription_effective_end_date', { p_subscription_id: subscription.id })
       if (effectiveEnd) effectiveEndDate = effectiveEnd as string
 
+      // Master Payment Directive task #81: was total - sum(payment_allocations)
+      // computed locally from the subscription's own price/discount, missing
+      // refund netting -- a subscription invoice paid in full then refunded
+      // showed 0 outstanding here. Now reads get_invoice_payment_summary()
+      // against the invoice's actual total, the single source of truth (see
+      // AUTONOMOUS_DECISION_LOG.md D-015).
       if (subscription.invoice_id) {
-        const { data: allocations } = await supabase.from('payment_allocations').select('amount').eq('invoice_id', subscription.invoice_id)
-        const paid = (allocations ?? []).reduce((sum, a) => sum + Number(a.amount), 0)
-        const total = Number(subscription.price) - Number(subscription.discount)
-        outstanding = Math.max(total - paid, 0)
+        const summaries = await fetchInvoicePaymentSummaries([subscription.invoice_id])
+        outstanding = summaries.get(subscription.invoice_id)?.outstanding ?? 0
       }
     }
   }
