@@ -30,6 +30,7 @@ import { ReportsPage } from '@/features/reports/ReportsPage'
 import { StaffPage } from '@/features/staff/StaffPage'
 import { SettingsPage } from '@/features/settings/SettingsPage'
 import { ScanPage } from '@/features/scanner/ScanPage'
+import { WhatsAppPage } from '@/features/whatsapp/WhatsAppPage'
 
 import { PortalRoot } from '@/features/portal/PortalRoot'
 import { PortalAcademyPage } from '@/features/portal/PortalAcademyPage'
@@ -94,6 +95,7 @@ export const router = createBrowserRouter([
           { path: 'subscription', element: <SubscriptionPage /> },
           { path: 'outstanding', element: <OutstandingPage /> },
           { path: 'reports', element: <ReportsPage /> },
+          { path: 'whatsapp', element: <WhatsAppPage /> },
           // P1-7: /app/club's content moved into the new Settings hub
           // (club identity, branches, and fields/hours/pricing all live
           // under /app/settings now) -- kept as a redirect for any stale

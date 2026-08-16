@@ -17,6 +17,7 @@ import {
   ScanLine,
   MoreHorizontal,
   LogOut,
+  MessageCircle,
 } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 
@@ -38,6 +39,7 @@ const sidebarItems: NavItem[] = [
   { to: '/app/customers', label: 'العملاء', icon: Users },
   { to: '/app/billing', label: 'الفواتير والمدفوعات', icon: Receipt },
   { to: '/app/reports', label: 'التقارير', icon: BarChart3 },
+  { to: '/app/whatsapp', label: 'واتساب', icon: MessageCircle },
   { to: '/app/staff', label: 'الموظفون', icon: UserCog },
   { to: '/app/settings', label: 'الإعدادات', icon: Settings },
 ]
