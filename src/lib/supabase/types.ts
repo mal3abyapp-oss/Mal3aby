@@ -2853,222 +2853,6 @@ export type Database = {
           },
         ]
       }
-      whatsapp_automations: {
-        Row: {
-          audience: string
-          club_id: string
-          created_at: string
-          dedup_window_minutes: number
-          delay_minutes: number
-          enabled: boolean
-          event_type: string
-          id: string
-          quiet_hours_end: string | null
-          quiet_hours_start: string | null
-          template_event_key: string
-          updated_at: string
-          updated_by: string | null
-        }
-        Insert: {
-          audience?: string
-          club_id: string
-          created_at?: string
-          dedup_window_minutes?: number
-          delay_minutes?: number
-          enabled?: boolean
-          event_type: string
-          id?: string
-          quiet_hours_end?: string | null
-          quiet_hours_start?: string | null
-          template_event_key: string
-          updated_at?: string
-          updated_by?: string | null
-        }
-        Update: {
-          audience?: string
-          club_id?: string
-          created_at?: string
-          dedup_window_minutes?: number
-          delay_minutes?: number
-          enabled?: boolean
-          event_type?: string
-          id?: string
-          quiet_hours_end?: string | null
-          quiet_hours_start?: string | null
-          template_event_key?: string
-          updated_at?: string
-          updated_by?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "whatsapp_automations_club_id_fkey"
-            columns: ["club_id"]
-            isOneToOne: false
-            referencedRelation: "clubs"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "whatsapp_automations_club_id_fkey"
-            columns: ["club_id"]
-            isOneToOne: false
-            referencedRelation: "commercial_entitlements_usage"
-            referencedColumns: ["club_id"]
-          },
-        ]
-      }
-      whatsapp_connection_events: {
-        Row: {
-          actor_id: string | null
-          club_id: string
-          created_at: string
-          detail: Json
-          event: string
-          id: string
-        }
-        Insert: {
-          actor_id?: string | null
-          club_id: string
-          created_at?: string
-          detail?: Json
-          event: string
-          id?: string
-        }
-        Update: {
-          actor_id?: string | null
-          club_id?: string
-          created_at?: string
-          detail?: Json
-          event?: string
-          id?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "whatsapp_connection_events_club_id_fkey"
-            columns: ["club_id"]
-            isOneToOne: false
-            referencedRelation: "clubs"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "whatsapp_connection_events_club_id_fkey"
-            columns: ["club_id"]
-            isOneToOne: false
-            referencedRelation: "commercial_entitlements_usage"
-            referencedColumns: ["club_id"]
-          },
-        ]
-      }
-      whatsapp_connections: {
-        Row: {
-          club_id: string
-          connected_at: string | null
-          connected_phone_number: string | null
-          last_error: string | null
-          last_health_check_at: string | null
-          pairing_expires_at: string | null
-          pairing_token: string | null
-          session_secret: string | null
-          status: string
-          updated_at: string
-          updated_by: string | null
-        }
-        Insert: {
-          club_id: string
-          connected_at?: string | null
-          connected_phone_number?: string | null
-          last_error?: string | null
-          last_health_check_at?: string | null
-          pairing_expires_at?: string | null
-          pairing_token?: string | null
-          session_secret?: string | null
-          status?: string
-          updated_at?: string
-          updated_by?: string | null
-        }
-        Update: {
-          club_id?: string
-          connected_at?: string | null
-          connected_phone_number?: string | null
-          last_error?: string | null
-          last_health_check_at?: string | null
-          pairing_expires_at?: string | null
-          pairing_token?: string | null
-          session_secret?: string | null
-          status?: string
-          updated_at?: string
-          updated_by?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "whatsapp_connections_club_id_fkey"
-            columns: ["club_id"]
-            isOneToOne: true
-            referencedRelation: "clubs"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "whatsapp_connections_club_id_fkey"
-            columns: ["club_id"]
-            isOneToOne: true
-            referencedRelation: "commercial_entitlements_usage"
-            referencedColumns: ["club_id"]
-          },
-        ]
-      }
-      whatsapp_templates: {
-        Row: {
-          body: string
-          club_id: string
-          created_at: string
-          event_key: string
-          id: string
-          is_active: boolean
-          language: string
-          updated_at: string
-          updated_by: string | null
-          variables: string[]
-        }
-        Insert: {
-          body: string
-          club_id: string
-          created_at?: string
-          event_key: string
-          id?: string
-          is_active?: boolean
-          language: string
-          updated_at?: string
-          updated_by?: string | null
-          variables?: string[]
-        }
-        Update: {
-          body?: string
-          club_id?: string
-          created_at?: string
-          event_key?: string
-          id?: string
-          is_active?: boolean
-          language?: string
-          updated_at?: string
-          updated_by?: string | null
-          variables?: string[]
-        }
-        Relationships: [
-          {
-            foreignKeyName: "whatsapp_templates_club_id_fkey"
-            columns: ["club_id"]
-            isOneToOne: false
-            referencedRelation: "clubs"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "whatsapp_templates_club_id_fkey"
-            columns: ["club_id"]
-            isOneToOne: false
-            referencedRelation: "commercial_entitlements_usage"
-            referencedColumns: ["club_id"]
-          },
-        ]
-      }
     }
     Views: {
       club_platform_subscription_summary: {
@@ -3409,7 +3193,6 @@ export type Database = {
         Args: { p_membership_id: string }
         Returns: undefined
       }
-      disconnect_whatsapp: { Args: { p_club_id: string }; Returns: undefined }
       emit_notification_event: {
         Args: {
           p_club_id: string
@@ -3511,17 +3294,6 @@ export type Database = {
         Returns: string
       }
       get_today_dashboard: { Args: { p_club_id: string }; Returns: Json }
-      get_whatsapp_connection_status: {
-        Args: { p_club_id: string }
-        Returns: {
-          connected_at: string
-          connected_phone_number: string
-          last_error: string
-          last_health_check_at: string
-          pairing_expires_at: string
-          status: string
-        }[]
-      }
       has_branch_access: {
         Args: { p_branch_id: string; p_membership_id: string }
         Returns: boolean
@@ -3645,13 +3417,6 @@ export type Database = {
       set_plan_publish_status: {
         Args: { p_is_public: boolean; p_plan_id: string }
         Returns: undefined
-      }
-      start_whatsapp_pairing: {
-        Args: { p_club_id: string }
-        Returns: {
-          expires_at: string
-          pairing_token: string
-        }[]
       }
       unfreeze_subscription: {
         Args: { p_reason?: string; p_subscription_id: string }
