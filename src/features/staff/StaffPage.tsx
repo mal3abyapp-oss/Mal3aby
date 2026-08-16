@@ -38,30 +38,48 @@ const ASSIGNABLE_ROLES = [
   { key: 'scanner', labelAr: 'ماسح QR' },
 ]
 
+// V1 Critical Fix Pass (2026-08-16): fetchStaff previously left-embedded
+// `profiles` on the same select() as `roles`/`membership_branches`. A
+// membership whose user has no profiles row yet (pre-trigger test data,
+// or any future edge case where handle_new_user didn't run) makes
+// PostgREST's embed resolve to null for that relation -- which is
+// correct and should NOT drop the row -- but there is no guarantee
+// every future embed stays that lenient, and a missing name silently
+// rendering as "—" with no visible explanation reads as "the staff
+// member I just added isn't there." Fetch profiles separately and merge
+// client-side so a missing profile can never hide a real membership row,
+// and show a clear placeholder instead of a bare dash.
 async function fetchStaff(clubId: string): Promise<StaffRow[]> {
   const { data, error } = await supabase
     .from('club_memberships')
     .select(
-      'id, user_id, status, roles(key, name_ar), profiles:user_id(full_name), membership_branches(branches(name))',
+      'id, user_id, status, roles(key, name_ar), membership_branches(branches(name))',
     )
     .eq('club_id', clubId)
     .order('created_at', { ascending: false })
 
   if (error) throw error
 
+  const userIds = (data ?? []).map((row) => row.user_id)
+  const profileByUserId = new Map<string, string | null>()
+  if (userIds.length > 0) {
+    const { data: profiles, error: profilesError } = await supabase
+      .from('profiles')
+      .select('user_id, full_name')
+      .in('user_id', userIds)
+    if (profilesError) throw profilesError
+    for (const p of profiles ?? []) profileByUserId.set(p.user_id, p.full_name)
+  }
+
   return (data ?? []).map((row) => {
     const roles = row.roles as unknown as { key: string; name_ar: string } | null
-    // profiles is joined via user_id -> profiles.user_id; Supabase returns
-    // it as an array-or-object depending on relationship inference, handle both.
-    const profilesRaw = row.profiles as unknown
-    const profile = Array.isArray(profilesRaw) ? profilesRaw[0] : profilesRaw
     const branchRows = (row.membership_branches ?? []) as unknown as Array<{
       branches: { name: string } | null
     }>
     return {
       membershipId: row.id,
       userId: row.user_id,
-      fullName: (profile as { full_name: string | null } | undefined)?.full_name ?? null,
+      fullName: profileByUserId.get(row.user_id) ?? null,
       roleKey: roles?.key ?? '',
       roleNameAr: roles?.name_ar ?? '',
       status: row.status,
@@ -124,7 +142,12 @@ export function StaffPage() {
   }
 
   const columns: DataTableColumn<StaffRow>[] = [
-    { key: 'name', header: 'الاسم', render: (r) => r.fullName ?? '—' },
+    {
+      key: 'name',
+      header: 'الاسم',
+      render: (r) =>
+        r.fullName ?? <span className="text-text-secondary">لم يسجّل الدخول بعد</span>,
+    },
     { key: 'role', header: 'الدور', render: (r) => r.roleNameAr },
     {
       key: 'branches',
