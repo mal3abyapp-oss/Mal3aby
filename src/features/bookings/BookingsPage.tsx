@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '@/lib/supabase/client'
 import { useAuth } from '@/app/providers/AuthProvider'
@@ -16,7 +16,21 @@ import { cn } from '@/lib/utils'
 import { BOOKING_STATUS_LABELS, FIELD_BLOCK_TYPE_LABELS, type BookingRow, type FieldBlockRow } from '@/lib/domain/booking'
 import { QuickBookingSheet, type QuickBookingSlot } from './QuickBookingSheet'
 import { BookingDetailSheet } from './BookingDetailSheet'
+import { BookingsMobileView } from './BookingsMobileView'
 import { resolveHoursForDay, useResolvedFieldPrice } from './useFieldPricing'
+
+// Section F: mobile gets a dedicated layout, not a squeezed desktop
+// grid. Matches the app's own mobile breakpoint (md: 768px, see
+// resize_window preset conventions used elsewhere in this codebase).
+function useIsMobile() {
+  const [isMobile, setIsMobile] = useState(() => window.innerWidth < 768)
+  useEffect(() => {
+    const onResize = () => setIsMobile(window.innerWidth < 768)
+    window.addEventListener('resize', onResize)
+    return () => window.removeEventListener('resize', onResize)
+  }, [])
+  return isMobile
+}
 
 // V1 Operational Product Rebuild -- Section E (Booking Calendar,
 // desktop/tablet): a real time-grid (30-min rows, sticky time column +
@@ -142,6 +156,7 @@ function FieldColumnHeader({ field, clubId, date }: { field: FieldWithBranch; cl
 export function BookingsPage() {
   const { currentClubId } = useAuth()
   const queryClient = useQueryClient()
+  const isMobile = useIsMobile()
   const [date, setDate] = useState(() => new Date().toISOString().slice(0, 10))
   const [branchId, setBranchId] = useState<string | null>(null)
   const [slotSelection, setSlotSelection] = useState<QuickBookingSlot | null>(null)
@@ -222,6 +237,41 @@ export function BookingsPage() {
     queryFn: () => fetchOperatingHours(currentClubId!),
     enabled: !!currentClubId,
   })
+
+  if (isMobile) {
+    return (
+      <div className="flex flex-col gap-3">
+        <PageHeader title="الحجوزات" description="" className="pb-0" />
+        {fields.length === 0 ? (
+          <p className="text-sm text-text-secondary">لا توجد ملاعب بعد. أضف ملعبًا من الإعدادات أولاً.</p>
+        ) : (
+          <BookingsMobileView
+            date={date}
+            onDateChange={setDate}
+            fields={fields}
+            bookings={bookings}
+            blocks={blocks}
+            hoursRows={hoursRows}
+            onSlotSelect={setSlotSelection}
+            onBookingSelect={setSelectedBooking}
+          />
+        )}
+
+        <QuickBookingSheet
+          slot={slotSelection}
+          clubId={currentClubId!}
+          onOpenChange={(open) => !open && setSlotSelection(null)}
+          onCreated={invalidateGrid}
+        />
+        <BookingDetailSheet
+          booking={selectedBooking}
+          fieldName={fields.find((f) => f.id === selectedBooking?.fieldId)?.name ?? ''}
+          onOpenChange={(open) => !open && setSelectedBooking(null)}
+          onChanged={invalidateGrid}
+        />
+      </div>
+    )
+  }
 
   return (
     <div className="flex flex-col gap-4">
