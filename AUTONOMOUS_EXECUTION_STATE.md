@@ -82,7 +82,24 @@ a genuine contradiction.
    scope cut (not silently dropped): no queue worker, no templates
    table, no automation-rules table yet — these are Gate 8's actual
    scope, since the WhatsApp connector needs all three to be useful.
-8. Gate 8 — WhatsApp QR Module — not started (large net-new module).
+8. ✅ **Gate 8 — WhatsApp QR Module** — IMPLEMENTED — EXTERNAL SCAN QA
+   PENDING (see D-008). Mid-task, the user sent an explicit directive
+   overriding an earlier stub-based plan: built a REAL persistent
+   Node/TypeScript connector service (`/whatsapp-connector`, Baileys-
+   based) behind a `MessagingProvider` adapter interface, plus a
+   deployed Supabase Edge Function (`whatsapp-bridge`) as the only
+   trusted caller. Verified via a real automated test that the service
+   opens a genuine WebSocket to WhatsApp's servers and receives a real,
+   valid, scannable QR — not a mock. A real bug (class-field-init
+   ordering crash) was found and fixed via that same real execution,
+   not type-checking. What remains is the actual phone-scan step
+   (REAL PHONE QR SCAN QA PENDING) — not automatable in this
+   environment, does not block continuing the rest of the run per the
+   directive's own explicit instruction. Also NOT yet built: the queue-
+   consumption worker that drains `notification_queue` and calls the
+   connector's `/send` (the send path itself is ready and callable, just
+   nothing polls the queue yet), quiet-hours/rate-limit enforcement
+   code (columns exist, enforcement doesn't).
 9. Gate 9 — RTL full sweep — not started (partial RTL exists via
    `DirectionProvider` but no full audit done). NOTE: the new portal
    screens built in Gate 3 were written with the same RTL-first
@@ -110,7 +127,22 @@ a genuine contradiction.
     (branch/field/academy limits) is DONE and verified; only the UI
     wiring (task #51 types regen onward) remains, deliberately paused.
 
-## Current gate: Gate 8 (WhatsApp QR Module) — starting next
+## Current gate: Gate 9 (RTL full sweep) — starting next
+
+## IMPORTANT — pending external QA (not a blocker, tracked explicitly)
+**REAL PHONE QR SCAN QA PENDING** (Gate 8): the WhatsApp connector
+service (`/whatsapp-connector`) is real and verified up to real QR
+generation (see D-008), but completing the actual pairing requires:
+(1) deploying the connector service to a real persistent host (it
+cannot run inside Vite or as a Supabase migration — it's a standalone
+Node process, see its own README for setup), (2) setting
+`WHATSAPP_CONNECTOR_URL`/`CONNECTOR_INTERNAL_SECRET` as secrets on the
+deployed `whatsapp-bridge` Edge Function so it can reach the connector,
+(3) a staff member opening WhatsApp → Connection in the app and
+scanning the real QR with an actual phone. None of this needs to
+happen before continuing other gates — it's the user's own
+infrastructure/phone step, not something further autonomous code
+changes can complete.
 
 ## Completed this run (chronological)
 - Resolved 3-way directive conflict via AskUserQuestion → user chose
@@ -216,30 +248,14 @@ chronological commit history of this run: Gate 1 fix, Gate 2 fix, Gate
 Local-first — not pushed to any remote per standing project policy.
 
 ## Next exact task
-Start Gate 8 — WhatsApp QR Module, the largest remaining single module
-in Doc 3. This is a genuinely large build (connection/session
-management via QR-pairing, templates, automations, message queue UI,
-diagnostics) layered on top of Gate 7's now-complete
-notification_events/notification_queue/notification_consent
-foundation. Suggested build order, each independently useful and
-testable: (a) `whatsapp_connections` table (per-club session state
-machine: disconnected/generating_qr/waiting_for_scan/authenticating/
-connected/failed/expired/reconnecting) + connect/disconnect RPCs --
-session credentials must never appear in any client-readable
-column/response, stored server-side only; (b) `whatsapp_templates`
-table (one per core event, bilingual, variable-validated) +
-CRUD RPCs gated on a new `manage_whatsapp_templates` permission;
-(c) a `WhatsAppConnector` adapter interface (a Postgres/Edge-Function
-boundary, NOT baked into business logic) so Notification/Booking/
-Academy code only ever calls `enqueue_notification()` (already built)
-and never anything WhatsApp-specific; (d) `whatsapp_automations` table
-mapping event_type -> template + delay + send-window + dedup policy,
-consumed by whatever eventually processes notification_queue; (e) the
-actual queue-processing worker is likely an Edge Function (check
-`list_edge_functions` for any existing scaffold before assuming none
-exists) since Postgres itself can't make outbound HTTP calls to a
-WhatsApp API on a schedule. Given this session's now-repeated pattern
-(Gates 1/2/4/5/6/7 all involved at least one real defect or a
-gap-vs-assumption correction), audit before building at every step --
-check `information_schema`/`pg_proc`/`list_edge_functions` for
-anything pre-existing before assuming a blank slate.
+Start Gate 9 — RTL full sweep. Doc 3 requires a full repository-wide
+audit (not partial fixes) covering nav/sidebar/bottom-nav/cards/tables/
+forms/inputs/selects/dialogs/sheets/dropdowns/calendars/date-pickers/
+booking-timeline/reports/charts/pagination/search/breadcrumbs/QR
+screens, using logical CSS properties where appropriate. This session
+added substantial new UI surface since the app was last RTL-reviewed
+(the entire Gate 3 portal, the entire Gate 8 WhatsApp tab) — sweep
+those specifically, not just the pre-existing screens. Check the
+existing `DirectionProvider` (mentioned in earlier session notes as
+only a state variable with no visible switcher) to understand current
+RTL mechanics before assuming what needs fixing.
