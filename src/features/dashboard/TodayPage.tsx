@@ -10,6 +10,7 @@ import { Button } from '@/components/ui/button'
 import { formatMoney } from '@/lib/domain/billing'
 import { FirstRunChecklist } from '@/features/dashboard/FirstRunChecklist'
 import { AttentionNeeded } from '@/features/dashboard/AttentionNeeded'
+import { OwnerFinanceTransparency } from '@/features/dashboard/OwnerFinanceTransparency'
 import { CoachTodayView } from '@/features/academy/CoachTodayView'
 import { BOOKING_STATUS_LABELS } from '@/lib/domain/booking'
 import { CalendarDays, CheckCircle2, Landmark, Wallet, CalendarPlus, ScanLine, UserPlus, GraduationCap } from 'lucide-react'
@@ -128,6 +129,7 @@ export function TodayPage() {
   const roleKey = currentMembership?.roleKey
 
   const isManager = roleKey === 'club_owner' || roleKey === 'club_manager' || roleKey === 'branch_manager'
+  const isOwner = roleKey === 'club_owner'
   const isReception = roleKey === 'receptionist'
   const isCoach = roleKey === 'coach'
 
@@ -192,6 +194,12 @@ export function TodayPage() {
       {(isManager || isReception) && (
         <div className="mb-6">
           <AttentionNeeded />
+        </div>
+      )}
+
+      {isOwner && (
+        <div className="mb-6">
+          <OwnerFinanceTransparency />
         </div>
       )}
 
