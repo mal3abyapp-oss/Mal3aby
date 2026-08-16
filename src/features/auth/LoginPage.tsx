@@ -23,6 +23,18 @@ async function hasAnyActiveMembership(): Promise<boolean> {
   return (count ?? 0) > 0
 }
 
+// Gate 3 (Unified Accounts): a login with no staff membership is not
+// necessarily a prospective club owner who hasn't onboarded yet -- it
+// may be a customer/guardian who has claimed (or can claim) a
+// self-service link to their own customer record. Route those to the
+// customer portal instead of club-creation onboarding.
+async function hasAnyLinkedCustomerRecord(): Promise<boolean> {
+  const { count } = await supabase
+    .from('customers')
+    .select('id', { count: 'exact', head: true })
+  return (count ?? 0) > 0
+}
+
 export function LoginPage() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
@@ -56,7 +68,12 @@ export function LoginPage() {
     }
 
     const hasClub = await hasAnyActiveMembership()
-    navigate(hasClub ? '/app' : '/onboarding', { replace: true })
+    if (hasClub) {
+      navigate('/app', { replace: true })
+      return
+    }
+    const hasCustomerRecord = await hasAnyLinkedCustomerRecord()
+    navigate(hasCustomerRecord ? '/portal' : '/onboarding', { replace: true })
   }
 
   return (

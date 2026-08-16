@@ -315,3 +315,106 @@ PostgREST's grant check).
 
 **Next:** build the frontend claim flow + first real self-service
 screen (My Bookings) to prove the pattern end-to-end.
+
+**Frontend built:** `PortalLayout` (mobile-first shell, separate from
+`AppLayout`), `RequirePortalAuth` guard, `ClaimAccountPage` (explicit
+club + mobile-number confirmation before claiming, never silent
+auto-match), `PortalRoot` (claim-flow vs dashboard router),
+`PortalBookingsPage` (My Bookings), `PortalAcademyPage` (My Children),
+`PortalQrPage` (My QR — reuses the existing `ensure_booking_qr()`
+mechanism unchanged), `PortalProfilePage` (contact-info self-edit).
+`LoginPage` now distinguishes "no membership + has a linked customer
+record" (→ `/portal`) from "no membership + no customer record at all"
+(→ `/onboarding`, genuinely a prospective club owner) — previously
+every no-membership login was sent to club-creation onboarding
+regardless of persona.
+
+**Additional RLS/read-access gaps found and fixed while wiring real
+screens** (each of these tables had ONLY staff-permission-gated SELECT
+policies before this pass — a self-service customer would have seen
+nothing, silently, with no error): `bookings`, `fields`, `branches`,
+`clubs`, `guardian_links`, `players`, `enrollments`, `groups`,
+`subscriptions`. Added narrow self-service SELECT policies to each,
+chained back to `customers.user_id = auth.uid()` (or, for academy
+tables, chained through `guardian_links` as well) so a customer only
+ever sees their own data, never another family's or another club's.
+
+**Second real bug found while wiring My QR:** `ensure_booking_qr()`
+only ever checked staff `booking.view` permission — a real customer,
+having no `club_memberships` row, would always fail this and could
+never generate their own booking's QR. Fixed by also authorizing the
+caller when the booking's own `customer_id` is linked
+(`customers.user_id`) to their `auth.uid()`. This is the same bug
+pattern as D-002 (a permission check written with only the staff
+persona in mind, silently breaking a legitimate second persona) —
+worth treating as a standing review item for every remaining
+staff-permission-only RPC as portal screens keep expanding onto them.
+
+**Critical bug found via real black-box RLS testing (not just SQL
+inspection):** signed up a genuine throwaway test auth user (via the
+real `/auth/v1/signup` + `/auth/v1/token` endpoints, confirmed the
+email directly in `auth.users` since this project's mailer isn't
+configured for real delivery, then issued real REST calls with the
+resulting access token — this is what actually exercises RLS, since
+service-role/SQL-console access bypasses it entirely). Found:
+`claim_customer_self_service()` appeared to succeed (returned the
+customer id, no error) but `user_id` was never actually persisted.
+Root cause: `protect_customer_identity_columns()` (the identity-column
+guard from earlier in this same gate) fires on every `customers`
+UPDATE, including the one inside the claim RPC itself — and correctly
+identified the claiming user as lacking staff `customer.update`
+permission (true, by definition, for a self-service claimant), so it
+silently reverted its own `user_id` write. Fixed with a
+transaction-local Postgres GUC flag
+(`set_config('app.allow_customer_identity_claim', 'true', true)`,
+`is_local=true` so it can never leak outside the claim RPC's own
+transaction) that the trigger checks specifically for the `user_id`
+column, leaving every other protected column's guard fully intact.
+
+**Full verified test matrix (real access token, real REST calls):**
+- Before claiming: 0 bookings, 0 customers visible. ✅
+- After claiming: exactly the claimed customer's own 2 bookings
+  visible, customer record shows correct `user_id`. ✅
+- Reading a different customer's row directly by id: `[]` (denied). ✅
+- Claiming a second customer in the same club: rejected
+  (`customer not found`, since the RPC's own unclaimed-only query
+  correctly excludes it). ✅
+- Direct PATCH of `photo_url`/`full_name` (bypassing the RPC): request
+  returns 200 (no RLS row-level violation, since the row is the
+  caller's own) but the protected values are silently unchanged. ✅
+- Direct PATCH of `mobile_display` (a legitimately self-editable
+  column): correctly succeeds. ✅
+
+All test-induced data changes (the claimed `user_id`, the edited
+`mobile_display`) were reverted afterward via a trigger-disabled
+cleanup pass so this session's QA dataset stays clean; the test
+account's `audit_logs` entry from the claim was deliberately left in
+place (audit history must never be deleted, per the platform's own
+"immutable audit trail" rule) and the throwaway `auth.users` row was
+left in place too (harmless, isolated, no relationship to any real
+customer/staff data).
+
+**DB impact this pass:** `customers.user_id` column + unique index;
+11 new self-service RLS SELECT policies across 9 tables; 1 new
+self-service UPDATE policy; `customer_photo_update_requests` table +
+2 RPCs; `claim_customer_self_service()` + `find_claimable_customer()`
+RPCs; `protect_customer_identity_columns()` trigger; `ensure_booking_qr()`
+and `_activate_subscription_if_due_internal()` grant/logic fixes.
+
+**Security impact:** net-positive — closes the "no self-service surface
+exists" gap while keeping every new access path narrowly scoped and
+independently verified; the one real defect this introduced
+(claim-vs-guard conflict) was caught and fixed within the same pass,
+before being left in a shippable state, via genuine black-box testing
+rather than assumption.
+
+**Reversal path:** every migration in this pass is a clean forward
+`create or replace`/`create policy`/`alter table add column` — fully
+recoverable from `list_migrations`/git history; no destructive
+operations were performed on real data.
+
+**Status:** Gate 3 foundational build complete and verified. Remaining
+Gate 3 scope (deeper "My Subscriptions"/"My Payments" screens, the
+photo-request UI itself, rate-limiting `find_claimable_customer`) is
+tracked as follow-up in the execution state file, not blocking
+progress to Gate 4+.

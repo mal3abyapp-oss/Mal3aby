@@ -17,6 +17,24 @@ export function RequireAuth() {
   return <Outlet />
 }
 
+// Guards /portal (the customer/guardian self-service area, Gate 3).
+// Session-only, same as RequireAuth — a customer never needs a
+// club_membership row (that would incorrectly grant staff-side RLS
+// access). The real boundary is still RLS: customers_self_service_*
+// policies scoped to customers.user_id = auth.uid().
+export function RequirePortalAuth() {
+  const { session, loading } = useAuth()
+  const location = useLocation()
+
+  if (loading) return null
+
+  if (!session) {
+    return <Navigate to="/login" state={{ from: location }} replace />
+  }
+
+  return <Outlet />
+}
+
 // Guards /platform specifically — requires the platform_owner role on at
 // least one active membership. Real enforcement is still server-side
 // (public.is_platform_owner() SECURITY DEFINER + RLS policies); this only

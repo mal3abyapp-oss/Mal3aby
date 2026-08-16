@@ -2,7 +2,8 @@ import { createBrowserRouter, Navigate } from 'react-router-dom'
 import { PublicLayout } from '@/app/layouts/PublicLayout'
 import { AppLayout } from '@/app/layouts/AppLayout'
 import { PlatformLayout } from '@/app/layouts/PlatformLayout'
-import { RequireAuth, RequirePlatformOwner } from '@/app/routing/RequireAuth'
+import { PortalLayout } from '@/app/layouts/PortalLayout'
+import { RequireAuth, RequirePlatformOwner, RequirePortalAuth } from '@/app/routing/RequireAuth'
 
 import { HomePage } from '@/features/public-site/HomePage'
 import { PricingPage } from '@/features/public-site/PricingPage'
@@ -29,6 +30,11 @@ import { ReportsPage } from '@/features/reports/ReportsPage'
 import { StaffPage } from '@/features/staff/StaffPage'
 import { SettingsPage } from '@/features/settings/SettingsPage'
 import { ScanPage } from '@/features/scanner/ScanPage'
+
+import { PortalRoot } from '@/features/portal/PortalRoot'
+import { PortalAcademyPage } from '@/features/portal/PortalAcademyPage'
+import { PortalQrPage } from '@/features/portal/PortalQrPage'
+import { PortalProfilePage } from '@/features/portal/PortalProfilePage'
 
 import { PlatformOverviewPage } from '@/features/platform/PlatformOverviewPage'
 import { PlatformClubsPage } from '@/features/platform/PlatformClubsPage'
@@ -104,6 +110,21 @@ export const router = createBrowserRouter([
           // (owner/manager only) the audit log.
           { path: 'settings', element: <SettingsPage /> },
           { path: 'more', element: <MorePage /> },
+        ],
+      },
+    ],
+  },
+  {
+    element: <RequirePortalAuth />,
+    children: [
+      {
+        path: '/portal',
+        element: <PortalLayout />,
+        children: [
+          { index: true, element: <PortalRoot /> },
+          { path: 'academy', element: <PortalAcademyPage /> },
+          { path: 'qr', element: <PortalQrPage /> },
+          { path: 'profile', element: <PortalProfilePage /> },
         ],
       },
     ],

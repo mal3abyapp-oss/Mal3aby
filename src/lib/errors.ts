@@ -37,6 +37,10 @@ const MESSAGE_RULES: Array<[RegExp, string]> = [
   [/invoice not found/i, 'الفاتورة غير موجودة.'],
   [/payment not found/i, 'الدفعة غير موجودة.'],
   [/exceeds? (the )?outstanding|refund amount/i, 'قيمة الاسترجاع تتجاوز الرصيد القابل للاسترجاع.'],
+  [/customer not found/i, 'العميل غير موجود.'],
+  [/already linked to a different account/i, 'هذا السجل مرتبط بالفعل بحساب آخر.'],
+  [/already linked to a customer record in this club/i, 'حسابك مرتبط بالفعل ببيانات عميل في هذا النادي.'],
+  [/invalid mobile number/i, 'رقم الهاتف غير صحيح.'],
 ]
 
 const CODE_RULES: Record<string, string> = {
