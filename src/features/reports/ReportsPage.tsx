@@ -16,7 +16,7 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { Wallet, Landmark, GraduationCap, Users, Download, LayoutDashboard, CalendarCheck2 } from 'lucide-react'
+import { Wallet, Landmark, GraduationCap, Users, Download, LayoutDashboard, CalendarCheck2, HandCoins } from 'lucide-react'
 
 // V1 Implementation Gap Audit (2026-08-16): docs/IMPLEMENTATION_PLAN.md's
 // Phase 7 scope was explicit -- "CSV export on this [Outstanding] AND
@@ -67,6 +67,12 @@ interface AcademyReport {
 interface CustomerReport {
   new_customers: number
   top_customers: { customer_id: string; customer_name: string; total_spend: number; booking_count: number }[]
+}
+
+interface CollectionsReport {
+  total_collected: number
+  by_employee: { user_id: string | null; full_name: string; amount: number; payment_count: number }[]
+  by_branch: { branch_id: string; branch_name: string; amount: number; payment_count: number }[]
 }
 
 function useDateRange() {
@@ -355,6 +361,114 @@ function RevenueReportTab() {
   )
 }
 
+// Gate 13 #58: the natural follow-on to #57's attribution audit -- once
+// received_by is confirmed trustworthy, this is "how much did each staff
+// member collect, and how much did each branch collect" over a range.
+function CollectionsReportTab() {
+  const { currentClubId } = useAuth()
+  const { startDate, setStartDate, endDate, setEndDate } = useDateRange()
+
+  const { data, isLoading } = useQuery({
+    queryKey: ['collections-report', currentClubId, startDate, endDate],
+    queryFn: async () => {
+      const { data, error } = await supabase.rpc('get_collections_report', {
+        p_club_id: currentClubId!,
+        p_start_date: startDate,
+        p_end_date: endDate,
+      })
+      if (error) throw error
+      return data as unknown as CollectionsReport
+    },
+    enabled: !!currentClubId,
+  })
+
+  return (
+    <div>
+      <DateRangeFilter startDate={startDate} endDate={endDate} onStart={setStartDate} onEnd={setEndDate} />
+      {isLoading && <p className="text-sm text-text-secondary">جارٍ التحميل...</p>}
+      {data && (
+        <>
+          <div className="mb-6">
+            <StatCard label="إجمالي التحصيلات" value={formatMoney(data.total_collected)} icon={HandCoins} />
+          </div>
+          <div className="grid gap-4 md:grid-cols-2">
+            <div>
+              <div className="mb-2 flex items-center justify-between">
+                <p className="font-medium">حسب الموظف</p>
+                {data.by_employee.length > 0 && (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() =>
+                      downloadCsv(
+                        `collections-by-employee-${startDate}-${endDate}.csv`,
+                        rowsToCsv(
+                          data.by_employee.map((e) => ({ full_name: e.full_name, amount: e.amount, payment_count: e.payment_count })),
+                          { full_name: 'الموظف', amount: 'المبلغ المحصّل', payment_count: 'عدد الدفعات' },
+                        ),
+                      )
+                    }
+                  >
+                    <Download className="me-1 size-4" />
+                    تصدير CSV
+                  </Button>
+                )}
+              </div>
+              {data.by_employee.length === 0 ? (
+                <p className="text-sm text-text-secondary">لا توجد بيانات</p>
+              ) : (
+                <ul className="flex flex-col gap-1">
+                  {data.by_employee.map((e) => (
+                    <li key={e.user_id ?? 'unknown'} className="flex justify-between rounded-md border border-border p-2 text-sm">
+                      <span>{e.full_name}</span>
+                      <span>{formatMoney(e.amount)} — {e.payment_count} دفعة</span>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+            <div>
+              <div className="mb-2 flex items-center justify-between">
+                <p className="font-medium">حسب الفرع</p>
+                {data.by_branch.length > 0 && (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() =>
+                      downloadCsv(
+                        `collections-by-branch-${startDate}-${endDate}.csv`,
+                        rowsToCsv(
+                          data.by_branch.map((b) => ({ branch_name: b.branch_name, amount: b.amount, payment_count: b.payment_count })),
+                          { branch_name: 'الفرع', amount: 'المبلغ المحصّل', payment_count: 'عدد الدفعات' },
+                        ),
+                      )
+                    }
+                  >
+                    <Download className="me-1 size-4" />
+                    تصدير CSV
+                  </Button>
+                )}
+              </div>
+              {data.by_branch.length === 0 ? (
+                <p className="text-sm text-text-secondary">لا توجد بيانات</p>
+              ) : (
+                <ul className="flex flex-col gap-1">
+                  {data.by_branch.map((b) => (
+                    <li key={b.branch_id} className="flex justify-between rounded-md border border-border p-2 text-sm">
+                      <span>{b.branch_name}</span>
+                      <span>{formatMoney(b.amount)} — {b.payment_count} دفعة</span>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          </div>
+        </>
+      )}
+    </div>
+  )
+}
+
 function OccupancyReportTab() {
   const { currentClubId } = useAuth()
   const { startDate, setStartDate, endDate, setEndDate } = useDateRange()
@@ -544,7 +658,7 @@ function CustomerReportTab() {
 export function ReportsPage() {
   return (
     <div>
-      <PageHeader title="التقارير" description="تقارير الإيرادات والملاعب والأكاديمية والعملاء" />
+      <PageHeader title="التقارير" description="تقارير الإيرادات والتحصيلات والملاعب والأكاديمية والعملاء" />
       <Tabs defaultValue="dashboard">
         <TabsList>
           <TabsTrigger value="dashboard">
@@ -558,6 +672,10 @@ export function ReportsPage() {
           <TabsTrigger value="bookings">
             <CalendarCheck2 className="me-1 size-4" />
             الحجوزات
+          </TabsTrigger>
+          <TabsTrigger value="collections">
+            <HandCoins className="me-1 size-4" />
+            التحصيلات
           </TabsTrigger>
           <TabsTrigger value="occupancy">
             <Landmark className="me-1 size-4" />
@@ -574,6 +692,7 @@ export function ReportsPage() {
         </TabsList>
         <TabsContent value="dashboard"><ExecutiveDashboardTab /></TabsContent>
         <TabsContent value="revenue"><RevenueReportTab /></TabsContent>
+        <TabsContent value="collections"><CollectionsReportTab /></TabsContent>
         <TabsContent value="bookings"><BookingReportTab /></TabsContent>
         <TabsContent value="occupancy"><OccupancyReportTab /></TabsContent>
         <TabsContent value="academy"><AcademyReportTab /></TabsContent>

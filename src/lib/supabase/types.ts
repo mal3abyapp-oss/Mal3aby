@@ -3262,6 +3262,15 @@ export type Database = {
         Returns: Json
       }
       get_club_platform_access: { Args: { p_club_id: string }; Returns: string }
+      get_collections_report: {
+        Args: {
+          p_branch_id?: string
+          p_club_id: string
+          p_end_date: string
+          p_start_date: string
+        }
+        Returns: Json
+      }
       get_customer_activity_report: {
         Args: { p_club_id: string; p_end_date: string; p_start_date: string }
         Returns: Json
