@@ -54,7 +54,7 @@ async function fetchAgeGroups(clubId: string) {
 async function fetchGroups(clubId: string) {
   const { data, error } = await supabase
     .from('groups')
-    .select('id, branch_id, program_id, season_id, age_group_id, coach_id, assistant_coach_id, field_id, name, capacity, status, programs(name), seasons(name), branches(name), age_groups(name), fields(name)')
+    .select('id, branch_id, program_id, season_id, age_group_id, coach_id, assistant_coach_id, field_id, name, capacity, status, subscription_price, programs(name), seasons(name), branches(name), age_groups(name), fields(name)')
     .eq('club_id', clubId)
     .order('created_at', { ascending: false })
   if (error) throw error
@@ -70,6 +70,7 @@ async function fetchGroups(clubId: string) {
     name: g.name,
     capacity: g.capacity,
     status: g.status,
+    subscriptionPrice: g.subscription_price != null ? Number(g.subscription_price) : null,
     programName: (g.programs as unknown as { name: string } | null)?.name,
     seasonName: (g.seasons as unknown as { name: string } | null)?.name,
     branchName: (g.branches as unknown as { name: string } | null)?.name,
@@ -170,6 +171,7 @@ export function ProgramsGroupsSection() {
   const [groupCoachId, setGroupCoachId] = useState('')
   const [groupFieldId, setGroupFieldId] = useState('')
   const [groupCapacity, setGroupCapacity] = useState('12')
+  const [groupSubscriptionPrice, setGroupSubscriptionPrice] = useState('')
 
   const [selectedGroup, setSelectedGroup] = useState<GroupRow | null>(null)
   const [slotDay, setSlotDay] = useState('1')
@@ -248,6 +250,7 @@ export function ProgramsGroupsSection() {
         field_id: groupFieldId || null,
         name: groupName,
         capacity: Number(groupCapacity),
+        subscription_price: groupSubscriptionPrice ? Number(groupSubscriptionPrice) : null,
       })
       if (error) throw error
     },
@@ -260,6 +263,7 @@ export function ProgramsGroupsSection() {
       setGroupAgeGroupId('')
       setGroupCoachId('')
       setGroupFieldId('')
+      setGroupSubscriptionPrice('')
       void queryClient.invalidateQueries({ queryKey: ['groups', currentClubId] })
     },
   })
@@ -289,6 +293,7 @@ export function ProgramsGroupsSection() {
   const [editGroupCoachId, setEditGroupCoachId] = useState('')
   const [editGroupFieldId, setEditGroupFieldId] = useState('')
   const [editGroupStatus, setEditGroupStatus] = useState('active')
+  const [editGroupSubscriptionPrice, setEditGroupSubscriptionPrice] = useState('')
 
   const updateGroupMutation = useMutation({
     mutationFn: async () => {
@@ -300,12 +305,14 @@ export function ProgramsGroupsSection() {
           coach_id: editGroupCoachId || null,
           field_id: editGroupFieldId || null,
           status: editGroupStatus,
+          subscription_price: editGroupSubscriptionPrice ? Number(editGroupSubscriptionPrice) : null,
         })
         .eq('id', selectedGroup.id)
       if (error) throw error
     },
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ['groups', currentClubId] })
+      void queryClient.invalidateQueries({ queryKey: ['groups-for-enrollment', currentClubId] })
     },
   })
 
@@ -356,6 +363,7 @@ export function ProgramsGroupsSection() {
             setEditGroupCoachId(g.coachId ?? '')
             setEditGroupFieldId(g.fieldId ?? '')
             setEditGroupStatus(g.status)
+            setEditGroupSubscriptionPrice(g.subscriptionPrice != null ? String(g.subscriptionPrice) : '')
           }}
         >
           {g.name}
@@ -473,6 +481,10 @@ export function ProgramsGroupsSection() {
                 <SelectContent>{fields.map((f) => <SelectItem key={f.id} value={f.id}>{f.name}</SelectItem>)}</SelectContent>
               </Select>
               <Input required type="number" min={1} placeholder="السعة" value={groupCapacity} onChange={(e) => setGroupCapacity(e.target.value)} />
+              <div className="flex flex-col gap-1">
+                <label className="text-xs text-text-secondary">سعر الاشتراك الشهري (ج.م) — يُستخدم تلقائيًا عند تسجيل لاعب</label>
+                <Input type="number" min={0} placeholder="سعر الاشتراك" value={groupSubscriptionPrice} onChange={(e) => setGroupSubscriptionPrice(e.target.value)} />
+              </div>
               <Button type="submit" disabled={!groupBranchId || !groupProgramId || !groupSeasonId || createGroupMutation.isPending}>
                 إضافة
               </Button>
@@ -505,6 +517,10 @@ export function ProgramsGroupsSection() {
                   <span className="text-text-secondary">السعة: </span>
                   {enrolledCounts.get(selectedGroup.id) ?? 0}/{selectedGroup.capacity}
                 </div>
+                <div>
+                  <span className="text-text-secondary">سعر الاشتراك: </span>
+                  {selectedGroup.subscriptionPrice != null ? `${selectedGroup.subscriptionPrice} ج.م/شهر` : <span className="text-status-danger">غير محدد</span>}
+                </div>
                 {scheduleSlots.length > 0 && (
                   <div className="col-span-2">
                     <span className="text-text-secondary">الجدول: </span>
@@ -523,6 +539,10 @@ export function ProgramsGroupsSection() {
             <div className="flex flex-col gap-2 border-b border-border pb-3">
               <p className="text-sm font-medium text-text-secondary">السعة والتعيينات</p>
               <Input type="number" min={1} value={editGroupCapacity} onChange={(e) => setEditGroupCapacity(e.target.value)} placeholder="السعة" />
+              <div className="flex flex-col gap-1">
+                <label className="text-xs text-text-secondary">سعر الاشتراك الشهري (ج.م)</label>
+                <Input type="number" min={0} value={editGroupSubscriptionPrice} onChange={(e) => setEditGroupSubscriptionPrice(e.target.value)} placeholder="سعر الاشتراك" />
+              </div>
               <Select value={editGroupCoachId || 'none'} onValueChange={(v) => setEditGroupCoachId(v === 'none' ? '' : v)}>
                 <SelectTrigger><SelectValue placeholder="المدرب" /></SelectTrigger>
                 <SelectContent>

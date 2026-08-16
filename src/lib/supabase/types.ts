@@ -1,8 +1,3 @@
-// Auto-generated from the live Supabase project schema (gxkrtlvpjwxhcqdisyob).
-// Regenerate whenever supabase/migrations/ changes:
-//   Supabase MCP generate_typescript_types, or `supabase gen types typescript`.
-// Do not hand-edit.
-
 export type Json =
   | string
   | number
@@ -948,6 +943,7 @@ export type Database = {
           program_id: string
           season_id: string
           status: string
+          subscription_price: number | null
           updated_at: string
         }
         Insert: {
@@ -965,6 +961,7 @@ export type Database = {
           program_id: string
           season_id: string
           status?: string
+          subscription_price?: number | null
           updated_at?: string
         }
         Update: {
@@ -982,6 +979,7 @@ export type Database = {
           program_id?: string
           season_id?: string
           status?: string
+          subscription_price?: number | null
           updated_at?: string
         }
         Relationships: [
@@ -2701,6 +2699,14 @@ export type Database = {
         Args: { p_plan_id?: string; p_previous_subscription_id: string }
         Returns: string
       }
+      resolve_field_operating_hours: {
+        Args: { p_date: string; p_field_id: string }
+        Returns: {
+          close_time: string
+          has_any_config: boolean
+          open_time: string
+        }[]
+      }
       resolve_field_price: {
         Args: {
           p_date: string
@@ -2867,4 +2873,3 @@ export const Constants = {
     Enums: {},
   },
 } as const
-

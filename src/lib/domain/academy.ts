@@ -41,6 +41,7 @@ export interface GroupRow {
   branchName?: string
   ageGroupName?: string
   fieldName?: string | null
+  subscriptionPrice?: number | null
 }
 
 export interface ScheduleSlotRow {

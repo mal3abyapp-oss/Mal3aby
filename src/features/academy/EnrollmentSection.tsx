@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '@/lib/supabase/client'
 import { translateSupabaseError } from '@/lib/errors'
@@ -82,7 +82,7 @@ async function fetchPlayers(clubId: string) {
 }
 
 async function fetchGroups(clubId: string) {
-  const { data, error } = await supabase.from('groups').select('id, name, capacity, status').eq('club_id', clubId).eq('status', 'active').order('name')
+  const { data, error } = await supabase.from('groups').select('id, name, capacity, status, subscription_price').eq('club_id', clubId).eq('status', 'active').order('name')
   if (error) throw error
   return data ?? []
 }
@@ -125,6 +125,20 @@ export function EnrollmentSection() {
 
   const { data: players = [] } = useQuery({ queryKey: ['players-for-enrollment', currentClubId], queryFn: () => fetchPlayers(currentClubId!), enabled: !!currentClubId })
   const { data: groups = [] } = useQuery({ queryKey: ['groups-for-enrollment', currentClubId], queryFn: () => fetchGroups(currentClubId!), enabled: !!currentClubId })
+
+  // Locked pricing rule: the employee selects the group, the system
+  // resolves the approved price automatically -- never freely typed.
+  // The price field itself stays read-only; only the (permission-gated)
+  // discount remains editable.
+  const selectedGroupForPrice = groups.find((g) => g.id === wizardGroupId)
+  useEffect(() => {
+    if (selectedGroupForPrice) {
+      setWizardPrice(selectedGroupForPrice.subscription_price != null ? String(selectedGroupForPrice.subscription_price) : '')
+    } else {
+      setWizardPrice('')
+    }
+  }, [selectedGroupForPrice])
+
   const { data: guardians = [] } = useQuery({
     queryKey: ['guardians-for-player', wizardPlayerId],
     queryFn: () => fetchGuardiansForPlayer(wizardPlayerId),
@@ -258,13 +272,44 @@ export function EnrollmentSection() {
                 <Input required type="date" value={wizardStart} onChange={(e) => setWizardStart(e.target.value)} />
                 <Input required type="date" value={wizardEnd} onChange={(e) => setWizardEnd(e.target.value)} />
               </div>
-              <div className="flex gap-2">
-                <Input required type="number" min={0} placeholder="السعر" value={wizardPrice} onChange={(e) => setWizardPrice(e.target.value)} />
-                <Input type="number" min={0} placeholder="الخصم" value={wizardDiscount} onChange={(e) => setWizardDiscount(e.target.value)} />
-              </div>
+
+              {/* Locked pricing rule: price is resolved from the group's
+                  approved subscription_price, never freely typed. Only
+                  the discount stays editable. */}
+              {wizardGroupId && (
+                <div className="rounded-lg border border-accent/30 bg-accent/5 p-3 text-sm">
+                  {selectedGroupForPrice?.subscription_price != null ? (
+                    <div className="flex flex-col gap-1">
+                      <div className="flex justify-between">
+                        <span className="text-text-secondary">سعر الاشتراك المعتمد</span>
+                        <span className="font-medium tabular-nums">{Number(wizardPrice).toFixed(0)} ج.م</span>
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <span className="text-text-secondary">الخصم</span>
+                        <Input
+                          type="number"
+                          min={0}
+                          max={Number(wizardPrice)}
+                          value={wizardDiscount}
+                          onChange={(e) => setWizardDiscount(e.target.value)}
+                          className="h-7 w-24 text-end"
+                        />
+                      </div>
+                      <div className="mt-1 flex justify-between border-t border-accent/20 pt-1 font-semibold">
+                        <span>الإجمالي</span>
+                        <span className="tabular-nums">{Math.max(Number(wizardPrice) - Number(wizardDiscount || 0), 0).toFixed(0)} ج.م</span>
+                      </div>
+                    </div>
+                  ) : (
+                    <p className="text-status-danger">
+                      لا يوجد سعر معتمد لهذه المجموعة — حدد سعر الاشتراك من صفحة البرامج والمجموعات أولاً.
+                    </p>
+                  )}
+                </div>
+              )}
               {wizardError && <p role="alert" className="text-sm text-status-danger">{wizardError}</p>}
               <Button
-                disabled={!wizardPlayerId || !wizardGuardianId || !wizardGroupId || !wizardStart || !wizardEnd || !wizardPrice || enrollMutation.isPending}
+                disabled={!wizardPlayerId || !wizardGuardianId || !wizardGroupId || !wizardStart || !wizardEnd || selectedGroupForPrice?.subscription_price == null || enrollMutation.isPending}
                 onClick={() => enrollMutation.mutate()}
               >
                 {enrollMutation.isPending ? 'جارٍ التسجيل...' : 'تسجيل وإنشاء الاشتراك'}
