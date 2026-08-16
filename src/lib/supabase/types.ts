@@ -3288,6 +3288,10 @@ export type Database = {
         }
         Returns: Json
       }
+      get_financial_exceptions_report: {
+        Args: { p_club_id: string; p_end_date: string; p_start_date: string }
+        Returns: Json
+      }
       get_platform_club_owners: {
         Args: never
         Returns: {
