@@ -36,6 +36,19 @@ const ACCESS_TONE: Record<string, 'success' | 'warning' | 'danger'> = {
 }
 const ACCESS_LABEL: Record<string, string> = { full: 'كامل', grace: 'فترة سماح', blocked: 'موقوف' }
 
+const LIMIT_TYPE_LABELS: Record<string, string> = {
+  branch_limit: 'الفروع',
+  field_limit: 'الملاعب',
+  academy_limit: 'برامج الأكاديمية',
+}
+
+const REQUEST_STATUS_LABELS: Record<string, { label: string; tone: 'success' | 'warning' | 'danger' | 'neutral' }> = {
+  pending: { label: 'قيد المراجعة', tone: 'warning' },
+  reviewed: { label: 'تمت المراجعة', tone: 'neutral' },
+  approved: { label: 'تمت الموافقة', tone: 'success' },
+  dismissed: { label: 'مرفوض', tone: 'danger' },
+}
+
 async function fetchClub(clubId: string) {
   const { data, error } = await supabase.from('clubs').select('*').eq('id', clubId).single()
   if (error) throw error
@@ -79,6 +92,28 @@ async function fetchPlans() {
   return data ?? []
 }
 
+async function fetchEntitlements(clubId: string) {
+  const { data, error } = await supabase.from('commercial_entitlements').select('*').eq('club_id', clubId).maybeSingle()
+  if (error) throw error
+  return data
+}
+
+async function fetchUsage(clubId: string) {
+  const { data, error } = await supabase.from('commercial_entitlements_usage').select('*').eq('club_id', clubId).maybeSingle()
+  if (error) throw error
+  return data
+}
+
+async function fetchUpgradeRequests(clubId: string) {
+  const { data, error } = await supabase
+    .from('commercial_upgrade_requests')
+    .select('*')
+    .eq('club_id', clubId)
+    .order('created_at', { ascending: false })
+  if (error) throw error
+  return data ?? []
+}
+
 export function PlatformClubDetailPage() {
   const { clubId } = useParams<{ clubId: string }>()
   const queryClient = useQueryClient()
@@ -87,6 +122,10 @@ export function PlatformClubDetailPage() {
   const [reasonText, setReasonText] = useState('')
   const [selectedPlanId, setSelectedPlanId] = useState<string>('')
   const [actionError, setActionError] = useState<string | null>(null)
+  const [editingLimits, setEditingLimits] = useState(false)
+  const [branchLimitInput, setBranchLimitInput] = useState('')
+  const [fieldLimitInput, setFieldLimitInput] = useState('')
+  const [academyLimitInput, setAcademyLimitInput] = useState('')
 
   const { data: club } = useQuery({ queryKey: ['platform-club', clubId], queryFn: () => fetchClub(clubId!), enabled: !!clubId })
   const { data: access } = useQuery({
@@ -114,14 +153,36 @@ export function PlatformClubDetailPage() {
     enabled: !!clubId,
   })
   const { data: plans = [] } = useQuery({ queryKey: ['platform-plans-active'], queryFn: fetchPlans })
+  const { data: entitlements } = useQuery({
+    queryKey: ['platform-club-entitlements', clubId],
+    queryFn: () => fetchEntitlements(clubId!),
+    enabled: !!clubId,
+  })
+  const { data: usage } = useQuery({
+    queryKey: ['platform-club-usage', clubId],
+    queryFn: () => fetchUsage(clubId!),
+    enabled: !!clubId,
+  })
+  const { data: upgradeRequests = [] } = useQuery({
+    queryKey: ['platform-club-upgrade-requests', clubId],
+    queryFn: () => fetchUpgradeRequests(clubId!),
+    enabled: !!clubId,
+  })
 
   const currentSub = subscriptions.find((s) => s.lifecycle_status !== 'cancelled')
+  const pendingRequests = upgradeRequests.filter((r) => r.status === 'pending')
 
   function invalidateAll() {
     void queryClient.invalidateQueries({ queryKey: ['platform-club-access', clubId] })
     void queryClient.invalidateQueries({ queryKey: ['platform-club-subs', clubId] })
     void queryClient.invalidateQueries({ queryKey: ['platform-club-invoices', clubId] })
     void queryClient.invalidateQueries({ queryKey: ['platform-club-audit', clubId] })
+  }
+
+  function invalidateEntitlements() {
+    void queryClient.invalidateQueries({ queryKey: ['platform-club-entitlements', clubId] })
+    void queryClient.invalidateQueries({ queryKey: ['platform-club-usage', clubId] })
+    void queryClient.invalidateQueries({ queryKey: ['platform-club-upgrade-requests', clubId] })
   }
 
   const startTrialMutation = useMutation({
@@ -251,6 +312,46 @@ export function PlatformClubDetailPage() {
       setReasonText('')
     },
     onError: () => setActionError('تعذّر عكس الدفعة.'),
+  })
+
+  // Task #54: commercial_entitlements/commercial_upgrade_requests both
+  // already grant platform owners full RLS write access (verified via
+  // direct policy inspection before building this) -- no new RPC
+  // needed, direct table writes match this page's existing pattern
+  // (club suspend/reactivate already do this). An empty input clears
+  // the limit back to unlimited (null), matching the column's own
+  // semantics.
+  const saveLimitsMutation = useMutation({
+    mutationFn: async () => {
+      const toLimit = (v: string) => (v.trim() === '' ? null : Number(v))
+      const { error } = await supabase
+        .from('commercial_entitlements')
+        .upsert({
+          club_id: clubId!,
+          branch_limit: toLimit(branchLimitInput),
+          field_limit: toLimit(fieldLimitInput),
+          academy_limit: toLimit(academyLimitInput),
+        })
+      if (error) throw error
+    },
+    onSuccess: () => {
+      invalidateEntitlements()
+      setEditingLimits(false)
+    },
+    onError: () => setActionError('تعذّر حفظ الحدود التجارية.'),
+  })
+
+  const resolveUpgradeRequestMutation = useMutation({
+    mutationFn: async ({ requestId, status }: { requestId: string; status: 'approved' | 'dismissed' }) => {
+      const { data: userData } = await supabase.auth.getUser()
+      const { error } = await supabase
+        .from('commercial_upgrade_requests')
+        .update({ status, reviewed_at: new Date().toISOString(), reviewed_by: userData.user?.id })
+        .eq('id', requestId)
+      if (error) throw error
+    },
+    onSuccess: invalidateEntitlements,
+    onError: () => setActionError('تعذّر تحديث حالة الطلب.'),
   })
 
   const invoiceColumns: DataTableColumn<(typeof invoices)[number]>[] = [
@@ -403,10 +504,103 @@ export function PlatformClubDetailPage() {
         </Card>
       </div>
 
+      <Card className="mb-4">
+        <CardHeader className="flex flex-row items-center justify-between">
+          <CardTitle className="text-base">الحدود التجارية</CardTitle>
+          {!editingLimits && (
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => {
+                setBranchLimitInput(entitlements?.branch_limit?.toString() ?? '')
+                setFieldLimitInput(entitlements?.field_limit?.toString() ?? '')
+                setAcademyLimitInput(entitlements?.academy_limit?.toString() ?? '')
+                setEditingLimits(true)
+              }}
+            >
+              تعديل الحدود
+            </Button>
+          )}
+        </CardHeader>
+        <CardContent className="flex flex-col gap-4">
+          {editingLimits ? (
+            <div className="flex flex-col gap-3">
+              <p className="text-xs text-text-secondary">اترك الحقل فارغًا لجعل الحد بلا نهاية.</p>
+              <div className="grid gap-3 md:grid-cols-3">
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-sm font-medium text-text-secondary">حد الفروع</label>
+                  <Input type="number" min="0" value={branchLimitInput} onChange={(e) => setBranchLimitInput(e.target.value)} placeholder="بلا حد" />
+                </div>
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-sm font-medium text-text-secondary">حد الملاعب</label>
+                  <Input type="number" min="0" value={fieldLimitInput} onChange={(e) => setFieldLimitInput(e.target.value)} placeholder="بلا حد" />
+                </div>
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-sm font-medium text-text-secondary">حد برامج الأكاديمية</label>
+                  <Input type="number" min="0" value={academyLimitInput} onChange={(e) => setAcademyLimitInput(e.target.value)} placeholder="بلا حد" />
+                </div>
+              </div>
+              <div className="flex gap-2">
+                <Button size="sm" onClick={() => saveLimitsMutation.mutate()} disabled={saveLimitsMutation.isPending}>
+                  {saveLimitsMutation.isPending ? 'جارٍ الحفظ...' : 'حفظ الحدود'}
+                </Button>
+                <Button size="sm" variant="outline" onClick={() => setEditingLimits(false)}>إلغاء</Button>
+              </div>
+            </div>
+          ) : (
+            <div className="grid gap-3 md:grid-cols-3">
+              {(['branch_limit', 'field_limit', 'academy_limit'] as const).map((key) => {
+                const usedKey = key === 'branch_limit' ? 'branches_used' : key === 'field_limit' ? 'fields_used' : 'academy_used'
+                const limit = usage?.[key] ?? null
+                const used = usage?.[usedKey] ?? 0
+                return (
+                  <div key={key} className="rounded-lg border border-border p-3">
+                    <p className="text-sm font-medium">{LIMIT_TYPE_LABELS[key]}</p>
+                    <p className="text-sm text-text-secondary tabular-nums">{used} {limit === null ? '(بلا حد)' : `/ ${limit}`}</p>
+                  </div>
+                )
+              })}
+            </div>
+          )}
+
+          {pendingRequests.length > 0 && (
+            <div className="flex flex-col gap-2 rounded-lg border border-status-warning/40 bg-status-warning/10 p-3">
+              <p className="text-sm font-medium text-status-warning">طلبات ترقية قيد المراجعة ({pendingRequests.length})</p>
+              {pendingRequests.map((r) => (
+                <div key={r.id} className="flex flex-wrap items-center justify-between gap-2 rounded-md bg-surface p-2 text-sm">
+                  <span>
+                    {LIMIT_TYPE_LABELS[r.limit_type] ?? r.limit_type} — الحد الحالي {r.current_limit ?? 'بلا حد'} / الاستخدام {r.current_usage}
+                    {r.note && <span className="text-text-secondary"> — {r.note}</span>}
+                  </span>
+                  <div className="flex gap-2">
+                    <Button
+                      size="sm"
+                      onClick={() => resolveUpgradeRequestMutation.mutate({ requestId: r.id, status: 'approved' })}
+                      disabled={resolveUpgradeRequestMutation.isPending}
+                    >
+                      موافقة
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => resolveUpgradeRequestMutation.mutate({ requestId: r.id, status: 'dismissed' })}
+                      disabled={resolveUpgradeRequestMutation.isPending}
+                    >
+                      رفض
+                    </Button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
       <Tabs defaultValue="history">
         <TabsList>
           <TabsTrigger value="history">سجل الاشتراكات</TabsTrigger>
           <TabsTrigger value="invoices">الفواتير والمدفوعات</TabsTrigger>
+          <TabsTrigger value="requests">طلبات الترقية</TabsTrigger>
           <TabsTrigger value="audit">سجل التدقيق</TabsTrigger>
         </TabsList>
         <TabsContent value="history">
@@ -425,6 +619,30 @@ export function PlatformClubDetailPage() {
         </TabsContent>
         <TabsContent value="invoices">
           <DataTable columns={invoiceColumns} rows={invoices} rowKey={(i) => i.id} emptyTitle="لا توجد فواتير" />
+        </TabsContent>
+        <TabsContent value="requests">
+          <DataTable
+            columns={[
+              { key: 'type', header: 'النوع', render: (r: (typeof upgradeRequests)[number]) => LIMIT_TYPE_LABELS[r.limit_type] ?? r.limit_type },
+              { key: 'limit', header: 'الحد وقت الطلب', render: (r: (typeof upgradeRequests)[number]) => r.current_limit ?? 'بلا حد' },
+              { key: 'usage', header: 'الاستخدام وقت الطلب', render: (r: (typeof upgradeRequests)[number]) => r.current_usage },
+              { key: 'note', header: 'ملاحظة', render: (r: (typeof upgradeRequests)[number]) => r.note ?? '—' },
+              { key: 'created', header: 'تاريخ الطلب', render: (r: (typeof upgradeRequests)[number]) => new Date(r.created_at).toLocaleDateString('ar-EG') },
+              {
+                key: 'status',
+                header: 'الحالة',
+                render: (r: (typeof upgradeRequests)[number]) => (
+                  <StatusBadge
+                    tone={REQUEST_STATUS_LABELS[r.status]?.tone ?? 'neutral'}
+                    label={REQUEST_STATUS_LABELS[r.status]?.label ?? r.status}
+                  />
+                ),
+              },
+            ]}
+            rows={upgradeRequests}
+            rowKey={(r) => r.id}
+            emptyTitle="لا توجد طلبات ترقية"
+          />
         </TabsContent>
         <TabsContent value="audit">
           <DataTable
