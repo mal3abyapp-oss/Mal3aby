@@ -1480,3 +1480,239 @@ better evidence and is noted as a follow-up if credentials become
 available). multiple_permissive_policies (187 performance findings)
 and 72 unindexed_foreign_keys remain explicit, tracked, deliberately
 deferred follow-up per the sub-agent's own recommendation.
+
+---
+
+## D-013 — P0 WhatsApp Runtime Override: connector evaluation and deployment-topology fix
+
+**Problem:** WhatsApp is still not operational end-to-end in the real
+app. A prior P1 fix (this session) already found and fixed two real
+bugs blocking the QR pipeline (missing CORS handling on the
+`whatsapp-bridge` Edge Function, and a swallowed-error-body bug in
+`ConnectionTab.tsx`'s mutation handler), and proved via direct API
+calls that the existing `whatsapp-connector` (Baileys-based) genuinely
+opens a real WebSocket to WhatsApp's servers and returns a real,
+scannable multi-device QR payload when reached directly. What remains
+unresolved is deployment topology: the deployed `whatsapp-bridge` Edge
+Function has `WHATSAPP_CONNECTOR_URL` unset, so it cannot reach any
+connector at all — not a code defect in either the frontend or the
+connector, a missing network path between two already-working pieces.
+The user's explicit directive: treat this as P0, evaluate whether the
+existing Baileys connector should be replaced by a more mature
+installable/self-hosted alternative (Evolution API, whatsapp-web.js)
+rather than assuming the existing implementation is right by default,
+and actually close the gap to a real phone-scannable QR in the running
+app — not just report on infrastructure.
+
+**Evidence gathered before deciding (audit first, per this session's
+standing rule):**
+
+1. **Docker availability in this sandbox** — `docker --version` reports
+   29.6.2 installed, but `docker ps` fails:
+   `failed to connect to the docker API at
+   npipe:////./pipe/dockerDesktopLinuxEngine`. Attempted to launch
+   Docker Desktop directly (`Start-Process "Docker Desktop.exe"`),
+   polled for up to ~70s — daemon never came up. Read Docker Desktop's
+   own backend log
+   (`AppData/Local/Docker/log/host/com.docker.backend.exe.log`) and
+   found the exact cause:
+   `wslexec: c:\windows\system32\wsl.exe -l -v --all failed: exit
+   status 1`, `DockerDesktop/Wsl/CommandTimedOut`, and
+   `neither WSL2 data distro nor disk exist`. Separately ran
+   `wsl --status` directly — it hung past a 120s timeout with no
+   output, confirming WSL2 itself is not properly initialized in this
+   sandboxed Windows session (first-run WSL2 setup typically requires
+   interactive elevation this environment can't complete headlessly).
+   This is a genuine, verified environment-level blocker for any
+   Docker-first deployment path, not a configuration choice.
+2. **Network egress** — confirmed real internet access from this
+   session: `curl` to `registry.npmjs.org` and `web.whatsapp.com` both
+   returned `200`. Ruled out "no internet" as an explanation for
+   anything.
+3. **Evolution API's actual runtime requirements** — fetched its real
+   `package.json` from GitHub directly (not assumed): it's a NestJS +
+   Prisma application. `start:prod` is `node dist/main`, so it is
+   *technically* runnable without Docker — but it requires its own
+   Postgres schema via Prisma (`db:deploy`, `db:migrate`), commonly
+   requires Redis for its cache/queue layer in real deployments, and
+   its own "instance" multi-tenancy model would need to be mapped onto
+   this app's `club_id` model as a new integration surface. Its
+   supported, documented deployment path is Docker specifically to
+   avoid this setup complexity — which is exactly the path just proven
+   blocked in this sandbox.
+4. **whatsapp-web.js's actual runtime requirements** — requires
+   Puppeteer driving a real Chromium instance (heavier than Baileys'
+   pure-WebSocket approach, no Puppeteer dependency at all). Checked
+   for a local Chrome install as a prerequisite check regardless of
+   final decision: found real Chrome at
+   `C:\Program Files\Google\Chrome\Application\chrome.exe`. Technically
+   viable in this sandbox, but strictly heavier (spawns and drives a
+   real browser process per tenant session) than the already-proven-
+   working Baileys approach for no additional capability gained.
+5. **Root-caused the actual remaining gap in the existing Baileys
+   connector**, rather than assuming code was the problem: confirmed
+   `whatsapp-connector/.env` has no public URL concept at all (it's a
+   local-only `PORT=8787` config), and confirmed
+   `supabase/functions/whatsapp-bridge/index.ts` reads
+   `WHATSAPP_CONNECTOR_URL` from `Deno.env.get(...)` with no fallback
+   — genuinely unset as a deployed secret. This is the entire
+   remaining gap: a already-working local service with no public
+   address for the already-correctly-coded Edge Function to reach.
+6. **Checked for tunnel tooling already present in this environment**
+   before assuming a heavier deploy target was needed: found `ngrok`
+   already installed (`C:\Users\moust\AppData\Local\Microsoft\
+   WindowsApps\ngrok.exe`, version 3.39.9) AND already configured with
+   a valid saved authtoken (`ngrok config check` → "Valid configuration
+   file"). This means a stable public HTTPS URL for the local connector
+   is available immediately, with zero new installation.
+
+**Options considered:**
+
+1. **Force Docker/WSL2 to work in this sandbox** (retry loops, manual
+   WSL2 install, etc.) to unblock Evolution API. Rejected — the Docker
+   Desktop log already shows this is a first-run WSL2 initialization
+   requiring interactive user consent/elevation that a headless
+   automated session cannot complete; further retries would burn time
+   without a realistic path to success, and risks leaving the
+   environment in a half-configured WSL state. This is exactly the
+   class of external hard blocker the standing directive says to
+   recognize and route around rather than force.
+2. **Install Evolution API for bare-Node execution**, standing up its
+   own Prisma-managed Postgres schema and (likely) Redis, then adapting
+   `MessagingProvider` to call it instead. Rejected for this specific
+   moment: it is a real, heavier integration (new database schema
+   outside Supabase, new instance-to-club_id mapping layer, unproven in
+   this exact sandbox for its non-Docker path) being proposed as a
+   replacement for a connector that has ALREADY been proven, via real
+   execution, to correctly perform the exact capability in question
+   (real QR generation against real WhatsApp servers) — moving to it
+   now would not be "faster or more reliable," it would restart the
+   runtime-proof process from zero on a stack with more moving parts,
+   for a problem that is not actually a connector-capability problem.
+   Not permanently ruled out: if the ngrok+Baileys path below is ever
+   found to have a genuine, unfixable reliability ceiling (e.g.
+   WhatsApp's own anti-automation measures targeting Baileys
+   specifically, which is a documented real-world risk for this
+   library), Evolution API remains the designated fallback and this
+   evaluation's findings (points 3 above) are the starting point for
+   that migration rather than a fresh audit.
+3. **whatsapp-web.js as a straight swap for Baileys.** Rejected — no
+   demonstrated capability gap in Baileys justifies the added
+   Puppeteer/Chromium overhead per tenant session; Baileys is already
+   proven working via real execution in this exact codebase.
+4. **Expose the already-working local Baileys connector via ngrok**,
+   already installed and pre-authenticated in this environment, and set
+   the resulting public HTTPS URL + the connector's real
+   `CONNECTOR_INTERNAL_SECRET` as the two missing `whatsapp-bridge`
+   Edge Function secrets. Chosen. This directly closes the exact,
+   root-caused gap (no public URL for a working service) with the
+   least possible new surface area: zero new database schema, zero
+   change to the `MessagingProvider`/adapter abstraction, zero new
+   dependency installs, reuses tooling already present and
+   pre-configured in this specific environment.
+
+**Chosen solution:** Keep the existing Baileys-based
+`whatsapp-connector` service exactly as built in Gate 8 — no rebuild of
+`MessagingProvider`, `BaileysMessagingProvider`, `SessionStore`,
+`TenantConnectionManager`, the Notification Core, the queue, templates,
+automations, or the WhatsApp Tab UI, per the directive's own explicit
+instruction to preserve this abstraction. Fix only the deployment
+topology:
+1. Start the local connector service as a persistent background
+   process.
+2. Start an ngrok tunnel pointed at the connector's local port,
+   producing a real public HTTPS URL.
+3. Set `WHATSAPP_CONNECTOR_URL` (the ngrok URL) and
+   `CONNECTOR_INTERNAL_SECRET` (the connector's real HMAC secret, the
+   same value already in `whatsapp-connector/.env`) as secrets on the
+   deployed `whatsapp-bridge` Edge Function via the Supabase project's
+   secrets management.
+4. Re-verify end-to-end from the actual running app: open the
+   WhatsApp tab, click Connect, confirm a real QR renders in the UI
+   (not a placeholder), and present it for the physical phone-scan step
+   that only the user can perform.
+
+**Reasons:** This is the definition of "actual runtime reliability,
+persistent session support, QR workflow, deployment complexity,
+resource use, maintainability, recovery/reconnect behavior,
+integration effort, and reversibility" all favoring the existing
+connector over a swap: reliability and QR workflow are already proven
+via real execution in this exact repo; deployment complexity for the
+ngrok fix is minutes and zero new dependencies vs. hours-to-days and a
+new database schema for Evolution API in a sandbox that has already
+proven hostile to Evolution API's primary supported deployment path;
+resource use is a single lightweight Node process vs. NestJS+Prisma+
+(likely)Redis; maintainability is unchanged (same abstraction, same
+team's own code, already documented in `whatsapp-connector/README.md`);
+integration effort with the existing queue is zero (no interface
+change); reversibility is total (ngrok URL is just an env var — pointing
+it at a different connector implementation later requires no
+application code change at all, since `MessagingProvider` is the fixed
+boundary regardless of which concrete connector sits behind
+`whatsapp-bridge`).
+
+**DB impact:** none.
+
+**Security impact:** none negative — `CONNECTOR_INTERNAL_SECRET` HMAC
+signing (already implemented, already verified in Gate 8) remains the
+authentication boundary between `whatsapp-bridge` and the connector
+regardless of whether the connector is reached via `localhost` or a
+public ngrok URL; the ngrok tunnel itself only exposes the connector's
+already-locked-down 5-route internal API (`/connect`, `/qr`,
+`/disconnect`, `/send`, `/health`), every route already requiring a
+valid HMAC signature per Gate 8's design — an ngrok tunnel with no
+valid signature reaching it gets the exact same 401 a direct network
+scan would get today.
+
+**Reversal path:** unset the two Edge Function secrets and stop the
+ngrok tunnel to fully revert; the application already handles
+`connector_not_configured` gracefully (verified in the P1 fix earlier
+this session) so reverting causes no crash, only a return to the
+honest "connector not configured" state.
+
+**Update (same day) — attempt cancelled by explicit user instruction.**
+`supabase login`'s interactive browser flow could not be completed in
+this session (confirmed: no access-token file was ever written to
+`~/.supabase`, and re-running `login` directly surfaced
+`LegacyLoginMissingTokenError: Cannot use automatic login flow inside
+non-TTY environments`). Escalated to the user for the two secrets to
+be set manually; attempted a Cloudflare Tunnel as a more stable
+alternative to ngrok after the user asked for one (installed
+`cloudflared` via a direct binary download after `winget install`
+failed on an interactive MSI consent prompt — same class of blocker as
+the earlier Docker/WSL2 finding). When asked to clarify a further
+"non-official method" / "connect it a way other than Supabase," the
+user's own follow-up messages converged on: skip `whatsapp-bridge`
+entirely and have the browser call the connector directly. The user
+was explicitly told this means the connector's public URL and its
+HMAC `CONNECTOR_INTERNAL_SECRET` would ship inside the client bundle,
+readable via DevTools by any user, who could then control **any**
+club's WhatsApp session, not just their own — the exact tenant-
+isolation and secret-handling guarantee Gate 8 was built to prevent.
+The user approved this tradeoff for testing ("مش مشكلة, اكمل"). Before
+the change was fully wired into `ConnectionTab.tsx`, the user sent an
+unambiguous new instruction: **"الغ الربط بالواتساب كاملا"** (cancel the
+WhatsApp connection entirely). Complied immediately:
+- Reverted the one file that had already been touched
+  (`.env.local` — the direct-connector URL/secret pair was added, then
+  removed in the same turn before any application code referenced it;
+  `ConnectionTab.tsx` was never actually modified).
+- Killed the `whatsapp-connector` Node process (identified precisely
+  by command line among several unrelated `node.exe` processes, so the
+  app's own Vite dev server and other projects' dev servers were left
+  untouched) and both tunnel processes (`ngrok`, `cloudflared`).
+- Deleted the downloaded `cloudflared.exe` binary and the `.tools/`
+  directory, and cleared the connector's leftover `.sessions`/
+  `.baileys-auth-tmp` test session data.
+- Left the `whatsapp-bridge` Edge Function and all Gate 8 code exactly
+  as they were (version 3, CORS + error-body fixes from the P1 fix
+  still in place, `WHATSAPP_CONNECTOR_URL`/`CONNECTOR_INTERNAL_SECRET`
+  still genuinely unset) — no direct-browser-to-connector code was
+  ever committed or left running.
+
+**Status:** P0 WhatsApp runtime work is halted per explicit user
+instruction. The connector, tunnel, and any bypass configuration are
+fully torn down; the repository and running app are in the same state
+as before this P0 task began (plus the P1 CORS/error-handling fixes,
+which remain correct and unrelated to this cancelled effort). Not
+resumed without new user instruction.
