@@ -754,3 +754,100 @@ correctly prevents a coach from marking attendance for a session
 outside their own assigned groups when NOT going through the QR path
 (the direct-table-UPDATE risk, same class as Gates 2/4's guard-trigger
 work) — tracked as explicit follow-up, not silently assumed safe.
+
+---
+
+## D-007 — Gate 7: Notification Core (domain-event abstraction)
+
+**Date:** 2026-08-16
+**Problem:** Gate 7 (Notification Core). Doc 3 explicitly requires
+business logic never call WhatsApp/SMS/Email directly — a Notification
+Engine / domain-event abstraction must exist first, so Gate 8
+(WhatsApp) can be built as a connector without touching Booking/
+Academy/Enrollment/Payment code. Confirmed via
+`information_schema.tables`/`pg_proc` that ZERO notification/messaging
+infrastructure existed before this pass (genuinely new, not a bug fix).
+
+**Chosen architecture (three deliberately separate layers):**
+1. `notification_events` — an immutable log of domain facts, written
+   only via `emit_notification_event()` (a single narrow entry point,
+   revoked from direct client/authenticated access — matches this
+   codebase's `_internal`-suffix convention for
+   business-RPC-callable-only functions, even though this name doesn't
+   carry that literal suffix). Never updated after insert.
+2. `notification_queue` — the actual per-recipient, per-channel
+   delivery lifecycle (pending/scheduled/processing/sent/delivered/
+   failed/retrying/cancelled/expired, matching Doc 3's exact status
+   model), with `dedup_key` + a partial unique index on active statuses
+   for idempotency (Doc 3's suggested `tenant+recipient+event+resource+
+   template_version` pattern), `priority` tiers (critical_operational/
+   transactional/reminder/informational/marketing — matching Doc 3's
+   tier list exactly), and `expires_at` so a stale reminder for an
+   already-passed event never sends. `channel` is a free-text slug
+   (not an enum) specifically so Gate 8's WhatsApp connector needs no
+   schema change to plug in — it just becomes rows with
+   `channel='whatsapp'`.
+3. `notification_consent` — per-customer, per-channel opt-in state.
+   `enqueue_notification()` checks this before ever creating a queue
+   row for a channel; a customer existing is never suffient to message
+   them, per Doc 3's explicit requirement.
+
+Two entry-point functions: `emit_notification_event()` (records a
+fact) and `enqueue_notification()` (creates a delivery-queue row for
+one recipient/channel, gated on consent, gated on dedup). Deliberately
+kept as two separate steps rather than one — the event log and the
+delivery queue can evolve independently (e.g. a future automation-rules
+engine could re-process historical events against new rules without
+re-firing already-sent notifications).
+
+**What this migration deliberately does NOT include (explicit scope
+cut, not a silent gap):** no queue worker/consumer (something must
+eventually poll `notification_queue` and actually call a channel
+connector — that's Gate 8's WhatsApp connector's job, or a future
+generic worker); no automation-rules table mapping event types to
+templates (Doc 3's "WhatsApp → Automations" screen); no templates table
+yet (Doc 3's "WhatsApp → Templates" screen, bilingual with variable
+validation) — these are real, sizeable pieces of Gate 8, not omitted by
+oversight.
+
+**Proof of integration:** wired `_create_booking_internal()` (already
+touched in Gates 1 and 7's predecessor work) to call
+`emit_notification_event()` for `booking.created` (always) and
+`booking.confirmed` (when paid immediately) — matching Doc 3's own
+example event list. This proves the abstraction against a real business
+transaction rather than leaving it entirely unintegrated scaffolding.
+
+**Verification:** Live end-to-end RPC test (temporarily granted staff
+role, same pattern as prior gates): created a real booking with
+immediate payment via `create_booking()`, confirmed both
+`booking.created` and `booking.confirmed` rows exist in
+`notification_events` with the correct `reference_id`, confirmed
+booking creation itself still succeeds with no regression. All test
+data (booking, invoice, invoice items, payment, payment allocation,
+notification events, temporary staff grant) removed afterward.
+
+**DB impact:** 3 new tables (`notification_events`,
+`notification_queue`, `notification_consent`), 2 new functions, 1 new
+permission (`notification.view`, granted to `club_owner`/
+`club_manager`), 1 existing function (`_create_booking_internal`)
+extended with 2 new `emit_notification_event()` calls.
+
+**Security impact:** net-neutral/positive — all three new tables have
+RLS from creation (never a window where they're unprotected); consent
+table has both staff-managed and customer-self-service policies (the
+latter reusing Gate 3's `customers.user_id` pattern); the event-emission
+entry point is deliberately NOT exposed to `authenticated` at all, only
+callable from other SECURITY DEFINER business RPCs.
+
+**Reversal path:** fully reversible — new tables/functions only, no
+existing data touched; `_create_booking_internal`'s prior version
+recoverable from `list_migrations`/git history.
+
+**Status:** Gate 7's core abstraction is built, integrated at one real
+call site, and verified. NOT yet done: wiring more event types across
+other business RPCs (enrollment, payment, subscription lifecycle —
+Doc 3's full event list), a queue worker, templates, or automation
+rules — these are substantial and are Gate 8's actual scope (the
+WhatsApp connector needs all of them to be useful), tracked explicitly
+in the execution state file as the next gate's work, not silently
+dropped from this one.
