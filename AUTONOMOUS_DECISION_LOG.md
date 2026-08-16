@@ -851,3 +851,147 @@ rules — these are substantial and are Gate 8's actual scope (the
 WhatsApp connector needs all of them to be useful), tracked explicitly
 in the execution state file as the next gate's work, not silently
 dropped from this one.
+
+---
+
+## D-008 — Gate 8: WhatsApp module, including a real Baileys connector service
+
+**Date:** 2026-08-16
+**Mid-task user directive:** partway through Gate 8, the user sent an
+explicit "WHATSAPP QR CONNECTOR — CORRECT IMPLEMENTATION DIRECTIVE"
+overriding my initial framing (which had planned to leave the QR
+handshake as a UI-only stub, reasoning that Vite+Supabase has no
+persistent runtime). The directive is unambiguous: adding a persistent
+Node/TypeScript connector service IS part of Gate 8's scope, Baileys is
+the designated primary connector, session credentials must never touch
+the Vite client, and the directive supplies exact required completion
+vocabulary (COMPLETE only with a real phone scan; IMPLEMENTED —
+EXTERNAL SCAN QA PENDING if the system is ready but no phone is
+available; BLOCKED only for a genuine runtime hard-blocker) plus an
+instruction to continue autonomously into RTL/i18n/reporting/regression
+afterward rather than stopping to wait for a phone. This entry
+documents compliance with that directive, superseding my own earlier
+framing.
+
+**What was built:**
+
+1. **Supabase schema** (`whatsapp_connections`, `whatsapp_connection_events`,
+   `whatsapp_templates` with a variable-validation trigger,
+   `whatsapp_automations`, 6 granular permissions) — see the schema
+   commit for full detail. `session_secret` has ZERO RLS SELECT policy
+   at all; the only read path is `get_whatsapp_connection_status()`,
+   which never returns it.
+
+2. **A real, separate persistent Node/TypeScript connector service**
+   (`/whatsapp-connector`), per the directive's exact required
+   architecture:
+   - `MessagingProvider` interface (`initializeConnection`/`generateQr`/
+     `getConnectionState`/`sendMessage`/`reconnect`/`logout`/
+     `healthCheck`) — the adapter boundary. Only
+     `BaileysMessagingProvider.ts` imports `@whiskeysockets/baileys`;
+     nothing else in the platform (Supabase, the queue, Booking/Academy
+     code) knows Baileys exists.
+   - `SessionStore.ts` — AES-256-GCM session-state encryption at rest,
+     tenant-isolated via `sha256(clubId)` filenames (defense in depth
+     against path traversal even though `clubId` never originates from
+     untrusted input today).
+   - `TenantConnectionManager.ts` — one `MessagingProvider` per club in
+     memory, syncs state back to Supabase via the service-role key,
+     restores persisted sessions on process restart without requiring a
+     fresh scan.
+   - `server.ts` — the connector's internal HTTP API. Every request
+     requires a valid HMAC-SHA256 signature (`x-connector-signature`,
+     `timingSafeEqual` comparison) computed with a shared secret the
+     Vite client never sees; a strict allowlist of 5 routes
+     (connect/qr/disconnect/send/health), no generic passthrough.
+   - `supabase/functions/whatsapp-bridge` — the trusted Supabase-side
+     caller. Deployed live on the project. Re-verifies the caller's own
+     JWT + `manage_whatsapp_connection` permission via the same
+     `has_permission()` RLS predicate every other write path in this
+     app uses, before signing and forwarding to the connector service.
+     Returns an honest `connector_not_configured` (503) rather than a
+     fabricated success when the connector host isn't set — verified
+     live via a real HTTP call against the deployed function (correctly
+     401s with no JWT, per Supabase's own gateway-level `verify_jwt`).
+
+3. **Frontend**: dedicated "واتساب" nav tab (Connection/Templates/
+   Automations/Queue&History/Diagnostics), wired to call
+   `whatsapp-bridge` (not a fabricated client-side QR) for the real
+   connect/qr/disconnect actions.
+
+**Bug found via real execution (not type-check):** `BaileysMessagingProvider`'s
+class-field initializer for `logger` called `this.redactedClubId()`
+directly in the field declaration, which — per JS class-field-init
+ordering — runs *before* the constructor body assigns `this.clubId`,
+crashing immediately on `TypeError: Cannot read properties of
+undefined (reading 'slice')` the instant the class was instantiated.
+Found by actually running the service's own self-test, not by
+reasoning about the code — exactly the pattern that has held all
+session: `tsc --noEmit` cannot catch a field-initializer-ordering bug
+like this, only real execution can. Fixed by moving logger construction
+into the constructor body, after `this.clubId` is assigned.
+
+**Real verification performed (the honest boundary of what's
+provable without a physical phone):**
+- `npm install` + `npx tsc --noEmit` clean in the connector service.
+- **`npm test` (`selfTest.ts`) — a genuine integration test, not a
+  mock**: opened a real WebSocket to WhatsApp's actual servers,
+  completed a real device-pairing handshake exchange (visible in the
+  captured Baileys log: "connected to WA", a real pairing-data payload
+  with real cryptographic key material, "not logged in, attempting
+  registration..."), and received back a real 237-character QR token.
+  State machine correctly walked `generating_qr → authenticating →
+  waiting_for_scan`, then `logged_out → disconnected` on cleanup.
+- `whatsapp-bridge` Edge Function deployed and confirmed live (401 on
+  an unauthenticated real HTTP request, matching `verify_jwt: true`).
+- Frontend: full `npx tsc --noEmit` clean across the whole Vite app
+  after wiring the bridge calls.
+- Template variable-validation trigger tested directly against the
+  live database: a template using only declared variables inserts
+  successfully; a template referencing an undeclared `{{variable}}` is
+  correctly rejected with a clear error, before any bad data reaches
+  the table.
+
+**What remains — REAL PHONE QR SCAN QA PENDING**, per the directive's
+own required vocabulary: scanning the generated QR with an actual
+WhatsApp phone (Linked Devices → Link a Device), confirming the
+connection reaches `connected` with a real phone number attached,
+sending and receiving one real message, restarting the connector
+process and confirming reconnect-without-rescan, and confirming
+disconnect correctly requires a fresh QR next time. None of this is
+automatable in this execution environment (no physical phone
+available), and per the directive's own explicit instruction, this
+does NOT block the rest of the autonomous run — proceeding directly
+into RTL/i18n/reporting/regression next, exactly as instructed, rather
+than stopping to wait for a phone.
+
+**What is honestly NOT yet built** (explicit scope cut, not silently
+dropped): the queue-consumption worker that actually drains
+`notification_queue` and calls the connector's `/send` (the connector's
+own `sendMessage`/`TenantConnectionManager.send` exist and are ready to
+be called, but nothing polls the queue yet); quiet-hours/rate-limiting
+enforcement logic (the `whatsapp_automations` columns for it exist,
+the enforcement code doesn't); the templates/automations self-service
+UI's "preview" feature; a formal test matrix beyond what's listed
+above. Tracked in the execution state file, not claimed complete.
+
+**DB impact:** as listed in the schema section above; one new Edge
+Function deployed (no migration, but a real production artifact).
+
+**Security impact:** net-positive and carefully scoped per the
+directive's explicit requirements — no session secret in any
+client-reachable path (browser, git, logs, API response) at any layer;
+signed-request-only connector API; tenant isolation enforced at three
+independent layers (Supabase RLS + `has_permission()` re-check in the
+bridge function + hashed-filename session isolation in the connector
+service).
+
+**Reversal path:** the connector service and Edge Function are both
+new, isolated artifacts — removing them (or replacing
+`BaileysMessagingProvider` with a different implementation of the same
+`MessagingProvider` interface) touches nothing else in the platform.
+
+**Status:** IMPLEMENTED — EXTERNAL SCAN QA PENDING, per the directive's
+own required vocabulary. Continuing autonomously into RTL (Gate 9)
+next, per the directive's explicit instruction not to stop for the
+unavailable phone.

@@ -1,0 +1,27 @@
+{
+  "name": "mala3by-whatsapp-connector",
+  "version": "0.1.0",
+  "description": "Persistent Node/TypeScript service that performs the real WhatsApp Multi-Device (Baileys) handshake and message delivery, behind a MessagingProvider adapter interface. Never runs inside the Vite client -- session credentials never leave this process.",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "dev": "tsx watch src/index.ts",
+    "build": "tsc -p tsconfig.json",
+    "start": "node dist/index.js",
+    "test": "tsx src/selfTest.ts"
+  },
+  "dependencies": {
+    "@whiskeysockets/baileys": "^6.7.9",
+    "@supabase/supabase-js": "^2.45.4",
+    "@hapi/boom": "^9.1.4",
+    "qrcode-terminal": "^0.12.0",
+    "pino": "^9.4.0",
+    "dotenv": "^16.4.5"
+  },
+  "devDependencies": {
+    "@types/node": "^22.7.4",
+    "@types/qrcode-terminal": "^0.12.2",
+    "typescript": "^5.6.2",
+    "tsx": "^4.19.1"
+  }
+}

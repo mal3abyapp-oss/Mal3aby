@@ -61,27 +61,67 @@ export function ConnectionTab() {
     refetchInterval: 5000,
   })
 
+  // Gate 8 (per the WhatsApp QR Connector directive): the real QR comes
+  // from the connector service's actual Baileys socket, reached via the
+  // whatsapp-bridge Edge Function -- never from a value invented in the
+  // browser or in Postgres. start_whatsapp_pairing() (an RPC) only
+  // records the *attempt* + authorization check; the bridge is what
+  // actually starts the connector's real WebSocket connection and
+  // fetches the real QR payload it received back from WhatsApp.
   const pairMutation = useMutation({
     mutationFn: async () => {
-      const { data, error } = await supabase.rpc('start_whatsapp_pairing', { p_club_id: currentClubId })
-      if (error) throw error
-      return data?.[0] as { pairing_token: string; expires_at: string } | undefined
-    },
-    onSuccess: async (row) => {
-      setActionError(null)
-      if (row?.pairing_token) {
-        const url = await QRCode.toDataURL(row.pairing_token, { width: 240, margin: 1 })
-        setQrDataUrl(url)
+      const { error: rpcError } = await supabase.rpc('start_whatsapp_pairing', { p_club_id: currentClubId })
+      if (rpcError) throw rpcError
+
+      const { data: connectData, error: connectError } = await supabase.functions.invoke('whatsapp-bridge', {
+        body: { clubId: currentClubId, action: 'connect' },
+      })
+      if (connectError) throw connectError
+      if (connectData?.error === 'connector_not_configured') {
+        throw new Error('CONNECTOR_NOT_CONFIGURED')
       }
+
+      // Poll the bridge for the real QR the connector received from
+      // WhatsApp -- generation is asynchronous on the connector side
+      // (it needs to open the socket and wait for WhatsApp's own QR
+      // event), so this is a short poll, not a single fetch.
+      for (let attempt = 0; attempt < 15; attempt++) {
+        const { data: qrData } = await supabase.functions.invoke('whatsapp-bridge', {
+          body: { clubId: currentClubId, action: 'qr' },
+        })
+        if (qrData?.qr) return qrData.qr as string
+        await new Promise((r) => setTimeout(r, 1000))
+      }
+      throw new Error('QR_TIMEOUT')
+    },
+    onSuccess: async (rawQr) => {
+      setActionError(null)
+      const url = await QRCode.toDataURL(rawQr, { width: 240, margin: 1 })
+      setQrDataUrl(url)
       void queryClient.invalidateQueries({ queryKey: ['whatsapp-connection', currentClubId] })
     },
-    onError: (error) => setActionError(translateSupabaseError(error, 'تعذّر بدء الاتصال.')),
+    onError: (error) => {
+      if (error instanceof Error && error.message === 'CONNECTOR_NOT_CONFIGURED') {
+        setActionError('خدمة الاتصال بواتساب غير مُفعّلة على هذا الخادم بعد. راجع دليل whatsapp-connector للنشر.')
+        return
+      }
+      if (error instanceof Error && error.message === 'QR_TIMEOUT') {
+        setActionError('انتهت مهلة انتظار رمز QR — حاول مرة أخرى.')
+        return
+      }
+      setActionError(translateSupabaseError(error, 'تعذّر بدء الاتصال.'))
+    },
   })
 
   const disconnectMutation = useMutation({
     mutationFn: async () => {
-      const { error } = await supabase.rpc('disconnect_whatsapp', { p_club_id: currentClubId })
-      if (error) throw error
+      const { error: rpcError } = await supabase.rpc('disconnect_whatsapp', { p_club_id: currentClubId })
+      if (rpcError) throw rpcError
+      // Best-effort: also tell the connector service to actually log
+      // out the real session. If the connector isn't reachable, the DB
+      // side is still correctly marked disconnected (rpc above), so
+      // this failing doesn't leave the UI lying about connection state.
+      await supabase.functions.invoke('whatsapp-bridge', { body: { clubId: currentClubId, action: 'disconnect' } }).catch(() => null)
     },
     onSuccess: () => {
       setQrDataUrl(null)
@@ -131,7 +171,7 @@ export function ConnectionTab() {
       )}
 
       <div className="rounded-lg border border-dashed border-border p-4 text-sm text-text-secondary">
-        ملاحظة: يتطلب إكمال الاتصال الفعلي بواتساب حساب واتساب بزنس API معتمد. تم بناء نموذج الحالة والصلاحيات وسجل التدقيق بالكامل — ربط مزود واتساب فعلي هو الخطوة التالية بعد توفر بيانات الاعتماد.
+        ملاحظة: يستخدم هذا الاتصال خدمة ربط واتساب حقيقية (WhatsApp Multi-Device عبر Baileys) — الرمز المعروض أعلاه، عند ظهوره، هو رمز QR فعلي صادر من خوادم واتساب. يتطلب نشر خدمة الربط (whatsapp-connector) على خادم دائم وربطها بهذه الدالة قبل ظهور الرمز في بيئة الإنتاج.
       </div>
     </div>
   )
