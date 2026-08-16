@@ -100,12 +100,15 @@ a genuine contradiction.
    connector's `/send` (the send path itself is ready and callable, just
    nothing polls the queue yet), quiet-hours/rate-limit enforcement
    code (columns exist, enforcement doesn't).
-9. Gate 9 — RTL full sweep — not started (partial RTL exists via
-   `DirectionProvider` but no full audit done). NOTE: the new portal
-   screens built in Gate 3 were written with the same RTL-first
-   conventions as the rest of the app (no hardcoded ltr, uses logical
-   properties like existing screens) but were NOT specifically
-   re-audited for RTL correctness — include them in this gate's sweep.
+9. ✅ **Gate 9 — RTL full sweep** — DONE (see D-009). Exhaustive grep
+   across every feature screen found ZERO hardcoded physical-direction
+   classes anywhere in `src/features/**` — the RTL-first convention was
+   actually followed throughout. All real defects were isolated to 4
+   shared shadcn/ui primitives (`dialog.tsx`/`sheet.tsx`/`select.tsx`/
+   `dropdown-menu.tsx`) — close-button position, Select checkmark
+   position/padding, DropdownMenu insets/shortcuts/sub-menu chevron,
+   Dialog/Sheet header text alignment. Fixed at the root (shared
+   component), verified live via screenshot in the running app.
 10. Gate 10 — Arabic/English i18n — not started (Arabic-only currently,
     including all Gate 3 portal screens — they inherit the same
     hardcoded-Arabic-string pattern as the rest of the app, to be swept
@@ -127,7 +130,7 @@ a genuine contradiction.
     (branch/field/academy limits) is DONE and verified; only the UI
     wiring (task #51 types regen onward) remains, deliberately paused.
 
-## Current gate: Gate 9 (RTL full sweep) — starting next
+## Current gate: Gate 10 (Arabic/English i18n) — starting next
 
 ## IMPORTANT — pending external QA (not a blocker, tracked explicitly)
 **REAL PHONE QR SCAN QA PENDING** (Gate 8): the WhatsApp connector
@@ -248,14 +251,25 @@ chronological commit history of this run: Gate 1 fix, Gate 2 fix, Gate
 Local-first — not pushed to any remote per standing project policy.
 
 ## Next exact task
-Start Gate 9 — RTL full sweep. Doc 3 requires a full repository-wide
-audit (not partial fixes) covering nav/sidebar/bottom-nav/cards/tables/
-forms/inputs/selects/dialogs/sheets/dropdowns/calendars/date-pickers/
-booking-timeline/reports/charts/pagination/search/breadcrumbs/QR
-screens, using logical CSS properties where appropriate. This session
-added substantial new UI surface since the app was last RTL-reviewed
-(the entire Gate 3 portal, the entire Gate 8 WhatsApp tab) — sweep
-those specifically, not just the pre-existing screens. Check the
-existing `DirectionProvider` (mentioned in earlier session notes as
-only a state variable with no visible switcher) to understand current
-RTL mechanics before assuming what needs fixing.
+Start Gate 10 — Arabic/English i18n. Doc 3 requires a full i18n
+foundation (translation resources, language switcher, persistence,
+fallback, interpolation, pluralization, RTL/LTR switching without page
+reload, locale-aware numbers/dates/times/currency) and a sweep of all
+hardcoded UI copy into that system. Current state (confirmed in Gate 9):
+`DirectionProvider` has a `locale`/`setLocale` state shape already but
+NO visible switcher UI anywhere, and the entire app's UI text is
+hardcoded Arabic strings inline in every component (not extracted into
+resource files at all) — this is a large, genuinely-from-scratch build,
+not a partial gap. Given the sheer volume of hardcoded strings across
+every screen built this session and prior sessions, full extraction to
+i18n resource files for 100% of UI copy in one pass is unrealistic;
+recommend: (a) pick and wire a real i18n library (e.g. i18next/
+react-i18next, check what's already in package.json first) with ar/en
+resource namespaces, (b) build the actual language switcher UI +
+persistence (localStorage) + wire it to `DirectionProvider` so
+switching language also correctly flips `dir` without a page reload,
+(c) extract a representative, high-traffic slice of screens (nav,
+auth, dashboard, one or two feature areas) as the proven pattern, (d)
+document remaining unswept screens explicitly as follow-up rather than
+claiming full coverage. Explicitly forbidden per Doc 3: duplicate
+per-language pages/components for the same screen.
