@@ -17,16 +17,13 @@ a genuine contradiction.
    D-001 in the decision log). Root cause: naive datetime strings sent
    to timestamptz RPC params + timezone-agnostic local-time derivation
    server-side, both fixed.
-2. **Gate 2 — Academy Enrollment Integrity (P0)** — NOT YET
-   investigated this run. NOTE: a prior session (before Doc 3 arrived)
-   already found and fixed a real academy-permission bug (missing
-   `club_owner` grants — migrations `20260816080000`/`20260816080500`).
-   That fix should NOT be re-litigated from scratch; Gate 2 work should
-   start by checking whether further enrollment defects exist beyond
-   that already-fixed permission gap (transactionality of
-   enrollment+subscription+invoice+payment, the specific edge cases
-   Doc 3 lists: duplicate enrollment, full group, no approved price,
-   frozen/expired subscription re-enrollment, etc.) — NEXT TASK.
+2. **Gate 2 — Academy Enrollment Integrity (P0)** — ✅ INVESTIGATED &
+   FIXED (see D-002 in the decision log). Real bug found: `manual`
+   subscription-activation policy was bypassed by ANY payment (should
+   require explicit staff action). Fixed via a `p_explicit` flag.
+   Duplicate-enrollment protection, full-group filtering, and
+   no-approved-price guard were all already correctly handled — no fix
+   needed for those (verified, not assumed).
 3. Gate 3 — Unified Accounts / Participants / Guardians — not started.
 4. Gate 4 — Memberships / Subscriptions / Operational Entitlements —
    not started. NOTE: do not confuse with the already-built Commercial
@@ -56,18 +53,29 @@ a genuine contradiction.
     (branch/field/academy limits) is DONE and verified; only the UI
     wiring (task #51 types regen onward) remains, deliberately paused.
 
-## Current gate: Gate 2 (Academy Enrollment Integrity) — starting next
+## Current gate: Gate 3 (Unified Accounts / Participants / Guardians) — starting next
 
 ## Completed this run (chronological)
 - Resolved 3-way directive conflict via AskUserQuestion → user chose
   full autonomous execution per Docs 2/3.
 - Gate 1 (Booking Time Integrity): root-caused, fixed, verified
   end-to-end via live UI test + direct SQL. See D-001.
+- Gate 2 (Academy Enrollment Integrity): investigated, found and fixed
+  the manual-activation-policy bypass; confirmed duplicate-enrollment/
+  full-group/no-price cases already correctly handled. See D-002.
 
 ## Migrations applied this run
 - `20260816110000_fix_booking_venue_timezone.sql` — rewrote
   `_create_booking_internal` to use `clubs.timezone` + `AT TIME ZONE`
   for local date/time derivation instead of UTC-implicit casts.
+- `20260816120000_fix_enrollment_integrity.sql` — added `p_explicit`
+  flag to `_activate_subscription_if_due_internal`/
+  `activate_subscription_if_due`; added then removed a redundant
+  duplicate-enrollment index (pre-existing one already covered it).
+- Follow-up cleanup (ad hoc, via apply_migration): dropped the
+  redundant index and the orphaned 1-arg
+  `_activate_subscription_if_due_internal` overload left behind by
+  `create or replace`'s signature-change behavior.
 
 ## Files changed this run
 - `src/lib/domain/time.ts` (new) — Time Model utility.
@@ -79,6 +87,8 @@ a genuine contradiction.
 - `src/features/bookings/BookingsMobileView.tsx` — same class of fix.
 - `src/features/bookings/BookingDetailSheet.tsx` — display now
   timezone-aware via `formatInstant`.
+- `src/lib/errors.ts` — added Arabic translation for the
+  already-actively-enrolled error.
 
 ## Known-good, do NOT re-investigate without new evidence
 - React Query staleness / Radix Dialog-Select-Tabs: repeatedly tested
@@ -105,18 +115,22 @@ fix:/feat: convention per Doc 3 Part XXVII; local-first, do not push
 without separate authorization)
 
 ## Next exact task
-Start Gate 2 — Academy Enrollment Integrity. Trace: Participant →
-Guardian → Program → Season → Age Group → Group → Approved Price →
-Discount → Subscription → Invoice → Payment → Enrollment → Group
-Membership → Player Profile → Entitlement → QR → Attendance Eligibility.
-Test matrix per Doc 3: new player, existing player, child+guardian,
-guardian with multiple children, fully paid, partial payment,
-outstanding, existing active subscription, renewal, duplicate
-enrollment, full group, no approved price, frozen/expired/suspended/
-cancelled subscription, re-enrollment. Verify the enrollment operation
-(enrollment + subscription + invoice + payment state) is atomic/
-transactional. Start by reading the current `enroll_player` (or
-equivalent) RPC definition and `EnrollmentSection.tsx` to establish
-current actual behavior before assuming anything is broken — the
-already-fixed academy-permission bug from the prior session may account
-for some/all of what was originally reported as "academy doesn't work."
+Start Gate 3 — Unified Accounts / Participants / Guardians. This is a
+large net-new domain-modeling gate per Doc 3's design-only source
+document. Before writing any migration, read the current schema for
+`customers`/`players`/`guardian_links`/`club_memberships`/`profiles`
+(or equivalent) to establish what already exists vs. what's genuinely
+missing, since this codebase already has real customers/players/
+guardian_links tables from the V1 build — the gate is likely narrower
+than a full rebuild (e.g. may already satisfy "one account per person"
+if auth is already unified; needs verification, not assumption).
+Specifically check: (a) is there already a 1:1 mapping of
+auth.users → a single profile, with no separate per-role accounts;
+(b) does self-service signup exist without manual DB activation
+(SignupPage.tsx / OnboardingPage.tsx already exist per the router — 
+check their actual flow); (c) is there a profile-photo field, and is
+it distinguished from any "verified" academy-member photo concept
+(likely NOT yet built — this is probably the real gap); (d) does
+guardian_links already correctly support one guardian managing
+multiple children (schema suggests yes — verify). Do not rebuild what
+already works; scope the actual gap precisely before writing code.
