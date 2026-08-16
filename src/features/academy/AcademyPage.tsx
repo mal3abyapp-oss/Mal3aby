@@ -26,6 +26,7 @@ import { ProgramsGroupsSection } from '@/features/academy/ProgramsGroupsSection'
 import { EnrollmentSection, ActivationPolicySetting } from '@/features/academy/EnrollmentSection'
 import { CoachTodayView } from '@/features/academy/CoachTodayView'
 import { AcademyOverview } from '@/features/academy/AcademyOverview'
+import { PlayerStatusPanel } from '@/features/academy/PlayerStatusPanel'
 import type { PlayerRow, GuardianLinkRow } from '@/lib/domain/people'
 
 // Player Profile lives under /app/academy per SCREEN_MAP.md. Full
@@ -313,11 +314,16 @@ export function AcademyPage() {
               }
             }}
           >
-            <DialogContent>
+            <DialogContent className="max-h-[85vh] overflow-y-auto">
               <DialogHeader>
                 <DialogTitle>{selectedPlayer?.fullName}</DialogTitle>
               </DialogHeader>
               <div className="flex flex-col gap-4">
+                {selectedPlayer && (
+                  <div className="border-b border-border pb-4">
+                    <PlayerStatusPanel playerId={selectedPlayer.id} />
+                  </div>
+                )}
                 <div className="flex flex-col gap-2 border-b border-border pb-4">
                   <label className="text-sm font-medium text-text-secondary">الاسم الكامل</label>
                   <Input value={editName} onChange={(e) => setEditName(e.target.value)} />
