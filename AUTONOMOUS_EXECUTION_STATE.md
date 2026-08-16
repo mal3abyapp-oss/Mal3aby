@@ -33,18 +33,19 @@ a genuine contradiction.
    (real signed-up test user, real access tokens, real REST calls) —
    this caught and fixed a real bug (claim-vs-identity-guard trigger
    conflict) that pure SQL inspection would have missed.
-4. **Gate 4 — Memberships / Subscriptions / Operational Entitlements** —
-   NOT STARTED. NOTE: do not confuse with the already-built Commercial
-   Entitlements (platform-level club limits, tasks #51-67) — separate
-   concept. Gate 3 already gives the portal read access to a guardian's
-   own subscriptions (`subscriptions_self_service_select`) — a "My
-   Subscriptions" screen could extend `PortalAcademyPage` or become its
-   own screen cheaply using that existing policy. The Doc 3 "professional
-   subscription" requirements (freeze/extend/grace-period/full history)
-   should be audited against the existing `subscriptions`/
-   `freeze_subscription`/`get_subscription_effective_end_date` machinery
-   before assuming anything is missing — significant subscription
-   machinery already exists from the V1 build (Phase 11).
+4. ✅ **Gate 4 — Memberships / Subscriptions / Operational Entitlements**
+   — lifecycle-operations slice DONE (see D-004). Added
+   `unfreeze_subscription()`/`cancel_subscription()` RPCs, an
+   audit-log-enforcing status-transition guard trigger, and fixed a
+   real circular RLS dependency between `enrollments`/`groups`
+   (introduced across Gate 3's self-service policies, only surfaced
+   under real black-box RPC testing). Full freeze→unfreeze→cancel
+   lifecycle verified end-to-end with correct audit trail. NOT yet
+   built: explicit session-count/remaining-sessions tracking,
+   allowed-days/allowed-entry-times columns (`subscriptions.plan_type`
+   is still a simple enum with no structured usage-tracking) — needs
+   its own scoping pass on how `package`-type plans currently track
+   usage (if at all) before adding columns.
 5. Gate 5 — Bookings / Activities / Seats — booking CORE already exists
    (V1 rebuild, tasks #23-27); this gate is about recurring bookings,
    seat/activity booking, waitlist — not yet built. NOTE:
@@ -88,7 +89,7 @@ a genuine contradiction.
     (branch/field/academy limits) is DONE and verified; only the UI
     wiring (task #51 types regen onward) remains, deliberately paused.
 
-## Current gate: Gate 4 (Memberships / Subscriptions / Operational Entitlements) — starting next
+## Current gate: Gate 5 (Bookings / Activities / Seats) — starting next
 
 ## Completed this run (chronological)
 - Resolved 3-way directive conflict via AskUserQuestion → user chose
@@ -194,15 +195,22 @@ chronological commit history of this run: Gate 1 fix, Gate 2 fix, Gate
 Local-first — not pushed to any remote per standing project policy.
 
 ## Next exact task
-Start Gate 4 — Memberships / Subscriptions / Operational Entitlements.
-Before writing any migration, read the existing `subscriptions` table
-schema, `freeze_subscription()`, `get_subscription_effective_end_date()`,
-and `_activate_subscription_if_due_internal()` (already touched in Gate
-2) to establish what Doc 3's "professional subscription" requirements
-(package type, duration, session count, remaining sessions, allowed
-days/times, renewal, freeze, extension, grace period, cancellation,
-linked payments, discounts, remaining balance, usage, expiry, full
-change history — never erased on edit) are already satisfied by vs.
-genuinely missing. This table/RPC set already looks more mature than a
-first read of Doc 3 might suggest (freeze support and effective-end-date
-calculation already exist) — scope precisely before building.
+Start Gate 5 — Bookings / Activities / Seats. Per the Gate 1
+investigation, `create_recurring_booking()` and `create_field_block()`
+RPCs already exist in the generated Supabase types but have NO frontend
+caller anywhere in `src/` (confirmed via grep during Gate 1). Before
+building new UI: (a) read both RPC definitions directly from the DB to
+confirm they're actually correctly implemented server-side (apply the
+same rigor as Gate 1's booking-time trace — check they use
+`clubs.timezone`/`AT TIME ZONE` correctly for local-day/time derivation,
+not the same UTC-implicit-cast bug Gate 1 fixed in
+`_create_booking_internal`, since these are separate functions that may
+not have inherited that fix); (b) check whether a "recurring booking"
+UI concept was ever partially built and abandoned, or never started;
+(c) design seat/activity booking + waitlist as genuinely new schema if
+no `event_seats`/`waitlist`-shaped tables exist yet (check
+`information_schema.tables` first rather than assuming). Given this
+session's now-repeated pattern (Gates 1/2/4 all found real
+timezone/permission/RLS bugs hiding in seemingly-complete code), audit
+`create_recurring_booking`/`create_field_block` for the same class of
+defect before writing any new frontend against them.
