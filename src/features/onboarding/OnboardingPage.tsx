@@ -86,9 +86,19 @@ export function OnboardingPage() {
                 <p className="text-text-secondary">تم تفعيل التجربة المجانية لمدة 7 أيام.</p>
               </>
             ) : (
+              // Gate 13 (task #53): trial_granted=false here specifically
+              // means this owner already has an active trial-entitlement
+              // record on another club (complete_new_club_onboarding()
+              // enforces one automatic trial per owner). This is expected,
+              // routine behavior for a second/later club, not an error —
+              // the message must say so plainly rather than the previous
+              // vague "contact us to activate," which read as if something
+              // had gone wrong.
               <>
                 <h2 className="text-xl font-bold">تم إنشاء النادي</h2>
-                <p className="text-text-secondary">الاشتراك مطلوب لتفعيل الحساب بالكامل. تواصل معنا للتفعيل.</p>
+                <p className="text-text-secondary">
+                  هذا ناديك الإضافي، لذلك لم يُفعَّل له اشتراك تجريبي تلقائي — الأندية الإضافية تحتاج موافقة فريق منصة ملعبي أولًا. سنتواصل معك بمجرد المراجعة، ويمكنك متابعة حالة الاشتراك من صفحة الإعدادات.
+                </p>
               </>
             )}
             <Button onClick={() => navigate('/app', { replace: true })} className="mt-2">
