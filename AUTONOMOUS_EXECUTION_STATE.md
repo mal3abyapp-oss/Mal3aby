@@ -73,7 +73,15 @@ a genuine contradiction.
    and verified via real coach-role RPC calls. NOT re-audited in this
    pass: whether any manual (non-QR) attendance-marking path exists and
    is correctly coach-scoped — flagged as follow-up, not assumed safe.
-7. Gate 7 — Notification Core — not started.
+7. ✅ **Gate 7 — Notification Core** — DONE (see D-007). Built
+   `notification_events`/`notification_queue`/`notification_consent`
+   with `emit_notification_event()`/`enqueue_notification()`. Confirmed
+   zero notification infra existed before this pass. Wired one real
+   integration point (`_create_booking_internal` emits
+   `booking.created`/`booking.confirmed`), verified live. Explicit
+   scope cut (not silently dropped): no queue worker, no templates
+   table, no automation-rules table yet — these are Gate 8's actual
+   scope, since the WhatsApp connector needs all three to be useful.
 8. Gate 8 — WhatsApp QR Module — not started (large net-new module).
 9. Gate 9 — RTL full sweep — not started (partial RTL exists via
    `DirectionProvider` but no full audit done). NOTE: the new portal
@@ -102,7 +110,7 @@ a genuine contradiction.
     (branch/field/academy limits) is DONE and verified; only the UI
     wiring (task #51 types regen onward) remains, deliberately paused.
 
-## Current gate: Gate 7 (Notification Core) — starting next
+## Current gate: Gate 8 (WhatsApp QR Module) — starting next
 
 ## Completed this run (chronological)
 - Resolved 3-way directive conflict via AskUserQuestion → user chose
@@ -208,21 +216,30 @@ chronological commit history of this run: Gate 1 fix, Gate 2 fix, Gate
 Local-first — not pushed to any remote per standing project policy.
 
 ## Next exact task
-Start Gate 7 — Notification Core. Doc 3 requires business logic to
-never call WhatsApp/SMS/Email directly — a Notification Engine /
-domain-event abstraction must sit in between so Gate 8 (WhatsApp) can
-later be built as a connector without touching Booking/Academy/
-Enrollment code. Before building anything: (a) search for any existing
-notification/messaging table or function (`notifications`, `messages`,
-`sms`, `whatsapp` in `information_schema.tables`/`pg_proc`) — this
-session hasn't checked yet, so don't assume nothing exists; (b) if
-nothing exists, design the event model first (subscription-expiring,
-booking-confirmed, payment-received, etc. — the full Doc 3 event-type
-list is in the original directive text) as a queue/outbox table with
-status tracking (pending/sent/failed/expired), never a synchronous
-direct-send from a business-transaction RPC; (c) given this is
-explicitly a prerequisite for Gate 8 (WhatsApp), keep the core
-abstraction connector-agnostic — no WhatsApp-specific fields at this
-layer. Given this session's now-repeated pattern (Gates 1/2/4/5/6 all
-found at least one real defect hiding in seemingly-complete code),
-apply the same audit-before-build rigor here too.
+Start Gate 8 — WhatsApp QR Module, the largest remaining single module
+in Doc 3. This is a genuinely large build (connection/session
+management via QR-pairing, templates, automations, message queue UI,
+diagnostics) layered on top of Gate 7's now-complete
+notification_events/notification_queue/notification_consent
+foundation. Suggested build order, each independently useful and
+testable: (a) `whatsapp_connections` table (per-club session state
+machine: disconnected/generating_qr/waiting_for_scan/authenticating/
+connected/failed/expired/reconnecting) + connect/disconnect RPCs --
+session credentials must never appear in any client-readable
+column/response, stored server-side only; (b) `whatsapp_templates`
+table (one per core event, bilingual, variable-validated) +
+CRUD RPCs gated on a new `manage_whatsapp_templates` permission;
+(c) a `WhatsAppConnector` adapter interface (a Postgres/Edge-Function
+boundary, NOT baked into business logic) so Notification/Booking/
+Academy code only ever calls `enqueue_notification()` (already built)
+and never anything WhatsApp-specific; (d) `whatsapp_automations` table
+mapping event_type -> template + delay + send-window + dedup policy,
+consumed by whatever eventually processes notification_queue; (e) the
+actual queue-processing worker is likely an Edge Function (check
+`list_edge_functions` for any existing scaffold before assuming none
+exists) since Postgres itself can't make outbound HTTP calls to a
+WhatsApp API on a schedule. Given this session's now-repeated pattern
+(Gates 1/2/4/5/6/7 all involved at least one real defect or a
+gap-vs-assumption correction), audit before building at every step --
+check `information_schema`/`pg_proc`/`list_edge_functions` for
+anything pre-existing before assuming a blank slate.
