@@ -22,6 +22,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog'
 import { PAYMENT_METHOD_LABELS, type PaymentRow } from '@/lib/domain/billing'
+import { translateSupabaseError } from '@/lib/errors'
 
 // Invoice list, invoice detail (view + print), payment collection form,
 // refund flow. Print CSS via @media print rules scoped to #invoice-print.
@@ -31,23 +32,48 @@ interface InvoiceListRow {
   customerName: string
   status: string
   total: number
+  paid: number
+  outstanding: number
+  source: string
+  issuedAt: string | null
 }
+
+const SOURCE_LABELS: Record<string, string> = { booking: 'حجز', subscription: 'اشتراك أكاديمية' }
 
 async function fetchInvoices(clubId: string) {
   const { data, error } = await supabase
     .from('invoices')
-    .select('id, invoice_number, status, total, customers(full_name)')
+    .select('id, invoice_number, status, total, issued_at, customers(full_name), invoice_items(reference_type)')
     .eq('club_id', clubId)
     .order('created_at', { ascending: false })
     .limit(50)
   if (error) throw error
-  return (data ?? []).map<InvoiceListRow>((row) => ({
-    id: row.id,
-    invoiceNumber: row.invoice_number,
-    customerName: (row.customers as unknown as { full_name: string } | null)?.full_name ?? '—',
-    status: row.status,
-    total: Number(row.total),
-  }))
+
+  const invoiceIds = (data ?? []).map((row) => row.id)
+  const paidByInvoice = new Map<string, number>()
+  if (invoiceIds.length > 0) {
+    const { data: allocations } = await supabase.from('payment_allocations').select('invoice_id, amount').in('invoice_id', invoiceIds)
+    for (const a of allocations ?? []) {
+      paidByInvoice.set(a.invoice_id, (paidByInvoice.get(a.invoice_id) ?? 0) + Number(a.amount))
+    }
+  }
+
+  return (data ?? []).map<InvoiceListRow>((row) => {
+    const total = Number(row.total)
+    const paid = paidByInvoice.get(row.id) ?? 0
+    const items = (row.invoice_items as unknown as { reference_type: string }[] | null) ?? []
+    return {
+      id: row.id,
+      invoiceNumber: row.invoice_number,
+      customerName: (row.customers as unknown as { full_name: string } | null)?.full_name ?? '—',
+      status: row.status,
+      total,
+      paid,
+      outstanding: Math.max(total - paid, 0),
+      source: SOURCE_LABELS[items[0]?.reference_type ?? ''] ?? 'أخرى',
+      issuedAt: row.issued_at,
+    }
+  })
 }
 
 async function fetchInvoiceDetail(invoiceId: string) {
@@ -126,7 +152,7 @@ export function BillingPage() {
       setFormError(null)
       invalidateDetail()
     },
-    onError: () => setFormError('تعذّر تسجيل الدفعة.'),
+    onError: (error) => setFormError(translateSupabaseError(error, 'تعذّر تسجيل الدفعة.')),
   })
 
   const refundMutation = useMutation({
@@ -145,7 +171,7 @@ export function BillingPage() {
       setRefundReason('')
       invalidateDetail()
     },
-    onError: () => setFormError('تعذّر تنفيذ الاسترجاع — قد يتجاوز الرصيد القابل للاسترجاع.'),
+    onError: (error) => setFormError(translateSupabaseError(error, 'تعذّر تنفيذ الاسترجاع — قد يتجاوز الرصيد القابل للاسترجاع.')),
   })
 
   // V1 Implementation Gap Audit (2026-08-16): void_invoice had a working,
@@ -166,7 +192,7 @@ export function BillingPage() {
       setFormError(null)
       invalidateDetail()
     },
-    onError: () => setFormError('تعذّر إلغاء الفاتورة.'),
+    onError: (error) => setFormError(translateSupabaseError(error, 'تعذّر إلغاء الفاتورة.')),
   })
 
   const columns: DataTableColumn<InvoiceListRow>[] = [
@@ -180,7 +206,11 @@ export function BillingPage() {
       ),
     },
     { key: 'customer', header: 'العميل', render: (r) => r.customerName },
+    { key: 'source', header: 'المصدر', render: (r) => r.source },
+    { key: 'date', header: 'التاريخ', render: (r) => (r.issuedAt ? new Date(r.issuedAt).toLocaleDateString('ar-EG') : '—') },
     { key: 'total', header: 'الإجمالي', render: (r) => <MoneyDisplay amount={r.total} size="sm" /> },
+    { key: 'paid', header: 'المدفوع', render: (r) => <MoneyDisplay amount={r.paid} size="sm" tone={r.paid > 0 ? 'success' : 'default'} /> },
+    { key: 'outstanding', header: 'المتبقي', render: (r) => (r.outstanding > 0 ? <MoneyDisplay amount={r.outstanding} size="sm" tone="danger" /> : <span className="text-status-success text-sm">—</span>) },
     {
       key: 'status',
       header: 'الحالة',
@@ -193,9 +223,36 @@ export function BillingPage() {
     },
   ]
 
+  const totalOutstanding = invoices.reduce((sum, r) => sum + r.outstanding, 0)
+  const totalCollectedToday = invoices
+    .filter((r) => r.issuedAt && new Date(r.issuedAt).toDateString() === new Date().toDateString())
+    .reduce((sum, r) => sum + r.paid, 0)
+  const partialCount = invoices.filter((r) => r.paid > 0 && r.outstanding > 0).length
+  const owingCustomersCount = new Set(invoices.filter((r) => r.outstanding > 0).map((r) => r.customerName)).size
+
   return (
     <div>
       <PageHeader title="الفواتير والمدفوعات" description="سجل الفواتير والمدفوعات" />
+
+      <div className="mb-4 grid grid-cols-2 gap-3 md:grid-cols-4">
+        <div className="rounded-lg border border-border p-3">
+          <p className="text-xs text-text-secondary">إجمالي المستحقات</p>
+          <MoneyDisplay amount={totalOutstanding} size="lg" tone={totalOutstanding > 0 ? 'danger' : 'default'} />
+        </div>
+        <div className="rounded-lg border border-border p-3">
+          <p className="text-xs text-text-secondary">تحصيل اليوم</p>
+          <MoneyDisplay amount={totalCollectedToday} size="lg" tone="success" />
+        </div>
+        <div className="rounded-lg border border-border p-3">
+          <p className="text-xs text-text-secondary">فواتير مدفوعة جزئيًا</p>
+          <p className="text-2xl font-bold tabular-nums">{partialCount}</p>
+        </div>
+        <div className="rounded-lg border border-border p-3">
+          <p className="text-xs text-text-secondary">عملاء عليهم مستحقات</p>
+          <p className="text-2xl font-bold tabular-nums text-status-danger">{owingCustomersCount}</p>
+        </div>
+      </div>
+
       <DataTable columns={columns} rows={invoices} rowKey={(r) => r.id} isLoading={isLoading} emptyTitle="لا توجد فواتير" />
 
       <Dialog open={!!selectedInvoiceId} onOpenChange={(open) => !open && setSelectedInvoiceId(null)}>
