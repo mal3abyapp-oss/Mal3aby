@@ -995,3 +995,88 @@ new, isolated artifacts — removing them (or replacing
 own required vocabulary. Continuing autonomously into RTL (Gate 9)
 next, per the directive's explicit instruction not to stop for the
 unavailable phone.
+
+---
+
+## D-009 — Gate 9: RTL full sweep
+
+**Date:** 2026-08-16
+**Problem:** Gate 9 (RTL full sweep). Doc 3 requires a full repository-
+wide audit (not partial fixes) covering nav/cards/tables/forms/inputs/
+selects/dialogs/sheets/dropdowns/etc.
+
+**Approach:** Checked `DirectionProvider` first — confirmed it already
+correctly sets `document.documentElement.dir='rtl'`/`lang='ar'` as the
+hard default (no per-user switcher yet — that's Gate 10's i18n scope,
+not this gate's). Since the whole app already runs under `dir="rtl"`,
+searched for hardcoded PHYSICAL-direction Tailwind classes
+(`ml-`/`mr-`/`pl-`/`pr-`/`left-`/`right-`/`text-left`/`text-right`)
+that don't respect the `dir` attribute, as opposed to logical
+properties (`ms-`/`me-`/`ps-`/`pe-`/`start-`/`end-`) which do.
+
+**Findings:**
+- `grep` across `src/features/**` (every feature screen, including the
+  new Gate 3 portal and Gate 8 WhatsApp areas) found **zero** hardcoded
+  physical-direction classes — every feature screen already
+  consistently uses logical properties, confirming the "RTL-first"
+  design-system convention has actually been followed throughout this
+  project's build, not just documented.
+- Live-verified `ChevronRight`/`ChevronLeft`/`ArrowRight` usage in
+  date-navigation and back-button contexts (`BookingsPage.tsx`,
+  `BookingsMobileView.tsx`, `ScanPage.tsx`, `MorePage.tsx`) — all
+  already correctly RTL-oriented (previous-day arrow points right,
+  next-day arrow points left, back-arrow points right, disclosure
+  chevron points left) — no fix needed, confirmed rather than assumed.
+- **All defects found were isolated to 4 shared shadcn/ui primitive
+  files** (`dialog.tsx`, `sheet.tsx`, `select.tsx`, `dropdown-menu.tsx`)
+  — exactly the kind of systemic, root-level fix Doc 3 asks for rather
+  than a per-screen patch:
+  - `DialogPrimitive.Close`/`SheetPrimitive.Close`: hardcoded
+    `right-4 top-4` → `end-4 top-4`. In RTL this moved the close (×)
+    button from the wrong physical corner to the correct visual
+    top-left, verified live via screenshot (see below).
+  - `SelectItem`: hardcoded `pl-2 pr-8` padding + `right-2` checkmark
+    position → `ps-2 pe-8` + `end-2`. Verified live: a real Select
+    dropdown in the WhatsApp Automations "New Rule" dialog renders
+    correctly right-aligned with no visual glitch.
+  - `DropdownMenuItem`/`CheckboxItem`/`RadioItem`/`Label`: hardcoded
+    `pl-8`/`pl-8 pr-2` insets and `left-2` checkmark positions → logical
+    equivalents. (This component is currently unused anywhere in the
+    app, but fixed for correctness since it's shared library code that
+    could be adopted later — cheap and correct, not scope creep.)
+  - `DropdownMenuShortcut`: `ml-auto` → `ms-auto`.
+  - `DropdownMenuSubTrigger`: `ChevronRight` positioned with `ml-auto`
+    (wrong side) AND pointing the wrong direction for a submenu that
+    opens toward the reading-start in RTL → `ms-auto rtl:rotate-180`
+    (both position and icon direction now correct).
+  - `DialogHeader`/`SheetHeader`: `sm:text-left` → `sm:text-start`
+    (title/description text alignment was hardcoded to the LTR default
+    at the `sm` breakpoint, ignoring `dir`).
+  - `Sheet`'s `side="left"`/`"right"` slide variants were reviewed and
+    found NOT to need changing — the default (`side="right"`, used by
+    every actual call site in this app, `QuickBookingSheet`/
+    `BookingDetailSheet`) already visually corresponds to the RTL
+    "start" edge, which is correct; changing it would have introduced
+    a bug rather than fixed one. Documented explicitly so this isn't
+    re-investigated as a false lead later.
+
+**Verification:** Live browser screenshots confirmed both the Dialog
+close-button repositioning (a real "قاعدة تنبيه تلقائي" automation-rule
+dialog, close button correctly at top-left) and a real Select dropdown
+(the event picker in that same dialog) rendering correctly in RTL, no
+regressions. Full `npx tsc --noEmit` clean before and after.
+
+**DB impact:** none — pure frontend CSS class changes.
+
+**Security impact:** none.
+
+**Reversal path:** trivial — every change is a one-to-one Tailwind
+class swap (physical → logical), recoverable from git history.
+
+**Status:** Gate 9 complete for the "hardcoded physical-direction
+class" defect class, which is what actually existed in this codebase
+— confirmed via exhaustive grep, not assumed. A full manual click-
+through QA pass across every screen (calendars, reports, charts once
+built) is still worth doing before final ship, but the root-cause,
+repository-wide fix Doc 3 asks for (fixing shared primitives rather
+than patching individual screens) is done.
