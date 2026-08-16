@@ -18,6 +18,7 @@ export interface PaymentRow {
   method: string
   receivedAt: string
   reference: string | null
+  receivedByName: string | null
 }
 
 export const PAYMENT_METHOD_LABELS: Record<string, string> = {

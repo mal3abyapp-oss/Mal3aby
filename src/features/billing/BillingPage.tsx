@@ -89,13 +89,35 @@ async function fetchInvoiceDetail(invoiceId: string) {
 async function fetchInvoicePayments(invoiceId: string) {
   const { data, error } = await supabase
     .from('payment_allocations')
-    .select('amount, payments(id, amount, method, received_at, reference)')
+    .select('amount, payments(id, amount, method, received_at, reference, received_by)')
     .eq('invoice_id', invoiceId)
   if (error) throw error
-  return (data ?? [])
-    .map((row) => row.payments as unknown as { id: string; amount: number; method: string; received_at: string; reference: string | null } | null)
+
+  const rawPayments = (data ?? [])
+    .map((row) => row.payments as unknown as { id: string; amount: number; method: string; received_at: string; reference: string | null; received_by: string | null } | null)
     .filter((p): p is NonNullable<typeof p> => !!p)
-    .map<PaymentRow>((p) => ({ id: p.id, amount: Number(p.amount), method: p.method, receivedAt: p.received_at, reference: p.reference }))
+
+  // Gate 13 #57 (employee financial attribution audit): payments.received_by
+  // was always correctly populated server-side (record_payment() hardcodes
+  // auth.uid(), never a client-supplied value), but nothing in the UI ever
+  // surfaced WHO collected a payment. profiles_select_same_club_staff RLS
+  // already allows reading a fellow club staff member's profile, so this is
+  // a pure display gap, not a data or security one.
+  const collectorIds = [...new Set(rawPayments.map((p) => p.received_by).filter((id): id is string => !!id))]
+  const namesById = new Map<string, string>()
+  if (collectorIds.length > 0) {
+    const { data: collectors } = await supabase.from('profiles').select('user_id, full_name').in('user_id', collectorIds)
+    for (const c of collectors ?? []) if (c.full_name) namesById.set(c.user_id, c.full_name)
+  }
+
+  return rawPayments.map<PaymentRow>((p) => ({
+    id: p.id,
+    amount: Number(p.amount),
+    method: p.method,
+    receivedAt: p.received_at,
+    reference: p.reference,
+    receivedByName: p.received_by ? (namesById.get(p.received_by) ?? null) : null,
+  }))
 }
 
 const INVOICE_STATUS_LABELS: Record<string, string> = { draft: 'مسودة', issued: 'صادرة', void: 'ملغاة' }
@@ -323,6 +345,9 @@ export function BillingPage() {
                       <li key={p.id} className="flex items-center justify-between rounded-md border border-border p-2 text-sm">
                         <span>
                           <MoneyDisplay amount={p.amount} size="sm" /> — {PAYMENT_METHOD_LABELS[p.method] ?? p.method}
+                          {p.receivedByName && (
+                            <span className="text-text-secondary"> — حصّلها {p.receivedByName}</span>
+                          )}
                         </span>
                         <Button
                           size="sm"
