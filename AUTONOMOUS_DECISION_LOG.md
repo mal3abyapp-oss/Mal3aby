@@ -1824,3 +1824,77 @@ financial regression). WhatsApp remains explicitly out of scope per
 all prior directives; nothing in the new directive reopens it.
 
 Commit for task #62: `a79389b`.
+
+## D-015 — Payment Domain Audit (task #80): financial source-of-truth findings
+
+**Schema finding (good news)**: `invoices` and `bookings` have NO
+stored `payment_status` column at all -- there is no denormalized
+field that can go stale by definition. `invoices.status` is a
+workflow state (`draft`/`issued`/`void`), a genuinely separate concept
+from payment status, matching the new directive's Section 19
+distinction exactly. `outstanding_invoices` (built in Gate 11) already
+has the CORRECT formula: `total - allocated_payments +
+completed_refunds`, scoped to `status = 'issued'` invoices.
+
+**Real bug found: the correct formula is reimplemented five times,
+four of them wrong.** Grepped every screen that computes an
+outstanding/paid amount client-side instead of using the view:
+
+1. `CustomersPage.tsx` -- correct (explicitly reads
+   `outstanding_invoices`, per a prior Gate 11 fix note already in the
+   file).
+2. `BookingDetailSheet.tsx` (`fetchInvoiceSummary`) -- **WRONG**:
+   `total - sum(payment_allocations.amount)`, no refund netting.
+3. `BillingPage.tsx` (`fetchInvoices`) -- **WRONG**: same pattern,
+   used on the primary invoice list every club employee sees daily.
+4. `AcademyOverview.tsx` -- **WRONG**: same pattern, used to count
+   "outstanding academy invoices."
+5. `PlayerStatusPanel.tsx` -- **WRONG**: same pattern, used on the
+   player detail screen's financial summary.
+6. `CustomerDetailDialog.tsx` -- **WRONG**: same pattern, on a
+   customer's own detail view -- meaning a customer's list row
+   (`CustomersPage.tsx`, correct) and their own detail dialog
+   (`CustomerDetailDialog.tsx`, wrong) can show two different
+   outstanding balances for the exact same customer.
+
+**Concrete failure scenario (would happen today, not hypothetical)**:
+any booking/subscription that was paid in full and then partially
+refunded shows an outstanding balance that is too LOW (missing the
+refunded amount) on 4 of 5 screens that touch it, while
+`CustomersPage.tsx`/`OutstandingPage.tsx` show the correct, higher
+figure. This is precisely the "financial drift" the new master
+directive prohibits (Section 26: "unpaid invoice but paid booking" /
+wrong outstanding).
+
+**Second, independent bug found**: `AttentionNeeded.tsx`'s "unpaid"
+attention item queries `bookings.status = 'confirmed'` and treats
+every such row as needing payment attention, with zero join against
+invoices/payments -- conflating operational status with payment status
+exactly as Section 19 warns against. Confirmed against real data: rows
+`45e0e464-620f-49be-ac22-fff5bc1666e3`, `e02f1f57-...`, and
+`1cead4df-...` are `confirmed` AND fully paid
+(`allocated == total_price`), yet this screen would still surface them
+as "حجز مؤكد بدون دفع كامل" (confirmed booking without full payment)
+on the reception/manager dashboard today.
+
+**Architecture decision for task #81 (per Section 20's explicit
+guidance -- single source of truth, then a thin projection only where
+justified)**: rather than have every screen keep independently
+re-deriving `outstanding` from `payment_allocations`+`refunds`, build
+one canonical SQL function,
+`get_invoice_payment_summary(invoice_ids uuid[])`, returning per
+invoice: `total`, `paid` (net of refunds), `outstanding`, and a
+`payment_status` enum (`unpaid`/`partially_paid`/`paid`/
+`partially_refunded`/`refunded`/`void`), reusing `outstanding_invoices`'s
+exact formula but not restricted to `status='issued'` invoices (draft/
+void need a status too, just not an "outstanding" one). Every screen
+above gets migrated to call this function instead of hand-rolling the
+math -- this is the "REUSE -> EXTEND -> NORMALIZE, never DUPLICATE"
+rule from Part II Section 16 applied concretely. `AttentionNeeded.tsx`'s
+unpaid-booking query gets a join against this same summary instead of
+trusting `status = 'confirmed'` alone.
+
+No fix applied yet in this entry -- audit only, per the directive's
+explicit instruction not to build before the audit is complete. Task
+#81 (booking payment-state synchronization) is the next task and
+implements this design.
