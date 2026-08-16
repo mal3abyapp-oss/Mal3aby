@@ -418,3 +418,130 @@ Gate 3 scope (deeper "My Subscriptions"/"My Payments" screens, the
 photo-request UI itself, rate-limiting `find_claimable_customer`) is
 tracked as follow-up in the execution state file, not blocking
 progress to Gate 4+.
+
+---
+
+## D-004 — Gate 4: subscription lifecycle operations + a genuine RLS recursion bug
+
+**Date:** 2026-08-16
+**Problem:** Gate 4 (Memberships / Subscriptions / Operational
+Entitlements). Read the existing `subscriptions`/`subscription_freezes`
+schema and every subscription-related RPC before assuming Doc 3's
+"professional subscription" requirements were unmet.
+
+**Findings:**
+- `subscriptions.status` already has a clean model (pending/active/
+  frozen/expired/cancelled) — no `suspended`/`grace_period` literal
+  values needed, matching the directive's own "don't blindly adopt
+  Doc's literal state names if the system already has a better fit"
+  guidance.
+- `freeze_subscription()` already existed, with a real history table
+  (`subscription_freezes`, rows never overwritten) and reason/audit
+  logging. `get_subscription_effective_end_date()` already correctly
+  sums every `extends_expiry=true` freeze period, not just the latest.
+- **Real gap confirmed:** no `unfreeze_subscription()` — a frozen
+  subscription had no path back to active except a direct
+  `subscriptions` table UPDATE via the `subscriptions_update` RLS
+  policy, which bypasses `write_audit_log()` entirely (unlike every
+  other lifecycle transition in this schema).
+- **Real gap confirmed:** no dedicated academy-subscription
+  cancellation RPC. `cancel_platform_subscription()`/
+  `renew_platform_subscription()` exist but are for the PLATFORM/
+  commercial billing subscription — the exact naming collision Doc 3
+  itself warns about, not the academy member's subscription.
+- Repo-wide search confirmed no frontend code does a direct
+  `subscriptions` table UPDATE of `status` today — closing this gap via
+  a hard trigger-based guard (see below) breaks nothing currently
+  working.
+
+**Chosen solution:**
+- `unfreeze_subscription(p_subscription_id, p_reason)`: returns a
+  frozen subscription to active. If ending a freeze before its
+  originally scheduled `end_date`, shortens the freeze record's
+  `end_date` to today (never deletes the history of days actually
+  elapsed) — UNLESS the freeze hadn't started yet at all (future-dated,
+  cancelled before taking effect), in which case there's no valid
+  shortened `end_date` satisfying `end_date > start_date`, so that
+  0-elapsed-day record is removed outright (the cancellation action
+  itself is still audit-logged).
+- `cancel_subscription(p_subscription_id, p_reason)`: requires a
+  non-empty reason, permission-gated on `subscription.update`,
+  audit-logged with the previous status recorded.
+- `protect_subscription_status_transitions()` trigger (BEFORE UPDATE,
+  same silent-revert pattern as this codebase's established
+  `protect_club_status_from_non_platform_owner`/Gate 3's
+  `protect_customer_identity_columns`): any direct `status` change not
+  flagged via a transaction-local GUC
+  (`app.allow_subscription_status_transition`) is silently reverted.
+  Every legitimate lifecycle RPC (`_activate_subscription_if_due_internal`,
+  `freeze_subscription`, `unfreeze_subscription`, `cancel_subscription`)
+  sets the flag for its own transaction only before its own status
+  UPDATE.
+
+**Bugs found and fixed via testing (not assumed correct after writing):**
+1. **Genuine circular RLS dependency**, caught via real black-box RPC
+   testing (not SQL inspection — a raw superuser session doesn't
+   exercise RLS at all): querying `subscriptions` under a real
+   `authenticated` session raised "infinite recursion detected in
+   policy for relation enrollments." Root cause: `enrollments_select`
+   (pre-existing, staff/coach policy) references `groups.coach_id`,
+   which requires evaluating `groups`' own RLS — including Gate 3's
+   `groups_self_service_select`, which itself queried `enrollments`
+   directly. `enrollments → groups → enrollments → ...`. Fixed by
+   introducing `is_guardian_of_group()`, a `SECURITY DEFINER` function
+   (same escape-hatch pattern as this schema's existing
+   `has_permission()`/`user_club_ids()`) whose internal query bypasses
+   the caller's own RLS context, breaking the cycle while keeping the
+   exact same authorization semantics. Verified fixed via a direct
+   `set role authenticated` + JWT-claims simulation, confirming
+   `enrollments`/`groups`/`subscriptions` are all queryable again.
+2. **Unfreezing a not-yet-started freeze crashed** on the
+   `subscription_freezes_valid_period` check constraint (`end_date >
+   start_date`) — found identically to bug 1, via real RPC calls, not
+   assumption. Fixed as described above (delete the 0-elapsed-day
+   record instead of trying to shrink it below its own start).
+
+**Full verified test matrix (real staff-role access token, temporarily
+granted `club_owner` on the QA club then revoked afterward):**
+- Direct unauthorized `status` UPDATE (no RPC flag set): silently
+  reverted, confirmed via direct SQL. ✅
+- `freeze_subscription` → subscription becomes `frozen`. ✅
+- `unfreeze_subscription` (ending a freeze before it had even started)
+  → subscription becomes `active` again, the 0-day freeze record is
+  removed (confirmed empty via a follow-up read), no constraint
+  violation. ✅
+- `cancel_subscription` → subscription becomes `cancelled`. ✅
+- Every transition produced a correctly-ordered `audit_logs` entry with
+  the right action name and reason text. ✅
+- `enrollments`/`groups`/`subscriptions` all correctly queryable again
+  post-fix under a real `authenticated` role. ✅
+
+All test-induced state (the subscription's status, the temporary
+`club_memberships` grant) was reverted afterward.
+
+**DB impact:** `unfreeze_subscription()` + `cancel_subscription()` (new
+RPCs), `protect_subscription_status_transitions()` trigger,
+`is_guardian_of_group()` (new, breaks the RLS cycle), `freeze_subscription`/
+`_activate_subscription_if_due_internal` updated to set the new GUC
+flag, `groups_self_service_select` policy redefined against the new
+function. No schema/column changes, no data migration needed.
+
+**Security impact:** net-positive — closes the "status changes bypass
+audit log" gap Doc 3 explicitly calls out, while the RLS recursion fix
+restores correct (not broadened or narrowed) access — same rows
+visible to the same people as intended by the original Gate 3 policies,
+just without crashing.
+
+**Reversal path:** fully reversible — every change is a clean
+`create or replace`/`create policy`; recoverable from
+`list_migrations`/git history.
+
+**Status:** Gate 4 lifecycle-operations slice complete and verified.
+Deeper Doc 3 "professional subscription" fields (explicit session-count/
+remaining-sessions tracking, allowed-days/allowed-entry-times) are
+NOT yet built — `subscriptions.plan_type` is currently a simple enum
+(monthly/quarterly/season/package) with no structured session-count
+column. Scoping that properly requires understanding how `package`-type
+plans currently track usage (if at all) before adding columns — tracked
+as explicit follow-up in the execution state file, not silently
+dropped.
