@@ -20,9 +20,11 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
+import { StatusBadge } from '@/components/ui/status-badge'
 import { type FieldRow, type PricingRuleRow, type OperatingHoursRow } from '@/lib/domain/fields'
 import { OperatingHoursEditor } from './OperatingHoursEditor'
 import { PricingEditor } from './PricingEditor'
+import { resolveHoursForDay, useResolvedFieldPrice } from '@/features/bookings/useFieldPricing'
 
 // V1 Implementation Gap Audit (2026-08-16): field_operating_hours had
 // full RLS CRUD in place since Phase 5 but no UI at all -- a manager had
@@ -75,6 +77,40 @@ async function fetchPricingRules(clubId: string, fieldId: string) {
   }))
 }
 
+async function fetchAllOperatingHours(clubId: string) {
+  const { data, error } = await supabase
+    .from('field_operating_hours')
+    .select('field_id, branch_id, day_of_week, open_time, close_time')
+    .eq('club_id', clubId)
+  if (error) throw error
+  return data ?? []
+}
+
+async function fetchTodayBookingCounts(clubId: string) {
+  const today = new Date().toISOString().slice(0, 10)
+  const { data, error } = await supabase
+    .from('bookings')
+    .select('field_id, start_at, status')
+    .eq('club_id', clubId)
+    .gte('start_at', `${today}T00:00:00`)
+    .lte('start_at', `${today}T23:59:59`)
+    .neq('status', 'cancelled')
+  if (error) throw error
+  return data ?? []
+}
+
+async function fetchActiveBlocksNow(clubId: string) {
+  const now = new Date().toISOString()
+  const { data, error } = await supabase
+    .from('field_blocks')
+    .select('field_id, start_at, end_at')
+    .eq('club_id', clubId)
+    .lte('start_at', now)
+    .gte('end_at', now)
+  if (error) throw error
+  return data ?? []
+}
+
 async function fetchOperatingHours(fieldId: string) {
   const { data, error } = await supabase
     .from('field_operating_hours')
@@ -90,6 +126,14 @@ async function fetchOperatingHours(fieldId: string) {
     openTime: r.open_time,
     closeTime: r.close_time,
   }))
+}
+
+function FieldCurrentPriceCell({ fieldId, date }: { fieldId: string; date: string }) {
+  const nowTime = new Date().toTimeString().slice(0, 5)
+  const { data: price, isLoading } = useResolvedFieldPrice(fieldId, date, `${nowTime}:00`, `${nowTime}:00`)
+  if (isLoading) return <span className="text-text-secondary">...</span>
+  if (price == null) return <span className="text-status-danger">لا يوجد سعر</span>
+  return <span className="font-medium tabular-nums">{price.toFixed(0)} ج.م/ساعة</span>
 }
 
 export function FieldsManagement() {
@@ -111,6 +155,24 @@ export function FieldsManagement() {
   const { data: branches = [] } = useQuery({
     queryKey: ['branches-for-fields', currentClubId],
     queryFn: () => fetchBranches(currentClubId!),
+    enabled: !!currentClubId,
+  })
+
+  const { data: allHoursRows = [] } = useQuery({
+    queryKey: ['field-operating-hours-all', currentClubId],
+    queryFn: () => fetchAllOperatingHours(currentClubId!),
+    enabled: !!currentClubId,
+  })
+
+  const { data: todayBookings = [] } = useQuery({
+    queryKey: ['fields-today-bookings', currentClubId],
+    queryFn: () => fetchTodayBookingCounts(currentClubId!),
+    enabled: !!currentClubId,
+  })
+
+  const { data: activeBlocks = [] } = useQuery({
+    queryKey: ['fields-active-blocks', currentClubId],
+    queryFn: () => fetchActiveBlocksNow(currentClubId!),
     enabled: !!currentClubId,
   })
 
@@ -148,6 +210,9 @@ export function FieldsManagement() {
     createFieldMutation.mutate()
   }
 
+  const today = new Date().toISOString().slice(0, 10)
+  const dayOfWeek = new Date().getDay()
+
   const fieldColumns: DataTableColumn<FieldRow>[] = [
     {
       key: 'name',
@@ -165,14 +230,35 @@ export function FieldsManagement() {
       ),
     },
     { key: 'sport', header: 'الرياضة', render: (f) => f.sport },
-    { key: 'status', header: 'الحالة', render: (f) => (f.status === 'active' ? 'نشط' : f.status) },
     {
-      key: 'config',
-      header: 'الإعداد',
-      render: (f) =>
-        f.id === manageField?.id ? null : (
-          <span className="text-xs text-text-secondary">اضغط على الاسم لإدارة المواعيد والأسعار</span>
-        ),
+      key: 'hours',
+      header: 'مواعيد اليوم',
+      render: (f) => {
+        const hours = resolveHoursForDay(allHoursRows, f.id, dayOfWeek)
+        if (hours.isUnrestricted) return <span className="text-text-secondary">مفتوح على مدار اليوم</span>
+        if (hours.isClosed) return <span className="text-status-danger">مغلق اليوم</span>
+        return <span className="tabular-nums">{hours.openTime?.slice(0, 5)}–{hours.closeTime?.slice(0, 5)}</span>
+      },
+    },
+    {
+      key: 'price',
+      header: 'السعر الحالي',
+      render: (f) => <FieldCurrentPriceCell fieldId={f.id} date={today} />,
+    },
+    {
+      key: 'today',
+      header: 'حجوزات اليوم',
+      render: (f) => <span className="tabular-nums">{todayBookings.filter((b) => b.field_id === f.id).length}</span>,
+    },
+    {
+      key: 'blocked',
+      header: 'الحالة الآن',
+      render: (f) => {
+        const isBlocked = activeBlocks.some((b) => b.field_id === f.id)
+        if (isBlocked) return <StatusBadge tone="danger" label="مغلق مؤقتًا" />
+        if (f.status !== 'active') return <StatusBadge tone="neutral" label="غير نشط" />
+        return <StatusBadge tone="success" label="متاح" />
+      },
     },
   ]
 
