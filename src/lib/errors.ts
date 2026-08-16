@@ -21,6 +21,7 @@ const MESSAGE_RULES: Array<[RegExp, string]> = [
   [/authentication required/i, 'يجب تسجيل الدخول أولاً.'],
   [/group is at full capacity/i, 'المجموعة وصلت إلى الحد الأقصى من اللاعبين.'],
   [/group is not accepting enrollments/i, 'هذه المجموعة لا تقبل تسجيلات جديدة حاليًا.'],
+  [/already actively enrolled|enrollments_active_player_group_idx|enrollments_one_active_per_player_group/i, 'هذا اللاعب مسجّل بالفعل في هذه المجموعة.'],
   [/group not found/i, 'المجموعة غير موجودة.'],
   [/player not found/i, 'اللاعب غير موجود في هذا النادي.'],
   [/guardian not found/i, 'ولي الأمر المحدد غير موجود في هذا النادي.'],
