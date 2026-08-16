@@ -180,6 +180,22 @@ export function BookingsPage() {
     },
   })
 
+  // V1 Implementation Gap Audit (2026-08-16): mark_booking_no_show had a
+  // working, permission-gated RPC since Phase 6/9 but no UI anywhere --
+  // a receptionist/manager had no way to record a no-show through the
+  // product, despite it being a named V1 booking lifecycle state.
+  const noShowMutation = useMutation({
+    mutationFn: async () => {
+      if (!selectedBooking) throw new Error('no booking selected')
+      const { error } = await supabase.rpc('mark_booking_no_show', { p_booking_id: selectedBooking.id })
+      if (error) throw error
+    },
+    onSuccess: () => {
+      setSelectedBooking(null)
+      invalidateGrid()
+    },
+  })
+
   const quickBlockMutation = useMutation({
     mutationFn: async () => {
       if (!slotSelection) throw new Error('no slot selected')
@@ -380,7 +396,15 @@ export function BookingsPage() {
                 </div>
               )}
 
-              {selectedBooking.status !== 'cancelled' && (
+              {(selectedBooking.status === 'confirmed' || selectedBooking.status === 'checked_in') && (
+                <div className="flex flex-col gap-2 border-t border-border pt-3">
+                  <Button variant="outline" size="sm" disabled={noShowMutation.isPending} onClick={() => noShowMutation.mutate()}>
+                    {noShowMutation.isPending ? 'جارٍ التسجيل...' : 'تسجيل عدم حضور'}
+                  </Button>
+                </div>
+              )}
+
+              {selectedBooking.status !== 'cancelled' && selectedBooking.status !== 'no_show' && (
                 <div className="flex flex-col gap-2 border-t border-border pt-3">
                   <Input placeholder="سبب الإلغاء" value={cancelReason} onChange={(e) => setCancelReason(e.target.value)} />
                   <Button variant="destructive" size="sm" disabled={!cancelReason.trim() || cancelMutation.isPending} onClick={() => cancelMutation.mutate()}>

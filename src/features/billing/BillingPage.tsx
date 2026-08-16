@@ -84,6 +84,7 @@ export function BillingPage() {
   const [refundPaymentId, setRefundPaymentId] = useState<string | null>(null)
   const [refundAmount, setRefundAmount] = useState('')
   const [refundReason, setRefundReason] = useState('')
+  const [voidReason, setVoidReason] = useState('')
   const [formError, setFormError] = useState<string | null>(null)
 
   const { data: invoices = [], isLoading } = useQuery({
@@ -145,6 +146,27 @@ export function BillingPage() {
       invalidateDetail()
     },
     onError: () => setFormError('تعذّر تنفيذ الاسترجاع — قد يتجاوز الرصيد القابل للاسترجاع.'),
+  })
+
+  // V1 Implementation Gap Audit (2026-08-16): void_invoice had a working,
+  // permission-gated RPC but no UI anywhere. Only offered in this UI when
+  // the invoice has zero payments allocated (see the "لا توجد مدفوعات
+  // بعد" guard below) -- the RPC itself doesn't block voiding a
+  // partially/fully-paid invoice, so this UI is deliberately more
+  // conservative than the server strictly requires, to avoid stranding
+  // an already-allocated payment against a voided invoice.
+  const voidMutation = useMutation({
+    mutationFn: async () => {
+      if (!selectedInvoiceId) throw new Error('no invoice selected')
+      const { error } = await supabase.rpc('void_invoice', { p_invoice_id: selectedInvoiceId, p_reason: voidReason })
+      if (error) throw error
+    },
+    onSuccess: () => {
+      setVoidReason('')
+      setFormError(null)
+      invalidateDetail()
+    },
+    onError: () => setFormError('تعذّر إلغاء الفاتورة.'),
   })
 
   const columns: DataTableColumn<InvoiceListRow>[] = [
@@ -275,6 +297,23 @@ export function BillingPage() {
                       تسجيل
                     </Button>
                   </div>
+                </div>
+              )}
+
+              {detail.status === 'issued' && payments.length === 0 && (
+                <div className="flex flex-col gap-2 border-t border-border pt-3 print:hidden">
+                  <p className="font-medium">إلغاء الفاتورة</p>
+                  <p className="text-xs text-text-secondary">متاح فقط للفواتير التي لم تُسجَّل عليها أي دفعة بعد.</p>
+                  <Input placeholder="سبب الإلغاء" value={voidReason} onChange={(e) => setVoidReason(e.target.value)} />
+                  <Button
+                    variant="destructive"
+                    size="sm"
+                    className="w-fit"
+                    disabled={!voidReason.trim() || voidMutation.isPending}
+                    onClick={() => voidMutation.mutate()}
+                  >
+                    {voidMutation.isPending ? 'جارٍ الإلغاء...' : 'إلغاء الفاتورة'}
+                  </Button>
                 </div>
               )}
 
