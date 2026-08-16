@@ -81,7 +81,7 @@ export function TemplatesTab() {
     mutationFn: async () => {
       const variables = variablesInput.split(',').map((v) => v.trim()).filter(Boolean)
       const { error } = await supabase.from('whatsapp_templates').upsert(
-        { club_id: currentClubId, event_key: eventKey, language, body, variables },
+        { club_id: currentClubId as string, event_key: eventKey, language, body, variables },
         { onConflict: 'club_id,event_key,language' },
       )
       if (error) throw error

@@ -56,7 +56,7 @@ export function BookingsMobileView({
 
   function slotMinutesOf(iso: string) {
     const { time } = fromInstant(iso, clubTimezone)
-    const [h, m] = time.split(':').map(Number)
+    const [h = 0, m = 0] = time.split(':').map(Number)
     return h * 60 + m
   }
 
@@ -81,7 +81,7 @@ export function BookingsMobileView({
   // "now" as observed in the venue's timezone, not the browser's.
   const nowMin = useMemo(() => {
     const { time } = fromInstant(new Date(), clubTimezone)
-    const [h, m] = time.split(':').map(Number)
+    const [h = 0, m = 0] = time.split(':').map(Number)
     return h * 60 + m
   }, [clubTimezone])
   const nowBusy = isToday && fieldBookings.find((b) => nowMin >= slotMinutesOf(b.startAt) && nowMin < slotMinutesOf(b.endAt))

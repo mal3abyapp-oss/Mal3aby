@@ -214,7 +214,7 @@ export function BookingsPage() {
     // whenever they happen to match).
     if (!clubTimezone) return 0
     const { time } = fromInstant(iso, clubTimezone)
-    const [h, m] = time.split(':').map(Number)
+    const [h = 0, m = 0] = time.split(':').map(Number)
     return h * 60 + m
   }
 
@@ -426,6 +426,7 @@ export function BookingsPage() {
       <BookingDetailSheet
         booking={selectedBooking}
         fieldName={fields.find((f) => f.id === selectedBooking?.fieldId)?.name ?? ''}
+        clubTimezone={clubTimezone ?? 'UTC'}
         onOpenChange={(open) => !open && setSelectedBooking(null)}
         onChanged={invalidateGrid}
       />

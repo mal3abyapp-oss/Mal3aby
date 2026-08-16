@@ -31,15 +31,15 @@
  * hardcoded constant.
  */
 function getTimeZoneOffsetMinutes(ianaTimeZone: string, dateStr: string, timeStr: string): number {
-  const [year, month, day] = dateStr.split('-').map(Number)
-  const [hour, minute] = timeStr.split(':').map(Number)
+  const [year = 1970, month = 1, day = 1] = dateStr.split('-').map(Number)
+  const [hour = 0, minute = 0] = timeStr.split(':').map(Number)
 
   // Interpret the wall-clock values as if they were UTC, then ask the
   // Intl formatter what that same instant reads as in the target zone.
   // The difference between the two tells us the zone's offset at that
   // moment (handles DST correctly because we're asking about this
   // specific date, not a fixed rule).
-  const asUtc = Date.UTC(year, (month ?? 1) - 1, day, hour ?? 0, minute ?? 0, 0)
+  const asUtc = Date.UTC(year, month - 1, day, hour, minute, 0)
 
   const dtf = new Intl.DateTimeFormat('en-US', {
     timeZone: ianaTimeZone,
@@ -78,14 +78,14 @@ function getTimeZoneOffsetMinutes(ianaTimeZone: string, dateStr: string, timeStr
  */
 export function toInstant(dateStr: string, timeStr: string, ianaTimeZone: string): string {
   const normalizedTime = timeStr.length === 5 ? `${timeStr}:00` : timeStr
-  const [year, month, day] = dateStr.split('-').map(Number)
-  const [hour, minute, second] = normalizedTime.split(':').map(Number)
+  const [year = 1970, month = 1, day = 1] = dateStr.split('-').map(Number)
+  const [hour = 0, minute = 0, second = 0] = normalizedTime.split(':').map(Number)
 
   const offsetMinutes = getTimeZoneOffsetMinutes(ianaTimeZone, dateStr, timeStr)
 
   // The instant equals the wall-clock time treated as UTC, minus the
   // zone's offset from UTC (a zone at UTC+3 means local 18:00 is 15:00 UTC).
-  const asUtcMillis = Date.UTC(year, (month ?? 1) - 1, day, hour ?? 0, minute ?? 0, second ?? 0)
+  const asUtcMillis = Date.UTC(year, month - 1, day, hour, minute, second)
   const instantMillis = asUtcMillis - offsetMinutes * 60000
 
   return new Date(instantMillis).toISOString()

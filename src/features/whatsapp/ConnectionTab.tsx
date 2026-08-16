@@ -70,7 +70,7 @@ export function ConnectionTab() {
   // fetches the real QR payload it received back from WhatsApp.
   const pairMutation = useMutation({
     mutationFn: async () => {
-      const { error: rpcError } = await supabase.rpc('start_whatsapp_pairing', { p_club_id: currentClubId })
+      const { error: rpcError } = await supabase.rpc('start_whatsapp_pairing', { p_club_id: currentClubId as string })
       if (rpcError) throw rpcError
 
       const { data: connectData, error: connectError } = await supabase.functions.invoke('whatsapp-bridge', {
@@ -115,7 +115,7 @@ export function ConnectionTab() {
 
   const disconnectMutation = useMutation({
     mutationFn: async () => {
-      const { error: rpcError } = await supabase.rpc('disconnect_whatsapp', { p_club_id: currentClubId })
+      const { error: rpcError } = await supabase.rpc('disconnect_whatsapp', { p_club_id: currentClubId as string })
       if (rpcError) throw rpcError
       // Best-effort: also tell the connector service to actually log
       // out the real session. If the connector isn't reachable, the DB
@@ -132,7 +132,7 @@ export function ConnectionTab() {
   })
 
   const status = connection?.status ?? 'disconnected'
-  const statusMeta = STATUS_LABELS[status] ?? STATUS_LABELS.disconnected
+  const statusMeta = STATUS_LABELS[status] ?? { label: status, tone: 'neutral' as const }
 
   return (
     <div className="flex flex-col gap-4 py-4">

@@ -61,7 +61,7 @@ export function AutomationsTab() {
     mutationFn: async () => {
       const { error } = await supabase.from('whatsapp_automations').upsert(
         {
-          club_id: currentClubId,
+          club_id: currentClubId as string,
           event_type: eventType,
           template_event_key: eventType,
           delay_minutes: Number(delayMinutes) || 0,

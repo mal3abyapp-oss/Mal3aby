@@ -51,6 +51,7 @@ async function fetchCustomers(clubId: string, search: string) {
       .select('customer_id, outstanding')
       .in('customer_id', customerIds)
     for (const row of outstandingRows ?? []) {
+      if (!row.customer_id) continue
       const amount = Number(row.outstanding)
       if (amount > 0) {
         outstandingByCustomer.set(row.customer_id, (outstandingByCustomer.get(row.customer_id) ?? 0) + amount)

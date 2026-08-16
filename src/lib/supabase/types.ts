@@ -50,6 +50,13 @@ export type Database = {
             referencedRelation: "clubs"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "age_groups_club_id_fkey"
+            columns: ["club_id"]
+            isOneToOne: false
+            referencedRelation: "commercial_entitlements_usage"
+            referencedColumns: ["club_id"]
+          },
         ]
       }
       attendance: {
@@ -90,6 +97,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "clubs"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "attendance_club_id_fkey"
+            columns: ["club_id"]
+            isOneToOne: false
+            referencedRelation: "commercial_entitlements_usage"
+            referencedColumns: ["club_id"]
           },
           {
             foreignKeyName: "attendance_player_id_fkey"
@@ -169,6 +183,13 @@ export type Database = {
             referencedRelation: "clubs"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "audit_logs_club_id_fkey"
+            columns: ["club_id"]
+            isOneToOne: false
+            referencedRelation: "commercial_entitlements_usage"
+            referencedColumns: ["club_id"]
+          },
         ]
       }
       automatic_trial_entitlements: {
@@ -203,6 +224,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "clubs"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "automatic_trial_entitlements_club_id_fkey"
+            columns: ["club_id"]
+            isOneToOne: false
+            referencedRelation: "commercial_entitlements_usage"
+            referencedColumns: ["club_id"]
           },
         ]
       }
@@ -247,6 +275,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "clubs"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "booking_series_club_id_fkey"
+            columns: ["club_id"]
+            isOneToOne: false
+            referencedRelation: "commercial_entitlements_usage"
+            referencedColumns: ["club_id"]
           },
           {
             foreignKeyName: "booking_series_customer_id_fkey"
@@ -353,6 +388,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "bookings_club_id_fkey"
+            columns: ["club_id"]
+            isOneToOne: false
+            referencedRelation: "commercial_entitlements_usage"
+            referencedColumns: ["club_id"]
+          },
+          {
             foreignKeyName: "bookings_customer_id_fkey"
             columns: ["customer_id"]
             isOneToOne: false
@@ -437,6 +479,13 @@ export type Database = {
             referencedRelation: "clubs"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "branches_club_id_fkey"
+            columns: ["club_id"]
+            isOneToOne: false
+            referencedRelation: "commercial_entitlements_usage"
+            referencedColumns: ["club_id"]
+          },
         ]
       }
       club_memberships: {
@@ -474,6 +523,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "clubs"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "club_memberships_club_id_fkey"
+            columns: ["club_id"]
+            isOneToOne: false
+            referencedRelation: "commercial_entitlements_usage"
+            referencedColumns: ["club_id"]
           },
           {
             foreignKeyName: "club_memberships_role_id_fkey"
@@ -544,6 +600,108 @@ export type Database = {
         }
         Relationships: []
       }
+      commercial_entitlements: {
+        Row: {
+          academy_limit: number | null
+          branch_limit: number | null
+          club_id: string
+          field_limit: number | null
+          notes: string | null
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          academy_limit?: number | null
+          branch_limit?: number | null
+          club_id: string
+          field_limit?: number | null
+          notes?: string | null
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          academy_limit?: number | null
+          branch_limit?: number | null
+          club_id?: string
+          field_limit?: number | null
+          notes?: string | null
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "commercial_entitlements_club_id_fkey"
+            columns: ["club_id"]
+            isOneToOne: true
+            referencedRelation: "clubs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "commercial_entitlements_club_id_fkey"
+            columns: ["club_id"]
+            isOneToOne: true
+            referencedRelation: "commercial_entitlements_usage"
+            referencedColumns: ["club_id"]
+          },
+        ]
+      }
+      commercial_upgrade_requests: {
+        Row: {
+          club_id: string
+          created_at: string
+          current_limit: number | null
+          current_usage: number
+          id: string
+          limit_type: string
+          note: string | null
+          requested_by: string
+          reviewed_at: string | null
+          reviewed_by: string | null
+          status: string
+        }
+        Insert: {
+          club_id: string
+          created_at?: string
+          current_limit?: number | null
+          current_usage: number
+          id?: string
+          limit_type: string
+          note?: string | null
+          requested_by: string
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          status?: string
+        }
+        Update: {
+          club_id?: string
+          created_at?: string
+          current_limit?: number | null
+          current_usage?: number
+          id?: string
+          limit_type?: string
+          note?: string | null
+          requested_by?: string
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "commercial_upgrade_requests_club_id_fkey"
+            columns: ["club_id"]
+            isOneToOne: false
+            referencedRelation: "clubs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "commercial_upgrade_requests_club_id_fkey"
+            columns: ["club_id"]
+            isOneToOne: false
+            referencedRelation: "commercial_entitlements_usage"
+            referencedColumns: ["club_id"]
+          },
+        ]
+      }
       contact_requests: {
         Row: {
           business_name: string | null
@@ -580,6 +738,87 @@ export type Database = {
         }
         Relationships: []
       }
+      customer_photo_update_requests: {
+        Row: {
+          club_id: string
+          created_at: string
+          customer_id: string | null
+          id: string
+          new_photo_url: string
+          old_photo_url: string | null
+          player_id: string | null
+          requested_by: string
+          review_reason: string | null
+          reviewed_at: string | null
+          reviewed_by: string | null
+          status: string
+        }
+        Insert: {
+          club_id: string
+          created_at?: string
+          customer_id?: string | null
+          id?: string
+          new_photo_url: string
+          old_photo_url?: string | null
+          player_id?: string | null
+          requested_by: string
+          review_reason?: string | null
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          status?: string
+        }
+        Update: {
+          club_id?: string
+          created_at?: string
+          customer_id?: string | null
+          id?: string
+          new_photo_url?: string
+          old_photo_url?: string | null
+          player_id?: string | null
+          requested_by?: string
+          review_reason?: string | null
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "customer_photo_update_requests_club_id_fkey"
+            columns: ["club_id"]
+            isOneToOne: false
+            referencedRelation: "clubs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "customer_photo_update_requests_club_id_fkey"
+            columns: ["club_id"]
+            isOneToOne: false
+            referencedRelation: "commercial_entitlements_usage"
+            referencedColumns: ["club_id"]
+          },
+          {
+            foreignKeyName: "customer_photo_update_requests_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "customers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "customer_photo_update_requests_player_id_fkey"
+            columns: ["player_id"]
+            isOneToOne: false
+            referencedRelation: "players"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "customer_photo_update_requests_player_id_fkey"
+            columns: ["player_id"]
+            isOneToOne: false
+            referencedRelation: "players_safe"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       customers: {
         Row: {
           address: string | null
@@ -598,6 +837,7 @@ export type Database = {
           notes: string | null
           photo_url: string | null
           updated_at: string | null
+          user_id: string | null
           whatsapp: string | null
         }
         Insert: {
@@ -617,6 +857,7 @@ export type Database = {
           notes?: string | null
           photo_url?: string | null
           updated_at?: string | null
+          user_id?: string | null
           whatsapp?: string | null
         }
         Update: {
@@ -636,6 +877,7 @@ export type Database = {
           notes?: string | null
           photo_url?: string | null
           updated_at?: string | null
+          user_id?: string | null
           whatsapp?: string | null
         }
         Relationships: [
@@ -645,6 +887,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "clubs"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "customers_club_id_fkey"
+            columns: ["club_id"]
+            isOneToOne: false
+            referencedRelation: "commercial_entitlements_usage"
+            referencedColumns: ["club_id"]
           },
         ]
       }
@@ -686,6 +935,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "clubs"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "enrollments_club_id_fkey"
+            columns: ["club_id"]
+            isOneToOne: false
+            referencedRelation: "commercial_entitlements_usage"
+            referencedColumns: ["club_id"]
           },
           {
             foreignKeyName: "enrollments_group_id_fkey"
@@ -760,6 +1016,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "field_blocks_club_id_fkey"
+            columns: ["club_id"]
+            isOneToOne: false
+            referencedRelation: "commercial_entitlements_usage"
+            referencedColumns: ["club_id"]
+          },
+          {
             foreignKeyName: "field_blocks_field_id_fkey"
             columns: ["field_id"]
             isOneToOne: false
@@ -813,6 +1076,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "clubs"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "field_operating_hours_club_id_fkey"
+            columns: ["club_id"]
+            isOneToOne: false
+            referencedRelation: "commercial_entitlements_usage"
+            referencedColumns: ["club_id"]
           },
           {
             foreignKeyName: "field_operating_hours_field_id_fkey"
@@ -889,6 +1159,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "clubs"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fields_club_id_fkey"
+            columns: ["club_id"]
+            isOneToOne: false
+            referencedRelation: "commercial_entitlements_usage"
+            referencedColumns: ["club_id"]
           },
         ]
       }
@@ -1003,6 +1280,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "clubs"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "groups_club_id_fkey"
+            columns: ["club_id"]
+            isOneToOne: false
+            referencedRelation: "commercial_entitlements_usage"
+            referencedColumns: ["club_id"]
           },
           {
             foreignKeyName: "groups_field_id_fkey"
@@ -1224,6 +1508,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "invoices_club_id_fkey"
+            columns: ["club_id"]
+            isOneToOne: false
+            referencedRelation: "commercial_entitlements_usage"
+            referencedColumns: ["club_id"]
+          },
+          {
             foreignKeyName: "invoices_customer_id_fkey"
             columns: ["customer_id"]
             isOneToOne: false
@@ -1261,6 +1552,213 @@ export type Database = {
             columns: ["membership_id"]
             isOneToOne: false
             referencedRelation: "club_memberships"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      notification_consent: {
+        Row: {
+          channel: string
+          club_id: string
+          consent_at: string | null
+          consent_source: string | null
+          customer_id: string
+          enabled: boolean
+          id: string
+          revoked_at: string | null
+          updated_at: string
+        }
+        Insert: {
+          channel: string
+          club_id: string
+          consent_at?: string | null
+          consent_source?: string | null
+          customer_id: string
+          enabled?: boolean
+          id?: string
+          revoked_at?: string | null
+          updated_at?: string
+        }
+        Update: {
+          channel?: string
+          club_id?: string
+          consent_at?: string | null
+          consent_source?: string | null
+          customer_id?: string
+          enabled?: boolean
+          id?: string
+          revoked_at?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "notification_consent_club_id_fkey"
+            columns: ["club_id"]
+            isOneToOne: false
+            referencedRelation: "clubs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "notification_consent_club_id_fkey"
+            columns: ["club_id"]
+            isOneToOne: false
+            referencedRelation: "commercial_entitlements_usage"
+            referencedColumns: ["club_id"]
+          },
+          {
+            foreignKeyName: "notification_consent_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "customers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      notification_events: {
+        Row: {
+          club_id: string
+          created_by: string | null
+          event_type: string
+          id: string
+          occurred_at: string
+          payload: Json
+          reference_id: string
+          reference_type: string
+        }
+        Insert: {
+          club_id: string
+          created_by?: string | null
+          event_type: string
+          id?: string
+          occurred_at?: string
+          payload?: Json
+          reference_id: string
+          reference_type: string
+        }
+        Update: {
+          club_id?: string
+          created_by?: string | null
+          event_type?: string
+          id?: string
+          occurred_at?: string
+          payload?: Json
+          reference_id?: string
+          reference_type?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "notification_events_club_id_fkey"
+            columns: ["club_id"]
+            isOneToOne: false
+            referencedRelation: "clubs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "notification_events_club_id_fkey"
+            columns: ["club_id"]
+            isOneToOne: false
+            referencedRelation: "commercial_entitlements_usage"
+            referencedColumns: ["club_id"]
+          },
+        ]
+      }
+      notification_queue: {
+        Row: {
+          attempts: number
+          channel: string
+          club_id: string
+          created_at: string
+          dedup_key: string | null
+          event_id: string | null
+          expires_at: string | null
+          id: string
+          language: string
+          last_attempt_at: string | null
+          last_error: string | null
+          next_attempt_at: string | null
+          priority: string
+          provider_reference: string | null
+          recipient_customer_id: string | null
+          recipient_email: string | null
+          recipient_phone: string | null
+          scheduled_at: string
+          status: string
+          template_key: string
+          variables: Json
+        }
+        Insert: {
+          attempts?: number
+          channel: string
+          club_id: string
+          created_at?: string
+          dedup_key?: string | null
+          event_id?: string | null
+          expires_at?: string | null
+          id?: string
+          language?: string
+          last_attempt_at?: string | null
+          last_error?: string | null
+          next_attempt_at?: string | null
+          priority?: string
+          provider_reference?: string | null
+          recipient_customer_id?: string | null
+          recipient_email?: string | null
+          recipient_phone?: string | null
+          scheduled_at?: string
+          status?: string
+          template_key: string
+          variables?: Json
+        }
+        Update: {
+          attempts?: number
+          channel?: string
+          club_id?: string
+          created_at?: string
+          dedup_key?: string | null
+          event_id?: string | null
+          expires_at?: string | null
+          id?: string
+          language?: string
+          last_attempt_at?: string | null
+          last_error?: string | null
+          next_attempt_at?: string | null
+          priority?: string
+          provider_reference?: string | null
+          recipient_customer_id?: string | null
+          recipient_email?: string | null
+          recipient_phone?: string | null
+          scheduled_at?: string
+          status?: string
+          template_key?: string
+          variables?: Json
+        }
+        Relationships: [
+          {
+            foreignKeyName: "notification_queue_club_id_fkey"
+            columns: ["club_id"]
+            isOneToOne: false
+            referencedRelation: "clubs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "notification_queue_club_id_fkey"
+            columns: ["club_id"]
+            isOneToOne: false
+            referencedRelation: "commercial_entitlements_usage"
+            referencedColumns: ["club_id"]
+          },
+          {
+            foreignKeyName: "notification_queue_event_id_fkey"
+            columns: ["event_id"]
+            isOneToOne: false
+            referencedRelation: "notification_events"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "notification_queue_recipient_customer_id_fkey"
+            columns: ["recipient_customer_id"]
+            isOneToOne: false
+            referencedRelation: "customers"
             referencedColumns: ["id"]
           },
         ]
@@ -1364,6 +1862,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "payments_club_id_fkey"
+            columns: ["club_id"]
+            isOneToOne: false
+            referencedRelation: "commercial_entitlements_usage"
+            referencedColumns: ["club_id"]
+          },
+          {
             foreignKeyName: "payments_customer_id_fkey"
             columns: ["customer_id"]
             isOneToOne: false
@@ -1431,6 +1936,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "clubs"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "platform_invoices_club_id_fkey"
+            columns: ["club_id"]
+            isOneToOne: false
+            referencedRelation: "commercial_entitlements_usage"
+            referencedColumns: ["club_id"]
           },
           {
             foreignKeyName: "platform_invoices_platform_subscription_id_fkey"
@@ -1645,6 +2157,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "platform_subscriptions_club_id_fkey"
+            columns: ["club_id"]
+            isOneToOne: false
+            referencedRelation: "commercial_entitlements_usage"
+            referencedColumns: ["club_id"]
+          },
+          {
             foreignKeyName: "platform_subscriptions_plan_id_fkey"
             columns: ["plan_id"]
             isOneToOne: false
@@ -1708,6 +2227,13 @@ export type Database = {
             referencedRelation: "clubs"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "players_club_id_fkey"
+            columns: ["club_id"]
+            isOneToOne: false
+            referencedRelation: "commercial_entitlements_usage"
+            referencedColumns: ["club_id"]
+          },
         ]
       }
       pricing_rules: {
@@ -1757,6 +2283,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "clubs"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pricing_rules_club_id_fkey"
+            columns: ["club_id"]
+            isOneToOne: false
+            referencedRelation: "commercial_entitlements_usage"
+            referencedColumns: ["club_id"]
           },
           {
             foreignKeyName: "pricing_rules_field_id_fkey"
@@ -1839,6 +2372,13 @@ export type Database = {
             referencedRelation: "clubs"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "programs_club_id_fkey"
+            columns: ["club_id"]
+            isOneToOne: false
+            referencedRelation: "commercial_entitlements_usage"
+            referencedColumns: ["club_id"]
+          },
         ]
       }
       qr_credentials: {
@@ -1892,6 +2432,13 @@ export type Database = {
             referencedRelation: "clubs"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "qr_credentials_club_id_fkey"
+            columns: ["club_id"]
+            isOneToOne: false
+            referencedRelation: "commercial_entitlements_usage"
+            referencedColumns: ["club_id"]
+          },
         ]
       }
       qr_scan_events: {
@@ -1938,6 +2485,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "clubs"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "qr_scan_events_club_id_fkey"
+            columns: ["club_id"]
+            isOneToOne: false
+            referencedRelation: "commercial_entitlements_usage"
+            referencedColumns: ["club_id"]
           },
           {
             foreignKeyName: "qr_scan_events_credential_id_fkey"
@@ -2077,6 +2631,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "seasons_club_id_fkey"
+            columns: ["club_id"]
+            isOneToOne: false
+            referencedRelation: "commercial_entitlements_usage"
+            referencedColumns: ["club_id"]
+          },
+          {
             foreignKeyName: "seasons_program_id_fkey"
             columns: ["program_id"]
             isOneToOne: false
@@ -2126,6 +2687,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "clubs"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "subscription_freezes_club_id_fkey"
+            columns: ["club_id"]
+            isOneToOne: false
+            referencedRelation: "commercial_entitlements_usage"
+            referencedColumns: ["club_id"]
           },
           {
             foreignKeyName: "subscription_freezes_subscription_id_fkey"
@@ -2186,6 +2754,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "clubs"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "subscriptions_club_id_fkey"
+            columns: ["club_id"]
+            isOneToOne: false
+            referencedRelation: "commercial_entitlements_usage"
+            referencedColumns: ["club_id"]
           },
           {
             foreignKeyName: "subscriptions_enrollment_id_fkey"
@@ -2256,6 +2831,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "training_sessions_club_id_fkey"
+            columns: ["club_id"]
+            isOneToOne: false
+            referencedRelation: "commercial_entitlements_usage"
+            referencedColumns: ["club_id"]
+          },
+          {
             foreignKeyName: "training_sessions_field_id_fkey"
             columns: ["field_id"]
             isOneToOne: false
@@ -2268,6 +2850,222 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "groups"
             referencedColumns: ["id"]
+          },
+        ]
+      }
+      whatsapp_automations: {
+        Row: {
+          audience: string
+          club_id: string
+          created_at: string
+          dedup_window_minutes: number
+          delay_minutes: number
+          enabled: boolean
+          event_type: string
+          id: string
+          quiet_hours_end: string | null
+          quiet_hours_start: string | null
+          template_event_key: string
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          audience?: string
+          club_id: string
+          created_at?: string
+          dedup_window_minutes?: number
+          delay_minutes?: number
+          enabled?: boolean
+          event_type: string
+          id?: string
+          quiet_hours_end?: string | null
+          quiet_hours_start?: string | null
+          template_event_key: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          audience?: string
+          club_id?: string
+          created_at?: string
+          dedup_window_minutes?: number
+          delay_minutes?: number
+          enabled?: boolean
+          event_type?: string
+          id?: string
+          quiet_hours_end?: string | null
+          quiet_hours_start?: string | null
+          template_event_key?: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "whatsapp_automations_club_id_fkey"
+            columns: ["club_id"]
+            isOneToOne: false
+            referencedRelation: "clubs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "whatsapp_automations_club_id_fkey"
+            columns: ["club_id"]
+            isOneToOne: false
+            referencedRelation: "commercial_entitlements_usage"
+            referencedColumns: ["club_id"]
+          },
+        ]
+      }
+      whatsapp_connection_events: {
+        Row: {
+          actor_id: string | null
+          club_id: string
+          created_at: string
+          detail: Json
+          event: string
+          id: string
+        }
+        Insert: {
+          actor_id?: string | null
+          club_id: string
+          created_at?: string
+          detail?: Json
+          event: string
+          id?: string
+        }
+        Update: {
+          actor_id?: string | null
+          club_id?: string
+          created_at?: string
+          detail?: Json
+          event?: string
+          id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "whatsapp_connection_events_club_id_fkey"
+            columns: ["club_id"]
+            isOneToOne: false
+            referencedRelation: "clubs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "whatsapp_connection_events_club_id_fkey"
+            columns: ["club_id"]
+            isOneToOne: false
+            referencedRelation: "commercial_entitlements_usage"
+            referencedColumns: ["club_id"]
+          },
+        ]
+      }
+      whatsapp_connections: {
+        Row: {
+          club_id: string
+          connected_at: string | null
+          connected_phone_number: string | null
+          last_error: string | null
+          last_health_check_at: string | null
+          pairing_expires_at: string | null
+          pairing_token: string | null
+          session_secret: string | null
+          status: string
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          club_id: string
+          connected_at?: string | null
+          connected_phone_number?: string | null
+          last_error?: string | null
+          last_health_check_at?: string | null
+          pairing_expires_at?: string | null
+          pairing_token?: string | null
+          session_secret?: string | null
+          status?: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          club_id?: string
+          connected_at?: string | null
+          connected_phone_number?: string | null
+          last_error?: string | null
+          last_health_check_at?: string | null
+          pairing_expires_at?: string | null
+          pairing_token?: string | null
+          session_secret?: string | null
+          status?: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "whatsapp_connections_club_id_fkey"
+            columns: ["club_id"]
+            isOneToOne: true
+            referencedRelation: "clubs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "whatsapp_connections_club_id_fkey"
+            columns: ["club_id"]
+            isOneToOne: true
+            referencedRelation: "commercial_entitlements_usage"
+            referencedColumns: ["club_id"]
+          },
+        ]
+      }
+      whatsapp_templates: {
+        Row: {
+          body: string
+          club_id: string
+          created_at: string
+          event_key: string
+          id: string
+          is_active: boolean
+          language: string
+          updated_at: string
+          updated_by: string | null
+          variables: string[]
+        }
+        Insert: {
+          body: string
+          club_id: string
+          created_at?: string
+          event_key: string
+          id?: string
+          is_active?: boolean
+          language: string
+          updated_at?: string
+          updated_by?: string | null
+          variables?: string[]
+        }
+        Update: {
+          body?: string
+          club_id?: string
+          created_at?: string
+          event_key?: string
+          id?: string
+          is_active?: boolean
+          language?: string
+          updated_at?: string
+          updated_by?: string | null
+          variables?: string[]
+        }
+        Relationships: [
+          {
+            foreignKeyName: "whatsapp_templates_club_id_fkey"
+            columns: ["club_id"]
+            isOneToOne: false
+            referencedRelation: "clubs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "whatsapp_templates_club_id_fkey"
+            columns: ["club_id"]
+            isOneToOne: false
+            referencedRelation: "commercial_entitlements_usage"
+            referencedColumns: ["club_id"]
           },
         ]
       }
@@ -2309,7 +3107,27 @@ export type Database = {
             referencedRelation: "clubs"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "platform_subscriptions_club_id_fkey"
+            columns: ["club_id"]
+            isOneToOne: false
+            referencedRelation: "commercial_entitlements_usage"
+            referencedColumns: ["club_id"]
+          },
         ]
+      }
+      commercial_entitlements_usage: {
+        Row: {
+          academy_limit: number | null
+          academy_used: number | null
+          branch_limit: number | null
+          branches_used: number | null
+          club_id: string | null
+          club_name: string | null
+          field_limit: number | null
+          fields_used: number | null
+        }
+        Relationships: []
       }
       outstanding_invoices: {
         Row: {
@@ -2341,6 +3159,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "clubs"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "invoices_club_id_fkey"
+            columns: ["club_id"]
+            isOneToOne: false
+            referencedRelation: "commercial_entitlements_usage"
+            referencedColumns: ["club_id"]
           },
           {
             foreignKeyName: "invoices_customer_id_fkey"
@@ -2396,6 +3221,13 @@ export type Database = {
             referencedRelation: "clubs"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "players_club_id_fkey"
+            columns: ["club_id"]
+            isOneToOne: false
+            referencedRelation: "commercial_entitlements_usage"
+            referencedColumns: ["club_id"]
+          },
         ]
       }
       public_plans: {
@@ -2434,7 +3266,7 @@ export type Database = {
     }
     Functions: {
       _activate_subscription_if_due_internal: {
-        Args: { p_subscription_id: string }
+        Args: { p_explicit?: boolean; p_subscription_id: string }
         Returns: boolean
       }
       _create_booking_internal: {
@@ -2464,12 +3296,20 @@ export type Database = {
         Args: { p_reason: string; p_subscription_id: string }
         Returns: undefined
       }
+      cancel_subscription: {
+        Args: { p_reason: string; p_subscription_id: string }
+        Returns: undefined
+      }
       change_platform_plan: {
         Args: {
           p_current_subscription_id: string
           p_new_plan_id: string
           p_reason?: string
         }
+        Returns: string
+      }
+      claim_customer_self_service: {
+        Args: { p_club_id: string; p_customer_id: string }
         Returns: string
       }
       club_write_allowed: {
@@ -2569,11 +3409,47 @@ export type Database = {
         Args: { p_membership_id: string }
         Returns: undefined
       }
+      disconnect_whatsapp: { Args: { p_club_id: string }; Returns: undefined }
+      emit_notification_event: {
+        Args: {
+          p_club_id: string
+          p_event_type: string
+          p_payload?: Json
+          p_reference_id: string
+          p_reference_type: string
+        }
+        Returns: string
+      }
+      enqueue_notification: {
+        Args: {
+          p_channel: string
+          p_club_id: string
+          p_dedup_key?: string
+          p_event_id: string
+          p_expires_at?: string
+          p_language: string
+          p_priority?: string
+          p_recipient_customer_id: string
+          p_scheduled_at?: string
+          p_template_key: string
+          p_variables: Json
+        }
+        Returns: string
+      }
       ensure_booking_qr: { Args: { p_booking_id: string }; Returns: string }
       ensure_player_qr: { Args: { p_player_id: string }; Returns: string }
       extend_grace_period: {
         Args: { p_grace_period_days: number; p_subscription_id: string }
         Returns: undefined
+      }
+      find_claimable_customer: {
+        Args: { p_club_id: string; p_normalized_mobile: string }
+        Returns: {
+          club_id: string
+          full_name: string
+          id: string
+          mobile_display: string
+        }[]
       }
       freeze_subscription: {
         Args: {
@@ -2593,8 +3469,21 @@ export type Database = {
         Args: { p_club_id: string; p_end_date: string; p_start_date: string }
         Returns: Json
       }
+      get_booking_report: {
+        Args: {
+          p_branch_id?: string
+          p_club_id: string
+          p_end_date: string
+          p_start_date: string
+        }
+        Returns: Json
+      }
       get_club_platform_access: { Args: { p_club_id: string }; Returns: string }
       get_customer_activity_report: {
+        Args: { p_club_id: string; p_end_date: string; p_start_date: string }
+        Returns: Json
+      }
+      get_executive_dashboard: {
         Args: { p_club_id: string; p_end_date: string; p_start_date: string }
         Returns: Json
       }
@@ -2622,6 +3511,17 @@ export type Database = {
         Returns: string
       }
       get_today_dashboard: { Args: { p_club_id: string }; Returns: Json }
+      get_whatsapp_connection_status: {
+        Args: { p_club_id: string }
+        Returns: {
+          connected_at: string
+          connected_phone_number: string
+          last_error: string
+          last_health_check_at: string
+          pairing_expires_at: string
+          status: string
+        }[]
+      }
       has_branch_access: {
         Args: { p_branch_id: string; p_membership_id: string }
         Returns: boolean
@@ -2639,6 +3539,7 @@ export type Database = {
         }
         Returns: string
       }
+      is_guardian_of_group: { Args: { p_group_id: string }; Returns: boolean }
       is_platform_owner: { Args: never; Returns: boolean }
       issue_invoice_number: {
         Args: { p_branch_id: string; p_club_id: string }
@@ -2672,9 +3573,13 @@ export type Database = {
         Returns: {
           club_id: string
           credential_id: string
+          display_name: string
+          display_photo_url: string
+          display_subtitle: string
           reference_id: string
           reference_type: string
           result: string
+          subscription_status: string
         }[]
       }
       record_payment: {
@@ -2699,6 +3604,19 @@ export type Database = {
         Args: { p_plan_id?: string; p_previous_subscription_id: string }
         Returns: string
       }
+      request_commercial_upgrade: {
+        Args: { p_club_id: string; p_limit_type: string; p_note?: string }
+        Returns: string
+      }
+      request_customer_photo_update: {
+        Args: {
+          p_club_id: string
+          p_customer_id: string
+          p_new_photo_url: string
+          p_player_id: string
+        }
+        Returns: string
+      }
       resolve_field_operating_hours: {
         Args: { p_date: string; p_field_id: string }
         Returns: {
@@ -2720,8 +3638,23 @@ export type Database = {
         Args: { p_payment_id: string; p_reason: string }
         Returns: undefined
       }
+      review_customer_photo_request: {
+        Args: { p_approve: boolean; p_reason?: string; p_request_id: string }
+        Returns: undefined
+      }
       set_plan_publish_status: {
         Args: { p_is_public: boolean; p_plan_id: string }
+        Returns: undefined
+      }
+      start_whatsapp_pairing: {
+        Args: { p_club_id: string }
+        Returns: {
+          expires_at: string
+          pairing_token: string
+        }[]
+      }
+      unfreeze_subscription: {
+        Args: { p_reason?: string; p_subscription_id: string }
         Returns: undefined
       }
       user_club_ids: { Args: never; Returns: string[] }
