@@ -629,3 +629,128 @@ check and `club_write_allowed()` gate.
 Gate 5) shipped and verified. Seat/activity/event booking + waitlist
 remains unscoped/unbuilt — explicit follow-up, not silently dropped
 (see execution state file).
+
+---
+
+## D-006 — Gate 6: QR identity verification + a real "Active Entitlement" gap
+
+**Date:** 2026-08-16
+**Problem:** Gate 6 (Secure QR / Identity / Attendance). Doc 3's core
+rule: "Valid QR + Correct Account + Verified Membership + Active
+Entitlement + Identity Match = Approved Check-in." Audited the existing
+QR/scan/attendance RPCs and the scanner frontend against this before
+assuming anything was missing.
+
+**Findings — mostly already correct, genuinely well-designed:**
+- `qr_confirm_checkin()` (booking QR consumption) and
+  `qr_mark_attendance()` (academy membership QR consumption) both
+  already correctly checked single-use/`consumed` status, `revoked`
+  status, `expires_at`, permission, and correctly logged every scan
+  attempt (success AND every failure reason) to `qr_scan_events` for a
+  full audit trail. Token storage is already correct (opaque
+  `gen_random_bytes(32)` + sha256 hash, raw token never stored/
+  returned more than once).
+- Two distinct QR credential types already correctly modeled
+  (`booking` vs. `player_membership`) — exactly the "two different QR
+  types" distinction Doc 3 requires, already built.
+- `ensure_player_qr()` (academy membership QR generation) already
+  existed server-side.
+- **Real gap #1 (frontend):** the scanner (`ScanPage.tsx`) only ever
+  called the booking check-in path (`qr_confirm_checkin`) — there was
+  no UI at all for the academy `qr_mark_attendance` flow, despite the
+  backend RPC being fully built. A coach scanning a player's membership
+  QR had no way to actually mark attendance through this screen.
+- **Real gap #2 (frontend):** `qr_validate()` returned zero
+  identity-verification data (no name, no photo, no membership/
+  subscription status) — only `{result, credential_id, reference_type,
+  reference_id, club_id}`. The scanner UI could therefore never satisfy
+  Doc 3's "staff must see enough to visually compare the person to a
+  verified photo" requirement, because the data literally wasn't
+  fetched, regardless of how the UI was built.
+- **Real gap #3 (backend, the actual "Active Entitlement" violation):**
+  `qr_mark_attendance()` verified the player has an `active` enrollment
+  in the session's group, but NEVER checked whether their actual paid
+  `subscription` status was `active`. Since freezing/cancelling a
+  subscription does not withdraw the enrollment row (these are two
+  separate concepts by this schema's own design, confirmed via
+  Gate 2/4's own investigation), a player whose subscription was
+  frozen, expired, cancelled, or still `pending` could successfully
+  check in and consume a session slot. This is a direct, confirmed
+  violation of Doc 3's stated "Active Entitlement" requirement — not
+  assumed, verified by reading the function body and confirming no
+  `subscriptions` table reference existed anywhere in it.
+
+**Chosen solution:**
+- `qr_validate()` extended (required a `drop function` + recreate since
+  Postgres won't let `CREATE OR REPLACE` change a function's return
+  columns) to also return `display_name`/`display_photo_url`/
+  `display_subtitle`/`subscription_status`, resolved per credential
+  type: booking → customer name + field/time; player_membership →
+  player name/photo + group name + current subscription status. This
+  is deliberately the Doc 3 "minimal-necessary verification screen" —
+  never full financial/contact history, just enough to visually
+  confirm identity and current standing. Resolved regardless of the
+  token's own validity state (even an expired/used credential still
+  shows who it belongs to, so staff can recognize a member needing a
+  fresh QR rather than seeing a bare "expired").
+- `qr_mark_attendance()` now also requires the player's current
+  subscription (via their active enrollment) to have `status='active'`;
+  a mismatch produces a distinct `subscription_inactive` result instead
+  of silently succeeding.
+- `ScanPage.tsx` rewritten to show an identity-verification card
+  (photo/initial-avatar, name, subtitle, subscription-status badge)
+  before any confirm action, and to branch into the
+  `qr_mark_attendance` flow (with a same-day session picker scoped to
+  the coach's own groups) when the scanned credential is a
+  `player_membership` type, alongside the existing booking flow.
+
+**Bug found via testing (not assumed correct after writing):** the new
+`subscription_inactive` result value crashed on the pre-existing
+`qr_scan_events_result_check` CHECK constraint, which predates this fix
+and didn't know about the new value — found identically to this
+session's now-repeated pattern (Gates 4/6 both had a real backend value
+crash on a stale constraint, only surfaced via genuine RPC calls, never
+via reading the code alone). Fixed by widening the constraint.
+
+**Full verified test matrix (real staff/coach-role access token,
+temporarily granted then fully reverted afterward):**
+- Generated a real `player_membership` QR via `ensure_player_qr()`,
+  validated it via `qr_validate()`: confirmed `display_name`,
+  `display_subtitle` (group name), and `subscription_status: "active"`
+  all correctly populated. ✅
+- Marked attendance for a player with an `active` subscription via
+  `qr_mark_attendance()`: succeeded, real `attendance` row created. ✅
+- Marked attendance for a player with a `pending` (not yet activated)
+  subscription: correctly rejected with `subscription_inactive`, no
+  attendance row created — confirming the exact gap this fix closes. ✅
+- After widening the CHECK constraint, the same rejected-case call
+  succeeded cleanly (no more crash on the audit-log insert). ✅
+
+All test data (the generated QR credentials, the attendance row, the
+temporary coach role grant, the temporary `groups.coach_id`
+assignment) removed/reverted afterward.
+
+**DB impact:** `qr_validate()` recreated with additional return
+columns; `qr_mark_attendance()` updated with the subscription check;
+`qr_scan_events_result_check` constraint widened. No new tables.
+
+**Security impact:** net-positive — closes a real access-control gap
+(non-paying/frozen members could attend sessions) and adds the
+identity-verification data Doc 3 requires without over-exposing PII
+(deliberately excludes financial/contact details from the display
+payload).
+
+**Reversal path:** fully reversible — all `create or replace`/
+constraint changes, recoverable from `list_migrations`/git history.
+
+**Status:** Gate 6's core QR/identity/attendance audit is complete for
+the booking and academy-membership check-in paths. NOT yet audited in
+this pass: whether a coach can see WHICH specific check-in overrides
+happened and why (manual override audit trail — `qr_scan_events`
+covers scan attempts but a manual "mark present without a QR scan"
+path, if it exists elsewhere in the Academy UI, was not specifically
+re-audited here), and whether `attendance.mark`'s coach-scoping
+correctly prevents a coach from marking attendance for a session
+outside their own assigned groups when NOT going through the QR path
+(the direct-table-UPDATE risk, same class as Gates 2/4's guard-trigger
+work) — tracked as explicit follow-up, not silently assumed safe.
