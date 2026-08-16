@@ -1593,6 +1593,100 @@ export type Database = {
           },
         ]
       }
+      manual_payment_claims: {
+        Row: {
+          claimed_amount: number
+          claimed_at: string
+          claimed_by: string
+          club_id: string
+          id: string
+          invoice_id: string
+          payment_method_config_id: string | null
+          proof_note: string | null
+          reference: string | null
+          resulting_payment_id: string | null
+          review_reason: string | null
+          reviewed_at: string | null
+          reviewed_by: string | null
+          status: string
+        }
+        Insert: {
+          claimed_amount: number
+          claimed_at?: string
+          claimed_by: string
+          club_id: string
+          id?: string
+          invoice_id: string
+          payment_method_config_id?: string | null
+          proof_note?: string | null
+          reference?: string | null
+          resulting_payment_id?: string | null
+          review_reason?: string | null
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          status?: string
+        }
+        Update: {
+          claimed_amount?: number
+          claimed_at?: string
+          claimed_by?: string
+          club_id?: string
+          id?: string
+          invoice_id?: string
+          payment_method_config_id?: string | null
+          proof_note?: string | null
+          reference?: string | null
+          resulting_payment_id?: string | null
+          review_reason?: string | null
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "manual_payment_claims_club_id_fkey"
+            columns: ["club_id"]
+            isOneToOne: false
+            referencedRelation: "clubs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "manual_payment_claims_club_id_fkey"
+            columns: ["club_id"]
+            isOneToOne: false
+            referencedRelation: "commercial_entitlements_usage"
+            referencedColumns: ["club_id"]
+          },
+          {
+            foreignKeyName: "manual_payment_claims_invoice_id_fkey"
+            columns: ["invoice_id"]
+            isOneToOne: false
+            referencedRelation: "invoices"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "manual_payment_claims_invoice_id_fkey"
+            columns: ["invoice_id"]
+            isOneToOne: false
+            referencedRelation: "outstanding_invoices"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "manual_payment_claims_payment_method_config_id_fkey"
+            columns: ["payment_method_config_id"]
+            isOneToOne: false
+            referencedRelation: "payment_method_configs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "manual_payment_claims_resulting_payment_id_fkey"
+            columns: ["resulting_payment_id"]
+            isOneToOne: false
+            referencedRelation: "payments"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       membership_branches: {
         Row: {
           branch_id: string
@@ -3241,6 +3335,16 @@ export type Database = {
         Args: { p_club_id: string; p_customer_id: string }
         Returns: string
       }
+      claim_manual_payment: {
+        Args: {
+          p_claimed_amount: number
+          p_invoice_id: string
+          p_payment_method_config_id: string
+          p_proof_note?: string
+          p_reference?: string
+        }
+        Returns: string
+      }
       close_cash_shift: {
         Args: { p_closing_count: number; p_notes?: string; p_shift_id: string }
         Returns: Json
@@ -3518,6 +3622,8 @@ export type Database = {
         Args: { p_booking_id: string; p_reason?: string }
         Returns: undefined
       }
+      my_customer_invoice_ids: { Args: never; Returns: string[] }
+      my_customer_payment_ids: { Args: never; Returns: string[] }
       normalize_mobile: { Args: { p_mobile: string }; Returns: string }
       open_cash_shift: {
         Args: {
@@ -3624,6 +3730,10 @@ export type Database = {
         Returns: undefined
       }
       user_club_ids: { Args: never; Returns: string[] }
+      verify_manual_payment_claim: {
+        Args: { p_approve: boolean; p_claim_id: string; p_reason?: string }
+        Returns: string
+      }
       void_invoice: {
         Args: { p_invoice_id: string; p_reason: string }
         Returns: undefined

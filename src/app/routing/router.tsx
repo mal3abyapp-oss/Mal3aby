@@ -35,6 +35,7 @@ import { ScanPage } from '@/features/scanner/ScanPage'
 import { PortalRoot } from '@/features/portal/PortalRoot'
 import { PortalAcademyPage } from '@/features/portal/PortalAcademyPage'
 import { PortalQrPage } from '@/features/portal/PortalQrPage'
+import { PortalPaymentsPage } from '@/features/portal/PortalPaymentsPage'
 import { PortalProfilePage } from '@/features/portal/PortalProfilePage'
 
 import { PlatformOverviewPage } from '@/features/platform/PlatformOverviewPage'
@@ -126,6 +127,7 @@ export const router = createBrowserRouter([
         children: [
           { index: true, element: <PortalRoot /> },
           { path: 'academy', element: <PortalAcademyPage /> },
+          { path: 'payments', element: <PortalPaymentsPage /> },
           { path: 'qr', element: <PortalQrPage /> },
           { path: 'profile', element: <PortalProfilePage /> },
         ],

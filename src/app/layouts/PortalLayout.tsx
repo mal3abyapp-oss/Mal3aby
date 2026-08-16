@@ -1,6 +1,6 @@
 import { NavLink, Outlet } from 'react-router-dom'
 import { useAuth } from '@/app/providers/AuthProvider'
-import { CalendarDays, GraduationCap, QrCode, User, LogOut } from 'lucide-react'
+import { CalendarDays, GraduationCap, Wallet, QrCode, User, LogOut } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 import { LanguageSwitcher } from '@/components/ui/language-switcher'
 
@@ -18,6 +18,7 @@ interface NavItem {
 const navItems: NavItem[] = [
   { to: '/portal', label: 'حجوزاتي', icon: CalendarDays },
   { to: '/portal/academy', label: 'أكاديميتي', icon: GraduationCap },
+  { to: '/portal/payments', label: 'مدفوعاتي', icon: Wallet },
   { to: '/portal/qr', label: 'رمزي', icon: QrCode },
   { to: '/portal/profile', label: 'حسابي', icon: User },
 ]

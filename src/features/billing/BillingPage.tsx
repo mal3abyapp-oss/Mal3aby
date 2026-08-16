@@ -78,6 +78,44 @@ async function fetchInvoices(clubId: string) {
   })
 }
 
+// Master Payment Directive task #83 (staff side): a customer-claimed
+// manual transfer sits here as 'pending' until staff reviews it.
+// verify_manual_payment_claim() is the only path that ever calls the
+// real record_payment() RPC -- this list never marks anything paid
+// directly.
+interface PendingClaimRow {
+  id: string
+  invoiceId: string
+  invoiceNumber: string
+  customerName: string
+  claimedAmount: number
+  reference: string | null
+  proofNote: string | null
+  claimedAt: string
+  methodName: string | null
+}
+
+async function fetchPendingClaims(clubId: string): Promise<PendingClaimRow[]> {
+  const { data, error } = await supabase
+    .from('manual_payment_claims')
+    .select('id, invoice_id, claimed_amount, reference, proof_note, claimed_at, invoices(invoice_number, customers(full_name)), payment_method_configs(name_ar)')
+    .eq('club_id', clubId)
+    .eq('status', 'pending')
+    .order('claimed_at', { ascending: true })
+  if (error) throw error
+  return (data ?? []).map((c) => ({
+    id: c.id,
+    invoiceId: c.invoice_id,
+    invoiceNumber: (c.invoices as unknown as { invoice_number: string } | null)?.invoice_number ?? '—',
+    customerName: (c.invoices as unknown as { customers: { full_name: string } | null } | null)?.customers?.full_name ?? '—',
+    claimedAmount: Number(c.claimed_amount),
+    reference: c.reference,
+    proofNote: c.proof_note,
+    claimedAt: c.claimed_at,
+    methodName: (c.payment_method_configs as unknown as { name_ar: string } | null)?.name_ar ?? null,
+  }))
+}
+
 async function fetchInvoiceDetail(invoiceId: string) {
   const { data, error } = await supabase
     .from('invoices')
@@ -141,6 +179,25 @@ export function BillingPage() {
     queryKey: ['invoices', currentClubId],
     queryFn: () => fetchInvoices(currentClubId!),
     enabled: !!currentClubId,
+  })
+
+  const { data: pendingClaims = [] } = useQuery({
+    queryKey: ['pending-payment-claims', currentClubId],
+    queryFn: () => fetchPendingClaims(currentClubId!),
+    enabled: !!currentClubId,
+  })
+
+  const reviewClaimMutation = useMutation({
+    mutationFn: async ({ claimId, approve }: { claimId: string; approve: boolean }) => {
+      const { error } = await supabase.rpc('verify_manual_payment_claim', { p_claim_id: claimId, p_approve: approve })
+      if (error) throw error
+    },
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ['pending-payment-claims', currentClubId] })
+      void queryClient.invalidateQueries({ queryKey: ['invoices', currentClubId] })
+      invalidateDetail()
+    },
+    onError: (error) => setFormError(translateSupabaseError(error, 'تعذّر مراجعة طلب الدفع.')),
   })
 
   const { data: detail } = useQuery({
@@ -257,6 +314,34 @@ export function BillingPage() {
   return (
     <div>
       <PageHeader title="الفواتير والمدفوعات" description="سجل الفواتير والمدفوعات" />
+
+      {pendingClaims.length > 0 && (
+        <div className="mb-4 rounded-lg border border-status-warning/40 bg-status-warning/5 p-4">
+          <p className="mb-2 font-medium">طلبات دفع بانتظار المراجعة ({pendingClaims.length})</p>
+          <div className="flex flex-col gap-2">
+            {pendingClaims.map((c) => (
+              <div key={c.id} className="flex flex-col gap-2 rounded-md border border-border bg-surface p-3 text-sm md:flex-row md:items-center md:justify-between">
+                <div>
+                  <p className="font-medium">{c.customerName} — {c.invoiceNumber}</p>
+                  <p className="text-xs text-text-secondary">
+                    {c.methodName ?? '—'} — <MoneyDisplay amount={c.claimedAmount} size="sm" />
+                    {c.reference && ` — مرجع: ${c.reference}`}
+                    {c.proofNote && ` — ${c.proofNote}`}
+                  </p>
+                </div>
+                <div className="flex gap-2">
+                  <Button size="sm" onClick={() => reviewClaimMutation.mutate({ claimId: c.id, approve: true })} disabled={reviewClaimMutation.isPending}>
+                    تأكيد
+                  </Button>
+                  <Button size="sm" variant="outline" onClick={() => reviewClaimMutation.mutate({ claimId: c.id, approve: false })} disabled={reviewClaimMutation.isPending}>
+                    رفض
+                  </Button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       <div className="mb-4 grid grid-cols-2 gap-3 md:grid-cols-4">
         <div className="rounded-lg border border-border p-3">
