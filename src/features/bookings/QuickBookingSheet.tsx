@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '@/lib/supabase/client'
+import { translateSupabaseError } from '@/lib/errors'
 import {
   Sheet,
   SheetContent,
@@ -145,7 +146,8 @@ export function QuickBookingSheet({
       onOpenChange(false)
       onCreated()
     },
-    onError: () => setFormError('تعذّر إنشاء الحجز — قد يكون الموعد محجوزًا بالفعل أو غير مصرّح به.'),
+    onError: (error) =>
+      setFormError(translateSupabaseError(error, 'تعذّر إنشاء الحجز — قد يكون الموعد محجوزًا بالفعل أو غير مصرّح به.')),
   })
 
   return (

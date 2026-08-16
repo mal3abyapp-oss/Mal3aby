@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '@/lib/supabase/client'
+import { translateSupabaseError } from '@/lib/errors'
 import { useAuth } from '@/app/providers/AuthProvider'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -170,7 +171,8 @@ export function EnrollmentSection() {
       setWizardError(null)
       void queryClient.invalidateQueries({ queryKey: ['enrollments', currentClubId] })
     },
-    onError: () => setWizardError('تعذّر إتمام التسجيل — تحقق من توفر مكان في المجموعة أو صلاحياتك.'),
+    onError: (error) =>
+      setWizardError(translateSupabaseError(error, 'تعذّر إتمام التسجيل — تحقق من توفر مكان في المجموعة أو صلاحياتك.')),
   })
 
   const freezeMutation = useMutation({
