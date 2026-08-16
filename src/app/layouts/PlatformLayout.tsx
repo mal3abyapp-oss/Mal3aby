@@ -3,6 +3,7 @@ import { cn } from '@/lib/utils'
 import {
   LayoutDashboard,
   Building2,
+  Users,
   CreditCard,
   Wallet,
   RefreshCw,
@@ -28,6 +29,7 @@ interface NavItem {
 const navItems: NavItem[] = [
   { to: '/platform', label: 'نظرة عامة', icon: LayoutDashboard },
   { to: '/platform/clubs', label: 'الأندية', icon: Building2 },
+  { to: '/platform/owners', label: 'أصحاب الأندية', icon: Users },
   { to: '/platform/subscriptions', label: 'الاشتراكات', icon: CreditCard },
   { to: '/platform/plans', label: 'الخطط', icon: Sparkles },
   { to: '/platform/payments', label: 'المدفوعات', icon: Wallet },

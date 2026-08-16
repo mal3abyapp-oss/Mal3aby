@@ -39,6 +39,7 @@ import { PortalProfilePage } from '@/features/portal/PortalProfilePage'
 import { PlatformOverviewPage } from '@/features/platform/PlatformOverviewPage'
 import { PlatformClubsPage } from '@/features/platform/PlatformClubsPage'
 import { PlatformClubDetailPage } from '@/features/platform/PlatformClubDetailPage'
+import { PlatformOwnersPage } from '@/features/platform/PlatformOwnersPage'
 import { PlatformPlansPage } from '@/features/platform/PlatformPlansPage'
 import { PlatformTrialsPage } from '@/features/platform/PlatformTrialsPage'
 import { PlatformLeadsPage } from '@/features/platform/PlatformLeadsPage'
@@ -139,6 +140,7 @@ export const router = createBrowserRouter([
           { index: true, element: <PlatformOverviewPage /> },
           { path: 'clubs', element: <PlatformClubsPage /> },
           { path: 'clubs/:clubId', element: <PlatformClubDetailPage /> },
+          { path: 'owners', element: <PlatformOwnersPage /> },
           { path: 'subscriptions', element: <PlatformSubscriptionsPage /> },
           { path: 'plans', element: <PlatformPlansPage /> },
           { path: 'payments', element: <PlatformPaymentsPage /> },

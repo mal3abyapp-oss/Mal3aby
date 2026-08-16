@@ -3279,6 +3279,22 @@ export type Database = {
         }
         Returns: Json
       }
+      get_platform_club_owners: {
+        Args: never
+        Returns: {
+          club_code: string
+          club_id: string
+          club_name: string
+          club_status: string
+          email: string
+          full_name: string
+          membership_id: string
+          membership_status: string
+          owner_since: string
+          phone: string
+          user_id: string
+        }[]
+      }
       get_revenue_report: {
         Args: {
           p_branch_id?: string
