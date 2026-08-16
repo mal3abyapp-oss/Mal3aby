@@ -25,6 +25,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { ProgramsGroupsSection } from '@/features/academy/ProgramsGroupsSection'
 import { EnrollmentSection, ActivationPolicySetting } from '@/features/academy/EnrollmentSection'
 import { CoachTodayView } from '@/features/academy/CoachTodayView'
+import { AcademyOverview } from '@/features/academy/AcademyOverview'
 import type { PlayerRow, GuardianLinkRow } from '@/lib/domain/people'
 
 // Player Profile lives under /app/academy per SCREEN_MAP.md. Full
@@ -97,6 +98,7 @@ async function searchCustomers(clubId: string, search: string) {
 export function AcademyPage() {
   const { currentClubId, currentMembership } = useAuth()
   const queryClient = useQueryClient()
+  const [activeTab, setActiveTab] = useState<'overview' | 'players' | 'structure' | 'enrollments'>('overview')
   const [search, setSearch] = useState('')
   const [createDialogOpen, setCreateDialogOpen] = useState(false)
   const [playerName, setPlayerName] = useState('')
@@ -243,12 +245,17 @@ export function AcademyPage() {
     <div>
       <PageHeader title="الأكاديمية" description="إدارة اللاعبين والبرامج والمجموعات" />
 
-      <Tabs defaultValue="players">
+      <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as typeof activeTab)}>
         <TabsList>
+          <TabsTrigger value="overview">نظرة عامة</TabsTrigger>
           <TabsTrigger value="players">اللاعبون</TabsTrigger>
           <TabsTrigger value="structure">البرامج والمجموعات</TabsTrigger>
           <TabsTrigger value="enrollments">التسجيلات والاشتراكات</TabsTrigger>
         </TabsList>
+
+        <TabsContent value="overview">
+          <AcademyOverview onNavigateTab={(tab) => setActiveTab(tab)} />
+        </TabsContent>
 
         <TabsContent value="players">
           <div className="mb-4 mt-4 flex items-center justify-between gap-3">

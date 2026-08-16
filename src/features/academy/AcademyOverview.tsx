@@ -1,0 +1,149 @@
+import { useQuery } from '@tanstack/react-query'
+import { useNavigate } from 'react-router-dom'
+import { supabase } from '@/lib/supabase/client'
+import { useAuth } from '@/app/providers/AuthProvider'
+import { StatCard } from '@/components/ui/stat-card'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Button } from '@/components/ui/button'
+import { UserPlus, ClipboardList, CheckSquare } from 'lucide-react'
+
+// Section I1 — Academy Overview: the metrics a manager/academy_manager
+// needs at a glance without opening Players/Structure/Enrollments
+// individually -- sessions today, attendance incomplete, active
+// players, active subscriptions, expiring soon, outstanding academy
+// invoices, groups near capacity. Quick actions route straight into
+// the relevant tab/flow.
+interface OverviewData {
+  sessionsToday: number
+  sessionsUnmarked: number
+  activePlayers: number
+  activeSubscriptions: number
+  expiringSoon: number
+  outstandingCount: number
+  groupsNearCapacity: { id: string; name: string; enrolled: number; capacity: number }[]
+}
+
+async function fetchOverview(clubId: string): Promise<OverviewData> {
+  const today = new Date().toISOString().slice(0, 10)
+  const in3Days = new Date(Date.now() + 3 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10)
+
+  const [sessionsRes, activePlayersRes, activeSubsRes, expiringRes, groupsRes] = await Promise.all([
+    supabase.from('training_sessions').select('id').eq('club_id', clubId).eq('session_date', today),
+    supabase.from('players').select('id', { count: 'exact', head: true }).eq('club_id', clubId).eq('status', 'active'),
+    supabase.from('subscriptions').select('id', { count: 'exact', head: true }).eq('club_id', clubId).eq('status', 'active'),
+    supabase.from('subscriptions').select('id', { count: 'exact', head: true }).eq('club_id', clubId).eq('status', 'active').gte('end_date', today).lte('end_date', in3Days),
+    supabase.from('groups').select('id, name, capacity').eq('club_id', clubId).eq('status', 'active'),
+  ])
+
+  const sessionIds = (sessionsRes.data ?? []).map((s) => s.id)
+  let sessionsUnmarked = 0
+  if (sessionIds.length > 0) {
+    const { data: attendanceRows } = await supabase.from('attendance').select('session_id').in('session_id', sessionIds)
+    const markedSessionIds = new Set((attendanceRows ?? []).map((a) => a.session_id))
+    sessionsUnmarked = sessionIds.filter((id) => !markedSessionIds.has(id)).length
+  }
+
+  // Outstanding academy invoices: invoices whose items reference a subscription and aren't fully paid.
+  const { data: subInvoices } = await supabase
+    .from('invoice_items')
+    .select('invoice_id')
+    .eq('reference_type', 'subscription')
+  const subInvoiceIds = [...new Set((subInvoices ?? []).map((i) => i.invoice_id))]
+  let outstandingCount = 0
+  if (subInvoiceIds.length > 0) {
+    const { data: invoices } = await supabase
+      .from('invoices')
+      .select('id, total')
+      .eq('club_id', clubId)
+      .in('id', subInvoiceIds)
+    if (invoices && invoices.length > 0) {
+      const { data: allocations } = await supabase
+        .from('payment_allocations')
+        .select('invoice_id, amount')
+        .in('invoice_id', invoices.map((i) => i.id))
+      const paidByInvoice = new Map<string, number>()
+      for (const a of allocations ?? []) {
+        paidByInvoice.set(a.invoice_id, (paidByInvoice.get(a.invoice_id) ?? 0) + Number(a.amount))
+      }
+      outstandingCount = invoices.filter((inv) => (paidByInvoice.get(inv.id) ?? 0) < Number(inv.total)).length
+    }
+  }
+
+  const groupIds = (groupsRes.data ?? []).map((g) => g.id)
+  const enrolledCounts = new Map<string, number>()
+  if (groupIds.length > 0) {
+    const { data: enrollments } = await supabase.from('enrollments').select('group_id').in('group_id', groupIds).eq('status', 'active')
+    for (const e of enrollments ?? []) {
+      enrolledCounts.set(e.group_id, (enrolledCounts.get(e.group_id) ?? 0) + 1)
+    }
+  }
+  const groupsNearCapacity = (groupsRes.data ?? [])
+    .map((g) => ({ id: g.id, name: g.name, enrolled: enrolledCounts.get(g.id) ?? 0, capacity: g.capacity }))
+    .filter((g) => g.capacity > 0 && g.enrolled / g.capacity >= 0.85)
+
+  return {
+    sessionsToday: sessionIds.length,
+    sessionsUnmarked,
+    activePlayers: activePlayersRes.count ?? 0,
+    activeSubscriptions: activeSubsRes.count ?? 0,
+    expiringSoon: expiringRes.count ?? 0,
+    outstandingCount,
+    groupsNearCapacity,
+  }
+}
+
+export function AcademyOverview({ onNavigateTab }: { onNavigateTab: (tab: 'players' | 'structure' | 'enrollments') => void }) {
+  const { currentClubId } = useAuth()
+  const navigate = useNavigate()
+
+  const { data, isLoading } = useQuery({
+    queryKey: ['academy-overview', currentClubId],
+    queryFn: () => fetchOverview(currentClubId!),
+    enabled: !!currentClubId,
+  })
+
+  if (isLoading || !data) return <p className="mt-4 text-sm text-text-secondary">جارٍ التحميل...</p>
+
+  return (
+    <div className="mt-4 flex flex-col gap-4">
+      <div className="flex flex-wrap gap-2">
+        <Button size="sm" onClick={() => onNavigateTab('players')}>
+          <UserPlus className="size-4" /> إضافة لاعب
+        </Button>
+        <Button size="sm" variant="outline" onClick={() => onNavigateTab('enrollments')}>
+          <ClipboardList className="size-4" /> تسجيل لاعب في مجموعة
+        </Button>
+        <Button size="sm" variant="outline" onClick={() => navigate('/app')}>
+          <CheckSquare className="size-4" /> تسجيل الحضور
+        </Button>
+      </div>
+
+      <div className="grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-6">
+        <StatCard label="حصص اليوم" value={data.sessionsToday} />
+        <StatCard label="حضور غير مسجّل" value={data.sessionsUnmarked} tone={data.sessionsUnmarked > 0 ? 'warning' : 'default'} />
+        <StatCard label="لاعبون نشطون" value={data.activePlayers} />
+        <StatCard label="اشتراكات نشطة" value={data.activeSubscriptions} tone="success" />
+        <StatCard label="على وشك الانتهاء" value={data.expiringSoon} tone={data.expiringSoon > 0 ? 'warning' : 'default'} />
+        <StatCard label="فواتير مستحقة" value={data.outstandingCount} tone={data.outstandingCount > 0 ? 'danger' : 'default'} />
+      </div>
+
+      {data.groupsNearCapacity.length > 0 && (
+        <Card>
+          <CardHeader><CardTitle className="text-base">مجموعات قاربت على الاكتمال</CardTitle></CardHeader>
+          <CardContent className="flex flex-col gap-2">
+            {data.groupsNearCapacity.map((g) => (
+              <button
+                key={g.id}
+                onClick={() => onNavigateTab('structure')}
+                className="flex items-center justify-between rounded-md border border-border p-2.5 text-start text-sm hover:bg-muted/40"
+              >
+                <span>{g.name}</span>
+                <span className="tabular-nums font-medium">{g.enrolled}/{g.capacity}</span>
+              </button>
+            ))}
+          </CardContent>
+        </Card>
+      )}
+    </div>
+  )
+}
