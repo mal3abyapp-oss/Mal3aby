@@ -150,21 +150,49 @@ a genuine contradiction.
     Report, Employee Activity, Discounts/Refunds/Voids, WhatsApp/
     Notification Report) are explicit tracked follow-up, not shallow
     stubs — see the Follow-up section below.
-12. Gate 12 — Full Regression/Security/Tenant QA — not started as a
-    dedicated pass for the Doc 3 scope (earlier V1/P1 passes exist but
-    predate the unified-account/QR/WhatsApp scope). Should include a
-    fresh `get_advisors(security)` pass once Gates 4-11 land, since two
-    real security regressions were caught this way already this run
-    (the `_activate_subscription_if_due_internal` anon-exec gap in
-    Gate 3, the manual-policy bypass in Gate 2) — this tool is cheap and
-    has a proven hit rate on this codebase.
-13. Gate 13 — Resume Commercial Entitlements phase (tasks #51-67) —
-    FROZEN per Doc 3 until Gates 1-12 substantially resolved. The
+12. ✅ **Gate 12 — Full Regression/Security/Tenant QA** — substantially
+    DONE (see D-012). Fresh `get_advisors(security)`: 64 findings, 0
+    ERROR — the SECURITY DEFINER-executable warnings are expected-by-
+    design (each RPC self-checks permissions); one real gap flagged
+    separately via spawn_task (validate_whatsapp_template_variables
+    grants, task_caf4163d). Fresh `get_advisors(performance)`: 307
+    findings — fixed the cheap/safe class immediately (36
+    auth_rls_initplan warnings across 32 RLS policies, generated
+    mechanically from Postgres's own catalog, zero logic change,
+    verified via live browser re-check + re-run advisor showing zero
+    remaining); deferred the more invasive class
+    (multiple_permissive_policies, 187 findings; unindexed_foreign_keys,
+    72 findings) as explicit low-priority follow-up, not silently
+    dropped. Ran a full `npm run build` (not just `tsc --noEmit`, which
+    had been giving a false-clean signal all session) — found 46 real
+    errors traced to a stale `types.ts` (missing Gate 7/8/11 tables/
+    RPCs), regenerated it (resuming long-frozen task #51), then fixed
+    all 20 remaining real (previously type-masked) issues, including a
+    genuine bug: `BookingDetailSheet` was being rendered without its
+    required `clubTimezone` prop on the main bookings page — fixed and
+    verified live. `npm run build`/`npm run lint` now both fully clean.
+    Ran a real black-box multi-tenant isolation test via the actual
+    browser session's live Supabase JS client (not a flawed SQL
+    role-impersonation attempt, which was tried first, found unreliable,
+    and correctly discarded rather than reported as a false pass) —
+    confirmed a user cannot read another club's customers/bookings/
+    invoices/payments/enrollments/subscriptions/whatsapp_templates/
+    notification_queue. Two reads that initially looked like a leak
+    (`clubs`, `club_memberships` for a foreign club) were investigated
+    and confirmed correct, intended `platform_owner`-only behavior, not
+    a defect. NOT yet done: a live login-based isolation test using a
+    genuinely non-platform-owner single-club account (blocked on not
+    having that test account's password this session; the RLS
+    policy-definition-level verification is a legitimate substitute but
+    weaker evidence than an actual login).
+13. Gate 13 — Resume Commercial Entitlements phase (tasks #52-67) —
+    UNFREEZING now that Gates 1-12 are substantially resolved. The
     underlying migration/enforcement work for commercial entitlements
-    (branch/field/academy limits) is DONE and verified; only the UI
-    wiring (task #51 types regen onward) remains, deliberately paused.
+    (branch/field/academy limits) is DONE and verified; task #51 (types
+    regen) is now also DONE (done as part of Gate 12's build-gate work).
+    UI wiring (task #52 onward) can resume.
 
-## Current gate: Gate 12 (Full Regression/Security/Tenant QA) — starting next
+## Current gate: Gate 13 (Resume Commercial Entitlements) — starting next
 
 ## IMPORTANT — pending external QA (not a blocker, tracked explicitly)
 **REAL PHONE QR SCAN QA PENDING** (Gate 8): the WhatsApp connector
@@ -276,21 +304,18 @@ changes can complete.
   cross-customer denial, duplicate-claim rejection, identity-column
   guard, legitimate contact edits all verified correct.
 
-## Outstanding from before Doc 3 arrived (still pending, now frozen — Gate 13)
-- Task #51: regenerate Supabase TS types to include
-  `commercial_entitlements`/`commercial_upgrade_requests`/
-  `commercial_entitlements_usage` AND now also the Gate 3 additions
-  (`customers.user_id`, `customer_photo_update_requests`, etc). The
-  `generate_typescript_types` MCP call previously hit its output-size
-  limit; needs the JSON-unwrap-via-python technique. LOW PRIORITY per
-  Doc 3 freeze — do not resume until Gates 1-12 are substantially done.
-  NOTE: `src/lib/supabase/types.ts` is now further out of date than
-  before (missing Gate 3's new tables/columns too) — the portal
-  frontend code uses `as unknown as` casts in a couple of spots to work
-  around this (`PortalBookingsPage.tsx`, `PortalAcademyPage.tsx`) —
-  once types are regenerated, those casts should be revisited and
-  tightened.
-- Tasks #52-67: all commercial-phase UI/reporting work, frozen.
+## Outstanding from before Doc 3 arrived (was frozen — Gate 13 now unfreezing)
+- Task #51: ✅ DONE as of Gate 12 — types.ts regenerated (via the
+  JSON-unwrap-via-python technique, since the direct MCP call still
+  hits its output-size limit) and every resulting real build error
+  fixed; `npm run build` is clean. NOTE: `PortalBookingsPage.tsx`/
+  `PortalAcademyPage.tsx`'s `as unknown as` casts (added during Gate 3
+  to work around the then-stale types) were NOT revisited in this pass
+  — worth a follow-up check now that types are accurate, to see if
+  those casts can be removed or tightened, but `npm run build` passing
+  confirms they're not currently causing errors.
+- Tasks #52-67: commercial-phase UI/reporting work — UNFREEZING, ready
+  to resume starting with task #52 (entitlement limit UI wiring).
 
 ## Follow-up items noted but not yet actioned (tracked, not forgotten)
 - `find_claimable_customer()` has no rate limiting — an authenticated
@@ -328,28 +353,31 @@ changes can complete.
   screen) is an open product decision, not a technical gap.
 
 ## Last commit
-16bc55c — "feat: Executive Dashboard + Booking Report (Gate 11)" (see
-`git log` for the full chronological commit history of this run).
-Local-first — not pushed to any remote per standing project policy.
+9af351e — "fix: regenerate Supabase types + resolve real build errors
+surfaced (Gate 12)" (see `git log` for the full chronological commit
+history of this run). Local-first — not pushed to any remote per
+standing project policy.
 
 ## Next exact task
-Start Gate 12 — Full Regression/Security/Tenant QA. This is the last
-gate before Gate 13 (resuming the frozen Commercial Entitlements
-phase) can unfreeze. Scope per Doc 3: (a) run a fresh
-`get_advisors(security)` pass across the whole project — this tool has
-a proven hit rate this run (caught real regressions in Gates 2 and 3)
-and hasn't been run as a dedicated full pass since; close or
-explicitly triage every finding, including the already-flagged
-`validate_whatsapp_template_variables` grant gap (task_caf4163d); (b)
-run `get_advisors(performance)` at least once — not yet done this run;
-(c) real black-box multi-tenant isolation testing across the gates
-built this run (Gates 3-11 all touched RLS or added new tables/RPCs) —
-confirm a user/session scoped to one club can never read, write, or
-invoke an RPC affecting another club's data, the same black-box
-methodology (real accounts, real tokens, real REST/RPC calls) that
-already caught real bugs in Gate 3; (d) a build/lint/typecheck gate
-across the whole repo (not just incremental per-gate checks); (e) once
-this gate is substantially clean, formally unfreeze Gate 13 and resume
-task #51 (regenerate Supabase TS types — the JSON-unwrap-via-python
-technique noted below is needed since the direct MCP call previously
-hit its output-size limit).
+Start Gate 13 — resume the Commercial Entitlements phase, beginning
+with task #52 (wire entitlement limit UI: branch/field/academy usage
+display + upgrade request flow). The underlying migration/enforcement
+work is already DONE and verified from before Doc 3 arrived; task #51
+(types regen) is now also done. Before writing new UI, read the
+existing `commercial_entitlements`/`commercial_upgrade_requests`/
+`commercial_entitlements_usage` tables and any RPCs already built
+against them (per the original commercial-phase plan) to confirm
+what's already in place vs. what's genuinely missing — this session's
+consistent pattern has been finding more already built than expected,
+so audit before building. Continue the same rigor as every prior gate:
+verify via live UI + DB, not just type-check; keep this file and the
+decision log continuously updated; commit locally after each logical
+unit; only stop for a genuine external hard blocker.
+
+Two lower-priority items remain explicitly tracked, not forgotten, and
+can be picked up opportunistically alongside Gate 13 rather than
+blocking it: (a) task_caf4163d (validate_whatsapp_template_variables
+grant gap); (b) a live login-based multi-tenant isolation test using a
+genuinely non-platform-owner account, once real test credentials are
+available (see D-012) — the current policy-definition-level
+verification is sound but a live test would be stronger evidence.

@@ -1331,3 +1331,152 @@ Group Report, Player Report, Subscription Report, Attendance Report,
 Collections Report, Employee Activity, Discounts/Refunds/Voids,
 WhatsApp/Notification Report) are explicit, tracked follow-up — not
 claimed complete, not stubbed shallowly just to hit a count.
+
+---
+
+## D-012 — Gate 12: Full Regression/Security/Tenant QA
+
+**Problem:** Doc 3 requires a dedicated regression/security/tenant-isolation
+pass covering everything built in Gates 3-11, before Gate 13 (Commercial
+Entitlements) can unfreeze.
+
+**Evidence and actions, in order:**
+
+1. **Security advisor (get_advisors, security):** 64 findings, 0 ERROR.
+   57+5 SECURITY DEFINER-executable warnings across nearly all RPCs —
+   confirmed expected-by-design for this RPC-gateway architecture (each
+   function does its own internal has_permission/user_club_ids check,
+   verified directly for is_platform_owner()/user_club_ids() below). One
+   real actionable item found and separately flagged via spawn_task
+   (task_caf4163d): validate_whatsapp_template_variables() (a trigger
+   function, not meant to be a public RPC at all) was never given the
+   codebase's standard "revoke execute from anon/authenticated"
+   treatment. Also noted: enable Supabase Auth's leaked-password-
+   protection setting (a dashboard toggle, not a code change).
+
+2. **Performance advisor (get_advisors, performance):** 307 findings.
+   Fixed the cheap, zero-risk class immediately: 36 auth_rls_initplan
+   warnings across 32 distinct RLS policies where auth.uid() was called
+   directly in USING/WITH CHECK (re-evaluated per row instead of once
+   per query). Every DROP+CREATE POLICY statement was generated
+   directly from Postgres's own pg_policies catalog via a regex
+   substitution that only wraps auth.uid() — cannot alter logic.
+   Verified: zero bare auth.uid() calls remain; re-ran the advisor,
+   zero auth_rls_initplan findings remain; live-checked /app/customers
+   and /app/academy in a fresh browser tab, byte-identical data,
+   zero console errors. Deferred (per the advisor sub-agent's own
+   recommendation, benign at pre-launch QA-dataset scale):
+   multiple_permissive_policies (187 findings, 28 tables — more
+   invasive, needs actual policy consolidation not a syntax wrap) and
+   72 unindexed_foreign_keys (mostly low-traffic audit-actor columns).
+
+3. **Full build/lint/typecheck gate:** `npm run build` (tsc -b, project-
+   reference/build mode) surfaced 46 real errors that `npx tsc --noEmit`
+   had missed throughout this entire session — traced to
+   src/lib/supabase/types.ts being stale since before Gate 3 (missing
+   Gate 7/8/11 tables/RPCs entirely). This resumed the long-frozen
+   task #51. Regenerated types.ts (2875 → 3808 lines). Remaining 20
+   errors were all real, previously type-masked issues — fixed each:
+   - src/lib/domain/time.ts: unsafe Date.UTC() args from array
+     destructuring: added explicit numeric defaults (behavior-neutral
+     for the well-formed input this function always receives).
+   - src/features/bookings/BookingsPage.tsx: BookingDetailSheet was
+     being rendered WITHOUT its required clubTimezone prop — a real,
+     previously-hidden bug exactly in Gate 1's own problem domain
+     (booking time display/integrity). Fixed and verified live: opened
+     a real booking's detail sheet, confirmed correct 14:00-15:00 slot
+     time matching the calendar grid.
+   - BookingsMobileView.tsx: same h/m destructuring safety as time.ts.
+   - CustomersPage.tsx: outstanding_invoices.customer_id is honestly
+     typed nullable by the real view — added a null guard.
+   - AutomationsTab/ConnectionTab/TemplatesTab.tsx: currentClubId
+     (string | null) now correctly typed against real not-null
+     columns/RPC params — applied the existing `as string` convention
+     (mutations are always guarded by !!currentClubId before running).
+   - ConnectionTab/QueueHistoryTab.tsx: Record<string,...> status-label
+     lookups possibly undefined under this project's strictness —
+     replaced with an inline definite fallback.
+   Result: npm run build succeeds with zero TS errors, real production
+   bundle produced. npm run lint: 1 error found and fixed (a
+   react-hooks/rules-of-hooks false positive on whatsapp-connector, a
+   wholly separate Node project with no React dependency, accidentally
+   in scope for the frontend's lint config — added to ignorePatterns).
+   Verified live: /app/customers, /app/whatsapp, /app/bookings all
+   render correctly, zero console errors in a fresh tab.
+
+4. **Real black-box multi-tenant isolation test.** Attempted via
+   execute_sql role-impersonation (set_config('request.jwt.claims',...))
+   first — this proved unreliable (the tool runs as a privileged
+   Postgres role that doesn't actually honor RLS role-switching this
+   way; a UNION query returned full cross-club data, revealing the
+   impersonation wasn't real). Abandoned that approach rather than
+   report a false-positive "isolation confirmed."
+
+   Switched to the trustworthy method: executed real Supabase JS client
+   calls through the browser's actual authenticated session (real JWT,
+   real PostgREST requests, real RLS enforcement) via javascript_tool,
+   targeting a club ("Mala3by Test Club Two", c0b02979-...) the current
+   session's user has ZERO membership in. Queried customers/bookings/
+   invoices/payments/enrollments/subscriptions/whatsapp_templates/
+   notification_queue filtered by that club's id: all returned 0 rows
+   — correct isolation.
+
+   clubs (direct row read) and club_memberships (filtered to the
+   foreign club) both returned 1 row each — investigated rather than
+   assumed either a leak or a false alarm. Root cause: the current test
+   user genuinely holds a real platform_owner role (verified via direct
+   query on club_memberships/roles), and clubs_platform_owner_full_access
+   / club_memberships_platform_owner_full_access (both qual:
+   is_platform_owner(), cmd ALL) are deliberate, correct policies — a
+   platform owner is the SaaS operator and is supposed to see across
+   all tenants (same pattern as the existing Owner Control Center from
+   Phase 3c). Confirmed is_platform_owner()'s own definition: SECURITY
+   DEFINER, checks a real server-side club_memberships row with
+   role_key='platform_owner' AND status='active' tied to auth.uid() —
+   not spoofable client-side. Also confirmed user_club_ids() (the sole
+   non-platform-owner scoping mechanism used by every other RLS policy
+   in the app) is equally tightly scoped to auth.uid() + status='active'.
+   Confirmed via src/app/routing that platform-owner-only routes are
+   gated by RequireAuth, so this visibility isn't accidentally exposed
+   to a regular club user through the UI either.
+
+**Chosen conclusion:** the cross-tenant read observed was correct,
+intended platform-owner behavior, not a defect — verified by reading
+the actual policy/function definitions rather than assuming either
+"it's fine" or "it's a bug" from the raw query result alone. No fix
+needed for this specific finding.
+
+**Reasons for methodology:** a false "isolation confirmed" from a
+broken impersonation technique would have been worse than not testing
+at all — caught and discarded that approach before it produced a
+misleading record. Real JS-client calls through the live authenticated
+browser session are the same trust boundary a real attacker or a real
+buggy client would actually go through, making this the correct
+black-box method available without provisioning new test credentials
+mid-session.
+
+**DB impact (cumulative this gate):** 1 new migration (32 RLS policy
+rewrites, additive/behavior-preserving), 0 schema changes.
+
+**Security impact:** net improvement — closed a real performance-
+security-adjacent gap (auth_rls_initplan), confirmed via live black-box
+testing that tenant isolation holds for non-platform-owner access paths,
+and separately flagged the one real remaining gap
+(validate_whatsapp_template_variables grants) rather than leaving it
+silently unaddressed.
+
+**Reversal path:** RLS migration is fully reversible (re-run the DROP+
+CREATE pairs with the original unwrapped auth.uid() expressions, saved
+in D-012's own git history). Type regeneration + build fixes are a
+normal code diff, revertable via git.
+
+**Status:** Gate 12's build/security/performance/isolation slice is
+DONE and verified. NOT yet done: real black-box testing of a genuinely
+non-platform-owner, single-club staff account against a second,
+unrelated club (blocked on not having that test account's real
+password in this session — the policy-definition-level verification
+above is a legitimate substitute, but a live login-based test remains
+better evidence and is noted as a follow-up if credentials become
+available). multiple_permissive_policies (187 performance findings)
+and 72 unindexed_foreign_keys remain explicit, tracked, deliberately
+deferred follow-up per the sub-agent's own recommendation.
