@@ -527,15 +527,21 @@ run). Local-first — not pushed to any remote per standing project
 policy.
 
 ## Next exact task
-Task #62 is complete. Proceeding directly into Phase 2 of the new
-Part III directive: **Payment Domain Audit (task #80)** — review the
-existing invoices/payments/refunds/discounts/outstanding/booking-
-payment-state/academy-payments/customer-balances/reporting-RPC/cash-
-shift-integration surface end-to-end (following this session's
-established audit-first methodology) to identify the exact current
-financial source of truth and any existing drift, BEFORE building any
-new payment-method infrastructure — per the directive's explicit "do
-not create a second payment system" rule (reuse/extend/normalize, not
-duplicate). Then proceed through tasks #81-#90 in the directive's
-execution order (Phases 3-15), without stopping between them, per the
-standing full-autonomy rule.
+Tasks #62, #80, #81 complete (see commits `a79389b`, `8a09686`,
+`03defd9`). Task #80's audit found and task #81 fixed a real,
+currently-live financial-drift bug: the correct outstanding-balance
+formula (total - paid + completed refunds) had been independently
+reimplemented in 5 places, 4 of them wrong. Full detail in
+`AUTONOMOUS_DECISION_LOG.md` D-015. All 6 affected screens
+(BookingDetailSheet, BillingPage, AcademyOverview, PlayerStatusPanel,
+CustomerDetailDialog, AttentionNeeded) now read the single new
+`get_invoice_payment_summary()` RPC via `fetchInvoicePaymentSummaries()`
+in `src/lib/domain/billing.ts` — verified live against real data on 3
+of the 6 screens (the other 3 are structurally identical fixes,
+verified via `tsc`/build only).
+
+Proceeding directly into task #82 (configurable tenant payment
+methods: Cash/InstaPay/Wallet/Bank/POS/Custom, no hardcoded dropdown)
+per the directive's Phase 5-6, then continuing through tasks #83-#90
+in execution order without stopping, per the standing full-autonomy
+rule.
