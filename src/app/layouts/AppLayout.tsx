@@ -1,10 +1,12 @@
 import { NavLink, Outlet } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
+import { useTranslation } from 'react-i18next'
 import { cn } from '@/lib/utils'
 import { useAuth } from '@/app/providers/AuthProvider'
 import { supabase } from '@/lib/supabase/client'
 import { GlobalSearch } from '@/features/search/GlobalSearch'
 import { QuickActionsPalette } from '@/features/dashboard/QuickActionsPalette'
+import { LanguageSwitcher } from '@/components/ui/language-switcher'
 import {
   CalendarDays,
   GraduationCap,
@@ -28,28 +30,31 @@ import type { LucideIcon } from 'lucide-react'
 // see docs/DESIGN_SYSTEM.md#app-shell--desktop "if no permission, don't show".
 interface NavItem {
   to: string
-  label: string
+  labelKey: string
   icon: LucideIcon
 }
 
+// Gate 10: labels moved to i18n keys (nav.*) resolved via t() inside
+// the component -- these arrays stay static (no re-render cost from
+// recreating them), only the label lookup is locale-aware.
 const sidebarItems: NavItem[] = [
-  { to: '/app', label: 'اليوم', icon: LayoutDashboard },
-  { to: '/app/bookings', label: 'الحجوزات', icon: CalendarDays },
-  { to: '/app/academy', label: 'الأكاديمية', icon: GraduationCap },
-  { to: '/app/customers', label: 'العملاء', icon: Users },
-  { to: '/app/billing', label: 'الفواتير والمدفوعات', icon: Receipt },
-  { to: '/app/reports', label: 'التقارير', icon: BarChart3 },
-  { to: '/app/whatsapp', label: 'واتساب', icon: MessageCircle },
-  { to: '/app/staff', label: 'الموظفون', icon: UserCog },
-  { to: '/app/settings', label: 'الإعدادات', icon: Settings },
+  { to: '/app', labelKey: 'nav.today', icon: LayoutDashboard },
+  { to: '/app/bookings', labelKey: 'nav.bookings', icon: CalendarDays },
+  { to: '/app/academy', labelKey: 'nav.academy', icon: GraduationCap },
+  { to: '/app/customers', labelKey: 'nav.customers', icon: Users },
+  { to: '/app/billing', labelKey: 'nav.billing', icon: Receipt },
+  { to: '/app/reports', labelKey: 'nav.reports', icon: BarChart3 },
+  { to: '/app/whatsapp', labelKey: 'nav.whatsapp', icon: MessageCircle },
+  { to: '/app/staff', labelKey: 'nav.staff', icon: UserCog },
+  { to: '/app/settings', labelKey: 'nav.settings', icon: Settings },
 ]
 
 const mobileNavItems: NavItem[] = [
-  { to: '/app', label: 'اليوم', icon: LayoutDashboard },
-  { to: '/app/bookings', label: 'الحجوزات', icon: CalendarDays },
-  { to: '/scan', label: 'مسح', icon: ScanLine },
-  { to: '/app/academy', label: 'الأكاديمية', icon: GraduationCap },
-  { to: '/app/more', label: 'المزيد', icon: MoreHorizontal },
+  { to: '/app', labelKey: 'nav.today', icon: LayoutDashboard },
+  { to: '/app/bookings', labelKey: 'nav.bookings', icon: CalendarDays },
+  { to: '/scan', labelKey: 'nav.scan', icon: ScanLine },
+  { to: '/app/academy', labelKey: 'nav.academy', icon: GraduationCap },
+  { to: '/app/more', labelKey: 'nav.more', icon: MoreHorizontal },
 ]
 
 async function fetchSubscriptionSummary(clubId: string) {
@@ -63,6 +68,7 @@ async function fetchSubscriptionSummary(clubId: string) {
 }
 
 export function AppLayout() {
+  const { t } = useTranslation()
   const { memberships, currentMembership, currentClubId, setCurrentClubId, signOut } = useAuth()
   const { data: subSummary } = useQuery({
     queryKey: ['app-subscription-summary', currentClubId],
@@ -113,28 +119,33 @@ export function AppLayout() {
               }
             >
               <item.icon className="size-4" />
-              {item.label}
+              {t(item.labelKey)}
             </NavLink>
           ))}
         </nav>
 
+        <div className="flex items-center justify-between px-5 py-3 border-t border-white/10">
+          <LanguageSwitcher className="text-white/60 hover:text-white" />
+        </div>
         <button
           onClick={() => void signOut()}
           className="flex items-center gap-3 px-5 py-4 text-sm font-medium text-white/60 hover:text-white"
         >
           <LogOut className="size-4" />
-          تسجيل الخروج
+          {t('nav.logout')}
         </button>
       </aside>
 
       <div className="flex flex-1 flex-col">
         {/* Top bar: mobile shows brand, desktop shows Global Search */}
-        <header className="flex h-14 items-center border-b border-border bg-surface px-4 md:hidden">
+        <header className="flex h-14 items-center justify-between border-b border-border bg-surface px-4 md:hidden">
           <span className="font-bold text-text-primary">ملعبي | Mala3by</span>
+          <LanguageSwitcher />
         </header>
-        <header className="hidden h-14 items-center border-b border-border bg-surface px-4 md:flex">
+        <header className="hidden h-14 items-center gap-4 border-b border-border bg-surface px-4 md:flex">
           <GlobalSearch />
           <QuickActionsPalette />
+          <LanguageSwitcher className="ms-auto" />
         </header>
 
         {subSummary?.subscription_kind === 'trial' && subSummary.effective_access === 'full' && (
@@ -186,7 +197,7 @@ export function AppLayout() {
               }
             >
               <item.icon className={cn('size-5', item.to === '/scan' && 'size-6 text-status-success')} />
-              {item.label}
+              {t(item.labelKey)}
             </NavLink>
           ))}
         </nav>

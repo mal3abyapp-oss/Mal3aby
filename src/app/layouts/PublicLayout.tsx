@@ -1,6 +1,7 @@
 import { Link, Outlet } from 'react-router-dom'
 import { Button } from '@/components/ui/button'
 import { MessageCircle, Mail, Phone } from 'lucide-react'
+import { LanguageSwitcher } from '@/components/ui/language-switcher'
 
 // Public marketing site shell — see docs/ARCHITECTURE.md#public-website--layout-strategy
 // and docs/DESIGN_SYSTEM.md#public-website-visual-system.
@@ -19,7 +20,8 @@ export function PublicLayout() {
             <Link to="/pricing" className="hover:text-text-primary">الأسعار</Link>
             <Link to="/contact" className="hover:text-text-primary">تواصل معنا</Link>
           </nav>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-3">
+            <LanguageSwitcher />
             <Button variant="ghost" size="sm" asChild>
               <Link to="/login">تسجيل الدخول</Link>
             </Button>

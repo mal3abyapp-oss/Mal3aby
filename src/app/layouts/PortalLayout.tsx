@@ -2,6 +2,7 @@ import { NavLink, Outlet } from 'react-router-dom'
 import { useAuth } from '@/app/providers/AuthProvider'
 import { CalendarDays, GraduationCap, QrCode, User, LogOut } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
+import { LanguageSwitcher } from '@/components/ui/language-switcher'
 
 // Gate 3 — Unified User Dashboard shell. Deliberately separate from
 // AppLayout (the staff/employee product): a customer/guardian is never
@@ -28,13 +29,16 @@ export function PortalLayout() {
     <div className="flex min-h-screen flex-col bg-page-bg">
       <header className="sticky top-0 z-30 flex items-center justify-between border-b border-border bg-surface px-4 py-3">
         <span className="text-lg font-bold">ملعبي | Mala3by</span>
-        <button
-          onClick={() => void signOut()}
-          className="flex items-center gap-1.5 text-sm text-text-secondary hover:text-status-danger"
-        >
-          <LogOut className="size-4" />
-          خروج
-        </button>
+        <div className="flex items-center gap-3">
+          <LanguageSwitcher />
+          <button
+            onClick={() => void signOut()}
+            className="flex items-center gap-1.5 text-sm text-text-secondary hover:text-status-danger"
+          >
+            <LogOut className="size-4" />
+            خروج
+          </button>
+        </div>
       </header>
 
       <main className="mx-auto w-full max-w-2xl flex-1 px-4 py-4 pb-24">

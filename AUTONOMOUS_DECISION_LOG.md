@@ -1080,3 +1080,88 @@ through QA pass across every screen (calendars, reports, charts once
 built) is still worth doing before final ship, but the root-cause,
 repository-wide fix Doc 3 asks for (fixing shared primitives rather
 than patching individual screens) is done.
+
+---
+
+## D-010 — Gate 10: i18n foundation
+
+**Date:** 2026-08-16
+**Problem:** Gate 10 (Arabic/English i18n). Confirmed via `package.json`
+inspection that no i18n library existed at all — genuinely new
+infrastructure, not a gap in an existing system.
+
+**Chosen architecture:**
+- `react-i18next` + `i18next` + `i18next-browser-languagedetector`
+  (industry-standard, actively maintained, first-class React hooks API
+  matching this codebase's existing hook-heavy conventions).
+- Resource files under `src/lib/i18n/resources/{ar,en}/common.json` —
+  a single `common` namespace to start (nav/buttons/auth chrome), with
+  each feature area expected to add its OWN namespace as the sweep
+  continues (documented in the config file's own comment) rather than
+  growing one unbounded file.
+- `DirectionProvider` (already existed from a prior session, previously
+  just a bare `useState` with no persistence and no i18next
+  connection) is now the SINGLE source of truth for both direction and
+  active language — `setLocale()` drives `i18n.changeLanguage()` AND
+  flips `document.dir`/`document.lang` AND persists to `localStorage`
+  (`mala3by.locale`), all in one call, so direction and language can
+  never drift out of sync. Components call `useDirection().setLocale()`,
+  never the i18next instance directly.
+- `formatNumber`/`formatCurrency`/`formatDate` helpers added to the
+  i18n config, all requiring an explicit locale (and for dates, an
+  explicit IANA timezone — deliberately consistent with Gate 1's Time
+  Model, since a date must never be formatted without knowing which
+  venue timezone it's for).
+- A single reusable `LanguageSwitcher` component (`components/ui/
+  language-switcher.tsx`) — one toggle button, not a settings sub-page,
+  placed in `AppLayout` (desktop sidebar footer + both header variants),
+  `PortalLayout`, and `PublicLayout`, so it's available everywhere a
+  user actually is, matching Doc 3's "switcher must exist" requirement
+  broadly rather than in one buried settings screen.
+
+**Explicit scope decision, stated directly to avoid over-claiming:**
+Given the volume of hardcoded Arabic strings across every screen built
+in this and prior sessions, full extraction of 100% of UI copy in one
+pass is not realistic within this session. Swept: the staff app's
+sidebar/bottom-nav (`nav.*` keys), matching the "representative
+high-traffic slice" scoping from the execution-state plan. NOT swept:
+individual feature screens' own body copy (booking forms, academy
+screens, billing, WhatsApp tabs, portal screens, reports) — these all
+still render hardcoded Arabic text directly, by design working
+correctly today (Arabic is the correct default), but not yet
+switchable to English. This is tracked explicitly as follow-up, not
+silently claimed as "i18n done."
+
+**Verification (live browser, not just type-check):**
+- Screenshot 1: app loaded correctly in Arabic/RTL with the new
+  switcher visible, all `nav.*` labels correctly resolved via `t()`.
+- Screenshot 2: clicked the switcher — the ENTIRE layout correctly
+  flipped RTL→LTR (sidebar moved sides), all nav labels correctly
+  translated to English (Today/Bookings/Academy/Customers/Billing &
+  Payments/Reports/WhatsApp/Staff/Settings/Log out), with NO page
+  reload (URL and all other page state preserved) and no crash —
+  content not yet swept correctly remained in Arabic rather than
+  breaking, confirming graceful partial-coverage behavior.
+- Screenshot 3: clicked back to Arabic — correctly reverted.
+- Confirmed `localStorage.getItem('mala3by.locale')` correctly
+  persisted `'ar'` after switching back, proving the persistence
+  requirement works, not just the in-memory toggle.
+- Confirmed the switcher and correct locale also render correctly on
+  the unauthenticated public marketing homepage (`/`), proving the
+  provider order in `App.tsx` (already wrapping the whole router) needed
+  no changes.
+- Full `npx tsc --noEmit` clean throughout.
+
+**DB impact:** none.
+
+**Security impact:** none.
+
+**Reversal path:** fully additive — new files + `DirectionProvider`
+extended (not replaced) with backward-compatible behavior (its default
+state, `locale='ar'`, is unchanged from before this migration).
+
+**Status:** Gate 10's foundational infrastructure (library, resource
+system, persistence, switcher UI, locale-aware formatting helpers,
+no-reload RTL/LTR flip) is built and verified end-to-end. The full
+copy-extraction sweep across every remaining screen is real, tracked
+follow-up work — not claimed complete.

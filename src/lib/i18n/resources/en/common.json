@@ -1,0 +1,71 @@
+{
+  "app": {
+    "name": "Mala3by"
+  },
+  "nav": {
+    "today": "Today",
+    "bookings": "Bookings",
+    "academy": "Academy",
+    "customers": "Customers",
+    "billing": "Billing & Payments",
+    "reports": "Reports",
+    "whatsapp": "WhatsApp",
+    "staff": "Staff",
+    "settings": "Settings",
+    "more": "More",
+    "scan": "Scan",
+    "logout": "Log out"
+  },
+  "portal": {
+    "nav": {
+      "bookings": "My Bookings",
+      "academy": "My Academy",
+      "qr": "My QR",
+      "profile": "My Account"
+    }
+  },
+  "common": {
+    "save": "Save",
+    "cancel": "Cancel",
+    "confirm": "Confirm",
+    "delete": "Delete",
+    "edit": "Edit",
+    "add": "Add",
+    "close": "Close",
+    "loading": "Loading...",
+    "saving": "Saving...",
+    "search": "Search",
+    "noData": "No data",
+    "back": "Back",
+    "next": "Next",
+    "previous": "Previous",
+    "yes": "Yes",
+    "no": "No",
+    "today": "Today",
+    "status": "Status",
+    "actions": "Actions",
+    "name": "Name",
+    "phone": "Phone number",
+    "email": "Email",
+    "date": "Date",
+    "time": "Time",
+    "price": "Price",
+    "total": "Total",
+    "currency": "EGP"
+  },
+  "auth": {
+    "login": "Log in",
+    "signup": "Create a new account",
+    "email": "Email",
+    "password": "Password",
+    "fullName": "Full name",
+    "loginError": "Incorrect login details, or the account isn't activated yet.",
+    "signupSubmit": "Create account and start free trial",
+    "hasAccount": "Already have an account?"
+  },
+  "language": {
+    "label": "Language",
+    "arabic": "العربية",
+    "english": "English"
+  }
+}
