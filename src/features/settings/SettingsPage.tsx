@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button'
 import { ClubSettingsCard } from '@/features/clubs/ClubSettingsCard'
 import { BranchesCard } from '@/features/clubs/BranchesCard'
 import { PlatformSubscriptionCard } from '@/features/clubs/PlatformSubscriptionCard'
+import { EntitlementsCard } from '@/features/clubs/EntitlementsCard'
 import { FieldsManagement } from '@/features/clubs/FieldsManagement'
 import { ActivationPolicySetting } from '@/features/academy/EnrollmentSection'
 import { AuditLogSection } from './AuditLogPage'
@@ -63,7 +64,10 @@ export function SettingsPage() {
 
       <section className="flex flex-col gap-4">
         <h2 className="text-sm font-semibold text-text-secondary">اشتراك المنصة</h2>
-        <PlatformSubscriptionCard />
+        <div className="grid gap-4 md:grid-cols-2">
+          <PlatformSubscriptionCard />
+          <EntitlementsCard />
+        </div>
       </section>
 
       {isOwnerOrManager && (
