@@ -11,49 +11,84 @@ a genuine contradiction.
 
 0. ~~Initial audit~~ — superseded by direct-investigation approach per
    this run's evidence (see Gate 1 below); a separate standalone audit
-   report was not produced as its own artifact, but Gate 1/2 findings
-   ARE the audit for booking/academy, documented in the decision log.
+   report was not produced as its own artifact, but Gate 1/2/3 findings
+   ARE the audit for booking/academy/accounts, documented in the
+   decision log.
 1. **Gate 1 — Booking Time Integrity (P0)** — ✅ FIXED & VERIFIED (see
-   D-001 in the decision log). Root cause: naive datetime strings sent
-   to timestamptz RPC params + timezone-agnostic local-time derivation
-   server-side, both fixed.
+   D-001). Root cause: naive datetime strings sent to timestamptz RPC
+   params + timezone-agnostic local-time derivation server-side, both
+   fixed.
 2. **Gate 2 — Academy Enrollment Integrity (P0)** — ✅ INVESTIGATED &
-   FIXED (see D-002 in the decision log). Real bug found: `manual`
-   subscription-activation policy was bypassed by ANY payment (should
-   require explicit staff action). Fixed via a `p_explicit` flag.
+   FIXED (see D-002). Real bug found: `manual` subscription-activation
+   policy was bypassed by ANY payment. Fixed via a `p_explicit` flag.
    Duplicate-enrollment protection, full-group filtering, and
-   no-approved-price guard were all already correctly handled — no fix
-   needed for those (verified, not assumed).
-3. Gate 3 — Unified Accounts / Participants / Guardians — not started.
-4. Gate 4 — Memberships / Subscriptions / Operational Entitlements —
-   not started. NOTE: do not confuse with the already-built Commercial
+   no-approved-price guard were all already correctly handled.
+3. **Gate 3 — Unified Accounts / Participants / Guardians** — ✅ DONE
+   (see D-003). Built `customers.user_id` auth linking, self-service
+   RLS across 9 tables (bookings/fields/branches/clubs/guardian_links/
+   players/enrollments/groups/subscriptions), an identity-column guard
+   trigger with a photo re-approval workflow, and a real portal
+   frontend at `/portal` (claim flow, My Bookings, My Academy/Children,
+   My QR, My Profile). Fully verified via genuine black-box RLS testing
+   (real signed-up test user, real access tokens, real REST calls) —
+   this caught and fixed a real bug (claim-vs-identity-guard trigger
+   conflict) that pure SQL inspection would have missed.
+4. **Gate 4 — Memberships / Subscriptions / Operational Entitlements** —
+   NOT STARTED. NOTE: do not confuse with the already-built Commercial
    Entitlements (platform-level club limits, tasks #51-67) — separate
-   concept, same name collision Doc 3 warns about.
+   concept. Gate 3 already gives the portal read access to a guardian's
+   own subscriptions (`subscriptions_self_service_select`) — a "My
+   Subscriptions" screen could extend `PortalAcademyPage` or become its
+   own screen cheaply using that existing policy. The Doc 3 "professional
+   subscription" requirements (freeze/extend/grace-period/full history)
+   should be audited against the existing `subscriptions`/
+   `freeze_subscription`/`get_subscription_effective_end_date` machinery
+   before assuming anything is missing — significant subscription
+   machinery already exists from the V1 build (Phase 11).
 5. Gate 5 — Bookings / Activities / Seats — booking CORE already exists
    (V1 rebuild, tasks #23-27); this gate is about recurring bookings,
-   seat/activity booking, waitlist — not yet built.
-6. Gate 6 — Secure QR / Identity / Attendance — a QR mechanism already
-   exists for bookings (`ensure_booking_qr`) but has NOT been audited
-   against Doc 3's security requirements (opaque token vs guessable ID,
-   expiry, replay, identity-match verification screen). Not started.
+   seat/activity booking, waitlist — not yet built. NOTE:
+   `create_recurring_booking`/`create_field_block` RPCs already exist in
+   the generated types but have NO frontend caller yet (confirmed
+   during Gate 1 investigation) — check whether they're actually wired
+   server-side correctly before building new UI for them.
+6. Gate 6 — Secure QR / Identity / Attendance — `ensure_booking_qr`
+   exists and was extended in Gate 3 for self-service use, but has NOT
+   been fully audited against Doc 3's security requirements (opaque
+   token vs guessable ID — uses `gen_random_bytes(32)` + sha256 hash,
+   looks correct at a glance; expiry — has `expires_at`; replay/
+   duplicate-scan protection; the actual scanner-side identity-match
+   verification screen). Not started as a dedicated gate.
 7. Gate 7 — Notification Core — not started.
 8. Gate 8 — WhatsApp QR Module — not started (large net-new module).
 9. Gate 9 — RTL full sweep — not started (partial RTL exists via
-   `DirectionProvider` but no full audit done).
-10. Gate 10 — Arabic/English i18n — not started (Arabic-only currently).
+   `DirectionProvider` but no full audit done). NOTE: the new portal
+   screens built in Gate 3 were written with the same RTL-first
+   conventions as the rest of the app (no hardcoded ltr, uses logical
+   properties like existing screens) but were NOT specifically
+   re-audited for RTL correctness — include them in this gate's sweep.
+10. Gate 10 — Arabic/English i18n — not started (Arabic-only currently,
+    including all Gate 3 portal screens — they inherit the same
+    hardcoded-Arabic-string pattern as the rest of the app, to be swept
+    together in this gate).
 11. Gate 11 — Reporting Rebuild — not started (current reports are
     basic; task #12/Phase 13 in the original plan, not the full
     Doc 3 KPI-drill-down spec).
 12. Gate 12 — Full Regression/Security/Tenant QA — not started as a
     dedicated pass for the Doc 3 scope (earlier V1/P1 passes exist but
-    predate the unified-account/QR/WhatsApp scope).
+    predate the unified-account/QR/WhatsApp scope). Should include a
+    fresh `get_advisors(security)` pass once Gates 4-11 land, since two
+    real security regressions were caught this way already this run
+    (the `_activate_subscription_if_due_internal` anon-exec gap in
+    Gate 3, the manual-policy bypass in Gate 2) — this tool is cheap and
+    has a proven hit rate on this codebase.
 13. Gate 13 — Resume Commercial Entitlements phase (tasks #51-67) —
     FROZEN per Doc 3 until Gates 1-12 substantially resolved. The
     underlying migration/enforcement work for commercial entitlements
     (branch/field/academy limits) is DONE and verified; only the UI
     wiring (task #51 types regen onward) remains, deliberately paused.
 
-## Current gate: Gate 3 (Unified Accounts / Participants / Guardians) — starting next
+## Current gate: Gate 4 (Memberships / Subscriptions / Operational Entitlements) — starting next
 
 ## Completed this run (chronological)
 - Resolved 3-way directive conflict via AskUserQuestion → user chose
@@ -63,32 +98,48 @@ a genuine contradiction.
 - Gate 2 (Academy Enrollment Integrity): investigated, found and fixed
   the manual-activation-policy bypass; confirmed duplicate-enrollment/
   full-group/no-price cases already correctly handled. See D-002.
+- Gate 3 (Unified Accounts): built customer self-service auth linking +
+  RLS + identity-column guard + full portal frontend, verified via
+  black-box testing with a real test account. See D-003.
 
 ## Migrations applied this run
-- `20260816110000_fix_booking_venue_timezone.sql` — rewrote
-  `_create_booking_internal` to use `clubs.timezone` + `AT TIME ZONE`
-  for local date/time derivation instead of UTC-implicit casts.
-- `20260816120000_fix_enrollment_integrity.sql` — added `p_explicit`
-  flag to `_activate_subscription_if_due_internal`/
-  `activate_subscription_if_due`; added then removed a redundant
-  duplicate-enrollment index (pre-existing one already covered it).
-- Follow-up cleanup (ad hoc, via apply_migration): dropped the
-  redundant index and the orphaned 1-arg
-  `_activate_subscription_if_due_internal` overload left behind by
-  `create or replace`'s signature-change behavior.
+- `20260816110000_fix_booking_venue_timezone.sql` — venue-timezone-aware
+  local date/time derivation in `_create_booking_internal`.
+- `20260816120000_fix_enrollment_integrity.sql` — `p_explicit` flag for
+  subscription activation policy.
+- `20260816130000_customer_self_service_link.sql` — `customers.user_id`
+  + `claim_customer_self_service()`.
+- `20260816140000_customer_self_service_write_guard.sql` —
+  `protect_customer_identity_columns()` trigger + photo re-approval
+  flow (`customer_photo_update_requests` + 2 RPCs).
+- `20260816150000_find_claimable_customer.sql` — narrow claim-flow
+  lookup RPC.
+- `20260816160000_customer_self_service_bookings_read.sql`,
+  `20260816170000_..._fields_branches_read.sql`,
+  `20260816180000_..._clubs_read.sql`,
+  `20260816190000_..._academy_read.sql` — self-service SELECT policies
+  across 9 tables.
+- `20260816200000_fix_ensure_booking_qr_self_service.sql` — authorize
+  a booking's own linked customer, not just staff.
+- `20260816210000_fix_claim_vs_identity_guard_conflict.sql` —
+  transaction-local GUC flag fixing the claim-vs-guard-trigger conflict
+  found via black-box testing.
+- Ad hoc cleanup (via `apply_migration`, not separate files): dropped a
+  redundant duplicate-enrollment index and an orphaned function overload
+  from Gate 2's signature change; revoked `anon`/`authenticated` direct
+  EXECUTE on `_activate_subscription_if_due_internal` (security fix
+  caught via `get_advisors`).
 
 ## Files changed this run
-- `src/lib/domain/time.ts` (new) — Time Model utility.
-- `src/features/bookings/useFieldPricing.ts` — added `useClubTimezone`.
-- `src/features/bookings/QuickBookingSheet.tsx` — booking write path
-  now uses `toInstant`.
-- `src/features/bookings/BookingsPage.tsx` — day-range fetch filters,
-  `slotMinutesOf`, `FieldColumnHeader` now timezone-aware.
-- `src/features/bookings/BookingsMobileView.tsx` — same class of fix.
-- `src/features/bookings/BookingDetailSheet.tsx` — display now
-  timezone-aware via `formatInstant`.
-- `src/lib/errors.ts` — added Arabic translation for the
-  already-actively-enrolled error.
+- `src/lib/domain/time.ts` (new) — Time Model utility (Gate 1).
+- `src/features/bookings/*` — timezone-aware writes/reads (Gate 1).
+- `src/lib/errors.ts` — new Arabic error translations (Gates 1-3).
+- `src/app/layouts/PortalLayout.tsx` (new), `src/app/routing/
+  RequireAuth.tsx` (added `RequirePortalAuth`), `src/app/routing/
+  router.tsx` (added `/portal` tree), `src/features/auth/LoginPage.tsx`
+  (persona-aware post-login redirect), `src/features/portal/*` (new —
+  6 files: ClaimAccountPage, PortalRoot, PortalBookingsPage,
+  PortalAcademyPage, PortalQrPage, PortalProfilePage) — all Gate 3.
 
 ## Known-good, do NOT re-investigate without new evidence
 - React Query staleness / Radix Dialog-Select-Tabs: repeatedly tested
@@ -97,40 +148,61 @@ a genuine contradiction.
   limits): verified via direct SQL tamper tests (prior session).
 - Booking conflict detection (`field_blocks` overlap via `tstzrange`):
   confirmed timezone-agnostic and correct, untouched by Gate 1 fix.
+- Gate 3 self-service RLS/portal: fully black-box tested (real test
+  account, real tokens) — pre-claim isolation, post-claim scoping,
+  cross-customer denial, duplicate-claim rejection, identity-column
+  guard, legitimate contact edits all verified correct.
 
 ## Outstanding from before Doc 3 arrived (still pending, now frozen — Gate 13)
 - Task #51: regenerate Supabase TS types to include
   `commercial_entitlements`/`commercial_upgrade_requests`/
-  `commercial_entitlements_usage`. The `generate_typescript_types` MCP
-  call hit its output-size limit; raw output was saved to a session
-  tool-results file but never extracted into `src/lib/supabase/types.ts`.
-  Needs the JSON-unwrap-via-python technique documented in prior
-  session notes. LOW PRIORITY per Doc 3 freeze — do not resume until
-  Gates 1-12 are substantially done.
+  `commercial_entitlements_usage` AND now also the Gate 3 additions
+  (`customers.user_id`, `customer_photo_update_requests`, etc). The
+  `generate_typescript_types` MCP call previously hit its output-size
+  limit; needs the JSON-unwrap-via-python technique. LOW PRIORITY per
+  Doc 3 freeze — do not resume until Gates 1-12 are substantially done.
+  NOTE: `src/lib/supabase/types.ts` is now further out of date than
+  before (missing Gate 3's new tables/columns too) — the portal
+  frontend code uses `as unknown as` casts in a couple of spots to work
+  around this (`PortalBookingsPage.tsx`, `PortalAcademyPage.tsx`) —
+  once types are regenerated, those casts should be revisited and
+  tightened.
 - Tasks #52-67: all commercial-phase UI/reporting work, frozen.
 
+## Follow-up items noted but not yet actioned (tracked, not forgotten)
+- `find_claimable_customer()` has no rate limiting — an authenticated
+  attacker could brute-force phone numbers to discover which numbers
+  belong to real customers of a club. Noted in the migration's own
+  comment as a deliberate scope cut; should be addressed in Gate 12
+  (security hardening) via platform/edge-level rate limiting.
+- The photo re-approval request flow (`request_customer_photo_update`/
+  `review_customer_photo_request`) has backend RPCs but NO frontend UI
+  yet on either side (customer request screen, staff review screen) —
+  built the data model and guard first since that was the security-
+  critical part; the UI is real follow-up work, not optional polish.
+- Self-service booking CREATION (not just viewing) is explicitly out of
+  scope for Gate 3 — noted in the bookings_self_service_select policy's
+  own comment. A customer can see but not create/cancel their own
+  bookings yet; this needs payment-collection/deposit design before
+  it's safe to build.
+
 ## Last commit
-(check `git log` — commits should follow small logically-scoped
-fix:/feat: convention per Doc 3 Part XXVII; local-first, do not push
-without separate authorization)
+199d776 — "feat: customer self-service portal -- claim flow, My
+Bookings/Academy/QR/Profile (Gate 3)" (see `git log` for the full
+chronological commit history of this run: Gate 1 fix, Gate 2 fix, Gate
+3 schema, Gate 3 frontend, this state-file update to follow).
+Local-first — not pushed to any remote per standing project policy.
 
 ## Next exact task
-Start Gate 3 — Unified Accounts / Participants / Guardians. This is a
-large net-new domain-modeling gate per Doc 3's design-only source
-document. Before writing any migration, read the current schema for
-`customers`/`players`/`guardian_links`/`club_memberships`/`profiles`
-(or equivalent) to establish what already exists vs. what's genuinely
-missing, since this codebase already has real customers/players/
-guardian_links tables from the V1 build — the gate is likely narrower
-than a full rebuild (e.g. may already satisfy "one account per person"
-if auth is already unified; needs verification, not assumption).
-Specifically check: (a) is there already a 1:1 mapping of
-auth.users → a single profile, with no separate per-role accounts;
-(b) does self-service signup exist without manual DB activation
-(SignupPage.tsx / OnboardingPage.tsx already exist per the router — 
-check their actual flow); (c) is there a profile-photo field, and is
-it distinguished from any "verified" academy-member photo concept
-(likely NOT yet built — this is probably the real gap); (d) does
-guardian_links already correctly support one guardian managing
-multiple children (schema suggests yes — verify). Do not rebuild what
-already works; scope the actual gap precisely before writing code.
+Start Gate 4 — Memberships / Subscriptions / Operational Entitlements.
+Before writing any migration, read the existing `subscriptions` table
+schema, `freeze_subscription()`, `get_subscription_effective_end_date()`,
+and `_activate_subscription_if_due_internal()` (already touched in Gate
+2) to establish what Doc 3's "professional subscription" requirements
+(package type, duration, session count, remaining sessions, allowed
+days/times, renewal, freeze, extension, grace period, cancellation,
+linked payments, discounts, remaining balance, usage, expiry, full
+change history — never erased on edit) are already satisfied by vs.
+genuinely missing. This table/RPC set already looks more mature than a
+first read of Doc 3 might suggest (freeze support and effective-end-date
+calculation already exist) — scope precisely before building.
