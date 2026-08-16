@@ -13,6 +13,7 @@ import { Input } from '@/components/ui/input'
 import { StatusBadge } from '@/components/ui/status-badge'
 import { Separator } from '@/components/ui/separator'
 import { BOOKING_STATUS_LABELS, BOOKING_STATUS_TONE, type BookingRow } from '@/lib/domain/booking'
+import { formatInstant } from '@/lib/domain/time'
 
 // Section E4 — Booking Detail: everything an employee needs to act on a
 // booking, surfaced directly (not behind further navigation): customer,
@@ -45,11 +46,13 @@ async function fetchInvoiceSummary(invoiceId: string): Promise<InvoiceSummary | 
 export function BookingDetailSheet({
   booking,
   fieldName,
+  clubTimezone,
   onOpenChange,
   onChanged,
 }: {
   booking: BookingRow | null
   fieldName: string
+  clubTimezone: string
   onOpenChange: (open: boolean) => void
   onChanged: () => void
 }) {
@@ -129,7 +132,7 @@ export function BookingDetailSheet({
             <div className="flex items-center justify-between">
               <StatusBadge tone={BOOKING_STATUS_TONE[booking.status] ?? 'neutral'} label={BOOKING_STATUS_LABELS[booking.status] ?? booking.status} />
               <span className="text-xs text-text-secondary tabular-nums">
-                {new Date(booking.startAt).toLocaleDateString('ar-EG', { day: 'numeric', month: 'long' })}
+                {formatInstant(booking.startAt, clubTimezone, { day: 'numeric', month: 'long' })}
               </span>
             </div>
 
@@ -147,9 +150,9 @@ export function BookingDetailSheet({
               <div>
                 <p className="text-xs text-text-secondary">الوقت</p>
                 <p className="font-medium tabular-nums">
-                  {new Date(booking.startAt).toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit' })}
+                  {formatInstant(booking.startAt, clubTimezone, { hour: '2-digit', minute: '2-digit' })}
                   {' — '}
-                  {new Date(booking.endAt).toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit' })}
+                  {formatInstant(booking.endAt, clubTimezone, { hour: '2-digit', minute: '2-digit' })}
                 </p>
               </div>
             </div>

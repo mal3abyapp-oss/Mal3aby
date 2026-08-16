@@ -13,7 +13,8 @@ import {
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { useResolvedFieldPrice } from './useFieldPricing'
+import { useResolvedFieldPrice, useClubTimezone } from './useFieldPricing'
+import { toInstant } from '@/lib/domain/time'
 
 // Section E3 — Quick Booking: a right-side drawer opened from an empty
 // calendar slot. Price is ALWAYS server-resolved (resolve_field_price)
@@ -63,6 +64,7 @@ export function QuickBookingSheet({
   onCreated: () => void
 }) {
   const queryClient = useQueryClient()
+  const { data: clubTimezone } = useClubTimezone(clubId)
   const [customerId, setCustomerId] = useState('')
   const [customerSearch, setCustomerSearch] = useState('')
   const [duration, setDuration] = useState('1')
@@ -129,8 +131,15 @@ export function QuickBookingSheet({
   const bookMutation = useMutation({
     mutationFn: async () => {
       if (!slot || !customerId) throw new Error('missing input')
-      const startAt = `${slot.date}T${slot.startTime}:00`
-      const endAt = `${slot.date}T${endTime}:00`
+      if (!clubTimezone) throw new Error('club timezone not loaded')
+      // Gate 1 fix: slot.date/slot.startTime/endTime are venue-local wall-
+      // clock values as the user picked them on the calendar. They must
+      // be converted through the venue's real IANA timezone into an
+      // absolute instant before being sent as a timestamptz RPC param —
+      // a naive "date+Ttime+:00" string here was the root cause of the
+      // ~2-3h storage drift bug (see src/lib/domain/time.ts).
+      const startAt = toInstant(slot.date, slot.startTime, clubTimezone)
+      const endAt = toInstant(slot.date, endTime!, clubTimezone)
       const { error } = await supabase.rpc('create_booking', {
         p_field_id: slot.fieldId,
         p_customer_id: customerId,
@@ -276,7 +285,7 @@ export function QuickBookingSheet({
         <SheetFooter>
           <Button
             className="w-full"
-            disabled={!customerId || !resolvedPrice || bookMutation.isPending}
+            disabled={!customerId || !resolvedPrice || !clubTimezone || bookMutation.isPending}
             onClick={() => bookMutation.mutate()}
           >
             {bookMutation.isPending ? 'جارٍ الحجز...' : 'تأكيد الحجز'}

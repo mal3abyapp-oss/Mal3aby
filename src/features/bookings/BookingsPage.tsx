@@ -17,7 +17,8 @@ import { BOOKING_STATUS_LABELS, FIELD_BLOCK_TYPE_LABELS, type BookingRow, type F
 import { QuickBookingSheet, type QuickBookingSlot } from './QuickBookingSheet'
 import { BookingDetailSheet } from './BookingDetailSheet'
 import { BookingsMobileView } from './BookingsMobileView'
-import { resolveHoursForDay, useResolvedFieldPrice } from './useFieldPricing'
+import { resolveHoursForDay, useResolvedFieldPrice, useClubTimezone } from './useFieldPricing'
+import { toInstant, fromInstant } from '@/lib/domain/time'
 
 // Section F: mobile gets a dedicated layout, not a squeezed desktop
 // grid. Matches the app's own mobile breakpoint (md: 768px, see
@@ -72,9 +73,13 @@ async function fetchBranches(clubId: string) {
   return data ?? []
 }
 
-async function fetchBookingsForDay(clubId: string, date: string) {
-  const dayStart = `${date}T00:00:00`
-  const dayEnd = `${date}T23:59:59`
+async function fetchBookingsForDay(clubId: string, date: string, timezone: string) {
+  // Gate 1 fix: the day boundary must be the venue-local day, converted
+  // to a real instant — a naive "date+T00:00:00" string sent to a
+  // timestamptz filter was interpreted as UTC, silently shifting which
+  // bookings "today" actually returned near midnight.
+  const dayStart = toInstant(date, '00:00', timezone)
+  const dayEnd = toInstant(date, '23:59:59', timezone)
   const { data, error } = await supabase
     .from('bookings')
     .select('id, field_id, branch_id, customer_id, start_at, end_at, status, total_price, discount_amount, booking_series_id, invoice_id, notes, customers(full_name, mobile_display)')
@@ -101,9 +106,9 @@ async function fetchBookingsForDay(clubId: string, date: string) {
   }))
 }
 
-async function fetchBlocksForDay(clubId: string, date: string) {
-  const dayStart = `${date}T00:00:00`
-  const dayEnd = `${date}T23:59:59`
+async function fetchBlocksForDay(clubId: string, date: string, timezone: string) {
+  const dayStart = toInstant(date, '00:00', timezone)
+  const dayEnd = toInstant(date, '23:59:59', timezone)
   const { data, error } = await supabase
     .from('field_blocks')
     .select('id, field_id, start_at, end_at, type, reason')
@@ -130,14 +135,14 @@ async function fetchOperatingHours(clubId: string) {
   return data ?? []
 }
 
-function FieldColumnHeader({ field, clubId, date }: { field: FieldWithBranch; clubId: string; date: string }) {
+function FieldColumnHeader({ field, clubId, date, clubTimezone }: { field: FieldWithBranch; clubId: string; date: string; clubTimezone?: string }) {
   const dayOfWeek = new Date(`${date}T12:00:00`).getDay()
   const { data: hoursRows = [] } = useQuery({
     queryKey: ['field-operating-hours-all', clubId],
     queryFn: () => fetchOperatingHours(clubId),
   })
   const hours = resolveHoursForDay(hoursRows, field.id, dayOfWeek)
-  const nowTime = new Date().toTimeString().slice(0, 5)
+  const nowTime = clubTimezone ? fromInstant(new Date(), clubTimezone).time : new Date().toTimeString().slice(0, 5)
   const { data: currentPrice } = useResolvedFieldPrice(field.id, date, `${nowTime}:00`, `${nowTime}:00`)
 
   return (
@@ -162,22 +167,23 @@ export function BookingsPage() {
   const [slotSelection, setSlotSelection] = useState<QuickBookingSlot | null>(null)
   const [selectedBooking, setSelectedBooking] = useState<BookingRow | null>(null)
 
+  const { data: clubTimezone } = useClubTimezone(currentClubId)
   const { data: branches = [] } = useQuery({ queryKey: ['branches-for-bookings', currentClubId], queryFn: () => fetchBranches(currentClubId!), enabled: !!currentClubId })
   const { data: fields = [] } = useQuery({ queryKey: ['fields-for-bookings', currentClubId, branchId], queryFn: () => fetchFields(currentClubId!, branchId), enabled: !!currentClubId })
   const { data: bookings = [], isLoading } = useQuery({
-    queryKey: ['bookings', currentClubId, date],
-    queryFn: () => fetchBookingsForDay(currentClubId!, date),
-    enabled: !!currentClubId,
+    queryKey: ['bookings', currentClubId, date, clubTimezone],
+    queryFn: () => fetchBookingsForDay(currentClubId!, date, clubTimezone!),
+    enabled: !!currentClubId && !!clubTimezone,
   })
   const { data: blocks = [] } = useQuery({
-    queryKey: ['field-blocks', currentClubId, date],
-    queryFn: () => fetchBlocksForDay(currentClubId!, date),
-    enabled: !!currentClubId,
+    queryKey: ['field-blocks', currentClubId, date, clubTimezone],
+    queryFn: () => fetchBlocksForDay(currentClubId!, date, clubTimezone!),
+    enabled: !!currentClubId && !!clubTimezone,
   })
 
   function invalidateGrid() {
-    void queryClient.invalidateQueries({ queryKey: ['bookings', currentClubId, date] })
-    void queryClient.invalidateQueries({ queryKey: ['field-blocks', currentClubId, date] })
+    void queryClient.invalidateQueries({ queryKey: ['bookings', currentClubId] })
+    void queryClient.invalidateQueries({ queryKey: ['field-blocks', currentClubId] })
   }
 
   const bookingsByField = useMemo(() => {
@@ -201,8 +207,15 @@ export function BookingsPage() {
   }, [blocks])
 
   function slotMinutesOf(iso: string) {
-    const d = new Date(iso)
-    return d.getHours() * 60 + d.getMinutes()
+    // Gate 1 fix: must read the stored instant back in the venue's
+    // timezone, not the browser's local zone (new Date().getHours() used
+    // to silently assume they're the same — wrong for any staff viewing
+    // from outside the venue's timezone, and untestable-by-coincidence
+    // whenever they happen to match).
+    if (!clubTimezone) return 0
+    const { time } = fromInstant(iso, clubTimezone)
+    const [h, m] = time.split(':').map(Number)
+    return h * 60 + m
   }
 
   function entityAtSlot(fieldId: string, slotMin: number) {
@@ -244,6 +257,8 @@ export function BookingsPage() {
         <PageHeader title="الحجوزات" description="" className="pb-0" />
         {fields.length === 0 ? (
           <p className="text-sm text-text-secondary">لا توجد ملاعب بعد. أضف ملعبًا من الإعدادات أولاً.</p>
+        ) : !clubTimezone ? (
+          <p className="text-sm text-text-secondary">جارٍ التحميل...</p>
         ) : (
           <BookingsMobileView
             date={date}
@@ -252,6 +267,7 @@ export function BookingsPage() {
             bookings={bookings}
             blocks={blocks}
             hoursRows={hoursRows}
+            clubTimezone={clubTimezone}
             onSlotSelect={setSlotSelection}
             onBookingSelect={setSelectedBooking}
           />
@@ -266,6 +282,7 @@ export function BookingsPage() {
         <BookingDetailSheet
           booking={selectedBooking}
           fieldName={fields.find((f) => f.id === selectedBooking?.fieldId)?.name ?? ''}
+          clubTimezone={clubTimezone ?? 'UTC'}
           onOpenChange={(open) => !open && setSelectedBooking(null)}
           onChanged={invalidateGrid}
         />
@@ -314,7 +331,7 @@ export function BookingsPage() {
                 <th className="sticky start-0 z-30 w-20 border-b border-border bg-surface p-2 text-start text-xs text-text-secondary">الوقت</th>
                 {fields.map((f) => (
                   <th key={f.id} className="min-w-[180px] border-b border-s border-border bg-surface text-start font-normal">
-                    <FieldColumnHeader field={f} clubId={currentClubId!} date={date} />
+                    <FieldColumnHeader field={f} clubId={currentClubId!} date={date} clubTimezone={clubTimezone} />
                   </th>
                 ))}
               </tr>

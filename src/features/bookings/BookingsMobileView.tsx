@@ -5,6 +5,7 @@ import { cn } from '@/lib/utils'
 import { BOOKING_STATUS_LABELS, BOOKING_STATUS_TONE, FIELD_BLOCK_TYPE_LABELS, type BookingRow, type FieldBlockRow } from '@/lib/domain/booking'
 import { StatusBadge } from '@/components/ui/status-badge'
 import { resolveHoursForDay, useResolvedFieldPrice } from './useFieldPricing'
+import { fromInstant, formatInstant } from '@/lib/domain/time'
 import type { QuickBookingSlot } from './QuickBookingSheet'
 
 // V1 Operational Product Rebuild -- Section F (Mobile Bookings): a
@@ -29,6 +30,7 @@ export function BookingsMobileView({
   bookings,
   blocks,
   hoursRows,
+  clubTimezone,
   onSlotSelect,
   onBookingSelect,
 }: {
@@ -38,6 +40,7 @@ export function BookingsMobileView({
   bookings: BookingRow[]
   blocks: FieldBlockRow[]
   hoursRows: { day_of_week: number; open_time: string; close_time: string; field_id: string | null }[]
+  clubTimezone: string
   onSlotSelect: (slot: QuickBookingSlot) => void
   onBookingSelect: (booking: BookingRow) => void
 }) {
@@ -52,8 +55,9 @@ export function BookingsMobileView({
   const { data: currentPrice } = useResolvedFieldPrice(activeFieldId, date, `${nowTime}:00`, `${nowTime}:00`)
 
   function slotMinutesOf(iso: string) {
-    const d = new Date(iso)
-    return d.getHours() * 60 + d.getMinutes()
+    const { time } = fromInstant(iso, clubTimezone)
+    const [h, m] = time.split(':').map(Number)
+    return h * 60 + m
   }
 
   const fieldBookings = useMemo(
@@ -73,8 +77,13 @@ export function BookingsMobileView({
 
   const hours = activeFieldId ? resolveHoursForDay(hoursRows, activeFieldId, dayOfWeek) : null
 
-  // "Now" -- is the active field free right now, and until when?
-  const nowMin = new Date().getHours() * 60 + new Date().getMinutes()
+  // "Now" -- is the active field free right now, and until when? Must be
+  // "now" as observed in the venue's timezone, not the browser's.
+  const nowMin = useMemo(() => {
+    const { time } = fromInstant(new Date(), clubTimezone)
+    const [h, m] = time.split(':').map(Number)
+    return h * 60 + m
+  }, [clubTimezone])
   const nowBusy = isToday && fieldBookings.find((b) => nowMin >= slotMinutesOf(b.startAt) && nowMin < slotMinutesOf(b.endAt))
   const nextBooking = isToday ? fieldBookings.find((b) => slotMinutesOf(b.startAt) > nowMin) : fieldBookings[0]
 
@@ -126,7 +135,7 @@ export function BookingsMobileView({
             <p className="text-xs text-text-secondary">التالي</p>
             {nextBooking ? (
               <p className="font-medium tabular-nums">
-                {new Date(nextBooking.startAt).toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit' })} — {nextBooking.customerName}
+                {formatInstant(nextBooking.startAt, clubTimezone, { hour: '2-digit', minute: '2-digit' })} — {nextBooking.customerName}
               </p>
             ) : (
               <p className="text-text-secondary">لا يوجد حجوزات قادمة</p>
@@ -161,7 +170,7 @@ export function BookingsMobileView({
 
           if (entity?.kind === 'booking') {
             const b = entity.booking
-            const isStart = new Date(b.startAt).getHours() === hour
+            const isStart = Number(fromInstant(b.startAt, clubTimezone).time.split(':')[0]) === hour
             if (!isStart) return null
             return (
               <button
@@ -180,7 +189,7 @@ export function BookingsMobileView({
 
           if (entity?.kind === 'block') {
             const blk = entity.block
-            const isStart = new Date(blk.startAt).getHours() === hour
+            const isStart = Number(fromInstant(blk.startAt, clubTimezone).time.split(':')[0]) === hour
             if (!isStart) return null
             return (
               <div key={hour} className="flex items-center justify-between gap-2 bg-status-danger/5 p-3">

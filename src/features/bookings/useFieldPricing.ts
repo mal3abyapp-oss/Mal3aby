@@ -1,6 +1,23 @@
 import { useQuery } from '@tanstack/react-query'
 import { supabase } from '@/lib/supabase/client'
 
+// Gate 1 (Booking Time Integrity): the venue's real IANA timezone,
+// never hardcoded. Every booking write/read that converts between a
+// wall-clock Business Date+Time and an absolute Instant must resolve
+// this first — see src/lib/domain/time.ts for why.
+export function useClubTimezone(clubId: string | null) {
+  return useQuery({
+    queryKey: ['club-timezone', clubId],
+    queryFn: async () => {
+      const { data, error } = await supabase.from('clubs').select('timezone').eq('id', clubId!).single()
+      if (error) throw error
+      return data.timezone as string
+    },
+    enabled: !!clubId,
+    staleTime: 60 * 60 * 1000, // a club's timezone essentially never changes mid-session
+  })
+}
+
 // V1 Operational Product Rebuild (Section H — Pricing UX): the price an
 // employee sees anywhere in the product must come from the server-side
 // resolve_field_price() RPC, never be guessed/recomputed client-side.
