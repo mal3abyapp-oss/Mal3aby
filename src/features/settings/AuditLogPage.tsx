@@ -11,6 +11,70 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
+import { formatMoney } from '@/lib/domain/billing'
+
+// Gate 13 #60: this screen used to show the raw machine action string
+// ("booking.discount.apply"), the raw table name as "الكيان" ("booking"),
+// and a raw JSON before/after diff -- unreadable to a non-technical club
+// owner, and actor_id was fetched but never even displayed. This maps
+// every real write_audit_log() action (enumerated from every migration
+// that calls it) to a human sentence, and resolves actor_id to a name.
+// Raw JSON is kept, but demoted to an optional "تفاصيل تقنية" section in
+// the detail dialog for anyone who still wants it.
+const ACTION_LABELS: Record<string, string> = {
+  'booking.create': 'إنشاء حجز',
+  'booking.check_in': 'تسجيل حضور حجز',
+  'booking.discount.apply': 'تطبيق خصم على حجز',
+  cancel_booking: 'إلغاء حجز',
+  'field_block.create': 'حجب فترة على ملعب',
+  'invoice.issue': 'إصدار فاتورة',
+  void_invoice: 'إلغاء فاتورة',
+  'payment.record': 'تسجيل دفعة',
+  create_refund: 'استرجاع دفعة',
+  'payment.refund': 'استرجاع دفعة',
+  'subscription.activate': 'تفعيل اشتراك أكاديمية',
+  'subscription.cancel': 'إلغاء اشتراك أكاديمية',
+  'subscription.freeze': 'تجميد اشتراك أكاديمية',
+  'subscription.unfreeze': 'إلغاء تجميد اشتراك أكاديمية',
+  'customer.photo.approve': 'الموافقة على تغيير صورة',
+  'customer.photo.reject': 'رفض تغيير صورة',
+  'customer.self_service_claim': 'ربط حساب عميل تلقائيًا',
+}
+
+const ENTITY_LABELS: Record<string, string> = {
+  booking: 'حجز',
+  bookings: 'حجز',
+  invoice: 'فاتورة',
+  invoices: 'فاتورة',
+  payment: 'دفعة',
+  refund: 'استرجاع',
+  refunds: 'استرجاع',
+  field_block: 'حجب ملعب',
+  subscription: 'اشتراك أكاديمية',
+  customer: 'عميل',
+  player: 'لاعب',
+}
+
+function describeAuditLog(r: AuditLogRow): string {
+  const label = ACTION_LABELS[r.action] ?? r.action
+  const entity = ENTITY_LABELS[r.entityType] ?? r.entityType
+
+  // A few actions carry enough in before/after to say something more
+  // specific than just the action label -- worth the extra detail since
+  // this is exactly the kind of line a suspicious owner reads closely.
+  const after = (r.after ?? {}) as Record<string, unknown>
+  if (r.action === 'booking.discount.apply' && typeof after.discount_amount === 'number') {
+    return `${label} بقيمة ${formatMoney(after.discount_amount)}`
+  }
+  if ((r.action === 'create_refund' || r.action === 'payment.refund') && typeof after.amount === 'number') {
+    return `${label} بقيمة ${formatMoney(after.amount)}`
+  }
+  if (r.action === 'payment.record' && typeof after.amount === 'number') {
+    return `${label} بقيمة ${formatMoney(after.amount)}`
+  }
+
+  return `${label} — ${entity}`
+}
 
 // Audit Log Viewer -- RLS already restricts visibility to club_owner/
 // club_manager (own club) and branch_manager (own branch), per
@@ -28,6 +92,7 @@ interface AuditLogRow {
   reason: string | null
   createdAt: string
   actorId: string | null
+  actorName: string | null
 }
 
 async function fetchAuditLogs(clubId: string, search: string) {
@@ -44,6 +109,18 @@ async function fetchAuditLogs(clubId: string, search: string) {
 
   const { data, error } = await query
   if (error) throw error
+
+  // actor_id was already selected but never resolved to a name --
+  // profiles_select_same_club_staff RLS already allows reading a fellow
+  // staff member's profile in the same club (same pattern used for
+  // payment-collector attribution in Gate 13 #57).
+  const actorIds = [...new Set((data ?? []).map((r) => r.actor_id).filter((id): id is string => !!id))]
+  const namesById = new Map<string, string>()
+  if (actorIds.length > 0) {
+    const { data: actors } = await supabase.from('profiles').select('user_id, full_name').in('user_id', actorIds)
+    for (const a of actors ?? []) if (a.full_name) namesById.set(a.user_id, a.full_name)
+  }
+
   return (data ?? []).map<AuditLogRow>((r) => ({
     id: r.id,
     action: r.action,
@@ -54,6 +131,7 @@ async function fetchAuditLogs(clubId: string, search: string) {
     reason: r.reason,
     createdAt: r.created_at,
     actorId: r.actor_id,
+    actorName: r.actor_id ? (namesById.get(r.actor_id) ?? null) : null,
   }))
 }
 
@@ -83,11 +161,11 @@ export function AuditLogSection() {
       header: 'الإجراء',
       render: (r) => (
         <button className="text-accent-foreground hover:underline" onClick={() => setSelected(r)}>
-          {r.action}
+          {describeAuditLog(r)}
         </button>
       ),
     },
-    { key: 'entity', header: 'الكيان', render: (r) => r.entityType },
+    { key: 'actor', header: 'قام به', render: (r) => r.actorName ?? '—' },
     { key: 'reason', header: 'السبب', render: (r) => r.reason ?? '—' },
   ]
 
@@ -109,28 +187,31 @@ export function AuditLogSection() {
       <Dialog open={!!selected} onOpenChange={(open) => !open && setSelected(null)}>
         <DialogContent className="max-w-2xl">
           <DialogHeader>
-            <DialogTitle>{selected?.action}</DialogTitle>
+            <DialogTitle>{selected ? describeAuditLog(selected) : ''}</DialogTitle>
           </DialogHeader>
           {selected && (
             <div className="flex flex-col gap-4 text-sm">
               <p className="text-text-secondary">
-                {selected.entityType} — {new Date(selected.createdAt).toLocaleString('ar-EG')}
+                {selected.actorName ?? 'مستخدم غير معروف'} — {new Date(selected.createdAt).toLocaleString('ar-EG')}
               </p>
               {selected.reason && <p>السبب: {selected.reason}</p>}
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <p className="mb-1 font-medium text-text-secondary">قبل</p>
-                  <pre className="overflow-x-auto rounded-md border border-border bg-muted/30 p-2 text-xs" dir="ltr">
-                    {selected.before ? JSON.stringify(selected.before, null, 2) : '—'}
-                  </pre>
+              <details>
+                <summary className="cursor-pointer text-sm text-text-secondary">تفاصيل تقنية</summary>
+                <div className="mt-3 grid grid-cols-2 gap-4">
+                  <div>
+                    <p className="mb-1 font-medium text-text-secondary">قبل</p>
+                    <pre className="overflow-x-auto rounded-md border border-border bg-muted/30 p-2 text-xs" dir="ltr">
+                      {selected.before ? JSON.stringify(selected.before, null, 2) : '—'}
+                    </pre>
+                  </div>
+                  <div>
+                    <p className="mb-1 font-medium text-text-secondary">بعد</p>
+                    <pre className="overflow-x-auto rounded-md border border-border bg-muted/30 p-2 text-xs" dir="ltr">
+                      {selected.after ? JSON.stringify(selected.after, null, 2) : '—'}
+                    </pre>
+                  </div>
                 </div>
-                <div>
-                  <p className="mb-1 font-medium text-text-secondary">بعد</p>
-                  <pre className="overflow-x-auto rounded-md border border-border bg-muted/30 p-2 text-xs" dir="ltr">
-                    {selected.after ? JSON.stringify(selected.after, null, 2) : '—'}
-                  </pre>
-                </div>
-              </div>
+              </details>
             </div>
           )}
         </DialogContent>
