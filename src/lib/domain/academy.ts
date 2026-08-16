@@ -38,6 +38,9 @@ export interface GroupRow {
   programName?: string
   seasonName?: string
   coachName?: string | null
+  branchName?: string
+  ageGroupName?: string
+  fieldName?: string | null
 }
 
 export interface ScheduleSlotRow {

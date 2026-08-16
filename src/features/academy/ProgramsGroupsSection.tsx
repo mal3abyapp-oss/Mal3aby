@@ -54,7 +54,7 @@ async function fetchAgeGroups(clubId: string) {
 async function fetchGroups(clubId: string) {
   const { data, error } = await supabase
     .from('groups')
-    .select('id, branch_id, program_id, season_id, age_group_id, coach_id, assistant_coach_id, field_id, name, capacity, status, programs(name), seasons(name)')
+    .select('id, branch_id, program_id, season_id, age_group_id, coach_id, assistant_coach_id, field_id, name, capacity, status, programs(name), seasons(name), branches(name), age_groups(name), fields(name)')
     .eq('club_id', clubId)
     .order('created_at', { ascending: false })
   if (error) throw error
@@ -72,7 +72,35 @@ async function fetchGroups(clubId: string) {
     status: g.status,
     programName: (g.programs as unknown as { name: string } | null)?.name,
     seasonName: (g.seasons as unknown as { name: string } | null)?.name,
+    branchName: (g.branches as unknown as { name: string } | null)?.name,
+    ageGroupName: (g.age_groups as unknown as { name: string } | null)?.name,
+    fieldName: (g.fields as unknown as { name: string } | null)?.name,
   }))
+}
+
+async function fetchEnrolledCounts(clubId: string) {
+  const { data, error } = await supabase.from('enrollments').select('group_id, groups!inner(club_id)').eq('groups.club_id', clubId).eq('status', 'active')
+  if (error) throw error
+  const counts = new Map<string, number>()
+  for (const row of data ?? []) counts.set(row.group_id, (counts.get(row.group_id) ?? 0) + 1)
+  return counts
+}
+
+async function fetchNextSessionByGroup(clubId: string) {
+  const today = new Date().toISOString().slice(0, 10)
+  const { data, error } = await supabase
+    .from('training_sessions')
+    .select('group_id, session_date, start_time')
+    .eq('club_id', clubId)
+    .gte('session_date', today)
+    .order('session_date')
+    .order('start_time')
+  if (error) throw error
+  const nextByGroup = new Map<string, { date: string; time: string }>()
+  for (const row of data ?? []) {
+    if (!nextByGroup.has(row.group_id)) nextByGroup.set(row.group_id, { date: row.session_date, time: row.start_time.slice(0, 5) })
+  }
+  return nextByGroup
 }
 
 async function fetchScheduleSlots(groupId: string) {
@@ -152,6 +180,8 @@ export function ProgramsGroupsSection() {
   const { data: seasons = [] } = useQuery({ queryKey: ['seasons', currentClubId], queryFn: () => fetchSeasons(currentClubId!), enabled: !!currentClubId })
   const { data: ageGroups = [] } = useQuery({ queryKey: ['age-groups', currentClubId], queryFn: () => fetchAgeGroups(currentClubId!), enabled: !!currentClubId })
   const { data: groups = [], isLoading: groupsLoading } = useQuery({ queryKey: ['groups', currentClubId], queryFn: () => fetchGroups(currentClubId!), enabled: !!currentClubId })
+  const { data: enrolledCounts = new Map<string, number>() } = useQuery({ queryKey: ['groups-enrolled-counts', currentClubId], queryFn: () => fetchEnrolledCounts(currentClubId!), enabled: !!currentClubId })
+  const { data: nextSessionByGroup = new Map<string, { date: string; time: string }>() } = useQuery({ queryKey: ['groups-next-session', currentClubId], queryFn: () => fetchNextSessionByGroup(currentClubId!), enabled: !!currentClubId })
   const { data: branches = [] } = useQuery({ queryKey: ['branches-for-academy', currentClubId], queryFn: () => fetchBranches(currentClubId!), enabled: !!currentClubId })
   const { data: fields = [] } = useQuery({ queryKey: ['fields-for-academy', currentClubId], queryFn: () => fetchFields(currentClubId!), enabled: !!currentClubId })
   const { data: coaches = [] } = useQuery({ queryKey: ['coaches', currentClubId], queryFn: () => fetchCoaches(currentClubId!), enabled: !!currentClubId })
@@ -334,7 +364,28 @@ export function ProgramsGroupsSection() {
     },
     { key: 'program', header: 'البرنامج', render: (g) => g.programName ?? '—' },
     { key: 'season', header: 'الموسم', render: (g) => g.seasonName ?? '—' },
-    { key: 'capacity', header: 'السعة', render: (g) => g.capacity },
+    {
+      key: 'capacity',
+      header: 'السعة',
+      render: (g) => {
+        const enrolled = enrolledCounts.get(g.id) ?? 0
+        const remaining = g.capacity - enrolled
+        return (
+          <span className={remaining <= 2 ? 'font-medium text-status-warning' : ''}>
+            {enrolled}/{g.capacity} {remaining <= 2 && remaining >= 0 && `(متبقي ${remaining})`}
+          </span>
+        )
+      },
+    },
+    {
+      key: 'next-session',
+      header: 'الجلسة القادمة',
+      render: (g) => {
+        const next = nextSessionByGroup.get(g.id)
+        if (!next) return <span className="text-text-secondary">—</span>
+        return <span className="tabular-nums">{next.date} {next.time}</span>
+      },
+    },
     { key: 'status', header: 'الحالة', render: (g) => <StatusBadge tone={g.status === 'active' ? 'success' : 'neutral'} label={GROUP_STATUS_LABELS[g.status] ?? g.status} /> },
   ]
 
@@ -440,9 +491,35 @@ export function ProgramsGroupsSection() {
       />
 
       <Dialog open={!!selectedGroup} onOpenChange={(open) => !open && setSelectedGroup(null)}>
-        <DialogContent>
-          <DialogHeader><DialogTitle>إعداد {selectedGroup?.name}</DialogTitle></DialogHeader>
+        <DialogContent className="max-h-[85vh] overflow-y-auto">
+          <DialogHeader><DialogTitle>{selectedGroup?.name}</DialogTitle></DialogHeader>
           <div className="flex flex-col gap-3">
+            {selectedGroup && (
+              <div className="grid grid-cols-2 gap-2 rounded-lg border border-border bg-muted/20 p-3 text-sm">
+                <div><span className="text-text-secondary">البرنامج: </span>{selectedGroup.programName ?? '—'}</div>
+                <div><span className="text-text-secondary">الموسم: </span>{selectedGroup.seasonName ?? '—'}</div>
+                <div><span className="text-text-secondary">الفئة العمرية: </span>{selectedGroup.ageGroupName ?? '—'}</div>
+                <div><span className="text-text-secondary">الفرع: </span>{selectedGroup.branchName ?? '—'}</div>
+                <div><span className="text-text-secondary">الملعب: </span>{selectedGroup.fieldName ?? 'غير محدد'}</div>
+                <div>
+                  <span className="text-text-secondary">السعة: </span>
+                  {enrolledCounts.get(selectedGroup.id) ?? 0}/{selectedGroup.capacity}
+                </div>
+                {scheduleSlots.length > 0 && (
+                  <div className="col-span-2">
+                    <span className="text-text-secondary">الجدول: </span>
+                    {scheduleSlots.map((s) => `${DAY_OF_WEEK_LABELS[s.dayOfWeek]} ${s.startTime.slice(0, 5)}–${s.endTime.slice(0, 5)}`).join('، ')}
+                  </div>
+                )}
+                {nextSessionByGroup.get(selectedGroup.id) && (
+                  <div className="col-span-2">
+                    <span className="text-text-secondary">الجلسة القادمة: </span>
+                    {nextSessionByGroup.get(selectedGroup.id)!.date} — {nextSessionByGroup.get(selectedGroup.id)!.time}
+                  </div>
+                )}
+              </div>
+            )}
+
             <div className="flex flex-col gap-2 border-b border-border pb-3">
               <p className="text-sm font-medium text-text-secondary">السعة والتعيينات</p>
               <Input type="number" min={1} value={editGroupCapacity} onChange={(e) => setEditGroupCapacity(e.target.value)} placeholder="السعة" />
@@ -481,7 +558,7 @@ export function ProgramsGroupsSection() {
               <ul className="flex flex-col gap-1">
                 {scheduleSlots.map((s) => (
                   <li key={s.id} className="rounded-md border border-border p-2 text-sm">
-                    {DAY_OF_WEEK_LABELS[s.dayOfWeek]} — {s.startTime} إلى {s.endTime}
+                    {DAY_OF_WEEK_LABELS[s.dayOfWeek]} — {s.startTime.slice(0, 5)} إلى {s.endTime.slice(0, 5)}
                   </li>
                 ))}
               </ul>
