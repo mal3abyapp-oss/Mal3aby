@@ -545,3 +545,87 @@ column. Scoping that properly requires understanding how `package`-type
 plans currently track usage (if at all) before adding columns — tracked
 as explicit follow-up in the execution state file, not silently
 dropped.
+
+---
+
+## D-005 — Gate 5: recurring booking UI + double-booking prevention audit
+
+**Date:** 2026-08-16
+**Problem:** Gate 5 (Bookings / Activities / Seats). Gate 1's
+investigation had already flagged that `create_recurring_booking()` and
+`create_field_block()` RPCs exist in the generated types with NO
+frontend caller anywhere — audit both for the same class of defect
+found in Gates 1/2/4 before building UI against them.
+
+**Findings:**
+- `create_recurring_booking()` delegates each occurrence directly to
+  `_create_booking_internal()` (the same function Gate 1 fixed for
+  venue-timezone correctness) — so it automatically inherits that fix
+  with no separate bug. Correctly catches `exclusion_violation` per
+  occurrence and reports created-vs-conflicted counts rather than
+  failing the whole series on one conflict.
+- **Doc 3's core double-booking requirement was already fully and
+  correctly satisfied at the database level**, verified by direct
+  test: `bookings` has a real Postgres `EXCLUDE USING gist (field_id
+  WITH =, during WITH &&) WHERE (status IN (...))` constraint
+  (`no_overlapping_field_bookings`) — this is the textbook-correct,
+  concurrency-safe way to prevent overlapping bookings (enforced by the
+  index itself, not application logic, so it holds even under two
+  simultaneous transactions, which is exactly Doc 3's "under real
+  concurrent requests, not just UI" requirement). Verified directly:
+  two overlapping INSERTs in the same transaction correctly raised
+  `23P01 conflicting key value violates exclusion constraint`, rolled
+  back cleanly.
+- `create_field_block()` is well-designed: surfaces conflicting
+  existing bookings as information (doesn't block staff from creating
+  a maintenance block over existing bookings — a reasonable design,
+  since staff may need to block a field and separately handle
+  cancelling those bookings), audit-logged, no timezone bug (uses raw
+  UTC instant comparison throughout, which is correct for
+  timezone-agnostic overlap detection).
+- Seat/activity/event booking and waitlist: confirmed via
+  `information_schema.tables` that NO such tables exist at all
+  (`qr_scan_events` was the only even-tangentially-related match). This
+  is genuinely new schema/product surface, not a bug — deferred as its
+  own scoping decision given the size (event definition, seat
+  inventory, capacity enforcement, waitlist promotion policy all need
+  design), tracked explicitly in the execution state file rather than
+  attempted in the same pass as the smaller, already-proven recurring-
+  booking piece.
+
+**Chosen solution:** Wired `create_recurring_booking()` into
+`QuickBookingSheet.tsx` via a "حجز متكرر أسبوعيًا" (weekly recurring
+booking) checkbox + occurrence-count input, reusing the exact same
+slot/time/customer selection UI as a single booking (no new screen
+needed). Recurring bookings don't accept an upfront payment (each
+occurrence is billed separately later, matching the RPC's own
+payment-less signature and how every other `pending_payment` booking
+already works) — the payment section is hidden when recurring is
+selected. On success, shows a result summary ("N of M created, K
+conflicted") instead of silently closing, since a partial-success
+outcome is exactly the kind of information a close-and-forget flow
+would hide.
+
+**Why:** Minimal, additive UI change against an already-correct,
+already-tested backend — no new migration needed for the recurring-
+booking piece since the RPC and its safety guarantees (the exclusion
+constraint) were already fully correct.
+
+**Verification:** Live end-to-end RPC test (temporarily granted staff
+role to the session's test account, same as Gates 3/4): created a real
+3-occurrence weekly series, confirmed `{requested: 3, created: 3,
+conflicted: []}`, confirmed the 3 booking rows exist with correct
+7-day-spaced `start_at`/`end_at` values. All test data removed
+afterward (bookings, booking_series row, temporary staff grant).
+
+**DB impact:** None — no migration needed, purely a frontend addition
+against already-correct, already-deployed backend functions.
+
+**Security impact:** None — no new RPCs, no RLS changes; reuses
+`create_recurring_booking()`'s own existing `booking.create` permission
+check and `club_write_allowed()` gate.
+
+**Status:** Recurring bookings (the well-defined, backend-ready half of
+Gate 5) shipped and verified. Seat/activity/event booking + waitlist
+remains unscoped/unbuilt — explicit follow-up, not silently dropped
+(see execution state file).

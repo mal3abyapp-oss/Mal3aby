@@ -74,6 +74,14 @@ export function QuickBookingSheet({
   const [showNewCustomer, setShowNewCustomer] = useState(false)
   const [newCustomerName, setNewCustomerName] = useState('')
   const [newCustomerMobile, setNewCustomerMobile] = useState('')
+  // Gate 5 — recurring bookings: create_recurring_booking() already
+  // existed server-side (delegates to the same, already-fixed
+  // _create_booking_internal per occurrence) but had no frontend caller
+  // at all. Wired here rather than as a separate screen since the
+  // slot/time/customer selection is identical to a single booking.
+  const [isRecurring, setIsRecurring] = useState(false)
+  const [occurrenceCount, setOccurrenceCount] = useState('8')
+  const [recurringResult, setRecurringResult] = useState<{ created: number; requested: number; conflicted: string[] } | null>(null)
 
   useEffect(() => {
     if (!slot) {
@@ -85,6 +93,9 @@ export function QuickBookingSheet({
       setShowNewCustomer(false)
       setNewCustomerName('')
       setNewCustomerMobile('')
+      setIsRecurring(false)
+      setOccurrenceCount('8')
+      setRecurringResult(null)
     }
   }, [slot])
 
@@ -140,6 +151,31 @@ export function QuickBookingSheet({
       // ~2-3h storage drift bug (see src/lib/domain/time.ts).
       const startAt = toInstant(slot.date, slot.startTime, clubTimezone)
       const endAt = toInstant(slot.date, endTime!, clubTimezone)
+
+      if (isRecurring) {
+        // Recurring bookings never accept an upfront payment here (each
+        // occurrence would need its own payment decision) -- matches
+        // create_recurring_booking()'s own signature, which has no
+        // payment params at all; each created occurrence lands as
+        // 'pending_payment', same as any other new booking.
+        const { data, error } = await supabase.rpc('create_recurring_booking', {
+          p_field_id: slot.fieldId,
+          p_customer_id: customerId,
+          p_first_start_at: startAt,
+          p_first_end_at: endAt,
+          p_occurrence_count: Number(occurrenceCount),
+          p_interval_days: 7,
+        })
+        if (error) throw error
+        const row = data?.[0]
+        setRecurringResult({
+          created: row?.created ?? 0,
+          requested: row?.requested ?? Number(occurrenceCount),
+          conflicted: (row?.conflicted_occurrences ?? []) as string[],
+        })
+        return
+      }
+
       const { error } = await supabase.rpc('create_booking', {
         p_field_id: slot.fieldId,
         p_customer_id: customerId,
@@ -152,8 +188,15 @@ export function QuickBookingSheet({
       if (error) throw error
     },
     onSuccess: () => {
-      onOpenChange(false)
       onCreated()
+      // A recurring booking shows its own result summary (created vs.
+      // conflicted occurrences) instead of closing immediately -- the
+      // outcome ("6 of 8 created, 2 conflicted") is exactly the kind of
+      // partial-success information a single-booking close-and-forget
+      // flow would hide.
+      if (!isRecurring) {
+        onOpenChange(false)
+      }
     },
     onError: (error) =>
       setFormError(translateSupabaseError(error, 'تعذّر إنشاء الحجز — قد يكون الموعد محجوزًا بالفعل أو غير مصرّح به.')),
@@ -246,7 +289,7 @@ export function QuickBookingSheet({
                     <span className="tabular-nums">{duration} ساعة</span>
                   </div>
                   <div className="mt-1 flex justify-between border-t border-accent/20 pt-1 font-semibold">
-                    <span>الإجمالي</span>
+                    <span>{isRecurring ? 'سعر كل حجز' : 'الإجمالي'}</span>
                     <span className="tabular-nums">{resolvedPrice.toFixed(0)} ج.م</span>
                   </div>
                 </div>
@@ -255,28 +298,73 @@ export function QuickBookingSheet({
               )}
             </div>
 
-            {/* Payment */}
-            <div className="flex flex-col gap-2">
-              <label className="text-sm font-medium text-text-secondary">الدفع</label>
-              <div className="flex gap-2">
-                <Button type="button" variant={payNow ? 'default' : 'outline'} size="sm" onClick={() => setPayNow(true)}>
-                  دفع الآن
-                </Button>
-                <Button type="button" variant={!payNow ? 'default' : 'outline'} size="sm" onClick={() => setPayNow(false)}>
-                  بانتظار الدفع
-                </Button>
-              </div>
-              {payNow && (
-                <Select value={paymentMethod} onValueChange={setPaymentMethod}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="cash">نقدًا</SelectItem>
-                    <SelectItem value="card">بطاقة</SelectItem>
-                    <SelectItem value="transfer">تحويل بنكي</SelectItem>
-                  </SelectContent>
-                </Select>
+            {/* Recurring booking -- Gate 5: create_recurring_booking()
+                already existed server-side (same field/time/customer
+                every week for N occurrences) but had no UI. Each
+                occurrence is billed/paid separately as it happens, same
+                as any regular booking -- no upfront bulk payment here. */}
+            <div className="flex flex-col gap-2 rounded-lg border border-border p-3">
+              <label className="flex items-center gap-2 text-sm font-medium">
+                <input type="checkbox" checked={isRecurring} onChange={(e) => setIsRecurring(e.target.checked)} className="size-4" />
+                حجز متكرر أسبوعيًا
+              </label>
+              {isRecurring && (
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-xs text-text-secondary">عدد المرات</label>
+                  <Input
+                    type="number"
+                    min={1}
+                    max={52}
+                    value={occurrenceCount}
+                    onChange={(e) => setOccurrenceCount(e.target.value)}
+                  />
+                  <p className="text-xs text-text-secondary">
+                    سيتم إنشاء حجز كل أسبوع في نفس اليوم والوقت، بدءًا من هذا التاريخ.
+                  </p>
+                </div>
               )}
             </div>
+
+            {/* Payment -- not applicable to recurring bookings (each
+                occurrence is settled on its own later, same as any
+                pending_payment booking created elsewhere). */}
+            {!isRecurring && (
+              <div className="flex flex-col gap-2">
+                <label className="text-sm font-medium text-text-secondary">الدفع</label>
+                <div className="flex gap-2">
+                  <Button type="button" variant={payNow ? 'default' : 'outline'} size="sm" onClick={() => setPayNow(true)}>
+                    دفع الآن
+                  </Button>
+                  <Button type="button" variant={!payNow ? 'default' : 'outline'} size="sm" onClick={() => setPayNow(false)}>
+                    بانتظار الدفع
+                  </Button>
+                </div>
+                {payNow && (
+                  <Select value={paymentMethod} onValueChange={setPaymentMethod}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="cash">نقدًا</SelectItem>
+                      <SelectItem value="card">بطاقة</SelectItem>
+                      <SelectItem value="transfer">تحويل بنكي</SelectItem>
+                    </SelectContent>
+                  </Select>
+                )}
+              </div>
+            )}
+
+            {recurringResult && (
+              <div className="rounded-lg border border-status-info/30 bg-status-info/5 p-3 text-sm">
+                <p className="font-medium">
+                  تم إنشاء {recurringResult.created} من {recurringResult.requested} حجز.
+                </p>
+                {recurringResult.conflicted.length > 0 && (
+                  <p className="mt-1 text-status-warning">
+                    {recurringResult.conflicted.length} موعد تعارض مع حجوزات موجودة ولم يتم إنشاؤه.
+                  </p>
+                )}
+                <Button size="sm" className="mt-2" onClick={() => onOpenChange(false)}>تم</Button>
+              </div>
+            )}
 
             {formError && <p role="alert" className="text-sm text-status-danger">{formError}</p>}
           </div>
@@ -285,10 +373,10 @@ export function QuickBookingSheet({
         <SheetFooter>
           <Button
             className="w-full"
-            disabled={!customerId || !resolvedPrice || !clubTimezone || bookMutation.isPending}
+            disabled={!customerId || !resolvedPrice || !clubTimezone || bookMutation.isPending || !!recurringResult || (isRecurring && (!occurrenceCount || Number(occurrenceCount) < 1 || Number(occurrenceCount) > 52))}
             onClick={() => bookMutation.mutate()}
           >
-            {bookMutation.isPending ? 'جارٍ الحجز...' : 'تأكيد الحجز'}
+            {bookMutation.isPending ? 'جارٍ الحجز...' : isRecurring ? 'تأكيد الحجوزات المتكررة' : 'تأكيد الحجز'}
           </Button>
         </SheetFooter>
       </SheetContent>
