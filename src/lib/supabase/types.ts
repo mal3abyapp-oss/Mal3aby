@@ -1879,6 +1879,81 @@ export type Database = {
           },
         ]
       }
+      payment_method_configs: {
+        Row: {
+          club_id: string
+          created_at: string
+          created_by: string | null
+          customer_visible: boolean
+          details: Json
+          display_order: number
+          id: string
+          instructions_ar: string | null
+          instructions_en: string | null
+          is_active: boolean
+          name_ar: string
+          name_en: string
+          proof_required: boolean
+          provider: string | null
+          reference_required: boolean
+          underlying_method: string
+          updated_at: string
+        }
+        Insert: {
+          club_id: string
+          created_at?: string
+          created_by?: string | null
+          customer_visible?: boolean
+          details?: Json
+          display_order?: number
+          id?: string
+          instructions_ar?: string | null
+          instructions_en?: string | null
+          is_active?: boolean
+          name_ar: string
+          name_en: string
+          proof_required?: boolean
+          provider?: string | null
+          reference_required?: boolean
+          underlying_method: string
+          updated_at?: string
+        }
+        Update: {
+          club_id?: string
+          created_at?: string
+          created_by?: string | null
+          customer_visible?: boolean
+          details?: Json
+          display_order?: number
+          id?: string
+          instructions_ar?: string | null
+          instructions_en?: string | null
+          is_active?: boolean
+          name_ar?: string
+          name_en?: string
+          proof_required?: boolean
+          provider?: string | null
+          reference_required?: boolean
+          underlying_method?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "payment_method_configs_club_id_fkey"
+            columns: ["club_id"]
+            isOneToOne: false
+            referencedRelation: "clubs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "payment_method_configs_club_id_fkey"
+            columns: ["club_id"]
+            isOneToOne: false
+            referencedRelation: "commercial_entitlements_usage"
+            referencedColumns: ["club_id"]
+          },
+        ]
+      }
       payments: {
         Row: {
           amount: number

@@ -9,6 +9,7 @@ import { PlatformSubscriptionCard } from '@/features/clubs/PlatformSubscriptionC
 import { EntitlementsCard } from '@/features/clubs/EntitlementsCard'
 import { FieldsManagement } from '@/features/clubs/FieldsManagement'
 import { ActivationPolicySetting } from '@/features/academy/EnrollmentSection'
+import { PaymentMethodsCard } from '@/features/billing/PaymentMethodsCard'
 import { AuditLogSection } from './AuditLogPage'
 
 // P1-7 (critical usability fix pass, 2026-08-16): Settings was a
@@ -60,6 +61,11 @@ export function SettingsPage() {
             </Button>
           </CardContent>
         </Card>
+      </section>
+
+      <section className="flex flex-col gap-4">
+        <h2 className="text-sm font-semibold text-text-secondary">المدفوعات</h2>
+        <PaymentMethodsCard />
       </section>
 
       <section className="flex flex-col gap-4">
