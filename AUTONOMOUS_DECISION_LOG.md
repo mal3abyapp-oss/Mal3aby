@@ -199,3 +199,119 @@ paths (implicit vs explicit) against a real pending subscription.
 Duplicate-enrollment protection confirmed already correct (no fix
 needed — corrected my own false-positive before shipping an unneeded
 change). Full-group and no-price cases confirmed already correct.
+
+---
+
+## D-003 — Gate 3 scoping: no customer/guardian self-service surface exists
+
+**Date:** 2026-08-16
+**Problem:** Doc 3 Gate 3 requires a unified user account model where a
+person can self-manage their memberships/subscriptions/bookings/QR/
+children. Investigated actual current state before writing any code.
+
+**Findings (verified directly, not assumed):**
+1. `profiles` table already gives every `auth.users` account exactly
+   one profile with `avatar_url` — the "one account per person, not
+   per role" principle is already the architecture. No fix needed here.
+2. `players.photo_url` and `customers.photo_url` both already exist as
+   columns.
+3. **However:** `players`/`customers` RLS policies only grant
+   INSERT/UPDATE to staff holding `player.update`/equivalent
+   permissions — there is no RLS path today for an ordinary
+   authenticated end-user to write their own player/customer row.
+4. **Root gap found:** `customers` has NO column linking a row to
+   `auth.users` (no `user_id`/`auth_user_id` foreign key). A `customers`
+   row today is purely a staff-managed CRM record with no connection to
+   any login identity.
+5. **Consequence:** the entire `/app` route tree (`RequireAuth`) is
+   exclusively the staff/employee product. There is no customer-facing
+   route, page, or component anywhere in the app today — no login-and-
+   see-my-own-bookings surface exists at all. This is not a bug to
+   patch; it's an entire missing product domain (Doc 3's "Unified User
+   Dashboard": My Academies, My Subscriptions, My Bookings, My QR, My
+   Payments, My Attendance, My Children).
+6. Because there's no self-service write path to `players`/`customers`
+   at all yet, the specific threat Doc 3 warns about (a user swapping
+   their own verified photo to impersonate someone) does not yet apply
+   to this codebase — it will become a real risk only once self-service
+   write access is introduced, and the re-approval-workflow requirement
+   must be designed in from the start of that feature, not bolted on
+   after.
+
+**Decision:** This is legitimately a large net-new build, not a
+same-day fix. Given the sheer number of remaining Doc 3 gates (4
+through 13) that structurally depend on this one (Memberships/
+Subscriptions/Entitlements, Bookings extensions, Secure QR, Identity
+Verification, Attendance, Notifications, WhatsApp), building the full
+customer-facing portal end-to-end before touching any of those would
+be the correct dependency order if scope were unconstrained. Given
+this is a single autonomous session, the pragmatic path (still fully
+within the directive's "prefer reversible, incremental, real
+architecture" guidance) is:
+  a. Add the missing `customers.user_id -> auth.users` link (nullable,
+     backward compatible — existing customer rows created by staff have
+     no linked login and keep working exactly as today).
+  b. Build a minimal but real self-service auth linking flow so a
+     customer with a matching phone/email can claim their existing
+     staff-created customer record (or a new one is created) on
+     signup — never silent auto-linking without verification.
+  c. Build the first real screen of the Unified Dashboard (My Bookings)
+     end-to-end as the proof of the pattern, establish RLS policies for
+     self-service customer access (customer can read/write only their
+     own row, and only specific columns — never player financial data,
+     never other customers' data), then continue expanding
+     screen-by-screen in subsequent work.
+This keeps the architecture correct from the first line of code
+(the hard-to-reverse part — RLS/ownership model) while not attempting
+to boil the ocean in one pass.
+
+**Status:** Scoped. User explicitly confirmed via AskUserQuestion:
+"Build it now, full steam" — proceeding with (a)-(c) below.
+
+**Implementation so far:**
+- Migration `20260816130000_customer_self_service_link.sql`: added
+  nullable, unique `customers.user_id -> auth.users(id)`. Self-service
+  RLS policies (`customers_self_service_select`/`_update`) scoped
+  strictly to `user_id = auth.uid()`, entirely independent of
+  `club_memberships`/`has_permission()` so a customer can never
+  accidentally inherit staff privilege. `claim_customer_self_service()`
+  RPC is the only way `user_id` is ever set — requires an
+  already-authenticated caller to name an exact, currently-unclaimed
+  `(club_id, customer_id)` pair; never silent auto-matching by phone/
+  email (which would let anyone claim a stranger's financial history
+  just by knowing their phone number).
+- Migration `20260816140000_customer_self_service_write_guard.sql`:
+  RLS is row-level only, so the self-service UPDATE policy alone would
+  have let a customer silently rewrite `photo_url`/`national_id`/
+  `full_name` on their own row — exactly the identity-fraud vector Doc 3
+  warns about. Added `protect_customer_identity_columns()` BEFORE
+  UPDATE trigger (same silent-revert pattern as this codebase's
+  existing `protect_club_status_from_non_platform_owner`) that reverts
+  those columns to their prior value whenever the actor lacks staff
+  `customer.update` permission. Photo changes specifically get a real
+  request/approval flow instead of being blocked outright:
+  `customer_photo_update_requests` table +
+  `request_customer_photo_update()` (self-service, records old/new URL
+  and who requested) + `review_customer_photo_request()` (staff-only,
+  applies the change only on explicit approval, writes an audit log
+  entry either way). This is the concrete implementation of Doc 3's
+  "verified photo requires an explicit re-approval workflow with audit
+  trail" requirement.
+
+**Security regression caught and fixed in the same pass:**
+`get_advisors(type: security)` flagged that Gate 2's
+`_activate_subscription_if_due_internal(uuid, boolean)` — an internal
+helper following this codebase's own underscore-prefix "not directly
+RPC-callable" convention (matching `_create_booking_internal`) — had
+been left executable directly by `anon`/`authenticated` via PostgREST,
+with no permission check of its own (it trusts its two callers,
+`record_payment()` and `activate_subscription_if_due()`, to have
+already authorized the request). Fixed by revoking direct EXECUTE,
+matching the established pattern; verified via
+`has_function_privilege()` that both roles are now correctly denied
+while the function continues to work for its two legitimate
+SECURITY DEFINER callers (function-to-function calls don't go through
+PostgREST's grant check).
+
+**Next:** build the frontend claim flow + first real self-service
+screen (My Bookings) to prove the pattern end-to-end.
