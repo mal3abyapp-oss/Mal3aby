@@ -469,27 +469,73 @@ directive's explicit "do not stop after a gate/commit/report" rule.
   scope requires this be done properly this time, with real accounts
   across a second tenant.
 
+## Part III of the new directive: MASTER AUTONOMOUS DIRECTIVE — FINAL
+CONSOLIDATED VERSION (2026-08-17) — "Payment & Financial Platform"
+
+Supersedes all prior directives where they conflict. Self-contained
+(does not require reading prior prompts). Governing scope for the
+current and all subsequent work in this session:
+
+- **Gate 13 tasks #51-#61**: ✅ COMPLETE, all committed. Do not re-do
+  unless a genuine regression is found.
+- **Task #62 (Cash Shift / Cash Drawer)**: ✅ COMPLETE as of commit
+  `a79389b`. Migration `20260817040000_cash_shifts.sql` applied (with
+  a `FOR UPDATE` row-lock hardening fix on `close_cash_shift()` added
+  during this directive's Part I resume, closing a real concurrent-
+  double-close race). `CashShiftPage.tsx` built, wired into router/nav/
+  i18n, and verified end-to-end against real data (real shift open,
+  real cash payment via SQL, live expected-cash total confirmed
+  correct, real shortage-variance close confirmed correct in both the
+  UI and the human-readable audit log).
+- **New governing rule (non-negotiable, Part III Section 17-27)**:
+  booking/invoice payment state (unpaid/partial/paid/refunded) must be
+  a single derived value from Invoice+Payments+Refunds, consistent
+  across every screen that shows it (calendar, detail, quick booking,
+  customer profile/portal, invoice, payment history, dashboards,
+  reports, print, QR). No manual "mark paid" toggle. No financial
+  drift (paid invoice + unpaid booking, or the reverse) permitted
+  anywhere.
+- **New scope (Parts IV-XXXV)**: configurable payment methods (Cash/
+  InstaPay/Wallet/Bank/POS/Stripe/PayPal/Custom) behind a
+  PaymentGateway adapter abstraction for the two online gateways;
+  customer-visible payment instructions; manual-transfer proof +
+  staff-verification workflow (never auto-mark-paid from a customer
+  claim); partial + split payments; printable invoice (A4) + receipt
+  (80mm thermal) + refund receipt in Arabic/English; secure invoice QR
+  (opaque/signed token, never a raw UUID) + read-only verification
+  page; payment-method reporting/reconciliation; full financial
+  regression per the directive's acceptance-test matrix (Sections
+  103-119). "COMPLETE" is prohibited language for Stripe/PayPal if no
+  live credentials exist — use "IMPLEMENTED — EXTERNAL CONFIGURATION
+  PENDING" instead, and never fake/mock a successful online payment in
+  the production code path.
+- Task tracker: #80-#90 created for this scope (Phase 2 through Phase
+  15 of the directive's execution order). WhatsApp remains explicitly
+  OUT OF SCOPE — do not reintroduce under any framing.
+- **Environment note**: the Supabase MCP connector had a genuine
+  ~15-hour outage during this run (confirmed via `list_projects` 503s
+  with zero variation across ~25 spaced retries) before recovering on
+  its own. This was a connector-level outage, not proof the underlying
+  Supabase project/API was ever actually down — don't conflate the two
+  in future troubleshooting. No data was lost or corrupted; the
+  cash_shifts migration was never partially applied during the outage.
+
 ## Last commit
-`4dffd6e` — "feat!: remove the WhatsApp module entirely, preserve the
-channel-agnostic Notification Core" (see `git log` for the full
-chronological commit history of this run). Local-first — not pushed to
-any remote per standing project policy.
+`a79389b` — "feat: cash shift / cash drawer reconciliation (Gate 13
+#62)" (see `git log` for the full chronological commit history of this
+run). Local-first — not pushed to any remote per standing project
+policy.
 
 ## Next exact task
-WhatsApp removal (Part I) is fully complete and verified. Proceeding
-directly into Part II's scope without stopping, per the new directive.
-Immediate next action: continue Gate 13 (Commercial Entitlements) with
-task #54 — audit `PlatformClubDetailPage.tsx` (already found during
-task #53's work to have real subscription-granting capability) to
-determine its exact remaining scope before assuming more needs to be
-built, following this session's established audit-first pattern. Then
-continue through Part II's much larger scope in a sensible order:
-finish Gate 13's remaining commercial tasks, then move to the
-technical-debt sweep and the role-by-role/tenant-isolation attack
-testing (Sections 75-99), since these tend to surface real defects
-worth fixing before investing further in reporting/i18n/UX polish on
-top of a potentially-shaky foundation. Create `FINAL_DEFECT_
-REGISTER.md` and `UX_IMPROVEMENT_REGISTER.md` as real defects/UX
-findings start accumulating from this testing, not preemptively empty.
-Do not write `FINAL PLATFORM ACCEPTANCE REPORT` until the acceptance
-matrix can be filled with genuinely-tested PASS marks.
+Task #62 is complete. Proceeding directly into Phase 2 of the new
+Part III directive: **Payment Domain Audit (task #80)** — review the
+existing invoices/payments/refunds/discounts/outstanding/booking-
+payment-state/academy-payments/customer-balances/reporting-RPC/cash-
+shift-integration surface end-to-end (following this session's
+established audit-first methodology) to identify the exact current
+financial source of truth and any existing drift, BEFORE building any
+new payment-method infrastructure — per the directive's explicit "do
+not create a second payment system" rule (reuse/extend/normalize, not
+duplicate). Then proceed through tasks #81-#90 in the directive's
+execution order (Phases 3-15), without stopping between them, per the
+standing full-autonomy rule.

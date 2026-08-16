@@ -1752,3 +1752,75 @@ D-013 is now fully closed. The Notification Core
 `emit_notification_event()`/`enqueue_notification()`) remains exactly
 as built in Gate 7 — channel-agnostic by design, so a future messaging
 channel is a connector-only addition, not a schema change.
+
+## D-014 — Gate 13 task #62 resume: Supabase MCP connector outage, then Payment & Financial Platform master directive
+
+**Context**: task #62 (cash shift / cash drawer) was fully designed and
+its migration file written in the prior run, but the Supabase MCP
+connector began returning `503` on every call — including the lightest
+possible read (`list_projects`, no query or project ID involved) —
+before the migration could be applied. Retried at escalating intervals
+(90s, 3min, 10min, 15min, 30min, then hourly) for roughly 15 hours
+total with zero variation in the failure mode across ~25 attempts,
+correctly treated as a genuine sustained connector outage rather than
+a transient blip, and reported clearly to the user rather than either
+fabricating progress or silently giving up.
+
+**Resolution**: the connector recovered on its own (no action on this
+session's part fixed it) — confirmed via `list_projects` returning
+`ACTIVE_HEALTHY` for the project. This confirms the underlying
+Supabase project/API itself was never necessarily down; the MCP
+connector layer was the actual point of failure. Treat these as
+distinct failure modes in any future troubleshooting, per the new
+master directive's explicit instruction not to conflate them.
+
+**Same turn, before applying**: re-audited the existing
+`cash_shifts.sql` migration against the new directive's cash-shift
+checklist (constraints/indexes/FKs/RLS/tenant+branch scope/employee
+attribution/permissions/RPC security/money types/concurrency/open-
+shift-uniqueness/closing-behavior/reversibility). Found one real gap:
+`close_cash_shift()` read the shift row with a plain `SELECT` before
+locking it with the subsequent `UPDATE` — two concurrent close calls
+on the same shift could both observe `status='open'` before either
+committed, letting the same shift be "closed" twice with two different
+variance calculations. Fixed by adding `FOR UPDATE` to the initial
+`SELECT`, serializing concurrent closes (the second call blocks until
+the first commits, then correctly observes `status='closed'` and
+raises `'this shift is already closed'`). This is exactly the kind of
+concurrency defect the new directive's Section 14 (Cash Shift
+Concurrency) and Section 114 (Concurrency Test) require catching.
+
+**Applied and verified end-to-end against real data** (not mocked):
+opened a real shift (500 EGP opening float) on the real logged-in
+club's main branch; inserted a real 150 EGP `method='cash'`,
+`status='completed'` payment directly via SQL; reloaded the close panel
+and confirmed the live `get_open_cash_shift_status()` figure correctly
+showed 650.00 EGP (500 + 150); closed with a counted amount of 640.00
+and confirmed both the UI and the Gate 13 #60 human-readable audit log
+correctly showed a -10.00 EGP variance with the entered reason
+attached. Separately confirmed the one-open-shift-per-branch guarantee
+holds at the database level (not just in the RPC) by attempting a raw
+duplicate `INSERT` directly against `cash_shifts` while the shift was
+still open — correctly rejected with `23505` (unique-constraint
+violation on the partial index), proving the guarantee survives even a
+client that bypasses the RPC entirely. Test data (the shift and the
+synthetic payment) deleted afterward to leave the database clean.
+
+**New governing directive received mid-session**: "MASTER AUTONOMOUS
+DIRECTIVE — FINAL CONSOLIDATED VERSION" (Payment & Financial Platform
+scope), explicitly self-contained and superseding prior directives on
+conflict. Its most load-bearing new rule: booking/invoice payment
+state must be a single value derived consistently from
+Invoice+Payments+Refunds, shown identically everywhere in the app, with
+zero tolerance for financial drift (a paid invoice with an unpaid
+booking, or the reverse) — no manual "mark paid" toggle is ever
+permitted. This becomes the guiding correctness principle for tasks
+#80 onward. Tasks #80-#90 created in the tracker mapping directly to
+the directive's Phases 2-15 (payment domain audit → payment-state
+sync → configurable payment methods → customer instructions/proof/
+verification → partial/split payments → printing → secure QR →
+reporting/reconciliation → Stripe/PayPal gateway architecture → full
+financial regression). WhatsApp remains explicitly out of scope per
+all prior directives; nothing in the new directive reopens it.
+
+Commit for task #62: `a79389b`.
