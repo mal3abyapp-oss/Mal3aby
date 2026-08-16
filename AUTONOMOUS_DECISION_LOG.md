@@ -1716,3 +1716,39 @@ fully torn down; the repository and running app are in the same state
 as before this P0 task began (plus the P1 CORS/error-handling fixes,
 which remain correct and unrelated to this cancelled effort). Not
 resumed without new user instruction.
+
+**Final update — WhatsApp removed entirely.** The user's next
+instruction superseded "cancel the attempt" with "remove everything
+built for WhatsApp, preserve the tool's [channel-agnostic Notification
+Core] infrastructure." Executed as commit `4dffd6e`:
+
+- Database (`20260816350000_remove_whatsapp_module.sql`): dropped
+  `whatsapp_connections`, `whatsapp_connection_events`,
+  `whatsapp_templates`, `whatsapp_automations` and their RPCs/trigger
+  function; removed the 6 `whatsapp_*` permission keys and grants.
+  Confirmed via a direct FK-dependency query beforehand that zero
+  other tables reference these four tables. Confirmed real row counts
+  first: only this session's own QA data (1 connection, 13 event-log
+  rows); both template/automation tables were empty.
+- `whatsapp-bridge` Edge Function: no deletion tool was available in
+  this session, so replaced with an inert 410-Gone stub holding no
+  secrets and performing no bridging; local source directory deleted.
+- Deleted `src/features/whatsapp/` (6 files), the `/app/whatsapp`
+  route, the sidebar nav item, the `nav.whatsapp` i18n key (both
+  locales), and the entire `whatsapp-connector/` service directory.
+- Regenerated `src/lib/supabase/types.ts` — confirmed only the
+  legitimate, unrelated `customers.whatsapp` contact-info column
+  remains (a pre-existing per-customer phone field, distinct from the
+  removed connector module, correctly untouched).
+- Verified: `npx tsc --noEmit` clean, `npm run build` clean, `npm run
+  lint` clean (same 4 pre-existing unrelated warnings), and live-
+  checked in fresh browser tabs (ruling out this session's
+  well-established stale-HMR console-noise pattern) that `/app`,
+  `/app/settings`, `/app/staff` all render correctly and
+  `/app/whatsapp` now correctly 404s with no dead link anywhere.
+
+D-013 is now fully closed. The Notification Core
+(`notification_events`/`notification_queue`/`notification_consent`,
+`emit_notification_event()`/`enqueue_notification()`) remains exactly
+as built in Gate 7 — channel-agnostic by design, so a future messaging
+channel is a connector-only addition, not a schema change.

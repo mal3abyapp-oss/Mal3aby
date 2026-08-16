@@ -1,13 +1,101 @@
 # Autonomous Execution State
 
-Continuously updated. Governing directive: "MASTER AUTONOMOUS DIRECTIVE
-V3" (Doc 3) — user explicitly selected "Full autonomous execution (per
-docs 2/3)" via AskUserQuestion on 2026-08-16. Do not re-audit the whole
-project from scratch on every task — trust this file, the decision log
-(`AUTONOMOUS_DECISION_LOG.md`), and git history; only re-audit fully on
-a genuine contradiction.
+Continuously updated. Governing directive: **"MASTER AUTONOMOUS FINAL
+DIRECTIVE"** (2026-08-16) — supersedes the earlier "MASTER AUTONOMOUS
+DIRECTIVE V3" (Doc 3). Explicit full-autonomy mode: no questions, no
+waiting for approval, no stopping after an audit/report/gate/commit,
+professional decisions made unilaterally and documented in
+`AUTONOMOUS_DECISION_LOG.md`, only stop when (a) all possible work is
+genuinely done, (b) the environment no longer permits any execution, or
+(c) the only remaining step is an irreversible high-risk data action
+with no recovery path. Do not re-audit the whole project from scratch
+on every task — trust this file, the decision log, and git history;
+only re-audit fully on a genuine contradiction.
 
-## Priority order (Doc 3, governs until superseded by a new user message)
+## Part I of the new directive: WhatsApp removal — ✅ COMPLETE
+
+WhatsApp is no longer part of this product. Everything built for it in
+the old Gate 8 has been removed. See D-013's final update in
+`AUTONOMOUS_DECISION_LOG.md` for full detail. Summary:
+- Dropped `whatsapp_connections`, `whatsapp_connection_events`,
+  `whatsapp_templates`, `whatsapp_automations` and their RPCs/trigger
+  function (`20260816350000_remove_whatsapp_module.sql`). Confirmed via
+  FK-dependency query that nothing else referenced these tables.
+  Removed the 6 `whatsapp_*` permission keys and grants.
+- `whatsapp-bridge` Edge Function replaced with an inert 410-Gone stub
+  (no deletion tool was available in this session); local source
+  deleted.
+- Deleted `src/features/whatsapp/` (6 files), the `/app/whatsapp`
+  route, sidebar nav item, `nav.whatsapp` i18n key, and the entire
+  `whatsapp-connector/` Node service directory.
+- Regenerated `src/lib/supabase/types.ts` — confirmed only the
+  legitimate, unrelated `customers.whatsapp` contact-info column
+  remains (a customer's own WhatsApp phone number, distinct from the
+  removed connector, correctly untouched, same treatment for the
+  public site's plain `wa.me` contact link).
+- Verified: `npx tsc --noEmit`, `npm run build`, `npm run lint` all
+  clean; live-checked in fresh browser tabs; `/app/whatsapp` now
+  correctly 404s with no dead links anywhere.
+- The Notification Core (Gate 7: `notification_events`/
+  `notification_queue`/`notification_consent`,
+  `emit_notification_event()`/`enqueue_notification()`) was explicitly
+  preserved — channel-agnostic by design, so a future messaging
+  channel is a connector-only addition later, not a schema rework.
+- Commit: `4dffd6e`.
+
+Gate 8 in the priority order below is now marked REMOVED, not
+IMPLEMENTED — do not treat any historical "EXTERNAL SCAN QA PENDING"
+language elsewhere in this file or in old commits as still relevant.
+
+## Part II of the new directive: Full Platform Hardening & Acceptance — IN PROGRESS
+
+This is the current, active phase. Scope (from the directive, Parts
+II–XXXVII): full technical-debt sweep; complete role-by-role manual
+QA (platform owner, club owner, manager, reception, coach, scanner,
+customer, guardian, participant) across a second tenant for isolation
+testing; auth/session edge cases; unified-account model verification;
+portal ownership-security black-box testing; guardian/child edge
+cases; full booking-flow + timezone regression (the specific hours
+0/1/6/9/12/18/21/23 across create/edit/display/availability/reports/
+QR) + concurrency + edge cases + recurring bookings; academy enrollment
+full flow + every listed scenario + atomicity + capacity/concurrency;
+membership state-model review; subscription lifecycle + cross-effects
++ history; QR/identity security (replay, wrong-tenant, expired,
+frozen) + verified-photo requirement; attendance + manual-override
+audit trail; financial single-source-of-truth verification across
+every screen that shows a financial number + edge cases (partial/
+duplicate/overpayment/refund/void); full reporting build-out (14
+report types, drill-down, accurate KPIs, filters, period comparison,
+export) — this picks up directly from Gate 11's already-identified
+9 missing report types; Arabic + English full-app sweep (not just the
+nav-label slice from Gate 10) + hard-coded-string removal; RTL/LTR
+surface-by-surface testing; UX audit per screen; mobile + desktop QA;
+full RLS/cross-tenant/cross-user/role-escalation/input-abuse attack
+testing; DB integrity (orphans, constraints, indexes) with root-cause
+fixes not just cleanup; performance (N+1, evidence-based indexing);
+accessibility; design-system consistency; navigation/dead-button
+sweep; failure-recovery/retry-safety testing; Commercial Entitlements
+completion (Gate 13, already in progress — see below); adversarial
+"attack the system" pass; regression tests for real bugs found; final
+automated + manual QA; git discipline (small logical commits); new
+required artifacts: `FINAL_DEFECT_REGISTER.md`, `UX_IMPROVEMENT_
+REGISTER.md`; and a final `FINAL PLATFORM ACCEPTANCE REPORT` only once
+all of the above is genuinely done, including a full Roles × Desktop/
+Mobile × Arabic/English × Core-Features acceptance matrix with real
+PASS marks only after real testing.
+
+This supersedes and subsumes the old Doc 3 priority order below in
+scope, but the already-completed Gates 1-12 work (booking time
+integrity, academy enrollment integrity, unified accounts, membership/
+subscription lifecycle, recurring bookings, secure QR/attendance,
+notification core, RTL sweep, i18n foundation, reporting foundation,
+regression/security pass) remains valid, verified, DONE work — it is
+not being redone from scratch, only extended/deepened per the new
+directive's much larger scope. Gate 13 (Commercial Entitlements) was
+already in progress under the old directive and continues seamlessly
+under the new one — see its own section below.
+
+## Priority order (historical — Gates 1-12 DONE under the old directive, now superseded in scope by Part II above)
 
 0. ~~Initial audit~~ — superseded by direct-investigation approach per
    this run's evidence (see Gate 1 below); a separate standalone audit
@@ -73,141 +161,128 @@ a genuine contradiction.
    and verified via real coach-role RPC calls. NOT re-audited in this
    pass: whether any manual (non-QR) attendance-marking path exists and
    is correctly coach-scoped — flagged as follow-up, not assumed safe.
+   This remains an open item for Part II's attendance-testing scope.
 7. ✅ **Gate 7 — Notification Core** — DONE (see D-007). Built
    `notification_events`/`notification_queue`/`notification_consent`
    with `emit_notification_event()`/`enqueue_notification()`. Confirmed
    zero notification infra existed before this pass. Wired one real
    integration point (`_create_booking_internal` emits
-   `booking.created`/`booking.confirmed`), verified live. Explicit
-   scope cut (not silently dropped): no queue worker, no templates
-   table, no automation-rules table yet — these are Gate 8's actual
-   scope, since the WhatsApp connector needs all three to be useful.
-8. ✅ **Gate 8 — WhatsApp QR Module** — IMPLEMENTED — EXTERNAL SCAN QA
-   PENDING (see D-008). Mid-task, the user sent an explicit directive
-   overriding an earlier stub-based plan: built a REAL persistent
-   Node/TypeScript connector service (`/whatsapp-connector`, Baileys-
-   based) behind a `MessagingProvider` adapter interface, plus a
-   deployed Supabase Edge Function (`whatsapp-bridge`) as the only
-   trusted caller. Verified via a real automated test that the service
-   opens a genuine WebSocket to WhatsApp's servers and receives a real,
-   valid, scannable QR — not a mock. A real bug (class-field-init
-   ordering crash) was found and fixed via that same real execution,
-   not type-checking. What remains is the actual phone-scan step
-   (REAL PHONE QR SCAN QA PENDING) — not automatable in this
-   environment, does not block continuing the rest of the run per the
-   directive's own explicit instruction. Also NOT yet built: the queue-
-   consumption worker that drains `notification_queue` and calls the
-   connector's `/send` (the send path itself is ready and callable, just
-   nothing polls the queue yet), quiet-hours/rate-limit enforcement
-   code (columns exist, enforcement doesn't).
-9. ✅ **Gate 9 — RTL full sweep** — DONE (see D-009). Exhaustive grep
-   across every feature screen found ZERO hardcoded physical-direction
-   classes anywhere in `src/features/**` — the RTL-first convention was
-   actually followed throughout. All real defects were isolated to 4
-   shared shadcn/ui primitives (`dialog.tsx`/`sheet.tsx`/`select.tsx`/
-   `dropdown-menu.tsx`) — close-button position, Select checkmark
-   position/padding, DropdownMenu insets/shortcuts/sub-menu chevron,
-   Dialog/Sheet header text alignment. Fixed at the root (shared
-   component), verified live via screenshot in the running app.
-10. ✅ **Gate 10 — Arabic/English i18n** — foundation DONE (see D-010).
-    Installed react-i18next, built resource-file system
-    (`src/lib/i18n/resources/{ar,en}/common.json`), wired
-    `DirectionProvider` as the single source of truth for both language
-    and direction (no-reload RTL/LTR flip + localStorage persistence),
-    added a `LanguageSwitcher` to every layout (App/Portal/Public), and
-    locale-aware `formatNumber`/`formatCurrency`/`formatDate` helpers.
-    Verified live in browser: switching language correctly flips the
-    whole layout with no reload, persists correctly, works on both
-    authenticated and public pages. Swept the staff app's nav labels as
-    the representative slice — explicit, tracked follow-up: every
-    feature screen's own body copy (bookings, academy, billing,
-    WhatsApp tabs, portal screens, reports) still renders hardcoded
-    Arabic text directly, correct by default but not yet
-    switchable to English.
+   `booking.created`/`booking.confirmed`), verified live. Explicitly
+   channel-agnostic by design — no WhatsApp-specific (or any other
+   channel-specific) columns anywhere in this schema. Explicit scope
+   cut (not silently dropped): no queue worker yet.
+8. ❌ **Gate 8 — WhatsApp QR Module — REMOVED ENTIRELY.** Built, then
+   fully removed per explicit user instruction (2026-08-16) after
+   repeated real environment blockers (Docker/WSL2 unavailable,
+   Supabase CLI login non-interactive-only in this sandbox) prevented
+   reaching a genuinely verifiable end-to-end real-phone connection,
+   and after a proposed direct-browser-to-connector bypass was
+   explicitly rejected before being wired into code. See D-013's full
+   final update and "Part I" above. Do not resume WhatsApp work without
+   new explicit user instruction — it is out of scope for this product
+   as of this directive.
+9. ✅ **Gate 9 — RTL full sweep** — DONE (see D-009), for the slice
+   audited at the time. Exhaustive grep across every feature screen
+   found ZERO hardcoded physical-direction classes anywhere in
+   `src/features/**` — the RTL-first convention was actually followed
+   throughout. All real defects were isolated to 4 shared shadcn/ui
+   primitives (`dialog.tsx`/`sheet.tsx`/`select.tsx`/`dropdown-menu.tsx`)
+   — fixed at the root, verified live via screenshot. Part II's RTL
+   scope goes further: surface-by-surface testing (calendars, booking
+   timeline, reports, QR, portal) is still needed, not yet done as a
+   dedicated pass.
+10. ✅ **Gate 10 — Arabic/English i18n** — foundation DONE (see D-010),
+    NOT the full sweep Part II now requires. Installed react-i18next,
+    built resource-file system (`src/lib/i18n/resources/{ar,en}/
+    common.json`), wired `DirectionProvider` as the single source of
+    truth for both language and direction (no-reload RTL/LTR flip +
+    localStorage persistence), added a `LanguageSwitcher` to every
+    layout, and locale-aware `formatNumber`/`formatCurrency`/
+    `formatDate` helpers. Verified live. Swept the staff app's
+    sidebar/nav labels only — explicit, tracked, now-active follow-up
+    under Part II: every feature screen's own body copy (bookings,
+    academy, billing, portal screens, reports, forms, error messages)
+    still renders hardcoded Arabic text directly. This is Part II's
+    "no partial translation accepted" requirement — a real, large
+    remaining scope, not yet started.
 11. ✅ **Gate 11 — Reporting Rebuild** — foundational slice DONE (see
-    D-011). Audited existing reporting layer first: found 4 real RPC-
-    backed reports already existed (revenue/occupancy/academy/customer)
-    against Doc 3's 14-report list. Found and fixed a real
-    single-source-of-truth violation: `CustomersPage.tsx` independently
-    recomputed "outstanding balance" via a manual client-side join that
-    never netted out completed refunds (silently understating debt
-    whenever a refund existed on an already-paid invoice), while
-    `OutstandingPage.tsx` already correctly read the `outstanding_invoices`
-    view. Rewired `CustomersPage.tsx` to read the same view — verified
-    live that both screens now reconcile exactly against real seeded
-    data. Then built the two report types Doc 3 emphasizes as
-    foundational: `get_executive_dashboard` (top-level KPI summary,
-    reusing the exact same payments/refunds/bookings predicates as the
-    existing report RPCs, not reinventing them) and `get_booking_report`
-    (status mix/by-branch/cancellation-rate/avg-booking-value — distinct
-    from occupancy's booked-hours focus). Both wired into a rebuilt
-    `ReportsPage.tsx` (now 6 tabs) and verified live against real data
-    with cross-reconciliation (dashboard's outstanding_total matches
-    direct SQL sum; booking report's status counts reconcile with its
-    own cancellation rate and with the dashboard's bookings_count).
-    Remaining 9 Doc 3 report types (Field Performance, Group Report,
-    Player Report, Subscription Report, Attendance Report, Collections
-    Report, Employee Activity, Discounts/Refunds/Voids, WhatsApp/
-    Notification Report) are explicit tracked follow-up, not shallow
-    stubs — see the Follow-up section below.
+    D-011), NOT the full 14-report build-out Part II now requires.
+    Audited existing reporting layer first: found 4 real RPC-backed
+    reports already existed (revenue/occupancy/academy/customer).
+    Found and fixed a real single-source-of-truth violation
+    (`CustomersPage.tsx`'s independent "outstanding" recompute, now
+    reading the shared `outstanding_invoices` view). Built
+    `get_executive_dashboard` + `get_booking_report`, wired into a
+    rebuilt `ReportsPage.tsx` (6 tabs), verified live with cross-
+    reconciled real numbers. Remaining 9 Doc 3 report types (Field
+    Performance, Group Report, Player Report, Subscription Report,
+    Attendance Report, Collections Report, Employee Activity,
+    Discounts/Refunds/Voids, and — now that WhatsApp is removed — the
+    former "WhatsApp/Notification Report" item should be re-scoped as
+    a channel-agnostic Notification Report only) are the real,
+    now-active Part II reporting scope, along with drill-down capability
+    and export testing for every report, not just the 6 that exist.
 12. ✅ **Gate 12 — Full Regression/Security/Tenant QA** — substantially
-    DONE (see D-012). Fresh `get_advisors(security)`: 64 findings, 0
-    ERROR — the SECURITY DEFINER-executable warnings are expected-by-
-    design (each RPC self-checks permissions); one real gap flagged
-    separately via spawn_task (validate_whatsapp_template_variables
-    grants, task_caf4163d). Fresh `get_advisors(performance)`: 307
-    findings — fixed the cheap/safe class immediately (36
-    auth_rls_initplan warnings across 32 RLS policies, generated
-    mechanically from Postgres's own catalog, zero logic change,
-    verified via live browser re-check + re-run advisor showing zero
-    remaining); deferred the more invasive class
-    (multiple_permissive_policies, 187 findings; unindexed_foreign_keys,
-    72 findings) as explicit low-priority follow-up, not silently
-    dropped. Ran a full `npm run build` (not just `tsc --noEmit`, which
-    had been giving a false-clean signal all session) — found 46 real
-    errors traced to a stale `types.ts` (missing Gate 7/8/11 tables/
-    RPCs), regenerated it (resuming long-frozen task #51), then fixed
-    all 20 remaining real (previously type-masked) issues, including a
-    genuine bug: `BookingDetailSheet` was being rendered without its
-    required `clubTimezone` prop on the main bookings page — fixed and
-    verified live. `npm run build`/`npm run lint` now both fully clean.
-    Ran a real black-box multi-tenant isolation test via the actual
-    browser session's live Supabase JS client (not a flawed SQL
-    role-impersonation attempt, which was tried first, found unreliable,
-    and correctly discarded rather than reported as a false pass) —
-    confirmed a user cannot read another club's customers/bookings/
-    invoices/payments/enrollments/subscriptions/whatsapp_templates/
-    notification_queue. Two reads that initially looked like a leak
-    (`clubs`, `club_memberships` for a foreign club) were investigated
-    and confirmed correct, intended `platform_owner`-only behavior, not
-    a defect. NOT yet done: a live login-based isolation test using a
-    genuinely non-platform-owner single-club account (blocked on not
-    having that test account's password this session; the RLS
-    policy-definition-level verification is a legitimate substitute but
-    weaker evidence than an actual login).
-13. Gate 13 — Resume Commercial Entitlements phase (tasks #52-67) —
-    UNFREEZING now that Gates 1-12 are substantially resolved. The
-    underlying migration/enforcement work for commercial entitlements
-    (branch/field/academy limits) is DONE and verified; task #51 (types
-    regen) is now also DONE (done as part of Gate 12's build-gate work).
-    UI wiring (task #52 onward) can resume.
+    DONE (see D-012), NOT the exhaustive attack-testing Part II now
+    requires. Fresh `get_advisors(security)`: 64 findings, 0 ERROR —
+    SECURITY DEFINER-executable warnings are expected-by-design; one
+    real gap flagged separately via spawn_task
+    (`validate_whatsapp_template_variables` grants, task_caf4163d —
+    NOTE: this function no longer exists, it was dropped along with
+    the rest of the WhatsApp module in Gate 8's removal, so this task
+    is now moot/stale, safe to dismiss if still open). Fresh
+    `get_advisors(performance)`: 307 findings — fixed the cheap/safe
+    class immediately (36 `auth_rls_initplan` warnings across 32 RLS
+    policies); deferred `multiple_permissive_policies` (187) and
+    `unindexed_foreign_keys` (72) as explicit low-priority follow-up —
+    now Part II's active DB-hardening scope. Ran a full `npm run
+    build` (catching 46 real errors `tsc --noEmit` had missed all
+    session, traced to a stale `types.ts`), fixed all resulting real
+    issues including a genuine `BookingDetailSheet` `clubTimezone`
+    prop bug. Ran ONE real black-box multi-tenant isolation test via
+    the live browser session (not the exhaustive Roles × cross-tenant
+    × cross-user × role-escalation matrix Part II now requires) —
+    confirmed correct isolation on the tested paths; correctly
+    diagnosed a platform-owner cross-club read as intended behavior,
+    not a leak. Still NOT done: a live login-based isolation test using
+    a genuinely non-platform-owner single-club account (blocked on
+    credentials); the full attack-testing scope of Part II (Sections
+    75-99 of the new directive) is a much larger, still-open task.
+13. ✅ **Gate 13 — Commercial Entitlements phase** — IN PROGRESS, tasks
+    #52-53 DONE this run, continuing under Part II now:
+    - Task #51 (types regen): DONE as of Gate 12's build-gate work.
+    - Task #52 (entitlement limit UI): DONE — built
+      `EntitlementsCard.tsx` reading the existing
+      `commercial_entitlements_usage` view + `request_commercial_
+      upgrade()` RPC (both already correctly built pre-Doc-3), wired
+      into Settings, verified live with real limit/usage data and a
+      real submitted upgrade request.
+    - Task #53 (onboarding messaging for pending/blocked additional
+      club): DONE — audited first and found the backend policy (one
+      trial per owner, `blocked` access with no subscription row,
+      full platform-owner approval mechanism) was ALREADY fully
+      correct; the only gap was owner-facing messaging, fixed in
+      `PlatformSubscriptionCard.tsx` and `OnboardingPage.tsx`.
+      Directly satisfies Part II Section 96's "Additional Club Flow"
+      requirements — verify those are still true under a fresh
+      black-box test as part of Part II's broader QA pass, not just
+      trust this summary.
+    - Tasks #54-67: NOT yet started. Next up: #54 (platform owner
+      Clubs commercial detail page — note `PlatformClubDetailPage.tsx`
+      was found to already exist with real subscription-granting
+      capability during task #53's audit; confirm exact remaining
+      scope before assuming a rebuild is needed, same as this
+      session's established audit-first pattern).
 
-## Current gate: Gate 13 (Resume Commercial Entitlements) — starting next
+## Current phase: Part II — Full Platform Hardening & Acceptance (new master directive)
 
-## IMPORTANT — pending external QA (not a blocker, tracked explicitly)
-**REAL PHONE QR SCAN QA PENDING** (Gate 8): the WhatsApp connector
-service (`/whatsapp-connector`) is real and verified up to real QR
-generation (see D-008), but completing the actual pairing requires:
-(1) deploying the connector service to a real persistent host (it
-cannot run inside Vite or as a Supabase migration — it's a standalone
-Node process, see its own README for setup), (2) setting
-`WHATSAPP_CONNECTOR_URL`/`CONNECTOR_INTERNAL_SECRET` as secrets on the
-deployed `whatsapp-bridge` Edge Function so it can reach the connector,
-(3) a staff member opening WhatsApp → Connection in the app and
-scanning the real QR with an actual phone. None of this needs to
-happen before continuing other gates — it's the user's own
-infrastructure/phone step, not something further autonomous code
-changes can complete.
+Gate 13 (Commercial Entitlements) continues within this phase as one
+thread among many. The next concrete action is continuing Gate 13's
+task #54, then proceeding through the rest of Part II's scope
+(technical debt sweep, role-by-role QA, timezone regression, financial
+source-of-truth audit, full i18n sweep, full report build-out, RLS
+attack testing, etc.) without stopping between items, per the
+directive's explicit "do not stop after a gate/commit/report" rule.
 
 ## Completed this run (chronological)
 - Resolved 3-way directive conflict via AskUserQuestion → user chose
@@ -231,10 +306,11 @@ changes can complete.
 - Gate 7 (Notification Core): event/queue/consent tables + entry-point
   functions built, wired into booking creation, verified live. See
   D-007.
-- Gate 8 (WhatsApp): real persistent Node/TS Baileys connector service
-  built per explicit user directive, verified via a real WebSocket
-  handshake reaching a genuine scannable QR. IMPLEMENTED — EXTERNAL
-  SCAN QA PENDING. See D-008.
+- Gate 8 (WhatsApp): built a real persistent Node/TS Baileys connector
+  service, verified via a real WebSocket handshake reaching a genuine
+  scannable QR, then FULLY REMOVED per explicit user instruction after
+  repeated environment blockers prevented a real-phone end-to-end
+  verification. See D-008 (build) and D-013 (removal).
 - Gate 9 (RTL sweep): confirmed feature code already correct; fixed 4
   shared UI primitives at the root, verified live. See D-009.
 - Gate 10 (i18n foundation): react-i18next + LanguageSwitcher + no-
@@ -244,6 +320,26 @@ changes can complete.
   fixed a real single-source-of-truth violation (CustomersPage.tsx's
   outstanding calc), built Executive Dashboard + Booking Report,
   verified live with cross-reconciled real numbers. See D-011.
+- Gate 12 (Full Regression/Security/Tenant QA): security + performance
+  advisor passes, fixed auth_rls_initplan (32 policies), full build-gate
+  fix (regenerated stale types, fixed 20 real errors including a real
+  clubTimezone bug), one real black-box isolation test. See D-012.
+- P1 bug fix: WhatsApp QR not displaying — root-caused to (1) missing
+  CORS handling on whatsapp-bridge Edge Function, (2) a swallowed-
+  error-body bug in ConnectionTab.tsx. Both fixed and verified live
+  (later moot — WhatsApp fully removed, see Gate 8 above).
+- Gate 13 tasks #51-53: types regen (done as part of Gate 12), 
+  entitlement limit UI (EntitlementsCard.tsx), onboarding messaging
+  for pending/blocked additional clubs. See task list and this file's
+  Gate 13 section above.
+- P0 WhatsApp runtime task: audited existing Baileys connector against
+  Evolution API and whatsapp-web.js (documented comparison in D-013),
+  attempted real end-to-end connection via ngrok then Cloudflare
+  Tunnel (both genuinely worked as tunnels — verified via direct curl
+  — but Supabase Edge Function secrets could not be set due to
+  `supabase login` requiring a real interactive TTY unavailable in
+  this sandbox), user explicitly cancelled the attempt, then
+  instructed full removal of the WhatsApp module. See D-013 in full.
 
 ## Migrations applied this run
 - `20260816110000_fix_booking_venue_timezone.sql` — venue-timezone-aware
@@ -280,6 +376,16 @@ changes can complete.
   `20260816300000_wire_booking_notification_events.sql` — Gate 7.
 - `20260816310000_gate11_executive_and_booking_reports.sql` —
   `get_executive_dashboard()` + `get_booking_report()`, Gate 11.
+- `20260816310000_whatsapp_connection_model.sql`,
+  `20260816320000_whatsapp_permissions.sql`,
+  `20260816330000_whatsapp_templates_automations.sql`,
+  `20260816340000_revoke_whatsapp_template_validator_execute.sql` —
+  Gate 8's original build, all now reversed by the next entry.
+- `20260816350000_remove_whatsapp_module.sql` — drops all WhatsApp-
+  specific tables/RPCs/permissions (Gate 8 removal). This is the
+  correct forward-cleanup-migration pattern per the new directive's
+  Section 9 — original migrations were NOT rewritten or deleted from
+  history.
 
 ## Files changed this run
 - `src/lib/domain/time.ts` (new) — Time Model utility (Gate 1).
@@ -287,10 +393,24 @@ changes can complete.
 - `src/lib/errors.ts` — new Arabic error translations (Gates 1-3).
 - `src/app/layouts/PortalLayout.tsx` (new), `src/app/routing/
   RequireAuth.tsx` (added `RequirePortalAuth`), `src/app/routing/
-  router.tsx` (added `/portal` tree), `src/features/auth/LoginPage.tsx`
-  (persona-aware post-login redirect), `src/features/portal/*` (new —
-  6 files: ClaimAccountPage, PortalRoot, PortalBookingsPage,
-  PortalAcademyPage, PortalQrPage, PortalProfilePage) — all Gate 3.
+  router.tsx` (added `/portal` tree, later also had the `/app/whatsapp`
+  route removed), `src/features/auth/LoginPage.tsx` (persona-aware
+  post-login redirect), `src/features/portal/*` (new — 6 files:
+  ClaimAccountPage, PortalRoot, PortalBookingsPage, PortalAcademyPage,
+  PortalQrPage, PortalProfilePage) — all Gate 3.
+- `src/features/clubs/EntitlementsCard.tsx` (new) — Gate 13 task #52.
+- `src/features/clubs/PlatformSubscriptionCard.tsx`,
+  `src/features/onboarding/OnboardingPage.tsx` — Gate 13 task #53
+  messaging fixes.
+- `src/features/whatsapp/*` (6 files) — built in Gate 8, DELETED in
+  the WhatsApp removal. `src/app/layouts/AppLayout.tsx` (nav item +
+  icon import removed), `src/app/routing/router.tsx` (route removed),
+  `src/lib/i18n/resources/{ar,en}/common.json` (nav.whatsapp key
+  removed), `.eslintrc.cjs` (whatsapp-connector ignorePattern removed).
+  `whatsapp-connector/` (entire directory, 12 files) — DELETED.
+  `supabase/functions/whatsapp-bridge/index.ts` — DELETED locally,
+  replaced with an inert stub on the deployed Edge Function (no
+  deletion tool available).
 
 ## Known-good, do NOT re-investigate without new evidence
 - React Query staleness / Radix Dialog-Select-Tabs: repeatedly tested
@@ -303,81 +423,73 @@ changes can complete.
   account, real tokens) — pre-claim isolation, post-claim scoping,
   cross-customer denial, duplicate-claim rejection, identity-column
   guard, legitimate contact edits all verified correct.
+- `outstanding_invoices` view is the correct, verified single source
+  of truth for outstanding-balance figures — both `OutstandingPage.tsx`
+  and `CustomersPage.tsx` now read it, confirmed reconciling exactly
+  against real data (Gate 11).
 
-## Outstanding from before Doc 3 arrived (was frozen — Gate 13 now unfreezing)
-- Task #51: ✅ DONE as of Gate 12 — types.ts regenerated (via the
-  JSON-unwrap-via-python technique, since the direct MCP call still
-  hits its output-size limit) and every resulting real build error
-  fixed; `npm run build` is clean. NOTE: `PortalBookingsPage.tsx`/
-  `PortalAcademyPage.tsx`'s `as unknown as` casts (added during Gate 3
-  to work around the then-stale types) were NOT revisited in this pass
-  — worth a follow-up check now that types are accurate, to see if
-  those casts can be removed or tightened, but `npm run build` passing
-  confirms they're not currently causing errors.
-- Tasks #52-67: commercial-phase UI/reporting work — UNFREEZING, ready
-  to resume starting with task #52 (entitlement limit UI wiring).
-
-## Follow-up items noted but not yet actioned (tracked, not forgotten)
+## Outstanding from before this directive (still real, still open)
+- `PortalBookingsPage.tsx`/`PortalAcademyPage.tsx`'s `as unknown as`
+  casts (added during Gate 3 to work around then-stale types) were NOT
+  revisited after Gate 12's type regeneration — worth checking now
+  that types are accurate, to see if they can be removed/tightened.
 - `find_claimable_customer()` has no rate limiting — an authenticated
   attacker could brute-force phone numbers to discover which numbers
-  belong to real customers of a club. Noted in the migration's own
-  comment as a deliberate scope cut; should be addressed in Gate 12
-  (security hardening) via platform/edge-level rate limiting.
+  belong to real customers of a club. Should be addressed under Part
+  II's security-hardening scope via platform/edge-level rate limiting.
 - The photo re-approval request flow (`request_customer_photo_update`/
   `review_customer_photo_request`) has backend RPCs but NO frontend UI
-  yet on either side (customer request screen, staff review screen) —
-  built the data model and guard first since that was the security-
-  critical part; the UI is real follow-up work, not optional polish.
+  yet on either side (customer request screen, staff review screen).
 - Self-service booking CREATION (not just viewing) is explicitly out of
-  scope for Gate 3 — noted in the bookings_self_service_select policy's
-  own comment. A customer can see but not create/cancel their own
-  bookings yet; this needs payment-collection/deposit design before
-  it's safe to build.
-- Gate 8: `notification_queue` has no consuming worker yet — the send
-  path is callable but nothing polls the queue. Quiet-hours/rate-limit
-  columns exist without enforcement code. Also flagged via spawn_task:
-  `validate_whatsapp_template_variables()` (a trigger function) is
-  missing its `revoke execute from anon/authenticated` — low severity
-  (only validates row shape, no reads/writes) but should be closed to
-  match the codebase convention. task_caf4163d.
-- Gate 11: 9 of Doc 3's 14 report types remain unbuilt — Field
-  Performance (distinct from Occupancy: needs revenue-per-hour/
-  realized-rate, not just booked hours), Group Report, Player Report,
-  Subscription Report, Attendance Report, Collections Report, Employee
-  Activity, Discounts/Refunds/Voids, WhatsApp/Notification Report.
-  Each needs its own scoping pass on top-level KPI definition before
-  building — not appropriate to stub shallowly just to hit a count.
-  `OutstandingPage.tsx` (billing screen) already satisfies the
-  Receivables-with-aging requirement's data layer; whether it also
-  needs a presence as its own Reports-tab entry (vs. staying a billing
-  screen) is an open product decision, not a technical gap.
+  scope for Gate 3 — a customer can see but not create/cancel their own
+  bookings yet; needs payment-collection/deposit design first.
+- `notification_queue` has no consuming worker yet — the send path
+  exists (channel-agnostic) but nothing polls the queue. Quiet-hours/
+  rate-limit columns exist without enforcement code. This is now more
+  relevant than before: with WhatsApp removed, any future channel
+  (email/SMS/in-app) will need this worker built before it can do
+  anything real.
+- task_caf4163d (validate_whatsapp_template_variables grant gap): MOOT
+  — the function itself was dropped along with the rest of the
+  WhatsApp module. Safe to dismiss this task if it's still open in the
+  task tracker.
+- 9 (now effectively 9, with the WhatsApp/Notification report item
+  re-scoped to a channel-agnostic Notification Report) Doc 3 report
+  types remain unbuilt: Field Performance, Group Report, Player
+  Report, Subscription Report, Attendance Report, Collections Report,
+  Employee Activity, Discounts/Refunds/Voids, Notification Report.
+  Each needs its own KPI-definition scoping pass before building —
+  this is now Part II's active, large reporting scope.
+- `multiple_permissive_policies` (187 performance advisor findings
+  across 28 tables) and `unindexed_foreign_keys` (72 findings) remain
+  deferred from Gate 12 — now Part II's active DB-hardening scope.
+- A live login-based multi-tenant isolation test using a genuinely
+  non-platform-owner single-club account was never completed (blocked
+  on credentials in Gate 12) — Part II's Section 76-78 attack-testing
+  scope requires this be done properly this time, with real accounts
+  across a second tenant.
 
 ## Last commit
-9af351e — "fix: regenerate Supabase types + resolve real build errors
-surfaced (Gate 12)" (see `git log` for the full chronological commit
-history of this run). Local-first — not pushed to any remote per
-standing project policy.
+`4dffd6e` — "feat!: remove the WhatsApp module entirely, preserve the
+channel-agnostic Notification Core" (see `git log` for the full
+chronological commit history of this run). Local-first — not pushed to
+any remote per standing project policy.
 
 ## Next exact task
-Start Gate 13 — resume the Commercial Entitlements phase, beginning
-with task #52 (wire entitlement limit UI: branch/field/academy usage
-display + upgrade request flow). The underlying migration/enforcement
-work is already DONE and verified from before Doc 3 arrived; task #51
-(types regen) is now also done. Before writing new UI, read the
-existing `commercial_entitlements`/`commercial_upgrade_requests`/
-`commercial_entitlements_usage` tables and any RPCs already built
-against them (per the original commercial-phase plan) to confirm
-what's already in place vs. what's genuinely missing — this session's
-consistent pattern has been finding more already built than expected,
-so audit before building. Continue the same rigor as every prior gate:
-verify via live UI + DB, not just type-check; keep this file and the
-decision log continuously updated; commit locally after each logical
-unit; only stop for a genuine external hard blocker.
-
-Two lower-priority items remain explicitly tracked, not forgotten, and
-can be picked up opportunistically alongside Gate 13 rather than
-blocking it: (a) task_caf4163d (validate_whatsapp_template_variables
-grant gap); (b) a live login-based multi-tenant isolation test using a
-genuinely non-platform-owner account, once real test credentials are
-available (see D-012) — the current policy-definition-level
-verification is sound but a live test would be stronger evidence.
+WhatsApp removal (Part I) is fully complete and verified. Proceeding
+directly into Part II's scope without stopping, per the new directive.
+Immediate next action: continue Gate 13 (Commercial Entitlements) with
+task #54 — audit `PlatformClubDetailPage.tsx` (already found during
+task #53's work to have real subscription-granting capability) to
+determine its exact remaining scope before assuming more needs to be
+built, following this session's established audit-first pattern. Then
+continue through Part II's much larger scope in a sensible order:
+finish Gate 13's remaining commercial tasks, then move to the
+technical-debt sweep and the role-by-role/tenant-isolation attack
+testing (Sections 75-99), since these tend to surface real defects
+worth fixing before investing further in reporting/i18n/UX polish on
+top of a potentially-shaky foundation. Create `FINAL_DEFECT_
+REGISTER.md` and `UX_IMPROVEMENT_REGISTER.md` as real defects/UX
+findings start accumulating from this testing, not preemptively empty.
+Do not write `FINAL PLATFORM ACCEPTANCE REPORT` until the acceptance
+matrix can be filled with genuinely-tested PASS marks.
