@@ -59,13 +59,20 @@ a genuine contradiction.
    (genuinely new product surface, not a bug — needs its own design
    pass for event definition/seat inventory/capacity/waitlist-promotion
    policy before building).
-6. Gate 6 — Secure QR / Identity / Attendance — `ensure_booking_qr`
-   exists and was extended in Gate 3 for self-service use, but has NOT
-   been fully audited against Doc 3's security requirements (opaque
-   token vs guessable ID — uses `gen_random_bytes(32)` + sha256 hash,
-   looks correct at a glance; expiry — has `expires_at`; replay/
-   duplicate-scan protection; the actual scanner-side identity-match
-   verification screen). Not started as a dedicated gate.
+6. ✅ **Gate 6 — Secure QR / Identity / Attendance** — DONE (see D-006).
+   Audited both QR paths (booking + academy membership). Found the
+   backend was mostly already well-designed (opaque tokens, correct
+   single-use/expiry/revocation checks, full scan-attempt audit trail
+   via `qr_scan_events`) but found and fixed 3 real gaps: (1) scanner
+   had no UI for the academy attendance flow at all, (2) `qr_validate()`
+   returned zero identity-verification data so the required
+   photo/name/status comparison screen was structurally impossible,
+   (3) the actual "Active Entitlement" violation — `qr_mark_attendance()`
+   checked enrollment status but never subscription status, letting a
+   frozen/expired/cancelled/pending-payment member check in. All fixed
+   and verified via real coach-role RPC calls. NOT re-audited in this
+   pass: whether any manual (non-QR) attendance-marking path exists and
+   is correctly coach-scoped — flagged as follow-up, not assumed safe.
 7. Gate 7 — Notification Core — not started.
 8. Gate 8 — WhatsApp QR Module — not started (large net-new module).
 9. Gate 9 — RTL full sweep — not started (partial RTL exists via
@@ -95,7 +102,7 @@ a genuine contradiction.
     (branch/field/academy limits) is DONE and verified; only the UI
     wiring (task #51 types regen onward) remains, deliberately paused.
 
-## Current gate: Gate 6 (Secure QR / Identity / Attendance) — starting next
+## Current gate: Gate 7 (Notification Core) — starting next
 
 ## Completed this run (chronological)
 - Resolved 3-way directive conflict via AskUserQuestion → user chose
@@ -201,23 +208,21 @@ chronological commit history of this run: Gate 1 fix, Gate 2 fix, Gate
 Local-first — not pushed to any remote per standing project policy.
 
 ## Next exact task
-Start Gate 6 — Secure QR / Identity / Attendance. `ensure_booking_qr()`
-already exists (extended in Gate 3 for self-service use) and generates
-an opaque random token (`gen_random_bytes(32)` + sha256 hash stored,
-raw token only returned once) with `expires_at` and `single_use` — this
-looks architecturally sound at a glance but has NOT been audited
-against Doc 3's full requirement list: (a) find and read the actual
-QR-scan verification RPC (search for `scan`/`verify` in function names)
-to confirm it checks single-use/expiry/revocation correctly and can't
-be replayed; (b) confirm the scanner-side UI actually shows the
-identity-verification screen Doc 3 requires (photo + name + membership
-status) rather than just "valid/invalid"; (c) audit whether there's an
-equivalent secure QR mechanism for ACADEMY check-in (membership-based,
-not booking-based) — Doc 3 treats these as two different QR types
-(booking QR vs. academy membership QR) and only the booking one has
-been touched so far in this session; (d) confirm attendance records are
-written as an independent Check-in Event (per Doc 3) rather than
-directly mutating membership/subscription state. Given this session's
-now-repeated pattern (Gates 1/2/4/5 all found at least one real defect
-hiding in seemingly-complete code), apply the same rigor here — audit
-before assuming either "it's broken" or "it's fine."
+Start Gate 7 — Notification Core. Doc 3 requires business logic to
+never call WhatsApp/SMS/Email directly — a Notification Engine /
+domain-event abstraction must sit in between so Gate 8 (WhatsApp) can
+later be built as a connector without touching Booking/Academy/
+Enrollment code. Before building anything: (a) search for any existing
+notification/messaging table or function (`notifications`, `messages`,
+`sms`, `whatsapp` in `information_schema.tables`/`pg_proc`) — this
+session hasn't checked yet, so don't assume nothing exists; (b) if
+nothing exists, design the event model first (subscription-expiring,
+booking-confirmed, payment-received, etc. — the full Doc 3 event-type
+list is in the original directive text) as a queue/outbox table with
+status tracking (pending/sent/failed/expired), never a synchronous
+direct-send from a business-transaction RPC; (c) given this is
+explicitly a prerequisite for Gate 8 (WhatsApp), keep the core
+abstraction connector-agnostic — no WhatsApp-specific fields at this
+layer. Given this session's now-repeated pattern (Gates 1/2/4/5/6 all
+found at least one real defect hiding in seemingly-complete code),
+apply the same audit-before-build rigor here too.
