@@ -1,0 +1,188 @@
+import { useState, type FormEvent } from 'react'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { supabase } from '@/lib/supabase/client'
+import { useAuth } from '@/app/providers/AuthProvider'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import { StatusBadge } from '@/components/ui/status-badge'
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from '@/components/ui/dialog'
+import { translateSupabaseError } from '@/lib/errors'
+
+// P1-7 (critical usability fix pass, 2026-08-16): Settings previously
+// only exposed the FIRST branch's fields for editing, with no branch
+// list and no way to add a second branch through the product -- a real
+// gap for any club with more than one location (the QA dataset itself
+// has two). This is a real branch list + add + edit, matching Section
+// P1-7's "BRANCHES: branch list / add branch / edit branch / branch
+// code / branch details supported by schema" requirement.
+
+interface BranchRow {
+  id: string
+  name: string
+  branchCode: string
+  address: string | null
+  phone: string | null
+  status: string
+}
+
+async function fetchBranches(clubId: string): Promise<BranchRow[]> {
+  const { data, error } = await supabase
+    .from('branches')
+    .select('id, name, branch_code, address, phone, status')
+    .eq('club_id', clubId)
+    .order('created_at')
+  if (error) throw error
+  return (data ?? []).map((b) => ({
+    id: b.id,
+    name: b.name,
+    branchCode: b.branch_code,
+    address: b.address,
+    phone: b.phone,
+    status: b.status,
+  }))
+}
+
+export function BranchesCard() {
+  const { currentClubId } = useAuth()
+  const queryClient = useQueryClient()
+  const [editingBranch, setEditingBranch] = useState<BranchRow | null>(null)
+  const [createOpen, setCreateOpen] = useState(false)
+  const [formError, setFormError] = useState<string | null>(null)
+
+  const [name, setName] = useState('')
+  const [branchCode, setBranchCode] = useState('')
+  const [address, setAddress] = useState('')
+  const [phone, setPhone] = useState('')
+
+  const { data: branches = [], isLoading } = useQuery({
+    queryKey: ['branches-settings', currentClubId],
+    queryFn: () => fetchBranches(currentClubId!),
+    enabled: !!currentClubId,
+  })
+
+  function openEdit(b: BranchRow) {
+    setEditingBranch(b)
+    setName(b.name)
+    setBranchCode(b.branchCode)
+    setAddress(b.address ?? '')
+    setPhone(b.phone ?? '')
+    setFormError(null)
+  }
+
+  function openCreate() {
+    setCreateOpen(true)
+    setName('')
+    setBranchCode('')
+    setAddress('')
+    setPhone('')
+    setFormError(null)
+  }
+
+  const saveMutation = useMutation({
+    mutationFn: async () => {
+      if (editingBranch) {
+        const { error } = await supabase
+          .from('branches')
+          .update({ name, branch_code: branchCode, address: address || null, phone: phone || null })
+          .eq('id', editingBranch.id)
+        if (error) throw error
+      } else {
+        const { error } = await supabase.from('branches').insert({
+          club_id: currentClubId as string,
+          name,
+          branch_code: branchCode,
+          address: address || null,
+          phone: phone || null,
+        })
+        if (error) throw error
+      }
+    },
+    onSuccess: () => {
+      setEditingBranch(null)
+      setCreateOpen(false)
+      setFormError(null)
+      void queryClient.invalidateQueries({ queryKey: ['branches-settings', currentClubId] })
+      void queryClient.invalidateQueries({ queryKey: ['branches-for-bookings', currentClubId] })
+      void queryClient.invalidateQueries({ queryKey: ['branches-for-fields', currentClubId] })
+    },
+    onError: (error) => setFormError(translateSupabaseError(error, 'تعذّر حفظ بيانات الفرع.')),
+  })
+
+  function handleSubmit(e: FormEvent) {
+    e.preventDefault()
+    saveMutation.mutate()
+  }
+
+  const formFields = (
+    <>
+      <div className="flex flex-col gap-1.5">
+        <label className="text-sm font-medium text-text-secondary">اسم الفرع</label>
+        <Input required value={name} onChange={(e) => setName(e.target.value)} />
+      </div>
+      <div className="flex flex-col gap-1.5">
+        <label className="text-sm font-medium text-text-secondary">كود الفرع</label>
+        <Input required value={branchCode} onChange={(e) => setBranchCode(e.target.value.toUpperCase())} />
+      </div>
+      <div className="flex flex-col gap-1.5">
+        <label className="text-sm font-medium text-text-secondary">العنوان</label>
+        <Input value={address} onChange={(e) => setAddress(e.target.value)} />
+      </div>
+      <div className="flex flex-col gap-1.5">
+        <label className="text-sm font-medium text-text-secondary">رقم الهاتف</label>
+        <Input value={phone} onChange={(e) => setPhone(e.target.value)} />
+      </div>
+      {formError && <p role="alert" className="text-sm text-status-danger">{formError}</p>}
+      <Button type="submit" disabled={!name.trim() || !branchCode.trim() || saveMutation.isPending}>
+        {saveMutation.isPending ? 'جارٍ الحفظ...' : 'حفظ'}
+      </Button>
+    </>
+  )
+
+  return (
+    <Card>
+      <CardHeader className="flex flex-row items-center justify-between">
+        <CardTitle className="text-base">الفروع</CardTitle>
+        <Dialog open={createOpen} onOpenChange={setCreateOpen}>
+          <DialogTrigger asChild>
+            <Button size="sm" onClick={openCreate}>إضافة فرع</Button>
+          </DialogTrigger>
+          <DialogContent>
+            <DialogHeader><DialogTitle>إضافة فرع</DialogTitle></DialogHeader>
+            <form onSubmit={handleSubmit} className="flex flex-col gap-4">{formFields}</form>
+          </DialogContent>
+        </Dialog>
+      </CardHeader>
+      <CardContent className="flex flex-col gap-2">
+        {isLoading && <p className="text-sm text-text-secondary">جارٍ التحميل...</p>}
+        {!isLoading && branches.length === 0 && <p className="text-sm text-text-secondary">لا توجد فروع بعد.</p>}
+        {branches.map((b) => (
+          <button
+            key={b.id}
+            onClick={() => openEdit(b)}
+            className="flex items-center justify-between rounded-md border border-border p-3 text-start text-sm hover:bg-muted/40"
+          >
+            <div>
+              <p className="font-medium">{b.name} <span className="text-xs text-text-secondary">({b.branchCode})</span></p>
+              {b.address && <p className="text-xs text-text-secondary">{b.address}</p>}
+            </div>
+            <StatusBadge tone={b.status === 'active' ? 'success' : 'neutral'} label={b.status === 'active' ? 'نشط' : b.status} />
+          </button>
+        ))}
+      </CardContent>
+
+      <Dialog open={!!editingBranch} onOpenChange={(open) => !open && setEditingBranch(null)}>
+        <DialogContent>
+          <DialogHeader><DialogTitle>تعديل {editingBranch?.name}</DialogTitle></DialogHeader>
+          <form onSubmit={handleSubmit} className="flex flex-col gap-4">{formFields}</form>
+        </DialogContent>
+      </Dialog>
+    </Card>
+  )
+}

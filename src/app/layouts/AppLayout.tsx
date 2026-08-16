@@ -11,7 +11,6 @@ import {
   Users,
   Receipt,
   BarChart3,
-  Building2,
   UserCog,
   Settings,
   LayoutDashboard,
@@ -39,7 +38,6 @@ const sidebarItems: NavItem[] = [
   { to: '/app/customers', label: 'العملاء', icon: Users },
   { to: '/app/billing', label: 'الفواتير والمدفوعات', icon: Receipt },
   { to: '/app/reports', label: 'التقارير', icon: BarChart3 },
-  { to: '/app/club', label: 'النادي', icon: Building2 },
   { to: '/app/staff', label: 'الموظفون', icon: UserCog },
   { to: '/app/settings', label: 'الإعدادات', icon: Settings },
 ]

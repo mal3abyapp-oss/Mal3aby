@@ -1,4 +1,4 @@
-import { createBrowserRouter } from 'react-router-dom'
+import { createBrowserRouter, Navigate } from 'react-router-dom'
 import { PublicLayout } from '@/app/layouts/PublicLayout'
 import { AppLayout } from '@/app/layouts/AppLayout'
 import { PlatformLayout } from '@/app/layouts/PlatformLayout'
@@ -25,9 +25,8 @@ import { BillingPage } from '@/features/billing/BillingPage'
 import { SubscriptionPage } from '@/features/billing/SubscriptionPage'
 import { OutstandingPage } from '@/features/billing/OutstandingPage'
 import { ReportsPage } from '@/features/reports/ReportsPage'
-import { ClubPage } from '@/features/clubs/ClubPage'
 import { StaffPage } from '@/features/staff/StaffPage'
-import { AuditLogPage } from '@/features/settings/AuditLogPage'
+import { SettingsPage } from '@/features/settings/SettingsPage'
 import { ScanPage } from '@/features/scanner/ScanPage'
 
 import { PlatformOverviewPage } from '@/features/platform/PlatformOverviewPage'
@@ -88,16 +87,21 @@ export const router = createBrowserRouter([
           { path: 'subscription', element: <SubscriptionPage /> },
           { path: 'outstanding', element: <OutstandingPage /> },
           { path: 'reports', element: <ReportsPage /> },
-          { path: 'club', element: <ClubPage /> },
+          // P1-7: /app/club's content moved into the new Settings hub
+          // (club identity, branches, and fields/hours/pricing all live
+          // under /app/settings now) -- kept as a redirect for any stale
+          // links/bookmarks rather than a dead route.
+          { path: 'club', element: <Navigate to="/app/settings" replace /> },
           { path: 'staff', element: <StaffPage /> },
-          // "الإعدادات" per docs/SCREEN_MAP.md's own screen table (row:
-          // "Audit Log Viewer | settings | ... Owner, Manager") -- the
-          // club-side Settings nav entry's real V1 content was always the
-          // Audit Log Viewer, not a separate general-settings screen (no
-          // such screen appears anywhere else in the spec). SettingsPage's
-          // placeholder claiming "Phase 5" would build a different screen
-          // was stale -- removed in favor of routing directly here.
-          { path: 'settings', element: <AuditLogPage /> },
+          // P1-7 (critical usability fix pass, 2026-08-16): "الإعدادات"
+          // previously routed straight to the Audit Log Viewer alone,
+          // with club/branch/fields/subscription settings scattered
+          // elsewhere with no discoverable structure. Now a real
+          // settings hub (SettingsPage) with clear sections: club,
+          // branches, booking settings (fields/hours/pricing), academy
+          // settings, a link out to staff, platform subscription, and
+          // (owner/manager only) the audit log.
+          { path: 'settings', element: <SettingsPage /> },
         ],
       },
     ],

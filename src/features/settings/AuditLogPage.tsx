@@ -57,7 +57,11 @@ async function fetchAuditLogs(clubId: string, search: string) {
   }))
 }
 
-export function AuditLogPage() {
+// P1-7 (critical usability fix pass, 2026-08-16): extracted the page
+// body into AuditLogSection so SettingsPage can embed it directly under
+// a "الأمان وسجل التدقيق" heading instead of duplicating the query/table/
+// detail-dialog logic. AuditLogPage stays as a thin standalone wrapper.
+export function AuditLogSection() {
   const { currentClubId } = useAuth()
   const [search, setSearch] = useState('')
   const [selected, setSelected] = useState<AuditLogRow | null>(null)
@@ -89,8 +93,6 @@ export function AuditLogPage() {
 
   return (
     <div>
-      <PageHeader title="سجل التدقيق" description="سجل غير قابل للتعديل لكل الإجراءات الحساسة" />
-
       <div className="mb-4">
         <Input placeholder="بحث بنوع الإجراء" value={search} onChange={(e) => setSearch(e.target.value)} className="max-w-sm" />
       </div>
@@ -133,6 +135,15 @@ export function AuditLogPage() {
           )}
         </DialogContent>
       </Dialog>
+    </div>
+  )
+}
+
+export function AuditLogPage() {
+  return (
+    <div>
+      <PageHeader title="سجل التدقيق" description="سجل غير قابل للتعديل لكل الإجراءات الحساسة" />
+      <AuditLogSection />
     </div>
   )
 }
