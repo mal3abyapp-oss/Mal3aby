@@ -76,7 +76,21 @@ export function ConnectionTab() {
       const { data: connectData, error: connectError } = await supabase.functions.invoke('whatsapp-bridge', {
         body: { clubId: currentClubId, action: 'connect' },
       })
-      if (connectError) throw connectError
+      // Bug fix: supabase.functions.invoke() treats any non-2xx response
+      // (e.g. the bridge's honest 503 connector_not_configured) as an
+      // error and leaves `data` null -- the real error body is only
+      // reachable via error.context, a Response object. The previous
+      // code checked `connectData?.error` first, which is unreachable
+      // whenever the bridge returns a non-2xx status, so this specific,
+      // actionable message never actually rendered; the user only saw
+      // the generic fallback below. Read the real body before throwing.
+      if (connectError) {
+        const body = await connectError.context?.json?.().catch(() => null)
+        if (body?.error === 'connector_not_configured') {
+          throw new Error('CONNECTOR_NOT_CONFIGURED')
+        }
+        throw connectError
+      }
       if (connectData?.error === 'connector_not_configured') {
         throw new Error('CONNECTOR_NOT_CONFIGURED')
       }
@@ -86,9 +100,19 @@ export function ConnectionTab() {
       // (it needs to open the socket and wait for WhatsApp's own QR
       // event), so this is a short poll, not a single fetch.
       for (let attempt = 0; attempt < 15; attempt++) {
-        const { data: qrData } = await supabase.functions.invoke('whatsapp-bridge', {
+        const { data: qrData, error: qrError } = await supabase.functions.invoke('whatsapp-bridge', {
           body: { clubId: currentClubId, action: 'qr' },
         })
+        // A real provider/connector error during polling must surface,
+        // not be silently swallowed as "still generating" -- never hide
+        // a backend failure behind an indefinite spinner.
+        if (qrError) {
+          const body = await qrError.context?.json?.().catch(() => null)
+          if (body?.error === 'connector_not_configured') {
+            throw new Error('CONNECTOR_NOT_CONFIGURED')
+          }
+          throw qrError
+        }
         if (qrData?.qr) return qrData.qr as string
         await new Promise((r) => setTimeout(r, 1000))
       }
