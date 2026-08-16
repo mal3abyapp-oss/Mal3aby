@@ -6,6 +6,7 @@ export interface CustomerRow {
   mobileDisplay: string | null
   email: string | null
   whatsapp: string | null
+  outstanding?: number
 }
 
 export interface PlayerRow {

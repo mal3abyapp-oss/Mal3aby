@@ -14,6 +14,8 @@ import {
   DialogTrigger,
 } from '@/components/ui/dialog'
 import type { CustomerRow } from '@/lib/domain/people'
+import { CustomerDetailDialog } from './CustomerDetailDialog'
+import { translateSupabaseError } from '@/lib/errors'
 
 // Phase 4: search, create, edit customers. Guardian linking (from the
 // player side) lives in AcademyPage's Player Profile per SCREEN_MAP.md
@@ -33,12 +35,33 @@ async function fetchCustomers(clubId: string, search: string) {
   const { data, error } = await query
   if (error) throw error
 
+  const customerIds = (data ?? []).map((row) => row.id)
+  const outstandingByCustomer = new Map<string, number>()
+  if (customerIds.length > 0) {
+    const { data: invoices } = await supabase.from('invoices').select('id, customer_id, total').in('customer_id', customerIds).eq('status', 'issued')
+    if (invoices && invoices.length > 0) {
+      const invoiceIds = invoices.map((i) => i.id)
+      const { data: allocations } = await supabase.from('payment_allocations').select('invoice_id, amount').in('invoice_id', invoiceIds)
+      const paidByInvoice = new Map<string, number>()
+      for (const a of allocations ?? []) {
+        paidByInvoice.set(a.invoice_id, (paidByInvoice.get(a.invoice_id) ?? 0) + Number(a.amount))
+      }
+      for (const inv of invoices) {
+        const outstanding = Math.max(Number(inv.total) - (paidByInvoice.get(inv.id) ?? 0), 0)
+        if (outstanding > 0) {
+          outstandingByCustomer.set(inv.customer_id, (outstandingByCustomer.get(inv.customer_id) ?? 0) + outstanding)
+        }
+      }
+    }
+  }
+
   return (data ?? []).map<CustomerRow>((row) => ({
     id: row.id,
     fullName: row.full_name,
     mobileDisplay: row.mobile_display,
     email: row.email,
     whatsapp: row.whatsapp,
+    outstanding: outstandingByCustomer.get(row.id) ?? 0,
   }))
 }
 
@@ -63,6 +86,7 @@ export function CustomersPage() {
   // the same dialog/form as create, pre-filled, submitting an update
   // instead of an insert.
   const [editingCustomer, setEditingCustomer] = useState<CustomerRow | null>(null)
+  const [viewingCustomer, setViewingCustomer] = useState<CustomerRow | null>(null)
 
   const { data: customers = [], isLoading } = useQuery({
     queryKey: ['customers', currentClubId, search],
@@ -113,7 +137,8 @@ export function CustomersPage() {
       setFormError(null)
       void queryClient.invalidateQueries({ queryKey: ['customers', currentClubId] })
     },
-    onError: () => setFormError(editingCustomer ? 'تعذّر حفظ التعديلات، حاول مرة أخرى.' : 'تعذّرت الإضافة، حاول مرة أخرى.'),
+    onError: (error) =>
+      setFormError(translateSupabaseError(error, editingCustomer ? 'تعذّر حفظ التعديلات، حاول مرة أخرى.' : 'تعذّرت الإضافة، حاول مرة أخرى.')),
   })
 
   function handleSubmit(e: FormEvent) {
@@ -127,13 +152,27 @@ export function CustomersPage() {
       key: 'name',
       header: 'الاسم',
       render: (c) => (
-        <button className="text-accent-foreground hover:underline" onClick={() => openEditDialog(c)}>
+        <button className="text-accent-foreground hover:underline" onClick={() => setViewingCustomer(c)}>
           {c.fullName}
         </button>
       ),
     },
     { key: 'mobile', header: 'الهاتف', render: (c) => c.mobileDisplay ?? '—' },
     { key: 'email', header: 'البريد الإلكتروني', render: (c) => c.email ?? '—' },
+    {
+      key: 'outstanding',
+      header: 'المستحق',
+      render: (c) => (c.outstanding && c.outstanding > 0 ? <span className="font-medium text-status-danger tabular-nums">{c.outstanding.toFixed(0)} ج.م</span> : <span className="text-status-success">—</span>),
+    },
+    {
+      key: 'actions',
+      header: '',
+      render: (c) => (
+        <button className="text-xs text-text-secondary hover:text-accent-foreground hover:underline" onClick={() => openEditDialog(c)}>
+          تعديل
+        </button>
+      ),
+    },
   ]
 
   return (
@@ -193,6 +232,12 @@ export function CustomersPage() {
         isLoading={isLoading}
         emptyTitle="لا يوجد عملاء"
         emptyDescription="أضف أول عميل لبدء إدارة قاعدة عملاء النادي"
+      />
+
+      <CustomerDetailDialog
+        customerId={viewingCustomer?.id ?? null}
+        customerName={viewingCustomer?.fullName ?? ''}
+        onOpenChange={(open) => !open && setViewingCustomer(null)}
       />
     </div>
   )
