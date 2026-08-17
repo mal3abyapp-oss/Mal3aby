@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '@/lib/supabase/client'
 import { useAuth } from '@/app/providers/AuthProvider'
@@ -21,7 +21,15 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
-import { PAYMENT_METHOD_LABELS, type PaymentRow, fetchInvoicePaymentSummaries, type PaymentStatus } from '@/lib/domain/billing'
+import {
+  PAYMENT_METHOD_LABELS,
+  PAYMENT_STATUS_LABELS,
+  PAYMENT_STATUS_TONE,
+  type PaymentRow,
+  fetchInvoicePaymentSummaries,
+  type PaymentStatus,
+} from '@/lib/domain/billing'
+import { Trash2 } from 'lucide-react'
 import { translateSupabaseError } from '@/lib/errors'
 
 // Invoice list, invoice detail (view + print), payment collection form,
@@ -166,8 +174,6 @@ export function BillingPage() {
   const { currentClubId } = useAuth()
   const queryClient = useQueryClient()
   const [selectedInvoiceId, setSelectedInvoiceId] = useState<string | null>(null)
-  const [paymentAmount, setPaymentAmount] = useState('')
-  const [paymentMethod, setPaymentMethod] = useState('cash')
   const [printSize, setPrintSize] = useState<'a4' | '80mm'>('a4')
   const [refundPaymentId, setRefundPaymentId] = useState<string | null>(null)
   const [refundAmount, setRefundAmount] = useState('')
@@ -212,28 +218,94 @@ export function BillingPage() {
     enabled: !!selectedInvoiceId,
   })
 
+  // task #84: the payment form previously gave staff no visibility into
+  // how much was actually left owing on this invoice -- they had to do
+  // the total-minus-paid math themselves, error-prone the moment an
+  // invoice already had a partial payment or a refund on it. Reuses the
+  // exact same single-source-of-truth RPC every other screen in this app
+  // uses (task #81) rather than re-deriving the number here.
+  const { data: paymentSummary } = useQuery({
+    queryKey: ['invoice-payment-summary', selectedInvoiceId],
+    queryFn: async () => {
+      const map = await fetchInvoicePaymentSummaries([selectedInvoiceId!])
+      return map.get(selectedInvoiceId!) ?? null
+    },
+    enabled: !!selectedInvoiceId,
+  })
+
   function invalidateDetail() {
     void queryClient.invalidateQueries({ queryKey: ['invoice-detail', selectedInvoiceId] })
     void queryClient.invalidateQueries({ queryKey: ['invoice-payments', selectedInvoiceId] })
+    void queryClient.invalidateQueries({ queryKey: ['invoice-payment-summary', selectedInvoiceId] })
     void queryClient.invalidateQueries({ queryKey: ['invoices', currentClubId] })
   }
+
+  // task #84 (split payments): a single checkout moment can legitimately
+  // involve more than one payment method (e.g. the customer pays part
+  // cash, part card). The data model already supports this correctly --
+  // each method becomes its own real payments row via its own
+  // record_payment() call, exactly like two payments recorded minutes
+  // apart already worked -- this is a UI change (a list of method+amount
+  // lines submitted together, client-side sum validated against the
+  // outstanding balance before any call is made), not a schema or RPC
+  // change. Each line is recorded with its own record_payment() call in
+  // sequence; if a later line fails (e.g. a race against another
+  // recorded payment shrinking the true outstanding balance), the
+  // earlier lines already succeeded and are NOT rolled back -- this
+  // matches record_payment()'s own per-call transactional guarantee
+  // (it's a single top-level RPC call, not part of a larger client-side
+  // transaction) and is the same behavior as recording those same
+  // payments one at a time in separate submissions.
+  interface SplitLine {
+    key: string
+    amount: string
+    method: string
+  }
+  const [splitLines, setSplitLines] = useState<SplitLine[]>([{ key: crypto.randomUUID(), amount: '', method: 'cash' }])
+  const splitTotal = splitLines.reduce((sum, l) => sum + (Number(l.amount) || 0), 0)
+  const outstandingForSelected = paymentSummary?.outstanding ?? null
+
+  function resetSplitForm() {
+    setSplitLines([{ key: crypto.randomUUID(), amount: '', method: 'cash' }])
+  }
+
+  useEffect(() => {
+    resetSplitForm()
+    setFormError(null)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedInvoiceId])
 
   const recordPaymentMutation = useMutation({
     mutationFn: async () => {
       if (!selectedInvoiceId) throw new Error('no invoice selected')
-      const { error } = await supabase.rpc('record_payment', {
-        p_invoice_id: selectedInvoiceId,
-        p_amount: Number(paymentAmount),
-        p_method: paymentMethod,
-      })
-      if (error) throw error
+      const validLines = splitLines.filter((l) => Number(l.amount) > 0)
+      if (validLines.length === 0) throw new Error('أدخل مبلغًا واحدًا على الأقل')
+      if (outstandingForSelected !== null && splitTotal - outstandingForSelected > 0.01) {
+        throw new Error(`إجمالي الدفعات (${splitTotal.toFixed(2)}) يتجاوز المبلغ المتبقي (${outstandingForSelected.toFixed(2)})`)
+      }
+      // Sequential, not parallel -- each record_payment() call re-checks
+      // the outstanding balance server-side against the latest state, so
+      // running them one after another (not Promise.all) means the
+      // second line's own server-side check sees the first line's
+      // allocation already applied, which is the correct behavior for
+      // "two lines that together must not exceed the outstanding
+      // balance" rather than two calls racing against the same stale
+      // outstanding figure.
+      for (const line of validLines) {
+        const { error } = await supabase.rpc('record_payment', {
+          p_invoice_id: selectedInvoiceId,
+          p_amount: Number(line.amount),
+          p_method: line.method,
+        })
+        if (error) throw error
+      }
     },
     onSuccess: () => {
-      setPaymentAmount('')
+      resetSplitForm()
       setFormError(null)
       invalidateDetail()
     },
-    onError: (error) => setFormError(translateSupabaseError(error, 'تعذّر تسجيل الدفعة.')),
+    onError: (error) => setFormError(error instanceof Error && !('code' in error) ? error.message : translateSupabaseError(error, 'تعذّر تسجيل الدفعة.')),
   })
 
   const refundMutation = useMutation({
@@ -379,10 +451,18 @@ export function BillingPage() {
                       {(detail.customers as unknown as { full_name: string })?.full_name}
                     </p>
                   </div>
-                  <StatusBadge
-                    tone={detail.status === 'issued' ? 'success' : 'neutral'}
-                    label={INVOICE_STATUS_LABELS[detail.status] ?? detail.status}
-                  />
+                  <div className="flex flex-col items-end gap-1 print:hidden">
+                    <StatusBadge
+                      tone={detail.status === 'issued' ? 'success' : 'neutral'}
+                      label={INVOICE_STATUS_LABELS[detail.status] ?? detail.status}
+                    />
+                    {paymentSummary && (
+                      <StatusBadge
+                        tone={PAYMENT_STATUS_TONE[paymentSummary.paymentStatus]}
+                        label={PAYMENT_STATUS_LABELS[paymentSummary.paymentStatus]}
+                      />
+                    )}
+                  </div>
                 </div>
                 <table className="w-full text-start">
                   <thead>
@@ -404,8 +484,23 @@ export function BillingPage() {
                     ))}
                   </tbody>
                 </table>
-                <div className="mt-3 flex justify-end">
-                  <MoneyDisplay amount={Number(detail.total)} size="lg" />
+                <div className="mt-3 flex flex-col items-end gap-1">
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs text-text-secondary">الإجمالي</span>
+                    <MoneyDisplay amount={Number(detail.total)} size="lg" />
+                  </div>
+                  {paymentSummary && paymentSummary.paid > 0 && (
+                    <div className="flex items-center gap-2 print:hidden">
+                      <span className="text-xs text-text-secondary">المدفوع</span>
+                      <MoneyDisplay amount={paymentSummary.paid} size="sm" tone="success" />
+                    </div>
+                  )}
+                  {paymentSummary && paymentSummary.outstanding > 0 && (
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs text-text-secondary">المتبقي</span>
+                      <MoneyDisplay amount={paymentSummary.outstanding} size="lg" tone="danger" />
+                    </div>
+                  )}
                 </div>
               </div>
 
@@ -449,23 +544,76 @@ export function BillingPage() {
                 )}
               </div>
 
-              {detail.status === 'issued' && (
+              {detail.status === 'issued' && outstandingForSelected !== null && outstandingForSelected > 0 && (
                 <div className="flex flex-col gap-2 border-t border-border pt-3 print:hidden">
-                  <p className="font-medium">تسجيل دفعة</p>
-                  <div className="flex gap-2">
-                    <Input type="number" placeholder="المبلغ" value={paymentAmount} onChange={(e) => setPaymentAmount(e.target.value)} />
-                    <Select value={paymentMethod} onValueChange={setPaymentMethod}>
-                      <SelectTrigger className="w-40"><SelectValue /></SelectTrigger>
-                      <SelectContent>
-                        {Object.entries(PAYMENT_METHOD_LABELS).map(([key, label]) => (
-                          <SelectItem key={key} value={key}>{label}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    <Button disabled={!paymentAmount || recordPaymentMutation.isPending} onClick={() => recordPaymentMutation.mutate()}>
-                      تسجيل
-                    </Button>
+                  <div className="flex items-center justify-between">
+                    <p className="font-medium">تسجيل دفعة</p>
+                    <p className="text-xs text-text-secondary">
+                      المتبقي: <span className="font-medium text-status-danger">{outstandingForSelected.toFixed(2)}</span>
+                    </p>
                   </div>
+                  <p className="text-xs text-text-secondary">
+                    يمكن تسجيل الدفعة بأكثر من طريقة دفع في نفس العملية (مثال: جزء نقدًا وجزء بالبطاقة).
+                  </p>
+                  <div className="flex flex-col gap-2">
+                    {splitLines.map((line, idx) => (
+                      <div key={line.key} className="flex gap-2">
+                        <Input
+                          type="number"
+                          placeholder="المبلغ"
+                          value={line.amount}
+                          onChange={(e) =>
+                            setSplitLines((prev) => prev.map((l) => (l.key === line.key ? { ...l, amount: e.target.value } : l)))
+                          }
+                        />
+                        <Select
+                          value={line.method}
+                          onValueChange={(v) => setSplitLines((prev) => prev.map((l) => (l.key === line.key ? { ...l, method: v } : l)))}
+                        >
+                          <SelectTrigger className="w-40"><SelectValue /></SelectTrigger>
+                          <SelectContent>
+                            {Object.entries(PAYMENT_METHOD_LABELS).map(([key, label]) => (
+                              <SelectItem key={key} value={key}>{label}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        {splitLines.length > 1 && (
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            onClick={() => setSplitLines((prev) => prev.filter((l) => l.key !== line.key))}
+                            aria-label="حذف السطر"
+                          >
+                            <Trash2 className="size-4" />
+                          </Button>
+                        )}
+                        {idx === splitLines.length - 1 && (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => setSplitLines((prev) => [...prev, { key: crypto.randomUUID(), amount: '', method: 'cash' }])}
+                          >
+                            + طريقة أخرى
+                          </Button>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                  {splitLines.length > 1 && splitTotal > 0 && (
+                    <p className="text-xs text-text-secondary">
+                      إجمالي الدفعات: <span className="font-medium">{splitTotal.toFixed(2)}</span>
+                      {splitTotal - outstandingForSelected > 0.01 && (
+                        <span className="text-status-danger"> — يتجاوز المتبقي</span>
+                      )}
+                    </p>
+                  )}
+                  <Button
+                    className="w-fit"
+                    disabled={splitTotal <= 0 || recordPaymentMutation.isPending || splitTotal - outstandingForSelected > 0.01}
+                    onClick={() => recordPaymentMutation.mutate()}
+                  >
+                    {recordPaymentMutation.isPending ? 'جارٍ التسجيل...' : 'تسجيل الدفعة'}
+                  </Button>
                 </div>
               )}
 
