@@ -100,6 +100,21 @@ async function fetchCustomerActivity(customerId: string): Promise<CustomerActivi
 
 const RELATIONSHIP_LABELS: Record<string, string> = { father: 'الأب', mother: 'الأم', guardian: 'ولي أمر', other: 'أخرى' }
 
+// Master IA/UX audit (Club Side Customer 360 phase): the bookings list
+// here was a single flat "آخر الحجوزات" list with no distinction between
+// what's coming up vs. what already happened -- a staff member checking
+// a customer's history had to visually scan every row's date/status
+// instead of seeing "next booking" at a glance. Bucketed client-side
+// from the same already-fetched rows (still capped at the same 10 most
+// recent, per the fetch's own .limit(10) -- not a new query).
+function bucketBookings(bookings: CustomerActivity['bookings']) {
+  const now = new Date()
+  const upcoming = bookings.filter((b) => new Date(b.startAt) >= now && b.status !== 'cancelled' && b.status !== 'no_show')
+  const past = bookings.filter((b) => new Date(b.startAt) < now && b.status !== 'cancelled' && b.status !== 'no_show')
+  const cancelledOrNoShow = bookings.filter((b) => b.status === 'cancelled' || b.status === 'no_show')
+  return { upcoming, past, cancelledOrNoShow }
+}
+
 export function CustomerDetailDialog({ customerId, customerName, onOpenChange }: { customerId: string | null; customerName: string; onOpenChange: (open: boolean) => void }) {
   const { data, isLoading } = useQuery({
     queryKey: ['customer-activity', customerId],
@@ -158,24 +173,55 @@ export function CustomerDetailDialog({ customerId, customerName, onOpenChange }:
               </div>
             )}
 
-            <div>
-              <p className="mb-2 text-sm font-medium text-text-secondary">آخر الحجوزات</p>
-              {data.bookings.length === 0 ? (
-                <p className="text-sm text-text-secondary">لا يوجد حجوزات بعد.</p>
-              ) : (
-                <div className="flex flex-col gap-1.5">
-                  {data.bookings.map((b) => (
-                    <div key={b.id} className="flex items-center justify-between rounded-md border border-border p-2 text-sm">
-                      <div>
-                        <p>{b.fieldName}</p>
-                        <p className="text-xs text-text-secondary tabular-nums">{new Date(b.startAt).toLocaleString('ar-EG', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}</p>
-                      </div>
-                      <StatusBadge tone={BOOKING_STATUS_TONE[b.status] ?? 'neutral'} label={BOOKING_STATUS_LABELS[b.status] ?? b.status} />
+            {(() => {
+              const { upcoming, past, cancelledOrNoShow } = bucketBookings(data.bookings)
+              const groups: { title: string; rows: CustomerActivity['bookings'] }[] = [
+                { title: 'القادمة', rows: upcoming },
+                { title: 'السابقة', rows: past },
+                { title: 'ملغاة / لم يحضر', rows: cancelledOrNoShow },
+              ]
+              return (
+                <div>
+                  <div className="mb-2 flex items-center justify-between">
+                    <p className="text-sm font-medium text-text-secondary">الحجوزات</p>
+                    {/* Booking rows aren't individually clickable into
+                        BookingDetailSheet -- that sheet is opened from
+                        state on BookingsPage (a full BookingRow object,
+                        not just an id), not a route/query-param, so a
+                        per-row deep-link would need new routing
+                        infrastructure. Links to the list instead, same
+                        as this dialog's field-name precedent. */}
+                    <Link to="/app/bookings" className="text-xs font-medium text-accent-foreground hover:underline">
+                      عرض كل الحجوزات
+                    </Link>
+                  </div>
+                  {data.bookings.length === 0 ? (
+                    <p className="text-sm text-text-secondary">لا يوجد حجوزات بعد.</p>
+                  ) : (
+                    <div className="flex flex-col gap-3">
+                      {groups.filter((g) => g.rows.length > 0).map((g) => (
+                        <div key={g.title}>
+                          <p className="mb-1 text-xs text-text-secondary">{g.title}</p>
+                          <div className="flex flex-col gap-1.5">
+                            {g.rows.map((b) => (
+                              <div key={b.id} className="flex items-center justify-between rounded-md border border-border p-2 text-sm">
+                                <div>
+                                  <p>{b.fieldName}</p>
+                                  <p className="text-xs text-text-secondary tabular-nums">
+                                    <bdi>{new Date(b.startAt).toLocaleString('ar-EG', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}</bdi>
+                                  </p>
+                                </div>
+                                <StatusBadge tone={BOOKING_STATUS_TONE[b.status] ?? 'neutral'} label={BOOKING_STATUS_LABELS[b.status] ?? b.status} />
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      ))}
                     </div>
-                  ))}
+                  )}
                 </div>
-              )}
-            </div>
+              )
+            })()}
 
             <div>
               <p className="mb-2 text-sm font-medium text-text-secondary">الفواتير</p>
@@ -184,13 +230,17 @@ export function CustomerDetailDialog({ customerId, customerName, onOpenChange }:
               ) : (
                 <div className="flex flex-col gap-1.5">
                   {data.invoices.map((i) => (
-                    <div key={i.id} className="flex items-center justify-between rounded-md border border-border p-2 text-sm">
-                      <span>{i.invoiceNumber}</span>
+                    <Link
+                      key={i.id}
+                      to={`/app/billing?invoice=${i.id}`}
+                      className="flex items-center justify-between rounded-md border border-border p-2 text-sm hover:bg-muted/40"
+                    >
+                      <span className="text-accent-foreground"><bdi>{i.invoiceNumber}</bdi></span>
                       <div className="flex items-center gap-2">
                         <MoneyDisplay amount={i.total} size="sm" />
                         {i.outstanding > 0 && <StatusBadge tone="danger" label={`متبقي ${i.outstanding.toFixed(0)}`} />}
                       </div>
-                    </div>
+                    </Link>
                   ))}
                 </div>
               )}
