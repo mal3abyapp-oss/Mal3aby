@@ -1,4 +1,3 @@
-import 'dotenv/config'
 import { ConnectionRequestPoller } from './ConnectionRequestPoller.js'
 import { QueueConsumer } from './QueueConsumer.js'
 import { SupabaseSync } from './SupabaseSync.js'
@@ -17,9 +16,44 @@ import { TenantConnectionManager } from './TenantConnectionManager.js'
  * was possible specifically because polling Postgres for intent is
  * cheap and this is a low-frequency operation (pairing requests, not
  * per-message).
+ *
+ * Environment loading: no `dotenv` import here -- both `npm run dev`
+ * and `npm start` invoke this file with Node's native
+ * `--env-file=.env` flag (see package.json), which is a built-in
+ * feature on Node 20.6+/22 and avoids an unnecessary runtime
+ * dependency for a task the platform already does natively.
  */
 
+/**
+ * Safe startup validation: reports only WHETHER each required variable
+ * is present and non-empty, never the value itself, and never writes
+ * any of them to a log line. Exits with a clear, actionable message
+ * (naming the exact missing variable) rather than letting a missing
+ * credential surface later as an opaque Supabase/Baileys error.
+ */
+function validateRequiredEnv(): void {
+  const required = ['SUPABASE_URL', 'SUPABASE_SERVICE_ROLE_KEY', 'WHATSAPP_SESSION_ENCRYPTION_KEY'] as const
+  const missing = required.filter((name) => !process.env[name] || process.env[name]!.length === 0)
+
+  if (missing.length > 0) {
+    console.error('[connector] EXTERNAL CONFIGURATION REQUIRED -- missing required environment variable(s):')
+    for (const name of missing) console.error(`  - ${name}`)
+    console.error('[connector] Copy whatsapp-connector/.env.example to whatsapp-connector/.env and fill in the missing value(s), then retry.')
+    process.exit(1)
+  }
+
+  const keyBytes = Buffer.from(process.env.WHATSAPP_SESSION_ENCRYPTION_KEY!, 'base64').length
+  if (keyBytes !== 32) {
+    console.error(`[connector] WHATSAPP_SESSION_ENCRYPTION_KEY must decode to exactly 32 bytes (AES-256) -- got ${keyBytes} bytes. Regenerate with: node -e "console.log(require('crypto').randomBytes(32).toString('base64'))"`)
+    process.exit(1)
+  }
+
+  console.log('[connector] environment check: SUPABASE_URL present, SUPABASE_SERVICE_ROLE_KEY present, WHATSAPP_SESSION_ENCRYPTION_KEY present and valid (32 bytes).')
+}
+
 async function main() {
+  validateRequiredEnv()
+
   const sync = new SupabaseSync()
   const connections = new TenantConnectionManager(sync)
 

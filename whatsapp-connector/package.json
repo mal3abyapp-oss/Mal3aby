@@ -5,23 +5,22 @@
   "type": "module",
   "private": true,
   "scripts": {
-    "dev": "tsx watch src/index.ts",
+    "dev": "tsx watch --env-file=.env src/index.ts",
     "build": "tsc -p tsconfig.json",
-    "start": "node dist/index.js",
-    "test": "tsx src/selfTest.ts"
+    "start": "node --env-file=.env dist/index.js",
+    "test": "tsx --env-file=.env src/selfTest.ts"
   },
   "dependencies": {
-    "@whiskeysockets/baileys": "^6.7.9",
-    "@supabase/supabase-js": "^2.47.0",
     "@hapi/boom": "^9.1.4",
-    "qrcode-terminal": "^0.12.0",
+    "@supabase/supabase-js": "^2.47.0",
+    "@whiskeysockets/baileys": "^6.7.9",
     "pino": "^9.4.0",
-    "dotenv": "^16.4.5"
+    "qrcode-terminal": "^0.12.0"
   },
   "devDependencies": {
     "@types/node": "^22.10.1",
     "@types/qrcode-terminal": "^0.12.2",
-    "typescript": "^5.6.2",
-    "tsx": "^4.19.1"
+    "tsx": "^4.19.1",
+    "typescript": "^5.6.2"
   }
 }

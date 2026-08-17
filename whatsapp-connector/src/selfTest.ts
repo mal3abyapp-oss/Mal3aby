@@ -6,9 +6,9 @@
  * requires a real scan) but it does prove the Baileys integration
  * itself is real and functional, not a mock/stub.
  *
- * Run with: npm test
+ * Run with: npm test (invokes this file with --env-file=.env, see
+ * package.json -- no dotenv import needed).
  */
-import 'dotenv/config'
 import { BaileysProvider } from './BaileysProvider.js'
 
 const TEST_CLUB_ID = 'selftest-' + Date.now()
