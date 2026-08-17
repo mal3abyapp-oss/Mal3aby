@@ -17,12 +17,12 @@ Never stop mid-phase to send a report or wait for permission. After finishing an
 ## RESUME CURSOR
 
 ```
-current_phase: Phase 10 — Customer Portal
-completed_phases: 1 (Audit), 2 (Target IA), 3 (Shared navigation foundation), 4 (Platform Owner), 5 (Club Settings restructure), 6 (Finance domain grouping), 7 (Reports tab-grouping), 8 (WhatsApp module), 9 (Booking 360 collect-payment)
-last_commit: 37e618c (Phase 9)
-test_status: tsc clean, build clean, live end-to-end verified against real data -- recorded a real 1.00 EGP payment via the new BookingDetailSheet action, confirmed المدفوع/المتبقي updated in place and a real audit log entry was written via the same record_payment() path BillingPage uses
+current_phase: Phase 11 — Role-based nav visibility (re-verification)
+completed_phases: 1 (Audit), 2 (Target IA), 3 (Shared navigation foundation), 4 (Platform Owner), 5 (Club Settings restructure), 6 (Finance domain grouping), 7 (Reports tab-grouping), 8 (WhatsApp module), 9 (Booking 360 collect-payment), 10 (Customer Portal)
+last_commit: 75bdf80 (Phase 10)
+test_status: tsc clean, build clean, live end-to-end verified against real data -- /portal/bookings + cross-links to QR/payments confirmed working with real bookings; PortalProfilePage's multi-club selector confirmed against a real multi-club guardian account ("أحمد والد اللاعب") that was previously silently losing every club after the first
 blocker: none
-exact_next_action: Begin Phase 10 -- Customer Portal. First read PortalRoot.tsx, PortalBookingsPage.tsx (if it exists as a real file already), PortalAcademyPage.tsx, and PortalProfilePage.tsx in full to confirm current structure before changing anything. Tasks: (1) give PortalBookingsPage a real /portal/bookings route (audit found it currently only rendered inline at /portal index via the claim-gate, no standalone route); (2) add cross-links between booking cards <-> QR <-> invoice via query params so a customer can move between related views; (3) fix PortalAcademyPage's confirmed silent-data-drop bug -- shows only the FIRST active enrollment/subscription per player instead of all; (4) fix PortalProfilePage's confirmed silent-data-drop bug -- shows/edits only the FIRST linked customer record instead of offering a club selector for multi-club guardians. Then Phase 11 (role-based nav visibility re-verification) and Phase 12 (full regression + 30-item success checklist).
+exact_next_action: Begin Phase 11 -- re-verify role-based nav visibility now that Finance/WhatsApp got new routes/groupings since Phase 3 built navigation.ts. Read src/lib/domain/navigation.ts's ROLE_NAV_DOMAINS map against every route added/changed in Phases 5-10 (/app/fields, /app/audit-log, /app/whatsapp, the Finance section grouping, /app/subscription's new sidebar entry) and confirm each new NavDomain tag on AppLayout's navSections items matches a role that should actually see it -- cross-check against the live role_permissions table (used raw SQL query in Phase 1's audit) rather than assuming. Fix any mismatches found. Then Phase 12 -- full regression: run tsc/build/lint one final time, live-verify every moved feature end-to-end per the no-feature-lost table below, then declare the IA restructuring COMPLETE against the directive's 30-item success checklist and send the final report.
 
 NOTE: Phase 4 deliberately did NOT fix the 2 hardcoded-reason/method RPC calls on PlatformClubDetailPage (change_platform_plan, record_platform_payment) or the 2 direct-table-writes there that bypass RPCs -- these are real data-integrity/form-completeness findings from the audit but are NOT information-architecture problems (no screen/nav reorganization involved), and fixing them requires adding real form inputs (a scope-creep risk against "reorganize, don't invent features"). Logged here as a legitimate follow-up, deliberately deferred, not forgotten -- revisit after the core IA restructuring (all 12 phases) is complete, as a discrete follow-up task if the user wants it.
 ```
@@ -73,7 +73,10 @@ Verified: tsc clean, `npm run build` clean, live-verified in browser -- Overview
 Added a "تحصيل الدفعة" action directly to `BookingDetailSheet.tsx` -- reuses `record_payment()` (same RPC, same params BillingPage's own split-payment UI calls) rather than duplicating payment logic. Single-line quick-collect pre-filled with the exact outstanding amount; only rendered when the booking has a linked invoice with real outstanding > 0.01. Reveal-then-confirm UX matching the sheet's existing cancel/no-show patterns. On success invalidates the invoice-summary query so the sheet's own breakdown updates immediately.
 
 Verified: tsc clean, `npm run build` clean, live end-to-end test against real data -- opened a real booking with 1.00 EGP outstanding, used the new action to collect it, watched المدفوع go 220→221 and المتبقي go 1→0 in place with no reload, confirmed a real "تسجيل دفعة بقيمة 1.00 EGP" audit log entry was written by the same code path BillingPage uses (not a parallel/duplicate implementation).
-### Phase 10 — Customer Portal: NOT STARTED
+### Phase 10 — Customer Portal: COMPLETE (commit `75bdf80`)
+Gave `PortalBookingsPage` a real `/portal/bookings` route (previously only reachable inline via the claim-gated `/portal` index); sidebar nav's "حجوزاتي" now points there directly. Added cross-links: booking cards now show "رمز الحضور" (→ `/portal/qr?bookingId=`) when QR-eligible and "الفاتورة والدفع" (→ `/portal/payments?invoiceId=`) when a linked invoice exists; `PortalQrPage` preselects from the query param, `PortalPaymentsPage` auto-opens its claim dialog from the query param only when that invoice has a real outstanding balance. Fixed 2 confirmed silent-data-drop bugs from the audit: `PortalAcademyPage` was using `.find()` to keep only the FIRST active enrollment per player (now renders all); `PortalProfilePage` was using `records[0]` to keep only the FIRST linked customer record (now offers a club selector whenever a guardian has more than one linked club).
+
+Verified: tsc clean, `npm run build` clean, live end-to-end against real data -- `/portal/bookings` renders real bookings with correct cross-links; QR deep-link preselected the correct real booking and rendered its real QR code; invoice deep-link's outstanding guard correctly stayed closed for 2 fully-paid test invoices (no false trigger) while the underlying claim dialog itself opened correctly via the pre-existing manual path against a real unpaid invoice; `PortalProfilePage` showed a genuinely real multi-club guardian account ("أحمد والد اللاعب") with the new selector and correct "حسابك مرتبط بأكثر من نادي" message -- this was a live, previously-silent data loss, now fixed and confirmed.
 ### Phase 11 — Role-based nav visibility: NOT STARTED
 ### Phase 12 — Full regression: NOT STARTED
 
@@ -97,14 +100,16 @@ Verified: tsc clean, `npm run build` clean, live end-to-end test against real da
 | Platform Settings nav item | Placeholder | Real screen (trial/grace defaults) | Yes | Yes (live-verified, loads real DB values) |
 | Outstanding page | Built, unlinked | Finance domain nav | Yes (added to sidebar + MorePage) | Yes (live-verified, loads real data) |
 | Subscription page (`/app/subscription`) | Built, unlinked from any nav | Contextual banner links (pre-existing) + Settings' new "عرض التفاصيل الكاملة" link | Yes (nav presence added) | Yes (live-verified, full plan/billing content renders) |
+| Portal "My Bookings" | Inline at `/portal` index only (via claim-gate) | Real `/portal/bookings` route + nav item | Yes (nav presence added) | Yes (live-verified, real bookings render with cross-links) |
+| Booking→QR / Booking→Invoice connection | Nowhere (had to navigate to QR/Payments tabs and search manually) | Cross-links on each booking card (query-param deep links) | Yes (new connection) | Yes (live-verified, QR deep-link preselected correct real booking) |
 
 ---
 
 ## DEFECT LOG (real bugs found during restructuring, distinct from IA problems)
 
-None found yet during restructuring itself (Phases 1-2 were documentation-only). The audit found 2 confirmed silent-data-drop bugs to fix during Phase 10 (Customer Portal):
-- `PortalAcademyPage` shows only the first active enrollment/subscription per player (should show all)
-- `PortalProfilePage` shows only the first linked customer record for a multi-club guardian (needs a club selector)
+The audit found 2 confirmed silent-data-drop bugs -- both fixed in Phase 10 (Customer Portal), commit `75bdf80`:
+- `PortalAcademyPage` showed only the first active enrollment/subscription per player -- FIXED, now renders every active enrollment.
+- `PortalProfilePage` showed only the first linked customer record for a multi-club guardian -- FIXED, now offers a club selector. Live-verified against a real multi-club guardian account ("أحمد والد اللاعب") that was previously losing every club after the first silently.
 
 ---
 
