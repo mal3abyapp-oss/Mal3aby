@@ -140,6 +140,71 @@ check('unknown template_key throws rather than silently rendering nothing', () =
   assert.throws(() => renderTemplate('not-a-real-key', 'ar', BASE_VARS))
 })
 
+// ----------------------------------------------------------------
+// WhatsApp secure links directive (rules 17/19): booking-created/
+// booking-confirmed must carry a QR check-in link when a token is
+// present, payment-received/invoice-created must carry an invoice
+// link. All must NEVER include one when the token is absent.
+// ----------------------------------------------------------------
+
+check('booking-created includes a /qr/ link when booking_qr_token is present', () => {
+  const msg = renderTemplate('booking-created', 'ar', { ...BASE_VARS, booking_qr_token: 'abc123deadbeef' })
+  assert.ok(msg.includes('/qr/abc123deadbeef'), 'missing the booking QR link with the raw token in the path')
+  assert.ok(msg.includes('رمز الحضور'), 'missing the Arabic QR-link label')
+})
+
+check('booking-created omits the QR link entirely when booking_qr_token is absent', () => {
+  const msg = renderTemplate('booking-created', 'ar', BASE_VARS)
+  assert.ok(!msg.includes('/qr/'), 'a QR link appeared with no token supplied')
+  assert.ok(!msg.includes('رمز الحضور'), 'the QR-link label appeared with no token supplied')
+})
+
+check('booking-confirmed includes a /qr/ link when booking_qr_token is present (ar + en)', () => {
+  const ar = renderTemplate('booking-confirmed', 'ar', { ...BASE_VARS, booking_qr_token: 'xyz789' })
+  assert.ok(ar.includes('/qr/xyz789'), 'missing the booking QR link (ar)')
+  const en = renderTemplate('booking-confirmed', 'en', { ...BASE_VARS, booking_qr_token: 'xyz789' })
+  assert.ok(en.includes('/qr/xyz789'), 'missing the booking QR link (en)')
+  assert.ok(en.includes('Check-in code'), 'missing the English QR-link label')
+})
+
+check('payment-received includes a /verify/ link when invoice_token is present', () => {
+  const msg = renderTemplate('payment-received', 'ar', { ...BASE_VARS, amount: 220, method: 'cash', invoice_token: 'invtok456' })
+  assert.ok(msg.includes('/verify/invtok456'), 'missing the invoice verification link with the raw token in the path')
+  assert.ok(msg.includes('عرض الفاتورة'), 'missing the Arabic invoice-link label')
+})
+
+check('payment-received omits the invoice link entirely when invoice_token is absent', () => {
+  const msg = renderTemplate('payment-received', 'ar', { ...BASE_VARS, amount: 220, method: 'cash' })
+  assert.ok(!msg.includes('/verify/'), 'an invoice link appeared with no token supplied')
+})
+
+check('invoice-created includes a /verify/ link when invoice_token is present (ar + en)', () => {
+  const ar = renderTemplate('invoice-created', 'ar', { ...BASE_VARS, total: 220, invoice_token: 'invtok789' })
+  assert.ok(ar.includes('/verify/invtok789'), 'missing the invoice verification link (ar)')
+  const en = renderTemplate('invoice-created', 'en', { ...BASE_VARS, total: 220, invoice_token: 'invtok789' })
+  assert.ok(en.includes('/verify/invtok789'), 'missing the invoice verification link (en)')
+})
+
+check('booking-cancelled NEVER includes a QR link even if a stale booking_qr_token is somehow present', () => {
+  // Directive rule 3/11: a cancellation message must never carry a
+  // valid-looking QR link -- confirmed the renderer for this template
+  // never reads booking_qr_token at all, so even a caller mistake
+  // (passing a stale token through) can't leak a link into this
+  // specific message.
+  const msg = renderTemplate('booking-cancelled', 'ar', { ...BASE_VARS, booking_qr_token: 'should-never-appear' })
+  assert.ok(!msg.includes('should-never-appear'), 'a QR token leaked into the cancellation message')
+  assert.ok(!msg.includes('/qr/'), 'a QR link appeared in the cancellation message')
+})
+
+check('the token itself is never used as a bare value -- always embedded inside a /qr/ or /verify/ path', () => {
+  // Directive rule 8: never authorize off a raw predictable value with
+  // no path context -- confirms the rendered link always has the
+  // /qr/<token> or /verify/<token> shape, not the token printed alone.
+  const msg = renderTemplate('booking-created', 'ar', { ...BASE_VARS, booking_qr_token: 'sole-token-999' })
+  const bareTokenLine = msg.split('\n').find((l) => l.trim() === 'sole-token-999')
+  assert.ok(!bareTokenLine, 'the token appeared on its own line with no /qr/ path prefix')
+})
+
 console.log(`\n[templates.test] ${passed} test(s) passed.`)
 if (process.exitCode) {
   console.error('[templates.test] SOME TESTS FAILED.')

@@ -72,6 +72,37 @@ function line(emoji: string, label: string, value: unknown): string {
   return isPresent(value) ? `${emoji} *${label}:* ${value}` : ''
 }
 
+// ----------------------------------------------------------------
+// WhatsApp secure links directive: booking_qr_token / invoice_token
+// arrive in `variables` as the RAW TOKEN ONLY -- business RPCs
+// (supabase/migrations/20260818120000_whatsapp_secure_links.sql)
+// deliberately never build a URL in SQL or the frontend, since this
+// connector is the only layer with real env-var access. URL
+// composition happens here, once, right before the token is used in
+// a rendered line -- never logged, never stored, only interpolated
+// into the outgoing message text.
+//
+// PUBLIC_APP_URL must be a full origin (e.g. https://app.mala3by.com)
+// with no trailing slash and no localhost/127.0.0.1 in a deployed
+// environment (directive rule 14) -- during local dev it's fine to
+// point this at a dev URL (http://localhost:5173), that's what the
+// directive's own "local/dev URL for testing, architecture ready for
+// the final domain at deploy time" language describes. Falls back to
+// localhost ONLY as a last resort so local runs don't crash outright
+// if the var is unset -- deployed environments MUST set this.
+// ----------------------------------------------------------------
+const PUBLIC_APP_URL = (process.env.PUBLIC_APP_URL ?? 'http://localhost:5173').replace(/\/+$/, '')
+
+function bookingQrUrl(token: unknown): string | null {
+  if (!isPresent(token)) return null
+  return `${PUBLIC_APP_URL}/qr/${encodeURIComponent(String(token))}`
+}
+
+function invoiceUrl(token: unknown): string | null {
+  if (!isPresent(token)) return null
+  return `${PUBLIC_APP_URL}/verify/${encodeURIComponent(String(token))}`
+}
+
 /**
  * Venue-timezone-aware date/time formatting -- mirrors the frontend's
  * formatInstant() (src/lib/domain/time.ts) intent exactly: never a raw
@@ -227,6 +258,7 @@ const AR: Record<TemplateKey, Renderer> = {
     const tz = isPresent(v.timezone) ? String(v.timezone) : DEFAULT_TIMEZONE
     const date = isPresent(v.start_at) ? formatDate(String(v.start_at), tz, 'ar-EG') : null
     const time = isPresent(v.start_at) ? formatTime(String(v.start_at), tz, 'ar-EG') : null
+    const qrUrl = bookingQrUrl(v.booking_qr_token)
     return joinLines(
       '📝 *تم استلام طلب الحجز*',
       '',
@@ -243,6 +275,8 @@ const AR: Record<TemplateKey, Renderer> = {
       '',
       'سنرسل لك رسالة أخرى فور تأكيد الحجز.',
       '',
+      qrUrl ? `رمز الحضور:\n${qrUrl}` : '',
+      '',
       brandLine(v, 'ar'),
     )
   },
@@ -252,6 +286,7 @@ const AR: Record<TemplateKey, Renderer> = {
     const date = isPresent(v.start_at) ? formatDate(String(v.start_at), tz, 'ar-EG') : null
     const time = isPresent(v.start_at) ? formatTime(String(v.start_at), tz, 'ar-EG') : null
     const paymentStatus = paymentStatusLabel(v.payment_status, 'ar')
+    const qrUrl = bookingQrUrl(v.booking_qr_token)
     return joinLines(
       '✅ *تم تأكيد حجزك*',
       '',
@@ -265,6 +300,8 @@ const AR: Record<TemplateKey, Renderer> = {
       line('🕐', 'الوقت', time),
       line('🔖', 'رقم الحجز', v.booking_ref),
       line('💳', 'حالة الدفع', paymentStatus),
+      '',
+      qrUrl ? `رمز الحضور:\n${qrUrl}` : '',
       '',
       'نتمنى لك وقتًا ممتعًا ⚽',
       '',
@@ -297,6 +334,7 @@ const AR: Record<TemplateKey, Renderer> = {
     const amount = formatMoney(v.amount, 'ج.م', 'EGP', 'ar')
     const paymentStatus = paymentStatusLabel(v.payment_status, 'ar')
     const method = paymentMethodLabel(v.method, 'ar')
+    const invoiceLink = invoiceUrl(v.invoice_token)
     return joinLines(
       '✅ *تم استلام دفعتك بنجاح*',
       '',
@@ -307,6 +345,8 @@ const AR: Record<TemplateKey, Renderer> = {
       line('🔖', 'رقم الحجز', v.booking_ref),
       line('🧾', 'رقم الفاتورة', v.invoice_number),
       line('💳', 'حالة الدفع', paymentStatus),
+      '',
+      invoiceLink ? `عرض الفاتورة:\n${invoiceLink}` : '',
       '',
       'شكرًا لك.',
       '',
@@ -336,6 +376,7 @@ const AR: Record<TemplateKey, Renderer> = {
   'invoice-created': (v) => {
     const total = formatMoney(v.total, 'ج.م', 'EGP', 'ar')
     const paymentStatus = paymentStatusLabel(v.payment_status, 'ar')
+    const invoiceLink = invoiceUrl(v.invoice_token)
     return joinLines(
       '🧾 *تم إصدار فاتورتك*',
       '',
@@ -345,6 +386,8 @@ const AR: Record<TemplateKey, Renderer> = {
       line('🧾', 'رقم الفاتورة', v.invoice_number),
       line('💰', 'الإجمالي', total),
       line('💳', 'حالة الدفع', paymentStatus),
+      '',
+      invoiceLink ? `الفاتورة:\n${invoiceLink}` : '',
       '',
       brandLine(v, 'ar'),
     )
@@ -356,6 +399,7 @@ const EN: Record<TemplateKey, Renderer> = {
     const tz = isPresent(v.timezone) ? String(v.timezone) : DEFAULT_TIMEZONE
     const date = isPresent(v.start_at) ? formatDate(String(v.start_at), tz, 'en-US') : null
     const time = isPresent(v.start_at) ? formatTime(String(v.start_at), tz, 'en-US') : null
+    const qrUrl = bookingQrUrl(v.booking_qr_token)
     return joinLines(
       '📝 *Booking request received*',
       '',
@@ -372,6 +416,8 @@ const EN: Record<TemplateKey, Renderer> = {
       '',
       "We'll message you again once your booking is confirmed.",
       '',
+      qrUrl ? `Check-in code:\n${qrUrl}` : '',
+      '',
       brandLine(v, 'en'),
     )
   },
@@ -381,6 +427,7 @@ const EN: Record<TemplateKey, Renderer> = {
     const date = isPresent(v.start_at) ? formatDate(String(v.start_at), tz, 'en-US') : null
     const time = isPresent(v.start_at) ? formatTime(String(v.start_at), tz, 'en-US') : null
     const paymentStatus = paymentStatusLabel(v.payment_status, 'en')
+    const qrUrl = bookingQrUrl(v.booking_qr_token)
     return joinLines(
       '✅ *Booking confirmed*',
       '',
@@ -394,6 +441,8 @@ const EN: Record<TemplateKey, Renderer> = {
       line('🕐', 'Time', time),
       line('🔖', 'Booking #', v.booking_ref),
       line('💳', 'Payment status', paymentStatus),
+      '',
+      qrUrl ? `Check-in code:\n${qrUrl}` : '',
       '',
       'See you there ⚽',
       '',
@@ -426,6 +475,7 @@ const EN: Record<TemplateKey, Renderer> = {
     const amount = formatMoney(v.amount, 'ج.م', 'EGP', 'en')
     const paymentStatus = paymentStatusLabel(v.payment_status, 'en')
     const method = paymentMethodLabel(v.method, 'en')
+    const invoiceLink = invoiceUrl(v.invoice_token)
     return joinLines(
       '✅ *Payment received*',
       '',
@@ -436,6 +486,8 @@ const EN: Record<TemplateKey, Renderer> = {
       line('🔖', 'Booking #', v.booking_ref),
       line('🧾', 'Invoice #', v.invoice_number),
       line('💳', 'Payment status', paymentStatus),
+      '',
+      invoiceLink ? `View invoice:\n${invoiceLink}` : '',
       '',
       'Thank you.',
       '',
@@ -462,6 +514,7 @@ const EN: Record<TemplateKey, Renderer> = {
   'invoice-created': (v) => {
     const total = formatMoney(v.total, 'ج.م', 'EGP', 'en')
     const paymentStatus = paymentStatusLabel(v.payment_status, 'en')
+    const invoiceLink = invoiceUrl(v.invoice_token)
     return joinLines(
       '🧾 *Your invoice is ready*',
       '',
@@ -471,6 +524,8 @@ const EN: Record<TemplateKey, Renderer> = {
       line('🧾', 'Invoice #', v.invoice_number),
       line('💰', 'Total', total),
       line('💳', 'Payment status', paymentStatus),
+      '',
+      invoiceLink ? `Invoice:\n${invoiceLink}` : '',
       '',
       brandLine(v, 'en'),
     )
