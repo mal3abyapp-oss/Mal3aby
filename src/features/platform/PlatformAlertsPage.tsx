@@ -5,7 +5,7 @@ import { PageHeader } from '@/components/ui/page-header'
 import { EmptyState } from '@/components/ui/empty-state'
 import { StatusBadge } from '@/components/ui/status-badge'
 import { Card, CardContent } from '@/components/ui/card'
-import { AlertTriangle, Clock, Sparkles } from 'lucide-react'
+import { AlertTriangle, Clock, Sparkles, XCircle } from 'lucide-react'
 
 // Rule-based in-app alerts, computed live from platform_subscriptions --
 // no external notification service (see IMPLEMENTATION_PLAN.md Phase 3c:
@@ -14,17 +14,21 @@ interface AlertItem {
   id: string
   clubId: string
   clubName: string
-  kind: 'expiring_soon' | 'overdue_grace' | 'trial_ending'
-  daysLeft: number
+  kind: 'expiring_soon' | 'overdue_grace' | 'trial_ending' | 'no_subscription'
+  daysLeft: number | null
 }
 
 async function fetchAlerts(): Promise<AlertItem[]> {
-  const { data, error } = await supabase
-    .from('platform_subscriptions')
-    .select('id, club_id, subscription_kind, lifecycle_status, end_at, grace_period_days_snapshot, clubs(name_ar)')
-    .neq('lifecycle_status', 'cancelled')
+  const [{ data, error }, { data: clubs, error: clubsError }] = await Promise.all([
+    supabase
+      .from('platform_subscriptions')
+      .select('id, club_id, subscription_kind, lifecycle_status, end_at, grace_period_days_snapshot, clubs(name_ar)')
+      .neq('lifecycle_status', 'cancelled'),
+    supabase.from('clubs').select('id, name_ar'),
+  ])
 
   if (error) throw error
+  if (clubsError) throw clubsError
 
   const now = new Date()
   const alerts: AlertItem[] = []
@@ -44,6 +48,22 @@ async function fetchAlerts(): Promise<AlertItem[]> {
     }
   }
 
+  // Owner-level review finding (P2): a club with ZERO
+  // platform_subscriptions rows at all (never had a trial/paid
+  // subscription provisioned -- a real onboarding-failure shape, found
+  // live during this review: 1 of 6 real clubs in this dataset has no
+  // subscription row whatsoever) was completely invisible here, since
+  // the loop above only ever iterates rows that already exist. It's
+  // also the same club get_club_platform_access() correctly reports as
+  // 'blocked' -- but until now, blocked-with-no-subscription-at-all had
+  // no rule-based alert surfacing it, only the new Overview KPI card.
+  const clubIdsWithSubscription = new Set((data ?? []).map((row) => row.club_id))
+  for (const club of clubs ?? []) {
+    if (!clubIdsWithSubscription.has(club.id)) {
+      alerts.push({ id: `no-sub-${club.id}`, clubId: club.id, clubName: club.name_ar, kind: 'no_subscription', daysLeft: null })
+    }
+  }
+
   return alerts
 }
 
@@ -51,6 +71,7 @@ const KIND_CONFIG = {
   expiring_soon: { icon: Clock, label: 'اشتراك ينتهي قريبًا', tone: 'warning' as const },
   overdue_grace: { icon: AlertTriangle, label: 'في فترة السماح', tone: 'danger' as const },
   trial_ending: { icon: Sparkles, label: 'تجربة مجانية تنتهي قريبًا', tone: 'info' as const },
+  no_subscription: { icon: XCircle, label: 'لا يوجد اشتراك مسجّل — يحتاج مراجعة', tone: 'danger' as const },
 }
 
 export function PlatformAlertsPage() {
@@ -74,7 +95,10 @@ export function PlatformAlertsPage() {
                       <Link to={`/platform/clubs/${a.clubId}`} className="font-medium hover:underline">
                         {a.clubName}
                       </Link>
-                      <p className="text-sm text-text-secondary">{config.label} — {a.daysLeft} يوم متبقٍ</p>
+                      <p className="text-sm text-text-secondary">
+                        {config.label}
+                        {a.daysLeft !== null ? ` — ${a.daysLeft} يوم متبقٍ` : ''}
+                      </p>
                     </div>
                   </div>
                   <StatusBadge tone={config.tone} label={config.label} />
