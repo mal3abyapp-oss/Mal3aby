@@ -33,7 +33,14 @@ export function StatCard({ label, value, icon: Icon, tone = 'default', className
   const content = (
     <CardContent className="flex items-center justify-between gap-3 p-0">
       <div className="min-w-0 flex-1">
-        <p className="truncate text-sm text-text-secondary">{label}</p>
+        {/* Master IA/UX audit (mobile verification phase): confirmed
+            live at 375px -- `truncate` on longer Arabic labels like
+            "الملاعب المشغولة الآن" left them cut mid-word ("المش...")
+            on the 2-column mobile grid, since the label competes for
+            width with the fixed-size icon slot. Labels now wrap
+            instead of truncating -- legibility over a rigid one-line
+            constraint for a small KPI card. */}
+        <p className="text-sm text-text-secondary">{label}</p>
         {/* Owner-level review finding (P2, RTL): a composite numeric
             value like "0 / 4" has no defined Unicode bidi direction
             of its own -- inside an RTL page it can render with the
