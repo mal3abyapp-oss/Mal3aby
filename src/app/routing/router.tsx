@@ -18,6 +18,7 @@ import { ResetPasswordPage } from '@/features/auth/ResetPasswordPage'
 
 import { OnboardingPage } from '@/features/onboarding/OnboardingPage'
 import { VerifyInvoicePage } from '@/features/verify/VerifyInvoicePage'
+import { BookingQrVerifyPage } from '@/features/verify/BookingQrVerifyPage'
 
 import { TodayPage } from '@/features/dashboard/TodayPage'
 import { MorePage } from '@/features/dashboard/MorePage'
@@ -92,6 +93,16 @@ export const router = createBrowserRouter([
     // PublicLayout marketing chrome), same pattern as /onboarding.
     path: '/verify/:token',
     element: <VerifyInvoicePage />,
+  },
+  {
+    // WhatsApp secure links directive: public booking-QR verification
+    // -- no auth guard, reachable by anyone holding the WhatsApp
+    // check-in link. Standalone, same pattern as /verify/:token.
+    // Distinct route (not /verify/:token) so an invoice token and a
+    // booking-QR token are never accidentally interchangeable at the
+    // routing layer even though both are opaque hex strings.
+    path: '/qr/:token',
+    element: <BookingQrVerifyPage />,
   },
   {
     element: <RequireAuth />,

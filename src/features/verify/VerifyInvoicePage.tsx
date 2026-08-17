@@ -15,17 +15,25 @@ import { CheckCircle2, XCircle } from 'lucide-react'
 // from the marketing site or log in.
 //
 // Deliberately shows ONLY what verify_invoice_public() returns:
-// invoice number, issue date, total, payment status. Never customer
-// name/phone/branch/line items -- the RPC itself never exposes them,
-// so there is no way for this page to accidentally leak more than the
-// paper invoice the customer already holds.
+// invoice number, issue date, total, payment status, and (WhatsApp
+// secure links directive) paid/outstanding/customer_name/booking_ref/
+// field_name -- never phone/email/internal IDs/line items. This link
+// is only ever reached by the customer themselves via their own
+// WhatsApp message (not a random QR-scanner-in-the-wild scenario the
+// way the printed-receipt case is), so showing their own name back to
+// them is correct, not an over-exposure.
 
 interface VerificationResult {
   result: 'success' | 'invalid'
   invoiceNumber: string | null
   issuedAt: string | null
   total: number | null
+  paid: number | null
+  outstanding: number | null
   paymentStatus: PaymentStatus | null
+  customerName: string | null
+  bookingRef: string | null
+  fieldName: string | null
 }
 
 async function verifyInvoice(token: string): Promise<VerificationResult> {
@@ -37,7 +45,12 @@ async function verifyInvoice(token: string): Promise<VerificationResult> {
     invoiceNumber: row?.invoice_number ?? null,
     issuedAt: row?.issued_at ?? null,
     total: row?.total !== null && row?.total !== undefined ? Number(row.total) : null,
+    paid: row?.paid !== null && row?.paid !== undefined ? Number(row.paid) : null,
+    outstanding: row?.outstanding !== null && row?.outstanding !== undefined ? Number(row.outstanding) : null,
     paymentStatus: (row?.payment_status as PaymentStatus) ?? null,
+    customerName: row?.customer_name ?? null,
+    bookingRef: row?.booking_ref ?? null,
+    fieldName: row?.field_name ?? null,
   }
 }
 
@@ -77,6 +90,24 @@ export function VerifyInvoicePage() {
                 <span className="text-text-secondary">رقم الفاتورة</span>
                 <span className="font-medium"><bdi>{data.invoiceNumber}</bdi></span>
               </div>
+              {data.customerName && (
+                <div className="flex justify-between py-1">
+                  <span className="text-text-secondary">العميل</span>
+                  <span className="font-medium">{data.customerName}</span>
+                </div>
+              )}
+              {data.bookingRef && (
+                <div className="flex justify-between py-1">
+                  <span className="text-text-secondary">رقم الحجز</span>
+                  <span className="font-medium"><bdi>{data.bookingRef}</bdi></span>
+                </div>
+              )}
+              {data.fieldName && (
+                <div className="flex justify-between py-1">
+                  <span className="text-text-secondary">الملعب</span>
+                  <span className="font-medium">{data.fieldName}</span>
+                </div>
+              )}
               <div className="flex justify-between py-1">
                 <span className="text-text-secondary">تاريخ الإصدار</span>
                 <span className="font-medium">
@@ -87,6 +118,18 @@ export function VerifyInvoicePage() {
                 <span className="text-text-secondary">الإجمالي</span>
                 <span className="font-medium">{data.total !== null ? formatMoney(data.total) : '—'}</span>
               </div>
+              {data.paid !== null && (
+                <div className="flex justify-between py-1">
+                  <span className="text-text-secondary">المدفوع</span>
+                  <span className="font-medium text-status-success">{formatMoney(data.paid)}</span>
+                </div>
+              )}
+              {data.outstanding !== null && data.outstanding > 0 && (
+                <div className="flex justify-between py-1">
+                  <span className="text-text-secondary">المتبقي</span>
+                  <span className="font-medium text-status-danger">{formatMoney(data.outstanding)}</span>
+                </div>
+              )}
               <div className="flex justify-between py-1">
                 <span className="text-text-secondary">حالة السداد</span>
                 {data.paymentStatus && (
