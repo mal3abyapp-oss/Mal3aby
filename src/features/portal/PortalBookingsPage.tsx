@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom'
 import { supabase } from '@/lib/supabase/client'
 import { StatusBadge } from '@/components/ui/status-badge'
 import { PageHeader } from '@/components/ui/page-header'
+import { MoneyDisplay } from '@/components/ui/money-display'
 import { BOOKING_STATUS_LABELS, BOOKING_STATUS_TONE } from '@/lib/domain/booking'
 import { formatInstant } from '@/lib/domain/time'
 import { fetchInvoicePaymentSummaries, type InvoicePaymentSummary } from '@/lib/domain/billing'
@@ -111,17 +112,29 @@ function BookingCard({ booking, outstanding }: { booking: PortalBooking; outstan
         <div className="flex flex-col gap-0.5">
           <p className="font-medium">{booking.fields?.name ?? '—'}</p>
           <p className="text-xs text-text-secondary">{booking.fields?.branches?.name}</p>
+          {/* RTL sweep finding: formatInstant() returns a plain
+              Intl.DateTimeFormat string with no bidi isolation (unlike
+              formatMoney(), which explicitly adds FSI/PDI marks) -- 3
+              separately-formatted Latin-digit segments concatenated
+              with dash separators could visually reorder relative to
+              each other. bdi-wrapping the whole composite range,
+              same pattern as BookingDetailSheet's time-range display. */}
           <p className="text-xs text-text-secondary tabular-nums">
-            {formatInstant(booking.start_at, tz, { day: 'numeric', month: 'long' })}
-            {' — '}
-            {formatInstant(booking.start_at, tz, { hour: '2-digit', minute: '2-digit' })}
-            {' - '}
-            {formatInstant(booking.end_at, tz, { hour: '2-digit', minute: '2-digit' })}
+            <bdi>
+              {formatInstant(booking.start_at, tz, { day: 'numeric', month: 'long' })}
+              {' — '}
+              {formatInstant(booking.start_at, tz, { hour: '2-digit', minute: '2-digit' })}
+              {' - '}
+              {formatInstant(booking.end_at, tz, { hour: '2-digit', minute: '2-digit' })}
+            </bdi>
           </p>
         </div>
         <div className="flex flex-col items-end gap-1">
           <StatusBadge tone={BOOKING_STATUS_TONE[booking.status] ?? 'neutral'} label={BOOKING_STATUS_LABELS[booking.status] ?? booking.status} />
-          <p className="text-xs font-medium tabular-nums text-text-secondary">{booking.total_price.toFixed(0)} ج.م</p>
+          {/* RTL sweep finding: was the one remaining hand-rolled money
+              display in the codebase, bypassing MoneyDisplay's bidi
+              isolation. */}
+          <MoneyDisplay amount={booking.total_price} size="sm" />
           {/* Master IA/UX audit (Customer Portal phase): "did I pay for
               this?" was previously answerable only via a tab-switch to
               Payments -- this chip answers it right on the card. Only

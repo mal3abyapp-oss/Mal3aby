@@ -98,7 +98,7 @@ export function PlatformOwnersPage() {
         )
       },
     },
-    { key: 'phone', header: 'الهاتف', render: (o) => o.phone ?? '—' },
+    { key: 'phone', header: 'الهاتف', render: (o) => (o.phone ? <bdi>{o.phone}</bdi> : '—') },
     {
       key: 'club',
       header: 'النادي',
@@ -108,7 +108,7 @@ export function PlatformOwnersPage() {
         </Link>
       ),
     },
-    { key: 'code', header: 'الكود', render: (o) => o.club_code },
+    { key: 'code', header: 'الكود', render: (o) => <bdi>{o.club_code}</bdi> },
     {
       key: 'club_status',
       header: 'حالة النادي',

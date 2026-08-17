@@ -68,7 +68,7 @@ export function PlatformClubsPage() {
         </Link>
       ),
     },
-    { key: 'code', header: 'الكود', render: (c) => c.club_code },
+    { key: 'code', header: 'الكود', render: (c) => <bdi>{c.club_code}</bdi> },
     {
       key: 'status',
       header: 'الحالة الإدارية',

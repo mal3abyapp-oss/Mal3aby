@@ -137,7 +137,7 @@ function ClaimPaymentDialog({ invoice, clubId, onClose }: { invoice: InvoiceRow;
   return (
     <Dialog open onOpenChange={(open) => !open && onClose()}>
       <DialogContent>
-        <DialogHeader><DialogTitle>دفع فاتورة {invoice.invoiceNumber}</DialogTitle></DialogHeader>
+        <DialogHeader><DialogTitle>دفع فاتورة <bdi>{invoice.invoiceNumber}</bdi></DialogTitle></DialogHeader>
         {submitted ? (
           <div className="flex flex-col gap-3 text-sm">
             <p className="text-status-success">تم إرسال طلبك بنجاح. سيقوم فريق النادي بمراجعته وتأكيده قريبًا.</p>
@@ -251,7 +251,7 @@ export function PortalPaymentsPage() {
           <Card key={inv.id}>
             <CardContent className="flex flex-col gap-2 p-4">
               <div className="flex items-center justify-between">
-                <p className="font-medium">{inv.invoiceNumber}</p>
+                <p className="font-medium"><bdi>{inv.invoiceNumber}</bdi></p>
                 <StatusBadge tone={PAYMENT_STATUS_TONE[inv.paymentStatus]} label={PAYMENT_STATUS_LABELS[inv.paymentStatus]} />
               </div>
               <div className="flex justify-between text-sm text-text-secondary">

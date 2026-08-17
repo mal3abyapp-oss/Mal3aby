@@ -358,7 +358,7 @@ export function PlatformClubDetailPage() {
   })
 
   const invoiceColumns: DataTableColumn<(typeof invoices)[number]>[] = [
-    { key: 'number', header: 'رقم الفاتورة', render: (i) => i.invoice_number },
+    { key: 'number', header: 'رقم الفاتورة', render: (i) => <bdi>{i.invoice_number}</bdi> },
     { key: 'amount', header: 'المبلغ', render: (i) => <MoneyDisplay amount={Number(i.amount)} size="sm" /> },
     { key: 'due', header: 'الاستحقاق', render: (i) => new Date(i.due_date).toLocaleDateString('ar-EG') },
     {
@@ -407,7 +407,7 @@ export function PlatformClubDetailPage() {
     <div>
       <PageHeader
         title={club?.name_ar ?? '...'}
-        description={club?.club_code}
+        description={club?.club_code ? <bdi>{club.club_code}</bdi> : undefined}
         actions={club && <StatusBadge tone={club.status === 'active' ? 'success' : 'danger'} label={club.status === 'active' ? 'نشط' : 'موقوف'} />}
       />
 
@@ -430,7 +430,7 @@ export function PlatformClubDetailPage() {
             {currentSub && (
               <>
                 <p>النوع: {SUBSCRIPTION_KIND_LABELS[currentSub.subscription_kind] ?? currentSub.subscription_kind}</p>
-                <p>ينتهي: {new Date(currentSub.end_at).toLocaleDateString('ar-EG')}</p>
+                <p>ينتهي: <bdi>{new Date(currentSub.end_at).toLocaleDateString('ar-EG')}</bdi></p>
               </>
             )}
           </CardContent>
