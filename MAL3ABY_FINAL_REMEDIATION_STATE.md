@@ -2,7 +2,7 @@
 
 Live state tracker for the **MAL3ABY FINAL AUTONOMOUS REMEDIATION & LAUNCH READINESS** directive. Updated continuously as work progresses — not a final report, a working log.
 
-**Current phase:** Security P0 ✅ closed → Finance P0 ✅ closed → Booking Integrity ✅ verified sound → WhatsApp C4 ✅ closed → Backup/Deployment runbooks ✅ written (external blockers documented) → **now running Phase 2 parallel work: Observability, Auth flow verification, E2E core scenarios (background workflow `wf_616f1628-534`)**.
+**Current phase:** ALL closeable work complete. Security P0 ✅ → Security HIGH ✅ → Finance P0 ✅ → Booking Integrity ✅ (verified sound) → WhatsApp C4 ✅ → Backup/Deployment runbooks ✅ (C5/C6 external blockers fully documented) → Observability ✅ → Auth flows ✅ (verified, one gap confirmed genuinely external) → E2E core scenarios ✅ (all PASS) → Performance indexing ✅ → Final security advisor cleanup ✅ → **Final gates run, all green. Writing final report.**
 
 ---
 
@@ -56,6 +56,14 @@ Orchestrator (this session) will review every finding before applying any furthe
 - Re-score `MAL3ABY_PRODUCTION_READINESS.md` based on everything closed in this pass — do NOT keep the old 52/100.
 - Final single-message report per the directive's required format (not sent yet — waiting for the phase-2 workflow + remaining items above).
 
+## Completed (continued)
+
+- **Phase 2 workflow (`wf_616f1628-534`)**: 3 parallel agents completed — observability (ErrorBoundary added, `pg_cron` confirmed unavailable, platform WhatsApp health screen scoped as Phase B), auth flows (all 5 gate items PASS with real confirmed accounts, email-confirmation gap re-confirmed as genuinely external), E2E core scenarios (all 4 PASS: cancellation, QR lifecycle, finance, tenant-crossing denial).
+- **Methodology correction**: found and fixed a real testing-technique mistake while writing the SQL regression suite — `set_config('role', ...)` alone doesn't exercise RLS when connected as the `postgres` superuser (which owns every table). Correct technique is `SET ROLE authenticated` + `set_config('request.jwt.claims', ...)`. Re-verified C1/C2 with the correct technique — both hold (triggers, not RLS-dependent). Documented this in `supabase/tests/security_finance_regression.sql`.
+- **Performance**: indexed `whatsapp_connection_events(club_id, created_at desc)` and 3 unindexed FK columns.
+- **Final security advisor sweep**: 0 ERROR, 90 WARN (down from 93 total findings) — dropped an orphaned debug function, pinned `search_path` on `get_invoice_payment_summary()`.
+- **Re-scored `MAL3ABY_PRODUCTION_READINESS.md`**: Overall 78/100, Production Readiness 76/100, Technical Quality 82/100 (Commercial Readiness unchanged at 45/100, out of this pass's scope). Decision: CONDITIONAL GO, with only 2 remaining blockers (C5 deployment, C6 backup), both genuinely external.
+
 ## Exact Next Action
 
-Await `wf_616f1628-534` completion (background), triage its 3 result sets, apply any additional safe fixes it surfaces, then move to the Testing gate (add regression tests for the 3 P0 fixes made so far) before the final gate sweep.
+**COMPLETE for the in-scope remediation work.** All security/finance/booking/WhatsApp/observability/performance items closeable without external credentials, domains, or payment decisions have been closed and verified live. Remaining work (C5, C6, email provider) requires the user's own external decisions — documented in full in the two runbooks. Final report delivered in this turn's closing message.
