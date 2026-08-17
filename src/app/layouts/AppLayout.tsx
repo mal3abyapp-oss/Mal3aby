@@ -23,6 +23,8 @@ import {
   MoreHorizontal,
   LogOut,
   MessageCircle,
+  Building2,
+  ShieldCheck,
 } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 
@@ -94,6 +96,14 @@ const navSections: NavSection[] = [
       // instruction.
       { to: '/app/whatsapp', labelKey: 'nav.whatsapp', icon: MessageCircle, domain: 'whatsapp' },
       { to: '/app/staff', labelKey: 'nav.staff', icon: UserCog, domain: 'staff' },
+      // Master IA/UX audit (permission-model drift-risk phase): /app/fields
+      // and /app/audit-log both already had real routes and a MorePage
+      // (mobile "More") entry, but were entirely absent from this desktop
+      // sidebar -- reachable on mobile, invisible on desktop for the exact
+      // same role. Added here with MorePage's own domain gating ('settings')
+      // so desktop and mobile now agree on who sees them.
+      { to: '/app/fields', labelKey: 'nav.fields', icon: Building2, domain: 'settings' },
+      { to: '/app/audit-log', labelKey: 'nav.auditLog', icon: ShieldCheck, domain: 'settings' },
       { to: '/app/settings', labelKey: 'nav.settings', icon: Settings, domain: 'settings' },
     ],
   },
