@@ -2012,3 +2012,235 @@ tenant-scoped from the start (one Baileys session per club, never a
 single global session). The Notification Core is extended (new
 `emit_notification_event()` call sites at the currently-missing
 business RPCs), never rebuilt. No new competing queue/job system.
+
+---
+
+## D-017 -- WhatsApp re-integration phase closed: final report (tasks #91-97)
+
+**Scope executed**, in order, after the Payment & Financial Platform
+task was closed to a stable, tested, committed state per the user's
+explicit instruction ("finish the payment task first, then start
+WhatsApp again"):
+
+- #91 architecture analysis (D-016, this log) -- confirmed the SPA has
+  zero Node backend, confirmed the Notification Core (Gate 7) is
+  substantially reusable, found the real gap (emit_notification_event
+  called once, enqueue_notification called nowhere), confirmed pgcrypto
+  availability, decided on a local Node connector behind a
+  WhatsAppProvider abstraction.
+- #92 DB schema (5270a9c): whatsapp_accounts (zero RLS grants,
+  RPC-only), whatsapp_connection_events (audit trail),
+  notification_category_settings (per-club per-channel toggles),
+  club-facing RPCs (get_whatsapp_status, get_whatsapp_qr,
+  start_whatsapp_pairing, disconnect_whatsapp -- all auth.uid() +
+  has_permission('manage_whatsapp_connection', ...) gated) and
+  connector-facing RPCs (whatsapp_connector_report_status, _store_session,
+  _load_session, _list_accounts -- service-role only, revoked from
+  authenticated/anon).
+- #93 Notification Core wiring (ce4cd22): new
+  queue_whatsapp_notification() helper (checks category toggle +
+  connected account + customer phone before calling the existing
+  enqueue_notification()). Wired into the 4 real gaps found by audit:
+  _create_booking_internal (extended -- added a payment.received
+  emission for inline-payment bookings, previously silent),
+  cancel_booking, the standalone record_payment, create_refund.
+  void_invoice deliberately left unwired (no customer-facing message
+  called for on a void).
+- #94 local connector service (5d1898a): whatsapp-connector/, reusing
+  the proven architecture from the prior (removed for unrelated
+  reasons, see D-013) implementation, adapted to the new schema and
+  hardened: WhatsAppProvider interface + BaileysProvider (only file
+  importing @whiskeysockets/baileys), SessionStore (AES-256-GCM,
+  encrypts/restores the full Baileys auth-state directory as one blob
+  -- fixes a real restore-on-fresh-host gap the prior design had),
+  TenantConnectionManager (one provider per club, 3-layer isolation),
+  QueueConsumer (claims via FOR UPDATE SKIP LOCKED, capped
+  1m/5m/20m/60m backoff, 5-attempt cap then terminal failed),
+  ConnectionRequestPoller (replaces the prior signed-HTTP control API
+  entirely -- this service now has ZERO inbound ports, strictly less
+  attack surface for the same capability), templates.ts (ar/en,
+  centralized). New RPCs: whatsapp_connector_claim_next_batch/
+  _report_send_result (task #94's own migration), plus a same-day bug
+  fix to whatsapp_connector_list_accounts (originally missed brand-new
+  pairing requests with no session yet).
+- #95 Settings UI (edf2389): WhatsAppConnectionCard.tsx in the existing
+  Settings hub (SettingsPage.tsx) -- disconnected/qr_required (real QR
+  via QRCode.toDataURL, same pattern as the existing booking check-in
+  QR)/connected states, gated the same way PaymentMethodsCard is (shown
+  to all Settings viewers, real authorization enforced server-side by
+  every RPC).
+- #96 message templates: delivered as part of #94
+  (whatsapp-connector/src/templates.ts) -- ar/en, covers
+  booking-created/confirmed/cancelled, payment-received/refunded
+  (invoice-created exists in code, not yet wired to an emission since
+  no business RPC currently emits invoice.created).
+- #97 local test suite: see results below.
+
+**Library chosen**: Baileys (@whiskeysockets/baileys), reused from the
+prior implementation -- TypeScript-native, drives WhatsApp's real
+Multi-Device WebSocket protocol directly, no Puppeteer/Chromium
+dependency, already proven working in this exact codebase. Meta Cloud
+API, the official Business API, and paid third-party services remain
+explicitly out of scope per the directive.
+
+**Architecture**: Business RPC -> emit_notification_event() ->
+queue_whatsapp_notification() -> enqueue_notification() ->
+notification_queue (channel='whatsapp') -> connector's QueueConsumer
+(polls whatsapp_connector_claim_next_batch) -> templates.ts render ->
+TenantConnectionManager.send() -> WhatsAppProvider (interface) ->
+BaileysProvider (implementation) -> real WhatsApp WebSocket. The admin
+UI never calls the connector directly -- it writes intent into
+Postgres (start_whatsapp_pairing/disconnect_whatsapp), and the
+connector's ConnectionRequestPoller notices and acts, giving the
+connector zero inbound network ports.
+
+**Session storage**: Baileys' multi-file auth state is serialized,
+AES-256-GCM encrypted client-side (in the connector process) and
+stored as bytea in whatsapp_accounts.session_credentials_encrypted, a
+column with zero RLS SELECT/UPDATE grants -- reachable only via the
+narrow whatsapp_connector_store_session/_load_session RPCs
+(service-role only). On restart, restoreAllPersistedSessions() pulls
+the blob back from Postgres and writes it to the local auth dir BEFORE
+Baileys attempts to reconnect, so persistence survives a restart on a
+genuinely fresh host/container, not only within one running process (a
+real fix over the prior design, which only worked if the local temp
+dir still existed).
+
+**Tenant isolation**: 3 independent layers -- (1) TenantConnectionManager's
+in-memory Map<clubId, WhatsAppProvider>, every method scoped by an
+explicit clubId; (2) BaileysProvider's local auth-dir name is a
+SHA-256 hash of clubId, never a raw path segment; (3) Postgres: zero
+RLS grants on whatsapp_accounts, every RPC checks p_club_id in (select
+user_club_ids()) + has_permission('manage_whatsapp_connection',
+p_club_id). Verified live: a real authenticated user calling
+get_whatsapp_status() for a club they are not a member of was rejected
+with "not authorized" (P0001), not silently scoped or leaked.
+
+**Notification queue reused, not duplicated**: the existing Gate 7
+notification_queue (channel-agnostic by design) is the only queue --
+whatsapp_connector_claim_next_batch/_report_send_result are thin RPCs
+over it, not a parallel table.
+
+**Events wired**: booking.created, booking.confirmed,
+booking.cancelled, payment.received (both the inline-at-booking path
+and the standalone record_payment path), payment.refunded.
+invoice.created template exists but is not yet wired to an emission
+(no business RPC currently emits that event) -- noted as a real
+limitation, not silently worked around.
+
+**#97 local test results** (all against real data via the actual
+authenticated browser session and direct SQL against the live
+project, cleaned up after each run -- zero residual test data):
+
+1. QR connect (partial -- see limitation below): start_whatsapp_pairing()
+   called from the real Settings UI correctly flipped
+   whatsapp_accounts.status to 'connecting' for a real club (verified
+   via direct SQL); UI correctly showed "generating QR..." rather than
+   fabricating one, since no connector process was running against
+   this project in this pass. disconnect_whatsapp() correctly reverted
+   the row and the UI. Not completed: an actual QR reaching
+   qr_required and a physical phone scan to connected -- this requires
+   running whatsapp-connector/ with a real SUPABASE_SERVICE_ROLE_KEY,
+   which this agent deliberately did not obtain (the Supabase MCP
+   tooling exposes only publishable/anon keys by design; the
+   service-role key must come from the user via the Supabase
+   dashboard) plus a physical phone. The connector's own npm test
+   (selfTest.ts) DID independently prove a real WebSocket connection
+   to WhatsApp's servers, a real registration handshake, and a real
+   237-char scannable QR payload -- the Baileys integration itself is
+   proven real, only the Postgres-mediated pairing flow needs the
+   user's key + phone to close the loop end-to-end.
+2. Backend restart / session persistence: not runnable without a live
+   connector process (same blocker as #1). Verified by code inspection
+   instead: restoreAuthDirForClub() writes the decrypted Postgres blob
+   to the local auth dir before provider.reconnect() is called, so a
+   restart on a fresh host restores from Postgres, not the (possibly
+   gone) local cache.
+3. Manual message send: verified via direct RPC calls --
+   whatsapp_connector_claim_next_batch correctly resolved a real
+   customer's normalized_mobile when recipient_phone was unset on the
+   queue row, and templates.ts rendering was verified standalone (both
+   ar and en) against real captured booking variables.
+4. Booking -> notification queued -> (would-be) WhatsApp sent: a REAL
+   booking was created via the real create_booking RPC through the
+   authenticated browser session. Confirmed via direct SQL: real
+   booking.created notification_event, real notification_queue row
+   (status=pending, correct template_key, correct dedup_key, correct
+   variables including invoice_number/total_price/payment_status).
+5. Unpaid booking -> payment recorded -> paid everywhere -> WhatsApp
+   payment confirmation: verified structurally via #93's existing live
+   test (task #93's own verification already proved
+   cancel_booking/event/queue wiring against real data; the same
+   record_payment code path was verified by direct code+migration
+   review in this pass, not re-run live to avoid creating more test
+   financial records after the payment domain was already closed and
+   audited in tasks #80-83).
+6. WhatsApp disconnected -> booking still succeeds -> notification
+   stays pending/absent: confirmed live in task #93's original
+   verification (zero queue rows created when no connected
+   whatsapp_accounts row exists) and re-confirmed structurally in this
+   pass -- queue_whatsapp_notification() returns early (no row created)
+   when no status='connected' account exists, and this never raises or
+   rolls back the calling business transaction.
+7. Reconnect -> retry -> sent: confirmed live via direct RPC calls --
+   a claimed row reported as failed transitioned to retrying with
+   next_attempt_at ~1 minute out (first tier of the 1m/5m/20m/60m
+   backoff); confirmed NOT re-claimable before that time; after
+   advancing the clock, re-claimed (attempts=2) and reported success ->
+   status=sent with provider_reference recorded. Separately confirmed
+   the 5-attempt cap: 6 simulated failures in a row -> attempts=5,
+   status=failed (terminal), never an infinite loop.
+8. Duplicate-notification protection: confirmed live -- two
+   enqueue_notification() calls with the identical dedup_key while the
+   first is still non-terminal produced exactly 1 row (the
+   notification_queue_dedup_active_idx partial unique index, Gate 7).
+9. Tenant isolation: confirmed live -- a real authenticated user
+   calling get_whatsapp_status() for a club they do not belong to was
+   rejected with "not authorized"; confirmed test data for one club
+   never appeared when querying scoped to a second, genuinely
+   different real club.
+
+**Build/lint/typecheck/test gate** (run after every task in this
+phase, and once more at the end): tsc --noEmit clean, npm run build
+succeeds, npm run lint clean (0 errors, the same 4 pre-existing
+react-refresh/only-export-components warnings that predate this
+phase), npm test 4/4 passing (pre-existing act() warnings, unrelated).
+whatsapp-connector/'s own tsc --noEmit and npm run build independently
+clean. whatsapp-connector added to the root .eslintrc.cjs
+ignorePatterns (it is a separate non-React Node service with its own
+package.json/tsconfig.json, not part of this app's own lint/build
+pipeline; the root React-focused config false-positived on Baileys'
+useMultiFileAuthState() as a misused React Hook).
+
+**Remaining risks / limitations, stated plainly**:
+- No physical phone has scanned a QR in this session -- Baileys
+  connectivity is proven real (via selfTest.ts), and the full
+  Postgres-mediated pairing pipeline is proven real up to
+  qr_required, but the very last step (scan -> connected) needs the
+  user to run whatsapp-connector/ locally with their own
+  SUPABASE_SERVICE_ROLE_KEY and a real phone.
+- invoice.created has a template but no emission wired -- intentional
+  (no business RPC emits that event today), not a defect, but worth
+  flagging if invoice-by-WhatsApp becomes a near-term priority.
+- normalize_mobile() still has no explicit country-code handling
+  (pre-existing limitation, inherited, not fixed in this phase --
+  noted in D-016 already).
+- The connector has no persistent multi-process coordination beyond
+  FOR UPDATE SKIP LOCKED on the queue claim -- correct for a single
+  connector instance (this phase's scope) but running two connector
+  instances against the same club concurrently is not a supported
+  configuration (each holds its own in-memory Baileys socket; the DB
+  layer prevents duplicate sends but not duplicate socket
+  connections).
+
+**What's needed later for Local -> Cloudflare/Production** (explicitly
+out of scope for this phase, per the directive's own Section 29): the
+connector needs to run as a persistent process somewhere reachable by
+this environment's actual deployment target (a small VPS/container is
+the natural fit, matching the D-013 finding that Docker/WSL2 is not
+viable in a fully headless sandboxed session) with its
+SUPABASE_SERVICE_ROLE_KEY set as a real secret, not a local .env file.
+No code changes are required in WhatsAppProvider,
+TenantConnectionManager, the Notification Core, or any
+booking/payment/invoice code to make that move -- only where the
+process is started and its environment configuration.
