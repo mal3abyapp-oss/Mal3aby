@@ -40,14 +40,27 @@ export function PortalQrPage() {
   // directly on this booking's QR instead of an empty selector the
   // customer has to search through again.
   const [searchParams] = useSearchParams()
+  // Master IA/UX audit (Customer Portal phase): confirmed a real gap --
+  // when ?bookingId= doesn't resolve (the booking already happened, was
+  // cancelled since the link was shared, or the id is simply wrong),
+  // this silently fell through to the plain empty selector with zero
+  // explanation, leaving the customer to wonder why their link "didn't
+  // work". Only shown once bookings have actually loaded, so it can't
+  // fire during the normal brief loading window before the real match
+  // succeeds.
+  const [preselectNotFound, setPreselectNotFound] = useState(false)
 
   useEffect(() => {
+    if (isLoading) return
     const bookingId = searchParams.get('bookingId')
-    if (bookingId && bookings.some((b) => b.id === bookingId)) {
+    if (!bookingId) return
+    if (bookings.some((b) => b.id === bookingId)) {
       void handleSelect(bookingId)
+    } else {
+      setPreselectNotFound(true)
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [bookings, searchParams])
+  }, [bookings, isLoading, searchParams])
 
   async function handleSelect(id: string) {
     setSelectedId(id)
@@ -69,6 +82,12 @@ export function PortalQrPage() {
       <PageHeader title="رمزي" description="رمز QR لتسجيل الحضور عند الوصول" />
 
       {isLoading && <p className="text-sm text-text-secondary">جارٍ التحميل...</p>}
+
+      {!isLoading && preselectNotFound && (
+        <p role="alert" className="rounded-lg border border-status-warning/30 bg-status-warning/5 p-3 text-sm text-status-warning">
+          لم يتم العثور على الحجز المطلوب — قد يكون قد انتهى أو أُلغي. اختر حجزًا من القائمة أدناه.
+        </p>
+      )}
 
       {!isLoading && bookings.length === 0 && (
         <p className="rounded-lg border border-dashed border-border p-6 text-center text-sm text-text-secondary">

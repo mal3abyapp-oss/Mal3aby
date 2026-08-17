@@ -5,6 +5,7 @@ import { StatusBadge } from '@/components/ui/status-badge'
 import { PageHeader } from '@/components/ui/page-header'
 import { BOOKING_STATUS_LABELS, BOOKING_STATUS_TONE } from '@/lib/domain/booking'
 import { formatInstant } from '@/lib/domain/time'
+import { fetchInvoicePaymentSummaries, type InvoicePaymentSummary } from '@/lib/domain/billing'
 import { QrCode, Receipt } from 'lucide-react'
 
 // Gate 3 — first real screen of the Unified User Dashboard: My
@@ -32,8 +33,27 @@ async function fetchMyBookings(): Promise<PortalBooking[]> {
   return (data ?? []) as unknown as PortalBooking[]
 }
 
+// Master IA/UX audit (Customer Portal phase): confirmed the real gap --
+// booking cards showed only total_price, not payment/outstanding status,
+// so "did I pay for this?" (the single most common question a customer
+// has about a booking) required a tab-switch to Payments and manual
+// invoice matching. get_invoice_payment_summary() is security invoker
+// (inherits the caller's own RLS on invoices) and is already safely
+// called from PortalPaymentsPage -- same call, no new privilege surface.
+async function fetchOutstandingByInvoice(invoiceIds: string[]): Promise<Map<string, InvoicePaymentSummary>> {
+  if (invoiceIds.length === 0) return new Map()
+  return fetchInvoicePaymentSummaries(invoiceIds)
+}
+
 export function PortalBookingsPage() {
   const { data: bookings = [], isLoading } = useQuery({ queryKey: ['portal', 'my-bookings'], queryFn: fetchMyBookings })
+
+  const invoiceIds = bookings.map((b) => b.invoice_id).filter((id): id is string => !!id)
+  const { data: summaries } = useQuery({
+    queryKey: ['portal', 'my-bookings-outstanding', invoiceIds],
+    queryFn: () => fetchOutstandingByInvoice(invoiceIds),
+    enabled: invoiceIds.length > 0,
+  })
 
   const now = Date.now()
   const upcoming = bookings.filter((b) => new Date(b.start_at).getTime() >= now && b.status !== 'cancelled')
@@ -55,7 +75,7 @@ export function PortalBookingsPage() {
         <div className="flex flex-col gap-2">
           <h2 className="text-sm font-semibold text-text-secondary">القادمة</h2>
           {upcoming.map((b) => (
-            <BookingCard key={b.id} booking={b} />
+            <BookingCard key={b.id} booking={b} outstanding={b.invoice_id ? summaries?.get(b.invoice_id) : undefined} />
           ))}
         </div>
       )}
@@ -64,7 +84,7 @@ export function PortalBookingsPage() {
         <div className="flex flex-col gap-2">
           <h2 className="text-sm font-semibold text-text-secondary">السابقة</h2>
           {past.map((b) => (
-            <BookingCard key={b.id} booking={b} />
+            <BookingCard key={b.id} booking={b} outstanding={b.invoice_id ? summaries?.get(b.invoice_id) : undefined} />
           ))}
         </div>
       )}
@@ -82,7 +102,7 @@ export function PortalBookingsPage() {
 // concrete destination.
 const CAN_SHOW_QR_STATUSES = new Set(['confirmed', 'pending_payment'])
 
-function BookingCard({ booking }: { booking: PortalBooking }) {
+function BookingCard({ booking, outstanding }: { booking: PortalBooking; outstanding?: InvoicePaymentSummary }) {
   const tz = booking.clubs?.timezone ?? 'UTC'
   const showQrLink = CAN_SHOW_QR_STATUSES.has(booking.status) && new Date(booking.start_at).getTime() >= Date.now()
   return (
@@ -102,6 +122,15 @@ function BookingCard({ booking }: { booking: PortalBooking }) {
         <div className="flex flex-col items-end gap-1">
           <StatusBadge tone={BOOKING_STATUS_TONE[booking.status] ?? 'neutral'} label={BOOKING_STATUS_LABELS[booking.status] ?? booking.status} />
           <p className="text-xs font-medium tabular-nums text-text-secondary">{booking.total_price.toFixed(0)} ج.م</p>
+          {/* Master IA/UX audit (Customer Portal phase): "did I pay for
+              this?" was previously answerable only via a tab-switch to
+              Payments -- this chip answers it right on the card. Only
+              shown for a real, positive outstanding balance; a fully
+              paid booking shows no extra chip (booking status already
+              reads "مؤكد"/confirmed, no need to also say "paid"). */}
+          {outstanding && outstanding.outstanding > 0.01 && (
+            <StatusBadge tone="danger" label={`متبقي ${outstanding.outstanding.toFixed(0)} ج.م`} />
+          )}
         </div>
       </div>
       {(showQrLink || booking.invoice_id) && (

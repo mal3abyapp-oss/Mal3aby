@@ -201,10 +201,19 @@ export function PortalPaymentsPage() {
   // customer lands on the full list and has to find the same invoice
   // again by eye, defeating the point of a direct link.
   const [searchParams] = useSearchParams()
+  // Master IA/UX audit (Customer Portal phase): confirmed a real gap --
+  // an ?invoiceId= that doesn't match any of this customer's own
+  // invoices (wrong id, or genuinely someone else's) silently fell
+  // through with zero feedback. A match with zero outstanding is NOT
+  // an error case (the invoice is just already paid -- the claim
+  // dialog correctly has nothing to do), so only the not-found case
+  // gets a message.
+  const [invoiceNotFound, setInvoiceNotFound] = useState(false)
 
   const { data: invoices = [], isLoading } = useQuery({ queryKey: ['portal', 'my-invoices'], queryFn: fetchMyInvoices })
 
   useEffect(() => {
+    if (isLoading) return
     const invoiceId = searchParams.get('invoiceId')
     if (!invoiceId || claimingInvoice) return
     const target = invoices.find((i) => i.id === invoiceId)
@@ -213,15 +222,23 @@ export function PortalPaymentsPage() {
         setClaimClubId(data?.club_id ?? null)
         setClaimingInvoice(target)
       })
+    } else if (!target) {
+      setInvoiceNotFound(true)
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [invoices, searchParams])
+  }, [invoices, isLoading, searchParams])
 
   return (
     <div className="flex flex-col gap-4">
       <PageHeader title="مدفوعاتي" description="فواتيرك وحالة السداد وطرق الدفع" />
 
       {isLoading && <p className="text-sm text-text-secondary">جارٍ التحميل...</p>}
+
+      {!isLoading && invoiceNotFound && (
+        <p role="alert" className="rounded-lg border border-status-warning/30 bg-status-warning/5 p-3 text-sm text-status-warning">
+          لم يتم العثور على الفاتورة المطلوبة. تصفح فواتيرك أدناه.
+        </p>
+      )}
 
       {!isLoading && invoices.length === 0 && (
         <p className="rounded-lg border border-dashed border-border p-6 text-center text-sm text-text-secondary">
