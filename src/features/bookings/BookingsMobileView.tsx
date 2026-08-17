@@ -98,13 +98,15 @@ export function BookingsMobileView({
       {/* Date nav */}
       <div className="flex items-center gap-2">
         {/* Master IA/UX audit (RTL phase): matches BookingsPage.tsx's fix
-            -- single icon + rtl:rotate-180 instead of two hardcoded
-            icons only correct for RTL. */}
-        <Button variant="outline" size="icon" aria-label="اليوم السابق" onClick={() => shiftDate(-1)}><ChevronRight className="size-4 rtl:rotate-180" /></Button>
+            -- base icon is the LTR-correct direction (back=left,
+            forward=right), rtl:rotate-180 flips for RTL. Verified live
+            in both directions after an earlier version had this
+            backwards. */}
+        <Button variant="outline" size="icon" aria-label="اليوم السابق" onClick={() => shiftDate(-1)}><ChevronLeft className="size-4 rtl:rotate-180" /></Button>
         <Button variant="outline" size="sm" className="flex-1" onClick={() => onDateChange(new Date().toISOString().slice(0, 10))}>
           {isToday ? 'اليوم' : new Date(`${date}T12:00:00`).toLocaleDateString('ar-EG', { weekday: 'long', day: 'numeric', month: 'long' })}
         </Button>
-        <Button variant="outline" size="icon" aria-label="اليوم التالي" onClick={() => shiftDate(1)}><ChevronLeft className="size-4 rtl:rotate-180" /></Button>
+        <Button variant="outline" size="icon" aria-label="اليوم التالي" onClick={() => shiftDate(1)}><ChevronRight className="size-4 rtl:rotate-180" /></Button>
       </div>
 
       {/* Field chips */}

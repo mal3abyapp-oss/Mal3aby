@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { BrowserQRCodeReader, type IScannerControls } from '@zxing/browser'
 import { supabase } from '@/lib/supabase/client'
 import { Button } from '@/components/ui/button'
-import { ArrowRight, CheckCircle2, XCircle, Clock, ShieldAlert } from 'lucide-react'
+import { ArrowLeft, CheckCircle2, XCircle, Clock, ShieldAlert } from 'lucide-react'
 
 // /scan -- camera-based QR scanner. Two explicit steps, never one (ADR-011e):
 // scanning only validates + displays; a separate "Confirm Check-in" tap
@@ -161,10 +161,12 @@ export function ScanPage() {
   return (
     <div className="flex min-h-screen flex-col bg-dark-base text-white">
       <header className="flex items-center gap-3 p-4">
-        {/* Master IA/UX audit (RTL phase): back arrow now flips with
-            direction instead of assuming RTL (right = back). */}
+        {/* Master IA/UX audit (RTL phase): base icon is the LTR-correct
+            "back" direction (left), rtl:rotate-180 flips it for RTL.
+            Verified live in both directions after an earlier version
+            had this backwards. */}
         <button onClick={() => navigate(-1)} aria-label="رجوع">
-          <ArrowRight className="size-5 rtl:rotate-180" />
+          <ArrowLeft className="size-5 rtl:rotate-180" />
         </button>
         <h1 className="text-lg font-bold">مسح QR</h1>
       </header>

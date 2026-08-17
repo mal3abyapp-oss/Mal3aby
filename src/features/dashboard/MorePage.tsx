@@ -1,7 +1,7 @@
 import { Link } from 'react-router-dom'
 import { PageHeader } from '@/components/ui/page-header'
 import { Card, CardContent } from '@/components/ui/card'
-import { Users, Receipt, Wallet, BarChart3, UserCog, Settings, ChevronLeft, CircleDollarSign, Building2, ShieldCheck, MessageCircle } from 'lucide-react'
+import { Users, Receipt, Wallet, BarChart3, UserCog, Settings, ChevronRight, CircleDollarSign, Building2, ShieldCheck, MessageCircle } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 import { useAuth } from '@/app/providers/AuthProvider'
 import { canSeeNavDomain, type NavDomain } from '@/lib/domain/navigation'
@@ -79,9 +79,13 @@ export function MorePage() {
                   <p className="font-medium">{item.label}</p>
                   <p className="truncate text-sm text-text-secondary">{item.description}</p>
                 </div>
-                {/* Master IA/UX audit (RTL phase): disclosure chevron
-                    now flips with direction instead of assuming RTL. */}
-                <ChevronLeft className="size-4 shrink-0 text-text-secondary rtl:rotate-180" />
+                {/* Master IA/UX audit (RTL phase): base icon is the
+                    LTR-correct "forward" direction (right), rtl:
+                    rotate-180 flips it for RTL. Verified live in both
+                    directions after an earlier version had this
+                    backwards (base icon must already be LTR-correct
+                    for rtl:rotate-180 to work). */}
+                <ChevronRight className="size-4 shrink-0 text-text-secondary rtl:rotate-180" />
               </CardContent>
             </Card>
           </Link>

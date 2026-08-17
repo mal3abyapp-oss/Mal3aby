@@ -308,13 +308,17 @@ export function BookingsPage() {
                 </SelectContent>
               </Select>
             )}
-            {/* Master IA/UX audit (RTL phase): a single icon + rtl:rotate-180
-                (matching dropdown-menu.tsx's existing pattern) reads
-                correctly in both directions, instead of two hardcoded
-                icons that were only correct while the app stayed RTL. */}
-            <Button variant="outline" size="icon" aria-label="اليوم السابق" onClick={() => shiftDate(-1)}><ChevronRight className="size-4 rtl:rotate-180" /></Button>
+            {/* Master IA/UX audit (RTL phase): base icon must be the
+                LTR-correct direction (back = left, forward = right,
+                the universal web convention), with rtl:rotate-180
+                flipping it for RTL -- matching dropdown-menu.tsx's
+                existing pattern. Verified live in the browser in both
+                directions after an earlier version of this fix had the
+                base/rotated icons swapped (rtl:rotate-180 only helps if
+                the UNROTATED state is already correct for LTR). */}
+            <Button variant="outline" size="icon" aria-label="اليوم السابق" onClick={() => shiftDate(-1)}><ChevronLeft className="size-4 rtl:rotate-180" /></Button>
             <Button variant="outline" size="sm" onClick={() => setDate(new Date().toISOString().slice(0, 10))}>اليوم</Button>
-            <Button variant="outline" size="icon" aria-label="اليوم التالي" onClick={() => shiftDate(1)}><ChevronLeft className="size-4 rtl:rotate-180" /></Button>
+            <Button variant="outline" size="icon" aria-label="اليوم التالي" onClick={() => shiftDate(1)}><ChevronRight className="size-4 rtl:rotate-180" /></Button>
             <input
               type="date"
               value={date}
