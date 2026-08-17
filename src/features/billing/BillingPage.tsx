@@ -308,17 +308,45 @@ export function BillingPage() {
     onError: (error) => setFormError(error instanceof Error && !('code' in error) ? error.message : translateSupabaseError(error, 'تعذّر تسجيل الدفعة.')),
   })
 
+  // task #85: create_refund() succeeds server-side but the UI never
+  // offered any printable proof of a refund happening -- a customer
+  // asking "where's my refund receipt" had nothing to hand them. Capture
+  // enough of the just-completed refund (amount/reason/method/invoice
+  // number, all already in scope at the moment of success) to render a
+  // receipt using the exact same #invoice-print A4/80mm print CSS
+  // already built for invoices (Phase 7) -- reused, not a second print
+  // stylesheet.
+  interface RefundReceiptData {
+    refundAmount: number
+    reason: string
+    method: string
+    invoiceNumber: string
+    customerName: string
+    refundedAt: string
+  }
+  const [refundReceipt, setRefundReceipt] = useState<RefundReceiptData | null>(null)
+
   const refundMutation = useMutation({
     mutationFn: async () => {
       if (!refundPaymentId) throw new Error('no payment selected')
+      const paymentBeingRefunded = payments.find((p) => p.id === refundPaymentId)
       const { error } = await supabase.rpc('create_refund', {
         p_payment_id: refundPaymentId,
         p_amount: Number(refundAmount),
         p_reason: refundReason,
       })
       if (error) throw error
+      return paymentBeingRefunded
     },
-    onSuccess: () => {
+    onSuccess: (paymentBeingRefunded) => {
+      setRefundReceipt({
+        refundAmount: Number(refundAmount),
+        reason: refundReason,
+        method: paymentBeingRefunded?.method ?? '—',
+        invoiceNumber: detail?.invoice_number ?? '—',
+        customerName: (detail?.customers as unknown as { full_name: string })?.full_name ?? '—',
+        refundedAt: new Date().toISOString(),
+      })
       setRefundPaymentId(null)
       setRefundAmount('')
       setRefundReason('')
@@ -443,7 +471,10 @@ export function BillingPage() {
           </DialogHeader>
           {detail && (
             <div className="flex flex-col gap-4">
-              <div id="invoice-print" data-print-size={printSize} className="rounded-md border border-border p-4 text-sm print:border-0">
+              <div
+                data-print-size={printSize}
+                className={`print-target rounded-md border border-border p-4 text-sm print:border-0 ${refundReceipt ? '' : 'visible-for-print'}`}
+              >
                 <div className="mb-3 flex justify-between">
                   <div>
                     <p className="font-bold">فاتورة رقم {detail.invoice_number}</p>
@@ -654,6 +685,46 @@ export function BillingPage() {
               تأكيد الاسترجاع
             </Button>
           </div>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={!!refundReceipt} onOpenChange={(open) => !open && setRefundReceipt(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>إيصال استرجاع</DialogTitle>
+          </DialogHeader>
+          {refundReceipt && (
+            <div className="flex flex-col gap-3">
+              <div data-print-size={printSize} className="print-target visible-for-print rounded-md border border-border p-4 text-sm print:border-0">
+                <p className="mb-2 font-bold">إيصال استرجاع</p>
+                <div className="flex flex-col gap-1">
+                  <p>الفاتورة: {refundReceipt.invoiceNumber}</p>
+                  <p>العميل: {refundReceipt.customerName}</p>
+                  <p>طريقة الدفع الأصلية: {PAYMENT_METHOD_LABELS[refundReceipt.method] ?? refundReceipt.method}</p>
+                  <p>السبب: {refundReceipt.reason}</p>
+                  <p>التاريخ: {new Date(refundReceipt.refundedAt).toLocaleString('ar-EG')}</p>
+                </div>
+                <div className="mt-3 flex justify-end">
+                  <MoneyDisplay amount={refundReceipt.refundAmount} size="lg" tone="danger" />
+                </div>
+              </div>
+              <div className="flex items-center gap-2 print:hidden">
+                <Select value={printSize} onValueChange={(v) => setPrintSize(v as 'a4' | '80mm')}>
+                  <SelectTrigger className="w-32"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="a4">A4</SelectItem>
+                    <SelectItem value="80mm">إيصال 80mm</SelectItem>
+                  </SelectContent>
+                </Select>
+                <Button variant="outline" size="sm" className="w-fit" onClick={() => window.print()}>
+                  طباعة
+                </Button>
+                <Button variant="ghost" size="sm" className="w-fit" onClick={() => setRefundReceipt(null)}>
+                  إغلاق
+                </Button>
+              </div>
+            </div>
+          )}
         </DialogContent>
       </Dialog>
     </div>

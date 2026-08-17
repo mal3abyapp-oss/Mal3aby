@@ -51,17 +51,25 @@
   }
 }
 
-/* Invoice print CSS — A4 default; #invoice-print[data-print-size="80mm"]
-   switches to receipt width. Phase 7 (invoice view + print). Everything
-   outside #invoice-print (dialogs chrome, buttons, nav) is hidden via
-   .print:hidden utility classes already applied at the call sites. */
+/* Invoice/receipt print CSS — A4 default; .print-target[data-print-size="80mm"]
+   switches to receipt width. Phase 7 (invoice view + print), extended in
+   task #85 for the refund receipt. Class-based (not #invoice-print) because
+   task #85 added a second printable surface (the refund receipt dialog)
+   that can be mounted in the DOM at the same time as the invoice detail
+   dialog underneath it -- two elements sharing one id would be invalid
+   HTML and make the print selector ambiguous. .visible-for-print marks
+   whichever ONE instance should actually be shown when printing (the
+   currently-open dialog's own print target sets it; the other, if
+   present but closed/hidden, does not). Everything outside the visible
+   target (dialog chrome, buttons, nav) is hidden via .print:hidden
+   utility classes already applied at the call sites. */
 @media print {
   @page {
     size: A4;
     margin: 12mm;
   }
 
-  #invoice-print[data-print-size='80mm'] {
+  .print-target[data-print-size='80mm'] {
     width: 80mm;
   }
 
@@ -70,7 +78,7 @@
     margin: 4mm;
   }
 
-  #invoice-print[data-print-size='80mm'] {
+  .print-target[data-print-size='80mm'] {
     page: receipt;
   }
 
@@ -78,12 +86,12 @@
     visibility: hidden;
   }
 
-  #invoice-print,
-  #invoice-print * {
+  .print-target.visible-for-print,
+  .print-target.visible-for-print * {
     visibility: visible;
   }
 
-  #invoice-print {
+  .print-target.visible-for-print {
     position: absolute;
     inset-inline-start: 0;
     top: 0;
