@@ -38,6 +38,16 @@ export type NavDomain =
  * existing owner-only conditional elsewhere in the app, e.g.
  * TodayPage's isOwner).
  */
+// Master IA/UX audit (permission-model drift-risk phase): this map is a
+// hand-maintained mirror of the live role_permissions table, so it can
+// silently drift out of sync as permissions are added/changed in the DB
+// without anyone updating this file (a real maintenance-drift risk, not
+// a live security bug -- RLS remains the actual authorization boundary,
+// this only controls nav-item visibility). A live comparison against
+// role_permissions (via SQL, not guessed) found 4 confirmed cases where
+// a role had real, relevant DB permissions for a domain that was
+// nonetheless hidden from its nav -- fixed below. No case was found of
+// a domain granted with zero backing permissions.
 const ROLE_NAV_DOMAINS: Record<string, ReadonlySet<NavDomain>> = {
   club_owner: new Set<NavDomain>([
     'today', 'bookings', 'customers', 'academy', 'finance', 'reports', 'whatsapp', 'staff', 'settings',
@@ -45,17 +55,33 @@ const ROLE_NAV_DOMAINS: Record<string, ReadonlySet<NavDomain>> = {
   club_manager: new Set<NavDomain>([
     'today', 'bookings', 'customers', 'academy', 'finance', 'reports', 'whatsapp', 'staff', 'settings',
   ]),
+  // branch_manager holds branch.update + field.update/view (confirmed
+  // live) -- exactly what the 'settings' domain gates (/app/fields,
+  // /app/settings) -- but 'settings' was withheld entirely.
   branch_manager: new Set<NavDomain>([
-    'today', 'bookings', 'customers', 'academy', 'finance', 'reports', 'whatsapp',
+    'today', 'bookings', 'customers', 'academy', 'finance', 'reports', 'whatsapp', 'settings',
   ]),
+  // receptionist holds enrollment.view + player.create/view +
+  // subscription.view (confirmed live) -- three distinct academy-domain
+  // permission families including a real create right -- but 'academy'
+  // was withheld entirely.
   receptionist: new Set<NavDomain>([
-    'today', 'bookings', 'customers', 'finance',
+    'today', 'bookings', 'customers', 'finance', 'academy',
   ]),
+  // accountant holds enrollment.view + player.view + subscription.view
+  // (confirmed live) -- the full breadth of what 'academy' exposes,
+  // plausibly needed for billing/reconciliation context -- but 'academy'
+  // was withheld entirely. (booking.view alone was judged too weak a
+  // signal to also add 'bookings' here -- single view-only permission,
+  // not central to this role's workflow -- left as-is.)
   accountant: new Set<NavDomain>([
-    'today', 'customers', 'finance', 'reports',
+    'today', 'customers', 'finance', 'reports', 'academy',
   ]),
+  // academy_manager holds invoice.create + invoice.view (confirmed
+  // live) -- invoice.create is a real write capability squarely in the
+  // 'finance' domain -- but 'finance' was withheld entirely.
   academy_manager: new Set<NavDomain>([
-    'today', 'academy', 'customers', 'reports',
+    'today', 'academy', 'customers', 'reports', 'finance',
   ]),
   coach: new Set<NavDomain>([
     'today', 'academy', 'scan',
