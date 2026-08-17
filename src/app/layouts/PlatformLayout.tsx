@@ -3,6 +3,7 @@ import { NavLink, Outlet } from 'react-router-dom'
 import { cn } from '@/lib/utils'
 import { Sheet, SheetContent, SheetTitle } from '@/components/ui/sheet'
 import { Button } from '@/components/ui/button'
+import { LanguageSwitcher } from '@/components/ui/language-switcher'
 import {
   LayoutDashboard,
   Building2,
@@ -129,19 +130,31 @@ export function PlatformLayout() {
           <p className="text-xs text-white/50">Platform Owner Console</p>
         </div>
         <PlatformNavList />
+        {/* Master IA/UX audit (RTL sweep phase): confirmed a real gap --
+            AppLayout (club side), PortalLayout, and PublicLayout all
+            have a LanguageSwitcher; PlatformLayout was the only shell
+            missing one entirely, leaving Platform Owner users with no
+            in-UI way to switch to English at all. Same placement
+            pattern as AppLayout's sidebar footer. */}
+        <div className="flex items-center justify-between border-t border-white/10 px-5 py-3">
+          <LanguageSwitcher className="text-white/60 hover:text-white" />
+        </div>
       </aside>
 
       <div className="flex flex-1 flex-col">
         <header className="flex h-14 items-center justify-between border-b border-border bg-surface px-4 md:hidden">
           <span className="font-bold text-text-primary">Mala3by — Platform</span>
-          <Button
-            variant="ghost"
-            size="icon"
-            aria-label="فتح قائمة التنقل"
-            onClick={() => setMobileNavOpen(true)}
-          >
-            <Menu className="size-5" />
-          </Button>
+          <div className="flex items-center gap-2">
+            <LanguageSwitcher />
+            <Button
+              variant="ghost"
+              size="icon"
+              aria-label="فتح قائمة التنقل"
+              onClick={() => setMobileNavOpen(true)}
+            >
+              <Menu className="size-5" />
+            </Button>
+          </div>
         </header>
         <main className="flex-1 p-4">
           <Outlet />
