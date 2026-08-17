@@ -1898,3 +1898,117 @@ No fix applied yet in this entry -- audit only, per the directive's
 explicit instruction not to build before the audit is complete. Task
 #81 (booking payment-state synchronization) is the next task and
 implements this design.
+
+## D-016 — WhatsApp re-integration: pre-implementation architecture analysis
+
+**Context**: the user's earlier explicit instruction to fully remove
+WhatsApp (carried out in commit `4dffd6e`) is being reversed by a new,
+detailed directive requiring a full Baileys-based re-integration,
+confirmed via AskUserQuestion given the direct conflict between the
+two instructions. This entry documents the mandatory pre-
+implementation analysis (the new directive's own Section 1) before any
+library is installed or code written.
+
+**Runtime/frontend/backend, confirmed via package.json and repo
+inspection**: this is a pure Vite + React 18 SPA with ZERO Node
+backend of its own -- `package.json` has no server framework, no
+Express/Fastify, nothing. All server-side logic lives entirely in
+Supabase: Postgres RPCs (SECURITY DEFINER functions), RLS policies,
+and Deno-runtime Edge Functions. This is the single most important
+fact for the WhatsApp integration: **Baileys requires a long-lived
+persistent process holding a real WebSocket connection to WhatsApp's
+servers** -- it cannot run inside a stateless, short-lived Deno Edge
+Function invocation, and it cannot run inside the browser SPA. Per the
+new directive's own Section 29 (explicitly anticipating exactly this
+conflict): the correct design is an isolated local Node WhatsApp
+service, connected to Mala3by via an internal API, behind the same
+WhatsAppProvider abstraction regardless of where that service
+eventually runs. Confirmed the previously-built `whatsapp-connector/`
+Node service directory (deleted in the earlier removal) followed
+exactly this pattern -- this is not a new architectural direction, it
+is returning to the one already independently arrived at and proven
+working (a real QR was displayed and a real tunnel reached the real
+connector in the earlier P0 attempt, before that work was cancelled
+for unrelated reasons -- see D-013).
+
+**Notification Core (Gate 7), confirmed already exists and is directly
+reusable** -- `notification_events` / `notification_queue` /
+`notification_consent` (migration `20260816280000_notification_core.sql`,
+preserved through the WhatsApp removal by design). This already
+satisfies, without any new schema:
+- Section 7 (event -> queue -> provider separation): `emit_notification_event()`
+  (SECURITY DEFINER, revoked from all client roles -- only callable by
+  other business RPCs) writes an immutable domain-event log;
+  `enqueue_notification()` (same access model) creates the actual
+  per-recipient delivery row, channel-agnostic (`channel` is free
+  text, no whatsapp-specific column exists anywhere in this layer).
+- Section 12 (queue states): `notification_queue.status` already has
+  `pending/scheduled/processing/sent/delivered/failed/retrying/
+  cancelled/expired` plus `attempts`/`last_attempt_at`/`next_attempt_at`/
+  `last_error` -- exactly the fields the new directive asks for,
+  already present.
+- Section 14 (duplicate prevention): `notification_queue_dedup_active_idx`,
+  a partial unique index on `dedup_key` scoped to non-terminal
+  statuses, already enforces idempotency at the database level.
+  `enqueue_notification()` already does `ON CONFLICT (dedup_key) ...
+  DO NOTHING`.
+- Section 15 (templates): `template_key` + `variables` jsonb columns
+  already exist on `notification_queue`.
+- Section 17 (per-channel consent/opt-out): `notification_consent`
+  (customer_id, channel, enabled) already exists;
+  `enqueue_notification()` already checks it and returns null (creates
+  nothing) if consent is not explicitly enabled for that channel.
+
+**Genuine gap found (not yet built, confirmed by grep across every
+migration)**: `emit_notification_event()` is currently called from
+exactly ONE place in the entire codebase --
+`_create_booking_internal()`, emitting `booking.created` always and
+`booking.confirmed` when payment happens inline at booking creation.
+`enqueue_notification()` is called from ZERO places -- events are
+recorded but nothing currently turns them into an actual queued
+message. `cancel_booking()`, the standalone `record_payment()` RPC
+(used by manual invoice payment and the new task #83 claim-
+verification flow), `create_refund()`, and invoice issuance from paths
+other than booking creation do NOT emit events yet. This means Section
+8-11's wiring checklist (booking created/confirmed/updated/cancelled/
+reminder, payment pending/received/failed/refunded, invoice created)
+is genuinely new work, not something to merely surface in a UI --
+consistent with "REUSE the Notification Core layer, but still WIRE the
+missing emit_notification_event() calls at each of those real business
+RPCs."
+
+**Tenant isolation primitives, confirmed reusable directly**:
+`user_club_ids()`, `has_permission(key, club_id)`, `is_platform_owner()`
+-- the same three functions every other table in this schema uses for
+RLS. WhatsApp account/session tables will use the identical pattern
+(club_id column + `club_id in (select user_club_ids())` + a
+permission-gated write policy), not a new isolation mechanism.
+
+**Phone normalization, confirmed reusable**: `normalize_mobile(text)`
+(migration `20260815180000_phase3d_onboarding.sql`) already strips
+non-digit characters and leading zeros -- used today for
+`customers.normalized_mobile`. Limitation noted (not silently fixed,
+since it's out of this task's scope): it does not add a country code,
+so it implicitly assumes a single-country numbering convention. This
+will be reused as-is for WhatsApp JID construction; adding proper
+E.164/country-code handling is a separate, larger change to the
+existing customer-phone system, not something to fold silently into
+the WhatsApp connector.
+
+**Secrets extension available**: `pgcrypto` is already installed
+(confirmed via `list_extensions`) -- available for encrypting Baileys
+auth-state credentials at rest if stored in Postgres, per Section 6's
+requirement that session credentials never be stored in plain text or
+in browser localStorage.
+
+**Decision**: build a new local Node WhatsApp connector service (not
+inside any Supabase Edge Function, not inside the SPA), following the
+exact abstraction shape the new directive specifies
+(`WhatsAppProvider` interface, `BaileysProvider` implementation),
+communicating with Mala3by via an internal HTTP API the connector
+exposes and the app calls (mirroring the proven pre-removal design).
+Session credentials persisted server-side (not in browser storage),
+tenant-scoped from the start (one Baileys session per club, never a
+single global session). The Notification Core is extended (new
+`emit_notification_event()` call sites at the currently-missing
+business RPCs), never rebuilt. No new competing queue/job system.
