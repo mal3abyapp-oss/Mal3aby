@@ -23,6 +23,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
+import { LIFECYCLE_STATUS_LABELS, SUBSCRIPTION_KIND_LABELS } from './labels'
 
 // Per-club detail: Overview / Current Subscription / History / Payment
 // History / Access Status / Audit, plus the Actions panel wired to every
@@ -48,6 +49,10 @@ const REQUEST_STATUS_LABELS: Record<string, { label: string; tone: 'success' | '
   approved: { label: 'تمت الموافقة', tone: 'success' },
   dismissed: { label: 'مرفوض', tone: 'danger' },
 }
+
+// See labels.ts: subscription_kind/lifecycle_status were rendered as
+// raw enum values in three places on this page (owner-level review
+// finding, P2) -- fixed via the shared label maps there.
 
 async function fetchClub(clubId: string) {
   const { data, error } = await supabase.from('clubs').select('*').eq('id', clubId).single()
@@ -426,7 +431,7 @@ export function PlatformClubDetailPage() {
             />
             {currentSub && (
               <>
-                <p>النوع: {currentSub.subscription_kind}</p>
+                <p>النوع: {SUBSCRIPTION_KIND_LABELS[currentSub.subscription_kind] ?? currentSub.subscription_kind}</p>
                 <p>ينتهي: {new Date(currentSub.end_at).toLocaleDateString('ar-EG')}</p>
               </>
             )}
@@ -606,11 +611,11 @@ export function PlatformClubDetailPage() {
         <TabsContent value="history">
           <DataTable
             columns={[
-              { key: 'kind', header: 'النوع', render: (s: (typeof subscriptions)[number]) => s.subscription_kind },
+              { key: 'kind', header: 'النوع', render: (s: (typeof subscriptions)[number]) => SUBSCRIPTION_KIND_LABELS[s.subscription_kind] ?? s.subscription_kind },
               { key: 'plan', header: 'الخطة', render: (s: (typeof subscriptions)[number]) => s.plan_name_snapshot ?? '—' },
               { key: 'start', header: 'البداية', render: (s: (typeof subscriptions)[number]) => new Date(s.start_at).toLocaleDateString('ar-EG') },
               { key: 'end', header: 'النهاية', render: (s: (typeof subscriptions)[number]) => new Date(s.end_at).toLocaleDateString('ar-EG') },
-              { key: 'status', header: 'الحالة', render: (s: (typeof subscriptions)[number]) => s.lifecycle_status },
+              { key: 'status', header: 'الحالة', render: (s: (typeof subscriptions)[number]) => LIFECYCLE_STATUS_LABELS[s.lifecycle_status] ?? s.lifecycle_status },
             ]}
             rows={subscriptions}
             rowKey={(s) => s.id}

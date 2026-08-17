@@ -5,6 +5,7 @@ import { DataTable, type DataTableColumn } from '@/components/ui/data-table'
 import { MoneyDisplay } from '@/components/ui/money-display'
 import { StatusBadge } from '@/components/ui/status-badge'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { LIFECYCLE_STATUS_LABELS } from './labels'
 
 // Five report types per IMPLEMENTATION_PLAN.md Phase 3c: Subscription,
 // Revenue, Renewal, Growth, Usage. All read live from Phase 3b/2 tables --
@@ -112,7 +113,7 @@ export function PlatformReportsPage() {
   const subColumns: DataTableColumn<SubRow>[] = [
     { key: 'club', header: 'النادي', render: (r) => r.club_name },
     { key: 'plan', header: 'الخطة', render: (r) => r.plan_name_snapshot ?? '—' },
-    { key: 'status', header: 'الحالة', render: (r) => r.lifecycle_status },
+    { key: 'status', header: 'الحالة', render: (r) => LIFECYCLE_STATUS_LABELS[r.lifecycle_status] ?? r.lifecycle_status },
     { key: 'start', header: 'البداية', render: (r) => new Date(r.start_at).toLocaleDateString('ar-EG') },
     { key: 'end', header: 'النهاية', render: (r) => new Date(r.end_at).toLocaleDateString('ar-EG') },
     { key: 'price', header: 'السعر', render: (r) => <MoneyDisplay amount={r.price_snapshot} size="sm" /> },
