@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import QRCode from 'qrcode'
 import { supabase } from '@/lib/supabase/client'
@@ -174,7 +175,13 @@ const INVOICE_STATUS_LABELS: Record<string, string> = { draft: 'مسودة', iss
 export function BillingPage() {
   const { currentClubId } = useAuth()
   const queryClient = useQueryClient()
-  const [selectedInvoiceId, setSelectedInvoiceId] = useState<string | null>(null)
+  const [searchParams] = useSearchParams()
+  // Master IA/UX audit (Club Side Booking 360 phase): BookingDetailSheet
+  // showed the outstanding balance read-only with no way to reach the
+  // actual invoice on BillingPage -- same minimal ?param= deep-link
+  // pattern already used for Reports' customer search cross-link
+  // (CustomersPage's ?q=), not new infrastructure.
+  const [selectedInvoiceId, setSelectedInvoiceId] = useState<string | null>(() => searchParams.get('invoice'))
   const [printSize, setPrintSize] = useState<'a4' | '80mm'>('a4')
   const [refundPaymentId, setRefundPaymentId] = useState<string | null>(null)
   const [refundAmount, setRefundAmount] = useState('')

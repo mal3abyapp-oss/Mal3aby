@@ -82,6 +82,21 @@ async function fetchInvoiceSummary(invoiceId: string): Promise<InvoicePaymentSum
   return summaries.get(invoiceId) ?? null
 }
 
+// Master IA/UX audit (Club Side Booking 360 phase): confirmed real gaps
+// -- this sheet showed no invoice number and no link to it at all, and
+// customer/field were static text with zero navigation, unlike every
+// sibling screen (Reports, Alerts, Audit) which link club-keyed rows.
+// get_invoice_payment_summary() (the RPC above) doesn't carry
+// invoice_number, and per this codebase's own standing caution around
+// RPC-body/signature edits (a prior parameter-order incident), a
+// separate plain single-column read is the lower-risk fix here rather
+// than widening that RPC's return shape.
+async function fetchInvoiceNumber(invoiceId: string): Promise<string | null> {
+  const { data, error } = await supabase.from('invoices').select('invoice_number').eq('id', invoiceId).single()
+  if (error) return null
+  return data?.invoice_number ?? null
+}
+
 export function BookingDetailSheet({
   booking,
   fieldName,
@@ -125,6 +140,12 @@ export function BookingDetailSheet({
   const { data: invoiceSummary } = useQuery({
     queryKey: ['booking-invoice-summary', booking?.invoiceId],
     queryFn: () => fetchInvoiceSummary(booking!.invoiceId!),
+    enabled: !!booking?.invoiceId,
+  })
+
+  const { data: invoiceNumber } = useQuery({
+    queryKey: ['booking-invoice-number', booking?.invoiceId],
+    queryFn: () => fetchInvoiceNumber(booking!.invoiceId!),
     enabled: !!booking?.invoiceId,
   })
 
@@ -233,14 +254,18 @@ export function BookingDetailSheet({
 
             <div className="rounded-lg border border-border p-3">
               <p className="text-xs text-text-secondary">العميل</p>
-              <p className="font-semibold">{booking.customerName}</p>
+              <Link to={`/app/customers?q=${encodeURIComponent(booking.customerName)}`} className="font-semibold text-accent-foreground hover:underline">
+                {booking.customerName}
+              </Link>
               {booking.customerMobile && <p className="text-text-secondary tabular-nums"><bdi>{booking.customerMobile}</bdi></p>}
             </div>
 
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <p className="text-xs text-text-secondary">الملعب</p>
-                <p className="font-medium">{fieldName}</p>
+                <Link to="/app/fields" className="font-medium text-accent-foreground hover:underline">
+                  {fieldName}
+                </Link>
               </div>
               <div>
                 <p className="text-xs text-text-secondary">الوقت</p>
@@ -260,6 +285,17 @@ export function BookingDetailSheet({
             <Separator />
 
             <div className="flex flex-col gap-1.5">
+              {booking.invoiceId && (
+                <div className="flex justify-between">
+                  <span className="text-text-secondary">رقم الفاتورة</span>
+                  <Link
+                    to={`/app/billing?invoice=${booking.invoiceId}`}
+                    className="font-medium text-accent-foreground hover:underline"
+                  >
+                    <bdi>{invoiceNumber ?? '...'}</bdi>
+                  </Link>
+                </div>
+              )}
               <div className="flex justify-between">
                 <span className="text-text-secondary">الإجمالي</span>
                 <span className="tabular-nums font-medium">{booking.totalPrice.toFixed(0)} ج.م</span>
@@ -278,7 +314,13 @@ export function BookingDetailSheet({
                   )}
                   <div className="flex justify-between font-semibold">
                     <span>المتبقي</span>
-                    <span className={outstanding > 0 ? 'text-status-danger tabular-nums' : 'tabular-nums'}>{outstanding.toFixed(0)} ج.م</span>
+                    {outstanding > 0 ? (
+                      <Link to={`/app/billing?invoice=${booking.invoiceId}`} className="tabular-nums text-status-danger hover:underline">
+                        {outstanding.toFixed(0)} ج.م
+                      </Link>
+                    ) : (
+                      <span className="tabular-nums">{outstanding.toFixed(0)} ج.م</span>
+                    )}
                   </div>
                   <div className="flex justify-between text-xs text-text-secondary">
                     <span>حالة الدفع</span>
