@@ -17,12 +17,12 @@ Never stop mid-phase to send a report or wait for permission. After finishing an
 ## RESUME CURSOR
 
 ```
-current_phase: Phase 5 — Club Settings restructure
-completed_phases: 1 (Audit), 2 (Target IA), 3 (Shared navigation foundation), 4 (Platform Owner)
-last_commit: 21f4576 (Phase 3) -- Phase 4 about to be committed
-test_status: tsc clean, build clean, live-verified in browser (redirects fire correctly, grouped sidebar renders, new Settings screen loads real data)
+current_phase: Phase 6 — Finance domain grouping
+completed_phases: 1 (Audit), 2 (Target IA), 3 (Shared navigation foundation), 4 (Platform Owner), 5 (Club Settings restructure)
+last_commit: afadffa (Phase 5)
+test_status: tsc clean, build clean, live-verified in browser (Settings renders 5 correctly-scoped sections, /app/fields + /app/audit-log load real data, /app/subscription reachable via Settings link, Academy Enrollments pointer link renders with no duplicate mount)
 blocker: none
-exact_next_action: Commit Phase 4, then begin Phase 5 -- extract WhatsApp (WhatsAppConnectionCard + MessagingSafetyCard) and Fields/Booking-rules (FieldsManagement) out of SettingsPage's "الإشعارات"/"إعدادات الحجوزات" sections into their own top-level destinations per target IA §2 (WhatsApp becomes /app/whatsapp in Phase 8; Fields/Booking-rules becomes a new route in this phase), remove the dead "الموظفون والصلاحيات" stub card, de-duplicate ActivationPolicySetting (currently mounted in both AcademyPage's Enrollments tab AND SettingsPage -- keep Settings only per target IA), de-duplicate the platform-subscription card (SubscriptionPage becomes canonical, Settings gets a slim summary only).
+exact_next_action: Begin Phase 6 -- formal "Finance" domain grouping/labeling in AppLayout's sidebar for Billing/Outstanding/Cash Shift/Subscription (nav-visibility already wired to the 'finance' NavDomain in Phase 3; this phase is presentation only -- group them under a section header the same way PlatformLayout's sidebar was grouped in Phase 4, matching target IA §2's Finance domain definition). Then Phase 7 (Reports tab-grouping).
 
 NOTE: Phase 4 deliberately did NOT fix the 2 hardcoded-reason/method RPC calls on PlatformClubDetailPage (change_platform_plan, record_platform_payment) or the 2 direct-table-writes there that bypass RPCs -- these are real data-integrity/form-completeness findings from the audit but are NOT information-architecture problems (no screen/nav reorganization involved), and fixing them requires adding real form inputs (a scope-creep risk against "reorganize, don't invent features"). Logged here as a legitimate follow-up, deliberately deferred, not forgotten -- revisit after the core IA restructuring (all 12 phases) is complete, as a discrete follow-up task if the user wants it.
 ```
@@ -53,7 +53,11 @@ Verified: tsc clean, `npm run build` clean, live-verified in browser -- audit lo
 Removed the 3 dead-end placeholder routes (Subscriptions/Payments/Renewals) -- `<Navigate>` redirects now point `/platform/subscriptions` -> `/platform/clubs`, `/platform/payments` -> `/platform/reports`, `/platform/renewals` -> `/platform/alerts` (same pattern as the pre-existing `/app/club` -> `/app/settings` redirect), preserving deep links per the migration rule while removing their sidebar entries entirely. Built a real `PlatformSettingsPage` (trial-days/grace-days defaults, backed by the real `platform_settings` table, confirmed RLS-writable by platform_owner) replacing the 4th placeholder. Restructured `PlatformLayout`'s sidebar from 13 flat items into 4 sections (standalone نظرة عامة -> الأندية group -> التجارة group -> المراقبة group -> standalone الإعدادات) exactly matching target IA §1's navigation tree. Fixed Trials' icon (was duplicating Plans' Sparkles icon -- now Award).
 
 Verified: tsc clean, `npm run build` clean, live-verified in browser -- all 3 redirects fire correctly (confirmed via window.location.pathname), grouped sidebar renders with correct section headers and no dead-end items, new Settings screen loads real values (7/7 trial/grace days) from the database and is ready to save.
-### Phase 5 — Club Settings restructure: NOT STARTED
+### Phase 5 — Club Settings restructure: COMPLETE (commit `afadffa`)
+Extracted BranchesFieldsPage (new `/app/fields` route) from Settings' "النادي" (branches half) and "إعدادات الحجوزات" section (FieldsManagement) -- confirmed real operational infrastructure, not settings. Removed Settings' "الأمان وسجل التدقيق" section (AuditLogSection) now that `/app/audit-log` exists as its own route (wired in Phase 3, just not yet un-duplicated from Settings until now). Removed the dead "الموظفون والصلاحيات" stub card entirely (redundant -- Staff already has its own sidebar item). De-duplicated `ActivationPolicySetting`: was mounted in both AcademyPage's Enrollments tab and SettingsPage -- Settings stays canonical, Academy now shows a short link ("سياسة تفعيل الاشتراك تُدار من صفحة الإعدادات") instead of re-rendering the control. Gave `/app/subscription` a real nav presence for the first time: `PlatformSubscriptionCard` (kept in Settings as a compact status glance -- a genuinely different purpose from the full `SubscriptionPage`, not a duplicate) now links out via "عرض التفاصيل الكاملة". Updated MorePage (mobile "المزيد" hub): added the 2 new routes that had no mobile entry point (الفروع والملاعب, سجل التدقيق) and refreshed Settings' stale description text. WhatsApp cards deliberately left in place in Settings -- Phase 8 gives them a real module; moving them now would strand them with no upgrade path.
+
+Verified: tsc clean, `npm run build` clean, live-verified in browser -- Settings now renders exactly 5 sections (النادي / إعدادات الأكاديمية / المدفوعات / الإشعارات / اشتراك المنصة) all loading real data, `/app/fields` shows real branches+fields+pricing, `/app/audit-log` shows real human-labeled entries, `/app/subscription` reachable and renders full plan/billing content, Academy's Enrollments tab shows the pointer link with the enrollment table still rendering correctly beneath it (no regression from removing the duplicate mount).
+### Phase 6 — Finance domain grouping: NOT STARTED
 ### Phase 6 — Finance domain grouping: NOT STARTED
 ### Phase 7 — Reports tab-grouping: NOT STARTED
 ### Phase 8 — WhatsApp module: NOT STARTED
@@ -68,16 +72,19 @@ Verified: tsc clean, `npm run build` clean, live-verified in browser -- all 3 re
 
 | Feature | Old location | New location | Moved? | Verified? |
 |---|---|---|---|---|
-| WhatsApp connection (QR/disconnect) | Settings → الإشعارات | `/app/whatsapp` → الاتصال | No | No |
-| WhatsApp safety settings | Settings → الإشعارات | `/app/whatsapp` → الإعدادات | No | No |
-| Fields/hours/pricing management | Settings → إعدادات الحجوزات | New domain (TBD route) | No | No |
-| Audit log (club-side) | Settings → الأمان وسجل التدقيق | `/app/audit-log` | No | No |
+| WhatsApp connection (QR/disconnect) | Settings → الإشعارات | `/app/whatsapp` → الاتصال | No (Phase 8) | No |
+| WhatsApp safety settings | Settings → الإشعارات | `/app/whatsapp` → الإعدادات | No (Phase 8) | No |
+| Branches management | Settings → النادي | `/app/fields` → الفروع | Yes | Yes (live-verified, real branch data) |
+| Fields/hours/pricing management | Settings → إعدادات الحجوزات | `/app/fields` → الملاعب | Yes | Yes (live-verified, real field/pricing data) |
+| Audit log (club-side) | Settings → الأمان وسجل التدقيق | `/app/audit-log` | Yes | Yes (live-verified, human-readable labels) |
+| Staff stub card | Settings → الموظفون والصلاحيات | Removed (Staff already had its own sidebar item) | Yes (removed, not moved -- destination already existed) | Yes (confirmed `/app/staff` still reachable via sidebar) |
+| Activation policy setting | Academy tab AND Settings (dup) | Settings only; Academy shows a link | Yes | Yes (live-verified, pointer link renders correctly) |
 | Platform Subscriptions nav item | Placeholder | Redirect → `/platform/clubs` | Yes | Yes (live-verified redirect fires) |
 | Platform Payments nav item | Placeholder | Redirect → `/platform/reports` | Yes | Yes (live-verified redirect fires) |
 | Platform Renewals nav item | Placeholder | Redirect → `/platform/alerts` | Yes | Yes (route wired, same pattern as the other 2 -- not separately re-clicked but identical code path) |
 | Platform Settings nav item | Placeholder | Real screen (trial/grace defaults) | Yes | Yes (live-verified, loads real DB values) |
 | Outstanding page | Built, unlinked | Finance domain nav | Yes (added to sidebar + MorePage) | Yes (live-verified, loads real data) |
-| Activation policy setting | Academy tab AND Settings (dup) | Settings only | No | No |
+| Subscription page (`/app/subscription`) | Built, unlinked from any nav | Contextual banner links (pre-existing) + Settings' new "عرض التفاصيل الكاملة" link | Yes (nav presence added) | Yes (live-verified, full plan/billing content renders) |
 
 ---
 

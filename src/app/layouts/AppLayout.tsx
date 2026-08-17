@@ -14,6 +14,7 @@ import {
   Users,
   Receipt,
   Wallet,
+  CreditCard,
   BarChart3,
   UserCog,
   Settings,
@@ -42,20 +43,53 @@ interface NavItem {
   domain: NavDomain
 }
 
+interface NavSection {
+  titleKey: string | null
+  items: NavItem[]
+}
+
 // Gate 10: labels moved to i18n keys (nav.*) resolved via t() inside
 // the component -- these arrays stay static (no re-render cost from
 // recreating them), only the label lookup is locale-aware.
-const sidebarItems: NavItem[] = [
-  { to: '/app', labelKey: 'nav.today', icon: LayoutDashboard, domain: 'today' },
-  { to: '/app/bookings', labelKey: 'nav.bookings', icon: CalendarDays, domain: 'bookings' },
-  { to: '/app/academy', labelKey: 'nav.academy', icon: GraduationCap, domain: 'academy' },
-  { to: '/app/customers', labelKey: 'nav.customers', icon: Users, domain: 'customers' },
-  { to: '/app/billing', labelKey: 'nav.billing', icon: Receipt, domain: 'finance' },
-  { to: '/app/outstanding', labelKey: 'nav.outstanding', icon: Wallet, domain: 'finance' },
-  { to: '/app/cash-shift', labelKey: 'nav.cashShift', icon: Wallet, domain: 'finance' },
-  { to: '/app/reports', labelKey: 'nav.reports', icon: BarChart3, domain: 'reports' },
-  { to: '/app/staff', labelKey: 'nav.staff', icon: UserCog, domain: 'staff' },
-  { to: '/app/settings', labelKey: 'nav.settings', icon: Settings, domain: 'settings' },
+//
+// IA restructuring (Phase 6): Billing/Outstanding/Cash Shift/Subscription
+// were 4 separate flat items with no visual indication they're all the
+// same "money" domain -- confirmed in the audit as one of the crowding
+// symptoms (nav-visibility was already grouped under the 'finance'
+// NavDomain since Phase 3, but the sidebar never reflected that
+// grouping visually). Grouped under a "المالية" section header, same
+// pattern as PlatformLayout's sidebar sections (Phase 4). Subscription
+// added here too -- per target IA it "gets a real nav presence... as a
+// Settings sub-link", but a persistent sidebar entry inside the Finance
+// group is the more honest home for an always-relevant financial
+// concern than a link buried at the bottom of Settings.
+const navSections: NavSection[] = [
+  {
+    titleKey: null,
+    items: [
+      { to: '/app', labelKey: 'nav.today', icon: LayoutDashboard, domain: 'today' },
+      { to: '/app/bookings', labelKey: 'nav.bookings', icon: CalendarDays, domain: 'bookings' },
+      { to: '/app/academy', labelKey: 'nav.academy', icon: GraduationCap, domain: 'academy' },
+      { to: '/app/customers', labelKey: 'nav.customers', icon: Users, domain: 'customers' },
+    ],
+  },
+  {
+    titleKey: 'nav.sectionFinance',
+    items: [
+      { to: '/app/billing', labelKey: 'nav.billing', icon: Receipt, domain: 'finance' },
+      { to: '/app/outstanding', labelKey: 'nav.outstanding', icon: Wallet, domain: 'finance' },
+      { to: '/app/cash-shift', labelKey: 'nav.cashShift', icon: Wallet, domain: 'finance' },
+      { to: '/app/subscription', labelKey: 'nav.subscription', icon: CreditCard, domain: 'finance' },
+    ],
+  },
+  {
+    titleKey: null,
+    items: [
+      { to: '/app/reports', labelKey: 'nav.reports', icon: BarChart3, domain: 'reports' },
+      { to: '/app/staff', labelKey: 'nav.staff', icon: UserCog, domain: 'staff' },
+      { to: '/app/settings', labelKey: 'nav.settings', icon: Settings, domain: 'settings' },
+    ],
+  },
 ]
 
 const mobileNavItems: NavItem[] = [
@@ -89,7 +123,12 @@ export function AppLayout() {
     ? Math.ceil((new Date(subSummary.end_at).getTime() - Date.now()) / (24 * 60 * 60 * 1000))
     : null
 
-  const visibleSidebarItems = sidebarItems.filter((item) => canSeeNavDomain(currentMembership?.roleKey, item.domain))
+  const visibleNavSections = navSections
+    .map((section) => ({
+      ...section,
+      items: section.items.filter((item) => canSeeNavDomain(currentMembership?.roleKey, item.domain)),
+    }))
+    .filter((section) => section.items.length > 0)
   const visibleMobileNavItems = mobileNavItems.filter((item) => canSeeNavDomain(currentMembership?.roleKey, item.domain))
 
   return (
@@ -117,22 +156,29 @@ export function AppLayout() {
           </div>
         )}
 
-        <nav className="flex flex-1 flex-col gap-1 px-2">
-          {visibleSidebarItems.map((item) => (
-            <NavLink
-              key={item.to}
-              to={item.to}
-              end={item.to === '/app'}
-              className={({ isActive }) =>
-                cn(
-                  'flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium text-white/70 transition-colors hover:bg-white/10 hover:text-white',
-                  isActive && 'bg-accent text-accent-foreground hover:bg-accent/90',
-                )
-              }
-            >
-              <item.icon className="size-4" />
-              {t(item.labelKey)}
-            </NavLink>
+        <nav className="flex flex-1 flex-col gap-4 px-2">
+          {visibleNavSections.map((section, i) => (
+            <div key={section.titleKey ?? `section-${i}`} className="flex flex-col gap-1">
+              {section.titleKey && (
+                <p className="px-3 pb-1 text-xs font-semibold text-white/40">{t(section.titleKey)}</p>
+              )}
+              {section.items.map((item) => (
+                <NavLink
+                  key={item.to}
+                  to={item.to}
+                  end={item.to === '/app'}
+                  className={({ isActive }) =>
+                    cn(
+                      'flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium text-white/70 transition-colors hover:bg-white/10 hover:text-white',
+                      isActive && 'bg-accent text-accent-foreground hover:bg-accent/90',
+                    )
+                  }
+                >
+                  <item.icon className="size-4" />
+                  {t(item.labelKey)}
+                </NavLink>
+              ))}
+            </div>
           ))}
         </nav>
 
