@@ -7,22 +7,36 @@ import { CheckCircle2, Circle } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
 // Dismissible checklist, not a wizard continuation (ADR-043). Each item is
-// an independent existence check, not stored progress state. "Add a field"
-// and "create a first booking" are deferred until Phase 5/6 build those
-// tables — listed here as not-yet-actionable so the checklist still
-// reflects the true four-item scope from IMPLEMENTATION_PLAN.md without
-// linking to routes that don't do anything real yet.
+// an independent existence check, not stored progress state.
+//
+// Owner-level review finding (P1, dead/stale UI): "أضف ملعبًا" and
+// "أنشئ أول حجز" were hardcoded to done=false with `to: null` and a
+// "(قريبًا)" (Coming Soon) suffix, permanently unclickable -- leftover
+// from a Phase-0-era comment claiming fields/bookings tables "don't
+// exist until Phase 5/6". Both tables have existed and been fully
+// functional since Phase 5/6 shipped, long before this review; real
+// clubs in this dataset already have real fields and real bookings, so
+// every club owner has been seeing a permanently-stuck "coming soon"
+// message on their primary dashboard for no real reason. Also,
+// hasCustomer was hardcoded via `Promise.resolve({ count: null })`
+// with a comment claiming "customers table doesn't exist until Phase
+// 4" -- also long since shipped -- so "أضف أول عميل" could never mark
+// done even for a club with dozens of real customers. Fixed to real
+// existence checks against the real, long-existing tables.
 const STORAGE_KEY = 'mala3by.firstRunChecklistDismissed'
 
 async function fetchChecklistState(clubId: string) {
-  const [{ count: staffCount }, { count: customerCount }] = await Promise.all([
+  const [{ count: staffCount }, { count: customerCount }, { count: fieldCount }, { count: bookingCount }] = await Promise.all([
     supabase.from('club_memberships').select('id', { count: 'exact', head: true }).eq('club_id', clubId).eq('status', 'active'),
-    // customers table doesn't exist until Phase 4 -- guarded below.
-    Promise.resolve({ count: null as number | null }),
+    supabase.from('customers').select('id', { count: 'exact', head: true }).eq('club_id', clubId),
+    supabase.from('fields').select('id', { count: 'exact', head: true }).eq('club_id', clubId),
+    supabase.from('bookings').select('id', { count: 'exact', head: true }).eq('club_id', clubId),
   ])
   return {
     hasStaff: (staffCount ?? 0) > 1, // >1 because the owner's own membership always exists
     hasCustomer: (customerCount ?? 0) > 0,
+    hasField: (fieldCount ?? 0) > 0,
+    hasBooking: (bookingCount ?? 0) > 0,
   }
 }
 
@@ -41,8 +55,10 @@ export function FirstRunChecklist() {
   const items = [
     { label: 'أضف موظفًا', done: !!data?.hasStaff, to: '/app/staff' },
     { label: 'أضف أول عميل', done: !!data?.hasCustomer, to: '/app/customers' },
-    { label: 'أضف ملعبًا (قريبًا)', done: false, to: null },
-    { label: 'أنشئ أول حجز (قريبًا)', done: false, to: null },
+    // Fields live under Settings -> إعدادات الحجوزات (moved there in
+    // the P1-7 usability pass) -- not a standalone /app/fields route.
+    { label: 'أضف ملعبًا', done: !!data?.hasField, to: '/app/settings' },
+    { label: 'أنشئ أول حجز', done: !!data?.hasBooking, to: '/app/bookings' },
   ]
 
   return (
