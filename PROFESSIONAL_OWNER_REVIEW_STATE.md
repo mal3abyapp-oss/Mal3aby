@@ -10,16 +10,17 @@ This file is the durable tracking artifact for the Master Autonomous Owner-Level
 ## RESUME CURSOR
 
 ```
-current_role: Platform Owner
-module: Phase 2 — Platform Owner review: FIRST PASS COMPLETE (all 13 /platform/* screens visited)
-screen: last visited /platform/reports (confirmed PlatformReportsPage fix is live)
-test_scenario: manual live click-through as platform owner via browser, cross-checked against real DB state via SQL
-last_issue: (see DEFECT LOG — 4 found & fixed, all committed, all gate-clean)
-last_fix: 81f6229 (no_subscription alert kind)
-last_commit: 81f6229
-test_status: gate clean after every fix (tsc/build/lint/test), all 4 fixes live-verified against real data
+current_role: Club Owner
+module: Phase 3 — Club Owner review: FIRST PASS COMPLETE (all /app/* screens visited: Today, Bookings, Academy, Customers, Billing, CashShift, Outstanding, Reports, Staff, Settings, Subscription, More)
+screen: last visited /app/more (nav hub, no issues)
+test_scenario: manual live click-through as club owner via browser, cross-checked against real DB state via SQL
+last_issue: (see DEFECT LOG — 9 found & fixed so far, all committed, all gate-clean)
+last_fix: 30ba84e (Outstanding page listing fully-paid invoices)
+last_commit: 30ba84e
+test_status: gate clean after every fix (tsc/build/lint/test), all fixes live-verified against real data
 blocker: none
-exact_next_action: Begin Phase 3 (Club Owner) — start at /app as club_owner, work through Today/Bookings/Academy/Customers/Billing/CashShift/Outstanding/Reports/Staff/Settings per the module tracker below. Then Phase 4 (first-time setup), Phase 5 (Manager), Phase 6 (Reception), Phase 7 (Cashier), Phase 8 (Customer portal), Phase 9 (Guardian), Phase 10 (Coach), continuing in directive order through Phase 50, then the mandatory second full re-review pass.
+STANDING RULE (do not violate): never stop after a phase/checkpoint/commit to send a report or wait for permission. Update this file, commit if appropriate, continue immediately to the next phase. Only 2 valid stop conditions: (1) the ENTIRE program complete (owner review + second pass + WhatsApp + final regression + final report), or (2) a genuine external blocker (missing secret/credential, external service down, unresolvable business decision) after exhausting investigation/workarounds. Task size, session length, phase count, or number of defects found are NEVER valid reasons to pause.
+exact_next_action: Begin Phase 4 (first-time club setup / new-owner onboarding flow: registration -> onboarding wizard -> create club/branch/field/pricing/hours -> academy -> employee -> roles -> payment methods -> WhatsApp -> first customer/booking/invoice/payment). Note: Academy sub-tabs (التسجيلات والاشتراكات، البرامج والمجموعات، تسجيل الحضور) got only an Overview-level pass in Phase 3, not deep -- revisit in the second full re-review pass. After Phase 4: Phase 5 (Manager) -> Phase 6 (Reception) -> Phase 7 (Cashier) -> Phase 8 (Customer portal) -> Phase 9 (Guardian) -> Phase 10 (Coach) -> continue through Phase 50 -> mandatory second full re-review -> WhatsApp integration phase (already exists, verify+extend per the separate WhatsApp directive) -> final regression -> final report.
 ```
 
 ---
@@ -104,6 +105,12 @@ Status values: `not started` / `in progress` / `reviewed — no issues` / `revie
 | 1 | P1 | PlatformLayout | No mobile navigation at all below 768px (sidebar `hidden md:flex`, mobile header had no menu/links) | Missing mobile fallback that AppLayout already has (bottom nav) — never built for PlatformLayout | 7246379 | Yes — live: hamburger appears, drawer opens w/ 13 items, click navigates + closes |
 | 2 | P2 | PlatformOverviewPage | "أندية موقوفة" KPI (admin `clubs.status='suspended'`) uses the same Arabic word as PlatformClubsPage's "حالة الاشتراك: موقوف" (`get_club_platform_access()==='blocked'`) — different concepts, same label, real "needs attention" signal invisible on dashboard | Two independently-correct fields sharing one ambiguous label; no dashboard surface for subscription-blocked clubs | 7246379 | Yes — live: 0 admin-suspended / 1 subscription-blocked, matches Clubs list |
 | 3 | P2 | PlatformClubDetailPage, PlatformReportsPage | Raw enum values (`trial`, `active`) rendered directly in Arabic UI in 4 places | No label map applied at those render sites, unlike the file's own existing LIMIT_TYPE_LABELS pattern | bf1fb34 | Yes — live: "trial" became "تجربة مجانية" everywhere |
+| 4 | P2 | PlatformAlertsPage | Club with zero subscription history invisible on Alerts (no rule-based alert kind for it) | Alert loop only ever iterated existing platform_subscriptions rows | 81f6229 | Yes — live: club now shows "لا يوجد اشتراك مسجّل" alert |
+| 5 | P1 | FirstRunChecklist | Two checklist items permanently stuck "(قريبًا)"/unclickable; hasCustomer hardcoded to always-false | Stale Phase-0-era comments/logic never updated when fields/bookings/customers tables shipped (long ago) | a0e7637 | Yes — live: all 3 items correctly checked for a club with real data |
+| 6 | P2 | StatCard (shared component) | Composite "N / M" values visually digit-swapped in RTL context (DOM correct, rendering wrong) | No Unicode bidi isolation on numeric value content | a0e7637 | Yes — live: "الملاعب المشغولة الآن" now shows "0 / 4" correctly |
+| 7 | P1 | BookingDetailSheet | "تسجيل عدم حضور" fired instantly on click, zero confirmation — genuinely mutated a real confirmed booking to no_show during this review (reverted via SQL) | No confirmation step, inconsistent with the adjacent Cancel action's own two-step pattern in the same file | 5d1eada | Yes — live: confirm prompt now required; تراجع leaves booking status untouched (verified via SQL) |
+| 8 | P2 | AcademyOverview, ReportsPage, PlayerStatusPanel, ProgramsGroupsSection | Same RTL digit-swap risk as #6, found via codebase-wide grep for the same composite-ratio pattern outside StatCard | Same root cause as #6, not covered by that fix since these don't use StatCard | 09b070d | Yes — live: AcademyOverview's "17/20" group-capacity card confirmed rendering correctly |
+| 9 | P1 | OutstandingPage | Fully-paid invoices (outstanding=0) listed with "مستحق" badge on the one screen whose purpose is showing unpaid invoices | outstanding_invoices view is deliberately WHERE status='issued' only (shared by other consumers with broader scope); this page never added its own outstanding>0 filter | 30ba84e | Yes — live: 12+ zero-balance rows correctly disappeared, every remaining row has real nonzero outstanding |
 
 ---
 
