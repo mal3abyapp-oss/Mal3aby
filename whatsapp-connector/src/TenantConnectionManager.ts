@@ -106,4 +106,41 @@ export class TenantConnectionManager {
       }
     }
   }
+
+  /**
+   * Self-healing watchdog (found during this review's real end-to-end
+   * WhatsApp send test, not a pre-existing known gap): BaileysProvider
+   * deliberately never auto-reconnects once its own bounded retry cap
+   * is exhausted and it reaches the terminal 'failed' state (see the
+   * comment at that call site) -- by design, so a genuinely dead
+   * session doesn't hammer WhatsApp's servers forever. But nothing was
+   * driving the *next* recovery step: ConnectionRequestPoller only acts
+   * on rows the ADMIN flipped to 'connecting'/'disconnected'; a club
+   * that was already connected and independently reached 'failed'
+   * in-memory (e.g. a burst of stream:error/conflict during a session
+   * restore racing an old lingering WhatsApp Web session) had no path
+   * back to health short of a full process restart -- confirmed live:
+   * the provider sat in 'failed' for 7+ minutes with zero recovery
+   * attempts, and (worse) the DB row could still read a stale
+   * 'connected' if the very status-report call that would have written
+   * 'failed' itself failed during the same network hiccup, hiding the
+   * outage from anything that only reads whatsapp_accounts.
+   *
+   * This is a bounded, one-shot recovery per detection (not a raw
+   * auto-hammer loop) -- called periodically by the poller. A provider
+   * that reaches 'failed' again after this attempt simply waits for the
+   * next tick, same bounded cadence as the poller's own interval, not a
+   * tight retry.
+   */
+  async recoverFailedConnections(): Promise<void> {
+    for (const [clubId, provider] of this.providers) {
+      if (provider.getConnectionState() !== 'failed') continue
+      console.error(`[connector] self-healing: club ${clubId.slice(0, 8)} provider is 'failed', attempting reconnect`)
+      try {
+        await provider.reconnect()
+      } catch (err) {
+        console.error(`[connector] self-healing reconnect failed for club ${clubId.slice(0, 8)}:`, (err as Error).message)
+      }
+    }
+  }
 }

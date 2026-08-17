@@ -45,6 +45,12 @@ export class ConnectionRequestPoller {
   }
 
   private async pollOnce(): Promise<void> {
+    // Self-healing pass first (see TenantConnectionManager.
+    // recoverFailedConnections doc comment) -- a provider that reached
+    // 'failed' in-memory has no other trigger back to health, since the
+    // rest of this method only reacts to rows an admin action flipped.
+    await this.connections.recoverFailedConnections()
+
     const accounts = await this.sync.listAccounts()
     const stillConnecting = new Set<string>()
 
