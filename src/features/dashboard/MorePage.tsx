@@ -3,6 +3,8 @@ import { PageHeader } from '@/components/ui/page-header'
 import { Card, CardContent } from '@/components/ui/card'
 import { Users, Receipt, Wallet, BarChart3, UserCog, Settings, ChevronLeft, CircleDollarSign, Building2, ShieldCheck, MessageCircle } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
+import { useAuth } from '@/app/providers/AuthProvider'
+import { canSeeNavDomain, type NavDomain } from '@/lib/domain/navigation'
 
 // Section M: mobile bottom nav stays minimal (اليوم/الحجوزات/مسح/
 // الأكاديمية) -- lower-frequency screens live behind "المزيد" instead
@@ -27,32 +29,48 @@ import type { LucideIcon } from 'lucide-react'
 // (/app/whatsapp) when promoted out of Settings into an independent
 // top-level module; same discoverability requirement as the Phase 5
 // additions above.
+//
+// IA restructuring (Phase 11, role-based nav visibility re-verification):
+// confirmed real gap -- this list was NEVER role-filtered, unlike
+// AppLayout's desktop sidebar (Phase 3) which correctly hides items a
+// role has no use for. A coach or scanner account on mobile saw
+// "الفواتير والمدفوعات"/"الموظفون"/"الإعدادات" etc. in "المزيد" even
+// though the exact same items were already correctly hidden from them
+// on desktop -- same UX-clarity class of issue Phase 3 fixed for the
+// sidebar, just never applied here. Each item now carries the same
+// NavDomain tag its sidebar counterpart uses and is filtered with the
+// same canSeeNavDomain() helper -- one shared role->domain mapping, not
+// a second one invented for mobile.
 interface MoreItem {
   to: string
   label: string
   description: string
   icon: LucideIcon
+  domain: NavDomain
 }
 
 const ITEMS: MoreItem[] = [
-  { to: '/app/customers', label: 'العملاء', description: 'البحث عن العملاء وإدارة بياناتهم', icon: Users },
-  { to: '/app/billing', label: 'الفواتير والمدفوعات', description: 'سجل الفواتير والمدفوعات والمستحقات', icon: Receipt },
-  { to: '/app/outstanding', label: 'المستحقات', description: 'الفواتير غير المسددة بالكامل', icon: CircleDollarSign },
-  { to: '/app/cash-shift', label: 'وردية النقدية', description: 'فتح وإغلاق وردية الصندوق النقدي', icon: Wallet },
-  { to: '/app/reports', label: 'التقارير', description: 'تقارير الإيرادات والإشغال والأكاديمية', icon: BarChart3 },
-  { to: '/app/fields', label: 'الفروع والملاعب', description: 'فروع النادي، الملاعب، مواعيد العمل، والأسعار', icon: Building2 },
-  { to: '/app/whatsapp', label: 'واتساب', description: 'الاتصال، النشاط، وضوابط الإرسال', icon: MessageCircle },
-  { to: '/app/staff', label: 'الموظفون', description: 'إدارة الموظفين وأدوارهم', icon: UserCog },
-  { to: '/app/audit-log', label: 'سجل التدقيق', description: 'سجل كل العمليات الحساسة في النادي', icon: ShieldCheck },
-  { to: '/app/settings', label: 'الإعدادات', description: 'هوية النادي، الأكاديمية، المدفوعات، والاشتراك', icon: Settings },
+  { to: '/app/customers', label: 'العملاء', description: 'البحث عن العملاء وإدارة بياناتهم', icon: Users, domain: 'customers' },
+  { to: '/app/billing', label: 'الفواتير والمدفوعات', description: 'سجل الفواتير والمدفوعات والمستحقات', icon: Receipt, domain: 'finance' },
+  { to: '/app/outstanding', label: 'المستحقات', description: 'الفواتير غير المسددة بالكامل', icon: CircleDollarSign, domain: 'finance' },
+  { to: '/app/cash-shift', label: 'وردية النقدية', description: 'فتح وإغلاق وردية الصندوق النقدي', icon: Wallet, domain: 'finance' },
+  { to: '/app/reports', label: 'التقارير', description: 'تقارير الإيرادات والإشغال والأكاديمية', icon: BarChart3, domain: 'reports' },
+  { to: '/app/fields', label: 'الفروع والملاعب', description: 'فروع النادي، الملاعب، مواعيد العمل، والأسعار', icon: Building2, domain: 'settings' },
+  { to: '/app/whatsapp', label: 'واتساب', description: 'الاتصال، النشاط، وضوابط الإرسال', icon: MessageCircle, domain: 'whatsapp' },
+  { to: '/app/staff', label: 'الموظفون', description: 'إدارة الموظفين وأدوارهم', icon: UserCog, domain: 'staff' },
+  { to: '/app/audit-log', label: 'سجل التدقيق', description: 'سجل كل العمليات الحساسة في النادي', icon: ShieldCheck, domain: 'settings' },
+  { to: '/app/settings', label: 'الإعدادات', description: 'هوية النادي، الأكاديمية، المدفوعات، والاشتراك', icon: Settings, domain: 'settings' },
 ]
 
 export function MorePage() {
+  const { currentMembership } = useAuth()
+  const visibleItems = ITEMS.filter((item) => canSeeNavDomain(currentMembership?.roleKey, item.domain))
+
   return (
     <div>
       <PageHeader title="المزيد" />
       <div className="flex flex-col gap-2">
-        {ITEMS.map((item) => (
+        {visibleItems.map((item) => (
           <Link key={item.to} to={item.to}>
             <Card className="transition hover:bg-muted/40">
               <CardContent className="flex items-center gap-3 p-4">
