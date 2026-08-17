@@ -17,12 +17,12 @@ Never stop mid-phase to send a report or wait for permission. After finishing an
 ## RESUME CURSOR
 
 ```
-current_phase: Phase 8 — WhatsApp module
-completed_phases: 1 (Audit), 2 (Target IA), 3 (Shared navigation foundation), 4 (Platform Owner), 5 (Club Settings restructure), 6 (Finance domain grouping), 7 (Reports tab-grouping)
-last_commit: 89af14f (Phase 7)
-test_status: tsc clean, build clean, live-verified in browser at 1280px width (4 group captions render, all 9 tabs present under correct groups, cross-group tab switching confirmed working with real data)
+current_phase: Phase 9 — Booking 360 (collect-payment action)
+completed_phases: 1 (Audit), 2 (Target IA), 3 (Shared navigation foundation), 4 (Platform Owner), 5 (Club Settings restructure), 6 (Finance domain grouping), 7 (Reports tab-grouping), 8 (WhatsApp module)
+last_commit: 175ef35 (Phase 8)
+test_status: tsc clean, build clean, live-verified in browser -- all 4 WhatsApp tabs render real data, Settings pointer link works, sidebar/MorePage نav entries present, BookingDetailSheet/CustomerDetailDialog contextual summaries confirmed (CustomerDetailDialog for "Mustafa" showed real "أُرسلت 1 رسالة واتساب" + working link; BookingDetailSheet's summary is conditional and correctly stayed hidden for a booking with zero matching notification_queue rows)
 blocker: none
-exact_next_action: Begin Phase 8 -- build the WhatsApp module per target IA §2: new /app/whatsapp route with 4 tabs (Overview/Activity/Connection/Settings). Move WhatsAppConnectionCard + MessagingSafetyCard out of SettingsPage's "الإشعارات" section into this module's Connection/Settings tabs respectively. Build the new "Activity" tab (per-message log reading notification_queue, filtered by club -- read-only view, no new backend logic since the data already exists). Add a nav-domain entry (new NavDomain value, e.g. 'whatsapp') so it appears in the sidebar/mobile nav per role. Add contextual "sent ✓ / view activity" summary lines to BookingDetailSheet and CustomerDetailDialog per target IA's "independent but connected" requirement -- read WhatsAppConnectionCard.tsx, MessagingSafetyCard.tsx, and the notification_queue schema first to confirm exact current structure before moving anything.
+exact_next_action: Begin Phase 9 -- add a "تحصيل الدفعة" (collect payment) action directly to BookingDetailSheet.tsx, reusing BillingPage's existing payment-recording RPC/logic rather than duplicating it (read BillingPage.tsx first to find the exact record_payment RPC call and its param shape). This lets staff collect an outstanding payment without leaving the booking they're already looking at -- currently BookingDetailSheet only shows the outstanding balance read-only, no action. Then Phase 10 (Customer Portal): give PortalBookingsPage a real /portal/bookings route, add cross-links between booking cards/QR/invoice via query params, and fix 2 confirmed silent-data-drop bugs (PortalAcademyPage showing only first active enrollment per player; PortalProfilePage showing only first linked customer record for multi-club guardians).
 
 NOTE: Phase 4 deliberately did NOT fix the 2 hardcoded-reason/method RPC calls on PlatformClubDetailPage (change_platform_plan, record_platform_payment) or the 2 direct-table-writes there that bypass RPCs -- these are real data-integrity/form-completeness findings from the audit but are NOT information-architecture problems (no screen/nav reorganization involved), and fixing them requires adding real form inputs (a scope-creep risk against "reorganize, don't invent features"). Logged here as a legitimate follow-up, deliberately deferred, not forgotten -- revisit after the core IA restructuring (all 12 phases) is complete, as a discrete follow-up task if the user wants it.
 ```
@@ -65,8 +65,10 @@ Verified: tsc clean, `npm run build` clean, live-verified in browser at 1280px w
 Restructured ReportsPage's 9 flat tabs into 4 labeled clusters (نظرة عامة / التشغيل / المالية / الأكاديمية والعملاء), matching the Phase 2 design decision already on record (reports share one genuine purpose -- presentation fix, not a route split). Implemented as 4 separate `TabsList` clusters (Radix's flat trigger list doesn't support non-trigger label children) each under its own caption, all 9 `TabsTrigger`s remaining siblings of one `Tabs.Root` so the single active-tab state and all existing `TabsContent` panels are completely unchanged -- zero data/RPC/route changes.
 
 Verified: tsc clean, `npm run build` clean, live-verified in browser at 1280px width -- all 4 group captions render, all 9 tabs present under the correct group, clicked a tab in a different group (Collections, inside المالية) and confirmed the content panel swapped correctly with real data (حسب الموظف/حسب الفرع).
-### Phase 8 — WhatsApp module: NOT STARTED
-### Phase 8 — WhatsApp module: NOT STARTED
+### Phase 8 — WhatsApp module: COMPLETE (commit `175ef35`)
+Built new `/app/whatsapp` route (`WhatsAppPage.tsx`) with 4 tabs matching target IA §2: نظرة عامة (new lightweight status+queue-count summary), النشاط (brand-new `WhatsAppActivityTab.tsx` -- per-message log reading `notification_queue`, filterable by status, the one genuinely new screen in this phase), الاتصال (`WhatsAppConnectionCard`, moved via `git mv` from `settings/` to a new `whatsapp/` feature directory -- zero logic changes), الإعدادات (`MessagingSafetyCard`, same move). `SettingsPage`'s "الإشعارات" section replaced with a pointer link (same de-duplication pattern as Phase 5's `ActivationPolicySetting`). Sidebar (`AppLayout`) and mobile hub (`MorePage`) both gained a "واتساب" nav entry using the `whatsapp` `NavDomain` that had existed since Phase 3 but was never actually used anywhere. Added small "sent ✓ / failed count" contextual summaries + a "عرض النشاط" link to `BookingDetailSheet` (via `notification_events.reference_id` join) and `CustomerDetailDialog` (via `notification_queue.recipient_customer_id` directly) -- summary only, no controls, per the directive's "independent but connected" requirement.
+
+Verified: tsc clean, `npm run build` clean, live-verified in browser -- Overview tab shows real connected status + queue counts (0 pending, 1 failed); Activity tab shows 8 real message rows with correct human-readable template labels, correct status badges, and the real connector error text on the failed row; Connection tab shows the live phone number/connected-since/last-seen (same data as before the move, confirming the relocation didn't break anything); Settings tab shows the full `MessagingSafetyCard` (categories, quiet hours, rate limits, diagnostics) with real data. Settings' الإشعارات section renders the pointer link. Sidebar's واتساب item present, correctly highlighted when active. `CustomerDetailDialog` opened for a real customer ("Mustafa") and showed the correct "أُرسلت 1 رسالة واتساب لهذا العميل ✓" summary with a working "عرض النشاط" link -- confirms the contextual summary query works end-to-end against real data, not just compiles.
 ### Phase 9 — Booking 360 (collect-payment action): NOT STARTED
 ### Phase 10 — Customer Portal: NOT STARTED
 ### Phase 11 — Role-based nav visibility: NOT STARTED
@@ -78,8 +80,9 @@ Verified: tsc clean, `npm run build` clean, live-verified in browser at 1280px w
 
 | Feature | Old location | New location | Moved? | Verified? |
 |---|---|---|---|---|
-| WhatsApp connection (QR/disconnect) | Settings → الإشعارات | `/app/whatsapp` → الاتصال | No (Phase 8) | No |
-| WhatsApp safety settings | Settings → الإشعارات | `/app/whatsapp` → الإعدادات | No (Phase 8) | No |
+| WhatsApp connection (QR/disconnect) | Settings → الإشعارات | `/app/whatsapp` → الاتصال | Yes | Yes (live-verified, real phone/connected-since/last-seen data) |
+| WhatsApp safety settings | Settings → الإشعارات | `/app/whatsapp` → الإعدادات | Yes | Yes (live-verified, real categories/quiet-hours/rate-limit/diagnostics data) |
+| WhatsApp message activity (new) | Nowhere (data existed, no view) | `/app/whatsapp` → النشاط | Yes (new screen) | Yes (live-verified, 8 real message rows with correct labels/status/error) |
 | Branches management | Settings → النادي | `/app/fields` → الفروع | Yes | Yes (live-verified, real branch data) |
 | Fields/hours/pricing management | Settings → إعدادات الحجوزات | `/app/fields` → الملاعب | Yes | Yes (live-verified, real field/pricing data) |
 | Audit log (club-side) | Settings → الأمان وسجل التدقيق | `/app/audit-log` | Yes | Yes (live-verified, human-readable labels) |
