@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Link } from 'react-router-dom'
 import QRCode from 'qrcode'
@@ -135,6 +135,14 @@ export function BookingDetailSheet({
   const [showCollectForm, setShowCollectForm] = useState(false)
   const [collectAmount, setCollectAmount] = useState('')
   const [collectMethod, setCollectMethod] = useState('cash')
+  // Security P0 fix (MAL3ABY_PRODUCTION_READINESS.md C3): one key per
+  // logical collection attempt, not per click -- generated lazily on
+  // first submit and reused verbatim if record_payment() is retried
+  // (network timeout, mutation retry), so the server-side idempotency
+  // check can recognize "same attempt" vs "genuinely new payment".
+  // Reset to null whenever the form is dismissed/reopened so the next
+  // distinct attempt gets its own fresh key.
+  const collectIdempotencyKeyRef = useRef<string | null>(null)
   const queryClient = useQueryClient()
 
   const { data: invoiceSummary } = useQuery({
@@ -206,14 +214,19 @@ export function BookingDetailSheet({
       if (amount - outstanding > 0.01) {
         throw new Error(`المبلغ (${amount.toFixed(2)}) يتجاوز المتبقي (${outstanding.toFixed(2)})`)
       }
+      if (!collectIdempotencyKeyRef.current) {
+        collectIdempotencyKeyRef.current = crypto.randomUUID()
+      }
       const { error } = await supabase.rpc('record_payment', {
         p_invoice_id: booking.invoiceId,
         p_amount: amount,
         p_method: collectMethod,
+        p_idempotency_key: collectIdempotencyKeyRef.current,
       })
       if (error) throw error
     },
     onSuccess: () => {
+      collectIdempotencyKeyRef.current = null
       setShowCollectForm(false)
       setCollectAmount('')
       setActionError(null)
@@ -362,7 +375,7 @@ export function BookingDetailSheet({
                     >
                       {collectPaymentMutation.isPending ? 'جارٍ التسجيل...' : 'تأكيد التحصيل'}
                     </Button>
-                    <Button variant="ghost" size="sm" onClick={() => { setShowCollectForm(false); setCollectAmount('') }}>تراجع</Button>
+                    <Button variant="ghost" size="sm" onClick={() => { setShowCollectForm(false); setCollectAmount(''); collectIdempotencyKeyRef.current = null }}>تراجع</Button>
                   </div>
                 </div>
               ) : (

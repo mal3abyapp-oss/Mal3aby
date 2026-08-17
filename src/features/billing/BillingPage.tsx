@@ -318,11 +318,20 @@ export function BillingPage() {
       // "two lines that together must not exceed the outstanding
       // balance" rather than two calls racing against the same stale
       // outstanding figure.
+      // Security P0 fix (MAL3ABY_PRODUCTION_READINESS.md C3): each
+      // split line's own `key` (already a stable per-line UUID, see
+      // splitLines state above) doubles as its idempotency key -- a
+      // retry of this same mutation (e.g. after line 1 succeeds and
+      // line 2's network call times out) resends the SAME key for
+      // line 1, which record_payment() now recognizes as the same
+      // attempt and returns the existing payment rather than
+      // recording it twice, while line 2 still gets its own fresh key.
       for (const line of validLines) {
         const { error } = await supabase.rpc('record_payment', {
           p_invoice_id: selectedInvoiceId,
           p_amount: Number(line.amount),
           p_method: line.method,
+          p_idempotency_key: line.key,
         })
         if (error) throw error
       }

@@ -2476,6 +2476,7 @@ export type Database = {
           club_id: string
           customer_id: string
           id: string
+          idempotency_key: string | null
           method: string
           received_at: string
           received_by: string | null
@@ -2488,6 +2489,7 @@ export type Database = {
           club_id: string
           customer_id: string
           id?: string
+          idempotency_key?: string | null
           method: string
           received_at?: string
           received_by?: string | null
@@ -2500,6 +2502,7 @@ export type Database = {
           club_id?: string
           customer_id?: string
           id?: string
+          idempotency_key?: string | null
           method?: string
           received_at?: string
           received_by?: string | null
@@ -3848,37 +3851,21 @@ export type Database = {
         Args: { p_explicit?: boolean; p_subscription_id: string }
         Returns: boolean
       }
-      _create_booking_internal:
-        | {
-            Args: {
-              p_booking_series_id: string
-              p_customer_id: string
-              p_discount_amount: number
-              p_end_at: string
-              p_field_id: string
-              p_notes: string
-              p_payment_amount: number
-              p_payment_method: string
-              p_record_payment: boolean
-              p_start_at: string
-            }
-            Returns: string
-          }
-        | {
-            Args: {
-              p_booking_series_id: string
-              p_customer_id: string
-              p_discount_amount: number
-              p_end_at: string
-              p_field_id: string
-              p_notes: string
-              p_payment_amount: number
-              p_payment_method: string
-              p_record_payment: boolean
-              p_start_at: string
-            }
-            Returns: string
-          }
+      _create_booking_internal: {
+        Args: {
+          p_booking_series_id: string
+          p_customer_id: string
+          p_discount_amount: number
+          p_end_at: string
+          p_field_id: string
+          p_notes: string
+          p_payment_amount: number
+          p_payment_method: string
+          p_record_payment: boolean
+          p_start_at: string
+        }
+        Returns: string
+      }
       _mint_booking_qr_token_internal: {
         Args: {
           p_booking_id: string
@@ -4329,6 +4316,7 @@ export type Database = {
       record_payment: {
         Args: {
           p_amount: number
+          p_idempotency_key?: string
           p_invoice_id: string
           p_method: string
           p_reference?: string
