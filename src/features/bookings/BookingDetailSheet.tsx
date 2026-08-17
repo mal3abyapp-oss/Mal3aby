@@ -148,10 +148,15 @@ export function BookingDetailSheet({
               </div>
               <div>
                 <p className="text-xs text-text-secondary">الوقت</p>
+                {/* Same RTL bidi-swap risk as StatCard's composite values
+                    (owner-level review finding) -- isolates the time
+                    range's direction from the surrounding Arabic context. */}
                 <p className="font-medium tabular-nums">
-                  {formatInstant(booking.startAt, clubTimezone, { hour: '2-digit', minute: '2-digit' })}
-                  {' — '}
-                  {formatInstant(booking.endAt, clubTimezone, { hour: '2-digit', minute: '2-digit' })}
+                  <bdi>
+                    {formatInstant(booking.startAt, clubTimezone, { hour: '2-digit', minute: '2-digit' })}
+                    {' — '}
+                    {formatInstant(booking.endAt, clubTimezone, { hour: '2-digit', minute: '2-digit' })}
+                  </bdi>
                 </p>
               </div>
             </div>

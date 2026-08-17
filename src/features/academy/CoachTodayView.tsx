@@ -154,7 +154,9 @@ export function CoachTodayView() {
             <CardContent className="flex items-center justify-between p-4">
               <div>
                 <p className="font-semibold">{s.groupName}</p>
-                <p className="text-sm text-text-secondary tabular-nums">{s.startTime} - {s.endTime}</p>
+                {/* Same RTL bidi-swap risk as StatCard's composite values
+                    (owner-level review finding). */}
+                <p className="text-sm text-text-secondary tabular-nums"><bdi>{s.startTime} - {s.endTime}</bdi></p>
               </div>
             </CardContent>
           </Card>

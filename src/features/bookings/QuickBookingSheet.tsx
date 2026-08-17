@@ -224,7 +224,9 @@ export function QuickBookingSheet({
               </div>
               <div>
                 <p className="text-xs text-text-secondary">الوقت</p>
-                <p className="font-medium tabular-nums">{slot.startTime} — {endTime}</p>
+                {/* Same RTL bidi-swap risk as StatCard's composite values
+                    (owner-level review finding). */}
+                <p className="font-medium tabular-nums"><bdi>{slot.startTime} — {endTime}</bdi></p>
               </div>
             </div>
 
