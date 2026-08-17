@@ -1,4 +1,5 @@
 import { useQuery } from '@tanstack/react-query'
+import { Link } from 'react-router-dom'
 import { supabase } from '@/lib/supabase/client'
 import {
   Dialog,
@@ -10,6 +11,28 @@ import { StatusBadge } from '@/components/ui/status-badge'
 import { MoneyDisplay } from '@/components/ui/money-display'
 import { BOOKING_STATUS_LABELS, BOOKING_STATUS_TONE } from '@/lib/domain/booking'
 import { fetchInvoicePaymentSummaries } from '@/lib/domain/billing'
+import { MessageCircle } from 'lucide-react'
+
+// IA restructuring (Phase 8): same "independent but connected"
+// contextual summary as BookingDetailSheet -- notification_queue rows
+// tie directly to a customer via recipient_customer_id, so no event
+// join is needed here (simpler than the booking case). Summary only,
+// no controls -- full management stays in the WhatsApp module.
+async function fetchCustomerWhatsAppSummary(customerId: string): Promise<{ sentCount: number; failedCount: number }> {
+  const { data, error } = await supabase
+    .from('notification_queue')
+    .select('status')
+    .eq('channel', 'whatsapp')
+    .eq('recipient_customer_id', customerId)
+  if (error) throw error
+  let sentCount = 0
+  let failedCount = 0
+  for (const r of data ?? []) {
+    if (r.status === 'sent') sentCount++
+    else if (r.status === 'failed' || r.status === 'expired') failedCount++
+  }
+  return { sentCount, failedCount }
+}
 
 // Section K: Customer detail must not be CRUD-only -- identity, recent
 // bookings, invoices/outstanding, and linked players/guardian
@@ -84,6 +107,12 @@ export function CustomerDetailDialog({ customerId, customerName, onOpenChange }:
     enabled: !!customerId,
   })
 
+  const { data: whatsappSummary } = useQuery({
+    queryKey: ['customer-whatsapp-summary', customerId],
+    queryFn: () => fetchCustomerWhatsAppSummary(customerId!),
+    enabled: !!customerId,
+  })
+
   const totalOutstanding = data?.invoices.reduce((sum, i) => sum + i.outstanding, 0) ?? 0
 
   return (
@@ -98,6 +127,20 @@ export function CustomerDetailDialog({ customerId, customerName, onOpenChange }:
               <div className="rounded-lg border border-status-danger/30 bg-status-danger/5 p-3">
                 <span className="text-sm text-text-secondary">إجمالي المستحق: </span>
                 <MoneyDisplay amount={totalOutstanding} tone="danger" />
+              </div>
+            )}
+
+            {whatsappSummary && (whatsappSummary.sentCount > 0 || whatsappSummary.failedCount > 0) && (
+              <div className="flex items-center justify-between text-xs">
+                <span className="flex items-center gap-1.5 text-text-secondary">
+                  <MessageCircle className="size-3.5" />
+                  {whatsappSummary.failedCount > 0
+                    ? `فشل إرسال ${whatsappSummary.failedCount} رسالة واتساب لهذا العميل`
+                    : `أُرسلت ${whatsappSummary.sentCount} رسالة واتساب لهذا العميل ✓`}
+                </span>
+                <Link to="/app/whatsapp" className="font-medium text-accent-foreground hover:underline">
+                  عرض النشاط
+                </Link>
               </div>
             )}
 

@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { useMutation, useQuery } from '@tanstack/react-query'
+import { Link } from 'react-router-dom'
 import QRCode from 'qrcode'
 import { supabase } from '@/lib/supabase/client'
 import {
@@ -15,6 +16,48 @@ import { Separator } from '@/components/ui/separator'
 import { BOOKING_STATUS_LABELS, BOOKING_STATUS_TONE, type BookingRow } from '@/lib/domain/booking'
 import { formatInstant } from '@/lib/domain/time'
 import { fetchInvoicePaymentSummaries, PAYMENT_STATUS_LABELS, type InvoicePaymentSummary } from '@/lib/domain/billing'
+import { MessageCircle } from 'lucide-react'
+
+// IA restructuring (Phase 8): "independent but connected" -- WhatsApp
+// management lives entirely in its own module now (/app/whatsapp), but
+// a booking is exactly the kind of place a staff member wants a quick
+// "did we actually notify this customer?" answer without leaving the
+// booking they're already looking at. Reads the same notification_queue
+// data the Activity tab reads, scoped to this booking's own events via
+// notification_events.reference_id -- summary only, no send/retry
+// controls here (those stay in the WhatsApp module, avoiding duplicated
+// business logic).
+interface WhatsAppSummary {
+  sentCount: number
+  failedCount: number
+  pendingCount: number
+}
+
+async function fetchBookingWhatsAppSummary(bookingId: string): Promise<WhatsAppSummary> {
+  const { data: events, error: eventsError } = await supabase
+    .from('notification_events')
+    .select('id')
+    .eq('reference_type', 'booking')
+    .eq('reference_id', bookingId)
+  if (eventsError) throw eventsError
+  const eventIds = (events ?? []).map((e) => e.id)
+  if (eventIds.length === 0) return { sentCount: 0, failedCount: 0, pendingCount: 0 }
+
+  const { data: rows, error: queueError } = await supabase
+    .from('notification_queue')
+    .select('status')
+    .eq('channel', 'whatsapp')
+    .in('event_id', eventIds)
+  if (queueError) throw queueError
+
+  const summary = { sentCount: 0, failedCount: 0, pendingCount: 0 }
+  for (const r of rows ?? []) {
+    if (r.status === 'sent') summary.sentCount++
+    else if (r.status === 'failed' || r.status === 'expired') summary.failedCount++
+    else summary.pendingCount++
+  }
+  return summary
+}
 
 // Section E4 — Booking Detail: everything an employee needs to act on a
 // booking, surfaced directly (not behind further navigation): customer,
@@ -63,6 +106,12 @@ export function BookingDetailSheet({
     queryKey: ['booking-invoice-summary', booking?.invoiceId],
     queryFn: () => fetchInvoiceSummary(booking!.invoiceId!),
     enabled: !!booking?.invoiceId,
+  })
+
+  const { data: whatsappSummary } = useQuery({
+    queryKey: ['booking-whatsapp-summary', booking?.id],
+    queryFn: () => fetchBookingWhatsAppSummary(booking!.id),
+    enabled: !!booking?.id,
   })
 
   const qrMutation = useMutation({
@@ -201,6 +250,25 @@ export function BookingDetailSheet({
                 <div>
                   <p className="text-xs text-text-secondary">ملاحظات</p>
                   <p>{booking.notes}</p>
+                </div>
+              </>
+            )}
+
+            {whatsappSummary && (whatsappSummary.sentCount > 0 || whatsappSummary.failedCount > 0 || whatsappSummary.pendingCount > 0) && (
+              <>
+                <Separator />
+                <div className="flex items-center justify-between text-xs">
+                  <span className="flex items-center gap-1.5 text-text-secondary">
+                    <MessageCircle className="size-3.5" />
+                    {whatsappSummary.failedCount > 0
+                      ? `فشل إرسال ${whatsappSummary.failedCount} رسالة واتساب`
+                      : whatsappSummary.pendingCount > 0
+                        ? 'رسالة واتساب قيد الإرسال'
+                        : `أُرسلت ${whatsappSummary.sentCount} رسالة واتساب ✓`}
+                  </span>
+                  <Link to="/app/whatsapp" className="font-medium text-accent-foreground hover:underline">
+                    عرض النشاط
+                  </Link>
                 </div>
               </>
             )}

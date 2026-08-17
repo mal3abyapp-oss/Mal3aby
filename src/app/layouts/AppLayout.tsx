@@ -22,6 +22,7 @@ import {
   ScanLine,
   MoreHorizontal,
   LogOut,
+  MessageCircle,
 } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 
@@ -86,6 +87,12 @@ const navSections: NavSection[] = [
     titleKey: null,
     items: [
       { to: '/app/reports', labelKey: 'nav.reports', icon: BarChart3, domain: 'reports' },
+      // IA restructuring (Phase 8): WhatsApp promoted to an independent
+      // top-level sidebar item -- previously reachable only via
+      // Settings' "الإشعارات" section, now has a real nav presence
+      // matching the directive's "independent but connected module"
+      // instruction.
+      { to: '/app/whatsapp', labelKey: 'nav.whatsapp', icon: MessageCircle, domain: 'whatsapp' },
       { to: '/app/staff', labelKey: 'nav.staff', icon: UserCog, domain: 'staff' },
       { to: '/app/settings', labelKey: 'nav.settings', icon: Settings, domain: 'settings' },
     ],

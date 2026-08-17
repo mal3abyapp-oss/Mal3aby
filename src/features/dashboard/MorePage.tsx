@@ -1,7 +1,7 @@
 import { Link } from 'react-router-dom'
 import { PageHeader } from '@/components/ui/page-header'
 import { Card, CardContent } from '@/components/ui/card'
-import { Users, Receipt, Wallet, BarChart3, UserCog, Settings, ChevronLeft, CircleDollarSign, Building2, ShieldCheck } from 'lucide-react'
+import { Users, Receipt, Wallet, BarChart3, UserCog, Settings, ChevronLeft, CircleDollarSign, Building2, ShieldCheck, MessageCircle } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 
 // Section M: mobile bottom nav stays minimal (اليوم/الحجوزات/مسح/
@@ -22,6 +22,11 @@ import type { LucideIcon } from 'lucide-react'
 // mobile as Outstanding was before Phase 3. Settings' description
 // updated to match its narrowed scope (branches/fields/staff/audit all
 // moved to their own destinations).
+//
+// IA restructuring (Phase 8): "واتساب" added -- gained its own route
+// (/app/whatsapp) when promoted out of Settings into an independent
+// top-level module; same discoverability requirement as the Phase 5
+// additions above.
 interface MoreItem {
   to: string
   label: string
@@ -36,6 +41,7 @@ const ITEMS: MoreItem[] = [
   { to: '/app/cash-shift', label: 'وردية النقدية', description: 'فتح وإغلاق وردية الصندوق النقدي', icon: Wallet },
   { to: '/app/reports', label: 'التقارير', description: 'تقارير الإيرادات والإشغال والأكاديمية', icon: BarChart3 },
   { to: '/app/fields', label: 'الفروع والملاعب', description: 'فروع النادي، الملاعب، مواعيد العمل، والأسعار', icon: Building2 },
+  { to: '/app/whatsapp', label: 'واتساب', description: 'الاتصال، النشاط، وضوابط الإرسال', icon: MessageCircle },
   { to: '/app/staff', label: 'الموظفون', description: 'إدارة الموظفين وأدوارهم', icon: UserCog },
   { to: '/app/audit-log', label: 'سجل التدقيق', description: 'سجل كل العمليات الحساسة في النادي', icon: ShieldCheck },
   { to: '/app/settings', label: 'الإعدادات', description: 'هوية النادي، الأكاديمية، المدفوعات، والاشتراك', icon: Settings },

@@ -9,8 +9,6 @@ import { EntitlementsCard } from '@/features/clubs/EntitlementsCard'
 import { ActivationPolicySetting } from '@/features/academy/EnrollmentSection'
 import { PaymentMethodsCard } from '@/features/billing/PaymentMethodsCard'
 import { PaymentGatewaysCard } from '@/features/billing/PaymentGatewaysCard'
-import { WhatsAppConnectionCard } from './WhatsAppConnectionCard'
-import { MessagingSafetyCard } from './MessagingSafetyCard'
 
 // P1-7 (critical usability fix pass, 2026-08-16): Settings was a
 // dumping ground -- /app/settings rendered only the Audit Log Viewer,
@@ -31,10 +29,13 @@ import { MessagingSafetyCard } from './MessagingSafetyCard'
 //     its own sidebar item, this card only ever linked to it)
 //   - Audit log -> /app/audit-log (a monitoring/security concern, not
 //     settings)
-// WhatsApp (WhatsAppConnectionCard/MessagingSafetyCard) stays here for
-// now -- migration plan Phase 8 gives it a full top-level module with
-// its own Activity/Overview tabs; moving it before that module exists
-// would strand it with no upgrade path.
+//
+// IA restructuring (Phase 8): WhatsApp (WhatsAppConnectionCard /
+// MessagingSafetyCard) moved out to its own top-level module
+// (/app/whatsapp, 4 tabs) per the directive's explicit instruction --
+// a link replaces the two cards, same de-duplication pattern used for
+// ActivationPolicySetting in Phase 5.
+//
 // What remains is true club-identity/business configuration: club
 // identity, academy activation policy, payment method/gateway config,
 // and platform-subscription status.
@@ -73,10 +74,14 @@ export function SettingsPage() {
 
       <section className="flex flex-col gap-4">
         <h2 className="text-sm font-semibold text-text-secondary">الإشعارات</h2>
-        <div className="grid gap-4 lg:grid-cols-2">
-          <WhatsAppConnectionCard />
-          <MessagingSafetyCard />
-        </div>
+        <Card>
+          <CardContent className="flex items-center justify-between pt-6">
+            <p className="text-sm text-text-secondary">اتصال واتساب، ضوابط الإرسال، وسجل الرسائل تُدار من صفحة واتساب المخصصة.</p>
+            <Button asChild size="sm" variant="outline">
+              <Link to="/app/whatsapp">فتح صفحة واتساب</Link>
+            </Button>
+          </CardContent>
+        </Card>
       </section>
 
       <section className="flex flex-col gap-4">

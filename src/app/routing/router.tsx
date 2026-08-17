@@ -33,6 +33,7 @@ import { StaffPage } from '@/features/staff/StaffPage'
 import { SettingsPage } from '@/features/settings/SettingsPage'
 import { BranchesFieldsPage } from '@/features/clubs/BranchesFieldsPage'
 import { AuditLogPage } from '@/features/settings/AuditLogPage'
+import { WhatsAppPage } from '@/features/whatsapp/WhatsAppPage'
 import { ScanPage } from '@/features/scanner/ScanPage'
 
 import { PortalRoot } from '@/features/portal/PortalRoot'
@@ -120,6 +121,11 @@ export const router = createBrowserRouter([
           // standalone wrapper but had no registered route (confirmed
           // dead code in the audit) -- this is that route.
           { path: 'audit-log', element: <AuditLogPage /> },
+          // IA restructuring (Phase 8): WhatsApp promoted to an
+          // independent top-level module per the directive's explicit
+          // instruction -- 4 tabs (Overview/Activity/Connection/
+          // Settings), no longer buried inside Settings' "الإشعارات".
+          { path: 'whatsapp', element: <WhatsAppPage /> },
           // P1-7 (critical usability fix pass, 2026-08-16), narrowed in
           // IA restructuring Phase 5: "الإعدادات" now covers only true
           // club-identity/configuration settings -- club identity,
