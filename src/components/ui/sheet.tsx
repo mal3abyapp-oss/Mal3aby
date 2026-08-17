@@ -36,15 +36,22 @@ SheetOverlay.displayName = SheetPrimitive.Overlay.displayName
 // wants "the reading-start edge" was forced to hardcode side="right"
 // and explain why in a comment (see PlatformLayout.tsx's mobile Sheet)
 // -- correct only while the app stays Arabic/RTL, silently wrong the
-// moment a user toggles to English via LanguageSwitcher (a Sheet meant
-// to open from the reading-start edge would then open from the
-// physical right, the wrong edge in LTR). Switched to logical CSS
-// (`start-0`/`end-0`, `border-s`/`border-e`) so the SAME `side="right"`
-// prop callers already pass keeps meaning "the reading-start edge" in
-// both directions, without any caller needing to change. `left`/`right`
-// prop names are kept (not renamed to start/end) to avoid a breaking
-// API change across every existing call site -- only their underlying
-// CSS implementation became direction-aware.
+// moment a user toggles to English via LanguageSwitcher.
+//
+// Fix, verified live in-browser in both directions: `side="right"`
+// must keep meaning "the reading-start edge" -- physical right in
+// Arabic (RTL reads right-to-left, so content starts at the right),
+// physical LEFT in English (LTR reads left-to-right, content starts at
+// the left). That is exactly what CSS logical `start`/`end` express:
+// `inset-inline-start` resolves to `right` under `dir="rtl"` and `left`
+// under `dir="ltr"` automatically -- so `side="right"` maps to
+// `start-0`/`border-e`, and `side="left"` (reading-END edge) maps to
+// `end-0`/`border-s`. (An earlier pass here had this backwards --
+// mapped `right` to `end-0` -- which produced the same physical-right
+// position in both directions instead of flipping; caught and fixed
+// via live LTR verification in the browser, not just by reading the
+// CSS.) `left`/`right` prop names are kept unchanged (not renamed to
+// start/end) so no caller needs to change.
 const sheetVariants = cva(
   "fixed z-50 gap-4 bg-background p-6 shadow-lg transition ease-in-out data-[state=closed]:duration-300 data-[state=open]:duration-500 data-[state=open]:animate-in data-[state=closed]:animate-out",
   {
@@ -53,9 +60,9 @@ const sheetVariants = cva(
         top: "inset-x-0 top-0 border-b data-[state=closed]:slide-out-to-top data-[state=open]:slide-in-from-top",
         bottom:
           "inset-x-0 bottom-0 border-t data-[state=closed]:slide-out-to-bottom data-[state=open]:slide-in-from-bottom",
-        left: "inset-y-0 start-0 h-full w-3/4 border-e data-[state=closed]:slide-out-to-left rtl:data-[state=closed]:slide-out-to-right data-[state=open]:slide-in-from-left rtl:data-[state=open]:slide-in-from-right sm:max-w-sm",
+        left: "inset-y-0 end-0 h-full w-3/4 border-s data-[state=closed]:slide-out-to-right rtl:data-[state=closed]:slide-out-to-left data-[state=open]:slide-in-from-right rtl:data-[state=open]:slide-in-from-left sm:max-w-sm",
         right:
-          "inset-y-0 end-0 h-full w-3/4 border-s data-[state=closed]:slide-out-to-right rtl:data-[state=closed]:slide-out-to-left data-[state=open]:slide-in-from-right rtl:data-[state=open]:slide-in-from-left sm:max-w-sm",
+          "inset-y-0 start-0 h-full w-3/4 border-e data-[state=closed]:slide-out-to-left rtl:data-[state=closed]:slide-out-to-right data-[state=open]:slide-in-from-left rtl:data-[state=open]:slide-in-from-right sm:max-w-sm",
       },
     },
     defaultVariants: {
