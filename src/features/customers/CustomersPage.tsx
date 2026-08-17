@@ -1,4 +1,5 @@
 import { useState, type FormEvent } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '@/lib/supabase/client'
 import { useAuth } from '@/app/providers/AuthProvider'
@@ -76,7 +77,12 @@ function normalizeMobile(input: string): string {
 export function CustomersPage() {
   const { currentClubId } = useAuth()
   const queryClient = useQueryClient()
-  const [search, setSearch] = useState('')
+  // Master IA/UX audit (Reports decomposition phase): reports must not
+  // be dead ends -- a "top spenders" list row now links here with
+  // ?q=<name> so the customer is pre-searched instead of landing on an
+  // empty list the manager has to re-search by hand.
+  const [searchParams] = useSearchParams()
+  const [search, setSearch] = useState(() => searchParams.get('q') ?? '')
   const [dialogOpen, setDialogOpen] = useState(false)
   const [fullName, setFullName] = useState('')
   const [mobile, setMobile] = useState('')

@@ -83,9 +83,13 @@ export function OwnerFinanceTransparency() {
           </div>
         )}
 
+        {/* Master IA/UX audit (Reports decomposition phase): Reports is
+            no longer one tabbed screen -- link straight to the
+            Exceptions report instead of the generic Overview, since
+            that's exactly what this alert is about. */}
         {hasExceptions && (
           <button
-            onClick={() => navigate('/app/reports')}
+            onClick={() => navigate('/app/reports/exceptions')}
             className="flex items-center justify-between gap-2 rounded-md border border-status-warning/40 bg-status-warning/5 p-2.5 text-start text-sm hover:bg-status-warning/10"
           >
             <span>يوجد استثناءات مالية اليوم</span>

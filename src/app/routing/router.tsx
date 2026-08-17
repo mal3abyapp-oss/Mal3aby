@@ -28,7 +28,15 @@ import { BillingPage } from '@/features/billing/BillingPage'
 import { CashShiftPage } from '@/features/billing/CashShiftPage'
 import { SubscriptionPage } from '@/features/billing/SubscriptionPage'
 import { OutstandingPage } from '@/features/billing/OutstandingPage'
-import { ReportsPage } from '@/features/reports/ReportsPage'
+import { ReportsOverviewPage } from '@/features/reports/ReportsOverviewPage'
+import { ReportBookingsPage } from '@/features/reports/ReportBookingsPage'
+import { ReportOccupancyPage } from '@/features/reports/ReportOccupancyPage'
+import { ReportRevenuePage } from '@/features/reports/ReportRevenuePage'
+import { ReportCollectionsPage } from '@/features/reports/ReportCollectionsPage'
+import { ReportPaymentMethodsPage } from '@/features/reports/ReportPaymentMethodsPage'
+import { ReportExceptionsPage } from '@/features/reports/ReportExceptionsPage'
+import { ReportAcademyPage } from '@/features/reports/ReportAcademyPage'
+import { ReportCustomersPage } from '@/features/reports/ReportCustomersPage'
 import { StaffPage } from '@/features/staff/StaffPage'
 import { SettingsPage } from '@/features/settings/SettingsPage'
 import { BranchesFieldsPage } from '@/features/clubs/BranchesFieldsPage'
@@ -104,7 +112,23 @@ export const router = createBrowserRouter([
           { path: 'cash-shift', element: <CashShiftPage /> },
           { path: 'subscription', element: <SubscriptionPage /> },
           { path: 'outstanding', element: <OutstandingPage /> },
-          { path: 'reports', element: <ReportsPage /> },
+          // Master IA/UX audit (Reports decomposition phase): the old
+          // single /app/reports route rendered a 1127-line file with
+          // 9 tabs sharing one Tabs.Root -- visual grouping (a prior
+          // IA pass) was correctly identified as NOT real
+          // decomposition. Split into real routed screens, one per
+          // report, each independently bundled/testable/linkable.
+          // /app/reports itself is now the Overview/landing screen,
+          // not a tab among equals.
+          { path: 'reports', element: <ReportsOverviewPage /> },
+          { path: 'reports/bookings', element: <ReportBookingsPage /> },
+          { path: 'reports/occupancy', element: <ReportOccupancyPage /> },
+          { path: 'reports/revenue', element: <ReportRevenuePage /> },
+          { path: 'reports/collections', element: <ReportCollectionsPage /> },
+          { path: 'reports/payment-methods', element: <ReportPaymentMethodsPage /> },
+          { path: 'reports/exceptions', element: <ReportExceptionsPage /> },
+          { path: 'reports/academy', element: <ReportAcademyPage /> },
+          { path: 'reports/customers', element: <ReportCustomersPage /> },
           // P1-7: /app/club's content moved into the new Settings hub
           // originally, then further split in the IA restructuring
           // (Phase 5) -- kept as a redirect for any stale links/
