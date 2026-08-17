@@ -19,7 +19,13 @@ Mala3by is a multi-tenant operations system for sports clubs and football academ
 
 ## What this is not (V1)
 
-No `organizations` layer above clubs (fully removed, not a placeholder — see [DECISIONS.md ADR-011](docs/DECISIONS.md#adr-011--organizations-removed-entirely-from-v1-schema)), no online payments, no WhatsApp/SMS, no native apps, no AI features, no full accounting suite, no customer self-service portal. See [docs/DECISIONS.md](docs/DECISIONS.md) and the V1/Deferred matrix in [docs/IMPLEMENTATION_PLAN.md](docs/IMPLEMENTATION_PLAN.md) for what's deferred and why.
+No `organizations` layer above clubs (fully removed, not a placeholder — see [DECISIONS.md ADR-011](docs/DECISIONS.md#adr-011--organizations-removed-entirely-from-v1-schema)), no native apps, no AI features, no full accounting suite. (WhatsApp notifications, a customer/guardian self-service portal at `/portal`, and Stripe/PayPal gateway adapters were added after the initial V1 scope and are live — see below.) See [docs/DECISIONS.md](docs/DECISIONS.md) and the V1/Deferred matrix in [docs/IMPLEMENTATION_PLAN.md](docs/IMPLEMENTATION_PLAN.md) for what's still deferred and why.
+
+## Since V1
+
+- **WhatsApp notifications** — local Baileys-based connector (QR pairing, session persistence, reconnect) sends real booking/payment/invoice notifications, with a full anti-abuse layer: consent, quiet hours, per-account rate limits, circuit breaker, dedup. No Meta Business API involved.
+- **Customer/guardian self-service portal** (`/portal`) — booking history, academy enrollment, payments, QR credentials, profile.
+- **Payment gateway architecture** — Stripe and PayPal adapters (adapter pattern), alongside the original manual/cash/InstaPay/bank/POS methods.
 
 ## Tech stack
 

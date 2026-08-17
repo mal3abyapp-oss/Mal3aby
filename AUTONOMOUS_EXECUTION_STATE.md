@@ -1,5 +1,25 @@
 # Autonomous Execution State
 
+> **SUPERSEDED NOTICE (added 2026-08-17, Owner-Level Review Phase 50 —
+> documentation reconciliation):** this file's content below stops
+> being an accurate description of current product state partway
+> through (its "Next exact task" section ends at task #82, and its
+> WhatsApp-removal narrative below is real history but was never
+> reconciled after a *later* directive reintroduced WhatsApp). Current
+> facts, for the record: **WhatsApp is live** — a real Baileys
+> connector (`whatsapp-connector/`) with QR pairing, session
+> persistence, and a full anti-abuse Safe Messaging layer (consent,
+> quiet hours, rate limits, circuit breaker) — see tasks #91–#105 in
+> the task tracker and `PROFESSIONAL_OWNER_REVIEW_STATE.md`. The
+> payment domain track (#80–#90) below completed in full, followed by
+> the WhatsApp re-integration and Safe Messaging tracks, followed by
+> this session's Master Owner-Level Review (see
+> `PROFESSIONAL_OWNER_REVIEW_STATE.md` for the authoritative current
+> state and resume cursor — that file, not this one, is the live
+> source of truth from 2026-08-17 onward). This file is kept as-is
+> below for historical/decision-log value; do not read it as current
+> state past task #82.
+
 Continuously updated. Governing directive: **"MASTER AUTONOMOUS FINAL
 DIRECTIVE"** (2026-08-16) — supersedes the earlier "MASTER AUTONOMOUS
 DIRECTIVE V3" (Doc 3). Explicit full-autonomy mode: no questions, no
