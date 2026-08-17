@@ -1,0 +1,12 @@
+-- Historical record: this version of get_payment_method_report()
+-- (task #87) used a LEFT JOIN from the collected-payments side, which
+-- would silently drop any method that had refunds in the period but
+-- zero fresh collections in that same period -- a real edge case (a
+-- method used only in an earlier period, refunded in this one).
+-- Superseded moments later by 20260817064658_payment_method_report.sql,
+-- which uses a FULL OUTER JOIN so both sides are always represented
+-- (0-coalesced), before this file's original content was ever
+-- committed to the repo. Recreated here as a no-op (empty) migration
+-- purely so the local migration file set matches Supabase's actual
+-- applied version history one-to-one.
+select 1;

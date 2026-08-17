@@ -2285,6 +2285,67 @@ export type Database = {
           },
         ]
       }
+      payment_reconciliations: {
+        Row: {
+          branch_id: string | null
+          club_id: string
+          id: string
+          method: string
+          note: string | null
+          period_end: string
+          period_start: string
+          reconciled_at: string
+          reconciled_by: string
+          reconciled_total: number
+        }
+        Insert: {
+          branch_id?: string | null
+          club_id: string
+          id?: string
+          method: string
+          note?: string | null
+          period_end: string
+          period_start: string
+          reconciled_at?: string
+          reconciled_by: string
+          reconciled_total: number
+        }
+        Update: {
+          branch_id?: string | null
+          club_id?: string
+          id?: string
+          method?: string
+          note?: string | null
+          period_end?: string
+          period_start?: string
+          reconciled_at?: string
+          reconciled_by?: string
+          reconciled_total?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "payment_reconciliations_branch_id_fkey"
+            columns: ["branch_id"]
+            isOneToOne: false
+            referencedRelation: "branches"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "payment_reconciliations_club_id_fkey"
+            columns: ["club_id"]
+            isOneToOne: false
+            referencedRelation: "clubs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "payment_reconciliations_club_id_fkey"
+            columns: ["club_id"]
+            isOneToOne: false
+            referencedRelation: "commercial_entitlements_usage"
+            referencedColumns: ["club_id"]
+          },
+        ]
+      }
       payments: {
         Row: {
           amount: number
@@ -3745,6 +3806,17 @@ export type Database = {
           trial_granted: boolean
         }[]
       }
+      confirm_payment_reconciliation: {
+        Args: {
+          p_branch_id?: string
+          p_club_id: string
+          p_method: string
+          p_note?: string
+          p_period_end: string
+          p_period_start: string
+        }
+        Returns: string
+      }
       create_booking: {
         Args: {
           p_customer_id: string
@@ -3936,6 +4008,15 @@ export type Database = {
       }
       get_open_cash_shift_status: {
         Args: { p_shift_id: string }
+        Returns: Json
+      }
+      get_payment_method_report: {
+        Args: {
+          p_branch_id?: string
+          p_club_id: string
+          p_end_date: string
+          p_start_date: string
+        }
         Returns: Json
       }
       get_platform_club_owners: {
