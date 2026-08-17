@@ -66,7 +66,17 @@ async function fetchAcademyRisk(clubId: string): Promise<AcademyRisk> {
   }
 }
 
+// Master IA/UX audit (Club Side TodayPage phase): every NOW/NEXT row
+// and every StatCard on this "operational command center" screen was a
+// dead-end -- a manager glancing at "حجوزات اليوم: 12" or a NOW row had
+// no way to reach the actual booking without leaving to search
+// BookingsPage manually. Rows now navigate to /app/bookings (the
+// bookings list, not a specific booking sheet -- BookingDetailSheet
+// opens from a full BookingRow object in BookingsPage's own state, not
+// a route/id, so a true per-booking deep-link isn't available without
+// new routing infra).
 function BookingListCard({ title, bookings }: { title: string; bookings: DashboardData['now_bookings'] }) {
+  const navigate = useNavigate()
   return (
     <Card>
       <CardHeader>
@@ -77,7 +87,11 @@ function BookingListCard({ title, bookings }: { title: string; bookings: Dashboa
           <p className="text-sm text-text-secondary">لا يوجد</p>
         ) : (
           bookings.map((b) => (
-            <div key={b.id} className="flex items-center justify-between rounded-md border border-border p-2 text-sm">
+            <button
+              key={b.id}
+              onClick={() => navigate('/app/bookings')}
+              className="flex items-center justify-between rounded-md border border-border p-2 text-start text-sm hover:bg-muted/40"
+            >
               <div>
                 <p className="font-medium">{b.field_name}</p>
                 <p className="text-text-secondary">{b.customer_name}</p>
@@ -91,7 +105,7 @@ function BookingListCard({ title, bookings }: { title: string; bookings: Dashboa
                   label={BOOKING_STATUS_LABELS[b.status] ?? b.status}
                 />
               </div>
-            </div>
+            </button>
           ))
         )}
       </CardContent>
@@ -162,32 +176,42 @@ export function TodayPage() {
 
       {data && (isManager || isReception) && (
         <div className="mb-6 grid grid-cols-2 gap-3 md:grid-cols-4">
-          <StatCard label="حجوزات اليوم" value={data.bookings_today_count} icon={CalendarDays} />
-          <StatCard label="تم تسجيل الحضور" value={data.checked_in_count} icon={CheckCircle2} tone="success" />
+          <StatCard label="حجوزات اليوم" value={data.bookings_today_count} icon={CalendarDays} to="/app/bookings" />
+          <StatCard label="تم تسجيل الحضور" value={data.checked_in_count} icon={CheckCircle2} tone="success" to="/app/bookings" />
           <StatCard
             label="الملاعب المشغولة الآن"
             value={`${data.fields_occupied_now_count} / ${data.fields_active_count}`}
             icon={Landmark}
+            to="/app/fields"
           />
           {isManager && (
-            <StatCard label="إيرادات اليوم" value={formatMoney(data.revenue_today)} icon={Wallet} />
+            <StatCard label="إيرادات اليوم" value={formatMoney(data.revenue_today)} icon={Wallet} to="/app/billing" />
           )}
         </div>
       )}
 
       {data && isManager && data.outstanding_total > 0 && (
         <div className="mb-6">
-          <StatCard label="إجمالي المستحقات" value={formatMoney(data.outstanding_total)} tone="danger" />
+          <StatCard label="إجمالي المستحقات" value={formatMoney(data.outstanding_total)} tone="danger" to="/app/outstanding" />
         </div>
       )}
 
+      {/* Master IA/UX audit: "على وشك الانتهاء" (expiring-soon count)
+          duplicated the exact same 3-day-window signal AttentionNeeded
+          already itemizes per-player with a direct link -- a manager
+          scanning this screen saw the same underlying risk represented
+          twice, once as a bare unclickable count, once as real
+          actionable rows. Dropped the redundant count card; the
+          itemized version in AttentionNeeded below is the real one.
+          The remaining 4 cards are informational counts (not
+          "needs a decision today" items) but still get drill-down
+          links since they're clickable now rather than dead numbers. */}
       {isManager && academyRisk && (
-        <div className="mb-6 grid grid-cols-2 gap-3 md:grid-cols-5">
-          <StatCard label="اشتراكات نشطة" value={academyRisk.activeSubscriptions} icon={GraduationCap} />
-          <StatCard label="على وشك الانتهاء" value={academyRisk.expiringSoon} tone={academyRisk.expiringSoon > 0 ? 'warning' : 'default'} />
-          <StatCard label="اشتراكات غير مدفوعة" value={academyRisk.unpaid} tone={academyRisk.unpaid > 0 ? 'danger' : 'default'} />
-          <StatCard label="حصص اليوم" value={academyRisk.sessionsToday} />
-          <StatCard label="عملاء جدد اليوم" value={academyRisk.newCustomersToday} tone="success" />
+        <div className="mb-6 grid grid-cols-2 gap-3 md:grid-cols-4">
+          <StatCard label="اشتراكات نشطة" value={academyRisk.activeSubscriptions} icon={GraduationCap} to="/app/academy" />
+          <StatCard label="اشتراكات غير مدفوعة" value={academyRisk.unpaid} tone={academyRisk.unpaid > 0 ? 'danger' : 'default'} to="/app/academy" />
+          <StatCard label="حصص اليوم" value={academyRisk.sessionsToday} to="/app/academy" />
+          <StatCard label="عملاء جدد اليوم" value={academyRisk.newCustomersToday} tone="success" to="/app/customers" />
         </div>
       )}
 
