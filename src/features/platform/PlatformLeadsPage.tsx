@@ -50,8 +50,28 @@ export function PlatformLeadsPage() {
 
   const columns: DataTableColumn<LeadRow>[] = [
     { key: 'name', header: 'الاسم', render: (l) => l.name },
-    { key: 'phone', header: 'الهاتف', render: (l) => l.phone },
+    { key: 'phone', header: 'الهاتف', render: (l) => <bdi>{l.phone}</bdi> },
+    // Master IA/UX audit (Platform Owner phase, Audit 5): email and
+    // message were fetched via `select('*')` but never rendered in any
+    // column -- a lead's actual inquiry text was invisible here, only
+    // reachable by querying the DB directly. Message is shown truncated
+    // with the full text in a native title tooltip (no expandable-row
+    // component exists yet in this DataTable, and building one is out
+    // of scope for this fix).
+    { key: 'email', header: 'البريد الإلكتروني', render: (l) => (l.email ? <bdi>{l.email}</bdi> : '—') },
     { key: 'business', header: 'النشاط', render: (l) => l.business_name ?? '—' },
+    {
+      key: 'message',
+      header: 'الرسالة',
+      render: (l) =>
+        l.message ? (
+          <span className="block max-w-[16rem] truncate" title={l.message}>
+            {l.message}
+          </span>
+        ) : (
+          '—'
+        ),
+    },
     { key: 'date', header: 'التاريخ', render: (l) => new Date(l.created_at).toLocaleDateString('ar-EG') },
     {
       key: 'status',
