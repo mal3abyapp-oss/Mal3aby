@@ -15,8 +15,16 @@ interface NavItem {
   icon: LucideIcon
 }
 
+// IA restructuring (Phase 10): "حجوزاتي" now points at a real, stable
+// /portal/bookings route instead of the claim-gated index (/portal) --
+// confirmed in the audit that no direct URL for "my bookings" existed
+// independent of PortalRoot's claim-gate check. The index route still
+// exists and still renders the same page for a first-time visit
+// (RequirePortalAuth guarantees the gate has already resolved by the
+// time any nav click is even possible), so this is a pure improvement,
+// not a behavior change for existing users.
 const navItems: NavItem[] = [
-  { to: '/portal', label: 'حجوزاتي', icon: CalendarDays },
+  { to: '/portal/bookings', label: 'حجوزاتي', icon: CalendarDays },
   { to: '/portal/academy', label: 'أكاديميتي', icon: GraduationCap },
   { to: '/portal/payments', label: 'مدفوعاتي', icon: Wallet },
   { to: '/portal/qr', label: 'رمزي', icon: QrCode },
@@ -51,7 +59,6 @@ export function PortalLayout() {
           <NavLink
             key={item.to}
             to={item.to}
-            end={item.to === '/portal'}
             className={({ isActive }) =>
               `flex flex-1 flex-col items-center gap-0.5 py-2.5 text-xs ${
                 isActive ? 'text-accent-foreground' : 'text-text-secondary'

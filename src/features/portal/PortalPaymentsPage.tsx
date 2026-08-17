@@ -1,5 +1,6 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { useSearchParams } from 'react-router-dom'
 import { supabase } from '@/lib/supabase/client'
 import { PageHeader } from '@/components/ui/page-header'
 import { Card, CardContent } from '@/components/ui/card'
@@ -194,8 +195,27 @@ function ClaimPaymentDialog({ invoice, clubId, onClose }: { invoice: InvoiceRow;
 export function PortalPaymentsPage() {
   const [claimingInvoice, setClaimingInvoice] = useState<InvoiceRow | null>(null)
   const [claimClubId, setClaimClubId] = useState<string | null>(null)
+  // IA restructuring (Phase 10): auto-open the claim dialog when arriving
+  // via PortalBookingsPage's "الفاتورة والدفع" cross-link (?invoiceId=)
+  // and that invoice still has an outstanding balance -- otherwise the
+  // customer lands on the full list and has to find the same invoice
+  // again by eye, defeating the point of a direct link.
+  const [searchParams] = useSearchParams()
 
   const { data: invoices = [], isLoading } = useQuery({ queryKey: ['portal', 'my-invoices'], queryFn: fetchMyInvoices })
+
+  useEffect(() => {
+    const invoiceId = searchParams.get('invoiceId')
+    if (!invoiceId || claimingInvoice) return
+    const target = invoices.find((i) => i.id === invoiceId)
+    if (target && target.outstanding > 0) {
+      void supabase.from('invoices').select('club_id').eq('id', invoiceId).single().then(({ data }) => {
+        setClaimClubId(data?.club_id ?? null)
+        setClaimingInvoice(target)
+      })
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [invoices, searchParams])
 
   return (
     <div className="flex flex-col gap-4">

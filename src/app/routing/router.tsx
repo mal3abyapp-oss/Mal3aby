@@ -37,6 +37,7 @@ import { WhatsAppPage } from '@/features/whatsapp/WhatsAppPage'
 import { ScanPage } from '@/features/scanner/ScanPage'
 
 import { PortalRoot } from '@/features/portal/PortalRoot'
+import { PortalBookingsPage } from '@/features/portal/PortalBookingsPage'
 import { PortalAcademyPage } from '@/features/portal/PortalAcademyPage'
 import { PortalQrPage } from '@/features/portal/PortalQrPage'
 import { PortalPaymentsPage } from '@/features/portal/PortalPaymentsPage'
@@ -148,6 +149,18 @@ export const router = createBrowserRouter([
         element: <PortalLayout />,
         children: [
           { index: true, element: <PortalRoot /> },
+          // IA restructuring (Phase 10): "حجوزاتي" only ever rendered
+          // inline at the claim-gated index route (via PortalRoot) --
+          // confirmed in the audit as a real gap: no direct, bookmarkable
+          // /portal/bookings URL existed even though the sidebar nav item
+          // pointed conceptually at "my bookings" as its own section, not
+          // just "whatever the index happens to show". Deep links from
+          // QR/payments cross-links (added this phase) need a stable
+          // target independent of the claim-gate logic living in
+          // PortalRoot -- this route bypasses that gate entirely since
+          // reaching it at all requires RequirePortalAuth, which already
+          // implies a linked customer record exists.
+          { path: 'bookings', element: <PortalBookingsPage /> },
           { path: 'academy', element: <PortalAcademyPage /> },
           { path: 'payments', element: <PortalPaymentsPage /> },
           { path: 'qr', element: <PortalQrPage /> },

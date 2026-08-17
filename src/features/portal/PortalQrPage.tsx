@@ -1,5 +1,6 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
+import { useSearchParams } from 'react-router-dom'
 import QRCode from 'qrcode'
 import { supabase } from '@/lib/supabase/client'
 import { PageHeader } from '@/components/ui/page-header'
@@ -34,6 +35,19 @@ export function PortalQrPage() {
   const [qrDataUrl, setQrDataUrl] = useState<string | null>(null)
   const [qrError, setQrError] = useState<string | null>(null)
   const [loadingQr, setLoadingQr] = useState(false)
+  // IA restructuring (Phase 10): preselect from a ?bookingId= query
+  // param so PortalBookingsPage's "رمز الحضور" cross-link lands
+  // directly on this booking's QR instead of an empty selector the
+  // customer has to search through again.
+  const [searchParams] = useSearchParams()
+
+  useEffect(() => {
+    const bookingId = searchParams.get('bookingId')
+    if (bookingId && bookings.some((b) => b.id === bookingId)) {
+      void handleSelect(bookingId)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [bookings, searchParams])
 
   async function handleSelect(id: string) {
     setSelectedId(id)

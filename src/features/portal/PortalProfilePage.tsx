@@ -4,6 +4,7 @@ import { supabase } from '@/lib/supabase/client'
 import { PageHeader } from '@/components/ui/page-header'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { translateSupabaseError } from '@/lib/errors'
 
 // Gate 3 — "My Account": contact-preference self-service edit (the
@@ -12,37 +13,57 @@ import { translateSupabaseError } from '@/lib/errors'
 // deliberately NOT editable here -- name/national_id require staff
 // (identity data), photo goes through the request_customer_photo_update
 // re-approval flow instead of a direct edit.
+//
+// IA restructuring (Phase 10): confirmed silent-data-drop bug --
+// `records[0]` silently picked only the FIRST linked customer record.
+// A guardian linked at more than one club (a real, supported state --
+// the same phone number can be a customer of two different clubs) had
+// every club after the first completely inaccessible here, with no
+// indication a second record even existed. Now fetches club_id/name
+// alongside each record and offers a club selector whenever more than
+// one linked record exists; a single-club guardian sees no selector at
+// all (same experience as before for the common case).
 interface MyCustomerRecord {
   id: string
   full_name: string
   mobile_display: string | null
   email: string | null
   whatsapp: string | null
+  club_id: string
+  clubs: { name_ar: string } | null
 }
 
 async function fetchMyCustomerRecords(): Promise<MyCustomerRecord[]> {
-  const { data, error } = await supabase.from('customers').select('id, full_name, mobile_display, email, whatsapp')
+  const { data, error } = await supabase
+    .from('customers')
+    .select('id, full_name, mobile_display, email, whatsapp, club_id, clubs(name_ar)')
   if (error) throw error
-  return data ?? []
+  return (data ?? []) as unknown as MyCustomerRecord[]
 }
 
 export function PortalProfilePage() {
   const queryClient = useQueryClient()
   const { data: records = [], isLoading } = useQuery({ queryKey: ['portal', 'my-customer-records'], queryFn: fetchMyCustomerRecords })
-  const record = records[0]
+  const [selectedClubId, setSelectedClubId] = useState<string | null>(null)
+  const record = records.find((r) => r.club_id === selectedClubId) ?? records[0]
 
   const [mobile, setMobile] = useState(record?.mobile_display ?? '')
   const [email, setEmail] = useState(record?.email ?? '')
   const [whatsapp, setWhatsapp] = useState(record?.whatsapp ?? '')
-  const [initialized, setInitialized] = useState(false)
+  const [initializedForId, setInitializedForId] = useState<string | null>(null)
   const [formError, setFormError] = useState<string | null>(null)
   const [saved, setSaved] = useState(false)
 
-  if (record && !initialized) {
+  // Re-initialize the form fields whenever the effective record changes
+  // (first load, or the guardian switches clubs via the selector) --
+  // keyed on record.id so switching clubs always re-syncs to that
+  // club's own data instead of carrying over the previous club's
+  // edited-but-unsaved field values.
+  if (record && initializedForId !== record.id) {
     setMobile(record.mobile_display ?? '')
     setEmail(record.email ?? '')
     setWhatsapp(record.whatsapp ?? '')
-    setInitialized(true)
+    setInitializedForId(record.id)
   }
 
   const saveMutation = useMutation({
@@ -84,6 +105,21 @@ export function PortalProfilePage() {
         <p className="rounded-lg border border-dashed border-border p-6 text-center text-sm text-text-secondary">
           لا توجد بيانات مرتبطة بحسابك.
         </p>
+      )}
+
+      {records.length > 1 && (
+        <div className="flex flex-col gap-1.5">
+          <label className="text-sm font-medium text-text-secondary">النادي</label>
+          <Select value={record?.club_id ?? ''} onValueChange={setSelectedClubId}>
+            <SelectTrigger><SelectValue /></SelectTrigger>
+            <SelectContent>
+              {records.map((r) => (
+                <SelectItem key={r.club_id} value={r.club_id}>{r.clubs?.name_ar ?? r.club_id}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <p className="text-xs text-text-secondary">حسابك مرتبط بأكثر من نادي -- اختر النادي لتعديل بياناتك فيه.</p>
+        </div>
       )}
 
       {record && (
