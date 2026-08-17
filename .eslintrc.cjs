@@ -6,7 +6,14 @@ module.exports = {
     'plugin:@typescript-eslint/recommended',
     'plugin:react-hooks/recommended',
   ],
-  ignorePatterns: ['dist', '.eslintrc.cjs', 'vite.config.ts'],
+  // whatsapp-connector is a separate, non-React Node/TypeScript service
+  // (its own package.json/tsconfig.json/node_modules) -- the root
+  // React-focused config (react-hooks/rules-of-hooks etc.) does not
+  // apply there and produces false positives, e.g. flagging Baileys'
+  // useMultiFileAuthState() as a misused React Hook. Excluded rather
+  // than given its own eslint config, since it is not part of this
+  // app's lint/build/deploy pipeline at all.
+  ignorePatterns: ['dist', '.eslintrc.cjs', 'vite.config.ts', 'whatsapp-connector'],
   parser: '@typescript-eslint/parser',
   parserOptions: { ecmaVersion: 'latest', sourceType: 'module' },
   plugins: ['react-refresh'],
