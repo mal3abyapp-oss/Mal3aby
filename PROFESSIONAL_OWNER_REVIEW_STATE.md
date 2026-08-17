@@ -10,16 +10,16 @@ This file is the durable tracking artifact for the Master Autonomous Owner-Level
 ## RESUME CURSOR
 
 ```
-current_role: (none yet — Phase 0 just completed)
-module: —
-screen: —
-test_scenario: —
-last_issue: —
-last_fix: —
-last_commit: 045cf082b15284c76f4570cfd73bfbdea018d26d
-test_status: baseline gate PASS (see Phase 0 below)
+current_role: Platform Owner
+module: Phase 2 — Platform Owner review: FIRST PASS COMPLETE (all 13 /platform/* screens visited)
+screen: last visited /platform/reports (confirmed PlatformReportsPage fix is live)
+test_scenario: manual live click-through as platform owner via browser, cross-checked against real DB state via SQL
+last_issue: (see DEFECT LOG — 4 found & fixed, all committed, all gate-clean)
+last_fix: 81f6229 (no_subscription alert kind)
+last_commit: 81f6229
+test_status: gate clean after every fix (tsc/build/lint/test), all 4 fixes live-verified against real data
 blocker: none
-exact_next_action: Begin Phase 1 — complete product inventory (map every route to role/permission/data-source), then start Phase 2 (Platform Owner review)
+exact_next_action: Begin Phase 3 (Club Owner) — start at /app as club_owner, work through Today/Bookings/Academy/Customers/Billing/CashShift/Outstanding/Reports/Staff/Settings per the module tracker below. Then Phase 4 (first-time setup), Phase 5 (Manager), Phase 6 (Reception), Phase 7 (Cashier), Phase 8 (Customer portal), Phase 9 (Guardian), Phase 10 (Coach), continuing in directive order through Phase 50, then the mandatory second full re-review pass.
 ```
 
 ---
@@ -68,8 +68,8 @@ Status values: `not started` / `in progress` / `reviewed — no issues` / `revie
 
 | # | Module/Screen | Role(s) | Status | Notes |
 |---|---|---|---|---|
-| 1 | Platform Overview (`/platform`) | Platform Owner | not started | |
-| 2 | Platform Clubs list + detail | Platform Owner | not started | |
+| 1 | Platform Overview (`/platform`) | Platform Owner | reviewed — fixed & reverified | Fixed ambiguous "موقوف" KPI (7246379), see defect log #2 |
+| 2 | Platform Clubs list + detail | Platform Owner | reviewed — fixed & reverified | Fixed raw enum labels (bf1fb34), see defect log #3 |
 | 3 | Platform Owners directory | Platform Owner | not started | |
 | 4 | Platform Subscriptions/Plans/Payments/Renewals | Platform Owner | not started | |
 | 5 | Platform Trials/Leads | Platform Owner | not started | |
@@ -99,10 +99,16 @@ Status values: `not started` / `in progress` / `reviewed — no issues` / `revie
 
 ## DEFECT LOG
 
-_(Empty — review not yet started. Populate as: ID | Priority | Module | Description | Root cause | Fix commit | Verified)_
+| ID | Priority | Module | Description | Root cause | Fix commit | Verified |
+|---|---|---|---|---|---|---|
+| 1 | P1 | PlatformLayout | No mobile navigation at all below 768px (sidebar `hidden md:flex`, mobile header had no menu/links) | Missing mobile fallback that AppLayout already has (bottom nav) — never built for PlatformLayout | 7246379 | Yes — live: hamburger appears, drawer opens w/ 13 items, click navigates + closes |
+| 2 | P2 | PlatformOverviewPage | "أندية موقوفة" KPI (admin `clubs.status='suspended'`) uses the same Arabic word as PlatformClubsPage's "حالة الاشتراك: موقوف" (`get_club_platform_access()==='blocked'`) — different concepts, same label, real "needs attention" signal invisible on dashboard | Two independently-correct fields sharing one ambiguous label; no dashboard surface for subscription-blocked clubs | 7246379 | Yes — live: 0 admin-suspended / 1 subscription-blocked, matches Clubs list |
+| 3 | P2 | PlatformClubDetailPage, PlatformReportsPage | Raw enum values (`trial`, `active`) rendered directly in Arabic UI in 4 places | No label map applied at those render sites, unlike the file's own existing LIMIT_TYPE_LABELS pattern | bf1fb34 | Yes — live: "trial" became "تجربة مجانية" everywhere |
 
 ---
 
 ## DECISIONS LOG (owner-level, no-approval-needed calls)
 
-_(Empty — populate as decisions are made)_
+- Kept the stale secondary worktree (`.claude/worktrees/goofy-ptolemy-0d3fbc`) untouched — inspected, confirmed inert (behind master, clean, no unique commits), not worth the risk of deleting unknown content per directive's explicit caution.
+- Chose `side="right"` (physical) over adding a new logical start/end variant to the shared `sheet.tsx` component for the Platform mobile nav drawer — smallest correct change; this app is Arabic/RTL-primary so "right" is the correct reading-start edge in practice.
+- Centralized `SUBSCRIPTION_KIND_LABELS`/`LIFECYCLE_STATUS_LABELS` into a new `src/features/platform/labels.ts` the moment a second file needed the same map, rather than a third inline duplicate — matches directive's REUSE/CONSOLIDATE preference over rewrite.
