@@ -1,0 +1,34 @@
+-- FINAL AUTONOMOUS REMEDIATION -- WhatsApp P0 (C4 from
+-- MAL3ABY_PRODUCTION_READINESS.md's confirmed CRITICAL findings):
+-- the pilot club's whatsapp_accounts row has no matching
+-- messaging_safety_settings row, confirmed live before this fix.
+--
+-- Root cause: 20260817043657_safe_messaging_controls.sql ran a
+-- one-time backfill INSERT for every whatsapp_accounts row that
+-- existed at the time that migration was applied, plus an AFTER
+-- INSERT trigger to auto-provision settings for every FUTURE
+-- whatsapp_accounts row. This club's whatsapp_accounts row was
+-- created at 01:27 UTC on 2026-08-17 -- BEFORE that migration ran at
+-- 04:36 UTC the same day -- so it should have been caught by the
+-- one-time backfill. It wasn't (the exact reason isn't reconstructible
+-- from migration history alone, but the net effect is a real, live
+-- gap: whatsapp_connector_claim_next_batch() INNER JOINs
+-- whatsapp_accounts to messaging_safety_settings, so any club missing
+-- the settings row is silently excluded from every queue poll,
+-- forever, with zero error surfaced anywhere).
+--
+-- Live impact confirmed before this fix: real customer-facing
+-- WhatsApp messages (booking-confirmed, payment-received) queued for
+-- this club sat in notification_queue with status='pending' and
+-- attempts=0 indefinitely, because the connector's own claim query
+-- never selected them.
+--
+-- Fix: re-run the exact same backfill this codebase already trusts
+-- (on conflict do nothing, so this is safe to run against a project
+-- where the original backfill DID work correctly for other clubs --
+-- it's a true no-op everywhere except the one row that was missed).
+-- The trigger from the original migration is unaffected and continues
+-- covering every future whatsapp_accounts row correctly.
+insert into public.messaging_safety_settings (club_id)
+select club_id from public.whatsapp_accounts
+on conflict (club_id) do nothing;
