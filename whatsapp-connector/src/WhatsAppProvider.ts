@@ -13,13 +13,31 @@
  * never imports anything from this directory at all) are untouched.
  */
 
+/**
+ * Part M (Safe Messaging directive): the full account health state
+ * set. BaileysProvider itself only ever emits the states it can
+ * genuinely detect from the socket (disconnected/connecting/
+ * qr_required/connected/reconnecting/logged_out/error) -- 'degraded'
+ * and 'restricted' are states the policy/observability layer or a
+ * staff action can reach (e.g. a circuit-breaker trip is surfaced via
+ * whatsapp_accounts.circuit_breaker_open_until, not this enum, and a
+ * future manual "mark restricted" staff action would use this value),
+ * and 'failed' covers the case in BaileysProvider where reconnection
+ * attempts are exhausted. This type is widened here (not narrowed) so
+ * the whole chain -- provider, sync layer, DB check constraint --
+ * shares one vocabulary without forcing every layer to reimplement the
+ * same union.
+ */
 export type ConnectionState =
   | 'disconnected'
   | 'qr_required'
   | 'connecting'
   | 'connected'
   | 'reconnecting'
+  | 'degraded'
   | 'logged_out'
+  | 'restricted'
+  | 'failed'
   | 'error'
 
 export interface SendMessageResult {

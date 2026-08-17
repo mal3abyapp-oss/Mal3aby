@@ -24,7 +24,23 @@ import { MessageCircle } from 'lucide-react'
 // whatsapp_connector_report_status(). This card polls the resulting
 // status/QR RPCs to reflect that real state, never simulates it.
 
-type WhatsAppStatus = 'disconnected' | 'qr_required' | 'connecting' | 'connected' | 'reconnecting' | 'logged_out' | 'error'
+// Safe Messaging directive Part M: full account health state set,
+// widened to match whatsapp_accounts_status_check (migration
+// 20260818050000) -- 'degraded'/'restricted'/'failed' added alongside
+// the original 7 states (including 'error', kept for backward
+// compatibility with BaileysProvider's existing reconnect-exhausted
+// reporting).
+type WhatsAppStatus =
+  | 'disconnected'
+  | 'qr_required'
+  | 'connecting'
+  | 'connected'
+  | 'reconnecting'
+  | 'degraded'
+  | 'logged_out'
+  | 'restricted'
+  | 'failed'
+  | 'error'
 
 interface StatusData {
   status: WhatsAppStatus
@@ -41,7 +57,10 @@ const STATUS_LABELS: Record<WhatsAppStatus, string> = {
   connecting: 'جارٍ الاتصال...',
   connected: 'متصل',
   reconnecting: 'جارٍ إعادة الاتصال...',
+  degraded: 'الاتصال غير مستقر',
   logged_out: 'تم تسجيل الخروج من الهاتف',
+  restricted: 'الحساب مقيّد',
+  failed: 'فشل الاتصال',
   error: 'حدث خطأ',
 }
 
@@ -51,7 +70,10 @@ const STATUS_TONE: Record<WhatsAppStatus, StatusTone> = {
   connecting: 'warning',
   connected: 'success',
   reconnecting: 'warning',
+  degraded: 'warning',
   logged_out: 'danger',
+  restricted: 'danger',
+  failed: 'danger',
   error: 'danger',
 }
 
@@ -229,7 +251,7 @@ export function WhatsAppConnectionCard() {
       <CardContent className="flex flex-col gap-4">
         {isLoading && <p className="text-sm text-text-secondary">جارٍ التحميل...</p>}
         {actionError && <p className="text-sm text-status-danger">{actionError}</p>}
-        {!isLoading && status?.lastError && currentStatus === 'error' && (
+        {!isLoading && status?.lastError && (currentStatus === 'error' || currentStatus === 'failed' || currentStatus === 'restricted' || currentStatus === 'degraded') && (
           <p className="text-sm text-status-danger">{status.lastError}</p>
         )}
 
@@ -293,19 +315,30 @@ export function WhatsAppConnectionCard() {
           </div>
         )}
 
-        {!isLoading && (currentStatus === 'disconnected' || currentStatus === 'logged_out' || currentStatus === 'error') && (
-          <div className="flex flex-col gap-3">
-            <p className="text-sm text-text-secondary">
-              اربط رقم واتساب الخاص بالنادي لإرسال تأكيدات الحجز والدفع والفواتير تلقائيًا للعملاء.
-            </p>
-            <Button size="sm" className="self-start" onClick={() => connectMutation.mutate()} disabled={connectMutation.isPending}>
-              ربط واتساب
-            </Button>
-          </div>
-        )}
+        {!isLoading &&
+          (currentStatus === 'disconnected' ||
+            currentStatus === 'logged_out' ||
+            currentStatus === 'error' ||
+            currentStatus === 'failed' ||
+            currentStatus === 'restricted') && (
+            <div className="flex flex-col gap-3">
+              <p className="text-sm text-text-secondary">
+                {currentStatus === 'restricted'
+                  ? 'الحساب مقيّد من واتساب حاليًا. راجع حالة الحساب على هاتفك قبل إعادة الربط.'
+                  : 'اربط رقم واتساب الخاص بالنادي لإرسال تأكيدات الحجز والدفع والفواتير تلقائيًا للعملاء.'}
+              </p>
+              <Button size="sm" className="self-start" onClick={() => connectMutation.mutate()} disabled={connectMutation.isPending}>
+                ربط واتساب
+              </Button>
+            </div>
+          )}
 
         {!isLoading && currentStatus === 'reconnecting' && (
           <p className="text-sm text-text-secondary">انقطع الاتصال مؤقتًا، جارٍ إعادة المحاولة...</p>
+        )}
+
+        {!isLoading && currentStatus === 'degraded' && (
+          <p className="text-sm text-text-secondary">الاتصال غير مستقر حاليًا. سيتم استئناف الإرسال تلقائيًا عند تحسّن الاتصال.</p>
         )}
       </CardContent>
     </Card>

@@ -28,7 +28,7 @@ export class SupabaseSync {
 
   async reportStatus(params: {
     clubId: string
-    status: 'disconnected' | 'qr_required' | 'connecting' | 'connected' | 'reconnecting' | 'logged_out' | 'error'
+    status: 'disconnected' | 'qr_required' | 'connecting' | 'connected' | 'reconnecting' | 'degraded' | 'logged_out' | 'restricted' | 'failed' | 'error'
     qrPayload?: string | null
     qrTtlSeconds?: number | null
     connectedPhoneNumber?: string | null
@@ -104,6 +104,13 @@ export class SupabaseSync {
         attempts: row.attempts,
       }),
     )
+  }
+
+  /** Part J: sweeps whatsapp-channel pending/retrying rows past their expires_at to a terminal 'expired' status, before they're ever claimed/attempted. Returns how many rows were expired (for logging only -- never logs message content). */
+  async expireStale(): Promise<number> {
+    const { data, error } = await this.client.rpc('whatsapp_connector_expire_stale')
+    if (error) throw new Error(`whatsapp_connector_expire_stale failed: ${error.message}`)
+    return (data as number) ?? 0
   }
 
   async reportSendResult(queueId: string, success: boolean, providerReference?: string, error?: string): Promise<void> {

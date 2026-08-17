@@ -1,0 +1,12 @@
+-- Historical record: this version was applied as an intermediate draft
+-- of the Safe Messaging policy evaluation layer (is_phone_plausible,
+-- next_eligible_send_time, queue_whatsapp_notification), then fully
+-- superseded moments later by 20260817044007_safe_messaging_policy_layer.sql
+-- (same functions, create-or-replace) before this file's original
+-- content was ever committed to the repo. Recreated here as a no-op
+-- (empty) migration purely so the local migration file set matches
+-- Supabase's actual applied version history one-to-one -- every
+-- function this version created is fully redefined by the very next
+-- migration, so there is nothing left for this file to meaningfully
+-- reproduce or that any other migration depends on.
+select 1;

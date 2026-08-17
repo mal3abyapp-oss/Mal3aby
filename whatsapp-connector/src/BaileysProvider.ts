@@ -146,7 +146,14 @@ export class BaileysProvider implements WhatsAppProvider {
         const message = lastDisconnect?.error?.message ?? 'Connection closed unexpectedly.'
         this.reconnectAttempts += 1
         if (this.reconnectAttempts > 5) {
-          this.setState('error', { error: `${message} (giving up after ${this.reconnectAttempts} reconnect attempts)` })
+          // Part M: 'failed' -- reconnect attempts genuinely exhausted,
+          // a terminal state distinct from a still-in-progress
+          // 'reconnecting'. Per Part M/N, this does NOT loop back into
+          // initializeConnection() automatically -- a controlled
+          // reconnect/re-pairing action (start_whatsapp_pairing() from
+          // the admin UI, which ConnectionRequestPoller picks up) is
+          // required, matching "no auto-hammer" for logged_out/failed.
+          this.setState('failed', { error: `${message} (giving up after ${this.reconnectAttempts} reconnect attempts)` })
           return
         }
         this.setState('reconnecting', { error: message })

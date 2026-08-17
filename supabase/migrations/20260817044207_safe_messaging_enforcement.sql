@@ -1,0 +1,14 @@
+-- Historical record: this version was applied as an intermediate draft
+-- of the Safe Messaging rate-control / circuit-breaker enforcement
+-- (whatsapp_connector_claim_next_batch, whatsapp_connector_report_send_result,
+-- and the whatsapp_accounts_status_check / whatsapp_connector_report_status
+-- fix for the dropped 'error' status value), then fully superseded
+-- moments later by 20260817044244_safe_messaging_rate_control_circuit_breaker.sql
+-- (same functions, create-or-replace) before this file's original
+-- content was ever committed to the repo. Recreated here as a no-op
+-- (empty) migration purely so the local migration file set matches
+-- Supabase's actual applied version history one-to-one -- every
+-- function this version created is fully redefined by the very next
+-- migration, so there is nothing left for this file to meaningfully
+-- reproduce or that any other migration depends on.
+select 1;

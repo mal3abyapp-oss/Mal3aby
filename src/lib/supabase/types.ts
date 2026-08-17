@@ -1720,6 +1720,78 @@ export type Database = {
           },
         ]
       }
+      messaging_safety_settings: {
+        Row: {
+          circuit_breaker_cooldown_minutes: number
+          circuit_breaker_enabled: boolean
+          circuit_breaker_failure_rate_threshold: number
+          circuit_breaker_min_sample_size: number
+          circuit_breaker_window_minutes: number
+          club_id: string
+          default_language: string
+          max_sends_per_hour_per_account: number
+          max_sends_per_minute_per_account: number
+          min_minutes_between_recipient_sends: number
+          quiet_hours_bypass_critical: boolean
+          quiet_hours_enabled: boolean
+          quiet_hours_end: string
+          quiet_hours_start: string
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          circuit_breaker_cooldown_minutes?: number
+          circuit_breaker_enabled?: boolean
+          circuit_breaker_failure_rate_threshold?: number
+          circuit_breaker_min_sample_size?: number
+          circuit_breaker_window_minutes?: number
+          club_id: string
+          default_language?: string
+          max_sends_per_hour_per_account?: number
+          max_sends_per_minute_per_account?: number
+          min_minutes_between_recipient_sends?: number
+          quiet_hours_bypass_critical?: boolean
+          quiet_hours_enabled?: boolean
+          quiet_hours_end?: string
+          quiet_hours_start?: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          circuit_breaker_cooldown_minutes?: number
+          circuit_breaker_enabled?: boolean
+          circuit_breaker_failure_rate_threshold?: number
+          circuit_breaker_min_sample_size?: number
+          circuit_breaker_window_minutes?: number
+          club_id?: string
+          default_language?: string
+          max_sends_per_hour_per_account?: number
+          max_sends_per_minute_per_account?: number
+          min_minutes_between_recipient_sends?: number
+          quiet_hours_bypass_critical?: boolean
+          quiet_hours_enabled?: boolean
+          quiet_hours_end?: string
+          quiet_hours_start?: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "messaging_safety_settings_club_id_fkey"
+            columns: ["club_id"]
+            isOneToOne: true
+            referencedRelation: "clubs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "messaging_safety_settings_club_id_fkey"
+            columns: ["club_id"]
+            isOneToOne: true
+            referencedRelation: "commercial_entitlements_usage"
+            referencedColumns: ["club_id"]
+          },
+        ]
+      }
       notification_category_settings: {
         Row: {
           category: string
@@ -1771,6 +1843,9 @@ export type Database = {
           customer_id: string
           enabled: boolean
           id: string
+          normalized_phone: string | null
+          phone_display: string | null
+          preferred_language: string
           revoked_at: string | null
           updated_at: string
         }
@@ -1782,6 +1857,9 @@ export type Database = {
           customer_id: string
           enabled?: boolean
           id?: string
+          normalized_phone?: string | null
+          phone_display?: string | null
+          preferred_language?: string
           revoked_at?: string | null
           updated_at?: string
         }
@@ -1793,6 +1871,9 @@ export type Database = {
           customer_id?: string
           enabled?: boolean
           id?: string
+          normalized_phone?: string | null
+          phone_display?: string | null
+          preferred_language?: string
           revoked_at?: string | null
           updated_at?: string
         }
@@ -1963,6 +2044,61 @@ export type Database = {
           {
             foreignKeyName: "notification_queue_recipient_customer_id_fkey"
             columns: ["recipient_customer_id"]
+            isOneToOne: false
+            referencedRelation: "customers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      notification_suppressions: {
+        Row: {
+          channel: string
+          club_id: string
+          created_at: string
+          created_by: string | null
+          customer_id: string
+          detail: string | null
+          id: string
+          reason: string
+        }
+        Insert: {
+          channel: string
+          club_id: string
+          created_at?: string
+          created_by?: string | null
+          customer_id: string
+          detail?: string | null
+          id?: string
+          reason: string
+        }
+        Update: {
+          channel?: string
+          club_id?: string
+          created_at?: string
+          created_by?: string | null
+          customer_id?: string
+          detail?: string | null
+          id?: string
+          reason?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "notification_suppressions_club_id_fkey"
+            columns: ["club_id"]
+            isOneToOne: false
+            referencedRelation: "clubs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "notification_suppressions_club_id_fkey"
+            columns: ["club_id"]
+            isOneToOne: false
+            referencedRelation: "commercial_entitlements_usage"
+            referencedColumns: ["club_id"]
+          },
+          {
+            foreignKeyName: "notification_suppressions_customer_id_fkey"
+            columns: ["customer_id"]
             isOneToOne: false
             referencedRelation: "customers"
             referencedColumns: ["id"]
@@ -3136,11 +3272,14 @@ export type Database = {
       }
       whatsapp_accounts: {
         Row: {
+          circuit_breaker_open_until: string | null
+          circuit_breaker_reason: string | null
           club_id: string
           connected_at: string | null
           connected_phone_number: string | null
           last_error: string | null
           last_seen_at: string | null
+          last_successful_send_at: string | null
           qr_expires_at: string | null
           qr_payload: string | null
           session_credentials_encrypted: string | null
@@ -3149,11 +3288,14 @@ export type Database = {
           updated_by: string | null
         }
         Insert: {
+          circuit_breaker_open_until?: string | null
+          circuit_breaker_reason?: string | null
           club_id: string
           connected_at?: string | null
           connected_phone_number?: string | null
           last_error?: string | null
           last_seen_at?: string | null
+          last_successful_send_at?: string | null
           qr_expires_at?: string | null
           qr_payload?: string | null
           session_credentials_encrypted?: string | null
@@ -3162,11 +3304,14 @@ export type Database = {
           updated_by?: string | null
         }
         Update: {
+          circuit_breaker_open_until?: string | null
+          circuit_breaker_reason?: string | null
           club_id?: string
           connected_at?: string | null
           connected_phone_number?: string | null
           last_error?: string | null
           last_seen_at?: string | null
+          last_successful_send_at?: string | null
           qr_expires_at?: string | null
           qr_payload?: string | null
           session_credentials_encrypted?: string | null
@@ -3427,6 +3572,33 @@ export type Database = {
         }
         Relationships: []
       }
+      whatsapp_queue_diagnostics: {
+        Row: {
+          club_id: string | null
+          expired_count: number | null
+          failed_count: number | null
+          oldest_pending_created_at: string | null
+          pending_count: number | null
+          retrying_count: number | null
+          sent_count: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "notification_queue_club_id_fkey"
+            columns: ["club_id"]
+            isOneToOne: false
+            referencedRelation: "clubs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "notification_queue_club_id_fkey"
+            columns: ["club_id"]
+            isOneToOne: false
+            referencedRelation: "commercial_entitlements_usage"
+            referencedColumns: ["club_id"]
+          },
+        ]
+      }
     }
     Functions: {
       _activate_subscription_if_due_internal: {
@@ -3455,6 +3627,10 @@ export type Database = {
       cancel_booking: {
         Args: { p_booking_id: string; p_reason: string }
         Returns: undefined
+      }
+      cancel_pending_whatsapp_for_booking: {
+        Args: { p_booking_id: string }
+        Returns: number
       }
       cancel_platform_subscription: {
         Args: { p_reason: string; p_subscription_id: string }
@@ -3743,10 +3919,13 @@ export type Database = {
       get_whatsapp_status: {
         Args: { p_club_id: string }
         Returns: {
+          circuit_breaker_open_until: string
+          circuit_breaker_reason: string
           connected_at: string
           connected_phone_number: string
           last_error: string
           last_seen_at: string
+          last_successful_send_at: string
           qr_expires_at: string
           status: string
         }[]
@@ -3769,6 +3948,10 @@ export type Database = {
         Returns: string
       }
       is_guardian_of_group: { Args: { p_group_id: string }; Returns: boolean }
+      is_phone_plausible: {
+        Args: { p_normalized_phone: string }
+        Returns: boolean
+      }
       is_platform_owner: { Args: never; Returns: boolean }
       issue_invoice_number: {
         Args: { p_branch_id: string; p_club_id: string }
@@ -3784,7 +3967,15 @@ export type Database = {
       }
       my_customer_invoice_ids: { Args: never; Returns: string[] }
       my_customer_payment_ids: { Args: never; Returns: string[] }
+      next_eligible_send_time: {
+        Args: { p_club_id: string; p_intended_at: string; p_priority: string }
+        Returns: string
+      }
       normalize_mobile: { Args: { p_mobile: string }; Returns: string }
+      notification_source_still_valid: {
+        Args: { p_reference_id: string; p_reference_type: string }
+        Returns: boolean
+      }
       open_cash_shift: {
         Args: {
           p_branch_id: string
@@ -3820,6 +4011,19 @@ export type Database = {
           result: string
           subscription_status: string
         }[]
+      }
+      queue_whatsapp_notification: {
+        Args: {
+          p_category: string
+          p_club_id: string
+          p_customer_id: string
+          p_dedup_key?: string
+          p_event_id: string
+          p_priority?: string
+          p_template_key: string
+          p_variables: Json
+        }
+        Returns: string
       }
       record_payment: {
         Args: {
@@ -3902,6 +4106,20 @@ export type Database = {
         Args: { p_invoice_id: string; p_reason: string }
         Returns: undefined
       }
+      whatsapp_connector_claim_next_batch: {
+        Args: { p_limit?: number }
+        Returns: {
+          attempts: number
+          club_id: string
+          id: string
+          language: string
+          recipient_customer_id: string
+          recipient_phone: string
+          template_key: string
+          variables: Json
+        }[]
+      }
+      whatsapp_connector_expire_stale: { Args: never; Returns: number }
       whatsapp_connector_list_accounts: {
         Args: never
         Returns: {
@@ -3912,6 +4130,15 @@ export type Database = {
       whatsapp_connector_load_session: {
         Args: { p_club_id: string }
         Returns: string
+      }
+      whatsapp_connector_report_send_result: {
+        Args: {
+          p_error?: string
+          p_provider_reference?: string
+          p_queue_id: string
+          p_success: boolean
+        }
+        Returns: undefined
       }
       whatsapp_connector_report_status: {
         Args: {

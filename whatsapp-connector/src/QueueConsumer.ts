@@ -49,9 +49,27 @@ export class QueueConsumer {
   }
 
   private async pollOnce(): Promise<void> {
+    // Part J: sweep stale (past-expires_at) rows to a terminal 'expired'
+    // status BEFORE claiming, so a reminder that's gone stale (e.g. the
+    // booking it referred to already started) is never attempted even
+    // once, let alone sent late.
+    await this.sync.expireStale()
+
     const batch = await this.sync.claimNextBatch(this.batchSize)
     for (const row of batch) {
       await this.processRow(row)
+      // Part G: process gradually rather than releasing a whole batch
+      // simultaneously. This spacing is for service stability and to
+      // avoid bursty behavior -- it is NOT an attempt to compute or
+      // claim a "safe" WhatsApp send rate (there is no such guarantee).
+      // The actual rate control is the per-account per-minute/per-hour
+      // caps in messaging_safety_settings, enforced server-side in
+      // whatsapp_connector_claim_next_batch -- this is just "don't fire
+      // N messages in the same instant" pacing within an already
+      // rate-limited batch.
+      if (batch.length > 1) {
+        await new Promise((resolve) => setTimeout(resolve, 1000))
+      }
     }
   }
 

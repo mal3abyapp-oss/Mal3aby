@@ -11,6 +11,7 @@ import { FieldsManagement } from '@/features/clubs/FieldsManagement'
 import { ActivationPolicySetting } from '@/features/academy/EnrollmentSection'
 import { PaymentMethodsCard } from '@/features/billing/PaymentMethodsCard'
 import { WhatsAppConnectionCard } from './WhatsAppConnectionCard'
+import { MessagingSafetyCard } from './MessagingSafetyCard'
 import { AuditLogSection } from './AuditLogPage'
 
 // P1-7 (critical usability fix pass, 2026-08-16): Settings was a
@@ -71,7 +72,10 @@ export function SettingsPage() {
 
       <section className="flex flex-col gap-4">
         <h2 className="text-sm font-semibold text-text-secondary">الإشعارات</h2>
-        <WhatsAppConnectionCard />
+        <div className="grid gap-4 lg:grid-cols-2">
+          <WhatsAppConnectionCard />
+          <MessagingSafetyCard />
+        </div>
       </section>
 
       <section className="flex flex-col gap-4">
