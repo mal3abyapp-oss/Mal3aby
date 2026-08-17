@@ -161,8 +161,10 @@ export function ScanPage() {
   return (
     <div className="flex min-h-screen flex-col bg-dark-base text-white">
       <header className="flex items-center gap-3 p-4">
+        {/* Master IA/UX audit (RTL phase): back arrow now flips with
+            direction instead of assuming RTL (right = back). */}
         <button onClick={() => navigate(-1)} aria-label="رجوع">
-          <ArrowRight className="size-5" />
+          <ArrowRight className="size-5 rtl:rotate-180" />
         </button>
         <h1 className="text-lg font-bold">مسح QR</h1>
       </header>

@@ -79,7 +79,9 @@ export function MorePage() {
                   <p className="font-medium">{item.label}</p>
                   <p className="truncate text-sm text-text-secondary">{item.description}</p>
                 </div>
-                <ChevronLeft className="size-4 shrink-0 text-text-secondary" />
+                {/* Master IA/UX audit (RTL phase): disclosure chevron
+                    now flips with direction instead of assuming RTL. */}
+                <ChevronLeft className="size-4 shrink-0 text-text-secondary rtl:rotate-180" />
               </CardContent>
             </Card>
           </Link>

@@ -33,12 +33,25 @@ export const PAYMENT_METHOD_LABELS: Record<string, string> = {
 // Plain-string money formatting for contexts that need a string value
 // (e.g. StatCard's value prop), as opposed to <MoneyDisplay> which renders
 // its own styled element.
+// Master IA/UX audit (RTL phase): this returns a plain string (not JSX),
+// so it can't wrap in a <bdi> element the way MoneyDisplay does -- every
+// call site interpolates the return value directly into Arabic text
+// (e.g. StatCard's `value` prop, report labels), which is exactly the
+// bidi-reversal risk StatCard's own <bdi> wrapper exists to guard
+// against for composite values. Unicode isolate marks (U+2066 FIRST
+// STRONG ISOLATE / U+2069 POP DIRECTIONAL ISOLATE) provide the same
+// protection *inside a plain string* -- they survive string
+// concatenation and interpolation, unlike a React element, so this
+// stays a drop-in replacement for every existing caller.
+const FSI = '⁦'
+const PDI = '⁩'
+
 export function formatMoney(amount: number, currency = 'EGP'): string {
   const formatted = new Intl.NumberFormat('ar-EG', {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
   }).format(amount)
-  return `${formatted} ${currency}`
+  return `${FSI}${formatted} ${currency}${PDI}`
 }
 
 // Master Payment Directive task #81: SINGLE source of truth for invoice

@@ -75,7 +75,7 @@ export function VerifyInvoicePage() {
             <div className="w-full rounded-md border border-border p-4 text-start text-sm">
               <div className="flex justify-between py-1">
                 <span className="text-text-secondary">رقم الفاتورة</span>
-                <span className="font-medium">{data.invoiceNumber}</span>
+                <span className="font-medium"><bdi>{data.invoiceNumber}</bdi></span>
               </div>
               <div className="flex justify-between py-1">
                 <span className="text-text-secondary">تاريخ الإصدار</span>

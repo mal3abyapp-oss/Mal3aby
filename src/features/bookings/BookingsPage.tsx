@@ -308,9 +308,13 @@ export function BookingsPage() {
                 </SelectContent>
               </Select>
             )}
-            <Button variant="outline" size="icon" aria-label="اليوم السابق" onClick={() => shiftDate(-1)}><ChevronRight className="size-4" /></Button>
+            {/* Master IA/UX audit (RTL phase): a single icon + rtl:rotate-180
+                (matching dropdown-menu.tsx's existing pattern) reads
+                correctly in both directions, instead of two hardcoded
+                icons that were only correct while the app stayed RTL. */}
+            <Button variant="outline" size="icon" aria-label="اليوم السابق" onClick={() => shiftDate(-1)}><ChevronRight className="size-4 rtl:rotate-180" /></Button>
             <Button variant="outline" size="sm" onClick={() => setDate(new Date().toISOString().slice(0, 10))}>اليوم</Button>
-            <Button variant="outline" size="icon" aria-label="اليوم التالي" onClick={() => shiftDate(1)}><ChevronLeft className="size-4" /></Button>
+            <Button variant="outline" size="icon" aria-label="اليوم التالي" onClick={() => shiftDate(1)}><ChevronLeft className="size-4 rtl:rotate-180" /></Button>
             <input
               type="date"
               value={date}

@@ -402,7 +402,7 @@ export function BillingPage() {
       header: 'رقم الفاتورة',
       render: (r) => (
         <button className="text-accent-foreground hover:underline" onClick={() => setSelectedInvoiceId(r.id)}>
-          {r.invoiceNumber}
+          <bdi>{r.invoiceNumber}</bdi>
         </button>
       ),
     },
@@ -442,7 +442,7 @@ export function BillingPage() {
             {pendingClaims.map((c) => (
               <div key={c.id} className="flex flex-col gap-2 rounded-md border border-border bg-surface p-3 text-sm md:flex-row md:items-center md:justify-between">
                 <div>
-                  <p className="font-medium">{c.customerName} — {c.invoiceNumber}</p>
+                  <p className="font-medium">{c.customerName} — <bdi>{c.invoiceNumber}</bdi></p>
                   <p className="text-xs text-text-secondary">
                     {c.methodName ?? '—'} — <MoneyDisplay amount={c.claimedAmount} size="sm" />
                     {c.reference && ` — مرجع: ${c.reference}`}
@@ -487,7 +487,7 @@ export function BillingPage() {
       <Dialog open={!!selectedInvoiceId} onOpenChange={(open) => !open && setSelectedInvoiceId(null)}>
         <DialogContent className="max-w-2xl">
           <DialogHeader>
-            <DialogTitle>فاتورة {detail?.invoice_number}</DialogTitle>
+            <DialogTitle>فاتورة <bdi>{detail?.invoice_number}</bdi></DialogTitle>
           </DialogHeader>
           {detail && (
             <div className="flex flex-col gap-4">
@@ -497,7 +497,7 @@ export function BillingPage() {
               >
                 <div className="mb-3 flex justify-between">
                   <div>
-                    <p className="font-bold">فاتورة رقم {detail.invoice_number}</p>
+                    <p className="font-bold">فاتورة رقم <bdi>{detail.invoice_number}</bdi></p>
                     <p className="text-text-secondary">
                       {(detail.customers as unknown as { full_name: string })?.full_name}
                     </p>
@@ -726,7 +726,7 @@ export function BillingPage() {
               <div data-print-size={printSize} className="print-target visible-for-print rounded-md border border-border p-4 text-sm print:border-0">
                 <p className="mb-2 font-bold">إيصال استرجاع</p>
                 <div className="flex flex-col gap-1">
-                  <p>الفاتورة: {refundReceipt.invoiceNumber}</p>
+                  <p>الفاتورة: <bdi>{refundReceipt.invoiceNumber}</bdi></p>
                   <p>العميل: {refundReceipt.customerName}</p>
                   <p>طريقة الدفع الأصلية: {PAYMENT_METHOD_LABELS[refundReceipt.method] ?? refundReceipt.method}</p>
                   <p>السبب: {refundReceipt.reason}</p>

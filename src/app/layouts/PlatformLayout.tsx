@@ -149,11 +149,11 @@ export function PlatformLayout() {
       </div>
 
       <Sheet open={mobileNavOpen} onOpenChange={setMobileNavOpen}>
-        {/* sheet.tsx's `side` variant is physical (left/right), not
-            logical -- this app is Arabic/RTL-primary, so "right" is the
-            correct reading-start edge here. Matches the sidebar's own
-            `border-e` (logical end-border) direction-awareness in spirit
-            without needing a new variant on the shared component. */}
+        {/* Master IA/UX audit (RTL phase): sheet.tsx's `side` variant is
+            now direction-aware (logical CSS under the hood) -- "right"
+            means "the reading-start edge" in both RTL and LTR, matching
+            the sidebar's own `border-e` direction-awareness, so this
+            stays correct if a user toggles to English. */}
         <SheetContent side="right" className="flex w-64 flex-col bg-dark-secondary p-0 text-white">
           <SheetTitle className="px-4 py-5 text-lg font-bold text-white">Mala3by — Platform</SheetTitle>
           <PlatformNavList onNavigate={() => setMobileNavOpen(false)} />

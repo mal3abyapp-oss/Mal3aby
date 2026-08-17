@@ -258,7 +258,12 @@ export function WhatsAppConnectionCard() {
         {!isLoading && currentStatus === 'connected' && (
           <div className="flex flex-col gap-3">
             <div className="rounded-md border border-border p-3 text-sm">
-              <p className="font-medium">الرقم المتصل: {status?.connectedPhoneNumber ?? '—'}</p>
+              {/* Master IA/UX audit (RTL phase): phone numbers are
+                  Latin-digit values embedded directly beside Arabic
+                  label text -- <bdi> isolates them from the
+                  surrounding bidi context so they can't visually
+                  reorder. */}
+              <p className="font-medium">الرقم المتصل: <bdi>{status?.connectedPhoneNumber ?? '—'}</bdi></p>
               <p className="text-xs text-text-secondary">متصل منذ: {formatDateTime(status?.connectedAt ?? null)}</p>
               <p className="text-xs text-text-secondary">آخر ظهور: {formatDateTime(status?.lastSeenAt ?? null)}</p>
             </div>

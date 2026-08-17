@@ -25,7 +25,15 @@ export function MoneyDisplay({ amount, currency = 'EGP', size = 'md', tone = 'de
 
   return (
     <span className={cn('tabular-nums', sizeClass[size], toneClass[tone], className)}>
-      {formatted} {currency}
+      {/* Master IA/UX audit (RTL phase): money is a Latin-digit value
+          that can appear directly beside/inside Arabic sentence text
+          (e.g. "المتبقي: 220.00 EGP") -- without bidi isolation the
+          browser's bidi algorithm can visually reorder it inside RTL
+          context (the exact bug class StatCard already guards against
+          for composite values, see stat-card.tsx). <bdi> isolates this
+          span's internal direction from its surrounding context so it
+          always reads left-to-right regardless of where it's embedded. */}
+      <bdi>{formatted} {currency}</bdi>
     </span>
   )
 }

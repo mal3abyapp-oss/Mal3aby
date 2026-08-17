@@ -234,7 +234,7 @@ export function BookingDetailSheet({
             <div className="rounded-lg border border-border p-3">
               <p className="text-xs text-text-secondary">العميل</p>
               <p className="font-semibold">{booking.customerName}</p>
-              {booking.customerMobile && <p className="text-text-secondary tabular-nums">{booking.customerMobile}</p>}
+              {booking.customerMobile && <p className="text-text-secondary tabular-nums"><bdi>{booking.customerMobile}</bdi></p>}
             </div>
 
             <div className="grid grid-cols-2 gap-3">

@@ -30,6 +30,21 @@ const SheetOverlay = React.forwardRef<
 ))
 SheetOverlay.displayName = SheetPrimitive.Overlay.displayName
 
+// Master IA/UX audit (RTL phase): `left`/`right` used to be PHYSICAL
+// (inset-y-0 left-0 / right-0, border-r / border-l, slide-in-from-left
+// / -right) with zero awareness of `dir`. Every caller in the app that
+// wants "the reading-start edge" was forced to hardcode side="right"
+// and explain why in a comment (see PlatformLayout.tsx's mobile Sheet)
+// -- correct only while the app stays Arabic/RTL, silently wrong the
+// moment a user toggles to English via LanguageSwitcher (a Sheet meant
+// to open from the reading-start edge would then open from the
+// physical right, the wrong edge in LTR). Switched to logical CSS
+// (`start-0`/`end-0`, `border-s`/`border-e`) so the SAME `side="right"`
+// prop callers already pass keeps meaning "the reading-start edge" in
+// both directions, without any caller needing to change. `left`/`right`
+// prop names are kept (not renamed to start/end) to avoid a breaking
+// API change across every existing call site -- only their underlying
+// CSS implementation became direction-aware.
 const sheetVariants = cva(
   "fixed z-50 gap-4 bg-background p-6 shadow-lg transition ease-in-out data-[state=closed]:duration-300 data-[state=open]:duration-500 data-[state=open]:animate-in data-[state=closed]:animate-out",
   {
@@ -38,9 +53,9 @@ const sheetVariants = cva(
         top: "inset-x-0 top-0 border-b data-[state=closed]:slide-out-to-top data-[state=open]:slide-in-from-top",
         bottom:
           "inset-x-0 bottom-0 border-t data-[state=closed]:slide-out-to-bottom data-[state=open]:slide-in-from-bottom",
-        left: "inset-y-0 left-0 h-full w-3/4 border-r data-[state=closed]:slide-out-to-left data-[state=open]:slide-in-from-left sm:max-w-sm",
+        left: "inset-y-0 start-0 h-full w-3/4 border-e data-[state=closed]:slide-out-to-left rtl:data-[state=closed]:slide-out-to-right data-[state=open]:slide-in-from-left rtl:data-[state=open]:slide-in-from-right sm:max-w-sm",
         right:
-          "inset-y-0 right-0 h-full w-3/4 border-l data-[state=closed]:slide-out-to-right data-[state=open]:slide-in-from-right sm:max-w-sm",
+          "inset-y-0 end-0 h-full w-3/4 border-s data-[state=closed]:slide-out-to-right rtl:data-[state=closed]:slide-out-to-left data-[state=open]:slide-in-from-right rtl:data-[state=open]:slide-in-from-left sm:max-w-sm",
       },
     },
     defaultVariants: {
