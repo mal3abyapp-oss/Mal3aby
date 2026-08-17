@@ -22,6 +22,20 @@ import type { InvoiceRow } from '@/lib/domain/billing'
 // from the exact rows shown, no library, same scoping as the on-screen
 // view by construction (it's the same query result, not a separate export
 // path that could diverge).
+//
+// Owner-level review finding (P1, real financial-status contradiction):
+// outstanding_invoices' own view definition is `WHERE status = 'issued'`
+// ONLY -- it deliberately has no `outstanding > 0` filter, because other
+// consumers (e.g. BookingDetailSheet) use it as a general per-invoice
+// payment-summary lookup, not exclusively an unpaid-invoices list. This
+// page never added that filter itself despite being titled "المستحقات"
+// (Outstanding/Dues) with its own on-screen description "الفواتير غير
+// المسددة بالكامل" (invoices not fully settled) -- found live showing
+// numerous invoices with outstanding = 0.00 EGP still labeled "مستحق".
+// Fixed at the fetch boundary (not the shared view, which other screens
+// correctly rely on for its broader scope) so a fully-paid invoice can
+// never appear on the one screen whose entire purpose is showing what's
+// still owed.
 type FilterKey = 'all' | 'due_today' | 'overdue'
 
 async function fetchOutstanding(clubId: string) {
@@ -31,17 +45,19 @@ async function fetchOutstanding(clubId: string) {
     .eq('club_id', clubId)
     .order('due_date', { ascending: true, nullsFirst: false })
   if (error) throw error
-  return (data ?? []).map<InvoiceRow>((row) => ({
-    id: row.id ?? '',
-    invoiceNumber: row.invoice_number ?? '',
-    customerId: row.customer_id ?? '',
-    customerName: row.customer_name ?? '—',
-    status: row.status ?? '',
-    total: Number(row.total),
-    outstanding: row.outstanding !== null ? Number(row.outstanding) : null,
-    dueDate: row.due_date,
-    daysOverdue: row.days_overdue,
-  }))
+  return (data ?? [])
+    .map<InvoiceRow>((row) => ({
+      id: row.id ?? '',
+      invoiceNumber: row.invoice_number ?? '',
+      customerId: row.customer_id ?? '',
+      customerName: row.customer_name ?? '—',
+      status: row.status ?? '',
+      total: Number(row.total),
+      outstanding: row.outstanding !== null ? Number(row.outstanding) : null,
+      dueDate: row.due_date,
+      daysOverdue: row.days_overdue,
+    }))
+    .filter((row) => (row.outstanding ?? 0) > 0)
 }
 
 function toCsv(rows: InvoiceRow[]): string {
