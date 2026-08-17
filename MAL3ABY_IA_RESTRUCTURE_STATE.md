@@ -17,12 +17,12 @@ Never stop mid-phase to send a report or wait for permission. After finishing an
 ## RESUME CURSOR
 
 ```
-current_phase: Phase 7 — Reports tab-grouping
-completed_phases: 1 (Audit), 2 (Target IA), 3 (Shared navigation foundation), 4 (Platform Owner), 5 (Club Settings restructure), 6 (Finance domain grouping)
-last_commit: 6d03548 (Phase 6)
-test_status: tsc clean, build clean, live-verified in browser at 1280px width (sidebar renders grouped "المالية" section header with all 4 finance items, all other items/hrefs unaffected)
+current_phase: Phase 8 — WhatsApp module
+completed_phases: 1 (Audit), 2 (Target IA), 3 (Shared navigation foundation), 4 (Platform Owner), 5 (Club Settings restructure), 6 (Finance domain grouping), 7 (Reports tab-grouping)
+last_commit: 89af14f (Phase 7)
+test_status: tsc clean, build clean, live-verified in browser at 1280px width (4 group captions render, all 9 tabs present under correct groups, cross-group tab switching confirmed working with real data)
 blocker: none
-exact_next_action: Begin Phase 7 -- restructure ReportsPage's flat tabs into labeled groups (Overview / التشغيل [Bookings, Occupancy] / المالية [Revenue, Collections, Reconciliation, Exceptions] / الأكاديمية والعملاء [Academy, Customers]) per target IA's decision (documented in Phase 2 log above): reports share one genuine purpose, so this is presentation-only tab-bar reorganization, NOT a route split. Read ReportsPage.tsx first to confirm the exact current tab list/order before restructuring. Then Phase 8 (WhatsApp module).
+exact_next_action: Begin Phase 8 -- build the WhatsApp module per target IA §2: new /app/whatsapp route with 4 tabs (Overview/Activity/Connection/Settings). Move WhatsAppConnectionCard + MessagingSafetyCard out of SettingsPage's "الإشعارات" section into this module's Connection/Settings tabs respectively. Build the new "Activity" tab (per-message log reading notification_queue, filtered by club -- read-only view, no new backend logic since the data already exists). Add a nav-domain entry (new NavDomain value, e.g. 'whatsapp') so it appears in the sidebar/mobile nav per role. Add contextual "sent ✓ / view activity" summary lines to BookingDetailSheet and CustomerDetailDialog per target IA's "independent but connected" requirement -- read WhatsAppConnectionCard.tsx, MessagingSafetyCard.tsx, and the notification_queue schema first to confirm exact current structure before moving anything.
 
 NOTE: Phase 4 deliberately did NOT fix the 2 hardcoded-reason/method RPC calls on PlatformClubDetailPage (change_platform_plan, record_platform_payment) or the 2 direct-table-writes there that bypass RPCs -- these are real data-integrity/form-completeness findings from the audit but are NOT information-architecture problems (no screen/nav reorganization involved), and fixing them requires adding real form inputs (a scope-creep risk against "reorganize, don't invent features"). Logged here as a legitimate follow-up, deliberately deferred, not forgotten -- revisit after the core IA restructuring (all 12 phases) is complete, as a discrete follow-up task if the user wants it.
 ```
@@ -61,7 +61,11 @@ Verified: tsc clean, `npm run build` clean, live-verified in browser -- Settings
 Restructured `AppLayout.tsx`'s sidebar from a flat `NavItem[]` into a `NavSection[]` (same pattern as `PlatformLayout`'s Phase 4 grouping) -- Billing/Outstanding/Cash Shift/Subscription now render under a labeled "المالية" section header. Nav-domain visibility filtering (role-based, via `canSeeNavDomain`) unchanged -- applied per-item within each section, sections with zero visible items after filtering are omitted entirely. `/app/subscription` gained a persistent sidebar entry inside the Finance group (previously reachable only via contextual banners + Phase 5's Settings link) -- an always-relevant financial concern warranted more than banner-only visibility. Mobile bottom nav untouched (out of scope -- it's deliberately minimal per its own design rationale, not a grouping candidate). Added `nav.sectionFinance`/`nav.subscription` i18n keys (ar/en).
 
 Verified: tsc clean, `npm run build` clean, live-verified in browser at 1280px width (browser pane's default viewport gets stuck below the `md:` breakpoint on plain `resize_window` calls -- worked around by passing explicit width/height) -- sidebar `read_page` tree confirms the "المالية" header appears exactly once, directly above all 4 finance items in the correct order, all other sidebar items and hrefs unaffected.
-### Phase 7 — Reports tab-grouping: NOT STARTED
+### Phase 7 — Reports tab-grouping: COMPLETE (commit `89af14f`)
+Restructured ReportsPage's 9 flat tabs into 4 labeled clusters (نظرة عامة / التشغيل / المالية / الأكاديمية والعملاء), matching the Phase 2 design decision already on record (reports share one genuine purpose -- presentation fix, not a route split). Implemented as 4 separate `TabsList` clusters (Radix's flat trigger list doesn't support non-trigger label children) each under its own caption, all 9 `TabsTrigger`s remaining siblings of one `Tabs.Root` so the single active-tab state and all existing `TabsContent` panels are completely unchanged -- zero data/RPC/route changes.
+
+Verified: tsc clean, `npm run build` clean, live-verified in browser at 1280px width -- all 4 group captions render, all 9 tabs present under the correct group, clicked a tab in a different group (Collections, inside المالية) and confirmed the content panel swapped correctly with real data (حسب الموظف/حسب الفرع).
+### Phase 8 — WhatsApp module: NOT STARTED
 ### Phase 8 — WhatsApp module: NOT STARTED
 ### Phase 9 — Booking 360 (collect-payment action): NOT STARTED
 ### Phase 10 — Customer Portal: NOT STARTED
