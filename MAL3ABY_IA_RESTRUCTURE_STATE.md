@@ -1,35 +1,81 @@
 # Mal3aby IA Restructure — Execution State
 
-Durable tracking artifact for the Information Architecture restructuring directive. Read this file first before resuming — it survives context resets.
+Durable tracking artifact. Read this file first before resuming — it survives context resets.
 
-**Directive received:** 2026-08-17 (immediately following completion of the Master Owner-Level Review + WhatsApp integration program)
-**Audit completed:** 2026-08-17 (`MAL3ABY_INFORMATION_ARCHITECTURE_AUDIT.md`)
-**Target IA completed:** 2026-08-17 (`MAL3ABY_INFORMATION_ARCHITECTURE.md`)
+**Prior directive (12-phase IA restructuring): COMPLETE** — see "PHASE LOG (Directive 1)" section below for the full history. All 12 phases done, verified, committed.
 
----
-
-## STANDING RULE (carried over from the Owner-Level Review directive, still in force)
-
-Never stop mid-phase to send a report or wait for permission. After finishing any step: verify → commit if appropriate → update this file → continue immediately to the next phase. "Checkpoint" is not a valid reason to pause. The only two valid stop conditions: (1) the ENTIRE restructuring is complete (all 12 phases from the target IA's migration plan, full regression clean), or (2) a genuine external blocker after exhausting investigation.
+**Directive 2 received:** 2026-08-17 (immediately after Directive 1's completion) — a much larger master audit/rebuild directive covering all 3 tiers end-to-end: real Reports decomposition (not just tab-grouping), Platform Owner finalization, Club IA finalization, Customer IA finalization, permission-driven navigation verification, FULL RTL/Bidi system audit, root/connector test architecture cleanup, cross-domain real-data verification, multi-club/multi-enrollment fixture verification, mobile+desktop verification, three-tier final regression. Governed as a multi-agent workflow: orchestrator (main session) holds final decision authority; 8 parallel read-only audit subagents gathered evidence; all findings synthesized and cross-verified against real code/DB before any implementation. **NO checkpoint/pause language permitted per the directive — continue autonomously through all phases until every acceptance-criteria item closes.**
 
 ---
 
-## RESUME CURSOR
+## STANDING RULE (in force for Directive 2)
+
+Never stop mid-phase to send a report or wait for permission. After finishing any step: verify → commit if appropriate → update this file → continue immediately to the next phase. "Checkpoint" is not a valid reason to pause. The only two valid stop conditions: (1) ALL acceptance criteria in the directive close (Information Architecture, Platform Owner, Club Side, Customer, Permissions, Reports, RTL/Bidi, WhatsApp, Testing, Evidence sections — see directive text), or (2) a genuine external blocker after exhausting investigation.
+
+---
+
+## DIRECTIVE 2 — 8 AUDIT FINDINGS (evidence gathered, synthesized by orchestrator)
+
+### Audit 1 — Reports Architecture
+`ReportsPage.tsx` is 1127 lines, 9 tab components, visual grouping only (NOT real decomposition — confirmed the user's concern). Key findings:
+- `PaymentMethodReportTab` is the outlier: owns a 2nd query (`payment_reconciliations`), a mutation (`confirm_payment_reconciliation`), local error state — a write/workflow screen disguised as a report tab.
+- 4 metrics are computed by TWO independently-written SQL bodies each (not shared): `total_revenue`/`revenue_by_day`/`refunds_total` (executive dashboard vs revenue report), `outstanding_total` (today dashboard vs executive dashboard), `active_enrollments` (executive dashboard vs academy report), `new_customers` (executive dashboard vs customer report). Consistent today only by convention/comment, not by shared code — real desync risk on future edits.
+- ALL 8 Overview KPI StatCards are dead-ends (`StatCard` has no onClick/href prop at all) — confirmed via component signature check.
+- Recommended decomposition: independent routed screens for Revenue, Payment-Methods (really a reconciliation workflow), Collections, Exceptions, Bookings; lighter sub-tabs for Occupancy/Academy/Customers; Dashboard becomes the index/landing, not a tab among equals.
+- Full canonical-metric table (defined-where/displayed-where) captured in audit output — needed for Reports/Finance consistency work.
+
+### Audit 2 — RTL/Bidi Full System
+Verdict: codebase is NOT systemically LTR-by-default — root DirectionProvider, logical Tailwind classes, and Radix's native dir-aware flex/grid are already correct. Real defects, now FIXED and live-verified in both directions (see Phase Log below):
+- Sheet primitive hardcoded physical left/right — FIXED (logical CSS + rtl: variants), verified live both directions after catching+fixing a start/end mapping error.
+- MoneyDisplay/formatMoney missing bidi isolation — FIXED (`<bdi>` / Unicode FSI-PDI isolate marks).
+- 4 directional-icon sites hardcoded per-direction — FIXED (rtl:rotate-180 pattern), verified live both directions after catching+fixing a base-icon selection error.
+- 6 phone/invoice-number sites missing bidi isolation — FIXED (`<bdi>` wraps).
+- Confirmed NOT bugs (no fix needed): Dialog/Sheet footer `space-x-2` (Tailwind 3.4.19 already uses logical margin-inline by default), ReportsPage's TabsList group order (native flex already dir-aware), DirectionProvider/AppLayout/PortalLayout/PlatformLayout sidebars/DataTable/DropdownMenu.
+
+### Audit 3 — Permission & Navigation Model
+Verdict: per-role (not per-user) navigation filtering is STRUCTURALLY SUFFICIENT — `role_permissions` PK is `(role_id, permission_id)` with zero per-membership override table anywhere in 108 migrations/60 live tables. `has_permission()` resolves purely through `role_id`, so two users with the same roleKey are guaranteed identical permissions by schema design, not just by convention. One real (inert) caveat: `membership_branches`/`has_branch_access()` allows branch-scoped ROW visibility to differ within a role (0 rows live today, exercised only by audit_logs RLS) — this is data-scoping, not domain-nav-visibility, so `NavDomain`'s coarser grain correctly has no opinion on it. Real finding: `ROLE_NAV_DOMAINS` is a hand-maintained SECOND copy of what `role_permissions` already encodes — a process/drift risk (evidenced by real migration history editing role_permissions without touching navigation.ts), not a live bug. Also found (adjacent, real gap): `/app/fields` and `/app/audit-log` have ZERO desktop sidebar entry point (MorePage-only) — still open, needs fixing in Phase: Club IA finalization.
+
+### Audit 4 — Test Architecture
+Root cause confirmed and FIXED (see Phase Log): vitest's default include glob walked the whole repo, discovering `whatsapp-connector/src/templates.test.ts` (a separate Node subproject's hand-rolled non-vitest test script) and `.claude/worktrees/**` (stale duplicate of `src/App.test.tsx`, causing "4 passed" to actually mean "2 real tests, run twice"). Fixed via `test.exclude` in vitest.config.ts. Root suite now correctly 1 file/2 tests; connector's 14 tests verified passing standalone via `npx tsx src/templates.test.ts`.
+
+### Audit 5 — Platform Owner UX
+10 concrete open gaps (not fixed by prior Directive-1 IA pass): (1) hardcoded RPC params on `change_platform_plan`/`record_platform_payment` + 2 direct-table-writes bypassing RPCs (PlatformClubDetailPage) — deliberately deferred by Directive 1, still open; (2) same RPC-vs-direct-write inconsistency in PlatformPlansPage's edit mutation; (3) 7 of 9 Overview stat cards are dead-ends, Trials/expiring-soon counts don't link to their own real screens; (4) Revenue report tab has no club drill-down (no club_id in query); (5) THREE different "expiring soon" day-thresholds across Overview(7d)/Alerts(3-7d)/Reports renewal tab (own bucketing) — real data-consistency bug; (6) PlatformLeadsPage fetches but never renders email/message fields; (7) no pagination on PlatformClubsPage (hard limit 100) or PlatformAuditPage (hard limit 200); (8) PlatformOwnersPage still lists one row per club-ownership, no true person-level grouping despite stat cards summarizing multi-club owners; (9) no role/permission variation in PlatformLayout (acceptable today, single role, but zero infra if that changes). Already-fixed-by-Directive-1 items confirmed still correct: 4 placeholder routes, sidebar grouping, mobile nav, raw-enum leaks, Reports/Trials drill-down links, Overview action-item cards.
+
+### Audit 6 — Club Side UX
+Booking 360 / Customer 360 "linking" requirement is LARGELY UNBUILT beyond what Directive 1 already did (WhatsApp summary + Phase-9 collect-payment). Confirmed gaps: BookingDetailSheet — customer name and field/branch are static text (no links), no invoice number/link shown at all, outstanding balance has no click-through to BillingPage, no history/audit section. CustomerDetailDialog — bookings list is flat (no upcoming/past/cancelled/no-show distinction), rows not clickable, payments not shown at all (only invoices as proxy), invoices not linked, NO NOTES SYSTEM EXISTS AT ALL (not hidden, genuinely unbuilt), no activity/audit log. TodayPage — ALL StatCards and NOW/NEXT booking lists are dead-ends (no onClick), some scope-creep (informational KPIs mixed into a "needs decision today" command center), duplicate signal with AttentionNeeded widget. Confirmed correct/no-fix-needed: Finance is genuinely one grouped domain (no duplicated payment logic — verified Academy reuses `record_payment` via the same invoice/subscription tables, zero parallel RPCs), WhatsApp is genuinely independent top-level nav, Settings is genuinely narrow, Academy is reasonably decomposed already (4 tabs, 6 files, no crowding), no RTL hardcoding found in bookings/academy grids.
+
+### Audit 7 — Customer Portal UX
+Confirmed the 2 claimed Directive-1 fixes (PortalAcademyPage all-enrollments, PortalProfilePage multi-club selector) are genuinely correct in current code, plus one additional pattern checked and cleared as safe (subscriptions[0] — DB-enforced 1:1 via unique constraint, not a bug). New gaps found: query-param preselection (?bookingId=/?invoiceId=) silently no-ops with zero user feedback when the id doesn't resolve (low severity, not a security issue, RLS still protects data) — worth a toast/inline message. PortalLayout is "mobile-only" not "mobile-first" (zero md:/lg: responsive classes at all) — defensible for a simple customer product, doc comment slightly overstates it. Booking cards show total_price but NOT payment/outstanding status — a customer literally cannot tell "did I pay for this?" from the bookings list without switching tabs, despite that being the single most common question — targeted gap worth closing (small outstanding chip on the card), NOT a case for full "Customer 360" consolidation (5-tab structure is arguably correct for a simple customer product, explicit tension noted and accepted). RLS verified clean via live Supabase MCP query — all self-service policies correctly scoped through customers.user_id = auth.uid() chains, manual_payment_claims INSERT correctly prevents claiming against someone else's invoice.
+
+### Audit 8 — (reserved, was Reports; see Audit 1)
+
+---
+
+## RESUME CURSOR (Directive 2)
 
 ```
-current_phase: COMPLETE — all 12 phases done
-completed_phases: 1 (Audit), 2 (Target IA), 3 (Shared navigation foundation), 4 (Platform Owner), 5 (Club Settings restructure), 6 (Finance domain grouping), 7 (Reports tab-grouping), 8 (WhatsApp module), 9 (Booking 360 collect-payment), 10 (Customer Portal), 11 (Role-based nav visibility), 12 (Full regression)
-last_commit: see Phase 12 log below for the regression-verification commit
-test_status: tsc clean, `npm run build` clean, `npm run lint` clean (0 errors, 4 pre-existing warnings unrelated to this work), `npm run test` 4/4 real app tests passing (the 1 failed suite is whatsapp-connector's separate Node-only self-test file being picked up by the root vitest scan -- pre-existing config gap, not a regression from this session, that connector has its own `test` script and was not touched in this restructuring)
+current_phase: Reports architecture decomposition (post-audit-synthesis implementation)
+completed_so_far:
+  - Test architecture fix (vitest.config.ts exclude) — commit adeaa17
+  - RTL primitive fixes batch 1 (Sheet, MoneyDisplay/formatMoney, directional icons, bidi isolation) — commit dd8670b
+  - RTL correction: Sheet start/end mapping was backwards, fixed + live-verified both directions — commit 7d1a3b3
+  - RTL correction: directional icon base/rotation was backwards, fixed + live-verified both directions — commit c67551b
+test_status: tsc clean, `npm run build` clean after every commit above, `npm run test` clean (1 file/2 tests, connector's 14 tests pass standalone)
 blocker: none
-exact_next_action: NONE -- the IA restructuring is COMPLETE. All 12 phases from MAL3ABY_INFORMATION_ARCHITECTURE.md §8's migration plan are done, verified, and committed. The §9 No-Feature-Lost Checklist is fully closed (every row accounted for in this file's live tracking table above, all confirmed Yes/Yes). If resuming a future session against this file: there is no next phase -- any further work is a new task, not a continuation of this directive.
-
-NOTE: Phase 4 deliberately did NOT fix the 2 hardcoded-reason/method RPC calls on PlatformClubDetailPage (change_platform_plan, record_platform_payment) or the 2 direct-table-writes there that bypass RPCs -- these are real data-integrity/form-completeness findings from the audit but are NOT information-architecture problems (no screen/nav reorganization involved), and fixing them requires adding real form inputs (a scope-creep risk against "reorganize, don't invent features"). Logged here as a legitimate follow-up, deliberately deferred, not forgotten -- revisit after the core IA restructuring (all 12 phases) is complete, as a discrete follow-up task if the user wants it.
+exact_next_action: Begin Reports architecture decomposition per Audit 1's findings -- split ReportsPage.tsx (1127 lines) into independent routed screens where warranted (Revenue, Payment-Methods/Reconciliation, Collections, Exceptions, Bookings) and lighter sub-tabs for the rest (Occupancy, Academy, Customers), with Dashboard becoming the index/landing rather than a tab among equals. Extract shared plumbing (the useQuery boilerplate pattern repeated 8x) into a shared hook. Add drill-down links from every KPI/StatCard to its filtered destination (confirmed ALL are currently dead-ends). Then address the 4 duplicate-SQL-body metrics (revenue, outstanding, active_enrollments, new_customers) — decide whether to centralize into shared SQL functions/views or at minimum add a code comment + test asserting they stay in sync. After Reports: Platform Owner gaps (10 items from Audit 5), Club Side Booking/Customer 360 links (Audit 6), Customer Portal outstanding-status chip (Audit 7), then permission-model documentation (Audit 3's drift-risk finding), then full RTL sweep of any remaining screens not yet spot-checked, then multi-club/multi-enrollment fixture verification, then mobile+desktop verification, then three-tier final regression per the directive's Acceptance Criteria checklist.
 ```
 
 ---
 
-## PHASE LOG
+## PHASE LOG (Directive 2 — in progress)
+
+### Test architecture cleanup: COMPLETE (commit `adeaa17`)
+Root cause: vitest's default include glob walks the whole repo tree with no override; `whatsapp-connector/src/templates.test.ts` (separate Node subproject, non-vitest hand-rolled test script) and `.claude/worktrees/**/src/App.test.tsx` (stale duplicate) were both being wrongly discovered. Fixed via `test.exclude` in `vitest.config.ts`. Verified: root suite now 1 file/2 tests, zero failed suites; connector's own 14 tests confirmed passing standalone via `npx tsx src/templates.test.ts`.
+
+### RTL/Bidi primitive fixes: COMPLETE (commits `dd8670b`, `7d1a3b3`, `c67551b`)
+Fixed Sheet's hardcoded physical left/right (logical CSS), MoneyDisplay/formatMoney bidi isolation, 4 directional-icon sites, 6 phone/invoice-number bidi-isolation sites. Two self-caught, self-corrected errors during live verification: the Sheet's start/end CSS mapping was initially backwards (fixed in `7d1a3b3`), and the directional icons' base/rotation was initially backwards too (fixed in `c67551b`) -- both caught by live-testing the actual LanguageSwitcher toggle in the browser (not just reading the CSS), both now verified correct in both RTL and LTR with computed-style checks, not just class-name checks. This is the pattern to keep using for all remaining RTL work: never trust a CSS/class change is correct without toggling the real switcher and checking computed styles in both directions.
+
+## PHASE LOG (Directive 1 — COMPLETE, all 12 phases)
 
 ### Phase 1 — Audit: COMPLETE (commit `fdc7b13`)
 Full inventory across Platform Owner (14 routes, 10 real screens + 4 placeholders), Club/Venue Staff (12 routes), Customer Portal (5 routes), WhatsApp current state. 15 confirmed cross-cutting problems documented with concrete evidence (file paths, line-level detail, exact duplicated logic). Gathered via 3 parallel deep-read exploration passes + live database queries (roles/permissions/table inventory with real row counts) + direct router.tsx/AppLayout.tsx/SettingsPage.tsx reads.
