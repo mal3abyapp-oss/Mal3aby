@@ -51,8 +51,35 @@ function validateRequiredEnv(): void {
   console.log('[connector] environment check: SUPABASE_URL present, SUPABASE_SERVICE_ROLE_KEY present, WHATSAPP_SESSION_ENCRYPTION_KEY present and valid (32 bytes).')
 }
 
+/**
+ * Real bug found live (Safe Messaging test #105): an unhandled
+ * exception from deep inside Baileys' own retry-message handling
+ * (`sendRetryRequest` hitting a closed WebSocket, Boom "Connection
+ * Closed") crashed this entire Node process, silently abandoning every
+ * club's queue processing and leaving in-flight rows stuck in
+ * 'processing' -- not a graceful reconnect, a hard process exit.
+ *
+ * This is NOT a change to the pairing/session logic itself (untouched,
+ * per the resume directive) -- it's process-level resilience so a
+ * single unhandled internal library error can never silently kill the
+ * whole service. Logged and swallowed at the process boundary; the
+ * specific club's BaileysProvider will surface its own real connection
+ * state (reconnecting/failed/etc.) through the normal state-change
+ * path regardless -- this handler exists only to stop an OS-level
+ * process death, not to hide or suppress a real per-club failure.
+ */
+function installCrashGuards(): void {
+  process.on('uncaughtException', (err) => {
+    console.error('[connector] uncaught exception (process kept alive):', err instanceof Error ? err.message : err)
+  })
+  process.on('unhandledRejection', (reason) => {
+    console.error('[connector] unhandled promise rejection (process kept alive):', reason instanceof Error ? reason.message : reason)
+  })
+}
+
 async function main() {
   validateRequiredEnv()
+  installCrashGuards()
 
   const sync = new SupabaseSync()
   const connections = new TenantConnectionManager(sync)
