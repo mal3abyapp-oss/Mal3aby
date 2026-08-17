@@ -23,19 +23,13 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import { LIFECYCLE_STATUS_LABELS, SUBSCRIPTION_KIND_LABELS } from './labels'
+import { LIFECYCLE_STATUS_LABELS, SUBSCRIPTION_KIND_LABELS, ACCESS_TONE, ACCESS_LABEL } from './labels'
+import { actionLabel, entityLabel } from '@/lib/domain/audit'
 
 // Per-club detail: Overview / Current Subscription / History / Payment
 // History / Access Status / Audit, plus the Actions panel wired to every
 // Phase 3b/3c RPC. This is the single highest-surface-area screen in the
 // Platform Owner console.
-
-const ACCESS_TONE: Record<string, 'success' | 'warning' | 'danger'> = {
-  full: 'success',
-  grace: 'warning',
-  blocked: 'danger',
-}
-const ACCESS_LABEL: Record<string, string> = { full: 'كامل', grace: 'فترة سماح', blocked: 'موقوف' }
 
 const LIMIT_TYPE_LABELS: Record<string, string> = {
   branch_limit: 'الفروع',
@@ -664,7 +658,8 @@ export function PlatformClubDetailPage() {
         <TabsContent value="audit">
           <DataTable
             columns={[
-              { key: 'action', header: 'الإجراء', render: (a: (typeof auditRows)[number]) => a.action },
+              { key: 'action', header: 'الإجراء', render: (a: (typeof auditRows)[number]) => actionLabel(a.action) },
+              { key: 'entity', header: 'الكيان', render: (a: (typeof auditRows)[number]) => entityLabel(a.entity_type) },
               { key: 'time', header: 'الوقت', render: (a: (typeof auditRows)[number]) => new Date(a.created_at).toLocaleString('ar-EG') },
               { key: 'reason', header: 'السبب', render: (a: (typeof auditRows)[number]) => a.reason ?? '—' },
             ]}

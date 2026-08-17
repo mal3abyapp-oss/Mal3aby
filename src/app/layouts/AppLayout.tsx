@@ -7,6 +7,7 @@ import { supabase } from '@/lib/supabase/client'
 import { GlobalSearch } from '@/features/search/GlobalSearch'
 import { QuickActionsPalette } from '@/features/dashboard/QuickActionsPalette'
 import { LanguageSwitcher } from '@/components/ui/language-switcher'
+import { canSeeNavDomain, type NavDomain } from '@/lib/domain/navigation'
 import {
   CalendarDays,
   GraduationCap,
@@ -26,35 +27,43 @@ import type { LucideIcon } from 'lucide-react'
 // Authenticated club-side app shell — desktop sidebar + mobile bottom nav.
 // See docs/DESIGN_SYSTEM.md#app-shell--desktop and #mobile-rules,
 // docs/SCREEN_MAP.md for the canonical nav item list.
-// Sidebar items should be permission-filtered once auth exists (Phase 2) —
-// see docs/DESIGN_SYSTEM.md#app-shell--desktop "if no permission, don't show".
+//
+// IA restructuring (Phase 3): sidebar is now permission-filtered by
+// role via src/lib/domain/navigation.ts -- this was flagged as an
+// intended-but-never-built Phase 2 task (see the removed comment that
+// used to sit here) and confirmed as a real gap in
+// MAL3ABY_INFORMATION_ARCHITECTURE_AUDIT.md: every role previously saw
+// all 9 items regardless of relevance (RLS always prevented any actual
+// data leak -- this was a UX-clarity fix, not a security fix).
 interface NavItem {
   to: string
   labelKey: string
   icon: LucideIcon
+  domain: NavDomain
 }
 
 // Gate 10: labels moved to i18n keys (nav.*) resolved via t() inside
 // the component -- these arrays stay static (no re-render cost from
 // recreating them), only the label lookup is locale-aware.
 const sidebarItems: NavItem[] = [
-  { to: '/app', labelKey: 'nav.today', icon: LayoutDashboard },
-  { to: '/app/bookings', labelKey: 'nav.bookings', icon: CalendarDays },
-  { to: '/app/academy', labelKey: 'nav.academy', icon: GraduationCap },
-  { to: '/app/customers', labelKey: 'nav.customers', icon: Users },
-  { to: '/app/billing', labelKey: 'nav.billing', icon: Receipt },
-  { to: '/app/cash-shift', labelKey: 'nav.cashShift', icon: Wallet },
-  { to: '/app/reports', labelKey: 'nav.reports', icon: BarChart3 },
-  { to: '/app/staff', labelKey: 'nav.staff', icon: UserCog },
-  { to: '/app/settings', labelKey: 'nav.settings', icon: Settings },
+  { to: '/app', labelKey: 'nav.today', icon: LayoutDashboard, domain: 'today' },
+  { to: '/app/bookings', labelKey: 'nav.bookings', icon: CalendarDays, domain: 'bookings' },
+  { to: '/app/academy', labelKey: 'nav.academy', icon: GraduationCap, domain: 'academy' },
+  { to: '/app/customers', labelKey: 'nav.customers', icon: Users, domain: 'customers' },
+  { to: '/app/billing', labelKey: 'nav.billing', icon: Receipt, domain: 'finance' },
+  { to: '/app/outstanding', labelKey: 'nav.outstanding', icon: Wallet, domain: 'finance' },
+  { to: '/app/cash-shift', labelKey: 'nav.cashShift', icon: Wallet, domain: 'finance' },
+  { to: '/app/reports', labelKey: 'nav.reports', icon: BarChart3, domain: 'reports' },
+  { to: '/app/staff', labelKey: 'nav.staff', icon: UserCog, domain: 'staff' },
+  { to: '/app/settings', labelKey: 'nav.settings', icon: Settings, domain: 'settings' },
 ]
 
 const mobileNavItems: NavItem[] = [
-  { to: '/app', labelKey: 'nav.today', icon: LayoutDashboard },
-  { to: '/app/bookings', labelKey: 'nav.bookings', icon: CalendarDays },
-  { to: '/scan', labelKey: 'nav.scan', icon: ScanLine },
-  { to: '/app/academy', labelKey: 'nav.academy', icon: GraduationCap },
-  { to: '/app/more', labelKey: 'nav.more', icon: MoreHorizontal },
+  { to: '/app', labelKey: 'nav.today', icon: LayoutDashboard, domain: 'today' },
+  { to: '/app/bookings', labelKey: 'nav.bookings', icon: CalendarDays, domain: 'bookings' },
+  { to: '/scan', labelKey: 'nav.scan', icon: ScanLine, domain: 'scan' },
+  { to: '/app/academy', labelKey: 'nav.academy', icon: GraduationCap, domain: 'academy' },
+  { to: '/app/more', labelKey: 'nav.more', icon: MoreHorizontal, domain: 'today' },
 ]
 
 async function fetchSubscriptionSummary(clubId: string) {
@@ -79,6 +88,9 @@ export function AppLayout() {
   const daysRemaining = subSummary?.end_at
     ? Math.ceil((new Date(subSummary.end_at).getTime() - Date.now()) / (24 * 60 * 60 * 1000))
     : null
+
+  const visibleSidebarItems = sidebarItems.filter((item) => canSeeNavDomain(currentMembership?.roleKey, item.domain))
+  const visibleMobileNavItems = mobileNavItems.filter((item) => canSeeNavDomain(currentMembership?.roleKey, item.domain))
 
   return (
     <div className="flex min-h-screen bg-page-bg">
@@ -106,7 +118,7 @@ export function AppLayout() {
         )}
 
         <nav className="flex flex-1 flex-col gap-1 px-2">
-          {sidebarItems.map((item) => (
+          {visibleSidebarItems.map((item) => (
             <NavLink
               key={item.to}
               to={item.to}
@@ -183,7 +195,7 @@ export function AppLayout() {
 
         {/* Mobile bottom nav */}
         <nav className="fixed inset-x-0 bottom-0 z-40 flex border-t border-border bg-surface md:hidden">
-          {mobileNavItems.map((item) => (
+          {visibleMobileNavItems.map((item) => (
             <NavLink
               key={item.to}
               to={item.to}

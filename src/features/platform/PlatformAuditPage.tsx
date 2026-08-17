@@ -1,7 +1,18 @@
+import { Link } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { supabase } from '@/lib/supabase/client'
 import { PageHeader } from '@/components/ui/page-header'
 import { DataTable, type DataTableColumn } from '@/components/ui/data-table'
+import { actionLabel, entityLabel } from '@/lib/domain/audit'
+
+// IA restructuring (Phase 3): two real findings from
+// MAL3ABY_INFORMATION_ARCHITECTURE_AUDIT.md fixed here --
+// (1) r.action/r.entity_type were rendered completely raw
+// ("platform_suspend_club", "clubs") instead of through a label map,
+// unlike every other enum-bearing column in the Platform Owner tier;
+// (2) club name was plain text, not a link, inconsistent with every
+// sibling screen (Clubs/Owners/Alerts) which link into
+// PlatformClubDetailPage -- this was flagged as a dead-end gap.
 
 interface AuditRow {
   id: string
@@ -37,9 +48,20 @@ export function PlatformAuditPage() {
 
   const columns: DataTableColumn<AuditRow>[] = [
     { key: 'time', header: 'الوقت', render: (r) => new Date(r.created_at).toLocaleString('ar-EG') },
-    { key: 'club', header: 'النادي', render: (r) => r.club_name ?? 'مستوى المنصة' },
-    { key: 'action', header: 'الإجراء', render: (r) => r.action },
-    { key: 'entity', header: 'الكيان', render: (r) => r.entity_type },
+    {
+      key: 'club',
+      header: 'النادي',
+      render: (r) =>
+        r.club_id ? (
+          <Link to={`/platform/clubs/${r.club_id}`} className="text-accent-foreground hover:underline">
+            {r.club_name ?? 'نادٍ'}
+          </Link>
+        ) : (
+          'مستوى المنصة'
+        ),
+    },
+    { key: 'action', header: 'الإجراء', render: (r) => actionLabel(r.action) },
+    { key: 'entity', header: 'الكيان', render: (r) => entityLabel(r.entity_type) },
     { key: 'reason', header: 'السبب', render: (r) => r.reason ?? '—' },
   ]
 

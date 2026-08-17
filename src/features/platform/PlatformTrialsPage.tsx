@@ -1,4 +1,5 @@
 import { useQuery } from '@tanstack/react-query'
+import { Link } from 'react-router-dom'
 import { supabase } from '@/lib/supabase/client'
 import { PageHeader } from '@/components/ui/page-header'
 import { StatCard } from '@/components/ui/stat-card'
@@ -43,7 +44,19 @@ export function PlatformTrialsPage() {
   const cancelled = trials.filter((t) => t.lifecycle_status === 'cancelled')
 
   const columns: DataTableColumn<TrialRow>[] = [
-    { key: 'club', header: 'النادي', render: (t) => t.club_name },
+    {
+      key: 'club',
+      header: 'النادي',
+      // IA restructuring (Phase 3): club name was plain text here,
+      // inconsistent with every sibling screen (Clubs/Owners/Alerts)
+      // which link into PlatformClubDetailPage -- confirmed dead-end
+      // in MAL3ABY_INFORMATION_ARCHITECTURE_AUDIT.md.
+      render: (t) => (
+        <Link to={`/platform/clubs/${t.club_id}`} className="text-accent-foreground hover:underline">
+          {t.club_name}
+        </Link>
+      ),
+    },
     { key: 'origin', header: 'المصدر', render: (t) => (t.trial_origin === 'automatic' ? 'تلقائي' : 'يدوي') },
     { key: 'start', header: 'البداية', render: (t) => new Date(t.start_at).toLocaleDateString('ar-EG') },
     { key: 'end', header: 'النهاية', render: (t) => new Date(t.end_at).toLocaleDateString('ar-EG') },

@@ -17,12 +17,12 @@ Never stop mid-phase to send a report or wait for permission. After finishing an
 ## RESUME CURSOR
 
 ```
-current_phase: Phase 3 — Shared navigation foundation
-completed_phases: 1 (Audit), 2 (Target IA)
-last_commit: fdc7b13 (Phase 1 audit) -- Phase 2 target IA not yet committed
-test_status: N/A (no code changes yet, documentation only)
+current_phase: Phase 4 — Platform Owner (placeholder removal, redirects)
+completed_phases: 1 (Audit), 2 (Target IA), 3 (Shared navigation foundation)
+last_commit: (pending -- Phase 3 changes about to be committed)
+test_status: tsc clean, build clean, live-verified in browser (audit log labels, club links, reports growth tab enum fix, outstanding page reachable, sidebar renders)
 blocker: none
-exact_next_action: Commit Phase 2 (target IA doc), then begin Phase 3 -- build the shared nav-permission-filtering helper (used by both AppLayout and PlatformLayout), extend src/features/platform/labels.ts with the confirmed missing enum->label maps (clubs.status for Growth tab, audit_logs.action/entity_type), consolidate CLUB_STATUS_LABELS/ACCESS_TONE/ACCESS_LABEL duplicated across PlatformClubsPage.tsx/PlatformClubDetailPage.tsx into labels.ts.
+exact_next_action: Commit Phase 3, then begin Phase 4 -- remove the 4 Platform Owner placeholder routes (/platform/subscriptions, /platform/payments, /platform/renewals -- redirect each to its real content per target IA; /platform/settings -- build a real small screen for trial/grace defaults), group PlatformLayout's 13 flat sidebar items into 4 sections, fix the 2 hardcoded-reason/method RPC calls on PlatformClubDetailPage (change_platform_plan, record_platform_payment), make the 2 direct-table-writes there use RPCs instead for consistency.
 ```
 
 ---
@@ -42,8 +42,10 @@ Designed target navigation trees for all 3 tiers, WhatsApp module structure, can
 - WhatsApp → new top-level `/app/whatsapp` module with 4 tabs (Overview/Activity/Connection/Settings) — directive's explicit instruction. Activity tab is the one genuinely NEW screen (data already exists in notification_queue, only a read-only view is new).
 - Templates preview, self-test tooling, owner-person-level profile, lead-conversion workflow, staff edit-role-after-invite, Plans full CRUD — explicitly logged as OUT OF SCOPE (real gaps, but new features, not IA restructuring) per §7 of the target IA doc.
 
-### Phase 3 — Shared navigation foundation: NOT STARTED
-Next up. Scope: permission-filtering helper for AppLayout sidebar, section-grouping for PlatformLayout sidebar, labels.ts extensions.
+### Phase 3 — Shared navigation foundation: COMPLETE
+Built `src/lib/domain/navigation.ts` (role -> nav-domain visibility map, mirrors target IA §6 exactly) and wired it into `AppLayout.tsx`'s sidebar + mobile nav (confirmed gap: was never permission-filtered despite an in-code comment saying it should be). Built `src/lib/domain/audit.ts` (shared ACTION_LABELS/ENTITY_LABELS, consolidating the club-side AuditLogPage's existing good map with the platform-tier's confirmed-raw values) and wired it into PlatformAuditPage + PlatformClubDetailPage's audit tab (both previously showed `r.action`/`r.entity_type` completely raw) plus AuditLogPage (now imports instead of duplicating). Consolidated `CLUB_STATUS_LABELS`/`ACCESS_TONE`/`ACCESS_LABEL` (each duplicated verbatim across 2-3 files) into `platform/labels.ts`. Fixed `PlatformReportsPage`'s Growth tab raw `clubs.status` enum. Added club-name drill-down links across all 4 club-keyed PlatformReportsPage tabs (Subscription/Renewal/Growth/Usage) and PlatformTrialsPage (all previously plain text, confirmed dead-ends in the audit). Added `/app/outstanding` to AppLayout's sidebar (Finance domain) and MorePage (confirmed: fully-built screen with zero navigation entry points anywhere). Added `nav.outstanding` i18n key (ar/en).
+
+Verified: tsc clean, `npm run build` clean, live-verified in browser -- audit log shows human labels + working club links, Reports Growth tab shows "نشط" not raw "active", Outstanding page reachable via المزيد and loads real data, sidebar renders correctly post role-filtering wiring (club_owner sees everything, matching expected behavior since ROLE_NAV_DOMAINS lists club_owner with the full domain set).
 
 ### Phase 4 — Platform Owner: NOT STARTED
 ### Phase 5 — Club Settings restructure: NOT STARTED
@@ -69,7 +71,7 @@ Next up. Scope: permission-filtering helper for AppLayout sidebar, section-group
 | Platform Payments nav item | Placeholder | Redirect → `/platform/reports` | No | No |
 | Platform Renewals nav item | Placeholder | Redirect → `/platform/alerts` | No | No |
 | Platform Settings nav item | Placeholder | Real screen | No | No |
-| Outstanding page | Built, unlinked | Finance domain nav | No | No |
+| Outstanding page | Built, unlinked | Finance domain nav | Yes (added to sidebar + MorePage) | Yes (live-verified, loads real data) |
 | Activation policy setting | Academy tab AND Settings (dup) | Settings only | No | No |
 
 ---

@@ -1,15 +1,29 @@
 import { useQuery } from '@tanstack/react-query'
+import { Link } from 'react-router-dom'
 import { supabase } from '@/lib/supabase/client'
 import { PageHeader } from '@/components/ui/page-header'
 import { DataTable, type DataTableColumn } from '@/components/ui/data-table'
 import { MoneyDisplay } from '@/components/ui/money-display'
 import { StatusBadge } from '@/components/ui/status-badge'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { LIFECYCLE_STATUS_LABELS } from './labels'
+import { LIFECYCLE_STATUS_LABELS, CLUB_STATUS_LABELS } from './labels'
 
 // Five report types per IMPLEMENTATION_PLAN.md Phase 3c: Subscription,
 // Revenue, Renewal, Growth, Usage. All read live from Phase 3b/2 tables --
 // no stored aggregate, no mock data.
+//
+// IA restructuring (Phase 3): two real findings from
+// MAL3ABY_INFORMATION_ARCHITECTURE_AUDIT.md fixed here --
+// (1) Growth tab rendered clubs.status completely raw ("active"/
+// "suspended"/"closed") instead of through a label map, the only tab
+// in this file that skipped that step; (2) zero row-to-club links
+// existed across all 5 tabs despite every tab being club-keyed --
+// "the single largest dead-end in the Platform Owner tier" per the
+// audit. Club name is now a link into PlatformClubDetailPage on every
+// tab where a club_id is actually available (Subscription/Renewal/
+// Growth/Usage -- Revenue is payment-level with no club_id in its
+// current query, a separate, real gap logged in the target IA's
+// out-of-scope list rather than papered over here).
 
 interface SubRow {
   club_id: string
@@ -111,7 +125,15 @@ export function PlatformReportsPage() {
   const { data: usageReport = [] } = useQuery({ queryKey: ['report-usage'], queryFn: fetchUsageReport })
 
   const subColumns: DataTableColumn<SubRow>[] = [
-    { key: 'club', header: 'النادي', render: (r) => r.club_name },
+    {
+      key: 'club',
+      header: 'النادي',
+      render: (r) => (
+        <Link to={`/platform/clubs/${r.club_id}`} className="text-accent-foreground hover:underline">
+          {r.club_name}
+        </Link>
+      ),
+    },
     { key: 'plan', header: 'الخطة', render: (r) => r.plan_name_snapshot ?? '—' },
     { key: 'status', header: 'الحالة', render: (r) => LIFECYCLE_STATUS_LABELS[r.lifecycle_status] ?? r.lifecycle_status },
     { key: 'start', header: 'البداية', render: (r) => new Date(r.start_at).toLocaleDateString('ar-EG') },
@@ -126,7 +148,15 @@ export function PlatformReportsPage() {
   ]
 
   const renewalColumns: DataTableColumn<(typeof renewalReport)[number]>[] = [
-    { key: 'club', header: 'النادي', render: (r) => r.club_name },
+    {
+      key: 'club',
+      header: 'النادي',
+      render: (r) => (
+        <Link to={`/platform/clubs/${r.club_id}`} className="text-accent-foreground hover:underline">
+          {r.club_name}
+        </Link>
+      ),
+    },
     { key: 'end', header: 'تاريخ الانتهاء', render: (r) => new Date(r.end_at).toLocaleDateString('ar-EG') },
     {
       key: 'status',
@@ -143,13 +173,29 @@ export function PlatformReportsPage() {
   ]
 
   const growthColumns: DataTableColumn<(typeof growthReport)[number]>[] = [
-    { key: 'club', header: 'النادي', render: (r) => r.name_ar },
-    { key: 'status', header: 'الحالة', render: (r) => r.status },
+    {
+      key: 'club',
+      header: 'النادي',
+      render: (r) => (
+        <Link to={`/platform/clubs/${r.id}`} className="text-accent-foreground hover:underline">
+          {r.name_ar}
+        </Link>
+      ),
+    },
+    { key: 'status', header: 'الحالة', render: (r) => CLUB_STATUS_LABELS[r.status] ?? r.status },
     { key: 'created', header: 'تاريخ الإنشاء', render: (r) => new Date(r.created_at).toLocaleDateString('ar-EG') },
   ]
 
   const usageColumns: DataTableColumn<(typeof usageReport)[number]>[] = [
-    { key: 'club', header: 'النادي', render: (r) => r.club_name },
+    {
+      key: 'club',
+      header: 'النادي',
+      render: (r) => (
+        <Link to={`/platform/clubs/${r.club_id}`} className="text-accent-foreground hover:underline">
+          {r.club_name}
+        </Link>
+      ),
+    },
     { key: 'branches', header: 'الفروع', render: (r) => r.branchCount },
     { key: 'staff', header: 'الموظفون', render: (r) => r.staffCount },
   ]

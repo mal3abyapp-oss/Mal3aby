@@ -7,6 +7,7 @@ import { StatCard } from '@/components/ui/stat-card'
 import { DataTable, type DataTableColumn } from '@/components/ui/data-table'
 import { StatusBadge } from '@/components/ui/status-badge'
 import { Input } from '@/components/ui/input'
+import { CLUB_STATUS_LABELS } from '@/features/platform/labels'
 
 // Gate 13 task #55: the platform owner console had no way to see WHO
 // owns each club -- ownership is a club_memberships row (role = club_owner),
@@ -34,7 +35,6 @@ async function fetchOwners(): Promise<OwnerRow[]> {
   return (data ?? []) as OwnerRow[]
 }
 
-const CLUB_STATUS_LABELS: Record<string, string> = { active: 'نشط', suspended: 'موقوف', closed: 'مغلق' }
 const MEMBERSHIP_STATUS_LABELS: Record<string, string> = { active: 'نشطة', suspended: 'موقوفة', removed: 'ملغاة' }
 
 export function PlatformOwnersPage() {

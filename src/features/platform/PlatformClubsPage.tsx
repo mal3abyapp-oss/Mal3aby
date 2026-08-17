@@ -4,6 +4,7 @@ import { supabase } from '@/lib/supabase/client'
 import { PageHeader } from '@/components/ui/page-header'
 import { DataTable, type DataTableColumn } from '@/components/ui/data-table'
 import { StatusBadge } from '@/components/ui/status-badge'
+import { CLUB_STATUS_LABELS, ACCESS_TONE, ACCESS_LABEL } from '@/features/platform/labels'
 
 interface ClubRow {
   id: string
@@ -32,14 +33,6 @@ async function fetchClubs(): Promise<ClubRow[]> {
 
   return withAccess
 }
-
-const CLUB_STATUS_LABELS: Record<string, string> = { active: 'نشط', suspended: 'موقوف', closed: 'مغلق' }
-const ACCESS_TONE: Record<string, 'success' | 'warning' | 'danger'> = {
-  full: 'success',
-  grace: 'warning',
-  blocked: 'danger',
-}
-const ACCESS_LABEL: Record<string, string> = { full: 'كامل', grace: 'فترة سماح', blocked: 'موقوف' }
 
 export function PlatformClubsPage() {
   const { data: clubs = [], isLoading } = useQuery({ queryKey: ['platform-clubs'], queryFn: fetchClubs })

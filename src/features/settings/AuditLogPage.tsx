@@ -12,6 +12,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog'
 import { formatMoney } from '@/lib/domain/billing'
+import { actionLabel, entityLabel } from '@/lib/domain/audit'
 
 // Gate 13 #60: this screen used to show the raw machine action string
 // ("booking.discount.apply"), the raw table name as "الكيان" ("booking"),
@@ -21,46 +22,16 @@ import { formatMoney } from '@/lib/domain/billing'
 // that calls it) to a human sentence, and resolves actor_id to a name.
 // Raw JSON is kept, but demoted to an optional "تفاصيل تقنية" section in
 // the detail dialog for anyone who still wants it.
-const ACTION_LABELS: Record<string, string> = {
-  'booking.create': 'إنشاء حجز',
-  'booking.check_in': 'تسجيل حضور حجز',
-  'booking.discount.apply': 'تطبيق خصم على حجز',
-  cancel_booking: 'إلغاء حجز',
-  'field_block.create': 'حجب فترة على ملعب',
-  'invoice.issue': 'إصدار فاتورة',
-  void_invoice: 'إلغاء فاتورة',
-  'payment.record': 'تسجيل دفعة',
-  create_refund: 'استرجاع دفعة',
-  'payment.refund': 'استرجاع دفعة',
-  'subscription.activate': 'تفعيل اشتراك أكاديمية',
-  'subscription.cancel': 'إلغاء اشتراك أكاديمية',
-  'subscription.freeze': 'تجميد اشتراك أكاديمية',
-  'subscription.unfreeze': 'إلغاء تجميد اشتراك أكاديمية',
-  'customer.photo.approve': 'الموافقة على تغيير صورة',
-  'customer.photo.reject': 'رفض تغيير صورة',
-  'customer.self_service_claim': 'ربط حساب عميل تلقائيًا',
-  'cash_shift.open': 'فتح وردية نقدية',
-  'cash_shift.close': 'إغلاق وردية نقدية',
-}
-
-const ENTITY_LABELS: Record<string, string> = {
-  booking: 'حجز',
-  bookings: 'حجز',
-  invoice: 'فاتورة',
-  invoices: 'فاتورة',
-  payment: 'دفعة',
-  refund: 'استرجاع',
-  refunds: 'استرجاع',
-  field_block: 'حجب ملعب',
-  subscription: 'اشتراك أكاديمية',
-  customer: 'عميل',
-  player: 'لاعب',
-  cash_shift: 'وردية نقدية',
-}
+//
+// IA restructuring (Phase 3): the action/entity label maps moved to
+// src/lib/domain/audit.ts so the Platform Owner tier's audit screens
+// (previously showing these values completely raw -- see
+// MAL3ABY_INFORMATION_ARCHITECTURE_AUDIT.md) share the exact same
+// vocabulary instead of a second, independently-maintained map.
 
 function describeAuditLog(r: AuditLogRow): string {
-  const label = ACTION_LABELS[r.action] ?? r.action
-  const entity = ENTITY_LABELS[r.entityType] ?? r.entityType
+  const label = actionLabel(r.action)
+  const entity = entityLabel(r.entityType)
 
   // A few actions carry enough in before/after to say something more
   // specific than just the action label -- worth the extra detail since
