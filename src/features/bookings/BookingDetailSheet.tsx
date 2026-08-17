@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { useMutation, useQuery } from '@tanstack/react-query'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Link } from 'react-router-dom'
 import QRCode from 'qrcode'
 import { supabase } from '@/lib/supabase/client'
@@ -15,7 +15,15 @@ import { StatusBadge } from '@/components/ui/status-badge'
 import { Separator } from '@/components/ui/separator'
 import { BOOKING_STATUS_LABELS, BOOKING_STATUS_TONE, type BookingRow } from '@/lib/domain/booking'
 import { formatInstant } from '@/lib/domain/time'
-import { fetchInvoicePaymentSummaries, PAYMENT_STATUS_LABELS, type InvoicePaymentSummary } from '@/lib/domain/billing'
+import { fetchInvoicePaymentSummaries, PAYMENT_METHOD_LABELS, PAYMENT_STATUS_LABELS, type InvoicePaymentSummary } from '@/lib/domain/billing'
+import { translateSupabaseError } from '@/lib/errors'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
 import { MessageCircle } from 'lucide-react'
 
 // IA restructuring (Phase 8): "independent but connected" -- WhatsApp
@@ -101,6 +109,18 @@ export function BookingDetailSheet({
   const [showNoShowConfirm, setShowNoShowConfirm] = useState(false)
   const [qrDataUrl, setQrDataUrl] = useState<string | null>(null)
   const [actionError, setActionError] = useState<string | null>(null)
+  // IA restructuring (Phase 9, Booking 360): confirmed in the audit --
+  // this sheet showed the outstanding balance read-only with no way to
+  // act on it; staff had to leave the booking and search for its
+  // invoice on BillingPage just to collect a payment. Reuses
+  // BillingPage's own record_payment() RPC call directly (same params,
+  // same server-side validation) rather than duplicating payment logic
+  // -- this is a single-line quick-collect for the exact outstanding
+  // amount, not a replacement for BillingPage's full split-payment UI.
+  const [showCollectForm, setShowCollectForm] = useState(false)
+  const [collectAmount, setCollectAmount] = useState('')
+  const [collectMethod, setCollectMethod] = useState('cash')
+  const queryClient = useQueryClient()
 
   const { data: invoiceSummary } = useQuery({
     queryKey: ['booking-invoice-summary', booking?.invoiceId],
@@ -157,6 +177,31 @@ export function BookingDetailSheet({
 
   const outstanding = invoiceSummary ? invoiceSummary.outstanding : booking?.totalPrice ?? 0
 
+  const collectPaymentMutation = useMutation({
+    mutationFn: async () => {
+      if (!booking?.invoiceId) throw new Error('no invoice to collect against')
+      const amount = Number(collectAmount)
+      if (!amount || amount <= 0) throw new Error('أدخل مبلغًا صحيحًا')
+      if (amount - outstanding > 0.01) {
+        throw new Error(`المبلغ (${amount.toFixed(2)}) يتجاوز المتبقي (${outstanding.toFixed(2)})`)
+      }
+      const { error } = await supabase.rpc('record_payment', {
+        p_invoice_id: booking.invoiceId,
+        p_amount: amount,
+        p_method: collectMethod,
+      })
+      if (error) throw error
+    },
+    onSuccess: () => {
+      setShowCollectForm(false)
+      setCollectAmount('')
+      setActionError(null)
+      void queryClient.invalidateQueries({ queryKey: ['booking-invoice-summary', booking?.invoiceId] })
+      onChanged()
+    },
+    onError: (error) => setActionError(error instanceof Error && !('code' in error) ? error.message : translateSupabaseError(error, 'تعذّر تسجيل الدفعة.')),
+  })
+
   return (
     <Sheet
       open={!!booking}
@@ -166,6 +211,8 @@ export function BookingDetailSheet({
           setShowCancelForm(false)
           setCancelReason('')
           setActionError(null)
+          setShowCollectForm(false)
+          setCollectAmount('')
         }
         onOpenChange(open)
       }}
@@ -243,6 +290,48 @@ export function BookingDetailSheet({
                 <p className="text-xs text-text-secondary">لا توجد فاتورة مرتبطة بهذا الحجز.</p>
               )}
             </div>
+
+            {booking.invoiceId && outstanding > 0.01 && (
+              showCollectForm ? (
+                <div className="flex flex-col gap-2 rounded-lg border border-border p-3">
+                  <div className="grid grid-cols-2 gap-2">
+                    <Input
+                      type="number"
+                      min={0}
+                      step="0.01"
+                      placeholder={`المبلغ (المتبقي ${outstanding.toFixed(0)})`}
+                      value={collectAmount}
+                      onChange={(e) => setCollectAmount(e.target.value)}
+                    />
+                    <Select value={collectMethod} onValueChange={setCollectMethod}>
+                      <SelectTrigger><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        {Object.entries(PAYMENT_METHOD_LABELS).map(([value, label]) => (
+                          <SelectItem key={value} value={value}>{label}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="flex gap-2">
+                    <Button
+                      size="sm"
+                      disabled={!collectAmount || collectPaymentMutation.isPending}
+                      onClick={() => collectPaymentMutation.mutate()}
+                    >
+                      {collectPaymentMutation.isPending ? 'جارٍ التسجيل...' : 'تأكيد التحصيل'}
+                    </Button>
+                    <Button variant="ghost" size="sm" onClick={() => { setShowCollectForm(false); setCollectAmount('') }}>تراجع</Button>
+                  </div>
+                </div>
+              ) : (
+                <Button
+                  size="sm"
+                  onClick={() => { setCollectAmount(outstanding.toFixed(2)); setShowCollectForm(true) }}
+                >
+                  تحصيل الدفعة
+                </Button>
+              )
+            )}
 
             {booking.notes && (
               <>
