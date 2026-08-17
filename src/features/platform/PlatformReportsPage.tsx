@@ -6,7 +6,7 @@ import { DataTable, type DataTableColumn } from '@/components/ui/data-table'
 import { MoneyDisplay } from '@/components/ui/money-display'
 import { StatusBadge } from '@/components/ui/status-badge'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { LIFECYCLE_STATUS_LABELS, CLUB_STATUS_LABELS } from './labels'
+import { LIFECYCLE_STATUS_LABELS, CLUB_STATUS_LABELS, isSubscriptionExpiringSoon } from './labels'
 
 // Five report types per IMPLEMENTATION_PLAN.md Phase 3c: Subscription,
 // Revenue, Renewal, Growth, Usage. All read live from Phase 3b/2 tables --
@@ -75,7 +75,7 @@ async function fetchRevenueReport(): Promise<RevenueRow[]> {
 async function fetchRenewalReport() {
   const { data, error } = await supabase
     .from('platform_subscriptions')
-    .select('club_id, end_at, grace_period_days_snapshot, lifecycle_status, clubs(name_ar)')
+    .select('club_id, subscription_kind, end_at, grace_period_days_snapshot, lifecycle_status, clubs(name_ar)')
     .neq('lifecycle_status', 'cancelled')
     .order('end_at')
   if (error) throw error
@@ -86,8 +86,15 @@ async function fetchRenewalReport() {
     return {
       club_id: r.club_id,
       club_name: (r.clubs as unknown as { name_ar: string } | null)?.name_ar ?? '—',
+      subscription_kind: r.subscription_kind,
       end_at: r.end_at,
       daysLeft,
+      // Master IA/UX audit (Platform Owner phase): now uses the same
+      // canonical isSubscriptionExpiringSoon() Overview and Alerts use
+      // (trial:3d / paid:7d), instead of this tab's own flat 7-day
+      // bucketing with no trial distinction -- so a subscription never
+      // shows "expiring soon" here while Alerts/Overview disagree.
+      expiringSoon: isSubscriptionExpiringSoon(r.subscription_kind, r.end_at, now),
     }
   })
 }
@@ -164,7 +171,7 @@ export function PlatformReportsPage() {
       render: (r) =>
         r.daysLeft < 0 ? (
           <StatusBadge tone="danger" label="منتهٍ" />
-        ) : r.daysLeft <= 7 ? (
+        ) : r.expiringSoon ? (
           <StatusBadge tone="warning" label={`${r.daysLeft} أيام متبقية`} />
         ) : (
           <StatusBadge tone="success" label={`${r.daysLeft} يوم متبقٍ`} />

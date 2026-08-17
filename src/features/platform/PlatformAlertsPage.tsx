@@ -6,6 +6,7 @@ import { EmptyState } from '@/components/ui/empty-state'
 import { StatusBadge } from '@/components/ui/status-badge'
 import { Card, CardContent } from '@/components/ui/card'
 import { AlertTriangle, Clock, Sparkles, XCircle } from 'lucide-react'
+import { isSubscriptionExpiringSoon } from './labels'
 
 // Rule-based in-app alerts, computed live from platform_subscriptions --
 // no external notification service (see IMPLEMENTATION_PLAN.md Phase 3c:
@@ -39,12 +40,21 @@ async function fetchAlerts(): Promise<AlertItem[]> {
     const clubName = (row.clubs as unknown as { name_ar: string } | null)?.name_ar ?? '—'
     const daysToEnd = Math.ceil((end.getTime() - now.getTime()) / (24 * 60 * 60 * 1000))
 
+    // Master IA/UX audit (Platform Owner phase): now calls the same
+    // canonical isSubscriptionExpiringSoon() Overview and Reports' Renewal
+    // tab use, instead of re-deriving the trial(3d)/paid(7d) split inline
+    // here. This file's distinction was already the canonical one -- see
+    // that function's comment in labels.ts for the full citation.
     if (now >= end && now < graceEnd) {
       alerts.push({ id: row.id, clubId: row.club_id, clubName, kind: 'overdue_grace', daysLeft: Math.ceil((graceEnd.getTime() - now.getTime()) / (24 * 60 * 60 * 1000)) })
-    } else if (row.subscription_kind === 'trial' && daysToEnd >= 0 && daysToEnd <= 3) {
-      alerts.push({ id: row.id, clubId: row.club_id, clubName, kind: 'trial_ending', daysLeft: daysToEnd })
-    } else if (row.subscription_kind !== 'trial' && daysToEnd >= 0 && daysToEnd <= 7) {
-      alerts.push({ id: row.id, clubId: row.club_id, clubName, kind: 'expiring_soon', daysLeft: daysToEnd })
+    } else if (isSubscriptionExpiringSoon(row.subscription_kind, row.end_at, now)) {
+      alerts.push({
+        id: row.id,
+        clubId: row.club_id,
+        clubName,
+        kind: row.subscription_kind === 'trial' ? 'trial_ending' : 'expiring_soon',
+        daysLeft: daysToEnd,
+      })
     }
   }
 

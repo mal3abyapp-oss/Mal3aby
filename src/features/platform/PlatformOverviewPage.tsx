@@ -5,6 +5,7 @@ import { PageHeader } from '@/components/ui/page-header'
 import { StatCard } from '@/components/ui/stat-card'
 import { MoneyDisplay } from '@/components/ui/money-display'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { isSubscriptionExpiringSoon } from './labels'
 
 // Platform Overview dashboard — real aggregate counts from clubs +
 // platform_subscriptions, computed client-side from RLS-scoped
@@ -53,7 +54,6 @@ async function fetchOverview(): Promise<OverviewData> {
 
   const now = new Date()
   const monthStart = new Date(now.getFullYear(), now.getMonth(), 1)
-  const soon = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000)
 
   const totalClubs = clubs?.length ?? 0
   const activeClubs = clubs?.filter((c) => c.status === 'active').length ?? 0
@@ -74,11 +74,15 @@ async function fetchOverview(): Promise<OverviewData> {
   const newClubsThisMonth = clubs?.filter((c) => new Date(c.created_at) >= monthStart).length ?? 0
 
   const trialCount = subs?.filter((s) => s.subscription_kind === 'trial').length ?? 0
+  // Master IA/UX audit (Platform Owner phase): was a flat 7-day window
+  // regardless of subscription kind -- now uses the same canonical
+  // definition Alerts and Reports' Renewal tab both use (3 days for
+  // trials, 7 for paid), so this count and those screens' lists always
+  // agree on which subscriptions count as "expiring soon". See
+  // isSubscriptionExpiringSoon()'s own comment in labels.ts for the
+  // full audit citation.
   const expiringSoonCount =
-    subs?.filter((s) => {
-      const end = new Date(s.end_at)
-      return end >= now && end <= soon
-    }).length ?? 0
+    subs?.filter((s) => isSubscriptionExpiringSoon(s.subscription_kind, s.end_at, now)).length ?? 0
 
   const revenueThisMonth =
     payments
