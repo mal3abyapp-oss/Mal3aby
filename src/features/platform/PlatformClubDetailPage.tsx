@@ -122,7 +122,7 @@ async function fetchUpgradeRequests(clubId: string) {
 export function PlatformClubDetailPage() {
   const { clubId } = useParams<{ clubId: string }>()
   const queryClient = useQueryClient()
-  const [reasonDialogAction, setReasonDialogAction] = useState<null | 'cancel' | 'reverse'>(null)
+  const [reasonDialogAction, setReasonDialogAction] = useState<null | 'cancel' | 'reverse' | 'suspend'>(null)
   const [reasonTarget, setReasonTarget] = useState<string | null>(null)
   const [reasonText, setReasonText] = useState('')
   const [selectedPlanId, setSelectedPlanId] = useState<string>('')
@@ -257,17 +257,21 @@ export function PlatformClubDetailPage() {
   })
 
   const suspendMutation = useMutation({
-    mutationFn: async () => {
-      const { error } = await supabase.from('clubs').update({ status: 'suspended' }).eq('id', clubId!)
+    mutationFn: async (reason: string) => {
+      const { error } = await supabase.rpc('platform_suspend_club', { p_club_id: clubId!, p_reason: reason })
       if (error) throw error
     },
-    onSuccess: () => void queryClient.invalidateQueries({ queryKey: ['platform-club', clubId] }),
+    onSuccess: () => {
+      setReasonDialogAction(null)
+      setReasonText('')
+      void queryClient.invalidateQueries({ queryKey: ['platform-club', clubId] })
+    },
     onError: () => setActionError('تعذّر إيقاف النادي.'),
   })
 
   const reactivateMutation = useMutation({
     mutationFn: async () => {
-      const { error } = await supabase.from('clubs').update({ status: 'active' }).eq('id', clubId!)
+      const { error } = await supabase.rpc('platform_reactivate_club', { p_club_id: clubId! })
       if (error) throw error
     },
     onSuccess: () => void queryClient.invalidateQueries({ queryKey: ['platform-club', clubId] }),
@@ -497,7 +501,15 @@ export function PlatformClubDetailPage() {
               </>
             )}
             {club?.status === 'active' ? (
-              <Button size="sm" variant="destructive" onClick={() => suspendMutation.mutate()} disabled={suspendMutation.isPending}>
+              <Button
+                size="sm"
+                variant="destructive"
+                onClick={() => {
+                  setReasonDialogAction('suspend')
+                  setReasonTarget(clubId ?? null)
+                }}
+                disabled={suspendMutation.isPending}
+              >
                 إيقاف النادي
               </Button>
             ) : (
@@ -666,19 +678,28 @@ export function PlatformClubDetailPage() {
       <Dialog open={reasonDialogAction !== null} onOpenChange={(open) => !open && setReasonDialogAction(null)}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>{reasonDialogAction === 'cancel' ? 'سبب الإلغاء' : 'سبب عكس الدفعة'}</DialogTitle>
+            <DialogTitle>
+              {reasonDialogAction === 'cancel' ? 'سبب الإلغاء' : reasonDialogAction === 'suspend' ? 'سبب إيقاف النادي' : 'سبب عكس الدفعة'}
+            </DialogTitle>
           </DialogHeader>
           <div className="flex flex-col gap-3">
+            {reasonDialogAction === 'suspend' && (
+              <p className="text-sm text-status-danger">
+                سيتم إيقاف النادي بالكامل عن العمل على المنصة فورًا. هذا إجراء حساس يُسجَّل في سجل التدقيق.
+              </p>
+            )}
             <Input value={reasonText} onChange={(e) => setReasonText(e.target.value)} placeholder="السبب مطلوب" />
             <Button
-              disabled={!reasonText.trim() || cancelMutation.isPending || reverseMutation.isPending}
+              variant={reasonDialogAction === 'suspend' ? 'destructive' : 'default'}
+              disabled={!reasonText.trim() || cancelMutation.isPending || reverseMutation.isPending || suspendMutation.isPending}
               onClick={() => {
                 if (!reasonTarget) return
                 if (reasonDialogAction === 'cancel') cancelMutation.mutate(reasonText)
+                else if (reasonDialogAction === 'suspend') suspendMutation.mutate(reasonText)
                 else reverseMutation.mutate({ paymentId: reasonTarget, reason: reasonText })
               }}
             >
-              تأكيد
+              {reasonDialogAction === 'suspend' ? 'تأكيد الإيقاف' : 'تأكيد'}
             </Button>
           </div>
         </DialogContent>

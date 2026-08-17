@@ -4248,6 +4248,14 @@ export type Database = {
         }
         Returns: string
       }
+      platform_reactivate_club: {
+        Args: { p_club_id: string }
+        Returns: undefined
+      }
+      platform_suspend_club: {
+        Args: { p_club_id: string; p_reason: string }
+        Returns: undefined
+      }
       qr_confirm_checkin: {
         Args: { p_token: string }
         Returns: {
