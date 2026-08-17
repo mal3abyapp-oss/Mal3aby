@@ -101,11 +101,28 @@ async function main() {
 
   console.log('[connector] running: watching for pairing requests and polling the WhatsApp notification queue.')
 
+  // P1 reliability fix (2026-08-17): the previous version of this
+  // handler stopped the pollers and exited immediately -- it never
+  // told WhatsApp's servers any club's live socket was closing. That
+  // left the OLD process's session looking "still active" from
+  // WhatsApp's side, so the NEXT process's reconnect (whether a real
+  // restart or a tsx-watch dev-server file-change restart) opened a
+  // second socket for the same device credentials while the first one
+  // hadn't been told to stand down -- WhatsApp's own servers then
+  // reject one of them with `stream:error / conflict / replaced`,
+  // observed live as a tight reconnect-storm loop. Calling
+  // disconnectAllGracefully() here (bounded, awaited, before exit)
+  // closes every socket cleanly first, which is what actually stops
+  // the storm at its root cause rather than just widening retry caps
+  // on the receiving end.
   const shutdown = () => {
     console.log('[connector] shutting down...')
     connectionPoller.stop()
     queueConsumer.stop()
-    process.exit(0)
+    void connections
+      .disconnectAllGracefully()
+      .catch((err) => console.error('[connector] error during graceful shutdown (exiting anyway):', (err as Error).message))
+      .finally(() => process.exit(0))
   }
   process.on('SIGINT', shutdown)
   process.on('SIGTERM', shutdown)

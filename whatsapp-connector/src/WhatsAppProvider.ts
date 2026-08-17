@@ -76,6 +76,29 @@ export interface WhatsAppProvider {
   /** Attempts to restore a previously-persisted session without requiring a new QR scan. */
   reconnect(): Promise<void>
 
+  /**
+   * Graceful, non-destructive close -- tells WhatsApp's servers this
+   * device is going away cleanly, WITHOUT wiping session credentials.
+   * Used for process shutdown/restart so the next process's reconnect
+   * doesn't race a still-registered-as-live old socket (the root cause
+   * of the conflict/replaced reconnect-storm defect fixed 2026-08-17
+   * -- see BaileysProvider's class-level doc comment for full detail).
+   * Never used for an operator-initiated logout -- that's logout()
+   * below.
+   */
+  disconnectGracefully(): Promise<void>
+
   /** Explicit disconnect + session credential wipe (both in-memory and on the encrypted store). */
   logout(): Promise<void>
+
+  /** Observability snapshot for a future admin health panel (review directive rule 17). */
+  getDiagnostics(): {
+    generation: number
+    disconnectCount: number
+    reconnectCount: number
+    lastDisconnectReason: string | null
+    lastDisconnectCode: number | null
+    currentReconnectAttempt: number
+    connectionUptimeMs: number | null
+  }
 }

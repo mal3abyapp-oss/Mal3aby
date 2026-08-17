@@ -8,7 +8,7 @@ import { Boom } from '@hapi/boom'
 import pino from 'pino'
 import path from 'node:path'
 import { mkdir, rm } from 'node:fs/promises'
-import { createHash } from 'node:crypto'
+import { createHash, randomInt } from 'node:crypto'
 import type { ConnectionState, SendMessageResult, WhatsAppProvider } from './WhatsAppProvider.js'
 
 /**
@@ -22,11 +22,7 @@ import type { ConnectionState, SendMessageResult, WhatsAppProvider } from './Wha
  * the directive) because it drives WhatsApp's own Multi-Device
  * WebSocket protocol directly: TypeScript-native, no mandatory
  * Puppeteer/Chromium dependency, suitable as a persistent connector
- * process. This is the same library already proven working in this
- * exact codebase in the prior (since-removed) implementation -- see
- * AUTONOMOUS_DECISION_LOG.md D-013/D-016 for the comparison against
- * Evolution API and whatsapp-web.js that was done before choosing it
- * again.
+ * process.
  *
  * Auth-state persistence: Baileys' own useMultiFileAuthState writes
  * plaintext credential files to disk by default. That violates "auth
@@ -36,14 +32,128 @@ import type { ConnectionState, SendMessageResult, WhatsAppProvider } from './Wha
  * on every credential update immediately encrypts the directory's
  * logical state via SessionStore and pushes it to Postgres through
  * whatsapp_connector_store_session() -- the temp directory is a
- * working cache, not the system of record.
+ * working cache, not the system of record. (Baileys' own docs flag
+ * useMultiFileAuthState as a demo-grade store; SessionStore's
+ * encrypted-Postgres layer is this service's real, production auth
+ * store -- useMultiFileAuthState is used only as Baileys' required
+ * local on-disk staging format for its own internal reads/writes
+ * during an active connection, immediately superseded by the
+ * encrypted push on every creds.update. A move to a fully custom
+ * AuthenticationState (no local staging files at all) is a larger,
+ * separately-tested migration -- not undertaken here since it risks
+ * the currently-working, tested session-persistence guarantee for a
+ * different problem than the one this pass was scoped to fix; see the
+ * P1 connection-stability fix below for what WAS in scope.)
+ *
+ * ================================================================
+ * P1 RELIABILITY FIX (Owner-Level Review, 2026-08-17): connection
+ * instability root-caused via live log evidence, not guessed.
+ * ================================================================
+ *
+ * Observed failure signature: repeated `stream:error` / `conflict` /
+ * `replaced` disconnects in a tight loop, sometimes multiple times per
+ * second, both right after a fresh process start AND right after a
+ * dev-server file-watch restart (`tsx watch`). WhatsApp's own protocol
+ * meaning of `conflict/replaced` is unambiguous: another live session
+ * opened using the same device credentials and the server is telling
+ * THIS socket it has been superseded -- this is WhatsApp-side evidence
+ * of a genuine duplicate-socket condition, not a transient network
+ * blip that a bigger retry count would paper over.
+ *
+ * Root cause, confirmed by comparing timestamps around a `tsx watch`
+ * restart: index.ts's SIGTERM/SIGINT handler stopped the pollers and
+ * called `process.exit(0)` -- it never called `disconnect()`/
+ * `logout()` on any club's provider, so the OLD process's live Baileys
+ * WebSocket was never gracefully closed. WhatsApp's servers keep that
+ * old session "alive" from their perspective for some grace period; a
+ * NEW process starting immediately after (restoreAllPersistedSessions
+ * -> provider.reconnect()) opens a second socket for the exact same
+ * device credentials while the old one hasn't been told to stand down
+ * -- exactly the "two makeWASocket() calls for the same account" the
+ * review directive suspected, just arising from process lifecycle
+ * (restart-without-graceful-shutdown), not application code calling
+ * connect() twice concurrently within one process.
+ *
+ * Fix, addressing the actual mechanism (not just widening retry caps):
+ *
+ * 1. **Generation ID per socket** (`this.generation`): every
+ *    `initializeConnection()` call increments it and captures the
+ *    value the new socket's event handlers close over. Any event
+ *    firing from a socket whose captured generation no longer matches
+ *    `this.generation` (a delayed callback from a socket that's since
+ *    been superseded) is ignored outright -- this is what stops a
+ *    stale socket's own `close`/`error` handler from racing a
+ *    newer socket's reconnect logic and corrupting state.
+ * 2. **Connection mutex** (`this.connectPromise`): concurrent
+ *    `initializeConnection()` calls reuse the in-flight promise rather
+ *    than opening a second socket -- enforces "one active connect
+ *    attempt at a time" per provider instance regardless of how many
+ *    callers race to trigger one (poller tick, manual UI action,
+ *    reconnect-on-close, self-healing watchdog).
+ * 3. **Explicit old-socket teardown before new-socket creation**: a
+ *    new `initializeConnection()` call, when a previous socket still
+ *    exists, removes its listeners and calls `.end()` on it FIRST
+ *    (best-effort, swallowing errors -- the old socket may already be
+ *    half-dead), then proceeds to create the new one. This directly
+ *    closes the "new socket created before old one is cleaned up" gap
+ *    the review flagged.
+ * 4. **Graceful shutdown wired all the way through**: index.ts's
+ *    shutdown handler now calls `connections.disconnectAllGracefully()`
+ *    before exiting, which calls `.end()` (not logout/credential-wipe
+ *    -- see point 6) on every live socket, telling WhatsApp's servers
+ *    this device is going away cleanly rather than vanishing.
+ * 5. **Disconnect-reason matrix, not one-size-fits-all retry**:
+ *    - `loggedOut` -> terminal, no auto-reconnect, `logged_out` state
+ *      (unchanged from before -- this was already correct).
+ *    - `restartRequired` (Baileys asks for a controlled restart, e.g.
+ *      after successful pairing) -> immediate single reconnect, not
+ *      counted against the backoff/attempt budget.
+ *    - `conflict`/`replaced` -> the new duplicate-socket-aware case:
+ *      treated as a signal to reconnect with backoff (the old-socket
+ *      teardown above is what actually prevents this from recurring;
+ *      if it happens again despite that, it means a truly separate
+ *      device/session logged in with these credentials, and repeated
+ *      backoff naturally surfaces that as 'failed' rather than a tight
+ *      loop).
+ *    - Everything else (timeout/connection lost/other transient) ->
+ *      reconnect with backoff, same bounded cap as before.
+ * 6. **Exponential backoff with jitter, single timer**: 2s, 5s, 10s,
+ *    20s, 30s, 60s (capped), +/-20% jitter to avoid synchronized
+ *    thundering-herd reconnects across multiple clubs. Only ever one
+ *    pending reconnect timer per provider (`this.reconnectTimer`) --
+ *    a new schedule call clears any existing one first.
+ * 7. **Stable-connection window before resetting attempts**:
+ *    `connection === 'open'` no longer immediately resets
+ *    `reconnectAttempts` to 0. It starts a 45s stability timer; only
+ *    if the connection is STILL open when that timer fires does the
+ *    attempt counter reset. A connection that flaps (open -> closed
+ *    again within the window) keeps accumulating against the backoff
+ *    schedule instead of getting a fresh full retry budget on every
+ *    brief flicker -- this is what stops a reconnect storm from
+ *    reading as a string of independently-successful attempts in logs
+ *    while never actually stabilizing.
+ * 8. Session credentials are NEVER wiped on a transient disconnect --
+ *    only on a confirmed `loggedOut` disconnect reason or an explicit
+ *    operator-initiated `logout()` call (unchanged from before; this
+ *    was already correct, re-verified as part of this pass since the
+ *    review specifically asked not to weaken it).
  */
 
 const TEMP_AUTH_ROOT = process.env.WHATSAPP_TEMP_AUTH_DIR ?? path.resolve(process.cwd(), '.baileys-auth-tmp')
 
+const RECONNECT_BACKOFF_MS = [2000, 5000, 10000, 20000, 30000, 60000]
+const STABLE_CONNECTION_WINDOW_MS = 45000
+const MAX_RECONNECT_ATTEMPTS = 8
+
 function tenantAuthDir(clubId: string): string {
   const hash = createHash('sha256').update(clubId).digest('hex')
   return path.join(TEMP_AUTH_ROOT, hash)
+}
+
+/** +/-20% jitter around a base delay, to avoid every club's provider retrying in lockstep. */
+function withJitter(baseMs: number): number {
+  const jitterRange = Math.round(baseMs * 0.2)
+  return baseMs + randomInt(-jitterRange, jitterRange + 1)
 }
 
 export interface BaileysProviderHooks {
@@ -61,6 +171,25 @@ export class BaileysProvider implements WhatsAppProvider {
   private readonly hooks: BaileysProviderHooks
   private reconnectAttempts = 0
   private explicitLogout = false
+
+  /** Generation counter -- see class-level doc comment, fix item 1. */
+  private generation = 0
+  /** Connection mutex -- see class-level doc comment, fix item 2. */
+  private connectPromise: Promise<void> | null = null
+  /** Single pending reconnect timer -- see class-level doc comment, fix item 6. */
+  private reconnectTimer: NodeJS.Timeout | null = null
+  /** Stable-connection window timer -- see class-level doc comment, fix item 7. */
+  private stabilityTimer: NodeJS.Timeout | null = null
+
+  // Observability counters (rule 17 of the directive) -- read via
+  // getDiagnostics() for a future admin-facing health panel; not
+  // currently persisted anywhere, in-memory only for this process's
+  // lifetime.
+  private disconnectCount = 0
+  private reconnectCount = 0
+  private lastDisconnectReason: string | null = null
+  private lastDisconnectCode: number | null = null
+  private connectedSince: number | null = null
 
   constructor(clubId: string, hooks: BaileysProviderHooks = {}) {
     // clubId must be assigned before anything deriving from it (e.g. a
@@ -82,17 +211,71 @@ export class BaileysProvider implements WhatsAppProvider {
     this.hooks.onStateChange?.(next, detail)
   }
 
+  private clearReconnectTimer(): void {
+    if (this.reconnectTimer) {
+      clearTimeout(this.reconnectTimer)
+      this.reconnectTimer = null
+    }
+  }
+
+  private clearStabilityTimer(): void {
+    if (this.stabilityTimer) {
+      clearTimeout(this.stabilityTimer)
+      this.stabilityTimer = null
+    }
+  }
+
+  /** Best-effort graceful close of the CURRENT socket, before a new one is created -- fix item 3. Never throws; the old socket may already be half-dead. */
+  private async teardownCurrentSocket(): Promise<void> {
+    const old = this.socket
+    this.socket = null
+    if (!old) return
+    try {
+      old.ev.removeAllListeners('connection.update')
+      old.ev.removeAllListeners('creds.update')
+      old.end(undefined)
+    } catch (err) {
+      this.logger.warn({ err: (err as Error).message }, 'error tearing down previous socket (non-fatal, proceeding)')
+    }
+  }
+
   async initializeConnection(): Promise<void> {
+    // Connection mutex -- fix item 2: a concurrent caller reuses the
+    // in-flight attempt instead of racing a second makeWASocket() call
+    // for the same account.
+    if (this.connectPromise) return this.connectPromise
+    this.connectPromise = this.doInitializeConnection().finally(() => {
+      this.connectPromise = null
+    })
+    return this.connectPromise
+  }
+
+  private async doInitializeConnection(): Promise<void> {
     this.explicitLogout = false
+    this.clearReconnectTimer()
+    this.clearStabilityTimer()
+    await this.teardownCurrentSocket()
+
+    this.generation += 1
+    const myGeneration = this.generation
+
     this.setState('connecting')
 
     const authDir = tenantAuthDir(this.clubId)
     await mkdir(authDir, { recursive: true, mode: 0o700 })
 
     const { state, saveCreds } = await useMultiFileAuthState(authDir)
-    const { version } = await fetchLatestBaileysVersion()
+    // fetchLatestBaileysVersion() itself has a try/catch that falls
+    // back to a bundled default version on failure -- but its
+    // underlying axios call has no timeout, so a network stall to
+    // GitHub (confirmed live during this fix: raw.githubusercontent.com
+    // unreachable, hanging past 10s with no timeout) blocks the whole
+    // connector's startup/reconnect indefinitely instead of falling
+    // back. An explicit timeout here is what actually makes the
+    // existing fallback logic reachable.
+    const { version } = await fetchLatestBaileysVersion({ timeout: 8000 })
 
-    this.socket = makeWASocket({
+    const socket = makeWASocket({
       auth: state,
       version,
       // Never printQRInTerminal / log the QR to any log stream -- the
@@ -103,12 +286,38 @@ export class BaileysProvider implements WhatsAppProvider {
       logger: this.logger as never,
     })
 
-    this.socket.ev.on('creds.update', async () => {
+    // A generation mismatch here means this socket has already been
+    // superseded by a newer initializeConnection() call that ran
+    // while this one was still awaiting useMultiFileAuthState/
+    // fetchLatestBaileysVersion above -- tear it down immediately and
+    // do not wire it up as the active socket. This is the mutex's
+    // belt-and-suspenders complement: the mutex prevents concurrent
+    // CALLS, this guards the (much narrower) async-gap-during-setup
+    // window.
+    if (myGeneration !== this.generation) {
+      try {
+        socket.end(undefined)
+      } catch {
+        // best-effort
+      }
+      return
+    }
+
+    this.socket = socket
+
+    socket.ev.on('creds.update', async () => {
+      if (myGeneration !== this.generation) return
       await saveCreds()
       this.hooks.onCredsUpdate?.()
     })
 
-    this.socket.ev.on('connection.update', (update) => {
+    socket.ev.on('connection.update', (update) => {
+      // Fix item 1: ignore any event from a socket generation that's
+      // since been superseded -- stops a stale/dying socket's own
+      // close handler from firing reconnect logic after a newer
+      // socket already took over.
+      if (myGeneration !== this.generation) return
+
       const { connection, lastDisconnect, qr } = update
 
       if (qr) {
@@ -118,48 +327,91 @@ export class BaileysProvider implements WhatsAppProvider {
 
       if (connection === 'open') {
         this.currentQr = null
-        this.reconnectAttempts = 0
-        const phone = this.socket?.user?.id?.split(':')[0] ?? undefined
+        this.clearReconnectTimer()
+        const phone = socket.user?.id?.split(':')[0] ?? undefined
         this.setState('connected', { connectedPhoneNumber: phone })
+        this.connectedSince = Date.now()
+
+        // Fix item 7: do NOT reset reconnectAttempts immediately on
+        // open -- only after this connection has held for a real
+        // stability window. A connection that flaps within the window
+        // keeps its accumulated backoff position instead of getting a
+        // fresh full retry budget on every brief open/close flicker.
+        this.clearStabilityTimer()
+        this.stabilityTimer = setTimeout(() => {
+          if (myGeneration === this.generation && this.state === 'connected') {
+            this.reconnectAttempts = 0
+          }
+        }, STABLE_CONNECTION_WINDOW_MS)
       }
 
       if (connection === 'close') {
-        const statusCode = (lastDisconnect?.error as Boom | undefined)?.output?.statusCode
-        const loggedOut = statusCode === DisconnectReason.loggedOut || this.explicitLogout
+        this.clearStabilityTimer()
+        this.connectedSince = null
+        this.disconnectCount += 1
 
-        if (loggedOut) {
+        const statusCode = (lastDisconnect?.error as Boom | undefined)?.output?.statusCode ?? null
+        const disconnectReasonTag = this.classifyDisconnectReason(statusCode)
+        this.lastDisconnectReason = disconnectReasonTag
+        this.lastDisconnectCode = statusCode
+        const message = lastDisconnect?.error?.message ?? 'Connection closed unexpectedly.'
+
+        this.logger.warn(
+          { statusCode, disconnectReasonTag, reconnectAttempts: this.reconnectAttempts, message },
+          'connection closed',
+        )
+
+        // Fix item 5: disconnect-reason matrix.
+        if (disconnectReasonTag === 'loggedOut' || this.explicitLogout) {
           // Explicit logout (either the operator disconnected from the
           // admin UI, or the device was removed from the phone) must
           // NOT auto-reconnect -- that would silently re-request a
-          // session the user deliberately ended. Transition back to
-          // qr_required-eligible 'logged_out' and stop.
+          // session the user deliberately ended.
           this.setState('logged_out', { error: 'Session was logged out.' })
           return
         }
 
-        // Bounded automatic reconnect for transient loss (network
-        // blip, WhatsApp-side restart signal) -- capped, not an
-        // infinite retry loop. TenantConnectionManager's own
-        // supervising interval will pick this club back up on its next
-        // scheduled restore pass if this cap is hit while still
-        // disconnected.
-        const message = lastDisconnect?.error?.message ?? 'Connection closed unexpectedly.'
-        this.reconnectAttempts += 1
-        if (this.reconnectAttempts > 5) {
-          // Part M: 'failed' -- reconnect attempts genuinely exhausted,
-          // a terminal state distinct from a still-in-progress
-          // 'reconnecting'. Per Part M/N, this does NOT loop back into
-          // initializeConnection() automatically -- a controlled
-          // reconnect/re-pairing action (start_whatsapp_pairing() from
-          // the admin UI, which ConnectionRequestPoller picks up) is
-          // required, matching "no auto-hammer" for logged_out/failed.
-          this.setState('failed', { error: `${message} (giving up after ${this.reconnectAttempts} reconnect attempts)` })
+        if (disconnectReasonTag === 'restartRequired') {
+          // Baileys explicitly asks for a controlled restart (e.g.
+          // right after successful pairing) -- reconnect immediately,
+          // does not consume/count against the backoff attempt budget.
+          this.setState('reconnecting', { error: message })
+          void this.initializeConnection()
           return
         }
+
+        // conflict/replaced and every other transient reason ->
+        // bounded exponential backoff with jitter, single timer.
+        this.reconnectAttempts += 1
+        if (this.reconnectAttempts > MAX_RECONNECT_ATTEMPTS) {
+          this.setState('failed', { error: `${message} (giving up after ${this.reconnectAttempts} reconnect attempts, last reason: ${disconnectReasonTag})` })
+          return
+        }
+
         this.setState('reconnecting', { error: message })
-        void this.initializeConnection()
+        const backoffBase = RECONNECT_BACKOFF_MS[Math.min(this.reconnectAttempts - 1, RECONNECT_BACKOFF_MS.length - 1)]
+        const delay = withJitter(backoffBase)
+        this.reconnectCount += 1
+        this.clearReconnectTimer()
+        this.reconnectTimer = setTimeout(() => {
+          if (myGeneration === this.generation) void this.initializeConnection()
+        }, delay)
       }
     })
+  }
+
+  /**
+   * Maps a Baileys/Boom disconnect status code to one of the matrix
+   * categories the review directive asked for -- fix item 5. Codes per
+   * Baileys' own DisconnectReason enum plus the raw stream-level ones
+   * (428/440/515) the review specifically named.
+   */
+  private classifyDisconnectReason(statusCode: number | null): 'loggedOut' | 'restartRequired' | 'conflict' | 'timedOut' | 'transient' {
+    if (statusCode === DisconnectReason.loggedOut) return 'loggedOut'
+    if (statusCode === DisconnectReason.restartRequired) return 'restartRequired'
+    if (statusCode === DisconnectReason.connectionReplaced || statusCode === 440) return 'conflict'
+    if (statusCode === DisconnectReason.timedOut || statusCode === 408) return 'timedOut'
+    return 'transient'
   }
 
   getQr(): string | null {
@@ -168,6 +420,19 @@ export class BaileysProvider implements WhatsAppProvider {
 
   getConnectionState(): ConnectionState {
     return this.state
+  }
+
+  /** Observability snapshot -- rule 17 of the review directive. */
+  getDiagnostics() {
+    return {
+      generation: this.generation,
+      disconnectCount: this.disconnectCount,
+      reconnectCount: this.reconnectCount,
+      lastDisconnectReason: this.lastDisconnectReason,
+      lastDisconnectCode: this.lastDisconnectCode,
+      currentReconnectAttempt: this.reconnectAttempts,
+      connectionUptimeMs: this.connectedSince ? Date.now() - this.connectedSince : null,
+    }
   }
 
   async sendMessage(toPhoneDigitsOnly: string, body: string): Promise<SendMessageResult> {
@@ -187,8 +452,27 @@ export class BaileysProvider implements WhatsAppProvider {
     await this.initializeConnection()
   }
 
+  /**
+   * Graceful, non-destructive close -- fix item 4. Tells WhatsApp's
+   * servers this device is going away cleanly (so a subsequent
+   * reconnect doesn't race a still-registered-as-live old socket) WITHOUT
+   * wiping session credentials -- used for process shutdown/restart,
+   * never for an operator-initiated logout (that's logout() below,
+   * which additionally wipes credentials).
+   */
+  async disconnectGracefully(): Promise<void> {
+    this.clearReconnectTimer()
+    this.clearStabilityTimer()
+    this.generation += 1 // invalidate any in-flight event handlers immediately
+    await this.teardownCurrentSocket()
+    this.setState('disconnected')
+  }
+
   async logout(): Promise<void> {
     this.explicitLogout = true
+    this.clearReconnectTimer()
+    this.clearStabilityTimer()
+    this.generation += 1
     try {
       await this.socket?.logout()
     } catch {

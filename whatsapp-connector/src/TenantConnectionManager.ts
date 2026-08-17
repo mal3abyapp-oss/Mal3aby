@@ -143,4 +143,36 @@ export class TenantConnectionManager {
       }
     }
   }
+
+  /**
+   * Graceful shutdown of every live provider -- P1 reliability fix
+   * (2026-08-17): this is the missing piece that caused the
+   * conflict/replaced reconnect-storm defect. Called from index.ts's
+   * SIGINT/SIGTERM handler (and should be called before any other
+   * process-exit path is added in the future) so WhatsApp's servers
+   * are told each device is going away cleanly BEFORE the process
+   * dies, instead of the old socket being abandoned mid-session and
+   * fighting the next process's reconnect attempt for the same
+   * account. Deliberately does NOT wipe credentials (disconnectGracefully,
+   * not logout) -- this is a restart, not a deliberate session end.
+   */
+  async disconnectAllGracefully(): Promise<void> {
+    const providers = [...this.providers.values()]
+    await Promise.all(
+      providers.map((provider) =>
+        provider.disconnectGracefully().catch((err) => {
+          console.error(`[connector] graceful disconnect failed for club ${provider.clubId.slice(0, 8)}:`, (err as Error).message)
+        }),
+      ),
+    )
+  }
+
+  /** Observability snapshot across all live providers (review directive rule 17). */
+  getAllDiagnostics(): Array<{ clubId: string; state: string } & ReturnType<WhatsAppProvider['getDiagnostics']>> {
+    return [...this.providers.entries()].map(([clubId, provider]) => ({
+      clubId: clubId.slice(0, 8),
+      state: provider.getConnectionState(),
+      ...provider.getDiagnostics(),
+    }))
+  }
 }
