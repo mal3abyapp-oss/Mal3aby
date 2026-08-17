@@ -49,12 +49,7 @@ import { PlatformLeadsPage } from '@/features/platform/PlatformLeadsPage'
 import { PlatformReportsPage } from '@/features/platform/PlatformReportsPage'
 import { PlatformAlertsPage } from '@/features/platform/PlatformAlertsPage'
 import { PlatformAuditPage } from '@/features/platform/PlatformAuditPage'
-import {
-  PlatformSubscriptionsPage,
-  PlatformPaymentsPage,
-  PlatformRenewalsPage,
-  PlatformSettingsPage,
-} from '@/features/platform/pages'
+import { PlatformSettingsPage } from '@/features/platform/PlatformSettingsPage'
 
 // Route guards: RequireAuth gates /app (any active membership),
 // RequirePlatformOwner gates /platform (a platform_owner-role membership).
@@ -153,10 +148,19 @@ export const router = createBrowserRouter([
           { path: 'clubs', element: <PlatformClubsPage /> },
           { path: 'clubs/:clubId', element: <PlatformClubDetailPage /> },
           { path: 'owners', element: <PlatformOwnersPage /> },
-          { path: 'subscriptions', element: <PlatformSubscriptionsPage /> },
+          // IA restructuring (Phase 4): these 3 were permanent
+          // placeholder dead-ends (see removed pages.tsx exports) --
+          // their promised content already lives on real screens.
+          // Redirected instead of rendering an inert page, same
+          // pattern as the pre-existing /app/club -> /app/settings
+          // redirect above. Sidebar items pointing here are removed
+          // (PlatformLayout.tsx) -- these routes exist only to catch
+          // stale bookmarks/deep links per the "preserve deep links"
+          // migration rule.
+          { path: 'subscriptions', element: <Navigate to="/platform/clubs" replace /> },
           { path: 'plans', element: <PlatformPlansPage /> },
-          { path: 'payments', element: <PlatformPaymentsPage /> },
-          { path: 'renewals', element: <PlatformRenewalsPage /> },
+          { path: 'payments', element: <Navigate to="/platform/reports" replace /> },
+          { path: 'renewals', element: <Navigate to="/platform/alerts" replace /> },
           { path: 'trials', element: <PlatformTrialsPage /> },
           { path: 'leads', element: <PlatformLeadsPage /> },
           { path: 'reports', element: <PlatformReportsPage /> },
