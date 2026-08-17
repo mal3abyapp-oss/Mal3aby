@@ -1,7 +1,7 @@
 import { Link } from 'react-router-dom'
 import { PageHeader } from '@/components/ui/page-header'
 import { Card, CardContent } from '@/components/ui/card'
-import { Users, Receipt, Wallet, BarChart3, UserCog, Settings, ChevronLeft, CircleDollarSign } from 'lucide-react'
+import { Users, Receipt, Wallet, BarChart3, UserCog, Settings, ChevronLeft, CircleDollarSign, Building2, ShieldCheck } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 
 // Section M: mobile bottom nav stays minimal (اليوم/الحجوزات/مسح/
@@ -14,6 +14,14 @@ import type { LucideIcon } from 'lucide-react'
 // built screen with ZERO navigation entry points anywhere (not
 // sidebar, not mobile nav, not here). A page whose entire purpose is
 // surfacing money owed to the club was completely undiscoverable.
+//
+// IA restructuring (Phase 5): "الفروع والملاعب" and "سجل التدقيق" added
+// -- both gained real routes (/app/fields, /app/audit-log) when they
+// were extracted out of Settings, but neither had been added to this
+// list yet, which would have made them just as undiscoverable on
+// mobile as Outstanding was before Phase 3. Settings' description
+// updated to match its narrowed scope (branches/fields/staff/audit all
+// moved to their own destinations).
 interface MoreItem {
   to: string
   label: string
@@ -27,8 +35,10 @@ const ITEMS: MoreItem[] = [
   { to: '/app/outstanding', label: 'المستحقات', description: 'الفواتير غير المسددة بالكامل', icon: CircleDollarSign },
   { to: '/app/cash-shift', label: 'وردية النقدية', description: 'فتح وإغلاق وردية الصندوق النقدي', icon: Wallet },
   { to: '/app/reports', label: 'التقارير', description: 'تقارير الإيرادات والإشغال والأكاديمية', icon: BarChart3 },
+  { to: '/app/fields', label: 'الفروع والملاعب', description: 'فروع النادي، الملاعب، مواعيد العمل، والأسعار', icon: Building2 },
   { to: '/app/staff', label: 'الموظفون', description: 'إدارة الموظفين وأدوارهم', icon: UserCog },
-  { to: '/app/settings', label: 'الإعدادات', description: 'النادي والفروع والملاعب والأكاديمية', icon: Settings },
+  { to: '/app/audit-log', label: 'سجل التدقيق', description: 'سجل كل العمليات الحساسة في النادي', icon: ShieldCheck },
+  { to: '/app/settings', label: 'الإعدادات', description: 'هوية النادي، الأكاديمية، المدفوعات، والاشتراك', icon: Settings },
 ]
 
 export function MorePage() {

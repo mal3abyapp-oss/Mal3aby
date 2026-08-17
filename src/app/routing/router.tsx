@@ -31,6 +31,8 @@ import { OutstandingPage } from '@/features/billing/OutstandingPage'
 import { ReportsPage } from '@/features/reports/ReportsPage'
 import { StaffPage } from '@/features/staff/StaffPage'
 import { SettingsPage } from '@/features/settings/SettingsPage'
+import { BranchesFieldsPage } from '@/features/clubs/BranchesFieldsPage'
+import { AuditLogPage } from '@/features/settings/AuditLogPage'
 import { ScanPage } from '@/features/scanner/ScanPage'
 
 import { PortalRoot } from '@/features/portal/PortalRoot'
@@ -102,19 +104,30 @@ export const router = createBrowserRouter([
           { path: 'outstanding', element: <OutstandingPage /> },
           { path: 'reports', element: <ReportsPage /> },
           // P1-7: /app/club's content moved into the new Settings hub
-          // (club identity, branches, and fields/hours/pricing all live
-          // under /app/settings now) -- kept as a redirect for any stale
-          // links/bookmarks rather than a dead route.
+          // originally, then further split in the IA restructuring
+          // (Phase 5) -- kept as a redirect for any stale links/
+          // bookmarks rather than a dead route.
           { path: 'club', element: <Navigate to="/app/settings" replace /> },
           { path: 'staff', element: <StaffPage /> },
-          // P1-7 (critical usability fix pass, 2026-08-16): "الإعدادات"
-          // previously routed straight to the Audit Log Viewer alone,
-          // with club/branch/fields/subscription settings scattered
-          // elsewhere with no discoverable structure. Now a real
-          // settings hub (SettingsPage) with clear sections: club,
-          // branches, booking settings (fields/hours/pricing), academy
-          // settings, a link out to staff, platform subscription, and
-          // (owner/manager only) the audit log.
+          // IA restructuring (Phase 5): branches + fields/hours/pricing
+          // extracted out of Settings into their own domain -- confirmed
+          // in MAL3ABY_INFORMATION_ARCHITECTURE_AUDIT.md as real
+          // operational infrastructure management, not settings.
+          { path: 'fields', element: <BranchesFieldsPage /> },
+          // IA restructuring (Phase 5): audit log extracted out of
+          // Settings into its own route -- a monitoring/security
+          // concern, not settings. AuditLogPage already existed as a
+          // standalone wrapper but had no registered route (confirmed
+          // dead code in the audit) -- this is that route.
+          { path: 'audit-log', element: <AuditLogPage /> },
+          // P1-7 (critical usability fix pass, 2026-08-16), narrowed in
+          // IA restructuring Phase 5: "الإعدادات" now covers only true
+          // club-identity/configuration settings -- club identity,
+          // academy activation policy, payment method configuration,
+          // and a platform-subscription summary. Branches/fields, staff
+          // management, WhatsApp, and the audit log all moved to their
+          // own destinations (see MAL3ABY_INFORMATION_ARCHITECTURE.md
+          // §2's Settings reallocation table).
           { path: 'settings', element: <SettingsPage /> },
           { path: 'more', element: <MorePage /> },
         ],

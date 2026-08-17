@@ -1,4 +1,5 @@
 import { useState, type FormEvent } from 'react'
+import { Link } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import QRCode from 'qrcode'
 import { supabase } from '@/lib/supabase/client'
@@ -23,7 +24,7 @@ import {
 } from '@/components/ui/dialog'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { ProgramsGroupsSection } from '@/features/academy/ProgramsGroupsSection'
-import { EnrollmentSection, ActivationPolicySetting } from '@/features/academy/EnrollmentSection'
+import { EnrollmentSection } from '@/features/academy/EnrollmentSection'
 import { CoachTodayView } from '@/features/academy/CoachTodayView'
 import { AcademyOverview } from '@/features/academy/AcademyOverview'
 import { PlayerStatusPanel } from '@/features/academy/PlayerStatusPanel'
@@ -431,9 +432,20 @@ export function AcademyPage() {
         </TabsContent>
 
         <TabsContent value="enrollments">
-          <div className="mt-4">
-            <ActivationPolicySetting />
-          </div>
+          {/* IA restructuring (Phase 5): ActivationPolicySetting used to
+              be mounted here AND inside SettingsPage -- the exact same
+              component, two places (confirmed duplicate in
+              MAL3ABY_INFORMATION_ARCHITECTURE_AUDIT.md). Settings is now
+              the single home for that control; a link out replaces the
+              duplicate mount so the policy stays discoverable from the
+              enrollment workflow without re-rendering it here. */}
+          <p className="mt-4 text-sm text-text-secondary">
+            سياسة تفعيل الاشتراك تُدار من{' '}
+            <Link to="/app/settings" className="text-accent-foreground hover:underline">
+              صفحة الإعدادات
+            </Link>
+            .
+          </p>
           <EnrollmentSection />
         </TabsContent>
       </Tabs>

@@ -4,16 +4,13 @@ import { PageHeader } from '@/components/ui/page-header'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { ClubSettingsCard } from '@/features/clubs/ClubSettingsCard'
-import { BranchesCard } from '@/features/clubs/BranchesCard'
 import { PlatformSubscriptionCard } from '@/features/clubs/PlatformSubscriptionCard'
 import { EntitlementsCard } from '@/features/clubs/EntitlementsCard'
-import { FieldsManagement } from '@/features/clubs/FieldsManagement'
 import { ActivationPolicySetting } from '@/features/academy/EnrollmentSection'
 import { PaymentMethodsCard } from '@/features/billing/PaymentMethodsCard'
 import { PaymentGatewaysCard } from '@/features/billing/PaymentGatewaysCard'
 import { WhatsAppConnectionCard } from './WhatsAppConnectionCard'
 import { MessagingSafetyCard } from './MessagingSafetyCard'
-import { AuditLogSection } from './AuditLogPage'
 
 // P1-7 (critical usability fix pass, 2026-08-16): Settings was a
 // dumping ground -- /app/settings rendered only the Audit Log Viewer,
@@ -21,25 +18,37 @@ import { AuditLogSection } from './AuditLogPage'
 // /app/club with no discoverable structure. Rebuilt as a real settings
 // hub with clear sections matching what the schema/business rules
 // actually support -- no placeholder or unsupported settings exposed.
+//
+// IA restructuring (Phase 5): narrowed further. Confirmed in
+// MAL3ABY_INFORMATION_ARCHITECTURE_AUDIT.md that this page had grown
+// into 8 sections covering identity, physical infrastructure, staff,
+// payments, WhatsApp, platform billing, and security -- most of which
+// are not "settings" in any coherent sense, just administrative screens
+// that hadn't been given a real home yet. Moved out:
+//   - Branches + Fields/hours/pricing -> /app/fields (own operational
+//     domain, not settings -- see BranchesFieldsPage.tsx)
+//   - Staff stub card -> removed entirely (redundant: Staff already has
+//     its own sidebar item, this card only ever linked to it)
+//   - Audit log -> /app/audit-log (a monitoring/security concern, not
+//     settings)
+// WhatsApp (WhatsAppConnectionCard/MessagingSafetyCard) stays here for
+// now -- migration plan Phase 8 gives it a full top-level module with
+// its own Activity/Overview tabs; moving it before that module exists
+// would strand it with no upgrade path.
+// What remains is true club-identity/business configuration: club
+// identity, academy activation policy, payment method/gateway config,
+// and platform-subscription status.
 export function SettingsPage() {
   const { currentMembership } = useAuth()
   const isOwnerOrManager = currentMembership?.roleKey === 'club_owner' || currentMembership?.roleKey === 'club_manager'
 
   return (
     <div className="flex flex-col gap-6">
-      <PageHeader title="الإعدادات" description="إعدادات النادي والفروع والأكاديمية والصلاحيات" />
+      <PageHeader title="الإعدادات" description="هوية النادي، سياسة الأكاديمية، المدفوعات، والاشتراك" />
 
       <section className="flex flex-col gap-4">
         <h2 className="text-sm font-semibold text-text-secondary">النادي</h2>
-        <div className="grid gap-4 md:grid-cols-2">
-          <ClubSettingsCard />
-          <BranchesCard />
-        </div>
-      </section>
-
-      <section className="flex flex-col gap-4">
-        <h2 className="text-sm font-semibold text-text-secondary">إعدادات الحجوزات</h2>
-        <FieldsManagement />
+        <ClubSettingsCard />
       </section>
 
       {isOwnerOrManager && (
@@ -53,18 +62,6 @@ export function SettingsPage() {
           </Card>
         </section>
       )}
-
-      <section className="flex flex-col gap-4">
-        <h2 className="text-sm font-semibold text-text-secondary">الموظفون والصلاحيات</h2>
-        <Card>
-          <CardContent className="flex items-center justify-between pt-6">
-            <p className="text-sm text-text-secondary">إدارة الموظفين وأدوارهم ونطاق الفروع تتم من صفحة الموظفين المخصصة.</p>
-            <Button asChild size="sm" variant="outline">
-              <Link to="/app/staff">فتح صفحة الموظفين</Link>
-            </Button>
-          </CardContent>
-        </Card>
-      </section>
 
       <section className="flex flex-col gap-4">
         <h2 className="text-sm font-semibold text-text-secondary">المدفوعات</h2>
@@ -83,19 +80,17 @@ export function SettingsPage() {
       </section>
 
       <section className="flex flex-col gap-4">
-        <h2 className="text-sm font-semibold text-text-secondary">اشتراك المنصة</h2>
+        <div className="flex items-center justify-between">
+          <h2 className="text-sm font-semibold text-text-secondary">اشتراك المنصة</h2>
+          <Button asChild size="sm" variant="ghost">
+            <Link to="/app/subscription">عرض التفاصيل الكاملة</Link>
+          </Button>
+        </div>
         <div className="grid gap-4 md:grid-cols-2">
           <PlatformSubscriptionCard />
           <EntitlementsCard />
         </div>
       </section>
-
-      {isOwnerOrManager && (
-        <section className="flex flex-col gap-4">
-          <h2 className="text-sm font-semibold text-text-secondary">الأمان وسجل التدقيق</h2>
-          <AuditLogSection />
-        </section>
-      )}
     </div>
   )
 }
