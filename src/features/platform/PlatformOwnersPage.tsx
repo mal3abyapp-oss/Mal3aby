@@ -59,16 +59,44 @@ export function PlatformOwnersPage() {
   const uniqueOwners = ownerClubCounts.size
   const multiClubOwners = [...ownerClubCounts.values()].filter((count) => count > 1).length
 
+  // Master IA/UX audit (Platform Owner phase, Audit 5): the same person
+  // owning multiple clubs (real data: "Moustafa Elsafy" owns 3 of the 6
+  // clubs in this dataset) showed up as 3 visually identical rows with
+  // zero indication they're the same owner -- only readable by
+  // carefully comparing every email. get_platform_club_owners() staying
+  // one-row-per-club-membership is correct (billing/entitlements are
+  // per-club, not per-person, per this file's original design comment)
+  // -- so this is a display-grouping fix, not an RPC change: rows are
+  // sorted by owner so a multi-club owner's rows land adjacent, and the
+  // name/email cell only renders once per owner (with a club-count
+  // badge), not once per row.
+  const sortedFiltered = useMemo(
+    () => [...filtered].sort((a, b) => (a.user_id === b.user_id ? 0 : (a.full_name ?? '').localeCompare(b.full_name ?? '', 'ar'))),
+    [filtered],
+  )
+
   const columns: DataTableColumn<OwnerRow>[] = [
     {
       key: 'owner',
       header: 'المالك',
-      render: (o) => (
-        <div className="flex flex-col">
-          <span className="font-medium text-text-primary">{o.full_name ?? '—'}</span>
-          <span className="text-xs text-text-secondary">{o.email ?? '—'}</span>
-        </div>
-      ),
+      render: (o, index, rows) => {
+        const isFirstOfOwner = index === 0 || rows[index - 1]?.user_id !== o.user_id
+        if (!isFirstOfOwner) return null
+        const clubCount = ownerClubCounts.get(o.user_id) ?? 1
+        return (
+          <div className="flex flex-col">
+            <span className="font-medium text-text-primary">
+              {o.full_name ?? '—'}
+              {clubCount > 1 && (
+                <span className="ms-2 rounded-full bg-info/10 px-2 py-0.5 text-xs font-normal text-info">
+                  {clubCount} أندية
+                </span>
+              )}
+            </span>
+            <span className="text-xs text-text-secondary">{o.email ?? '—'}</span>
+          </div>
+        )
+      },
     },
     { key: 'phone', header: 'الهاتف', render: (o) => o.phone ?? '—' },
     {
@@ -118,7 +146,7 @@ export function PlatformOwnersPage() {
       </div>
       <DataTable
         columns={columns}
-        rows={filtered}
+        rows={sortedFiltered}
         rowKey={(o) => o.membership_id}
         isLoading={isLoading}
         emptyTitle={search ? 'لا توجد نتائج مطابقة' : 'لا يوجد أصحاب أندية بعد'}

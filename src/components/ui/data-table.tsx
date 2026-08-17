@@ -9,7 +9,10 @@ import { Skeleton } from '@/components/ui/skeleton'
 export interface DataTableColumn<T> {
   key: string
   header: string
-  render: (row: T) => ReactNode
+  // index/rows are optional, additive params (PlatformOwnersPage needs
+  // them to detect "first row of this owner" for grouped-row rendering)
+  // -- every existing single-arg render callback stays valid as-is.
+  render: (row: T, index: number, rows: T[]) => ReactNode
   className?: string
 }
 
@@ -68,11 +71,11 @@ export function DataTable<T>({
           </tr>
         </thead>
         <tbody>
-          {rows.map((row) => (
+          {rows.map((row, index) => (
             <tr key={rowKey(row)} className="border-b border-border last:border-0 hover:bg-muted/30">
               {columns.map((col) => (
                 <td key={col.key} className={cn('whitespace-nowrap px-3 py-2', col.className)}>
-                  {col.render(row)}
+                  {col.render(row, index, rows)}
                 </td>
               ))}
             </tr>
