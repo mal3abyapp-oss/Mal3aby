@@ -1,8 +1,10 @@
+import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { supabase } from '@/lib/supabase/client'
 import { PageHeader } from '@/components/ui/page-header'
 import { DataTable, type DataTableColumn } from '@/components/ui/data-table'
+import { Button } from '@/components/ui/button'
 import { actionLabel, entityLabel } from '@/lib/domain/audit'
 
 // IA restructuring (Phase 3): two real findings from
@@ -14,6 +16,14 @@ import { actionLabel, entityLabel } from '@/lib/domain/audit'
 // sibling screen (Clubs/Owners/Alerts) which link into
 // PlatformClubDetailPage -- this was flagged as a dead-end gap.
 
+// Master IA/UX audit (Platform Owner phase, Audit 5): same
+// silent-cutoff-at-a-hard-limit issue as PlatformClubsPage -- worse
+// here, since this is the security-sensitive audit trail, and a
+// hard `.limit(200)` meant the 201st+ sensitive action was
+// invisible with no indication anything was cut off. Same
+// offset-based "load more" fix.
+const PAGE_SIZE = 200
+
 interface AuditRow {
   id: string
   club_id: string | null
@@ -24,15 +34,15 @@ interface AuditRow {
   created_at: string
 }
 
-async function fetchAudit(): Promise<AuditRow[]> {
+async function fetchAudit(offset: number): Promise<{ rows: AuditRow[]; hasMore: boolean }> {
   const { data, error } = await supabase
     .from('audit_logs')
     .select('id, club_id, action, entity_type, reason, created_at, clubs(name_ar)')
     .order('created_at', { ascending: false })
-    .limit(200)
+    .range(offset, offset + PAGE_SIZE - 1)
 
   if (error) throw error
-  return (data ?? []).map((row) => ({
+  const rows = (data ?? []).map((row) => ({
     id: row.id,
     club_id: row.club_id,
     club_name: (row.clubs as unknown as { name_ar: string } | null)?.name_ar ?? null,
@@ -41,10 +51,20 @@ async function fetchAudit(): Promise<AuditRow[]> {
     reason: row.reason,
     created_at: row.created_at,
   }))
+  return { rows, hasMore: rows.length === PAGE_SIZE }
 }
 
 export function PlatformAuditPage() {
-  const { data: rows = [], isLoading } = useQuery({ queryKey: ['platform-audit'], queryFn: fetchAudit })
+  const [pages, setPages] = useState(1)
+  const { data, isLoading, isFetching } = useQuery({
+    queryKey: ['platform-audit', pages],
+    queryFn: async () => {
+      const results = await Promise.all(Array.from({ length: pages }, (_, i) => fetchAudit(i * PAGE_SIZE)))
+      const lastPage = results.at(-1)
+      return { rows: results.flatMap((r) => r.rows), hasMore: lastPage?.hasMore ?? false }
+    },
+  })
+  const rows = data?.rows ?? []
 
   const columns: DataTableColumn<AuditRow>[] = [
     { key: 'time', header: 'الوقت', render: (r) => new Date(r.created_at).toLocaleString('ar-EG') },
@@ -67,8 +87,15 @@ export function PlatformAuditPage() {
 
   return (
     <div>
-      <PageHeader title="سجل التدقيق" description="آخر 200 إجراء حساس على مستوى المنصة (سجل غير قابل للتعديل)" />
+      <PageHeader title="سجل التدقيق" description="سجل غير قابل للتعديل لكل إجراء حساس على مستوى المنصة" />
       <DataTable columns={columns} rows={rows} rowKey={(r) => r.id} isLoading={isLoading} emptyTitle="لا يوجد سجل تدقيق بعد" />
+      {data?.hasMore && (
+        <div className="mt-4 flex justify-center">
+          <Button variant="outline" onClick={() => setPages((p) => p + 1)} disabled={isFetching}>
+            {isFetching ? 'جارٍ التحميل...' : 'تحميل المزيد'}
+          </Button>
+        </div>
+      )}
     </div>
   )
 }
