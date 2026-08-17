@@ -17,6 +17,7 @@ import { ForgotPasswordPage } from '@/features/auth/ForgotPasswordPage'
 import { ResetPasswordPage } from '@/features/auth/ResetPasswordPage'
 
 import { OnboardingPage } from '@/features/onboarding/OnboardingPage'
+import { VerifyInvoicePage } from '@/features/verify/VerifyInvoicePage'
 
 import { TodayPage } from '@/features/dashboard/TodayPage'
 import { MorePage } from '@/features/dashboard/MorePage'
@@ -77,6 +78,13 @@ export const router = createBrowserRouter([
   {
     path: '/onboarding',
     element: <OnboardingPage />,
+  },
+  {
+    // Task #86: public invoice verification -- no auth guard, reachable
+    // by anyone holding the printed invoice/receipt QR. Standalone (no
+    // PublicLayout marketing chrome), same pattern as /onboarding.
+    path: '/verify/:token',
+    element: <VerifyInvoicePage />,
   },
   {
     element: <RequireAuth />,

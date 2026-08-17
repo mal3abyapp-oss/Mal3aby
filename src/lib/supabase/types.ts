@@ -1510,6 +1510,65 @@ export type Database = {
           },
         ]
       }
+      invoice_verification_tokens: {
+        Row: {
+          club_id: string
+          created_at: string
+          created_by: string | null
+          id: string
+          invoice_id: string
+          status: string
+          token_hash: string
+        }
+        Insert: {
+          club_id: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          invoice_id: string
+          status?: string
+          token_hash: string
+        }
+        Update: {
+          club_id?: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          invoice_id?: string
+          status?: string
+          token_hash?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "invoice_verification_tokens_club_id_fkey"
+            columns: ["club_id"]
+            isOneToOne: false
+            referencedRelation: "clubs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "invoice_verification_tokens_club_id_fkey"
+            columns: ["club_id"]
+            isOneToOne: false
+            referencedRelation: "commercial_entitlements_usage"
+            referencedColumns: ["club_id"]
+          },
+          {
+            foreignKeyName: "invoice_verification_tokens_invoice_id_fkey"
+            columns: ["invoice_id"]
+            isOneToOne: false
+            referencedRelation: "invoices"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "invoice_verification_tokens_invoice_id_fkey"
+            columns: ["invoice_id"]
+            isOneToOne: false
+            referencedRelation: "outstanding_invoices"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       invoices: {
         Row: {
           branch_id: string
@@ -3791,6 +3850,7 @@ export type Database = {
         Returns: string
       }
       ensure_booking_qr: { Args: { p_booking_id: string }; Returns: string }
+      ensure_invoice_qr: { Args: { p_invoice_id: string }; Returns: string }
       ensure_player_qr: { Args: { p_player_id: string }; Returns: string }
       extend_grace_period: {
         Args: { p_grace_period_days: number; p_subscription_id: string }
@@ -4098,6 +4158,16 @@ export type Database = {
         Returns: undefined
       }
       user_club_ids: { Args: never; Returns: string[] }
+      verify_invoice_public: {
+        Args: { p_token: string }
+        Returns: {
+          invoice_number: string
+          issued_at: string
+          payment_status: string
+          result: string
+          total: number
+        }[]
+      }
       verify_manual_payment_claim: {
         Args: { p_approve: boolean; p_claim_id: string; p_reason?: string }
         Returns: string

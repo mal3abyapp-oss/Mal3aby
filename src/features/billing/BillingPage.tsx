@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import QRCode from 'qrcode'
 import { supabase } from '@/lib/supabase/client'
 import { useAuth } from '@/app/providers/AuthProvider'
 import { PageHeader } from '@/components/ui/page-header'
@@ -231,6 +232,25 @@ export function BillingPage() {
       return map.get(selectedInvoiceId!) ?? null
     },
     enabled: !!selectedInvoiceId,
+  })
+
+  // task #86: secure invoice QR + public verification page
+  // (/verify/:token, no login required -- see VerifyInvoicePage.tsx).
+  // ensure_invoice_qr() only requires an issued (non-draft) invoice --
+  // generated once per dialog open and reused, not regenerated on every
+  // render (the RPC itself is idempotent-safe to call repeatedly, but
+  // there's no reason to mint a fresh token + revoke the previous one
+  // every time this query re-runs).
+  const { data: verifyQrDataUrl } = useQuery({
+    queryKey: ['invoice-verify-qr', selectedInvoiceId],
+    queryFn: async () => {
+      const { data: token, error } = await supabase.rpc('ensure_invoice_qr', { p_invoice_id: selectedInvoiceId! })
+      if (error) throw error
+      const url = `${window.location.origin}/verify/${token}`
+      return QRCode.toDataURL(url, { width: 120, margin: 1 })
+    },
+    enabled: !!selectedInvoiceId && detail?.status === 'issued',
+    staleTime: Infinity,
   })
 
   function invalidateDetail() {
@@ -495,6 +515,14 @@ export function BillingPage() {
                     )}
                   </div>
                 </div>
+                {verifyQrDataUrl && (
+                  <div className="mb-3 flex items-center gap-2">
+                    <img src={verifyQrDataUrl} alt="رمز التحقق من الفاتورة" className="size-20" />
+                    <p className="text-xs text-text-secondary">
+                      امسح الرمز للتحقق من صحة الفاتورة وحالة السداد.
+                    </p>
+                  </div>
+                )}
                 <table className="w-full text-start">
                   <thead>
                     <tr className="border-b border-border">
