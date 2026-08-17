@@ -380,7 +380,7 @@ export function ProgramsGroupsSection() {
         const remaining = g.capacity - enrolled
         return (
           <span className={remaining <= 2 ? 'font-medium text-status-warning' : ''}>
-            {enrolled}/{g.capacity} {remaining <= 2 && remaining >= 0 && `(متبقي ${remaining})`}
+            <bdi>{enrolled}/{g.capacity}</bdi> {remaining <= 2 && remaining >= 0 && `(متبقي ${remaining})`}
           </span>
         )
       },

@@ -947,7 +947,7 @@ function AcademyReportTab() {
                   {data.by_group.map((g) => (
                     <li key={g.group_id} className="flex justify-between rounded-md border border-border p-2 text-sm">
                       <span>{g.group_name}</span>
-                      <span className="tabular-nums">{g.active_enrollments} / {g.capacity}</span>
+                      <span className="tabular-nums"><bdi>{g.active_enrollments} / {g.capacity}</bdi></span>
                     </li>
                   ))}
                 </ul>

@@ -138,7 +138,11 @@ export function AcademyOverview({ onNavigateTab }: { onNavigateTab: (tab: 'playe
                 className="flex items-center justify-between rounded-md border border-border p-2.5 text-start text-sm hover:bg-muted/40"
               >
                 <span>{g.name}</span>
-                <span className="tabular-nums font-medium">{g.enrolled}/{g.capacity}</span>
+                {/* Same RTL digit-swap risk as StatCard's composite
+                    values (owner-level review finding) -- isolates this
+                    ratio's bidi direction from the surrounding Arabic
+                    context. */}
+                <span className="tabular-nums font-medium"><bdi>{g.enrolled}/{g.capacity}</bdi></span>
               </button>
             ))}
           </CardContent>

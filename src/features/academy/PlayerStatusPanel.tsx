@@ -124,7 +124,7 @@ export function PlayerStatusPanel({ playerId }: { playerId: string }) {
       <div className="flex items-center justify-between">
         <span className="text-text-secondary">نسبة الحضور</span>
         {data.attendanceRate != null ? (
-          <span className="tabular-nums font-medium">{data.attendanceRate}% ({data.attendanceCount.present}/{data.attendanceCount.total})</span>
+          <span className="tabular-nums font-medium"><bdi>{data.attendanceRate}% ({data.attendanceCount.present}/{data.attendanceCount.total})</bdi></span>
         ) : (
           <span className="text-text-secondary">لا يوجد سجل حضور بعد</span>
         )}
