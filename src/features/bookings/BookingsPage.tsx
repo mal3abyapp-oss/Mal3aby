@@ -308,9 +308,9 @@ export function BookingsPage() {
                 </SelectContent>
               </Select>
             )}
-            <Button variant="outline" size="icon" onClick={() => shiftDate(-1)}><ChevronRight className="size-4" /></Button>
+            <Button variant="outline" size="icon" aria-label="اليوم السابق" onClick={() => shiftDate(-1)}><ChevronRight className="size-4" /></Button>
             <Button variant="outline" size="sm" onClick={() => setDate(new Date().toISOString().slice(0, 10))}>اليوم</Button>
-            <Button variant="outline" size="icon" onClick={() => shiftDate(1)}><ChevronLeft className="size-4" /></Button>
+            <Button variant="outline" size="icon" aria-label="اليوم التالي" onClick={() => shiftDate(1)}><ChevronLeft className="size-4" /></Button>
             <input
               type="date"
               value={date}

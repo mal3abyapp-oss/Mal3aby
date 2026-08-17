@@ -97,11 +97,11 @@ export function BookingsMobileView({
     <div className="flex flex-col gap-3">
       {/* Date nav */}
       <div className="flex items-center gap-2">
-        <Button variant="outline" size="icon" onClick={() => shiftDate(-1)}><ChevronRight className="size-4" /></Button>
+        <Button variant="outline" size="icon" aria-label="اليوم السابق" onClick={() => shiftDate(-1)}><ChevronRight className="size-4" /></Button>
         <Button variant="outline" size="sm" className="flex-1" onClick={() => onDateChange(new Date().toISOString().slice(0, 10))}>
           {isToday ? 'اليوم' : new Date(`${date}T12:00:00`).toLocaleDateString('ar-EG', { weekday: 'long', day: 'numeric', month: 'long' })}
         </Button>
-        <Button variant="outline" size="icon" onClick={() => shiftDate(1)}><ChevronLeft className="size-4" /></Button>
+        <Button variant="outline" size="icon" aria-label="اليوم التالي" onClick={() => shiftDate(1)}><ChevronLeft className="size-4" /></Button>
       </div>
 
       {/* Field chips */}
