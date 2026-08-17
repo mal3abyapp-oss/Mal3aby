@@ -1038,49 +1038,80 @@ function CustomerReportTab() {
   )
 }
 
+// IA restructuring (Phase 7): 9 flat, undifferentiated tabs was one of
+// the audit's confirmed crowding symptoms -- no visual indication that
+// "الإيرادات" and "تسوية طرق الدفع" are both financial reports while
+// "الأكاديمية" is a completely different concern. Per the target IA's
+// Phase 2 design decision (see MAL3ABY_IA_RESTRUCTURE_STATE.md's Phase
+// 2 log): reports share one genuine purpose (retrospective analysis),
+// so the crowding is a PRESENTATION problem, not a domain-mixing one --
+// fixed with labeled groups, not a route split. Each group renders as
+// its own bordered TabsList cluster with a caption above it; Radix
+// Tabs' single flat trigger list doesn't support inline group labels
+// as non-trigger children, so grouping is expressed via layout instead
+// (wrapping clusters + a caption row), keeping all 9 triggers as
+// siblings of one Tabs.Root (single active-tab state, no behavior
+// change).
+const TAB_GROUPS: {
+  titleKey: string
+  tabs: { value: string; label: string; icon: typeof LayoutDashboard }[]
+}[] = [
+  {
+    titleKey: 'overview',
+    tabs: [{ value: 'dashboard', label: 'نظرة عامة', icon: LayoutDashboard }],
+  },
+  {
+    titleKey: 'operations',
+    tabs: [
+      { value: 'bookings', label: 'الحجوزات', icon: CalendarCheck2 },
+      { value: 'occupancy', label: 'إشغال الملاعب', icon: Landmark },
+    ],
+  },
+  {
+    titleKey: 'finance',
+    tabs: [
+      { value: 'revenue', label: 'الإيرادات', icon: Wallet },
+      { value: 'collections', label: 'التحصيلات', icon: HandCoins },
+      { value: 'payment-methods', label: 'تسوية طرق الدفع', icon: Banknote },
+      { value: 'exceptions', label: 'الاستثناءات المالية', icon: ReceiptText },
+    ],
+  },
+  {
+    titleKey: 'academyCustomers',
+    tabs: [
+      { value: 'academy', label: 'الأكاديمية', icon: GraduationCap },
+      { value: 'customers', label: 'العملاء', icon: Users },
+    ],
+  },
+]
+
+const GROUP_TITLES: Record<string, string> = {
+  overview: 'نظرة عامة',
+  operations: 'التشغيل',
+  finance: 'المالية',
+  academyCustomers: 'الأكاديمية والعملاء',
+}
+
 export function ReportsPage() {
   return (
     <div>
       <PageHeader title="التقارير" description="تقارير الإيرادات والتحصيلات والاستثناءات المالية والملاعب والأكاديمية والعملاء" />
       <Tabs defaultValue="dashboard">
-        <TabsList>
-          <TabsTrigger value="dashboard">
-            <LayoutDashboard className="me-1 size-4" />
-            نظرة عامة
-          </TabsTrigger>
-          <TabsTrigger value="revenue">
-            <Wallet className="me-1 size-4" />
-            الإيرادات
-          </TabsTrigger>
-          <TabsTrigger value="bookings">
-            <CalendarCheck2 className="me-1 size-4" />
-            الحجوزات
-          </TabsTrigger>
-          <TabsTrigger value="collections">
-            <HandCoins className="me-1 size-4" />
-            التحصيلات
-          </TabsTrigger>
-          <TabsTrigger value="payment-methods">
-            <Banknote className="me-1 size-4" />
-            تسوية طرق الدفع
-          </TabsTrigger>
-          <TabsTrigger value="exceptions">
-            <ReceiptText className="me-1 size-4" />
-            الاستثناءات المالية
-          </TabsTrigger>
-          <TabsTrigger value="occupancy">
-            <Landmark className="me-1 size-4" />
-            إشغال الملاعب
-          </TabsTrigger>
-          <TabsTrigger value="academy">
-            <GraduationCap className="me-1 size-4" />
-            الأكاديمية
-          </TabsTrigger>
-          <TabsTrigger value="customers">
-            <Users className="me-1 size-4" />
-            العملاء
-          </TabsTrigger>
-        </TabsList>
+        <div className="mb-4 flex flex-wrap gap-4">
+          {TAB_GROUPS.map((group) => (
+            <div key={group.titleKey} className="flex flex-col gap-1">
+              <p className="px-1 text-xs font-medium text-text-secondary">{GROUP_TITLES[group.titleKey]}</p>
+              <TabsList>
+                {group.tabs.map((tab) => (
+                  <TabsTrigger key={tab.value} value={tab.value}>
+                    <tab.icon className="me-1 size-4" />
+                    {tab.label}
+                  </TabsTrigger>
+                ))}
+              </TabsList>
+            </div>
+          ))}
+        </div>
         <TabsContent value="dashboard"><ExecutiveDashboardTab /></TabsContent>
         <TabsContent value="revenue"><RevenueReportTab /></TabsContent>
         <TabsContent value="collections"><CollectionsReportTab /></TabsContent>
