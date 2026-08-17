@@ -3848,19 +3848,48 @@ export type Database = {
         Args: { p_explicit?: boolean; p_subscription_id: string }
         Returns: boolean
       }
-      _create_booking_internal: {
+      _create_booking_internal:
+        | {
+            Args: {
+              p_booking_series_id: string
+              p_customer_id: string
+              p_discount_amount: number
+              p_end_at: string
+              p_field_id: string
+              p_notes: string
+              p_payment_amount: number
+              p_payment_method: string
+              p_record_payment: boolean
+              p_start_at: string
+            }
+            Returns: string
+          }
+        | {
+            Args: {
+              p_booking_series_id: string
+              p_customer_id: string
+              p_discount_amount: number
+              p_end_at: string
+              p_field_id: string
+              p_notes: string
+              p_payment_amount: number
+              p_payment_method: string
+              p_record_payment: boolean
+              p_start_at: string
+            }
+            Returns: string
+          }
+      _mint_booking_qr_token_internal: {
         Args: {
-          p_booking_series_id: string
-          p_customer_id: string
-          p_discount_amount: number
-          p_end_at: string
-          p_field_id: string
-          p_notes: string
-          p_payment_amount: number
-          p_payment_method: string
-          p_record_payment: boolean
-          p_start_at: string
+          p_booking_id: string
+          p_club_id: string
+          p_created_by: string
+          p_expires_at: string
         }
+        Returns: string
+      }
+      _mint_invoice_token_internal: {
+        Args: { p_club_id: string; p_created_by: string; p_invoice_id: string }
         Returns: string
       }
       activate_subscription_if_due: {
@@ -4374,11 +4403,29 @@ export type Database = {
         Returns: undefined
       }
       user_club_ids: { Args: never; Returns: string[] }
+      verify_booking_qr_public: {
+        Args: { p_token: string }
+        Returns: {
+          booking_ref: string
+          booking_status: string
+          end_at: string
+          field_name: string
+          result: string
+          sport: string
+          start_at: string
+          timezone: string
+        }[]
+      }
       verify_invoice_public: {
         Args: { p_token: string }
         Returns: {
+          booking_ref: string
+          customer_name: string
+          field_name: string
           invoice_number: string
           issued_at: string
+          outstanding: number
+          paid: number
           payment_status: string
           result: string
           total: number
