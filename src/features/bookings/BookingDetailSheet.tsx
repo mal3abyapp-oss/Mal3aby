@@ -46,6 +46,16 @@ export function BookingDetailSheet({
 }) {
   const [cancelReason, setCancelReason] = useState('')
   const [showCancelForm, setShowCancelForm] = useState(false)
+  // Owner-level review finding (P1, confirmed live): "تسجيل عدم حضور"
+  // fired noShowMutation directly on click with zero confirmation --
+  // one misclick during this review genuinely marked a real, confirmed
+  // booking as no_show in the live database (reverted via direct SQL
+  // once caught). The adjacent "إلغاء الحجز" action in this same file
+  // already has a two-step reveal-then-confirm pattern (showCancelForm)
+  // -- No-Show is at least as consequential (customer-facing status,
+  // no undo UI) and had none. Mirrors that exact existing pattern
+  // rather than introducing a new confirmation-dialog component.
+  const [showNoShowConfirm, setShowNoShowConfirm] = useState(false)
   const [qrDataUrl, setQrDataUrl] = useState<string | null>(null)
   const [actionError, setActionError] = useState<string | null>(null)
 
@@ -89,6 +99,7 @@ export function BookingDetailSheet({
       if (error) throw error
     },
     onSuccess: () => {
+      setShowNoShowConfirm(false)
       onOpenChange(false)
       onChanged()
     },
@@ -205,9 +216,21 @@ export function BookingDetailSheet({
             )}
 
             {(booking.status === 'confirmed' || booking.status === 'checked_in') && (
-              <Button variant="outline" size="sm" disabled={noShowMutation.isPending} onClick={() => noShowMutation.mutate()}>
-                {noShowMutation.isPending ? 'جارٍ التسجيل...' : 'تسجيل عدم حضور'}
-              </Button>
+              showNoShowConfirm ? (
+                <div className="flex flex-col gap-2">
+                  <p className="text-sm text-text-secondary">تأكيد تسجيل عدم حضور العميل لهذا الحجز؟</p>
+                  <div className="flex gap-2">
+                    <Button variant="destructive" size="sm" disabled={noShowMutation.isPending} onClick={() => noShowMutation.mutate()}>
+                      {noShowMutation.isPending ? 'جارٍ التسجيل...' : 'تأكيد عدم الحضور'}
+                    </Button>
+                    <Button variant="ghost" size="sm" onClick={() => setShowNoShowConfirm(false)}>تراجع</Button>
+                  </div>
+                </div>
+              ) : (
+                <Button variant="outline" size="sm" onClick={() => setShowNoShowConfirm(true)}>
+                  تسجيل عدم حضور
+                </Button>
+              )
             )}
 
             {booking.status !== 'cancelled' && booking.status !== 'no_show' && booking.status !== 'completed' && (
