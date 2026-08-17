@@ -10,6 +10,7 @@ import { EntitlementsCard } from '@/features/clubs/EntitlementsCard'
 import { FieldsManagement } from '@/features/clubs/FieldsManagement'
 import { ActivationPolicySetting } from '@/features/academy/EnrollmentSection'
 import { PaymentMethodsCard } from '@/features/billing/PaymentMethodsCard'
+import { PaymentGatewaysCard } from '@/features/billing/PaymentGatewaysCard'
 import { WhatsAppConnectionCard } from './WhatsAppConnectionCard'
 import { MessagingSafetyCard } from './MessagingSafetyCard'
 import { AuditLogSection } from './AuditLogPage'
@@ -67,7 +68,10 @@ export function SettingsPage() {
 
       <section className="flex flex-col gap-4">
         <h2 className="text-sm font-semibold text-text-secondary">المدفوعات</h2>
-        <PaymentMethodsCard />
+        <div className="grid gap-4 lg:grid-cols-2">
+          <PaymentMethodsCard />
+          <PaymentGatewaysCard />
+        </div>
       </section>
 
       <section className="flex flex-col gap-4">

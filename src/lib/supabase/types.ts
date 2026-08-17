@@ -2210,6 +2210,129 @@ export type Database = {
           },
         ]
       }
+      payment_gateway_configs: {
+        Row: {
+          club_id: string
+          enabled: boolean
+          gateway: string
+          has_server_credentials: boolean
+          public_key: string | null
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          club_id: string
+          enabled?: boolean
+          gateway: string
+          has_server_credentials?: boolean
+          public_key?: string | null
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          club_id?: string
+          enabled?: boolean
+          gateway?: string
+          has_server_credentials?: boolean
+          public_key?: string | null
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "payment_gateway_configs_club_id_fkey"
+            columns: ["club_id"]
+            isOneToOne: false
+            referencedRelation: "clubs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "payment_gateway_configs_club_id_fkey"
+            columns: ["club_id"]
+            isOneToOne: false
+            referencedRelation: "commercial_entitlements_usage"
+            referencedColumns: ["club_id"]
+          },
+        ]
+      }
+      payment_gateway_transactions: {
+        Row: {
+          amount: number
+          club_id: string
+          created_at: string
+          failure_reason: string | null
+          gateway: string
+          gateway_reference: string | null
+          id: string
+          invoice_id: string
+          payment_id: string | null
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          amount: number
+          club_id: string
+          created_at?: string
+          failure_reason?: string | null
+          gateway: string
+          gateway_reference?: string | null
+          id?: string
+          invoice_id: string
+          payment_id?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          amount?: number
+          club_id?: string
+          created_at?: string
+          failure_reason?: string | null
+          gateway?: string
+          gateway_reference?: string | null
+          id?: string
+          invoice_id?: string
+          payment_id?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "payment_gateway_transactions_club_id_fkey"
+            columns: ["club_id"]
+            isOneToOne: false
+            referencedRelation: "clubs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "payment_gateway_transactions_club_id_fkey"
+            columns: ["club_id"]
+            isOneToOne: false
+            referencedRelation: "commercial_entitlements_usage"
+            referencedColumns: ["club_id"]
+          },
+          {
+            foreignKeyName: "payment_gateway_transactions_invoice_id_fkey"
+            columns: ["invoice_id"]
+            isOneToOne: false
+            referencedRelation: "invoices"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "payment_gateway_transactions_invoice_id_fkey"
+            columns: ["invoice_id"]
+            isOneToOne: false
+            referencedRelation: "outstanding_invoices"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "payment_gateway_transactions_payment_id_fkey"
+            columns: ["payment_id"]
+            isOneToOne: false
+            referencedRelation: "payments"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       payment_method_configs: {
         Row: {
           club_id: string
@@ -4229,6 +4352,10 @@ export type Database = {
       set_plan_publish_status: {
         Args: { p_is_public: boolean; p_plan_id: string }
         Returns: undefined
+      }
+      start_gateway_checkout: {
+        Args: { p_amount: number; p_gateway: string; p_invoice_id: string }
+        Returns: string
       }
       start_whatsapp_pairing: {
         Args: { p_club_id: string }
