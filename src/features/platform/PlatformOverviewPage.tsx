@@ -14,7 +14,8 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 interface OverviewData {
   totalClubs: number
   activeClubs: number
-  suspendedClubs: number
+  adminSuspendedClubs: number
+  blockedAccessClubs: number
   trialCount: number
   expiringSoonCount: number
   revenueThisMonth: number
@@ -56,7 +57,20 @@ async function fetchOverview(): Promise<OverviewData> {
 
   const totalClubs = clubs?.length ?? 0
   const activeClubs = clubs?.filter((c) => c.status === 'active').length ?? 0
-  const suspendedClubs = clubs?.filter((c) => c.status === 'suspended').length ?? 0
+  // Owner-level review finding (P2, terminology): this counts
+  // clubs.status = 'suspended' -- an ADMINISTRATIVE action (Platform
+  // Owner manually disabled the club). PlatformClubsPage separately
+  // shows "حالة الاشتراك" (subscription/billing access, from
+  // get_club_platform_access(): full/grace/blocked) using the SAME
+  // Arabic word "موقوف" for its own 'blocked' state -- a genuinely
+  // different concept computed from a different source, but
+  // indistinguishable by label alone. Renamed both this field and its
+  // on-screen label to "موقوفة إداريًا" to disambiguate, and added
+  // blockedAccessClubs below (via the same get_club_platform_access()
+  // RPC PlatformClubsPage already uses) so subscription-blocked clubs
+  // -- a real "needs attention" signal -- are no longer invisible from
+  // the landing dashboard.
+  const adminSuspendedClubs = clubs?.filter((c) => c.status === 'suspended').length ?? 0
   const newClubsThisMonth = clubs?.filter((c) => new Date(c.created_at) >= monthStart).length ?? 0
 
   const trialCount = subs?.filter((s) => s.subscription_kind === 'trial').length ?? 0
@@ -71,10 +85,16 @@ async function fetchOverview(): Promise<OverviewData> {
       ?.filter((p) => new Date(p.recorded_at) >= monthStart)
       .reduce((sum, p) => sum + Number(p.amount), 0) ?? 0
 
+  const accessResults = await Promise.all(
+    (clubs ?? []).map((c) => supabase.rpc('get_club_platform_access', { p_club_id: c.id })),
+  )
+  const blockedAccessClubs = accessResults.filter((r) => r.data === 'blocked').length
+
   return {
     totalClubs,
     activeClubs,
-    suspendedClubs,
+    adminSuspendedClubs,
+    blockedAccessClubs,
     trialCount,
     expiringSoonCount,
     revenueThisMonth,
@@ -93,7 +113,15 @@ export function PlatformOverviewPage() {
       <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
         <StatCard label="إجمالي الأندية" value={isLoading ? '—' : String(data?.totalClubs ?? 0)} />
         <StatCard label="أندية نشطة" value={isLoading ? '—' : String(data?.activeClubs ?? 0)} />
-        <StatCard label="أندية موقوفة" value={isLoading ? '—' : String(data?.suspendedClubs ?? 0)} />
+        {/* Renamed from "أندية موقوفة" -- that label was ambiguous with
+            "حالة الاشتراك: موقوف" on PlatformClubsPage, a different
+            concept (subscription/billing access, not admin status).
+            See blockedAccessClubs card below for that other signal. */}
+        <StatCard label="أندية موقوفة إداريًا" value={isLoading ? '—' : String(data?.adminSuspendedClubs ?? 0)} />
+        <StatCard
+          label="أندية بوصول موقوف (اشتراك)"
+          value={isLoading ? '—' : String(data?.blockedAccessClubs ?? 0)}
+        />
         <StatCard label="تجارب مجانية نشطة" value={isLoading ? '—' : String(data?.trialCount ?? 0)} />
         <StatCard label="اشتراكات تنتهي قريبًا (7 أيام)" value={isLoading ? '—' : String(data?.expiringSoonCount ?? 0)} />
         <StatCard label="أندية جديدة هذا الشهر" value={isLoading ? '—' : String(data?.newClubsThisMonth ?? 0)} />
