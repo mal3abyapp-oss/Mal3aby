@@ -243,8 +243,44 @@ function withSendTimeout<T>(promise: Promise<T>, label: string): Promise<T> {
   })
 }
 
+/**
+ * STATUS-WRITE RACE, PROVEN AND FIXED (2026-08-18, per an explicit
+ * evidence-driven directive): TenantConnectionManager.onStateChange's
+ * reportStatus() call is fire-and-forget (`void this.sync.reportStatus(...)`)
+ * with no ordering guarantee between concurrent calls. If two state
+ * transitions fire close together (e.g. a `restartRequired` disconnect
+ * immediately followed by a fresh reconnect, or a rapid
+ * connecting->connected sequence), their async RPC calls can land in
+ * Postgres OUT OF ORDER -- an OLDER "disconnected" write completing
+ * AFTER a NEWER "connected" write, permanently corrupting
+ * whatsapp_accounts.status until the next state change (which may
+ * never come if the account is genuinely healthy and idle). This is
+ * exactly what explains the earlier observed anomaly: provider
+ * connected in-memory, whatsapp_accounts.status showing 'disconnected'
+ * in the DB, which then made claimNextBatch()'s own
+ * `wa.status = 'connected'` eligibility filter incorrectly exclude a
+ * perfectly healthy, connected account's queued notifications.
+ *
+ * Fix (minimal correct design, not distributed coordination -- this is
+ * a single Node process per club, so a simple monotonic in-memory
+ * counter is sufficient, proven-needed before building anything more
+ * elaborate): every state transition is stamped with this provider's
+ * own `generation` (already existed, bumped on each real reconnect)
+ * and a NEW `stateSeq` (bumped on every single setState() call,
+ * finer-grained than generation -- multiple state changes can happen
+ * within one generation, e.g. connecting -> qr_required -> connected).
+ * whatsapp_connector_report_status now takes both and only applies the
+ * write if (generation, stateSeq) is not older than what's already
+ * stored -- "newer generation/sequence wins", "stale writer loses",
+ * with zero possibility of a late-arriving stale write clobbering a
+ * fresher one, regardless of network/RPC completion order.
+ */
 export interface BaileysProviderHooks {
-  onStateChange?: (state: ConnectionState, detail?: { qr?: string; qrTtlSeconds?: number; connectedPhoneNumber?: string; error?: string }) => void
+  onStateChange?: (
+    state: ConnectionState,
+    detail?: { qr?: string; qrTtlSeconds?: number; connectedPhoneNumber?: string; error?: string },
+    fencing?: { generation: number; stateSeq: number },
+  ) => void
   /** Called whenever Baileys persists updated credentials to the local auth dir -- the caller is responsible for encrypting the dir's contents and pushing to Supabase (see SessionStore.encryptAuthDirForClub). */
   onCredsUpdate?: () => void
 }
@@ -261,6 +297,8 @@ export class BaileysProvider implements WhatsAppProvider {
 
   /** Generation counter -- see class-level doc comment, fix item 1. */
   private generation = 0
+  /** Monotonic per-state-transition sequence, for the status-write-race fix -- see BaileysProviderHooks' own doc comment. Never reset (unlike generation, which only bumps on a real reconnect) -- strictly increasing for the lifetime of this provider instance/process. */
+  private stateSeq = 0
   /** Connection mutex -- see class-level doc comment, fix item 2. */
   private connectPromise: Promise<void> | null = null
   /** Single pending reconnect timer -- see class-level doc comment, fix item 6. */
@@ -295,7 +333,8 @@ export class BaileysProvider implements WhatsAppProvider {
 
   private setState(next: ConnectionState, detail?: Parameters<NonNullable<BaileysProviderHooks['onStateChange']>>[1]) {
     this.state = next
-    this.hooks.onStateChange?.(next, detail)
+    this.stateSeq += 1
+    this.hooks.onStateChange?.(next, detail, { generation: this.generation, stateSeq: this.stateSeq })
   }
 
   private clearReconnectTimer(): void {

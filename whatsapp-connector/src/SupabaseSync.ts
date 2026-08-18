@@ -33,6 +33,9 @@ export class SupabaseSync {
     qrTtlSeconds?: number | null
     connectedPhoneNumber?: string | null
     error?: string | null
+    /** Status-write-race fix -- see BaileysProviderHooks' doc comment (BaileysProvider.ts). Both required (not optional) so no call site can silently skip fencing and reintroduce the race. */
+    generation: number
+    stateSeq: number
   }): Promise<void> {
     const { error } = await this.client.rpc('whatsapp_connector_report_status', {
       p_club_id: params.clubId,
@@ -41,6 +44,8 @@ export class SupabaseSync {
       p_qr_ttl_seconds: params.qrTtlSeconds ?? null,
       p_connected_phone_number: params.connectedPhoneNumber ?? null,
       p_error: params.error ?? null,
+      p_generation: params.generation,
+      p_state_seq: params.stateSeq,
     })
     if (error) throw new Error(`whatsapp_connector_report_status failed: ${error.message}`)
   }

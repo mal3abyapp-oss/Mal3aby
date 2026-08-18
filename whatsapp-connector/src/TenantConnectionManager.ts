@@ -24,7 +24,13 @@ export class TenantConnectionManager {
     let provider = this.providers.get(clubId)
     if (!provider) {
       provider = new BaileysProvider(clubId, {
-        onStateChange: (state, detail) => {
+        onStateChange: (state, detail, fencing) => {
+          // Status-write-race fix (2026-08-18): pass this transition's
+          // own (generation, stateSeq) through so the RPC can reject a
+          // late-arriving stale write instead of always applying
+          // whichever call happens to land last -- see
+          // BaileysProviderHooks' own doc comment in BaileysProvider.ts
+          // for the full proof and design.
           void this.sync
             .reportStatus({
               clubId,
@@ -33,6 +39,8 @@ export class TenantConnectionManager {
               qrTtlSeconds: detail?.qrTtlSeconds ?? null,
               connectedPhoneNumber: detail?.connectedPhoneNumber ?? null,
               error: detail?.error ?? null,
+              generation: fencing?.generation ?? 0,
+              stateSeq: fencing?.stateSeq ?? 0,
             })
             .catch((err) => console.error(`[connector] failed to report status for club ${clubId.slice(0, 8)}:`, err.message))
         },
