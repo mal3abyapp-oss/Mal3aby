@@ -265,7 +265,11 @@ export class QueueConsumer {
       if (!data) {
         throw new Error(`invoice_pdf media_intent but whatsapp_connector_get_invoice_document_data returned no row for this invoice`)
       }
-      const pdf = await buildInvoicePdfBuffer(data)
+      // Real English PDF for an English customer (directive Section
+      // 36) -- never the same Arabic PDF re-sent regardless of
+      // language, matching booking_qr_token/invoice_token's own
+      // language-aware URL suffix (bookingQrUrl()/invoiceUrl()).
+      const pdf = await buildInvoicePdfBuffer(data, { language: row.language === 'en' ? 'en' : 'ar' })
       // Never the raw token in the filename (directive rule 12) --
       // only the human-facing invoice number, which is already shown
       // to the customer in the message text and on the invoice itself.

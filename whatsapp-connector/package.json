@@ -18,12 +18,14 @@
     "@supabase/supabase-js": "^2.47.0",
     "@whiskeysockets/baileys": "^6.7.9",
     "bidi-shaper": "^0.1.2",
+    "fontkit": "^2.0.4",
     "pdfkit": "^0.19.1",
     "pino": "^9.4.0",
     "qrcode": "^1.5.4",
     "qrcode-terminal": "^0.12.0"
   },
   "devDependencies": {
+    "@types/fontkit": "^2.0.9",
     "@types/node": "^22.10.1",
     "@types/pdfkit": "^0.17.6",
     "@types/qrcode": "^1.5.6",
