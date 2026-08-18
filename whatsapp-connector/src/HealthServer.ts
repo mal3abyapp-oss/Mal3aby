@@ -2,6 +2,8 @@ import { createServer, type Server } from 'node:http'
 import { timingSafeEqual } from 'node:crypto'
 import type { SupabaseSync } from './SupabaseSync.js'
 import type { TenantConnectionManager } from './TenantConnectionManager.js'
+import { getProcessDiagnosticsSnapshot } from './ProcessDiagnostics.js'
+import { getSendDiagnosticsSnapshot } from './SendDiagnostics.js'
 
 /**
  * Constant-time token comparison. The /status endpoint is internal-only
@@ -23,13 +25,10 @@ function safeTokenEquals(provided: string | undefined, expected: string): boolea
 
 /**
  * HealthServer -- Cloudflare Containers requires the container image to
- * listen on an HTTP port (Container class' `defaultPort`, confirmed
- * against the actual installed @cloudflare/containers@0.0.13 API --
- * there is no separate `pingEndpoint` property in this version;
- * startAndWaitForPorts() gates readiness on TCP port reachability, not
- * a specific HTTP path) so the platform can tell "container process
- * started successfully" and so the owning Durable Object can poll real
- * liveness before deciding whether to call renewActivityTimeout()
+ * listen on an HTTP port (Container class' `defaultPort`) so the
+ * platform can tell "container process started successfully" and so
+ * the owning Durable Object can poll real liveness before deciding
+ * whether to call renewActivityTimeout()
  * (keep the container awake) or let it sleep. This is the ONLY inbound
  * port this service opens --
  * every other capability (queue consumption, pairing requests) remains
@@ -138,6 +137,11 @@ export function startHealthServer(sync: SupabaseSync, connections: TenantConnect
             heapTotal: Math.round(mem.heapTotal / 1024 / 1024),
             external: Math.round(mem.external / 1024 / 1024),
           },
+          // Send-hang investigation additions (2026-08-18) -- see
+          // ProcessDiagnostics.ts and SendDiagnostics.ts for why these
+          // exist. No message content, no phone numbers, no tokens.
+          processDiagnostics: getProcessDiagnosticsSnapshot(),
+          sendDiagnostics: getSendDiagnosticsSnapshot(),
         }),
       )
       return

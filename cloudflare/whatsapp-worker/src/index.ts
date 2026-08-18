@@ -59,7 +59,7 @@ async function handleManage(request: Request, env: Env): Promise<Response> {
   }
 
   const url = new URL(request.url)
-  // /manage/:clubId/start | /manage/:clubId/status
+  // /manage/:clubId/start | /manage/:clubId/status | /manage/:clubId/restart
   const parts = url.pathname.split('/').filter(Boolean)
   if (parts.length !== 3 || parts[0] !== 'manage') {
     return new Response('not found', { status: 404 })
@@ -76,6 +76,24 @@ async function handleManage(request: Request, env: Env): Promise<Response> {
   if (action === 'status') {
     const result = await stub.pollHealthAndDecide()
     return Response.json({ clubId, ...result })
+  }
+
+  if (action === 'restart') {
+    // ADVERSARIAL PROOF SEQUENCE addition (2026-08-18): a legitimate,
+    // controlled restart capability was missing entirely -- this Worker
+    // could start a container and poll its status, but had no route to
+    // stop one, which blocked testing "fresh Baileys socket generation
+    // immediately after reconnect" vs. "same socket after a long idle
+    // period" (the send-hang root-cause investigation's core A/B test).
+    // Mirrors the existing start/status auth/route pattern exactly --
+    // no new trust boundary, same MANAGEMENT_API_TOKEN gate. Calls the
+    // real, sanctioned Container.stop() (SIGTERM, matching the
+    // documented stop sequence) -- ensureRunning() on the next request
+    // (or the next health-poll tick, since the account should stay
+    // awake if genuinely connected) brings it back with the same
+    // encrypted session restored, no new pairing.
+    await stub.stop()
+    return Response.json({ ok: true, clubId, action: 'restart' })
   }
 
   return new Response('unknown action', { status: 400 })

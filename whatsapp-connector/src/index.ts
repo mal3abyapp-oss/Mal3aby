@@ -3,6 +3,7 @@ import { QueueConsumer } from './QueueConsumer.js'
 import { SupabaseSync } from './SupabaseSync.js'
 import { TenantConnectionManager } from './TenantConnectionManager.js'
 import { startHealthServer } from './HealthServer.js'
+import { recordUncaughtException, recordUnhandledRejection } from './ProcessDiagnostics.js'
 
 /**
  * index.ts -- process entrypoint. No inbound HTTP server: this service
@@ -73,10 +74,18 @@ function installCrashGuards(): void {
   process.on('uncaughtException', (err) => {
     console.error('[connector] uncaught exception (process kept alive):', err instanceof Error ? err.message : err)
     if (err instanceof Error && err.stack) console.error('[connector] stack:', err.stack)
+    // Send-hang investigation (2026-08-18): this counter+timestamp is
+    // exposed via HealthServer.ts's /status -- see ProcessDiagnostics.ts
+    // for why this needed to exist at all (wrangler tail cannot see this
+    // process's own stdout, so without this there was no way to
+    // correlate "an uncaught exception fired" against "a later
+    // sendMessage() call hung", the specific hypothesis under test).
+    recordUncaughtException()
   })
   process.on('unhandledRejection', (reason) => {
     console.error('[connector] unhandled promise rejection (process kept alive):', reason instanceof Error ? reason.message : reason)
     if (reason instanceof Error && reason.stack) console.error('[connector] stack:', reason.stack)
+    recordUnhandledRejection()
   })
 }
 

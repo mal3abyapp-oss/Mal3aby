@@ -115,7 +115,7 @@ export interface WhatsAppProvider {
    * silently ignored, it is documented here and covered by the real
    * crash/retry test in the acceptance report.
    */
-  sendMessage(toPhoneDigitsOnly: string, body: string, media?: MediaAttachment): Promise<SendMessageResult>
+  sendMessage(toPhoneDigitsOnly: string, body: string, media?: MediaAttachment, templateKey?: string): Promise<SendMessageResult>
 
   /** Attempts to restore a previously-persisted session without requiring a new QR scan. */
   reconnect(): Promise<void>

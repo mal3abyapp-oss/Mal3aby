@@ -63,12 +63,12 @@ export class TenantConnectionManager {
     this.providers.delete(clubId)
   }
 
-  async send(clubId: string, toPhoneDigitsOnly: string, body: string, media?: MediaAttachment) {
+  async send(clubId: string, toPhoneDigitsOnly: string, body: string, media?: MediaAttachment, templateKey?: string) {
     const provider = this.providers.get(clubId)
     if (!provider) {
       return { success: false as const, error: 'no active connection for this club' }
     }
-    return provider.sendMessage(toPhoneDigitsOnly, body, media)
+    return provider.sendMessage(toPhoneDigitsOnly, body, media, templateKey)
   }
 
   getConnectionState(clubId: string) {

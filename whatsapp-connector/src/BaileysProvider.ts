@@ -10,6 +10,7 @@ import path from 'node:path'
 import { mkdir, rm } from 'node:fs/promises'
 import { createHash, randomInt } from 'node:crypto'
 import type { ConnectionState, MediaAttachment, SendMessageResult, WhatsAppProvider } from './WhatsAppProvider.js'
+import { recordSendStart, recordSendStage, recordSendOutcome } from './SendDiagnostics.js'
 
 /**
  * BaileysProvider -- the ONLY file in this service allowed to import
@@ -157,33 +158,55 @@ function withJitter(baseMs: number): number {
 }
 
 /**
- * REAL BUG found live (MAL3ABY WHATSAPP QR IMAGE + INVOICE DOCUMENT
- * DELIVERY task): `socket.sendMessage()` has no built-in timeout of its
- * own -- confirmed live via a genuinely stuck notification_queue row:
- * 3 rows claimed together in one batch sat in `status='processing'`
- * for 5+ minutes with ZERO error recorded and a simultaneously healthy,
- * `connected`, actively-reporting `whatsapp_accounts` row, meaning the
- * connector process was alive and the WhatsApp connection was alive,
- * but the specific `socket.sendMessage()` call itself never resolved
- * OR rejected -- a genuine hang, not a network-level timeout Baileys
- * itself would eventually surface as an error (that DOES happen
- * sometimes, confirmed by the earlier "Timed Out" errors seen during
- * this same investigation -- this is a DIFFERENT, worse failure mode
- * where not even that internal timeout fires). Because
- * QueueConsumer.pollOnce() processes one claimed row at a time in a
- * simple loop, a single hung sendMessage() call blocks the ENTIRE
- * batch indefinitely -- not just that one row.
+ * ROOT CAUSE FOUND (adversarial send-reliability investigation,
+ * 2026-08-18) -- REPLACES the diagnosis this comment used to record.
  *
- * Fix: wrap every sendMessage() call in an explicit, bounded timeout
- * here at the provider layer, so a hang can never propagate further
- * than this one call. 45s is generous for a real WhatsApp media
- * upload+send round-trip (QR PNGs are a few KB, invoice PDFs tens of
- * KB) while still being far short of blocking the whole queue
- * indefinitely -- a genuinely stuck send now surfaces as a normal,
- * reportable failure through the existing capped-retry path instead of
- * silently starving every other queued notification.
+ * The original 45s SEND_TIMEOUT_MS was NOT catching a genuine
+ * `socket.sendMessage()` hang -- it was racing, and always winning
+ * against, Baileys' OWN internal, legitimate, bounded query timeout.
+ *
+ * Traced live, from the installed @whiskeysockets/baileys@6.7.24
+ * source directly (not assumed): a plain 1:1 text sendMessage() call
+ * (no `participant` option, which is our own call shape) unconditionally
+ * calls `getUSyncDevices([meId, jid], useUserDevicesCache, true)`
+ * inside relayMessage() (messages-send.js) to discover the recipient's
+ * multi-device list -- there is no way to skip this for a direct
+ * message. That function checks an in-memory `userDevicesCache` Map
+ * FIRST (messages-send.js) -- which is always empty on a freshly
+ * started/restarted connector process (a plain JS Map, not persisted
+ * anywhere), so the VERY FIRST send to any JID after every process
+ * start/restart unavoidably falls through to a real network round-trip:
+ * `executeUSyncQuery()` -> `query(iq)` -> `waitForMessage(msgId,
+ * timeoutMs = defaultQueryTimeoutMs)` (usync.js / socket.js).
+ * `defaultQueryTimeoutMs` is 60000 by Baileys' own
+ * DEFAULT_CONNECTION_CONFIG (Defaults/index.js) -- our own
+ * makeWASocket() call never overrides it, so this is Baileys' real,
+ * intended, bounded wait for a WhatsApp-server response to that USync
+ * query, which can legitimately take up to a minute.
+ *
+ * Live evidence (2026-08-18, real WhatsApp send tests against the
+ * approved test number, both on a long-idle existing connection AND
+ * immediately after a fresh, controlled reconnect -- ruling out
+ * zombie-socket-after-idle as the cause, since a FRESH connection's
+ * very first send hung identically): every single attempt failed with
+ * the OLD 45s external timeout firing first, every time, because 45s <
+ * 60s -- our own safety-net was shorter than the operation it was
+ * wrapping legitimately needs on this exact, unavoidable-on-first-send
+ * code path. We were never observing a real hang; we were preempting
+ * Baileys before it got the chance to either succeed (slow USync
+ * response) or fail cleanly with its own real, classifiable error.
+ *
+ * Fix: raise the external safety-net timeout past Baileys' own known
+ * 60s internal ceiling with a real margin (75s), so Baileys' own
+ * timeout mechanism gets to do its job first. This external wrapper's
+ * job stays exactly what it always was -- a last-resort backstop
+ * against a TRUE hang (this call still exists, still bounds every send,
+ * still turns a genuine stuck promise into a reportable, retryable
+ * failure via the existing capped-retry path) -- it is simply no longer
+ * shorter than an operation Baileys itself considers normal and
+ * bounded.
  */
-const SEND_TIMEOUT_MS = 45_000
+const SEND_TIMEOUT_MS = 75_000
 
 function withSendTimeout<T>(promise: Promise<T>, label: string): Promise<T> {
   return new Promise<T>((resolve, reject) => {
@@ -501,20 +524,33 @@ export class BaileysProvider implements WhatsAppProvider {
    * second time, which is a documented, tested trade-off, not a silent
    * gap.
    */
-  async sendMessage(toPhoneDigitsOnly: string, body: string, media?: MediaAttachment): Promise<SendMessageResult> {
+  async sendMessage(toPhoneDigitsOnly: string, body: string, media?: MediaAttachment, templateKey = 'unknown'): Promise<SendMessageResult> {
     if (this.state !== 'connected' || !this.socket) {
       return { success: false, error: `not connected (state=${this.state})` }
     }
     const jid = `${toPhoneDigitsOnly}@s.whatsapp.net`
+    const myGeneration = this.generation
+    const sendStartedAt = Date.now()
+    // Send-hang investigation (2026-08-18): records THIS attempt's
+    // start, per-stage progress, and final outcome (never the message
+    // body/phone/tokens) -- see SendDiagnostics.ts. This is what makes
+    // "did this specific hang correlate with a recent uncaughtException"
+    // and "which generation was this send actually made against"
+    // answerable from /status instead of guessed.
+    recordSendStart(this.clubId, myGeneration, templateKey)
     let textProviderReference: string | undefined
     try {
       const textResult = await withSendTimeout(this.socket.sendMessage(jid, { text: body }), 'text')
       textProviderReference = textResult?.key?.id ?? undefined
+      recordSendStage(this.clubId, 'text_sent', Date.now() - sendStartedAt)
     } catch (err) {
+      const timedOut = (err as Error).message.includes('never resolved')
+      recordSendOutcome(this.clubId, timedOut ? 'timed_out' : 'failed', Date.now() - sendStartedAt)
       return { success: false, error: (err as Error).message }
     }
 
     if (!media) {
+      recordSendOutcome(this.clubId, 'success', Date.now() - sendStartedAt)
       return { success: true, providerReference: textProviderReference }
     }
 
@@ -530,6 +566,8 @@ export class BaileysProvider implements WhatsAppProvider {
             }),
         'media',
       )
+      recordSendStage(this.clubId, 'media_sent', Date.now() - sendStartedAt)
+      recordSendOutcome(this.clubId, 'success', Date.now() - sendStartedAt)
       return { success: true, providerReference: mediaResult?.key?.id ?? textProviderReference }
     } catch (err) {
       // Text already went out to the customer's phone at this point --
@@ -539,6 +577,8 @@ export class BaileysProvider implements WhatsAppProvider {
       // policy attempt the media again; the residual "text may be
       // resent on retry" risk is the honest, tested trade-off, not a
       // hidden one.
+      const timedOut = (err as Error).message.includes('never resolved')
+      recordSendOutcome(this.clubId, timedOut ? 'timed_out' : 'failed', Date.now() - sendStartedAt)
       return { success: false, error: `text sent but media failed: ${(err as Error).message}` }
     }
   }

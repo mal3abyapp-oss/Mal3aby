@@ -385,9 +385,21 @@ export class WhatsAppAccountObject extends Container<Env> {
       // real WA-side session is dead. generation/disconnectCount/
       // reconnectCount/connectionUptimeMs answer this without needing to
       // touch the send path itself.
+      // BUG FOUND AND FIXED in this same diagnostic pass: HealthServer.ts's
+      // /status returns `accounts` for EVERY club this connector process
+      // knows about (TenantConnectionManager.getAllDiagnostics() iterates
+      // its whole providers Map), not just the club THIS Durable Object
+      // owns -- an earlier version of this loop logged every account
+      // under `club=${this.clubIdShort()}` (this DO's OWN id), which once
+      // produced a genuinely alarming-looking line (a DIFFERENT,
+      // already-known logged_out club's diagnostics logged as if it were
+      // this DO's account) before being traced back to this mislabeling,
+      // not a real event on this account. Fixed by logging each
+      // account's OWN clubId (already an 8-char-truncated, non-secret
+      // prefix from BaileysProvider.redactedClubId()) instead.
       for (const account of body.accounts ?? []) {
         console.log(
-          `[diag] baileysState club=${this.clubIdShort()} at=${new Date().toISOString()} state=${account.state} generation=${account.generation} disconnectCount=${account.disconnectCount} reconnectCount=${account.reconnectCount} lastDisconnectReason=${account.lastDisconnectReason} connectionUptimeMs=${account.connectionUptimeMs}`,
+          `[diag] baileysState reportedBy=${this.clubIdShort()} accountClub=${account.clubId} at=${new Date().toISOString()} state=${account.state} generation=${account.generation} disconnectCount=${account.disconnectCount} reconnectCount=${account.reconnectCount} lastDisconnectReason=${account.lastDisconnectReason} connectionUptimeMs=${account.connectionUptimeMs}`,
         )
       }
       if (body.shouldStayAwake) {

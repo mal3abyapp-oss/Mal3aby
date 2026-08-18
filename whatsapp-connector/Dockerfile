@@ -63,20 +63,22 @@ ENV HEALTH_PORT=8080
 # Cloudflare Containers' Container class (startAndWaitForPorts(), see
 # WhatsAppAccountObject.ts) waits for THIS PORT to accept a TCP
 # connection as its startup-readiness signal -- confirmed against the
-# actual installed @cloudflare/containers@0.0.13 API surface
-# (node_modules/@cloudflare/containers/dist/index.d.ts): there is no
-# `pingEndpoint` property in this version: only `defaultPort` /
-# `requiredPorts`, which gate on port reachability, not on a specific
-# HTTP path responding. An earlier version of this comment incorrectly
-# described a documented-but-nonexistent "/ready" path override -- this
-# was a stale-documentation assumption, not a real API surface, caught
-# and corrected during a static audit rather than left uncorrected.
-# HealthServer.ts's actual /health, /ready, /status paths remain real
-# and are polled by WhatsAppAccountObject's own 60s alarm-driven
-# pollHealthAndDecide() logic (a request the DO makes AFTER the
-# container is already confirmed port-reachable), not by the Container
-# base class's own startup gate. Exposed here for documentation/local
-# `docker run -p` convenience; Cloudflare's own routing to this port is
+# actual installed @cloudflare/containers package API surface
+# (node_modules/@cloudflare/containers/dist/lib/container.d.ts).
+# UPDATED 2026-08-18 (@cloudflare/containers upgraded 0.0.13 -> 0.3.7,
+# see WhatsAppAccountObject.ts's class-level doc comment for the full
+# root-cause story that motivated the upgrade): 0.3.7 DOES expose a real
+# `pingEndpoint: string` property that 0.0.13 lacked -- WhatsAppAccountObject.ts
+# does not currently set it (defaultPort's plain TCP-reachability check,
+# used since before this upgrade, remains sufficient and is not being
+# changed without evidence it needs to be -- directive rule: "no random
+# upgrade beyond what's justified by real evidence"). HealthServer.ts's
+# actual /health, /ready, /status paths remain real and are polled by
+# WhatsAppAccountObject's own 60s alarm-driven pollHealthAndDecide()
+# logic (a request the DO makes AFTER the container is already confirmed
+# port-reachable), not by the Container base class's own startup gate.
+# Exposed here for documentation/local `docker run -p` convenience;
+# Cloudflare's own routing to this port is
 # configured via `defaultPort` in the Worker/Durable Object, not by
 # this EXPOSE directive.
 EXPOSE 8080

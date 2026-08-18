@@ -120,7 +120,7 @@ export class QueueConsumer {
       }
     }
 
-    const result = await this.connections.send(row.clubId, row.recipientPhone, body, media)
+    const result = await this.connections.send(row.clubId, row.recipientPhone, body, media, row.templateKey)
     // Observability (directive rule 18): id, media type/intent (never
     // the bytes or the token), success, provider reference, never any
     // customer-content beyond what's already logged elsewhere.
