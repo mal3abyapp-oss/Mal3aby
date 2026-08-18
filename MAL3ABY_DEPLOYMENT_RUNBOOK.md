@@ -1,94 +1,124 @@
-# Mal3aby — Production Deployment Runbook
+# Mal3aby — Production Deployment Runbook (Cloudflare-only)
 
-**Status: TECHNICALLY READY — EXTERNAL DEPLOYMENT CREDENTIALS REQUIRED.** Every step below that does not require an external account/domain/credential has been prepared or verified. The remaining steps require the human operator to provide: a production domain, a Cloudflare (or equivalent) account, and a hosting account/VM for the WhatsApp connector — none of which this task is authorized to purchase or create autonomously (see the standing "what not to do without you" list).
+**Status: TECHNICALLY DEPLOYABLE — EXTERNAL CREDENTIALS REQUIRED.** Every step below that does not require a Cloudflare account, a production domain, or Docker has been prepared and locally validated. See [MAL3ABY_CLOUDFLARE_PRODUCTION_ARCHITECTURE.md](MAL3ABY_CLOUDFLARE_PRODUCTION_ARCHITECTURE.md) for the full architecture and [MAL3ABY_CLOUDFLARE_WHATSAPP_VALIDATION.md](MAL3ABY_CLOUDFLARE_WHATSAPP_VALIDATION.md) for exactly what has and hasn't been empirically proven about the WhatsApp Container. This runbook supersedes all prior VPS/PM2/systemd guidance — Mal3aby's target deployment platform is Cloudflare + Supabase only, no traditional host.
 
----
-
-## Architecture Recap (why two different deployment targets)
-
-Mal3aby has **two independently-deployed components**, and they need genuinely different hosting:
-
-1. **Frontend (Vite/React SPA)** — stateless static files after build. Deploys anywhere that serves static files over HTTPS with SPA fallback routing. **Cloudflare Pages, Vercel, Netlify are all fine** — no server-side rendering, no persistent process needed.
-2. **WhatsApp connector (`whatsapp-connector/`)** — a long-lived Node.js process holding a persistent WebSocket connection to WhatsApp (via Baileys) and in-memory connection state per club (`TenantConnectionManager`). **This is explicitly NOT compatible with serverless/edge runtimes** (Cloudflare Workers, Vercel Edge Functions, AWS Lambda) — confirmed by reading `whatsapp-connector/package.json` and `src/index.ts`: it's a plain long-running `node` process (`npm start` → `node --env-file=.env dist/index.js`), not a request-handler entrypoint. It needs a VM, container host, or persistent-process PaaS (Fly.io, Railway, a small VPS, a DigitalOcean droplet, etc.) — never assume Cloudflare Workers "just works" for this piece.
-
-Supabase (Postgres + Auth + Storage) is already hosted by Supabase itself — no separate deployment step for that beyond the plan/backup decision covered in `BACKUP_RECOVERY_RUNBOOK.md`.
+Last updated: 2026-08-18
 
 ---
 
-## 1. Frontend Deployment
+## Architecture recap
 
-**Prerequisites (external, not yet provided):** a production domain name, a Cloudflare Pages (or equivalent static host) account connected to this repo or its build output.
+Two independently-deployed Cloudflare projects, plus Supabase (unchanged, already hosted by Supabase itself):
 
-**What's already correct in the codebase:**
-- `npm run build` produces a clean `dist/` (verified repeatedly throughout this remediation pass — build clean, 2202 modules, ~1.48MB main bundle).
-- `.env`/secrets are correctly git-ignored (verified — no `VITE_SUPABASE_SERVICE_ROLE_KEY` or any server-only secret is ever bundled into frontend code; only the public anon key and project URL are legitimate `VITE_`-prefixed env vars).
-- SPA routing (`react-router-dom`, client-side routes like `/qr/:token`, `/verify/:token`, `/app/*`) requires the host to serve `index.html` for any unmatched path — Cloudflare Pages/Vercel/Netlify all support this via a `_redirects`/`vercel.json`/host-native config; **none exists in this repo yet** and must be added at deploy time (a one-line `/* /index.html 200` for Cloudflare Pages' `_redirects` file, or the equivalent for the chosen host).
+1. **`cloudflare/frontend-worker`** — Cloudflare Workers Static Assets, serving the repo root's own `npm run build` output. Pure static SPA, no server logic.
+2. **`cloudflare/whatsapp-worker`** — a Cloudflare Worker + `WhatsAppAccountObject` Durable Object (one instance per club) orchestrating a Cloudflare Container running the existing `whatsapp-connector` (Baileys) unmodified.
 
-**Steps once credentials exist:**
-1. Connect the repo (or CI build output) to the static host.
-2. Set build command `npm run build`, output directory `dist`.
-3. Add the SPA-fallback redirect rule for the chosen host.
-4. Set production environment variables: `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY` (values already known — same Supabase project, just the public-safe keys).
-5. Point the production domain's DNS at the host (CNAME/A record per the host's own instructions) and confirm HTTPS is issued (Cloudflare Pages/Vercel/Netlify all auto-provision Let's Encrypt certificates — no manual SSL step needed on those platforms).
-6. **Set `PUBLIC_APP_URL` in the WhatsApp connector's `.env` to the real production domain** (e.g. `https://app.mala3by.com`) — this is what makes booking-QR and invoice links in real WhatsApp messages resolve for real customers on their own phones/networks, replacing the LAN-only `http://192.168.1.6:5173` value currently set for local device testing (see the WhatsApp secure-links work earlier in this project's history).
+Neither Cloudflare Pages, a VPS, PM2, nor systemd is used anywhere in this architecture. Full rationale in the architecture doc.
 
-## 2. Supabase (Backend)
+---
 
-Already provisioned and live (`gxkrtlvpjwxhcqdisyob`, `eu-central-1`, Postgres 17.6). Remaining actions:
+## 1. Frontend deployment
 
-- **Upgrade off the `free` plan** — see `BACKUP_RECOVERY_RUNBOOK.md` for why this is a hard launch requirement, not optional hardening. This is the same external-billing blocker as C6.
-- Migrations: this repo's `supabase/migrations/` is the source of truth; all migrations through this remediation pass have been applied directly to the live project via the Supabase MCP tooling (not a separate CI/CD migration pipeline). **For a real production cutover, establish a proper `supabase db push`/CI-based migration deployment flow** rather than continuing to apply migrations ad hoc through an AI-assisted session — this is a process recommendation, not a blocker, since the live project IS already correctly migrated.
-- Connection limits: default Supabase pooling (PgBouncer via the standard connection string) is sufficient for a single-pilot-club launch; revisit if/when the WhatsApp connector or frontend show connection-exhaustion errors at higher club counts (see Scalability section of `MAL3ABY_PRODUCTION_READINESS.md`).
-- Auth email confirmation: **known pre-existing gap** (documented in earlier project state) — Supabase Auth requires email confirmation before `signInWithPassword` succeeds, and no working transactional-email sender is confirmed configured for this project yet. This blocks real customer/staff self-service signup end-to-end until a real SMTP/email provider is connected in the Supabase Auth settings (Dashboard → Authentication → Email Templates/SMTP Settings) — **another external-credential item** (an email-sending service), flagged here rather than guessed at.
+**Prerequisites (external, not yet provided):** a Cloudflare account, and — for a real production domain — DNS ownership of that domain.
 
-## 3. WhatsApp Connector Deployment
+**What's already correct and locally verified:**
+- `npm run build` at the repo root produces the `dist/` directory `cloudflare/frontend-worker/wrangler.jsonc` points at (`../../dist`) — no separate build step or duplicated frontend code.
+- `cloudflare/frontend-worker/wrangler.jsonc` sets `assets.not_found_handling: "single-page-application"`, which serves `index.html` (200) for any unmatched path. Verified live via `wrangler dev` against real deep-link routes (`/qr/:token`, `/verify/:token`, `/app/*`, `/portal/*`) — all correctly SPA-fallback (see validation doc §2.5).
+- Static assets serve directly without Worker involvement (verified: `/favicon.svg` → 200, not a fallback).
 
-**Prerequisites (external, not yet provided):** a VM or persistent-process hosting account (Fly.io, Railway, a VPS, etc.) — genuinely cannot be a serverless/edge platform, see architecture note above.
+**Steps once a Cloudflare account exists:**
+1. `cd cloudflare/frontend-worker && npm install`
+2. From the repo root: `npm run build` (produces `../dist` relative to this folder — actually `dist/` at repo root).
+3. `npx wrangler login` (interactive OAuth — cannot be done autonomously; requires the human operator).
+4. `npx wrangler deploy` from `cloudflare/frontend-worker` — deploys to `*.workers.dev` first for a smoke test, or directly to a custom domain if one is bound (next step).
+5. **Custom domain**: once a real production domain is chosen and its DNS is on Cloudflare, bind it via the dashboard (Workers & Pages → `mala3by-frontend` → Settings → Domains & Routes) or `wrangler deploy --routes <domain>/*`. This repo deliberately does not invent a domain name.
+6. Confirm HTTPS is auto-issued (Cloudflare provisions this automatically for any domain on its own DNS/proxy — no manual certificate step).
+7. **Set `PUBLIC_APP_URL`** (used by the WhatsApp connector for QR/invoice links sent to real customers) to the real production domain — see §3 below. Never leave this as `localhost` or a LAN IP in production.
 
-**Process supervision — chosen architecture: whichever of these is native to the eventual host, in this priority order:**
-1. **Platform-native process supervision** (Railway/Fly.io's own restart policies) if using a PaaS — simplest, no extra config to maintain.
-2. **Docker with `restart: unless-stopped`** if deploying to a raw VM — a `Dockerfile` is NOT yet in this repo and should be added at deployment time (straightforward: `FROM node:22-slim`, `npm ci && npm run build`, `CMD ["npm", "start"]`, mount a volume or rely on the DB-backed session storage confirmed in `BACKUP_RECOVERY_RUNBOOK.md` §5 rather than local disk for anything that must survive a restart).
-3. **systemd** if deploying to a bare VPS without Docker — a unit file with `Restart=always`, `RestartSec=5` is the minimum viable config.
+## 2. Supabase (unchanged host, updated for the new frontend origin)
 
-None of these three is pre-built in this repo yet because the actual target platform is unknown — writing a Dockerfile speculatively for a platform that turns out to be wrong would be premature. **Once the hosting target is chosen, the specific config (Dockerfile, systemd unit, or platform config file) is a same-day addition, not a redesign.**
+Already provisioned and live (`gxkrtlvpjwxhcqdisyob`, `eu-central-1`, Postgres 17.6). This does not move — Supabase remains outside Cloudflare compute by design.
 
-**Required environment variables** (already documented in `whatsapp-connector/.env.example`, values must be set for the production host specifically — never copy the local dev `.env` file, which points at a LAN IP):
-- `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY` — same values as local dev (same Supabase project).
-- `WHATSAPP_SESSION_ENCRYPTION_KEY` — **must be the SAME value as local dev if the intent is to preserve the already-connected pilot club's WhatsApp session** (changing this key makes existing encrypted sessions in the database undecryptable, per `BACKUP_RECOVERY_RUNBOOK.md` §5). If starting fresh in production with a brand-new WhatsApp number, a new key may be generated instead.
-- `PUBLIC_APP_URL` — **must be the real production domain**, never a LAN IP or `localhost` (confirmed as a P0-adjacent requirement from the WhatsApp secure-links work).
-- `QUEUE_POLL_INTERVAL_MS`, `QUEUE_BATCH_SIZE`, `LOG_LEVEL` — existing defaults (5000ms, 10, info) are reasonable for a single-club pilot; no change needed at launch.
+Remaining actions:
+- **Upgrade off the `free` plan** before any real paid pilot — see `BACKUP_RECOVERY_RUNBOOK.md`. Do not claim "backup ready" while still on free. This is a billing action requiring the human operator; not self-purchased.
+- **Once a production domain exists**, update Supabase Auth → URL Configuration: Site URL and Redirect URLs must point at the real Cloudflare-hosted domain, not `localhost`. Password-reset and email-confirmation redirect links depend on this being correct — a stale `localhost` redirect here silently breaks production auth emails.
+- Migrations: `supabase/migrations/` remains the source of truth, applied via Supabase's own tooling. No change from prior state.
+- Transactional email provider for Auth email confirmation: still an unresolved external dependency (no SMTP/email provider credential configured). Blocks real self-service signup until connected in Supabase Auth settings. Documented here as an External Dependency per the governing directive — does not block the rest of Cloudflare deployment.
 
-**Health check:** the connector doesn't currently expose an HTTP health endpoint (it's a background worker, not a request handler) — for platform-native health checks (Fly.io, Railway), the simplest viable check is process-liveness only (is the Node process still running) rather than a deep health probe. A proper `/health` HTTP endpoint reporting WhatsApp connection status + queue lag is a Phase B (first-30-days) observability improvement, not a launch blocker, since `whatsapp_accounts.last_seen_at`/`status` in the database already gives an operator (via a future platform-owner WhatsApp health screen, also flagged as Phase B) a way to detect staleness without a dedicated endpoint.
+## 3. WhatsApp connector deployment (Cloudflare Container)
 
-**Secrets:** confirmed (repeatedly, throughout this remediation pass) that `.env` is git-ignored and never committed. The production host's own secrets-injection mechanism (Fly.io secrets, Railway variables, a mounted `.env` file with restricted permissions on a raw VM) should be used — never bake secrets into a committed Dockerfile or image layer.
+**Prerequisites (external, not yet provided):** a Cloudflare account with **Workers Paid** plan (required for Containers — no free tier), and a working local Docker installation to build the container image (`wrangler deploy` currently requires Docker locally; no remote-build path exists yet per Cloudflare's own current tooling). Docker was confirmed unavailable on the development machine used for this work (`docker build` failed to reach the daemon; user confirmed "Docker doesn't work for me") — this blocks the actual image build and live prototype validation, not the code/config, which is complete.
+
+**What's already built:**
+- `whatsapp-connector/Dockerfile` — multi-stage build, non-root `node` user, no `VOLUME` for the Baileys temp-auth directory (deliberate — Cloudflare Container disk is ephemeral by platform design; session state lives in Supabase, not local disk — see architecture doc §5).
+- `whatsapp-connector/src/HealthServer.ts` — the one inbound port (8080) this service opens: `/health`, `/ready`, `/status` (internal-token-gated). Required by Cloudflare Containers for readiness/liveness; harmless no-op on any other host.
+- `cloudflare/whatsapp-worker/` — Worker + `WhatsAppAccountObject` Durable Object orchestrating the container's lifecycle (start, idle-sleep, health polling). See architecture doc §4.
+
+**Steps once Docker and Cloudflare account access exist:**
+1. `cd cloudflare/whatsapp-worker && npm install`
+2. `npx wrangler login`
+3. Set secrets (never in `wrangler.jsonc`):
+   ```bash
+   npx wrangler secret put SUPABASE_SERVICE_ROLE_KEY
+   npx wrangler secret put WHATSAPP_SESSION_ENCRYPTION_KEY
+   npx wrangler secret put CONTAINER_INTERNAL_TOKEN
+   npx wrangler secret put MANAGEMENT_API_TOKEN
+   ```
+   `WHATSAPP_SESSION_ENCRYPTION_KEY` **must match the value already used in Postgres** for any club with an existing paired session — changing it makes existing encrypted sessions undecryptable (same rule as the prior VPS-era runbook, unchanged by the platform move).
+4. Update the non-secret `vars` in `cloudflare/whatsapp-worker/wrangler.jsonc` (`SUPABASE_URL`, `PUBLIC_APP_URL`) for the target environment.
+5. `npx wrangler deploy` — this is the step that requires local Docker to build the `whatsapp-connector` image; **not yet performed in this environment**.
+6. **Run the full validation checklist in `MAL3ABY_CLOUDFLARE_WHATSAPP_VALIDATION.md` §5 against the live deployment** before considering WhatsApp production-ready on Cloudflare — pairing, session restore, container replacement, queue recovery, multi-account isolation, at minimum.
+7. Trigger the first account start via `POST /manage/:clubId/start` (Bearer `MANAGEMENT_API_TOKEN`) and confirm via `/manage/:clubId/status`.
+
+**Health checks:** `/health` (liveness) and `/ready` (Supabase reachability) are real HTTP endpoints now, unlike the prior VPS-era runbook's "no health endpoint yet" state — Cloudflare Containers requires a port for readiness, which motivated finally building this.
+
+**Secrets:** confirmed `.env`/`.env.example` pattern unchanged and still git-ignored for local dev; production secrets live exclusively in Cloudflare's own secrets store via `wrangler secret put`, never in a committed file or baked into the Docker image.
 
 ## 4. Rollback
 
-**Frontend:** trivial — Cloudflare Pages/Vercel/Netlify all keep prior deploys and support one-click rollback to the previous build. No database coupling (the frontend is stateless), so a frontend rollback is always safe and instant.
+**Frontend:** `wrangler deployments list` / `wrangler rollback` — Cloudflare Workers keeps prior deployments and supports an explicit rollback command. Stateless, no DB coupling — always safe and near-instant.
 
-**Supabase migrations:** this repo has **no down-migrations** (consistent with its established pattern throughout — every fix in this remediation pass, and every fix before it, was a new forward migration, never an edit to an already-applied one). Rollback of a bad migration means writing a new **corrective forward migration** that undoes the specific change, not reverting history. This is slower than a true rollback but matches the project's own established discipline (see multiple `fix_*` migrations throughout `supabase/migrations/`) and avoids the far worse risk of editing already-applied migration history.
+**Supabase migrations:** unchanged — no down-migrations; roll back via a new corrective forward migration, per this project's established discipline (see `supabase/migrations/`).
 
-**WhatsApp connector:** redeploying a previous build/image version is safe as long as the database schema it expects hasn't changed underneath it (i.e., don't roll back the connector past a migration it depends on). Session state survives a connector rollback/restart since it's DB-backed, not process-local (§5 of the backup runbook).
+**WhatsApp Worker / Durable Object:** redeploy a previous `wrangler` version. **Durable Object class names must never be renamed carelessly once production state exists** — a rename changes the DO namespace identity and can orphan existing account lifecycle state. If a schema/binding change is ever needed, use `wrangler`'s migration tags (`new_sqlite_classes`, or `renamed_classes`/`deleted_classes` as appropriate) rather than an implicit rename.
 
-**Session recovery after any rollback:** per `BACKUP_RECOVERY_RUNBOOK.md` §5, the WhatsApp session rides along with the database — a connector redeploy/rollback does not require re-pairing WhatsApp as long as `WHATSAPP_SESSION_ENCRYPTION_KEY` stays the same across the rollback.
+**Container image:** version/tag container images explicitly (e.g. via the image reference in `wrangler.jsonc`'s `containers[]` block, or a registry tag if pushing pre-built images) so it is always known which version is running and rollback is a deploy of the previous tag, not a guess.
+
+**Session recovery after any rollback:** unchanged from the pre-Cloudflare architecture — session state lives in Supabase, not in the container/Worker, so any rollback/redeploy of the Worker, Durable Object, or Container does not require re-pairing WhatsApp as long as `WHATSAPP_SESSION_ENCRYPTION_KEY` stays constant.
 
 ---
 
-## Summary: What Is and Isn't Done
+## 5. Observability
+
+- **Workers Logs** (frontend Worker, whatsapp-worker) — enable via the Cloudflare dashboard or `wrangler.jsonc`'s `observability.enabled` once an account exists; not yet turned on (requires a live deployment to enable).
+- **Container logs** — accessible via `wrangler tail` against the deployed Worker, or the dashboard's Container logs view.
+- Never log: QR tokens, invoice tokens, JWTs, `SUPABASE_SERVICE_ROLE_KEY`, Baileys auth material, `WHATSAPP_SESSION_ENCRYPTION_KEY`, or message content — `HealthServer.ts`'s `/status` payload was specifically designed to exclude all of these (verified in validation doc §2.4).
+- Baseline alerts to configure once deployed (not yet configurable without a live account): container unhealthy for >N minutes, WhatsApp disconnected too long, `notification_queue` backlog growing, repeated send failures.
+
+## 6. Security headers & rate limiting (frontend)
+
+**Security headers: done, locally verified live.** `cloudflare/frontend-worker/src/index.ts` is a minimal Worker fetch handler wrapping `env.ASSETS.fetch()` that injects HSTS, `X-Content-Type-Options: nosniff`, `Referrer-Policy: strict-origin-when-cross-origin`, `X-Frame-Options: DENY`, `Permissions-Policy`, and a CSP scoped to `'self'` plus the real Supabase project origin (`connect-src`, including `wss://` for Supabase Realtime) on every response.
+
+A real bug was caught and fixed during this work: Cloudflare Workers Static Assets serves a matching static file **directly, bypassing the Worker script entirely**, unless `assets.run_worker_first: true` is set — confirmed via Cloudflare's own current documentation and reproduced locally (`wrangler dev` + `curl` showed headers present on the SPA-fallback route but silently absent on `/` and `/favicon.svg` before the fix). `run_worker_first: true` is now set in `wrangler.jsonc`, and a second live verification pass confirmed all six headers present on `/`, a real static asset, and a deep-link route alike.
+
+**Rate limiting: not yet applied.** Best configured via Cloudflare Rate Limiting Rules in the dashboard once a live domain exists, so real traffic patterns (not guesses) inform the threshold for public token-verification routes (`/qr/:token`, `/verify/:token`) — scoped tightly enough not to block real customers scanning a QR code in quick succession from the same network.
+
+## Summary: what is and isn't done
 
 | Item | Status |
 |---|---|
-| Frontend build verified clean and deployable | ✅ Done |
-| Frontend secrets hygiene verified | ✅ Done |
-| SPA-fallback routing requirement documented | ✅ Done (config itself added at deploy time, host-specific) |
-| WhatsApp connector architecture requirements documented | ✅ Done |
-| Process supervision approach chosen (contingent on host) | ✅ Done (decision framework, not yet a concrete Dockerfile/unit file) |
-| Required env vars documented | ✅ Done |
+| Frontend Cloudflare config (Workers Static Assets, SPA fallback) | ✅ Done, locally verified live |
+| WhatsApp connector Dockerfile + health endpoints | ✅ Done |
+| Worker + Durable Object orchestration code | ✅ Done, typechecked, dry-run validated |
+| Secrets architecture (two-tier internal tokens, `wrangler secret put`) | ✅ Done |
 | Rollback plan for all three components | ✅ Done |
-| Actual production domain | ❌ **PENDING EXTERNAL INPUT** |
-| Actual Cloudflare/hosting account for frontend | ❌ **PENDING EXTERNAL INPUT** |
-| Actual VM/PaaS account for WhatsApp connector | ❌ **PENDING EXTERNAL INPUT** |
-| Supabase plan upgrade (shared blocker with backups) | ❌ **PENDING EXTERNAL INPUT** |
-| Transactional email provider for Auth confirmation | ❌ **PENDING EXTERNAL INPUT** |
+| Live container build (Docker) | ❌ **BLOCKED — Docker unavailable in this environment** |
+| Live Baileys-in-Container networking proof | ❌ **BLOCKED — requires Docker or Cloudflare account access** |
+| Cloudflare account / `wrangler login` | ❌ **PENDING EXTERNAL INPUT** |
+| Production domain + DNS | ❌ **PENDING EXTERNAL INPUT** |
+| Supabase plan upgrade (backups) | ❌ **PENDING EXTERNAL INPUT** |
+| Transactional email provider for Auth | ❌ **PENDING EXTERNAL INPUT** |
+| Security headers (HSTS/CSP/X-Frame-Options/etc.) | ✅ Done, locally verified live on all route types |
+| Rate limiting / WAF rules | ❌ **NOT YET APPLIED** — best configured against a live domain |
 
-**This is the honest state of C5: everything preparable without a credential, domain, or payment has been prepared. The remaining gap is genuinely external.**
+**Honest state:** everything preparable without a Cloudflare account, a domain, or a working local Docker install has been built and locally validated. The remaining gaps are genuinely external or require live infrastructure that does not exist in this development environment.

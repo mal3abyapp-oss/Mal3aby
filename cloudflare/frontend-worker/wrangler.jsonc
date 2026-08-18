@@ -2,17 +2,22 @@
   "$schema": "node_modules/wrangler/config-schema.json",
   "name": "mala3by-frontend",
   "compatibility_date": "2026-08-18",
+  "compatibility_flags": ["nodejs_compat"],
 
   // Mal3aby's frontend is a pure client-side SPA (Vite + React Router,
-  // no server-side rendering, no Worker-side business logic of its own
-  // -- all real authorization is Supabase RLS/RPCs, confirmed
-  // throughout this project's own architecture). Workers Static Assets
-  // is the current Cloudflare-recommended approach for this shape of
-  // project (confirmed via current Cloudflare documentation research,
-  // Aug 2026: "Now that Workers supports serving static assets... you
-  // should start with Workers" for new projects) -- no separate Worker
-  // script/main entrypoint is needed since there is no dynamic
-  // request-time logic to run.
+  // no server-side rendering -- all real authorization is Supabase
+  // RLS/RPCs, confirmed throughout this project's own architecture).
+  // Workers Static Assets is the current Cloudflare-recommended
+  // approach for this shape of project (confirmed via current
+  // Cloudflare documentation research, Aug 2026: "Now that Workers
+  // supports serving static assets... you should start with Workers"
+  // for new projects).
+  //
+  // A minimal "main" Worker script IS used here -- not for any business
+  // logic, but purely to inject security headers (HSTS, CSP,
+  // X-Frame-Options, etc.) on every response, since static-assets-only
+  // config has no request-time hook to add headers from. See src/index.ts.
+  "main": "src/index.ts",
   "assets": {
     // Relative to this wrangler.jsonc -- the root frontend's own Vite
     // build output (../../dist, i.e. the existing `npm run build` at
@@ -25,7 +30,29 @@
     // client-side routing takes over -- this is what makes deep-link
     // reload (directive rule 42) work in production the same way Vite
     // dev server's own historyApiFallback already does locally.
-    "not_found_handling": "single-page-application"
+    "not_found_handling": "single-page-application",
+
+    "binding": "ASSETS",
+
+    // CRITICAL: Cloudflare's default routing serves a request directly
+    // from static assets WITHOUT invoking the Worker script at all when
+    // the path matches a real file (confirmed via current Cloudflare
+    // documentation, and by a real local repro in this repo's own
+    // history -- an earlier version of this config omitted
+    // run_worker_first and security headers were silently absent on
+    // every static-asset response and on "/", verified via `wrangler
+    // dev` + curl, then fixed here). run_worker_first: true forces
+    // EVERY request through src/index.ts's fetch handler first, so
+    // header injection applies universally, not just to SPA-fallback
+    // routes.
+    "run_worker_first": true
+  },
+
+  // Non-secret config the Worker script reads to build its CSP
+  // connect-src/frame-ancestors rules against the real Supabase project
+  // origin, without hardcoding it in source.
+  "vars": {
+    "SUPABASE_URL": "https://gxkrtlvpjwxhcqdisyob.supabase.co"
   }
 
   // Custom domain: bound via the Cloudflare dashboard (Workers &
@@ -34,4 +61,10 @@
   // domain exists -- see MAL3ABY_CLOUDFLARE_PRODUCTION_ARCHITECTURE.md
   // for the exact steps and why this repo does not invent a domain
   // name (directive rule 39).
+  //
+  // Rate limiting for public token-verification routes (/qr/:token,
+  // /verify/:token): best configured via Cloudflare Rate Limiting Rules
+  // in the dashboard once a live domain exists, so real traffic
+  // patterns (not guesses) inform the threshold -- see
+  // MAL3ABY_DEPLOYMENT_RUNBOOK.md section 6.
 }
