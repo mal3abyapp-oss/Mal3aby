@@ -56,23 +56,31 @@
       // GitHub-hosted runner (real Docker, no local dependency), since
       // the local dev machine has no working Docker daemon.
       //
-      // v5-keepalive: adds the /keepalive WebSocket endpoint
-      // (HealthServer.ts) -- the ROOT CAUSE FIX for the ~3-minute
-      // Durable Object eviction cycle. Proven necessary and sufficient
-      // by a controlled A/B test (see
-      // MAL3ABY_CLOUDFLARE_DEPLOYMENT_STATE.md): the last-known-stable
-      // pre-QR/PDF commit (1eef03a) and current HEAD both showed the
-      // IDENTICAL eviction cycle side-by-side, ruling out a QR/PDF
-      // regression and confirming Cloudflare's own documented behavior
-      // (plain fetch() health polls never keep a Durable Object alive;
-      // only an active outbound WebSocket/TCP connection does) as the
-      // real cause. WhatsAppAccountObject.ts's ensureKeepalive() now
-      // holds one such connection open per club while (and only while)
-      // there is a genuine reason to stay awake.
+      // v6-activity-expired: removes the whatsapp-connector's now-dead
+      // /keepalive WebSocket endpoint (HealthServer.ts). The TRUE ROOT
+      // CAUSE FIX for the ~3-minute Durable Object eviction cycle lives
+      // entirely on the Worker/DO side (WhatsAppAccountObject.ts's new
+      // onActivityExpired() override, enabled by upgrading
+      // @cloudflare/containers 0.0.13 -> 0.3.7) and needs no connector
+      // image change to function -- v5-keepalive's WebSocket approach
+      // was live-tested via wrangler tail and PROVEN not to prevent the
+      // next eviction (keepalive_opened at 12:54:41Z, another
+      // exitCode=0/reason=exit restart at 12:57:44Z regardless). That
+      // contradiction of Cloudflare's own docs is what led to checking
+      // the installed package version against latest and finding it was
+      // 46 versions behind, missing onActivityExpired() entirely -- the
+      // documented, correct override point. This image bump removes the
+      // now-unused server-side /keepalive code as cleanup, not as part
+      // of the fix itself. See WhatsAppAccountObject.ts's class-level
+      // doc comment and MAL3ABY_CLOUDFLARE_DEPLOYMENT_STATE.md for the
+      // full investigation history.
       // Traceable to: git commit PENDING (to be filled in after the
-      // commit lands), GitHub Actions run PENDING, tag v5-keepalive,
-      // digest PENDING -- fill in immediately after the build completes.
-      // (Prior: v4-diag, commit 30c0b72, run 32132856564, digest
+      // commit lands), GitHub Actions run PENDING, tag
+      // v6-activity-expired, digest PENDING -- fill in immediately
+      // after the build completes.
+      // (Prior: v5-keepalive, commit 514758f, run 32138309680, digest
+      // sha256:fe6f2f897b37200ee8e10b3d1614bc85875f2bf8f312ea64ca13cb05c4008ec6.
+      // v4-diag, commit 30c0b72, run 32132856564, digest
       // sha256:41368361a181225433c87ae9d9e4568b32dd6d05d27108ac18626bba6717a157.
       // v3-timeout-fix, commit e359404, run 32131143382, digest
       // sha256:5a562395ea5696647fb81eb7a09aaffe505317f9af50bfe6ae1daf238bea1cf8.
@@ -85,7 +93,7 @@
       // match -- never silently reuse the same tag for different code
       // (the digest above is the actual content-addressed proof of
       // what's running, keep it in sync with the tag).
-      "image": "registry.cloudflare.com/35ac10727701095866b16c276b4a33d1/mala3by-whatsapp-connector:v4-diag",
+      "image": "registry.cloudflare.com/35ac10727701095866b16c276b4a33d1/mala3by-whatsapp-connector:v5-keepalive",
       // One container instance per WhatsApp account (one Durable
       // Object = one container, directive rule 21's chosen model --
       // NOT a shared container serving multiple clubs, which would

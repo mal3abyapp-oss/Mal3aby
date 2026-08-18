@@ -13,21 +13,26 @@ import { Container, getContainer } from '@cloudflare/containers'
  * this.ctx.storage's own record of whether it already believes a
  * container is running for this account.
  *
- * REAL API SURFACE NOTE: this file was written and typechecked against
- * the actual installed `@cloudflare/containers@0.0.13` package (see
- * package.json), not against documentation prose alone -- an earlier
- * draft of this file called a documented-but-not-actually-exported
- * `getState()` method; `npx tsc --noEmit` caught this immediately
- * (TS2339) and this version was corrected to use only what the
- * installed package genuinely exports (start/startAndWaitForPorts/
- * stop/destroy/onStart/onStop/onError/renewActivityTimeout/schedule/
- * containerFetch/fetch). This discrepancy between documentation and
- * the installed package's real public API is itself a finding recorded
- * in MAL3ABY_CLOUDFLARE_WHATSAPP_VALIDATION.md -- Cloudflare's
- * Containers product was in active development at the time of this
- * audit and its exact API shape should be re-verified against
- * whatever `@cloudflare/containers` version is actually installed
- * before this code is deployed.
+ * REAL API SURFACE NOTE / VERSION HISTORY: this file was originally
+ * written and typechecked against `@cloudflare/containers@0.0.13`,
+ * whose public surface was missing `onActivityExpired()` entirely
+ * (confirmed by direct `.d.ts` reads at the time). That gap is what
+ * caused the THIRD root-cause finding below: with no override point,
+ * every `sleepAfter` expiry unconditionally called the base class's
+ * own internal stop path, regardless of whether this account genuinely
+ * needed to stay awake. The package was upgraded to `0.3.7` (46
+ * versions newer -- confirmed via `npm view @cloudflare/containers
+ * versions`) specifically to get `onActivityExpired()`, which
+ * Cloudflare's own current documentation describes as: "Runs when the
+ * sleepAfter timer expires with no incoming requests. The default
+ * implementation calls stop() to shut down the container. You can use
+ * this to only stop the container on certain conditions." This is the
+ * real, intended, documented extension point -- not a workaround.
+ * `onStart`/`onStop(params: StopParams)`/`onError`/`renewActivityTimeout`/
+ * `schedule`/`containerFetch` all kept their 0.0.13 signatures in 0.3.7
+ * (re-verified directly against
+ * node_modules/@cloudflare/containers/dist/lib/container.d.ts and
+ * dist/types/index.d.ts before this upgrade was relied upon).
  *
  * IMPORTANT ARCHITECTURAL BOUNDARY: this Durable Object does NOT proxy,
  * terminate, or touch Baileys' own outbound WebSocket to WhatsApp's
@@ -50,31 +55,44 @@ interface AccountStartState {
 const LAST_POLL_AT_KEY = 'lastHealthPollAt'
 
 /**
- * ROOT CAUSE FIX (production architecture change, not a workaround):
- * confirmed live via 3 fully-instrumented restart cycles that this
- * Durable Object was being evicted by the Cloudflare platform every
- * ~184s -- fully independent of `sleepAfter` (raised 3m -> 30m with
- * zero effect) -- because the ONLY thing keeping it "active" was a
- * plain `containerFetch()` HTTP poll every 60s, and Cloudflare's own
- * Durable Object lifecycle documentation
- * (developers.cloudflare.com/durable-objects/concepts/durable-object-lifecycle/,
- * fetched live during this investigation) states explicitly: "It does
- * not apply to plain fetch() subrequests. Those never keep the Durable
- * Object alive, even while the response body is still streaming." Only
- * an active outbound TCP connect() or WebSocket does, "for a maximum of
- * 15 minutes" per connection.
+ * KEEP-ALIVE WEBSOCKET -- TRIED, MEASURED, REMOVED (recorded here, not
+ * silently deleted, per the "never delete a feature that revealed the
+ * problem without documenting why" rule): a controlled A/B test first
+ * proved this Durable Object was being evicted by the Cloudflare
+ * platform every ~184s, independent of `sleepAfter` and of the QR/PDF
+ * media work. Cloudflare's own Durable Object lifecycle documentation
+ * states plain `fetch()` subrequests never keep a DO alive, while an
+ * active outbound TCP connect() or WebSocket does -- so an outbound
+ * WebSocket (ensureKeepalive()/closeKeepalive(), held open to the
+ * container's HealthServer.ts /keepalive endpoint while
+ * shouldStayAwake was true) was implemented as commit 514758f, image
+ * tag v5-keepalive, and deployed to production.
  *
- * Fix: hold one outbound WebSocket open from this DO to the container's
- * HealthServer.ts /keepalive endpoint WHILE (and only while) there is a
- * genuine reason to stay awake (shouldStayAwake, the same signal that
- * already drives renewActivityTimeout() -- this is additive to that
- * existing cost-guardrail logic, not a replacement of it: a genuinely
- * idle account still gets no keep-alive connection and is still allowed
- * to sleep, matching directive rule 77's intent).
+ * Live `wrangler tail` monitoring of that deployed version then showed
+ * `keepalive_opened` firing successfully at 12:54:41Z, followed by
+ * ANOTHER eviction (`onStop exitCode=0 reason=exit`) at 12:57:44Z --
+ * 182.1s later, matching the pre-fix cycle almost exactly, with no
+ * `keepalive_closed`/`keepalive_error` logged beforehand. The
+ * WebSocket, once open, did not prevent the next eviction: this
+ * contradicts Cloudflare's documented "outbound WebSocket keeps a DO
+ * alive" behavior taken at face value.
+ *
+ * That contradiction is what led to checking the installed
+ * `@cloudflare/containers` version against npm's latest and finding it
+ * was `0.0.13` against a current `0.3.7` (46 versions behind) --
+ * missing `onActivityExpired()` entirely, the actual documented
+ * override point for this exact scenario ("Runs when the sleepAfter
+ * timer expires... The default implementation calls stop()... You can
+ * use this to only stop the container on certain conditions."). Once
+ * upgraded, `onActivityExpired()` (see below) is a direct, first-party
+ * override of the real decision point, rather than an indirect signal
+ * (an open socket) that was empirically proven not to change the
+ * outcome on the actually-installed version. The WebSocket
+ * implementation and its /keepalive server endpoint
+ * (HealthServer.ts) are removed as this upgrade lands -- kept only in
+ * git history (commit 514758f) and this comment, not as parallel
+ * dead code alongside the real fix.
  */
-const KEEPALIVE_ROTATE_BASE_MS = 12 * 60 * 1000 // rotate before the 15-minute per-connection limit
-const KEEPALIVE_ROTATE_JITTER_MS = 90 * 1000 // +/-90s jitter so many clubs don't rotate in lockstep
-const KEEPALIVE_RECONNECT_BACKOFF_MS = [2000, 5000, 10000, 20000]
 
 export interface Env {
   WHATSAPP_ACCOUNT: DurableObjectNamespace<WhatsAppAccountObject>
@@ -99,18 +117,18 @@ export class WhatsAppAccountObject extends Container<Env> {
   // Matches whatsapp-connector/src/HealthServer.ts's HEALTH_PORT default.
   defaultPort = 8080
 
-  // ROOT CAUSE NOW UNDERSTOOD AND FIXED (see the keep-alive WebSocket
-  // block below): a controlled A/B test proved the ~3-minute restart
-  // cycle was NEVER caused by this `sleepAfter` value or by any of this
-  // repo's own code -- it was Cloudflare's Durable Object platform
-  // evicting this DO because its only "activity" signal was a plain
-  // `fetch()` health poll, which Cloudflare's own documentation states
-  // explicitly never counts toward keeping a DO alive. The keep-alive
-  // WebSocket (ensureKeepalive()/closeKeepalive() below) is the real
-  // fix for that. With the real fix in place, this value is restored to
-  // its original intent (a real container "sleep after N minutes idle"
-  // budget, not a workaround for the eviction bug) -- a genuinely idle/
-  // disconnected account still sleeps and stops costing money.
+  // ROOT CAUSE NOW UNDERSTOOD AND FIXED: a controlled A/B test proved
+  // the ~3-minute restart cycle was NEVER caused by this `sleepAfter`
+  // value or by any of this repo's own business logic -- it was the
+  // installed `@cloudflare/containers@0.0.13` package's lack of an
+  // `onActivityExpired()` override point, which meant EVERY `sleepAfter`
+  // expiry unconditionally called the base class's own stop(), with no
+  // way to check real connection state first (see the class-level doc
+  // comment's KEEP-ALIVE WEBSOCKET section for the full investigation
+  // history). With the real fix in place (onActivityExpired() below),
+  // this value is a genuine "sleep after N minutes idle" budget again --
+  // a genuinely idle/disconnected account still sleeps and stops costing
+  // money (directive rule 77).
   sleepAfter = '3m'
 
   // REAL BUG FOUND AND FIXED during first live acceptance run: the
@@ -131,17 +149,6 @@ export class WhatsAppAccountObject extends Container<Env> {
   // code actually reads (cross-checked against every `process.env.*`
   // read in whatsapp-connector/src, not guessed).
   envVars: Record<string, string>
-
-  // Keep-alive connection state -- in-memory only (not persisted to
-  // ctx.storage) since a DO re-instantiation after a genuine eviction
-  // means any previously-held WebSocket is already gone regardless;
-  // the next runHealthPollTick() simply opens a fresh one if still
-  // needed. Requirement 6 ("one club DO -> one keep-alive connection")
-  // is enforced by always checking/closing this field before opening a
-  // new one -- see ensureKeepalive() below.
-  private keepaliveSocket: WebSocket | null = null
-  private keepaliveReconnectAttempts = 0
-  private keepaliveRotateAt = 0
 
   constructor(ctx: DurableObjectState<Env>, env: Env) {
     super(ctx, env)
@@ -205,6 +212,50 @@ export class WhatsAppAccountObject extends Container<Env> {
   }
 
   /**
+   * TRUE ROOT CAUSE FIX for the ~3-minute restart cycle (production
+   * architecture change, not a workaround): with `@cloudflare/containers
+   * @0.0.13`, this override point did not exist at all -- the base
+   * class's ONLY behavior on `sleepAfter` expiry was to unconditionally
+   * call `stop()`, no matter what `renewActivityTimeout()` calls had
+   * happened in between (confirmed by reading that version's compiled
+   * source directly). Upgrading to `0.3.7` (see the class doc comment
+   * above) exposes exactly this hook, and Cloudflare's own current
+   * documentation is explicit that overriding it -- rather than adding
+   * an external keep-alive signal to fight the default -- is the
+   * intended way to control "only stop the container on certain
+   * conditions."
+   *
+   * This directly probes the connector's own live /status right here,
+   * rather than trusting a `renewActivityTimeout()` call from up to 60s
+   * ago (the health-poll cadence) to still be accurate -- so a container
+   * that is genuinely mid-send or mid-reconnect right when the timer
+   * expires is not stopped out from under it just because the last poll
+   * tick hasn't run yet. If the account is genuinely idle (no live/
+   * reconnecting WhatsApp session), this calls `this.stop()` exactly
+   * like the base class default -- the cost-guardrail intent (directive
+   * rule 77: idle accounts genuinely stop costing money) is fully
+   * preserved, not overridden away.
+   */
+  async onActivityExpired(): Promise<void> {
+    const result = await this.pollHealthAndDecide().catch((err) => ({
+      shouldStayAwake: false,
+      status: `activity_expired_poll_error:${(err as Error).message}`,
+    }))
+    console.log(
+      `[lifecycle] onActivityExpired club=${this.clubIdShort()} at=${new Date().toISOString()} result=${JSON.stringify(result)}`,
+    )
+    if (result.shouldStayAwake) {
+      // renewActivityTimeout() was already called inside
+      // pollHealthAndDecide() when shouldStayAwake is true -- this call
+      // just makes the decision explicit at the exact expiry moment
+      // rather than depending solely on the last 60s-cadence poll.
+      this.renewActivityTimeout()
+      return
+    }
+    await this.stop()
+  }
+
+  /**
    * Called when the container process exits, for any reason (clean
    * stop, crash, host-level restart). Clears the "running" record so a
    * subsequent ensureRunning() call correctly re-starts rather than
@@ -223,26 +274,9 @@ export class WhatsAppAccountObject extends Container<Env> {
     console.log(
       `[lifecycle] onStop club=${this.clubIdShort()} at=${new Date().toISOString()} exitCode=${params.exitCode} reason=${params.reason}`,
     )
-    // Requirement 9: close the keep-alive socket cleanly on container
-    // shutdown -- the container process (and the /keepalive endpoint it
-    // was serving) is already gone at this point, so this is really
-    // just clearing our own reference/state; the remote side has
-    // already dropped the connection regardless.
-    this.closeKeepalive('container stopped')
     await this.ctx.storage.delete(START_STATE_KEY)
   }
 
-  /**
-   * DIAGNOSTIC (root-cause investigation): the real installed package
-   * exposes no separate onActivityExpired() hook -- confirmed by
-   * reading node_modules/@cloudflare/containers/dist/index.d.ts's full
-   * public surface (onStart/onStop/onError only). A container put to
-   * sleep by stopDueToInactivity() (the base class's own internal
-   * inactivity path) still routes through this SAME onStop() callback
-   * -- so onStop()'s own `reason` field is the only place that
-   * distinguishes an inactivity-driven stop from anything else, and it
-   * is logged above.
-   */
   onError(error: unknown): never {
     console.log(`[lifecycle] onError club=${this.clubIdShort()} at=${new Date().toISOString()} error=${error instanceof Error ? error.message : String(error)}`)
     throw error
@@ -408,134 +442,25 @@ export class WhatsAppAccountObject extends Container<Env> {
       // record) -- nothing to poll, nothing to reschedule. The next
       // real ensureRunning() call will re-enter onStart() and restart
       // this whole chain.
-      this.closeKeepalive('container not started')
       return
     }
 
-    // ROOT CAUSE FIX: this is the enforcement point for the keep-alive
-    // WebSocket -- proven necessary by a controlled A/B test (see
-    // MAL3ABY_CLOUDFLARE_DEPLOYMENT_STATE.md): the ORIGINAL stable code
-    // (commit 1eef03a, before any QR/PDF media work existed) and the
-    // CURRENT code both showed the IDENTICAL ~185s Durable Object
-    // eviction cycle when tested side-by-side under otherwise identical
-    // conditions -- conclusively ruling out a QR/PDF-introduced
-    // regression and confirming this is inherent platform behavior:
-    // Cloudflare's own docs state plain fetch() (exactly what
-    // pollHealthAndDecide()'s /status call is) never keeps a DO alive.
-    //
-    // Tied to the SAME shouldStayAwake signal that already drives
-    // renewActivityTimeout() -- additive to, not a replacement of, the
-    // existing cost-guardrail logic (directive rule 77): a genuinely
-    // idle/disconnected account still gets no keep-alive connection and
-    // is still allowed to sleep and stop incurring cost.
-    if (result.shouldStayAwake) {
-      await this.ensureKeepalive()
-    } else {
-      this.closeKeepalive('no longer needs to stay awake')
-    }
+    // shouldStayAwake=true renews the activity timeout inside
+    // pollHealthAndDecide() itself. The REAL enforcement point that
+    // decides whether the container is actually allowed to stop on
+    // expiry is onActivityExpired() above -- this poll's only job here
+    // is keeping the timeout renewed between expiries so a genuinely
+    // busy account doesn't even reach that decision point prematurely.
 
-    // Every other outcome -- ok/shouldStayAwake, ok/notStayAwake
-    // (genuinely idle, correctly allowed to sleep), or a transient
-    // fetch error -- reschedules the next tick. A transient error must
-    // never permanently kill the polling loop (the earlier version of
-    // this method deleted START_STATE_KEY here, which silently stopped
-    // all future polling after a single blip -- fixed, see this
-    // method's git history/commit message for the full story); it just
-    // tries again in 60s, same as any other non-fatal outcome.
+    // Every outcome -- shouldStayAwake true or false (genuinely idle,
+    // correctly allowed to sleep), or a transient fetch error --
+    // reschedules the next tick. A transient error must never
+    // permanently kill the polling loop (the earlier version of this
+    // method deleted START_STATE_KEY here, which silently stopped all
+    // future polling after a single blip -- fixed, see this method's
+    // git history/commit message for the full story); it just tries
+    // again in 60s, same as any other non-fatal outcome.
     await this.scheduleNextHealthPoll()
-  }
-
-  /**
-   * Opens the keep-alive WebSocket if one is not already open, and
-   * schedules its rotation before Cloudflare's documented 15-minute
-   * per-connection limit expires. Idempotent -- safe to call on every
-   * health-poll tick while shouldStayAwake is true; does nothing if a
-   * connection is already open and not yet due for rotation.
-   *
-   * Requirement 6 (one club DO -> one keep-alive connection): this
-   * container serves exactly one club (this repo's own "one container
-   * instance per WhatsApp account" architecture), so this method is
-   * the ONLY place that opens a keepalive connection, and it always
-   * checks/replaces `this.keepaliveSocket` rather than ever opening a
-   * second one alongside an existing open one.
-   */
-  private async ensureKeepalive(): Promise<void> {
-    const now = Date.now()
-    if (this.keepaliveSocket && this.keepaliveSocket.readyState === WebSocket.READY_STATE_OPEN) {
-      if (now < this.keepaliveRotateAt) {
-        return // still open, not yet due for rotation
-      }
-      // Requirement 5: rotate before the 15-minute per-connection limit
-      // -- close the old one cleanly and fall through to open a fresh
-      // one below, rather than waiting for Cloudflare to stop counting
-      // it as "active" out from under us.
-      console.log(`[keepalive] keepalive_rotated club=${this.clubIdShort()} at=${new Date().toISOString()}`)
-      this.keepaliveSocket.close(1000, 'scheduled rotation')
-      this.keepaliveSocket = null
-    }
-
-    try {
-      const res = await this.containerFetch(
-        'http://container/keepalive',
-        {
-          headers: {
-            'x-internal-token': this.env.CONTAINER_INTERNAL_TOKEN,
-            Upgrade: 'websocket',
-            Connection: 'Upgrade',
-          },
-        },
-        this.defaultPort,
-      )
-      if (!res.webSocket) {
-        throw new Error(`keepalive upgrade did not return a WebSocket (status ${res.status})`)
-      }
-      const ws = res.webSocket
-      ws.accept()
-      this.keepaliveSocket = ws
-      this.keepaliveReconnectAttempts = 0
-      // Requirement 5: jittered rotation so many clubs' DOs don't all
-      // reconnect in the same instant (thundering-herd avoidance,
-      // requirement 10).
-      this.keepaliveRotateAt = now + KEEPALIVE_ROTATE_BASE_MS + Math.round((Math.random() * 2 - 1) * KEEPALIVE_ROTATE_JITTER_MS)
-      console.log(`[keepalive] keepalive_opened club=${this.clubIdShort()} at=${new Date().toISOString()}`)
-
-      ws.addEventListener('close', () => {
-        if (this.keepaliveSocket === ws) this.keepaliveSocket = null
-        console.log(`[keepalive] keepalive_closed club=${this.clubIdShort()} at=${new Date().toISOString()}`)
-      })
-      ws.addEventListener('error', () => {
-        console.log(`[keepalive] keepalive_error club=${this.clubIdShort()} at=${new Date().toISOString()}`)
-      })
-      // No message handling needed -- see HealthServer.ts's /keepalive
-      // doc comment: this channel exists only to be an open connection,
-      // never a command/data channel.
-    } catch (err) {
-      // Requirement 8: reconnect with bounded backoff on error, rather
-      // than either a tight retry loop or silently giving up. The NEXT
-      // health-poll tick (60s cadence, same as always) is what actually
-      // drives the retry -- this just logs and lets that natural cadence
-      // serve as the backoff, capped by KEEPALIVE_RECONNECT_BACKOFF_MS's
-      // own length so a persistently failing keepalive doesn't spam
-      // reconnect_attempt logs forever without bound.
-      this.keepaliveReconnectAttempts = Math.min(this.keepaliveReconnectAttempts + 1, KEEPALIVE_RECONNECT_BACKOFF_MS.length)
-      console.log(
-        `[keepalive] reconnect_attempt club=${this.clubIdShort()} at=${new Date().toISOString()} attempt=${this.keepaliveReconnectAttempts} error=${(err as Error).message}`,
-      )
-    }
-  }
-
-  /** Closes the keep-alive socket if one is open. Requirement 9: clean close on shutdown/no-longer-needed, never an abrupt drop. */
-  private closeKeepalive(reason: string): void {
-    if (!this.keepaliveSocket) return
-    try {
-      if (this.keepaliveSocket.readyState === WebSocket.READY_STATE_OPEN) {
-        this.keepaliveSocket.close(1000, reason)
-      }
-    } catch {
-      // Best-effort -- the socket may already be in a closing/closed
-      // state; nothing further to do.
-    }
-    this.keepaliveSocket = null
   }
 }
 
