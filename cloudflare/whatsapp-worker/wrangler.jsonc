@@ -56,28 +56,38 @@
       // GitHub-hosted runner (real Docker, no local dependency), since
       // the local dev machine has no working Docker daemon.
       //
-      // v6-activity-expired: removes the whatsapp-connector's now-dead
-      // /keepalive WebSocket endpoint (HealthServer.ts). The TRUE ROOT
-      // CAUSE FIX for the ~3-minute Durable Object eviction cycle lives
-      // entirely on the Worker/DO side (WhatsAppAccountObject.ts's new
-      // onActivityExpired() override, enabled by upgrading
-      // @cloudflare/containers 0.0.13 -> 0.3.7) and needs no connector
-      // image change to function -- v5-keepalive's WebSocket approach
-      // was live-tested via wrangler tail and PROVEN not to prevent the
-      // next eviction (keepalive_opened at 12:54:41Z, another
-      // exitCode=0/reason=exit restart at 12:57:44Z regardless). That
-      // contradiction of Cloudflare's own docs is what led to checking
-      // the installed package version against latest and finding it was
-      // 46 versions behind, missing onActivityExpired() entirely -- the
-      // documented, correct override point. This image bump removes the
-      // now-unused server-side /keepalive code as cleanup, not as part
-      // of the fix itself. See WhatsAppAccountObject.ts's class-level
-      // doc comment and MAL3ABY_CLOUDFLARE_DEPLOYMENT_STATE.md for the
-      // full investigation history.
-      // Traceable to: git commit a111794, GitHub Actions run
-      // 32142070765, tag v6-activity-expired, digest
-      // sha256:de839fc9fe9f9a986db0ab89ec5b21f5d2833f46e1aafe327432ba2b71210cd2.
-      // (Prior: v5-keepalive, commit 514758f, run 32138309680, digest
+      // v8-jid-fix-real: TRUE ROOT CAUSE FIX for the WhatsApp send-hang
+      // investigation. BaileysProvider.sendMessage() never normalized
+      // its phone-number argument before building the WhatsApp JID
+      // (`${phone}@s.whatsapp.net`) -- every real caller sources the
+      // phone from notification_queue.recipient_phone /
+      // customers.normalized_mobile, both of which store the E.164
+      // "+"-prefixed form verbatim. A JID with a literal "+" baked in
+      // is one WhatsApp's servers never send Baileys a usable response
+      // for, so Baileys' own internal query() waited out its full ~60s
+      // defaultQueryTimeoutMs ceiling on every queue-driven send.
+      // Proven via a decisive, controlled A/B test on the SAME
+      // connection/socket generation: send("971502061209") resolved in
+      // 240ms; send("+971502061209") took 59,999ms and failed with
+      // Baileys' own "Timed Out" error. Fix: BaileysProvider.ts now
+      // exports toWhatsAppJid(), which strips all non-digit characters
+      // before building the JID -- see its own doc comment and
+      // sendMessage()'s class-level doc comment for the full
+      // investigation trail (every other hypothesis tried --
+      // USync-timeout-race, executeInitQueries collision, zombie
+      // socket, queue/DB-layer delay, sequential-batch compounding --
+      // was individually tested and ruled out first). An earlier image
+      // built as "v8-jid-fix" (run 32163697016) was built from the
+      // PRE-fix commit ac0ee03 due to a temporary git push permission
+      // gap -- NOT deployed, recorded here so that tag is never
+      // reused/trusted.
+      // (Prior: v6-activity-expired, commit a111794, run 32142070765,
+      // digest sha256:de839fc9fe9f9a986db0ab89ec5b21f5d2833f46e1aafe327432ba2b71210cd2 --
+      // TRUE ROOT CAUSE FIX for the ~3-minute Durable Object eviction
+      // cycle, entirely on the Worker/DO side
+      // (WhatsAppAccountObject.ts's onActivityExpired() override,
+      // @cloudflare/containers 0.0.13 -> 0.3.7).
+      // v5-keepalive, commit 514758f, run 32138309680, digest
       // sha256:fe6f2f897b37200ee8e10b3d1614bc85875f2bf8f312ea64ca13cb05c4008ec6.
       // v4-diag, commit 30c0b72, run 32132856564, digest
       // sha256:41368361a181225433c87ae9d9e4568b32dd6d05d27108ac18626bba6717a157.
@@ -87,12 +97,15 @@
       // sha256:a080242072d44d176db628c2580d278d5091302fe5df4415f15d109598c24b2c.
       // v1, commit 17c64406fee997bf7e626a1f30c1c6b30f4255ea, run
       // 32111047189, digest sha256:6a229c291d2580fc235d9fecd0f7d1d9eda6f9a14d00d80a1b12f2b4863ec08c.)
+      // Traceable to: git commit 82aedbf, GitHub Actions run
+      // 32172921915, tag v8-jid-fix-real, digest
+      // sha256:6fbf385358dbc4ca9c515deb16ccc2db6a7a97a3d125f078b656d8f6063037b0.
       // To ship a new connector version: bump the tag in a new
       // workflow_dispatch run, then update this image reference to
       // match -- never silently reuse the same tag for different code
       // (the digest above is the actual content-addressed proof of
       // what's running, keep it in sync with the tag).
-      "image": "registry.cloudflare.com/35ac10727701095866b16c276b4a33d1/mala3by-whatsapp-connector:v6-activity-expired",
+      "image": "registry.cloudflare.com/35ac10727701095866b16c276b4a33d1/mala3by-whatsapp-connector:v8-jid-fix-real",
       // One container instance per WhatsApp account (one Durable
       // Object = one container, directive rule 21's chosen model --
       // NOT a shared container serving multiple clubs, which would
