@@ -74,10 +74,9 @@
       // of the fix itself. See WhatsAppAccountObject.ts's class-level
       // doc comment and MAL3ABY_CLOUDFLARE_DEPLOYMENT_STATE.md for the
       // full investigation history.
-      // Traceable to: git commit PENDING (to be filled in after the
-      // commit lands), GitHub Actions run PENDING, tag
-      // v6-activity-expired, digest PENDING -- fill in immediately
-      // after the build completes.
+      // Traceable to: git commit a111794, GitHub Actions run
+      // 32142070765, tag v6-activity-expired, digest
+      // sha256:de839fc9fe9f9a986db0ab89ec5b21f5d2833f46e1aafe327432ba2b71210cd2.
       // (Prior: v5-keepalive, commit 514758f, run 32138309680, digest
       // sha256:fe6f2f897b37200ee8e10b3d1614bc85875f2bf8f312ea64ca13cb05c4008ec6.
       // v4-diag, commit 30c0b72, run 32132856564, digest
@@ -93,7 +92,7 @@
       // match -- never silently reuse the same tag for different code
       // (the digest above is the actual content-addressed proof of
       // what's running, keep it in sync with the tag).
-      "image": "registry.cloudflare.com/35ac10727701095866b16c276b4a33d1/mala3by-whatsapp-connector:v5-keepalive",
+      "image": "registry.cloudflare.com/35ac10727701095866b16c276b4a33d1/mala3by-whatsapp-connector:v6-activity-expired",
       // One container instance per WhatsApp account (one Durable
       // Object = one container, directive rule 21's chosen model --
       // NOT a shared container serving multiple clubs, which would
