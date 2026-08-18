@@ -1,0 +1,60 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "mala3by-whatsapp-worker",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-08-18",
+  "compatibility_flags": ["nodejs_compat"],
+
+  // NO Secrets defined here as plaintext -- SUPABASE_SERVICE_ROLE_KEY,
+  // WHATSAPP_SESSION_ENCRYPTION_KEY, CONTAINER_INTERNAL_TOKEN, and
+  // MANAGEMENT_API_TOKEN are all set via `wrangler secret put <NAME>`
+  // (or the Cloudflare dashboard's Worker Settings -> Variables and
+  // Secrets, marked "Encrypt"), never in this file, never in git.
+  // See MAL3ABY_CLOUDFLARE_PRODUCTION_ARCHITECTURE.md's Secrets section
+  // for the exact `wrangler secret put` commands to run once account
+  // access exists.
+  "vars": {
+    // Non-secret, safe to keep in version control. Actual production
+    // domain filled in once it exists -- see directive rule 39, this
+    // repo intentionally does not invent a domain name.
+    "SUPABASE_URL": "https://gxkrtlvpjwxhcqdisyob.supabase.co",
+    "PUBLIC_APP_URL": "https://REPLACE-WITH-PRODUCTION-DOMAIN"
+  },
+
+  "durable_objects": {
+    "bindings": [
+      {
+        "name": "WHATSAPP_ACCOUNT",
+        "class_name": "WhatsAppAccountObject"
+      }
+    ]
+  },
+
+  // Durable Object migrations are append-only and version-tagged --
+  // per directive rule 72, class names/IDs must never be renamed after
+  // a production migration has shipped. v1 is the first (and, as of
+  // this architecture doc, only) migration.
+  "migrations": [
+    {
+      "tag": "v1",
+      "new_sqlite_classes": ["WhatsAppAccountObject"]
+    }
+  ],
+
+  "containers": [
+    {
+      "class_name": "WhatsAppAccountObject",
+      // Relative to this wrangler.jsonc -- the connector's own
+      // Dockerfile, containerizing the existing whatsapp-connector
+      // source with no rewrite (see ../../whatsapp-connector/Dockerfile).
+      "image": "../../whatsapp-connector/Dockerfile",
+      // One container instance per WhatsApp account (one Durable
+      // Object = one container, directive rule 21's chosen model --
+      // NOT a shared container serving multiple clubs, which would
+      // widen blast radius for a single account's crash/misbehavior to
+      // every other club sharing it).
+      "max_instances": 1000,
+      "instance_type": "basic"
+    }
+  ]
+}

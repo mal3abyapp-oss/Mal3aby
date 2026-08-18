@@ -2,6 +2,7 @@ import { ConnectionRequestPoller } from './ConnectionRequestPoller.js'
 import { QueueConsumer } from './QueueConsumer.js'
 import { SupabaseSync } from './SupabaseSync.js'
 import { TenantConnectionManager } from './TenantConnectionManager.js'
+import { startHealthServer } from './HealthServer.js'
 
 /**
  * index.ts -- process entrypoint. No inbound HTTP server: this service
@@ -84,6 +85,13 @@ async function main() {
   const sync = new SupabaseSync()
   const connections = new TenantConnectionManager(sync)
 
+  // Cloudflare Containers requires the image to listen on an HTTP port
+  // (see MAL3ABY_CLOUDFLARE_PRODUCTION_ARCHITECTURE.md) so the platform
+  // and the owning Durable Object can check liveness/readiness and
+  // decide whether to keep this container instance awake. Harmless
+  // no-op capability on a bare Node/VPS host -- nothing calls it there.
+  const healthServer = startHealthServer(sync, connections, Number(process.env.HEALTH_PORT ?? 8080))
+
   console.log('[connector] restoring persisted sessions...')
   await connections.restoreAllPersistedSessions()
   console.log('[connector] session restore pass complete.')
@@ -119,6 +127,7 @@ async function main() {
     console.log('[connector] shutting down...')
     connectionPoller.stop()
     queueConsumer.stop()
+    healthServer.close()
     void connections
       .disconnectAllGracefully()
       .catch((err) => console.error('[connector] error during graceful shutdown (exiting anyway):', (err as Error).message))

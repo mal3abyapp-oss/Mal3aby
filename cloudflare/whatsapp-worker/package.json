@@ -1,0 +1,20 @@
+{
+  "name": "mala3by-whatsapp-worker",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Cloudflare Worker + Durable Object orchestration layer for the Mal3aby WhatsApp connector container. Does not run Baileys itself -- see ../../whatsapp-connector, containerized via ../../whatsapp-connector/Dockerfile. See MAL3ABY_CLOUDFLARE_PRODUCTION_ARCHITECTURE.md.",
+  "scripts": {
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy",
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "^5.20260811.1",
+    "typescript": "^5.6.2",
+    "wrangler": "^4.0.0"
+  },
+  "dependencies": {
+    "@cloudflare/containers": "^0.0.13"
+  }
+}
