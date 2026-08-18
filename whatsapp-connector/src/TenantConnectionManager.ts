@@ -1,7 +1,7 @@
 import { BaileysProvider } from './BaileysProvider.js'
 import { encryptAuthDirForClub, restoreAuthDirForClub } from './SessionStore.js'
 import type { SupabaseSync } from './SupabaseSync.js'
-import type { WhatsAppProvider } from './WhatsAppProvider.js'
+import type { MediaAttachment, WhatsAppProvider } from './WhatsAppProvider.js'
 
 /**
  * TenantConnectionManager -- holds one WhatsAppProvider per club and
@@ -63,12 +63,12 @@ export class TenantConnectionManager {
     this.providers.delete(clubId)
   }
 
-  async send(clubId: string, toPhoneDigitsOnly: string, body: string) {
+  async send(clubId: string, toPhoneDigitsOnly: string, body: string, media?: MediaAttachment) {
     const provider = this.providers.get(clubId)
     if (!provider) {
       return { success: false as const, error: 'no active connection for this club' }
     }
-    return provider.sendMessage(toPhoneDigitsOnly, body)
+    return provider.sendMessage(toPhoneDigitsOnly, body, media)
   }
 
   getConnectionState(clubId: string) {

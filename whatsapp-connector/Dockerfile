@@ -40,6 +40,11 @@ COPY package.json package-lock.json ./
 RUN npm ci --omit=dev && npm cache clean --force
 
 COPY --from=build /app/dist ./dist
+# Bundled Noto Sans Arabic font (OFL-1.1, see assets/fonts/NOTICE.md)
+# used by InvoicePdf.ts for Arabic-script invoice PDF generation --
+# copied as static assets, not fetched at runtime from any external
+# service.
+COPY assets ./assets
 
 USER node
 

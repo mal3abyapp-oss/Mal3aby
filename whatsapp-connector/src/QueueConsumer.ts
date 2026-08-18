@@ -1,6 +1,9 @@
 import type { SupabaseSync } from './SupabaseSync.js'
 import type { TenantConnectionManager } from './TenantConnectionManager.js'
-import { renderTemplate } from './templates.js'
+import { renderTemplate, bookingQrUrl } from './templates.js'
+import { generateBookingQrPng } from './QrImage.js'
+import { buildInvoicePdfBuffer } from './InvoicePdf.js'
+import type { MediaAttachment } from './WhatsAppProvider.js'
 
 /**
  * QueueConsumer -- polls notification_queue (via
@@ -91,7 +94,93 @@ export class QueueConsumer {
       return
     }
 
-    const result = await this.connections.send(row.clubId, row.recipientPhone, body)
+    let media: MediaAttachment | undefined
+    if (row.mediaType && row.mediaIntent) {
+      try {
+        media = await this.buildMediaAttachment(row)
+      } catch (err) {
+        // MAL3ABY WHATSAPP QR IMAGE + INVOICE DOCUMENT DELIVERY,
+        // directive rule 17: a media GENERATION failure (bad/expired
+        // token, invoice not found, PDF library error) must never be
+        // silently downgraded to "just send the text anyway" -- that
+        // would violate rule 4 (never send a text that PROMISES a QR
+        // image is attached when it silently isn't) since templates.ts's
+        // own booking-created/confirmed/payment-received copy already
+        // includes the secure url as the documented fallback, but the
+        // caption line above it implies an attachment is coming. Report
+        // failure through the same capped-retry path as a send failure
+        // -- observability (id/media type/failure) without ever logging
+        // the token, PDF bytes, or PNG bytes themselves.
+        console.error(
+          `[connector] media generation failed for queue row ${row.id.slice(0, 8)} (type=${row.mediaType}, intent=${row.mediaIntent}):`,
+          (err as Error).message,
+        )
+        await this.sync.reportSendResult(row.id, false, undefined, `media generation failed: ${(err as Error).message}`)
+        return
+      }
+    }
+
+    const result = await this.connections.send(row.clubId, row.recipientPhone, body, media)
+    // Observability (directive rule 18): id, media type/intent (never
+    // the bytes or the token), success, provider reference, never any
+    // customer-content beyond what's already logged elsewhere.
+    if (media) {
+      console.log(
+        `[connector] queue row ${row.id.slice(0, 8)} media=${row.mediaType}/${row.mediaIntent} bytes=${media.buffer.length} success=${result.success}`,
+      )
+    }
     await this.sync.reportSendResult(row.id, result.success, result.providerReference, result.error)
+  }
+
+  /**
+   * Generates the media attachment transiently, in memory, from
+   * canonical data -- discarded by the caller immediately after send
+   * (directive rule 5). Never persists the PNG/PDF bytes anywhere;
+   * never logs the raw booking_qr_token/invoice token (rule 18).
+   */
+  private async buildMediaAttachment(row: Awaited<ReturnType<SupabaseSync['claimNextBatch']>>[number]): Promise<MediaAttachment> {
+    if (row.mediaIntent === 'booking_qr') {
+      const token = row.variables?.booking_qr_token
+      const url = bookingQrUrl(token)
+      if (!url) {
+        // Directive rule 4: never send a QR image for an event without
+        // an active credential -- a missing/empty token here means the
+        // business RPC didn't mint one (e.g. this template_key should
+        // never have been queued with media_intent set), which is a
+        // real bug worth a loud failure, not a silently-skipped image.
+        throw new Error('booking_qr media_intent but no booking_qr_token present in variables')
+      }
+      const png = await generateBookingQrPng(url)
+      return {
+        kind: 'image',
+        buffer: png,
+        caption: row.language === 'en' ? 'Your booking check-in code / keep it or show it on arrival' : 'رمز حضور حجزك في ملعبي / احتفظ به أو اعرضه عند الوصول',
+      }
+    }
+
+    if (row.mediaIntent === 'invoice_pdf') {
+      const invoiceId = row.variables?.invoice_id
+      if (typeof invoiceId !== 'string' || !invoiceId) {
+        throw new Error('invoice_pdf media_intent but no invoice_id present in variables')
+      }
+      const data = await this.sync.getInvoiceDocumentData(invoiceId)
+      if (!data) {
+        throw new Error(`invoice_pdf media_intent but whatsapp_connector_get_invoice_document_data returned no row for this invoice`)
+      }
+      const pdf = await buildInvoicePdfBuffer(data)
+      // Never the raw token in the filename (directive rule 12) --
+      // only the human-facing invoice number, which is already shown
+      // to the customer in the message text and on the invoice itself.
+      const safeInvoiceNumber = data.invoiceNumber.replace(/[^a-zA-Z0-9-]/g, '')
+      return {
+        kind: 'document',
+        buffer: pdf,
+        mimetype: 'application/pdf',
+        fileName: `Mal3aby-Invoice-${safeInvoiceNumber}.pdf`,
+        caption: row.language === 'en' ? 'Your invoice' : 'فاتورتك',
+      }
+    }
+
+    throw new Error(`unrecognized media_intent: ${row.mediaIntent}`)
   }
 }

@@ -47,6 +47,27 @@ export interface SendMessageResult {
 }
 
 /**
+ * Optional media attachment for a single sendMessage() call --
+ * MAL3ABY WHATSAPP QR IMAGE + INVOICE DOCUMENT DELIVERY directive.
+ *
+ * `buffer` is always an in-memory Buffer generated transiently by the
+ * caller (QrImage.ts / InvoicePdf.ts) immediately before this call and
+ * discarded immediately after -- never a file path, never anything
+ * persisted to disk or object storage (directive rule 5: "الأفضل
+ * توليد في الذاكرة → إرسال Buffer → تجاهل").
+ */
+export interface MediaAttachment {
+  kind: 'image' | 'document'
+  buffer: Buffer
+  /** Shown under the image in the chat (image) or as the caption alongside the document bubble (document). */
+  caption?: string
+  /** Required for 'document' -- WhatsApp needs a real MIME type to render/preview it correctly. Ignored for 'image' (always image/png here). */
+  mimetype?: string
+  /** Required for 'document' -- e.g. "Mal3aby-Invoice-INV-2026-0042.pdf". Never the raw secure token (directive rule 12). */
+  fileName?: string
+}
+
+/**
  * One WhatsAppProvider instance is scoped to exactly one tenant (club).
  * The connector service holds a Map<clubId, WhatsAppProvider> --
  * sessions are never shared or cross-referenced between tenants (see
@@ -70,8 +91,31 @@ export interface WhatsAppProvider {
 
   getConnectionState(): ConnectionState
 
-  /** Sends a single message. Never called directly by anything outside the queue consumer. */
-  sendMessage(toPhoneDigitsOnly: string, body: string): Promise<SendMessageResult>
+  /**
+   * Sends a single message, optionally with one media attachment
+   * (image or document). Never called directly by anything outside
+   * the queue consumer.
+   *
+   * Media idempotency (directive rule 7): Baileys/the WhatsApp
+   * Multi-Device protocol give no client-side exactly-once guarantee
+   * this provider can rely on -- a single sendMessage() call maps to
+   * exactly one socket.sendMessage() call for the text and, if
+   * present, exactly one more for the media, sequentially (text
+   * first, then media, matching the directive's required delivery
+   * order). If the text send succeeds but the media send throws, this
+   * method returns success:false with the text's own providerReference
+   * unavailable to the caller -- QueueConsumer treats the WHOLE row as
+   * failed and lets the existing capped-retry policy
+   * (whatsapp_connector_report_send_result) retry it. This is a
+   * deliberate, documented trade-off (not a claim of exactly-once
+   * delivery, which this task's own directive explicitly says not to
+   * claim if it isn't true): a retry after a text-succeeded/media-failed
+   * outcome CAN re-send the text a second time. There is no WhatsApp/
+   * Baileys API this provider can use to suppress that -- it is not
+   * silently ignored, it is documented here and covered by the real
+   * crash/retry test in the acceptance report.
+   */
+  sendMessage(toPhoneDigitsOnly: string, body: string, media?: MediaAttachment): Promise<SendMessageResult>
 
   /** Attempts to restore a previously-persisted session without requiring a new QR scan. */
   reconnect(): Promise<void>

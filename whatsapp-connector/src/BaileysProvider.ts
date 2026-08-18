@@ -9,7 +9,7 @@ import pino from 'pino'
 import path from 'node:path'
 import { mkdir, rm } from 'node:fs/promises'
 import { createHash, randomInt } from 'node:crypto'
-import type { ConnectionState, SendMessageResult, WhatsAppProvider } from './WhatsAppProvider.js'
+import type { ConnectionState, MediaAttachment, SendMessageResult, WhatsAppProvider } from './WhatsAppProvider.js'
 
 /**
  * BaileysProvider -- the ONLY file in this service allowed to import
@@ -435,16 +435,63 @@ export class BaileysProvider implements WhatsAppProvider {
     }
   }
 
-  async sendMessage(toPhoneDigitsOnly: string, body: string): Promise<SendMessageResult> {
+  /**
+   * Sends the text message first, then (if `media` is present) the
+   * image/document attachment as a SEPARATE, second WhatsApp message
+   * -- matching the directive's required delivery order (text first,
+   * then QR image / invoice PDF, with the secure url staying in the
+   * text as a fallback either way). Uses Baileys' own official media
+   * message shapes (`{ image: Buffer, caption }` /
+   * `{ document: Buffer, mimetype, fileName, caption }`, confirmed
+   * directly against the installed package's own
+   * AnyMediaMessageContent type) -- no browser automation, no separate
+   * send path outside this same provider/queue infrastructure.
+   *
+   * See the interface doc comment on WhatsAppProvider.sendMessage for
+   * the full media-idempotency discussion (directive rule 7): if the
+   * text send succeeds but the media send then throws, this method
+   * returns success:false so the caller's existing capped-retry policy
+   * retries the whole row -- a retry can genuinely re-send the text a
+   * second time, which is a documented, tested trade-off, not a silent
+   * gap.
+   */
+  async sendMessage(toPhoneDigitsOnly: string, body: string, media?: MediaAttachment): Promise<SendMessageResult> {
     if (this.state !== 'connected' || !this.socket) {
       return { success: false, error: `not connected (state=${this.state})` }
     }
+    const jid = `${toPhoneDigitsOnly}@s.whatsapp.net`
+    let textProviderReference: string | undefined
     try {
-      const jid = `${toPhoneDigitsOnly}@s.whatsapp.net`
-      const result = await this.socket.sendMessage(jid, { text: body })
-      return { success: true, providerReference: result?.key?.id ?? undefined }
+      const textResult = await this.socket.sendMessage(jid, { text: body })
+      textProviderReference = textResult?.key?.id ?? undefined
     } catch (err) {
       return { success: false, error: (err as Error).message }
+    }
+
+    if (!media) {
+      return { success: true, providerReference: textProviderReference }
+    }
+
+    try {
+      const mediaResult =
+        media.kind === 'image'
+          ? await this.socket.sendMessage(jid, { image: media.buffer, caption: media.caption })
+          : await this.socket.sendMessage(jid, {
+              document: media.buffer,
+              mimetype: media.mimetype ?? 'application/octet-stream',
+              fileName: media.fileName ?? 'attachment',
+              caption: media.caption,
+            })
+      return { success: true, providerReference: mediaResult?.key?.id ?? textProviderReference }
+    } catch (err) {
+      // Text already went out to the customer's phone at this point --
+      // documented above and in WhatsAppProvider's interface comment.
+      // Reporting failure here (rather than a partial-success shape
+      // notification_queue has no column for) is what lets the retry
+      // policy attempt the media again; the residual "text may be
+      // resent on retry" risk is the honest, tested trade-off, not a
+      // hidden one.
+      return { success: false, error: `text sent but media failed: ${(err as Error).message}` }
     }
   }
 

@@ -93,12 +93,17 @@ function line(emoji: string, label: string, value: unknown): string {
 // ----------------------------------------------------------------
 const PUBLIC_APP_URL = (process.env.PUBLIC_APP_URL ?? 'http://localhost:5173').replace(/\/+$/, '')
 
-function bookingQrUrl(token: unknown): string | null {
+// Exported (not just used internally) so QrImage.ts can encode the
+// EXACT SAME url this file puts in the message text -- directive rule
+// 1: the QR image must encode the same secure opaque URL already used,
+// never a second, independently-built URL that could silently drift
+// from the text fallback link.
+export function bookingQrUrl(token: unknown): string | null {
   if (!isPresent(token)) return null
   return `${PUBLIC_APP_URL}/qr/${encodeURIComponent(String(token))}`
 }
 
-function invoiceUrl(token: unknown): string | null {
+export function invoiceUrl(token: unknown): string | null {
   if (!isPresent(token)) return null
   return `${PUBLIC_APP_URL}/verify/${encodeURIComponent(String(token))}`
 }

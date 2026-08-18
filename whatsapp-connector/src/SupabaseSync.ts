@@ -79,6 +79,8 @@ export class SupabaseSync {
       language: string
       variables: Record<string, unknown>
       attempts: number
+      mediaType: 'image' | 'document' | null
+      mediaIntent: 'booking_qr' | 'invoice_pdf' | null
     }>
   > {
     const { data, error } = await this.client.rpc('whatsapp_connector_claim_next_batch', { p_limit: limit })
@@ -93,6 +95,8 @@ export class SupabaseSync {
         language: string
         variables: Record<string, unknown>
         attempts: number
+        media_type: 'image' | 'document' | null
+        media_intent: 'booking_qr' | 'invoice_pdf' | null
       }) => ({
         id: row.id,
         clubId: row.club_id,
@@ -102,8 +106,70 @@ export class SupabaseSync {
         language: row.language,
         variables: row.variables,
         attempts: row.attempts,
+        mediaType: row.media_type ?? null,
+        mediaIntent: row.media_intent ?? null,
       }),
     )
+  }
+
+  /**
+   * Canonical invoice data for PDF generation -- directive rule 9:
+   * NEVER recompute finance independently, always the same
+   * get_invoice_payment_summary()-backed source Reports/Billing/
+   * verify_invoice_public() use. Service-role-only RPC (not granted to
+   * anon/authenticated), matching this class's existing pattern of
+   * narrow, purpose-built RPC calls only.
+   */
+  async getInvoiceDocumentData(invoiceId: string): Promise<{
+    invoiceId: string
+    invoiceNumber: string
+    clubName: string | null
+    customerName: string | null
+    bookingRef: string | null
+    fieldName: string | null
+    issuedAt: string
+    total: number
+    paid: number
+    refunded: number
+    outstanding: number
+    paymentStatus: string
+    currency: string
+  } | null> {
+    const { data, error } = await this.client.rpc('whatsapp_connector_get_invoice_document_data', { p_invoice_id: invoiceId })
+    if (error) throw new Error(`whatsapp_connector_get_invoice_document_data failed: ${error.message}`)
+    const row = (data ?? [])[0] as
+      | {
+          invoice_id: string
+          invoice_number: string
+          club_name: string | null
+          customer_name: string | null
+          booking_ref: string | null
+          field_name: string | null
+          issued_at: string
+          total: number
+          paid: number
+          refunded: number
+          outstanding: number
+          payment_status: string
+          currency: string
+        }
+      | undefined
+    if (!row) return null
+    return {
+      invoiceId: row.invoice_id,
+      invoiceNumber: row.invoice_number,
+      clubName: row.club_name,
+      customerName: row.customer_name,
+      bookingRef: row.booking_ref,
+      fieldName: row.field_name,
+      issuedAt: row.issued_at,
+      total: row.total,
+      paid: row.paid,
+      refunded: row.refunded,
+      outstanding: row.outstanding,
+      paymentStatus: row.payment_status,
+      currency: row.currency,
+    }
   }
 
   /** Part J: sweeps whatsapp-channel pending/retrying rows past their expires_at to a terminal 'expired' status, before they're ever claimed/attempted. Returns how many rows were expired (for logging only -- never logs message content). */
