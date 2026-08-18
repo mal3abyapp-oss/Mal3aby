@@ -1,6 +1,6 @@
 # Mal3aby — Production Deployment Runbook (Cloudflare-only)
 
-**Status: TECHNICALLY DEPLOYABLE — EXTERNAL CREDENTIALS REQUIRED.** Every step below that does not require a Cloudflare account, a production domain, or Docker has been prepared and locally validated. See [MAL3ABY_CLOUDFLARE_PRODUCTION_ARCHITECTURE.md](MAL3ABY_CLOUDFLARE_PRODUCTION_ARCHITECTURE.md) for the full architecture and [MAL3ABY_CLOUDFLARE_WHATSAPP_VALIDATION.md](MAL3ABY_CLOUDFLARE_WHATSAPP_VALIDATION.md) for exactly what has and hasn't been empirically proven about the WhatsApp Container. This runbook supersedes all prior VPS/PM2/systemd guidance — Mal3aby's target deployment platform is Cloudflare + Supabase only, no traditional host.
+**Status: FRONTEND LIVE IN PRODUCTION. WHATSAPP CONTAINER PENDING ONE MANUAL STEP.** Cloudflare Workers Paid is active, `mal3aby.app` is bound and serving real traffic over HTTPS. Every step below that does not require Docker (or a `CLOUDFLARE_API_TOKEN` GitHub Actions secret to substitute for it) has been completed and live-verified. See [MAL3ABY_CLOUDFLARE_PRODUCTION_ARCHITECTURE.md](MAL3ABY_CLOUDFLARE_PRODUCTION_ARCHITECTURE.md) for the full architecture and [MAL3ABY_CLOUDFLARE_WHATSAPP_VALIDATION.md](MAL3ABY_CLOUDFLARE_WHATSAPP_VALIDATION.md) for exactly what has and hasn't been empirically proven about the WhatsApp Container. This runbook supersedes all prior VPS/PM2/systemd guidance — Mal3aby's target deployment platform is Cloudflare + Supabase only, no traditional host.
 
 Last updated: 2026-08-18
 
@@ -19,35 +19,36 @@ Neither Cloudflare Pages, a VPS, PM2, nor systemd is used anywhere in this archi
 
 ## 1. Frontend deployment
 
-**Prerequisites (external, not yet provided):** a Cloudflare account, and — for a real production domain — DNS ownership of that domain.
+**Status: DONE, live in production.** `mal3aby.app` and `www.mal3aby.app` are both bound as Custom Domains to `cloudflare/frontend-worker`, deployed via `wrangler deploy`, and externally verified over real HTTPS.
 
-**What's already correct and locally verified:**
+**What's confirmed correct, live:**
 - `npm run build` at the repo root produces the `dist/` directory `cloudflare/frontend-worker/wrangler.jsonc` points at (`../../dist`) — no separate build step or duplicated frontend code.
-- `cloudflare/frontend-worker/wrangler.jsonc` sets `assets.not_found_handling: "single-page-application"`, which serves `index.html` (200) for any unmatched path. Verified live via `wrangler dev` against real deep-link routes (`/qr/:token`, `/verify/:token`, `/app/*`, `/portal/*`) — all correctly SPA-fallback (see validation doc §2.5).
-- Static assets serve directly without Worker involvement (verified: `/favicon.svg` → 200, not a fallback).
+- `cloudflare/frontend-worker/wrangler.jsonc` sets `assets.not_found_handling: "single-page-application"`, which serves `index.html` (200) for any unmatched path. Verified live over real HTTPS on `https://mal3aby.app` against every deep-link route (`/login`, `/app/*`, `/portal/*`, `/qr/:token`, `/verify/:token`) — all correctly SPA-fallback with full security headers.
+- `www.mal3aby.app` issues a real `308 Permanent Redirect` to the apex (`src/index.ts`) rather than becoming an independent site.
+- HTTPS auto-issued by Cloudflare, no manual certificate step, confirmed valid via a real external `curl` (no `-k`/insecure flag needed).
+- `PUBLIC_APP_URL` is set to the real value `https://mal3aby.app` in `cloudflare/whatsapp-worker/wrangler.jsonc`.
 
-**Steps once a Cloudflare account exists:**
-1. `cd cloudflare/frontend-worker && npm install`
-2. From the repo root: `npm run build` (produces `../dist` relative to this folder — actually `dist/` at repo root).
-3. `npx wrangler login` (interactive OAuth — cannot be done autonomously; requires the human operator).
-4. `npx wrangler deploy` from `cloudflare/frontend-worker` — deploys to `*.workers.dev` first for a smoke test, or directly to a custom domain if one is bound (next step).
-5. **Custom domain**: once a real production domain is chosen and its DNS is on Cloudflare, bind it via the dashboard (Workers & Pages → `mala3by-frontend` → Settings → Domains & Routes) or `wrangler deploy --routes <domain>/*`. This repo deliberately does not invent a domain name.
-6. Confirm HTTPS is auto-issued (Cloudflare provisions this automatically for any domain on its own DNS/proxy — no manual certificate step).
-7. **Set `PUBLIC_APP_URL`** (used by the WhatsApp connector for QR/invoice links sent to real customers) to the real production domain — see §3 below. Never leave this as `localhost` or a LAN IP in production.
+Kept `workers_dev: true` explicit — the `workers.dev` URL stays live as a technical fallback, never the customer-facing canonical URL.
 
-## 2. Supabase (unchanged host, updated for the new frontend origin)
+## 2. Supabase (unchanged host, Auth URL update still pending)
 
 Already provisioned and live (`gxkrtlvpjwxhcqdisyob`, `eu-central-1`, Postgres 17.6). This does not move — Supabase remains outside Cloudflare compute by design.
 
 Remaining actions:
-- **Upgrade off the `free` plan** before any real paid pilot — see `BACKUP_RECOVERY_RUNBOOK.md`. Do not claim "backup ready" while still on free. This is a billing action requiring the human operator; not self-purchased.
-- **Once a production domain exists**, update Supabase Auth → URL Configuration: Site URL and Redirect URLs must point at the real Cloudflare-hosted domain, not `localhost`. Password-reset and email-confirmation redirect links depend on this being correct — a stale `localhost` redirect here silently breaks production auth emails.
+- **Upgrade off the `free` plan** before any real paid pilot — see `BACKUP_RECOVERY_RUNBOOK.md`. Do not claim "backup ready" while still on free. This is a billing action requiring the human operator; not self-purchased; explicitly not requested in this pass.
+- **Auth → URL Configuration must be updated manually by the platform owner**: Site URL → `https://mal3aby.app`, and `https://mal3aby.app/*` added to Redirect URLs. This session has no tool that can write Supabase Auth config (confirmed: no such capability in the Supabase MCP server's tool surface; the dashboard requires an authenticated browser session not available here — a login page with pre-filled credentials was found but neither touched nor submitted, per the standing rule against entering/submitting credentials). Local dev `localhost` redirects should stay as-is; they should just not be the production canonical.
 - Migrations: `supabase/migrations/` remains the source of truth, applied via Supabase's own tooling. No change from prior state.
-- Transactional email provider for Auth email confirmation: still an unresolved external dependency (no SMTP/email provider credential configured). Blocks real self-service signup until connected in Supabase Auth settings. Documented here as an External Dependency per the governing directive — does not block the rest of Cloudflare deployment.
+- Transactional email provider for Auth email confirmation: still an unresolved external dependency (no SMTP/email provider credential configured), not added in this pass. Blocks real self-service signup until connected in Supabase Auth settings. Controlled-pilot accounts can be pre-confirmed manually by the platform owner, unaffected by this gap.
 
 ## 3. WhatsApp connector deployment (Cloudflare Container)
 
-**Prerequisites (external, not yet provided):** a Cloudflare account with **Workers Paid** plan (required for Containers — no free tier), and a working local Docker installation to build the container image (`wrangler deploy` currently requires Docker locally; no remote-build path exists yet per Cloudflare's own current tooling). Docker was confirmed unavailable on the development machine used for this work (`docker build` failed to reach the daemon; user confirmed "Docker doesn't work for me") — this blocks the actual image build and live prototype validation, not the code/config, which is complete.
+**Status: Workers Paid ACTIVE, domain bound, one manual step remains before the Container itself can be built.**
+
+Confirmed live via real tooling: `wrangler containers list` now returns an authorized empty-list response (was previously a `401` plan-required error), and the whatsapp-worker's container config continues to resolve cleanly via `wrangler deploy --dry-run --containers-rollout=none`.
+
+**Remaining blocker, narrowed and precise**: every Cloudflare Container build/push path (`wrangler deploy` with a Dockerfile, `wrangler containers build`, `wrangler containers push`) requires a Docker-compatible engine wherever that command runs — confirmed against current Cloudflare documentation, no exception exists. The local dev machine's Docker daemon remains down (re-checked once this session, not retried further). A `.github/workflows/whatsapp-container-build.yml` workflow was built to provide that engine via a GitHub-hosted runner (real Docker, zero local dependency) — GitHub Actions is one of Cloudflare's own two officially-documented external CI/CD providers, a supported path, not an invented workaround, and does not touch VPS/self-hosted infrastructure. It needs exactly one manual step this session cannot perform: create a Cloudflare API token (My Profile → API Tokens → Create Custom Token, scoped to this account, Containers:Edit) and add it as the `CLOUDFLARE_API_TOKEN` secret in the GitHub repo's Actions settings. This session's `gh` token lacks the repository-secrets permission needed to do this itself (confirmed via a real `403` from `gh secret list`), and minting a new account-level API token is an account-security action, not something this session should perform even if it had a path to the dashboard.
+
+Once that one secret is added: trigger the workflow (`gh workflow run whatsapp-container-build.yml -f tag=<something>` or via the GitHub UI), which builds and pushes the image, then update `cloudflare/whatsapp-worker/wrangler.jsonc`'s `containers[].image` to the printed `registry.cloudflare.com/...` reference and redeploy the Worker — no Docker needed on this machine at any point in that flow.
 
 **What's already built:**
 - `whatsapp-connector/Dockerfile` — multi-stage build, non-root `node` user, no `VOLUME` for the Baileys temp-auth directory (deliberate — Cloudflare Container disk is ephemeral by platform design; session state lives in Supabase, not local disk — see architecture doc §5).
@@ -107,18 +108,22 @@ A real bug was caught and fixed during this work: Cloudflare Workers Static Asse
 
 | Item | Status |
 |---|---|
-| Frontend Cloudflare config (Workers Static Assets, SPA fallback) | ✅ Done, locally verified live |
+| Cloudflare account / `wrangler login` | ✅ Done, authenticated |
+| Cloudflare Workers Paid plan | ✅ **ACTIVE**, confirmed live via `wrangler containers list` |
+| Production domain + DNS (`mal3aby.app`) | ✅ **DONE**, bound and HTTPS-verified live |
+| Frontend Cloudflare config (Workers Static Assets, SPA fallback) | ✅ Done, live in production on `mal3aby.app` |
+| Security headers (HSTS/CSP/X-Frame-Options/etc.) | ✅ Done, verified live on all route types, real production domain |
+| `PUBLIC_APP_URL` set to real value | ✅ Done (`https://mal3aby.app`) |
 | WhatsApp connector Dockerfile + health endpoints | ✅ Done |
-| Worker + Durable Object orchestration code | ✅ Done, typechecked, dry-run validated |
-| Secrets architecture (two-tier internal tokens, `wrangler secret put`) | ✅ Done |
+| Worker + Durable Object orchestration code | ✅ Done, typechecked, dry-run validated, deployed live (minus Container) |
+| Secrets architecture (two-tier internal tokens, `wrangler secret put`) | ✅ Done (design); actual secrets not yet set (no live Container to consume them) |
+| GitHub Actions OCI build workflow | ✅ Built, Cloudflare-documented pattern — needs one `CLOUDFLARE_API_TOKEN` secret to activate |
 | Rollback plan for all three components | ✅ Done |
-| Live container build (Docker) | ❌ **BLOCKED — Docker unavailable in this environment** |
-| Live Baileys-in-Container networking proof | ❌ **BLOCKED — requires Docker or Cloudflare account access** |
-| Cloudflare account / `wrangler login` | ❌ **PENDING EXTERNAL INPUT** |
-| Production domain + DNS | ❌ **PENDING EXTERNAL INPUT** |
-| Supabase plan upgrade (backups) | ❌ **PENDING EXTERNAL INPUT** |
-| Transactional email provider for Auth | ❌ **PENDING EXTERNAL INPUT** |
-| Security headers (HSTS/CSP/X-Frame-Options/etc.) | ✅ Done, locally verified live on all route types |
-| Rate limiting / WAF rules | ❌ **NOT YET APPLIED** — best configured against a live domain |
+| Live container build | ❌ **PENDING** — needs the `CLOUDFLARE_API_TOKEN` GitHub secret (one manual step) or a working local Docker |
+| Live Baileys-in-Container networking proof | ❌ **PENDING** — blocked on the container build above |
+| Supabase Auth Site URL / Redirect URLs → `mal3aby.app` | ❌ **PENDING EXTERNAL INPUT** — no tool in this environment can write Supabase Auth config |
+| Supabase plan upgrade (backups) | ❌ **PENDING EXTERNAL INPUT** — not requested this pass, intentionally |
+| Transactional email provider for Auth | ❌ **PENDING EXTERNAL INPUT** — not requested this pass, intentionally |
+| Rate limiting / WAF rules | ❌ **NOT YET APPLIED** — best configured now that a live domain exists, not yet done |
 
-**Honest state:** everything preparable without a Cloudflare account, a domain, or a working local Docker install has been built and locally validated. The remaining gaps are genuinely external or require live infrastructure that does not exist in this development environment.
+**Honest state:** the frontend is genuinely live in production on the real domain. The WhatsApp Container is now blocked by exactly one thing — a Cloudflare API token needing to be created and added as a GitHub Actions secret — not by Workers Paid (active) or the domain (bound) or the architecture (complete and locally validated).

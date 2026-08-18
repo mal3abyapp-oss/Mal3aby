@@ -61,15 +61,28 @@
   // live post-deploy.
   "observability": {
     "enabled": true
-  }
+  },
 
-  // Custom domain: bound via the Cloudflare dashboard (Workers &
-  // Pages -> mala3by-frontend -> Settings -> Domains & Routes) or
-  // `wrangler deploy --routes <domain>/*`, once a real production
-  // domain exists -- see MAL3ABY_CLOUDFLARE_PRODUCTION_ARCHITECTURE.md
-  // for the exact steps and why this repo does not invent a domain
-  // name (directive rule 39).
-  //
+  // Production domain, purchased and confirmed under this Cloudflare
+  // account. Both the apex and www are bound as Custom Domains (not
+  // plain Routes) -- Cloudflare auto-manages the DNS record and issues
+  // an Advanced Certificate for each, no manual DNS/cert step needed.
+  // www is bound to the SAME Worker rather than left unrouted or made
+  // a separate site -- src/index.ts issues a 308 to the apex for any
+  // request arriving on the www host, so www never becomes an
+  // independent origin.
+  "routes": [
+    { "pattern": "mal3aby.app", "custom_domain": true },
+    { "pattern": "www.mal3aby.app", "custom_domain": true }
+  ],
+
+  // Keep workers.dev alive as a technical fallback/debugging address --
+  // NOT the customer-facing canonical URL (that's mal3aby.app), but
+  // useful for verifying a deploy independent of DNS/domain state.
+  // wrangler defaults this to disabled once any custom domain/route is
+  // configured, so it must be set explicitly to keep it available.
+  "workers_dev": true
+
   // Rate limiting for public token-verification routes (/qr/:token,
   // /verify/:token): best configured via Cloudflare Rate Limiting Rules
   // in the dashboard once a live domain exists, so real traffic

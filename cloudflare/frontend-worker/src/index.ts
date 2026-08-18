@@ -38,8 +38,26 @@ function securityHeaders(supabaseUrl: string): Record<string, string> {
   }
 }
 
+// www must never become an independent site -- both mal3aby.app and
+// www.mal3aby.app are bound as Custom Domains to this SAME Worker (see
+// wrangler.jsonc), and this is the one piece of logic that keeps them
+// from silently diverging into two origins: any request arriving on
+// the www host gets a permanent redirect to the apex, preserving the
+// original path/query. 308 (not 301) so a non-GET request's method and
+// body are preserved across the redirect, per the HTTP spec's actual
+// distinction between the two -- there is no real reason a canonical
+// hostname redirect should ever downgrade a POST to a GET.
+const WWW_HOST = 'www.mal3aby.app'
+const APEX_HOST = 'mal3aby.app'
+
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
+    const url = new URL(request.url)
+    if (url.hostname === WWW_HOST) {
+      url.hostname = APEX_HOST
+      return Response.redirect(url.toString(), 308)
+    }
+
     const response = await env.ASSETS.fetch(request)
     const headers = new Headers(response.headers)
     for (const [key, value] of Object.entries(securityHeaders(env.SUPABASE_URL))) {

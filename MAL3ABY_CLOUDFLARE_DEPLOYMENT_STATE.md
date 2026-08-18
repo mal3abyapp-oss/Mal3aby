@@ -6,6 +6,33 @@ Last updated: 2026-08-18
 
 ---
 
+## PRODUCTION DOMAIN BOUND — WORKERS PAID ACTIVE
+
+**Workers Paid: ACTIVE**, confirmed via real official tooling, not a dashboard success message: `wrangler containers list` previously returned `401 Unauthorized: Deploying containers requires the Workers Paid plan`; it now returns `No containers found` — a genuine empty-list response from an authorized account, and a real `wrangler deploy --dry-run --containers-rollout=none` against the whatsapp-worker's container config continues to resolve cleanly. **Containers capability: AVAILABLE.**
+
+**Domain: `mal3aby.app`, purchased and bound.** Both `mal3aby.app` and `www.mal3aby.app` are configured as Custom Domains (not plain Routes) in `cloudflare/frontend-worker/wrangler.jsonc`, deployed for real via `wrangler deploy` — Cloudflare's own deploy-time zone-ownership check is the proof the zone exists under this account (an unowned/nonexistent zone would have failed the deploy outright, not succeeded). `workers_dev: true` was kept explicit so the `workers.dev` URL remains available as a technical fallback, not the customer-facing canonical URL.
+
+- **HTTPS**: confirmed live externally — valid certificate (no `-k` needed), full security header set present on every route.
+- **www redirect**: `www.mal3aby.app` issues a real `308 Permanent Redirect` to `https://mal3aby.app/` (implemented in `cloudflare/frontend-worker/src/index.ts`, both domains route to the same Worker so www never becomes an independent origin). 308, not 301, so a non-GET request's method/body survive the redirect.
+- **DNS**: both custom-domain DNS records and certificates were auto-provisioned by Cloudflare as part of the Custom Domain binding — no manual DNS record was created or edited, and no other account services' DNS was touched.
+- **All deep-link routes re-verified live on `https://mal3aby.app`**: `/`, `/login`, `/app/bookings`, `/portal/bookings`, `/qr/invalid-test-token`, `/verify/invalid-test-token` — all 200, correct SPA fallback, full security headers, real Supabase RPC round-trips (invalid-token states correctly resolved), mobile viewport correct, RTL correct at default load.
+- **One real, non-blocking finding**: Cloudflare's own auto-injected Web Analytics beacon script (`static.cloudflareinsights.com`) is blocked by this app's own CSP (`script-src 'self'`). This is the CSP doing exactly its job, not a bug — documented rather than silently observed, and not "fixed" by loosening the CSP for a feature nobody asked for.
+- **`PUBLIC_APP_URL` updated to the real value**: `cloudflare/whatsapp-worker/wrangler.jsonc`'s `vars.PUBLIC_APP_URL` is now `https://mal3aby.app` (was the `REPLACE-WITH-PRODUCTION-DOMAIN` placeholder), redeployed live. Once the Container is deployed and actually sends a message, `templates.ts`'s `getQrUrl()`/`getVerifyUrl()` will produce `https://mal3aby.app/qr/<token>` and `https://mal3aby.app/verify/<token>` — confirmed by reading the code, not yet by a live send (no Container exists yet).
+
+### Supabase Auth production URLs — genuinely blocked, not skipped
+
+No tool available in this environment can write Supabase Auth's Site URL / Redirect URLs: the Supabase MCP server exposes no Auth-config write capability (confirmed by re-checking its full tool surface), and the Supabase dashboard requires an authenticated browser session this environment does not have (the browser tab opened at the Auth URL Configuration page showed a login form with credentials already present in the password field that were never entered by this session — entering or submitting that is out of scope regardless of what's pre-filled). This is a genuine, precise external/manual blocker: **the platform owner must update Supabase Dashboard → Authentication → URL Configuration → Site URL to `https://mal3aby.app` and add `https://mal3aby.app/*` to Redirect URLs** (login, email confirmation, password reset, customer portal, staff/owner auth all read from this same config). Local development `localhost` redirects were not touched and should stay for local dev.
+
+### WhatsApp Container — Cloudflare-supported OCI build path found, one manual step remains
+
+Per real Cloudflare documentation (re-verified live this session, not assumed): **every path to build or push a Container image — `wrangler deploy` with a Dockerfile, `wrangler containers build`, `wrangler containers push` — requires a Docker-compatible engine wherever that command runs.** There is no Cloudflare-native remote-build service that avoids this. The requirement is a valid OCI image, not "Docker Desktop specifically" — so a **GitHub Actions workflow** (`.github/workflows/whatsapp-container-build.yml`, new) was built: a GitHub-hosted runner (real Docker, zero local dependency) builds `whatsapp-connector/Dockerfile` and pushes it to `registry.cloudflare.com` via `wrangler containers build --push`, authenticated with `CLOUDFLARE_API_TOKEN` — GitHub Actions is one of Cloudflare's own two officially-documented external CI/CD providers, not an invented workaround, and this does not touch VPS/self-hosted infrastructure.
+
+**One remaining manual step gates this workflow**: a Cloudflare API token (scoped to this account, Containers:Edit) must be created via the Cloudflare dashboard (My Profile → API Tokens → Create Custom Token) and added as the `CLOUDFLARE_API_TOKEN` secret in the GitHub repo (Settings → Secrets and variables → Actions). Neither step is performable by this session: the `wrangler` OAuth session in use cannot mint a new scoped API token, and `gh secret list`/`gh secret set` against this repo returned `403: You must have repository read permissions or have the repository secrets fine-grained permission` — confirmed, not assumed. Creating an account-level API token is the same category of action as a credential/password entry and is correctly left to the account owner.
+
+Docker was re-checked once this session (per the "don't loop on Docker Desktop" instruction) and remains down — not retried further.
+
+---
+
 ## FREE PREPARATION COMPLETE
 
 Everything closeable on the current free plans (Cloudflare Workers Free, Supabase Free — both intentionally temporary, not upgraded during this pass) has been closed. Real findings from a full static/code-level audit of the WhatsApp Container path, Durable Object, Management API, and session/queue persistence design:

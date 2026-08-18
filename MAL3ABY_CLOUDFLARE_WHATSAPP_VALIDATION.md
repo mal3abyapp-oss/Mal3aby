@@ -6,6 +6,10 @@ Last updated: 2026-08-18
 
 This document exists to give an honest, evidence-separated account of what has actually been tested against real tooling versus what is architecturally reasoned but unverified. Every claim below is labeled with how it was established.
 
+## Update: Workers Paid is now ACTIVE — the remaining blocker is narrower
+
+Since this document was first written, **Cloudflare Workers Paid was activated and confirmed live** (`wrangler containers list` now returns an authorized empty-list response instead of a `401` plan-required error), and **`mal3aby.app` is now the bound production domain**. This removes one of the two independent blockers §1 originally described. The remaining blocker is now precisely: no local Docker daemon on this dev machine, and no Cloudflare-native way to build/push a Container image without a Docker-compatible engine running *somewhere* in the build path (confirmed against current Cloudflare documentation — every build/push command requires it). A GitHub Actions workflow (`.github/workflows/whatsapp-container-build.yml`) was built to provide that engine via a GitHub-hosted runner — a Cloudflare-documented, officially-supported CI/CD path, not an invented workaround — but it needs one manual step (a `CLOUDFLARE_API_TOKEN` GitHub Actions secret) that this session cannot perform (account-level API token creation, and this session's GitHub token lacks repo-secrets permission). See `MAL3ABY_CLOUDFLARE_DEPLOYMENT_STATE.md`'s "WhatsApp Container" section for the full detail. §1 below is retained as written at the time for historical accuracy.
+
 ---
 
 ## 1. Environment constraints (why some tests could not run)

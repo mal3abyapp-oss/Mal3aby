@@ -14,11 +14,17 @@
   // for the exact `wrangler secret put` commands to run once account
   // access exists.
   "vars": {
-    // Non-secret, safe to keep in version control. Actual production
-    // domain filled in once it exists -- see directive rule 39, this
-    // repo intentionally does not invent a domain name.
+    // Non-secret, safe to keep in version control. Real production
+    // domain -- purchased and bound to the frontend Worker as a
+    // Custom Domain, confirmed live via external HTTPS request before
+    // this value was set (never invented ahead of the real domain
+    // existing, per the standing "don't guess a domain name" rule).
+    // This is what makes QR/verify links in real WhatsApp messages
+    // resolve to https://mal3aby.app/qr/<token> and
+    // https://mal3aby.app/verify/<token> instead of a workers.dev or
+    // localhost URL.
     "SUPABASE_URL": "https://gxkrtlvpjwxhcqdisyob.supabase.co",
-    "PUBLIC_APP_URL": "https://REPLACE-WITH-PRODUCTION-DOMAIN"
+    "PUBLIC_APP_URL": "https://mal3aby.app"
   },
 
   "durable_objects": {

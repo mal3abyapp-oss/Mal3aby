@@ -1,0 +1,66 @@
+name: Build & push WhatsApp connector container image
+
+# Manual-trigger only (workflow_dispatch), not on every push. Building
+# and pushing a container image is a deliberate, infrequent action tied
+# to an actual code change in whatsapp-connector/ -- not something that
+# should fire on unrelated commits to the rest of the monorepo.
+#
+# WHY THIS EXISTS: Cloudflare Containers has no build-time OCI path that
+# avoids Docker entirely on the machine invoking `wrangler deploy` /
+# `wrangler containers build` (confirmed against current Cloudflare
+# documentation, Aug 2026 -- every path requires a local Docker-
+# compatible engine to produce or push the image bytes). The local dev
+# machine used for this project's Cloudflare work has a confirmed-down
+# Docker daemon. GitHub-hosted runners provide genuine Docker with zero
+# local dependency, and GitHub Actions is one of Cloudflare's own two
+# officially-documented external CI/CD providers (the other being
+# GitLab CI/CD) -- this is a supported, trusted path, not an invented
+# workaround, and does not touch VPS/self-hosted infrastructure.
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Image tag (e.g. a short git SHA or "latest")'
+        required: true
+        default: 'latest'
+
+jobs:
+  build-and-push:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Install wrangler
+        run: npm install -g wrangler
+
+      - name: Build and push image to Cloudflare Registry
+        # Requires the CLOUDFLARE_API_TOKEN repository secret to be
+        # configured (Settings -> Secrets and variables -> Actions).
+        # Documented Cloudflare pattern: CLOUDFLARE_API_TOKEN takes
+        # precedence over any interactive wrangler auth in CI. The
+        # token needs Account:Cloudflare Containers:Edit scope (or
+        # equivalent) -- create it at
+        # https://dash.cloudflare.com/profile/api-tokens, "Create
+        # Custom Token", scoped to this account only. Never commit the
+        # token value anywhere; it lives only in the GitHub repo's
+        # encrypted Actions secrets store.
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: '35ac10727701095866b16c276b4a33d1'
+        working-directory: whatsapp-connector
+        run: |
+          wrangler containers build \
+            --push \
+            -t "registry.cloudflare.com/${CLOUDFLARE_ACCOUNT_ID}/mala3by-whatsapp-connector:${{ github.event.inputs.tag }}" \
+            .
+
+      - name: Output image reference
+        run: |
+          echo "Image pushed. Set this as the containers[].image value in cloudflare/whatsapp-worker/wrangler.jsonc:"
+          echo "registry.cloudflare.com/35ac10727701095866b16c276b4a33d1/mala3by-whatsapp-connector:${{ github.event.inputs.tag }}"
