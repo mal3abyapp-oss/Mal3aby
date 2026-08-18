@@ -118,8 +118,40 @@ export class WhatsAppAccountObject extends Container<Env> {
    * in Durable Object storage (survives THIS Durable Object's own
    * restarts/hibernation, independent of the container's ephemeral
    * disk) and kicks off the recurring health-poll alarm loop.
+   *
+   * REAL BUG found live during the MAL3ABY WHATSAPP QR IMAGE + INVOICE
+   * DOCUMENT DELIVERY task's WhatsApp send tests: this class's own
+   * `sleepAfterMs` field (in the installed @cloudflare/containers@0.0.13
+   * base class) defaults to 0, and NOTHING in the base class's actual
+   * `startAndWaitForPorts()` implementation calls
+   * `renewActivityTimeout()` on a successful start -- despite that
+   * method's own doc comment claiming "5. When all ports are available,
+   * it triggers onStart and renewActivityTimeout" (confirmed by reading
+   * node_modules/@cloudflare/containers/dist/index.js directly: no such
+   * call exists in that function body). `isActivityExpired()` is
+   * `sleepAfterMs <= Date.now()`, so with sleepAfterMs still at its `0`
+   * default, the container reads as "already expired" from the instant
+   * it starts, until the FIRST scheduled health-poll tick (up to 60s
+   * later, per scheduleNextHealthPoll's cadence) gets a chance to renew
+   * it. If the shared Durable Object alarm mechanism fires for any
+   * other reason in that window, `alarm()`'s own inline
+   * `isActivityExpired()` check (also read directly from the same
+   * installed package) stops the container immediately -- confirmed
+   * live via `wrangler tail`: an alarm fired, found the container not
+   * listening on 8080 (already stopped), and had to restart it, in a
+   * tight ~3-minute repeating cycle that meant NO WhatsApp send (text
+   * or media) could complete without racing a mid-send container
+   * restart -- 3 consecutive real send attempts timed out during live
+   * testing before this was root-caused.
+   *
+   * Fix: renew the timeout explicitly and immediately here, the instant
+   * the container is confirmed started -- do not rely on the base
+   * class's undocumented-in-practice behavior. This closes the gap
+   * between "container just started" and "first health poll renews it"
+   * that was causing the premature-sleep race.
    */
   async onStart(): Promise<void> {
+    this.renewActivityTimeout()
     await this.ctx.storage.put<AccountStartState>(START_STATE_KEY, { startedAt: Date.now() })
     await this.scheduleNextHealthPoll()
   }
