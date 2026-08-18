@@ -124,17 +124,25 @@ export function fromInstant(instant: string | Date, ianaTimeZone: string): { dat
 }
 
 /**
- * Formats an absolute Instant for display in the venue's timezone using
- * Arabic locale conventions — the venue-timezone-aware replacement for
- * ad-hoc `new Date(x).toLocaleTimeString('ar-EG', ...)` calls, which
- * default to the *browser's* local timezone and can misrender for any
- * viewer not physically in the venue's zone.
+ * Formats an absolute Instant for display in the venue's timezone --
+ * the venue-timezone-aware replacement for ad-hoc
+ * `new Date(x).toLocaleTimeString('ar-EG', ...)` calls, which default
+ * to the *browser's* local timezone and can misrender for any viewer
+ * not physically in the venue's zone.
+ *
+ * English-localization sweep: this used to hardcode the 'ar-EG' Intl
+ * locale regardless of the app's active UI language, so English-mode
+ * screens rendered Arabic-Indic digits/month names. `locale` now
+ * threads through from the caller's useDirection() -- defaulted to
+ * 'ar' only so any caller that genuinely can't reach locale keeps the
+ * prior behavior instead of silently changing.
  */
 export function formatInstant(
   instant: string | Date,
   ianaTimeZone: string,
   options: Intl.DateTimeFormatOptions,
+  locale: 'ar' | 'en' = 'ar',
 ): string {
   const d = typeof instant === 'string' ? new Date(instant) : instant
-  return new Intl.DateTimeFormat('ar-EG', { timeZone: ianaTimeZone, ...options }).format(d)
+  return new Intl.DateTimeFormat(locale === 'en' ? 'en-US' : 'ar-EG', { timeZone: ianaTimeZone, ...options }).format(d)
 }

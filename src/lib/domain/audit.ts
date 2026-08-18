@@ -82,11 +82,79 @@ export const ENTITY_LABELS: Record<string, string> = {
   platform_plans: 'خطة',
 }
 
-/** Looks up a label, falling back to the raw value if genuinely unmapped -- never throws, matches the existing safe-fallback convention used throughout the app's other label maps. */
-export function actionLabel(action: string): string {
-  return ACTION_LABELS[action] ?? action
+// English mirror of ACTION_LABELS above -- same keys, same order, kept as
+// a plain lookup object (not i18n resource JSON) because these are a
+// fixed, small enum of audit_logs.action machine values, matching how
+// this file is already structured.
+export const ACTION_LABELS_EN: Record<string, string> = {
+  // Club-tier (originally in AuditLogPage.tsx, Gate 13 #60)
+  'booking.create': 'Create booking',
+  'booking.check_in': 'Check in booking',
+  'booking.discount.apply': 'Apply booking discount',
+  'booking.auto_confirmed_on_full_payment': 'Auto-confirm booking on full payment',
+  cancel_booking: 'Cancel booking',
+  'field_block.create': 'Block field time slot',
+  'invoice.issue': 'Issue invoice',
+  void_invoice: 'Void invoice',
+  'payment.record': 'Record payment',
+  create_refund: 'Refund payment',
+  'payment.refund': 'Refund payment',
+  'payment.reconciliation_confirmed': 'Confirm payment reconciliation',
+  'manual_payment_claim.verify': 'Review manual payment claim',
+  'subscription.activate': 'Activate academy subscription',
+  'subscription.cancel': 'Cancel academy subscription',
+  'subscription.freeze': 'Freeze academy subscription',
+  'subscription.unfreeze': 'Unfreeze academy subscription',
+  'customer.photo.approve': 'Approve photo change',
+  'customer.photo.reject': 'Reject photo change',
+  'customer.self_service_claim': 'Auto-link customer account',
+  'cash_shift.open': 'Open cash shift',
+  'cash_shift.close': 'Close cash shift',
+  'whatsapp.connect_requested': 'Request WhatsApp connection',
+  'whatsapp.disconnect_requested': 'Request WhatsApp disconnection',
+  'whatsapp.safety_settings_changed': 'Change WhatsApp sending controls',
+  'notification.consent_changed': 'Change notification consent',
+
+  // Platform-tier (found raw/unmapped in PlatformAuditPage and
+  // PlatformClubDetailPage's audit tab -- the actual real gap this
+  // consolidation fixes)
+  platform_suspend_club: 'Suspend club',
+  platform_reactivate_club: 'Reactivate club',
+  extend_grace_period: 'Extend grace period',
+  unpublish_plan: 'Unpublish plan',
 }
 
-export function entityLabel(entityType: string): string {
-  return ENTITY_LABELS[entityType] ?? entityType
+export const ENTITY_LABELS_EN: Record<string, string> = {
+  booking: 'Booking',
+  bookings: 'Booking',
+  invoice: 'Invoice',
+  invoices: 'Invoice',
+  payment: 'Payment',
+  payment_reconciliations: 'Payment reconciliation',
+  manual_payment_claim: 'Manual payment claim',
+  refund: 'Refund',
+  refunds: 'Refund',
+  field_block: 'Field block',
+  subscription: 'Academy subscription',
+  customer: 'Customer',
+  player: 'Player',
+  cash_shift: 'Cash shift',
+  whatsapp_accounts: 'WhatsApp account',
+  messaging_safety_settings: 'WhatsApp sending controls',
+  notification_consent: 'Notification consent',
+  // Platform-tier
+  clubs: 'Club',
+  platform_subscriptions: 'Platform subscription',
+  platform_plans: 'Plan',
+}
+
+/** Looks up a label, falling back to the raw value if genuinely unmapped -- never throws, matches the existing safe-fallback convention used throughout the app's other label maps. Defaults to 'ar' so any caller that hasn't been updated yet keeps its previous behavior. */
+export function actionLabel(action: string, locale: 'ar' | 'en' = 'ar'): string {
+  const table = locale === 'en' ? ACTION_LABELS_EN : ACTION_LABELS
+  return table[action] ?? action
+}
+
+export function entityLabel(entityType: string, locale: 'ar' | 'en' = 'ar'): string {
+  const table = locale === 'en' ? ENTITY_LABELS_EN : ENTITY_LABELS
+  return table[entityType] ?? entityType
 }

@@ -46,8 +46,17 @@ export const PAYMENT_METHOD_LABELS: Record<string, string> = {
 const FSI = '⁦'
 const PDI = '⁩'
 
-export function formatMoney(amount: number, currency = 'EGP'): string {
-  const formatted = new Intl.NumberFormat('ar-EG', {
+// English-localization sweep: this used to hardcode the 'ar-EG' Intl
+// locale regardless of the app's active UI language, so English-mode
+// screens rendered Arabic-Indic digits (e.g. "٢٢٠.٠٠") instead of
+// Western ones ("220.00"). `locale` now threads through from the
+// caller's useDirection() -- defaulted to 'ar' only so any caller that
+// genuinely can't reach locale (rare; almost every call site is inside
+// an authenticated /app, /portal, or /platform page where
+// DirectionProvider is in context) keeps the prior Arabic-digit
+// behavior instead of silently changing.
+export function formatMoney(amount: number, currency = 'EGP', locale: 'ar' | 'en' = 'ar'): string {
+  const formatted = new Intl.NumberFormat(locale === 'en' ? 'en-US' : 'ar-EG', {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
   }).format(amount)

@@ -1,4 +1,5 @@
 import { cn } from '@/lib/utils'
+import { useDirection } from '@/app/providers/DirectionProvider'
 
 // Financial figures must always be immediately legible — never buried in
 // small secondary text. See docs/DESIGN_SYSTEM.md#billing--outstanding-ux.
@@ -18,7 +19,14 @@ const toneClass = {
 } as const
 
 export function MoneyDisplay({ amount, currency = 'EGP', size = 'md', tone = 'default', className }: MoneyDisplayProps) {
-  const formatted = new Intl.NumberFormat('ar-EG', {
+  // English-localization sweep: was hardcoded to 'ar-EG' regardless of
+  // the app's active language, so English-mode screens showed
+  // Arabic-Indic digits. DirectionProvider is mounted globally above
+  // the router (App.tsx), so every consumer of this component --
+  // authenticated app pages and public-site pages alike -- has it in
+  // context.
+  const { locale } = useDirection()
+  const formatted = new Intl.NumberFormat(locale === 'en' ? 'en-US' : 'ar-EG', {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
   }).format(amount)
