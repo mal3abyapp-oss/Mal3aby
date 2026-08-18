@@ -205,6 +205,63 @@ check('the token itself is never used as a bare value -- always embedded inside 
   assert.ok(!bareTokenLine, 'the token appeared on its own line with no /qr/ path prefix')
 })
 
+// -----------------------------------------------------------------
+// booking-confirmed-paid -- duplicate-message fix (directive Sections
+// 22-24): the single merged message for a booking + same-transaction
+// payment, replacing the old booking-created + booking-confirmed +
+// payment-received trio.
+// -----------------------------------------------------------------
+
+const PAID_VARS = {
+  ...BASE_VARS,
+  amount_paid: 220,
+  method: 'cash',
+  booking_qr_token: 'qrtok-paid-1',
+  invoice_token: 'invtok-paid-1',
+}
+
+check('booking-confirmed-paid contains booking, payment, and invoice details in one message (ar + en)', () => {
+  const ar = renderTemplate('booking-confirmed-paid', 'ar', PAID_VARS)
+  assert.ok(ar.includes('ملعب 1'), 'missing field name')
+  assert.ok(ar.includes('MB-1A2B3C4D'), 'missing booking ref')
+  assert.ok(ar.includes('QAFULL-MAIN-2026-000030'), 'missing invoice number')
+  assert.ok(ar.includes('/qr/qrtok-paid-1'), 'missing QR link')
+  assert.ok(ar.includes('/verify/invtok-paid-1'), 'missing invoice link')
+
+  const en = renderTemplate('booking-confirmed-paid', 'en', PAID_VARS)
+  assert.ok(en.includes('Booking confirmed'), 'missing English title')
+  assert.ok(en.includes('MB-1A2B3C4D'), 'missing booking ref (en)')
+  assert.ok(en.includes('/qr/qrtok-paid-1'), 'missing QR link (en)')
+  assert.ok(en.includes('/verify/invtok-paid-1'), 'missing invoice link (en)')
+})
+
+check('booking-confirmed-paid formats money with Western digits in English, Arabic-Indic digits in Arabic (localization fix)', () => {
+  // Regression test for a real bug found in this exact template: money
+  // was always formatted with the 'ar-EG' locale regardless of message
+  // language, so an English customer's amounts rendered as "٢٢٠.٠٠"
+  // instead of "220.00" -- directive Section 38 (English mode must be
+  // actually English, not just the labels).
+  const en = renderTemplate('booking-confirmed-paid', 'en', PAID_VARS)
+  assert.ok(en.includes('220.00'), 'expected Western-digit amount in the English message')
+  assert.ok(!/[٠-٩]/.test(en), 'an Arabic-Indic digit leaked into the English message')
+
+  const ar = renderTemplate('booking-confirmed-paid', 'ar', PAID_VARS)
+  assert.ok(/[٠-٩]/.test(ar), 'expected Arabic-Indic digits in the Arabic message')
+})
+
+check('booking-confirmed-paid never leaks a raw ISO timestamp or unformatted money', () => {
+  const msg = renderTemplate('booking-confirmed-paid', 'ar', PAID_VARS)
+  assert.ok(!/\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/.test(msg), 'an ISO-shaped timestamp leaked into the rendered message')
+  assert.ok(!/\b220\b(?!\.00)/.test(msg), 'an unformatted raw amount leaked into the rendered message')
+})
+
+check('booking-confirmed-paid omits the invoice link when invoice_token is absent, but keeps the QR link', () => {
+  const { invoice_token, ...withoutInvoiceToken } = PAID_VARS
+  const msg = renderTemplate('booking-confirmed-paid', 'ar', withoutInvoiceToken)
+  assert.ok(!msg.includes('/verify/'), 'an invoice link appeared with no token supplied')
+  assert.ok(msg.includes('/qr/qrtok-paid-1'), 'the QR link should still be present')
+})
+
 console.log(`\n[templates.test] ${passed} test(s) passed.`)
 if (process.exitCode) {
   console.error('[templates.test] SOME TESTS FAILED.')

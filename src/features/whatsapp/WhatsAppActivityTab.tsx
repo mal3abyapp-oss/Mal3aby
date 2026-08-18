@@ -36,6 +36,11 @@ interface ActivityRow {
 const TEMPLATE_LABELS: Record<string, string> = {
   'booking-created': 'إنشاء حجز',
   'booking-confirmed': 'تأكيد حجز',
+  // Duplicate-message fix (2026-08-18): the merged booking+payment
+  // message queued by _create_booking_internal() when a payment is
+  // recorded in the same transaction as booking creation -- see
+  // whatsapp-connector/src/templates.ts's 'booking-confirmed-paid'.
+  'booking-confirmed-paid': 'تأكيد حجز مع الدفع',
   'booking-cancelled': 'إلغاء حجز',
   'payment-received': 'استلام دفعة',
   'payment-refunded': 'استرداد دفعة',

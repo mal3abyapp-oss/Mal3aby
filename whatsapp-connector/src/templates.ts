@@ -46,6 +46,7 @@
 export type TemplateKey =
   | 'booking-created'
   | 'booking-confirmed'
+  | 'booking-confirmed-paid'
   | 'booking-cancelled'
   | 'payment-received'
   | 'payment-refunded'
@@ -132,11 +133,24 @@ function formatTime(instant: string, timezone: string, locale: string): string |
   return new Intl.DateTimeFormat(locale, { timeZone: timezone, hour: 'numeric', minute: '2-digit', hour12: true }).format(d)
 }
 
-/** Mirrors formatMoney() (src/lib/domain/billing.ts) -- same Intl.NumberFormat('ar-EG', 2dp) pattern, ported rather than imported since the connector is a separate npm package with no shared module boundary to the frontend. */
+/**
+ * Mirrors formatMoney() (src/lib/domain/billing.ts) -- same 2dp
+ * pattern, ported rather than imported since the connector is a
+ * separate npm package with no shared module boundary to the frontend.
+ *
+ * Localization fix (2026-08-18, directive Section 38): this always
+ * used the 'ar-EG' locale for Intl.NumberFormat regardless of
+ * `language`, which renders Arabic-Indic digits (e.g. "٢٢٠.٠٠") even
+ * in an English-language message -- an English customer's booking
+ * confirmation showed Arabic numerals for every amount. Now picks
+ * 'en-US' (Western digits) for English, 'ar-EG' (Arabic-Indic digits,
+ * matching the rest of the Arabic UI) for Arabic.
+ */
 function formatMoney(amount: unknown, currencySuffixAr: string, currencySuffixEn: string, language: string): string | null {
   const n = typeof amount === 'number' ? amount : typeof amount === 'string' ? Number(amount) : NaN
   if (!Number.isFinite(n)) return null
-  const formatted = new Intl.NumberFormat('ar-EG', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(n)
+  const locale = language === 'en' ? 'en-US' : 'ar-EG'
+  const formatted = new Intl.NumberFormat(locale, { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(n)
   return `${formatted} ${language === 'en' ? currencySuffixEn : currencySuffixAr}`
 }
 
@@ -314,6 +328,54 @@ const AR: Record<TemplateKey, Renderer> = {
     )
   },
 
+  /**
+   * Duplicate-message fix (2026-08-18, directive Sections 22-24): fired
+   * ONCE instead of the old booking-created + booking-confirmed +
+   * payment-received trio when a payment is recorded in the SAME
+   * booking-creation transaction -- see
+   * _create_booking_internal()'s p_record_payment branch. A payment
+   * recorded LATER, as an independent event, still uses the separate
+   * 'payment-received' template below (that case is a genuinely
+   * distinct customer-facing event, not a duplicate).
+   */
+  'booking-confirmed-paid': (v) => {
+    const tz = isPresent(v.timezone) ? String(v.timezone) : DEFAULT_TIMEZONE
+    const date = isPresent(v.start_at) ? formatDate(String(v.start_at), tz, 'ar-EG') : null
+    const time = isPresent(v.start_at) ? formatTime(String(v.start_at), tz, 'ar-EG') : null
+    const total = formatMoney(v.total_price, 'ج.م', 'EGP', 'ar')
+    const paid = formatMoney(v.amount_paid, 'ج.م', 'EGP', 'ar')
+    const paymentStatus = paymentStatusLabel(v.payment_status, 'ar')
+    const method = paymentMethodLabel(v.method, 'ar')
+    const qrUrl = bookingQrUrl(v.booking_qr_token)
+    const invoiceLink = invoiceUrl(v.invoice_token)
+    return joinLines(
+      '✅ *تم تأكيد حجزك*',
+      '',
+      greeting(v, 'ar'),
+      '',
+      'تم تأكيد حجزك وتسجيل دفعتك بنجاح.',
+      '',
+      line('🏟️', 'الملعب', v.field_name),
+      line('⚽', 'النشاط', v.sport),
+      line('📅', 'التاريخ', date),
+      line('🕐', 'الوقت', time),
+      line('🔖', 'رقم الحجز', v.booking_ref),
+      '',
+      line('💰', 'الإجمالي', total),
+      line('✅', 'المدفوع', paid),
+      line('💳', 'طريقة الدفع', method),
+      line('💳', 'حالة الدفع', paymentStatus),
+      line('🧾', 'رقم الفاتورة', v.invoice_number),
+      '',
+      qrUrl ? `تفاصيل الحجز ورمز الحضور:\n${qrUrl}` : '',
+      invoiceLink ? `عرض الفاتورة:\n${invoiceLink}` : '',
+      '',
+      'نتمنى لك وقتًا ممتعًا ⚽',
+      '',
+      brandLine(v, 'ar'),
+    )
+  },
+
   'booking-cancelled': (v) => {
     const tz = isPresent(v.timezone) ? String(v.timezone) : DEFAULT_TIMEZONE
     const date = isPresent(v.start_at) ? formatDate(String(v.start_at), tz, 'ar-EG') : null
@@ -448,6 +510,45 @@ const EN: Record<TemplateKey, Renderer> = {
       line('💳', 'Payment status', paymentStatus),
       '',
       qrUrl ? `Check-in code:\n${qrUrl}` : '',
+      '',
+      'See you there ⚽',
+      '',
+      brandLine(v, 'en'),
+    )
+  },
+
+  /** English mirror of AR's 'booking-confirmed-paid' -- see its doc comment for the full duplicate-message-fix rationale. */
+  'booking-confirmed-paid': (v) => {
+    const tz = isPresent(v.timezone) ? String(v.timezone) : DEFAULT_TIMEZONE
+    const date = isPresent(v.start_at) ? formatDate(String(v.start_at), tz, 'en-US') : null
+    const time = isPresent(v.start_at) ? formatTime(String(v.start_at), tz, 'en-US') : null
+    const total = formatMoney(v.total_price, 'ج.م', 'EGP', 'en')
+    const paid = formatMoney(v.amount_paid, 'ج.م', 'EGP', 'en')
+    const paymentStatus = paymentStatusLabel(v.payment_status, 'en')
+    const method = paymentMethodLabel(v.method, 'en')
+    const qrUrl = bookingQrUrl(v.booking_qr_token)
+    const invoiceLink = invoiceUrl(v.invoice_token)
+    return joinLines(
+      '✅ *Booking confirmed*',
+      '',
+      greeting(v, 'en'),
+      '',
+      'Your booking is confirmed and your payment has been recorded.',
+      '',
+      line('🏟️', 'Field', v.field_name),
+      line('⚽', 'Sport', v.sport),
+      line('📅', 'Date', date),
+      line('🕐', 'Time', time),
+      line('🔖', 'Booking #', v.booking_ref),
+      '',
+      line('💰', 'Total', total),
+      line('✅', 'Paid', paid),
+      line('💳', 'Method', method),
+      line('💳', 'Payment status', paymentStatus),
+      line('🧾', 'Invoice #', v.invoice_number),
+      '',
+      qrUrl ? `View booking details and entry code:\n${qrUrl}` : '',
+      invoiceLink ? `View invoice:\n${invoiceLink}` : '',
       '',
       'See you there ⚽',
       '',
