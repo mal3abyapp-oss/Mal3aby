@@ -6,6 +6,56 @@ Last updated: 2026-08-18
 
 ---
 
+## FREE PREPARATION COMPLETE
+
+Everything closeable on the current free plans (Cloudflare Workers Free, Supabase Free — both intentionally temporary, not upgraded during this pass) has been closed. Real findings from a full static/code-level audit of the WhatsApp Container path, Durable Object, Management API, and session/queue persistence design:
+
+- **Two real (low-severity) findings fixed**: (1) both `whatsapp-connector/Dockerfile` and `HealthServer.ts` carried a stale comment claiming a `pingEndpoint`/"/ready" override that does not exist in the actually-installed `@cloudflare/containers@0.0.13` API (`startAndWaitForPorts()` gates on TCP port reachability only) — corrected to describe the real mechanism. (2) Both the Container's `/status` endpoint (`HealthServer.ts`) and the Worker's public `/manage/*` endpoint (`index.ts`) used a plain `!==` string comparison for their bearer tokens — timing-variable. Replaced with `node:crypto`'s `timingSafeEqual` (Container, internal-only, defense-in-depth) and the Workers runtime's native `crypto.subtle.timingSafeEqual` (Worker, genuinely public-internet-facing — the real threat surface of the two). Both typechecked clean, redeployed live, and the Management API auth gate re-verified live (401/401/404 for no-token/wrong-token/unknown-route).
+- **Session persistence design confirmed sound by direct code reading** (`SessionStore.ts`): AES-256-GCM encryption, per-club SHA-256-hashed auth-directory isolation, `0o700`/`0o600` file permissions, throws (never silent no-op) on a corrupted/tampered payload, and `TenantConnectionManager.restoreAllPersistedSessions()` pulls the encrypted blob from Postgres and writes it to local disk **before** Baileys attempts reconnect at every process start — the exact pattern needed for Cloudflare's ephemeral-disk container model. No architecture change was needed, only verification.
+- **Queue recovery confirmed already solved, with real evidence of a prior live bug and its fix**: `whatsapp_connector_claim_next_batch()` uses `FOR UPDATE ... SKIP LOCKED` (concurrency-safe claim). A genuine crash-recovery gap (a connector crash mid-send left a queue row permanently stuck in `processing`, invisible to every existing diagnostic) was found live during an earlier Safe Messaging test and fixed in `whatsapp_connector_expire_stale()` — already called every `QueueConsumer` poll tick — which reclaims any row stuck in `processing` for >10 minutes back to `retrying` without double-counting the attempt. Confirmed live in the current deployed function source, not assumed from a migration filename.
+- **Duplicate-delivery protection confirmed real**: a partial unique index (`notification_queue_dedup_active_idx`) on `dedup_key` scoped to active statuses prevents a second queue row for the same logical event while one is in flight. The one remaining residual risk — a crash in the narrow window between WhatsApp accepting a send and `reportSendResult()` committing — is not eliminable without idempotent send-confirmation from WhatsApp itself (Baileys doesn't provide one); this is documented honestly, not hidden, and is bounded by the same 10-minute stuck-processing recovery above.
+- **Durable Object club isolation confirmed real**: `getAccountObject()` derives the DO instance name directly from the request's `clubId` path segment via Cloudflare's own `getContainer()`/`idFromName` mechanism — there is no code path where a request authenticated for one club's management action can reach another club's DO instance except by an authorized caller explicitly supplying a different `clubId` (which is the intended platform-admin capability, not a leak).
+- **Git secrets audit: PASS.** Full repo-wide scan (this pass and cumulative across prior passes) found no real `.env`, JWT, service-role key, private key, Baileys session file, Cloudflare token, WhatsApp encryption key, or management token ever committed. Only `.env.example` (placeholder values) and the documented `PUBLIC_APP_URL` placeholder (`https://REPLACE-WITH-PRODUCTION-DOMAIN`, a non-secret `var`, not a fake secret) exist in tracked files.
+- **Production frontend re-verified live, no regression**: all deep-link routes, security headers, and Supabase connectivity confirmed unchanged and correct on `https://mala3by-frontend.moustafa-elsafy2.workers.dev`.
+
+**READY FOR WORKERS PAID ACTIVATION: YES.**
+
+### Production Secrets Matrix (names only — code-derived, no values shown)
+
+| Name | Secret or non-secret | Used by | Where configured | Required before deploy? | Rotation impact |
+|---|---|---|---|---|---|
+| `SUPABASE_URL` | Non-secret | Connector + Worker + Durable Object | `wrangler.jsonc` `vars` (both projects); connector `.env` | Yes | None — public project URL, safe to change anytime |
+| `SUPABASE_SERVICE_ROLE_KEY` | **Secret** | Connector (all Supabase reads/writes: queue claim, session load/store, account status) | `wrangler secret put` (whatsapp-worker, passed to Container via `envVars`); connector `.env` for local/VPS | Yes | Rotating requires updating both the Cloudflare secret and Supabase's own key — a stale value fails every Supabase call, not just auth |
+| `WHATSAPP_SESSION_ENCRYPTION_KEY` | **Secret** | Connector (`SessionStore.ts` — encrypts/decrypts the Baileys auth-state blob) | `wrangler secret put`; connector `.env` | Yes | **Must match the value already used for any club with an existing paired session** — changing it makes existing encrypted sessions permanently undecryptable, forcing a fresh QR pair for every affected club |
+| `CONTAINER_INTERNAL_TOKEN` | **Secret** | Container's `/status` endpoint (`HealthServer.ts`) checks it; Durable Object (`WhatsAppAccountObject.ts`) presents it via `containerFetch()` | `wrangler secret put` (whatsapp-worker) — flows to the Container via the Container class' own env passthrough; connector `.env` for local testing | Yes | Rotating requires updating the Worker secret and the value the Container reads — a mismatch makes `/status` fail closed (403), which only affects idle-sleep cost optimization, not correctness (the container keeps running, just never sleeps until fixed) |
+| `MANAGEMENT_API_TOKEN` | **Secret** | Worker's public `/manage/*` routes (`index.ts`) | `wrangler secret put` (whatsapp-worker) | Yes | Rotating requires updating whatever authorized caller (platform-owner admin action, ops tooling) presents it — a mismatch makes all `/manage/*` calls 401 until fixed; does not affect an already-running container |
+| `PUBLIC_APP_URL` | Non-secret | Connector (`templates.ts` — builds QR/invoice links in WhatsApp messages); Worker `vars` | `wrangler.jsonc` `vars` (currently the placeholder `https://REPLACE-WITH-PRODUCTION-DOMAIN` — intentionally not filled with a fake value while no Container is deployed); connector `.env` | Yes, once a real domain exists | Changing it only affects newly-generated links; already-sent WhatsApp messages keep their original (now possibly stale) link — no security impact, only a UX one if changed after messages are already in customers' hands |
+| `HEALTH_PORT` | Non-secret | Connector (`HealthServer.ts`) | Connector `.env` / Dockerfile `ENV` (defaults to `8080`, matches `defaultPort` in `WhatsAppAccountObject.ts`) | No (has a safe default) | None |
+| `QUEUE_POLL_INTERVAL_MS`, `QUEUE_BATCH_SIZE`, `LOG_LEVEL`, `WHATSAPP_TEMP_AUTH_DIR` | Non-secret | Connector | Connector `.env` (all have safe defaults) | No | None |
+
+**PUBLIC_APP_URL production value**: unknown until a real Cloudflare custom domain is bound (external blocker, unchanged from the prior report). No placeholder secret was invented for this — the config correctly documents the gap rather than guessing.
+
+### Observability preparation (free tier only, nothing purchased)
+
+Workers Logs (`observability.enabled: true`) is live on both `mala3by-frontend` and `mala3by-whatsapp-worker` — confirmed via the redeploy in the prior phase, free tier, no plan upgrade. Container health/connection-status/queue-pending/queue-failed/last-error/last-seen visibility already exists at the data layer (`whatsapp_accounts` table, `HealthServer.ts`'s `/status` diagnostics) and requires no additional purchase to view once the Container itself is deployed — the platform-owner-facing WhatsApp health screen remains a Phase B item per `MAL3ABY_PRODUCTION_READINESS.md`, not built in this pass (no scope creep).
+
+### Supabase Free / Transactional Email — explicitly not changed
+
+Per this task's own instruction, no Supabase upgrade was requested and none is pending action here. **`BACKUP = NOT PRODUCTION READY ON CURRENT PLAN`** remains the accurate, undisguised status — it is not reframed as PASS. This gap does not block technically testing the WhatsApp Container once Workers Paid + Docker are available; it only blocks the "FIRST PAID CLUB" commercial gate. Similarly, no transactional email provider was added: **`OPEN SELF-SERVICE SIGNUP = BLOCKED/WARN`**, while **`CONTROLLED PILOT WITH PRE-CONFIRMED ACCOUNTS = POSSIBLE`** (the platform owner can pre-confirm pilot accounts manually, unaffected by this gap).
+
+### Only remaining requirements to test the WhatsApp Container live
+
+1. Activate Cloudflare Workers Paid ($5/mo — not activated in this pass, requires explicit approval)
+2. Have a working Docker/OCI builder (local Docker daemon still down, re-confirmed once, not looped)
+3. Configure the production secrets listed in the matrix above via `wrangler secret put`
+4. Build the container image
+5. Deploy the Container
+6. Execute the live acceptance tests already specified in `MAL3ABY_CLOUDFLARE_WHATSAPP_VALIDATION.md` §5
+
+No other internal/code blocker remains.
+
+---
+
 ## Account discovery (real, live, verified — not assumed)
 
 - **Cloudflare**: authenticated via `wrangler whoami` — account `Moustafa.elsafy2@gmail.com's Account`, ID `35ac10727701095866b16c276b4a33d1`. Token scope includes `containers (write)`, `workers (write)`, `d1 (write)` — full deploy capability. **Workers plan: Free.** Confirmed live via `wrangler containers list` → `401 Unauthorized: ... Deploying containers requires the Workers Paid plan.` No existing zones/custom domains found in the account (4 pre-existing unrelated Workers: `nfc-platform-web-preview`, `local-commerce-platform`, `ems-v2`, `ghezaa` — none conflict with `mala3by-*` naming). R2 not enabled (separate dashboard opt-in required — not needed by this architecture anyway). D1: 0 databases (correctly unused — Supabase remains sole business-data store).

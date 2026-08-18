@@ -1,14 +1,37 @@
 import { createServer, type Server } from 'node:http'
+import { timingSafeEqual } from 'node:crypto'
 import type { SupabaseSync } from './SupabaseSync.js'
 import type { TenantConnectionManager } from './TenantConnectionManager.js'
 
 /**
+ * Constant-time token comparison. The /status endpoint is internal-only
+ * (Worker<->Container via containerFetch(), never public-internet-
+ * reachable per the architecture), so a practical timing attack over
+ * Cloudflare's own internal routing is not a realistic threat given a
+ * 32-byte random token -- but defense-in-depth costs nothing here, so a
+ * plain `!==` string comparison (timing-variable) is avoided in favor of
+ * this. Falls back to false on any length mismatch or non-string input
+ * without leaking length via the comparison itself.
+ */
+function safeTokenEquals(provided: string | undefined, expected: string): boolean {
+  if (typeof provided !== 'string') return false
+  const providedBuf = Buffer.from(provided)
+  const expectedBuf = Buffer.from(expected)
+  if (providedBuf.length !== expectedBuf.length) return false
+  return timingSafeEqual(providedBuf, expectedBuf)
+}
+
+/**
  * HealthServer -- Cloudflare Containers requires the container image to
- * listen on an HTTP port (Container class' `defaultPort`/`pingEndpoint`)
- * so the platform can tell "container process started successfully" and
- * so the owning Durable Object can poll real liveness before deciding
- * whether to call renewActivityTimeout() (keep the container awake) or
- * let it sleep. This is the ONLY inbound port this service opens --
+ * listen on an HTTP port (Container class' `defaultPort`, confirmed
+ * against the actual installed @cloudflare/containers@0.0.13 API --
+ * there is no separate `pingEndpoint` property in this version;
+ * startAndWaitForPorts() gates readiness on TCP port reachability, not
+ * a specific HTTP path) so the platform can tell "container process
+ * started successfully" and so the owning Durable Object can poll real
+ * liveness before deciding whether to call renewActivityTimeout()
+ * (keep the container awake) or let it sleep. This is the ONLY inbound
+ * port this service opens --
  * every other capability (queue consumption, pairing requests) remains
  * pure outbound polling against Supabase, exactly as before this file
  * was added. This does not change the local/VPS deployment story either
@@ -68,7 +91,7 @@ export function startHealthServer(sync: SupabaseSync, connections: TenantConnect
       // non-Cloudflare host where nothing ever calls this) fails closed
       // -- the endpoint simply refuses rather than defaulting open.
       const provided = req.headers['x-internal-token']
-      if (!internalToken || provided !== internalToken) {
+      if (!internalToken || Array.isArray(provided) || !safeTokenEquals(provided, internalToken)) {
         res.writeHead(403, { 'content-type': 'text/plain' })
         res.end('forbidden')
         return

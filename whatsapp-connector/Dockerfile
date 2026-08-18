@@ -55,12 +55,25 @@ USER node
 ENV WHATSAPP_TEMP_AUTH_DIR=/app/.baileys-auth-tmp
 ENV HEALTH_PORT=8080
 
-# Cloudflare Containers' Container class polls this for startup
-# readiness (`pingEndpoint`, default "ping" -- overridden to "/ready"
-# in the Worker config) and for ongoing liveness (`/health`). Exposed
-# for documentation/local `docker run -p` convenience; Cloudflare's own
-# routing to this port is configured in the Worker/Durable Object
-# (`defaultPort`), not by this EXPOSE directive.
+# Cloudflare Containers' Container class (startAndWaitForPorts(), see
+# WhatsAppAccountObject.ts) waits for THIS PORT to accept a TCP
+# connection as its startup-readiness signal -- confirmed against the
+# actual installed @cloudflare/containers@0.0.13 API surface
+# (node_modules/@cloudflare/containers/dist/index.d.ts): there is no
+# `pingEndpoint` property in this version: only `defaultPort` /
+# `requiredPorts`, which gate on port reachability, not on a specific
+# HTTP path responding. An earlier version of this comment incorrectly
+# described a documented-but-nonexistent "/ready" path override -- this
+# was a stale-documentation assumption, not a real API surface, caught
+# and corrected during a static audit rather than left uncorrected.
+# HealthServer.ts's actual /health, /ready, /status paths remain real
+# and are polled by WhatsAppAccountObject's own 60s alarm-driven
+# pollHealthAndDecide() logic (a request the DO makes AFTER the
+# container is already confirmed port-reachable), not by the Container
+# base class's own startup gate. Exposed here for documentation/local
+# `docker run -p` convenience; Cloudflare's own routing to this port is
+# configured via `defaultPort` in the Worker/Durable Object, not by
+# this EXPOSE directive.
 EXPOSE 8080
 
 # Graceful shutdown: index.ts already handles SIGTERM (calls

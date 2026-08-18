@@ -29,9 +29,32 @@ function unauthorized(): Response {
   return new Response('unauthorized', { status: 401 })
 }
 
+const textEncoder = new TextEncoder()
+
+/**
+ * Constant-time comparison for the Management API token. Unlike
+ * CONTAINER_INTERNAL_TOKEN (internal Worker<->Container routing only),
+ * /manage/* is this architecture's ONE genuinely public-internet-facing
+ * route -- a timing side-channel here is a real, not merely
+ * theoretical, threat surface. Uses the Workers runtime's native
+ * crypto.subtle.timingSafeEqual (documented Cloudflare pattern), and
+ * -- per that same documented pattern -- never short-circuits on a
+ * length mismatch, since an early return there would itself leak the
+ * secret's length via timing.
+ */
+function timingSafeStringEqual(a: string, b: string): boolean {
+  const aBytes = textEncoder.encode(a)
+  const bBytes = textEncoder.encode(b)
+  if (aBytes.byteLength !== bBytes.byteLength) {
+    return crypto.subtle.timingSafeEqual(aBytes, aBytes) && false
+  }
+  return crypto.subtle.timingSafeEqual(aBytes, bBytes)
+}
+
 async function handleManage(request: Request, env: Env): Promise<Response> {
   const auth = request.headers.get('authorization')
-  if (!env.MANAGEMENT_API_TOKEN || auth !== `Bearer ${env.MANAGEMENT_API_TOKEN}`) {
+  const expected = env.MANAGEMENT_API_TOKEN ? `Bearer ${env.MANAGEMENT_API_TOKEN}` : null
+  if (!expected || !auth || !timingSafeStringEqual(auth, expected)) {
     return unauthorized()
   }
 
