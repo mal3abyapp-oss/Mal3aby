@@ -342,7 +342,21 @@ export class WhatsAppAccountObject extends Container<Env> {
         // false here is the safe default, not "assume healthy".
         return { shouldStayAwake: false, status: `http_${res.status}` }
       }
-      const body = (await res.json()) as { shouldStayAwake: boolean; pid?: number; uptimeSeconds?: number; memoryMb?: { rss: number } }
+      const body = (await res.json()) as {
+        shouldStayAwake: boolean
+        pid?: number
+        uptimeSeconds?: number
+        memoryMb?: { rss: number }
+        accounts?: Array<{
+          clubId: string
+          state: string
+          generation?: number
+          disconnectCount?: number
+          reconnectCount?: number
+          lastDisconnectReason?: string | null
+          connectionUptimeMs?: number | null
+        }>
+      }
       // DIAGNOSTIC (root-cause investigation): surface the connector
       // process's own pid/uptimeSeconds/memory through THIS Worker's
       // logs -- wrangler tail only captures Durable Object/Worker
@@ -356,6 +370,26 @@ export class WhatsAppAccountObject extends Container<Env> {
       console.log(
         `[lifecycle] pollHealthAndDecide club=${this.clubIdShort()} at=${new Date().toISOString()} pid=${body.pid} uptimeSeconds=${body.uptimeSeconds} rssMb=${body.memoryMb?.rss}`,
       )
+      // ADVERSARIAL PROOF SEQUENCE FINDING (2026-08-18): real WhatsApp
+      // sends against this club are failing 100% of the time with
+      // "socket.sendMessage() never resolved" -- reproduced 3 separate
+      // times today, spanning BEFORE and AFTER all container-lifecycle
+      // changes in this session, so it is NOT a regression introduced by
+      // onActivityExpired()/the @cloudflare/containers upgrade. This is
+      // read-only observability (BaileysProvider.getDiagnostics(), which
+      // HealthServer.ts's /status already returns as `accounts` --
+      // logging it here adds zero new data collection, only visibility)
+      // to test the "zombie socket" hypothesis: a WASocket whose
+      // connection.update handler never fired 'close', so
+      // whatsapp_accounts.status stays 'connected' in Supabase while the
+      // real WA-side session is dead. generation/disconnectCount/
+      // reconnectCount/connectionUptimeMs answer this without needing to
+      // touch the send path itself.
+      for (const account of body.accounts ?? []) {
+        console.log(
+          `[diag] baileysState club=${this.clubIdShort()} at=${new Date().toISOString()} state=${account.state} generation=${account.generation} disconnectCount=${account.disconnectCount} reconnectCount=${account.reconnectCount} lastDisconnectReason=${account.lastDisconnectReason} connectionUptimeMs=${account.connectionUptimeMs}`,
+        )
+      }
       if (body.shouldStayAwake) {
         this.renewActivityTimeout()
       }
