@@ -80,6 +80,37 @@ export class WhatsAppAccountObject extends Container<Env> {
   // chance to let it sleep.
   sleepAfter = '3m'
 
+  // REAL BUG FOUND AND FIXED during first live acceptance run: the
+  // Container base class does NOT automatically forward this Worker's
+  // own env bindings/secrets into the container process -- envVars must
+  // be set explicitly (confirmed against the actual installed
+  // @cloudflare/containers@0.0.13 API: `envVars?: Record<string,
+  // string>` is a plain class property with no default forwarding
+  // behavior documented or observed). Without this, the container
+  // started with an empty environment; whatsapp-connector/src/index.ts
+  // does `process.env.WHATSAPP_SESSION_ENCRYPTION_KEY!` (non-null
+  // assertion) at startup, which threw immediately on `undefined` and
+  // crashed the container before it ever bound port 8080 -- observed
+  // live via `wrangler tail` as "Container crashed while checking for
+  // ports, did you setup the entrypoint correctly?" on the very first
+  // ensureRunning() call against a real deployed Container. Fixed by
+  // explicitly declaring the exact set of env vars the connector's own
+  // code actually reads (cross-checked against every `process.env.*`
+  // read in whatsapp-connector/src, not guessed).
+  envVars: Record<string, string>
+
+  constructor(ctx: DurableObjectState<Env>, env: Env) {
+    super(ctx, env)
+    this.envVars = {
+      SUPABASE_URL: env.SUPABASE_URL,
+      SUPABASE_SERVICE_ROLE_KEY: env.SUPABASE_SERVICE_ROLE_KEY,
+      WHATSAPP_SESSION_ENCRYPTION_KEY: env.WHATSAPP_SESSION_ENCRYPTION_KEY,
+      CONTAINER_INTERNAL_TOKEN: env.CONTAINER_INTERNAL_TOKEN,
+      PUBLIC_APP_URL: env.PUBLIC_APP_URL,
+      HEALTH_PORT: '8080',
+    }
+  }
+
   /**
    * Called by the Container base class once the container has started
    * and (if defaultPort/requiredPorts is set) its port is confirmed
