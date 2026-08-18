@@ -1,10 +1,12 @@
 import { useEffect } from 'react'
 import { useParams, useSearchParams } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
+import { useTranslation } from 'react-i18next'
 import { supabase } from '@/lib/supabase/client'
 import { StatusBadge } from '@/components/ui/status-badge'
-import { formatMoney, PAYMENT_STATUS_LABELS, PAYMENT_STATUS_TONE, type PaymentStatus } from '@/lib/domain/billing'
+import { PAYMENT_STATUS_TONE, type PaymentStatus } from '@/lib/domain/billing'
 import { useDirection } from '@/app/providers/DirectionProvider'
+import { formatCurrency, formatDate, type SupportedLocale } from '@/lib/i18n/config'
 import { CheckCircle2, XCircle } from 'lucide-react'
 
 // Task #86: public invoice verification page. Reachable with NO login
@@ -59,16 +61,16 @@ async function verifyInvoice(token: string): Promise<VerificationResult> {
 export function VerifyInvoicePage() {
   const { token } = useParams<{ token: string }>()
   const [searchParams] = useSearchParams()
+  const { t } = useTranslation()
   const { direction, locale, setLocale } = useDirection()
 
   // Secure Booking Page language hand-off (directive Sections 28-32/40):
   // invoiceUrl() now appends ?lang=ar|en matching the WhatsApp message's
   // own language -- honored here the same way SecureBookingPage does,
   // one-time on mount, so an English customer's "View invoice" link
-  // opens with the correct direction set immediately. Full copy
-  // translation for this page is tracked under the broader English
-  // localization sweep (this page's own strings stay Arabic-only for
-  // now) -- this only fixes direction/RTL-vs-LTR, not every string.
+  // opens with the correct direction set immediately. Copy is now fully
+  // translated via useTranslation()/t() (verifyInvoice.* resource keys),
+  // matching SecureBookingPage's pattern.
   useEffect(() => {
     const langParam = searchParams.get('lang')
     if ((langParam === 'ar' || langParam === 'en') && langParam !== locale) {
@@ -87,73 +89,76 @@ export function VerifyInvoicePage() {
   return (
     <div dir={direction} className="flex min-h-screen items-center justify-center bg-page-bg p-4">
       <div className="w-full max-w-sm rounded-xl border border-border bg-surface p-6 text-center shadow">
-        <p className="mb-4 text-sm font-medium text-text-secondary">التحقق من فاتورة</p>
+        <p className="mb-4 text-sm font-medium text-text-secondary">{t('verifyInvoice.title')}</p>
 
-        {isLoading && <p className="text-sm text-text-secondary">جارٍ التحقق...</p>}
+        {isLoading && <p className="text-sm text-text-secondary">{t('verifyInvoice.loading')}</p>}
 
         {!isLoading && (isError || !data || data.result === 'invalid') && (
           <div className="flex flex-col items-center gap-3">
             <XCircle className="size-12 text-status-danger" />
-            <p className="font-medium text-status-danger">رمز غير صالح</p>
-            <p className="text-sm text-text-secondary">
-              لم يتم العثور على فاتورة مطابقة لهذا الرمز. تأكد من مسح الرمز الصحيح، أو تواصل مع النادي مباشرة للتأكد.
-            </p>
+            <p className="font-medium text-status-danger">{t('verifyInvoice.states.invalidTitle')}</p>
+            <p className="text-sm text-text-secondary">{t('verifyInvoice.states.invalidMessage')}</p>
           </div>
         )}
 
         {!isLoading && data && data.result === 'success' && (
           <div className="flex flex-col items-center gap-3">
             <CheckCircle2 className="size-12 text-status-success" />
-            <p className="font-medium text-status-success">فاتورة موثّقة</p>
+            <p className="font-medium text-status-success">{t('verifyInvoice.states.successTitle')}</p>
             <div className="w-full rounded-md border border-border p-4 text-start text-sm">
               <div className="flex justify-between py-1">
-                <span className="text-text-secondary">رقم الفاتورة</span>
+                <span className="text-text-secondary">{t('verifyInvoice.invoiceNumber')}</span>
                 <span className="font-medium"><bdi>{data.invoiceNumber}</bdi></span>
               </div>
               {data.customerName && (
                 <div className="flex justify-between py-1">
-                  <span className="text-text-secondary">العميل</span>
+                  <span className="text-text-secondary">{t('verifyInvoice.customer')}</span>
                   <span className="font-medium">{data.customerName}</span>
                 </div>
               )}
               {data.bookingRef && (
                 <div className="flex justify-between py-1">
-                  <span className="text-text-secondary">رقم الحجز</span>
+                  <span className="text-text-secondary">{t('verifyInvoice.bookingRef')}</span>
                   <span className="font-medium"><bdi>{data.bookingRef}</bdi></span>
                 </div>
               )}
               {data.fieldName && (
                 <div className="flex justify-between py-1">
-                  <span className="text-text-secondary">الملعب</span>
+                  <span className="text-text-secondary">{t('verifyInvoice.field')}</span>
                   <span className="font-medium">{data.fieldName}</span>
                 </div>
               )}
               <div className="flex justify-between py-1">
-                <span className="text-text-secondary">تاريخ الإصدار</span>
+                <span className="text-text-secondary">{t('verifyInvoice.issuedAt')}</span>
                 <span className="font-medium">
-                  {data.issuedAt ? new Date(data.issuedAt).toLocaleDateString('ar-EG') : '—'}
+                  {data.issuedAt
+                    ? formatDate(data.issuedAt, locale as SupportedLocale, 'Africa/Cairo', { day: 'numeric', month: 'long', year: 'numeric' })
+                    : '—'}
                 </span>
               </div>
               <div className="flex justify-between py-1">
-                <span className="text-text-secondary">الإجمالي</span>
-                <span className="font-medium">{data.total !== null ? formatMoney(data.total) : '—'}</span>
+                <span className="text-text-secondary">{t('verifyInvoice.total')}</span>
+                <span className="font-medium">{data.total !== null ? formatCurrency(data.total, locale as SupportedLocale) : '—'}</span>
               </div>
               {data.paid !== null && (
                 <div className="flex justify-between py-1">
-                  <span className="text-text-secondary">المدفوع</span>
-                  <span className="font-medium text-status-success">{formatMoney(data.paid)}</span>
+                  <span className="text-text-secondary">{t('verifyInvoice.paid')}</span>
+                  <span className="font-medium text-status-success">{formatCurrency(data.paid, locale as SupportedLocale)}</span>
                 </div>
               )}
               {data.outstanding !== null && data.outstanding > 0 && (
                 <div className="flex justify-between py-1">
-                  <span className="text-text-secondary">المتبقي</span>
-                  <span className="font-medium text-status-danger">{formatMoney(data.outstanding)}</span>
+                  <span className="text-text-secondary">{t('verifyInvoice.outstanding')}</span>
+                  <span className="font-medium text-status-danger">{formatCurrency(data.outstanding, locale as SupportedLocale)}</span>
                 </div>
               )}
               <div className="flex justify-between py-1">
-                <span className="text-text-secondary">حالة السداد</span>
+                <span className="text-text-secondary">{t('verifyInvoice.paymentStatus')}</span>
                 {data.paymentStatus && (
-                  <StatusBadge tone={PAYMENT_STATUS_TONE[data.paymentStatus]} label={PAYMENT_STATUS_LABELS[data.paymentStatus]} />
+                  <StatusBadge
+                    tone={PAYMENT_STATUS_TONE[data.paymentStatus]}
+                    label={t(`verifyInvoice.paymentStatusLabels.${data.paymentStatus}`, { defaultValue: data.paymentStatus })}
+                  />
                 )}
               </div>
             </div>

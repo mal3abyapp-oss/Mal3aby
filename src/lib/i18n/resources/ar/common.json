@@ -122,5 +122,32 @@
       "invalidTitle": "رمز غير صالح",
       "invalidMessage": "لم يتم العثور على حجز مطابق لهذا الرمز. تأكد من فتح الرابط الصحيح، أو تواصل مع النادي مباشرة."
     }
+  },
+  "verifyInvoice": {
+    "title": "التحقق من فاتورة",
+    "loading": "جارٍ التحقق...",
+    "invoiceNumber": "رقم الفاتورة",
+    "customer": "العميل",
+    "bookingRef": "رقم الحجز",
+    "field": "الملعب",
+    "issuedAt": "تاريخ الإصدار",
+    "total": "الإجمالي",
+    "paid": "المدفوع",
+    "outstanding": "المتبقي",
+    "paymentStatus": "حالة السداد",
+    "states": {
+      "invalidTitle": "رمز غير صالح",
+      "invalidMessage": "لم يتم العثور على فاتورة مطابقة لهذا الرمز. تأكد من مسح الرمز الصحيح، أو تواصل مع النادي مباشرة للتأكد.",
+      "successTitle": "فاتورة موثّقة"
+    },
+    "paymentStatusLabels": {
+      "draft": "مسودة",
+      "void": "ملغاة",
+      "unpaid": "غير مدفوعة",
+      "partially_paid": "مدفوعة جزئيًا",
+      "paid": "مدفوعة بالكامل",
+      "partially_refunded": "مستردة جزئيًا",
+      "refunded": "مستردة بالكامل"
+    }
   }
 }

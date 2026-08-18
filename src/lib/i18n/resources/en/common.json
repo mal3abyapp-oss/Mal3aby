@@ -122,5 +122,32 @@
       "invalidTitle": "Invalid code",
       "invalidMessage": "No matching booking was found for this code. Make sure you opened the correct link, or contact the club directly."
     }
+  },
+  "verifyInvoice": {
+    "title": "Verify invoice",
+    "loading": "Verifying...",
+    "invoiceNumber": "Invoice #",
+    "customer": "Customer",
+    "bookingRef": "Booking #",
+    "field": "Field",
+    "issuedAt": "Issue date",
+    "total": "Total",
+    "paid": "Paid",
+    "outstanding": "Outstanding",
+    "paymentStatus": "Payment status",
+    "states": {
+      "invalidTitle": "Invalid code",
+      "invalidMessage": "No matching invoice was found for this code. Make sure you scanned the correct code, or contact the club directly to confirm.",
+      "successTitle": "Verified invoice"
+    },
+    "paymentStatusLabels": {
+      "draft": "Draft",
+      "void": "Voided",
+      "unpaid": "Unpaid",
+      "partially_paid": "Partially paid",
+      "paid": "Fully paid",
+      "partially_refunded": "Partially refunded",
+      "refunded": "Fully refunded"
+    }
   }
 }
