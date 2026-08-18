@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useSearchParams } from 'react-router-dom'
+import { useTranslation } from 'react-i18next'
 import { supabase } from '@/lib/supabase/client'
 import { PageHeader } from '@/components/ui/page-header'
 import { Card, CardContent } from '@/components/ui/card'
@@ -21,6 +22,7 @@ import {
   type PaymentStatus,
 } from '@/lib/domain/billing'
 import { translateSupabaseError } from '@/lib/errors'
+import { useDirection } from '@/app/providers/DirectionProvider'
 import { Wallet } from 'lucide-react'
 
 // Master Payment Directive Sections 46-53, 86-87: "My Payments" -- a
@@ -97,7 +99,9 @@ async function fetchVisiblePaymentMethods(clubId: string): Promise<PaymentMethod
 }
 
 function ClaimPaymentDialog({ invoice, clubId, onClose }: { invoice: InvoiceRow; clubId: string; onClose: () => void }) {
+  const { t } = useTranslation()
   const queryClient = useQueryClient()
+  const { locale } = useDirection()
   const [methodId, setMethodId] = useState<string | null>(null)
   const [amount, setAmount] = useState(invoice.outstanding.toFixed(2))
   const [reference, setReference] = useState('')
@@ -114,10 +118,10 @@ function ClaimPaymentDialog({ invoice, clubId, onClose }: { invoice: InvoiceRow;
 
   const claimMutation = useMutation({
     mutationFn: async () => {
-      if (!methodId) throw new Error('اختر طريقة الدفع أولًا')
+      if (!methodId) throw new Error(t('portal.paymentsPage.claimDialog.selectMethodError'))
       const amountNum = Number(amount)
-      if (Number.isNaN(amountNum) || amountNum <= 0) throw new Error('أدخل مبلغًا صحيحًا')
-      if (selectedMethod?.referenceRequired && !reference.trim()) throw new Error('هذه الطريقة تتطلب رقم مرجعي للتحويل')
+      if (Number.isNaN(amountNum) || amountNum <= 0) throw new Error(t('portal.paymentsPage.claimDialog.invalidAmountError'))
+      if (selectedMethod?.referenceRequired && !reference.trim()) throw new Error(t('portal.paymentsPage.claimDialog.referenceRequiredError'))
       const { error: rpcError } = await supabase.rpc('claim_manual_payment', {
         p_invoice_id: invoice.id,
         p_payment_method_config_id: methodId,
@@ -131,25 +135,25 @@ function ClaimPaymentDialog({ invoice, clubId, onClose }: { invoice: InvoiceRow;
       setSubmitted(true)
       queryClient.invalidateQueries({ queryKey: ['portal', 'my-invoices'] })
     },
-    onError: (err) => setError(err instanceof Error ? err.message : translateSupabaseError(err, 'تعذّر إرسال طلب الدفع')),
+    onError: (err) => setError(err instanceof Error ? err.message : translateSupabaseError(err, t('portal.paymentsPage.claimDialog.genericError'))),
   })
 
   return (
     <Dialog open onOpenChange={(open) => !open && onClose()}>
       <DialogContent>
-        <DialogHeader><DialogTitle>دفع فاتورة <bdi>{invoice.invoiceNumber}</bdi></DialogTitle></DialogHeader>
+        <DialogHeader><DialogTitle>{t('portal.paymentsPage.claimDialog.titlePrefix')} <bdi>{invoice.invoiceNumber}</bdi></DialogTitle></DialogHeader>
         {submitted ? (
           <div className="flex flex-col gap-3 text-sm">
-            <p className="text-status-success">تم إرسال طلبك بنجاح. سيقوم فريق النادي بمراجعته وتأكيده قريبًا.</p>
-            <p className="text-text-secondary">لن يتغير حساب فاتورتك إلى "مدفوعة" إلا بعد تأكيد النادي للتحويل.</p>
-            <Button onClick={onClose}>إغلاق</Button>
+            <p className="text-status-success">{t('portal.paymentsPage.claimDialog.submittedMessage')}</p>
+            <p className="text-text-secondary">{t('portal.paymentsPage.claimDialog.submittedHint')}</p>
+            <Button onClick={onClose}>{t('portal.paymentsPage.claimDialog.close')}</Button>
           </div>
         ) : (
           <div className="flex flex-col gap-3 text-sm">
             {error && <p className="text-status-danger">{error}</p>}
-            <p className="text-text-secondary">المبلغ المتبقي: {formatMoney(invoice.outstanding)}</p>
+            <p className="text-text-secondary">{t('portal.paymentsPage.claimDialog.outstandingAmount', { amount: formatMoney(invoice.outstanding, 'EGP', locale) })}</p>
             <div className="flex flex-col gap-1">
-              <label className="font-medium">طريقة الدفع</label>
+              <label className="font-medium">{t('portal.paymentsPage.claimDialog.methodLabel')}</label>
               <div className="flex flex-col gap-2">
                 {methods.map((m) => (
                   <button
@@ -165,25 +169,25 @@ function ClaimPaymentDialog({ invoice, clubId, onClose }: { invoice: InvoiceRow;
                     {m.instructionsAr && <p className="text-xs text-text-secondary">{m.instructionsAr}</p>}
                   </button>
                 ))}
-                {methods.length === 0 && <p className="text-text-secondary">لا توجد طرق دفع متاحة حاليًا. تواصل مع النادي.</p>}
+                {methods.length === 0 && <p className="text-text-secondary">{t('portal.paymentsPage.claimDialog.noMethodsAvailable')}</p>}
               </div>
             </div>
             <div className="flex flex-col gap-1">
-              <label className="font-medium">المبلغ الذي حوّلته</label>
+              <label className="font-medium">{t('portal.paymentsPage.claimDialog.amountTransferredLabel')}</label>
               <Input type="number" value={amount} onChange={(e) => setAmount(e.target.value)} />
             </div>
             <div className="flex flex-col gap-1">
               <label className="font-medium">
-                الرقم المرجعي للتحويل {selectedMethod?.referenceRequired ? '' : '(اختياري)'}
+                {t('portal.paymentsPage.claimDialog.referenceLabel')} {selectedMethod?.referenceRequired ? '' : t('portal.paymentsPage.claimDialog.optionalSuffix')}
               </label>
               <Input value={reference} onChange={(e) => setReference(e.target.value)} />
             </div>
             <div className="flex flex-col gap-1">
-              <label className="font-medium">ملاحظة إثبات إضافية (اختياري)</label>
-              <Input value={proofNote} onChange={(e) => setProofNote(e.target.value)} placeholder="مثال: رابط لقطة شاشة التحويل" />
+              <label className="font-medium">{t('portal.paymentsPage.claimDialog.proofNoteLabel')}</label>
+              <Input value={proofNote} onChange={(e) => setProofNote(e.target.value)} placeholder={t('portal.paymentsPage.claimDialog.proofNotePlaceholder')} />
             </div>
             <Button onClick={() => claimMutation.mutate()} disabled={claimMutation.isPending || !methodId}>
-              إرسال طلب الدفع
+              {t('portal.paymentsPage.claimDialog.submit')}
             </Button>
           </div>
         )}
@@ -193,6 +197,8 @@ function ClaimPaymentDialog({ invoice, clubId, onClose }: { invoice: InvoiceRow;
 }
 
 export function PortalPaymentsPage() {
+  const { t } = useTranslation()
+  const { locale } = useDirection()
   const [claimingInvoice, setClaimingInvoice] = useState<InvoiceRow | null>(null)
   const [claimClubId, setClaimClubId] = useState<string | null>(null)
   // IA restructuring (Phase 10): auto-open the claim dialog when arriving
@@ -230,19 +236,19 @@ export function PortalPaymentsPage() {
 
   return (
     <div className="flex flex-col gap-4">
-      <PageHeader title="مدفوعاتي" description="فواتيرك وحالة السداد وطرق الدفع" />
+      <PageHeader title={t('portal.paymentsPage.title')} description={t('portal.paymentsPage.description')} />
 
-      {isLoading && <p className="text-sm text-text-secondary">جارٍ التحميل...</p>}
+      {isLoading && <p className="text-sm text-text-secondary">{t('portal.paymentsPage.loading')}</p>}
 
       {!isLoading && invoiceNotFound && (
         <p role="alert" className="rounded-lg border border-status-warning/30 bg-status-warning/5 p-3 text-sm text-status-warning">
-          لم يتم العثور على الفاتورة المطلوبة. تصفح فواتيرك أدناه.
+          {t('portal.paymentsPage.invoiceNotFound')}
         </p>
       )}
 
       {!isLoading && invoices.length === 0 && (
         <p className="rounded-lg border border-dashed border-border p-6 text-center text-sm text-text-secondary">
-          لا توجد فواتير بعد.
+          {t('portal.paymentsPage.emptyTitle')}
         </p>
       )}
 
@@ -252,21 +258,24 @@ export function PortalPaymentsPage() {
             <CardContent className="flex flex-col gap-2 p-4">
               <div className="flex items-center justify-between">
                 <p className="font-medium"><bdi>{inv.invoiceNumber}</bdi></p>
-                <StatusBadge tone={PAYMENT_STATUS_TONE[inv.paymentStatus]} label={PAYMENT_STATUS_LABELS[inv.paymentStatus]} />
+                <StatusBadge
+                  tone={PAYMENT_STATUS_TONE[inv.paymentStatus]}
+                  label={t(`secureBooking.paymentStatusLabels.${inv.paymentStatus}`, { defaultValue: PAYMENT_STATUS_LABELS[inv.paymentStatus] })}
+                />
               </div>
               <div className="flex justify-between text-sm text-text-secondary">
-                <span>الإجمالي {formatMoney(inv.total)}</span>
-                <span>المدفوع {formatMoney(inv.paid)}</span>
+                <span>{t('portal.paymentsPage.total', { amount: formatMoney(inv.total, 'EGP', locale) })}</span>
+                <span>{t('portal.paymentsPage.paid', { amount: formatMoney(inv.paid, 'EGP', locale) })}</span>
               </div>
               {inv.outstanding > 0 && (
                 <div className="flex items-center justify-between">
-                  <span className="text-sm font-semibold text-status-danger">المتبقي {formatMoney(inv.outstanding)}</span>
+                  <span className="text-sm font-semibold text-status-danger">{t('portal.paymentsPage.outstanding', { amount: formatMoney(inv.outstanding, 'EGP', locale) })}</span>
                   <Button size="sm" onClick={async () => {
                     const { data } = await supabase.from('invoices').select('club_id').eq('id', inv.id).single()
                     setClaimClubId(data?.club_id ?? null)
                     setClaimingInvoice(inv)
                   }}>
-                    <Wallet className="me-1 size-4" /> دفع الآن
+                    <Wallet className="me-1 size-4" /> {t('portal.paymentsPage.payNow')}
                   </Button>
                 </div>
               )}

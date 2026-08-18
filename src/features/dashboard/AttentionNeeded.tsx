@@ -1,5 +1,7 @@
 import { useQuery } from '@tanstack/react-query'
 import { useNavigate } from 'react-router-dom'
+import { useTranslation } from 'react-i18next'
+import type { TFunction } from 'i18next'
 import { supabase } from '@/lib/supabase/client'
 import { useAuth } from '@/app/providers/AuthProvider'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -29,7 +31,7 @@ interface AttentionItem {
   to: string
 }
 
-async function fetchAttentionItems(clubId: string): Promise<AttentionItem[]> {
+async function fetchAttentionItems(clubId: string, t: TFunction): Promise<AttentionItem[]> {
   const today = new Date().toISOString().slice(0, 10)
   const now = new Date()
   const soonCutoff = new Date(now.getTime() + 60 * 60 * 1000).toISOString() // next 60 min
@@ -78,8 +80,8 @@ async function fetchAttentionItems(clubId: string): Promise<AttentionItem[]> {
     items.push({
       id: `unpaid-${b.id}`,
       kind: 'unpaid',
-      label: `حجز مؤكد بدون دفع كامل — ${name}`,
-      detail: `${outstanding.toFixed(0)} ج.م`,
+      label: t('dashboard.attentionNeeded.unpaidBooking', { name }),
+      detail: t('dashboard.attentionNeeded.amountEgp', { amount: outstanding.toFixed(0) }),
       to: '/app/bookings',
     })
   }
@@ -89,7 +91,7 @@ async function fetchAttentionItems(clubId: string): Promise<AttentionItem[]> {
     items.push({
       id: `soon-${b.id}`,
       kind: 'starting-soon',
-      label: `موعد قريب لم يتم تسجيل الحضور — ${name}`,
+      label: t('dashboard.attentionNeeded.startingSoon', { name }),
       detail: new Date(b.start_at).toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit' }),
       to: '/app/bookings',
     })
@@ -100,7 +102,7 @@ async function fetchAttentionItems(clubId: string): Promise<AttentionItem[]> {
     items.push({
       id: `expiring-${s.id}`,
       kind: 'expiring-subscription',
-      label: `اشتراك أكاديمية على وشك الانتهاء — ${playerName}`,
+      label: t('dashboard.attentionNeeded.expiringSubscription', { name: playerName }),
       detail: s.end_date,
       to: '/app/academy',
     })
@@ -115,19 +117,20 @@ const KIND_TONE = {
   'expiring-subscription': 'warning',
 } as const
 
-const KIND_CHIP_LABEL: Record<AttentionItem['kind'], string> = {
-  unpaid: 'دفع',
-  'starting-soon': 'عاجل',
-  'expiring-subscription': 'تجديد',
-}
-
 export function AttentionNeeded() {
+  const { t } = useTranslation()
   const { currentClubId } = useAuth()
   const navigate = useNavigate()
 
+  const KIND_CHIP_LABEL: Record<AttentionItem['kind'], string> = {
+    unpaid: t('dashboard.attentionNeeded.chipLabels.unpaid'),
+    'starting-soon': t('dashboard.attentionNeeded.chipLabels.startingSoon'),
+    'expiring-subscription': t('dashboard.attentionNeeded.chipLabels.expiringSubscription'),
+  }
+
   const { data: items = [], isLoading } = useQuery({
     queryKey: ['attention-needed', currentClubId],
-    queryFn: () => fetchAttentionItems(currentClubId!),
+    queryFn: () => fetchAttentionItems(currentClubId!, t),
     enabled: !!currentClubId,
     refetchInterval: 60_000,
   })
@@ -137,15 +140,15 @@ export function AttentionNeeded() {
   if (items.length === 0) {
     return (
       <Card>
-        <CardHeader><CardTitle className="text-base">يحتاج انتباه</CardTitle></CardHeader>
-        <CardContent><p className="text-sm text-status-success">لا يوجد ما يحتاج انتباهًا الآن.</p></CardContent>
+        <CardHeader><CardTitle className="text-base">{t('dashboard.attentionNeeded.title')}</CardTitle></CardHeader>
+        <CardContent><p className="text-sm text-status-success">{t('dashboard.attentionNeeded.nothingNow')}</p></CardContent>
       </Card>
     )
   }
 
   return (
     <Card>
-      <CardHeader><CardTitle className="text-base">يحتاج انتباه ({items.length})</CardTitle></CardHeader>
+      <CardHeader><CardTitle className="text-base">{t('dashboard.attentionNeeded.titleWithCount', { count: items.length })}</CardTitle></CardHeader>
       <CardContent className="flex flex-col gap-2">
         {items.map((item) => (
           <button

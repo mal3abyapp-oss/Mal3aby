@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useMutation } from '@tanstack/react-query'
+import { useTranslation } from 'react-i18next'
 import { supabase } from '@/lib/supabase/client'
 import { useAuth } from '@/app/providers/AuthProvider'
 import { Button } from '@/components/ui/button'
@@ -20,21 +21,25 @@ import { CheckCircle2 } from 'lucide-react'
 // gated on "no existing membership" (a returning owner can create another
 // club). See docs/ARCHITECTURE.md#signup--onboarding-strategy and
 // docs/DECISIONS.md ADR-042/ADR-043.
+// NOTE: values sent to the backend RPC stay in Arabic (p_business_type is
+// stored/compared as-is server-side) -- only the displayed label is
+// localized via t().
 const BUSINESS_TYPES = [
-  { value: 'نادي', label: 'نادي' },
-  { value: 'أكاديمية', label: 'أكاديمية' },
-  { value: 'ملاعب', label: 'ملاعب' },
-  { value: 'مركز رياضي', label: 'مركز رياضي' },
+  { value: 'نادي', labelKey: 'onboarding.businessTypes.club' },
+  { value: 'أكاديمية', labelKey: 'onboarding.businessTypes.academy' },
+  { value: 'ملاعب', labelKey: 'onboarding.businessTypes.fields' },
+  { value: 'مركز رياضي', labelKey: 'onboarding.businessTypes.sportsCenter' },
 ]
 
 export function OnboardingPage() {
+  const { t } = useTranslation()
   const { session, setCurrentClubId, refreshMemberships } = useAuth()
   const navigate = useNavigate()
   const [step, setStep] = useState(1)
   const [businessType, setBusinessType] = useState('نادي')
   const [clubNameAr, setClubNameAr] = useState('')
   const [clubNameEn, setClubNameEn] = useState('')
-  const [branchName, setBranchName] = useState('الفرع الرئيسي')
+  const [branchName, setBranchName] = useState(t('onboarding.defaultBranchName'))
   const [city, setCity] = useState('')
   const [phone, setPhone] = useState('')
   const [result, setResult] = useState<{ clubId: string; trialGranted: boolean } | null>(null)
@@ -63,13 +68,13 @@ export function OnboardingPage() {
       setCurrentClubId(r.clubId)
       setStep(4)
     },
-    onError: () => setSubmitError('تعذّر إنشاء النادي. حاول مرة أخرى.'),
+    onError: () => setSubmitError(t('onboarding.createError')),
   })
 
   if (!session) {
     return (
       <div className="mx-auto max-w-md px-4 py-12 text-center">
-        <p className="text-text-secondary">يجب تسجيل الدخول أولاً لإعداد ناديك.</p>
+        <p className="text-text-secondary">{t('onboarding.loginRequired')}</p>
       </div>
     )
   }
@@ -82,8 +87,8 @@ export function OnboardingPage() {
             <CheckCircle2 className="size-12 text-status-success" />
             {result.trialGranted ? (
               <>
-                <h2 className="text-xl font-bold">تم إنشاء ناديك بنجاح!</h2>
-                <p className="text-text-secondary">تم تفعيل التجربة المجانية لمدة 7 أيام.</p>
+                <h2 className="text-xl font-bold">{t('onboarding.success.titleWithTrial')}</h2>
+                <p className="text-text-secondary">{t('onboarding.success.trialActivated')}</p>
               </>
             ) : (
               // Gate 13 (task #53): trial_granted=false here specifically
@@ -95,14 +100,14 @@ export function OnboardingPage() {
               // vague "contact us to activate," which read as if something
               // had gone wrong.
               <>
-                <h2 className="text-xl font-bold">تم إنشاء النادي</h2>
+                <h2 className="text-xl font-bold">{t('onboarding.success.titleNoTrial')}</h2>
                 <p className="text-text-secondary">
-                  هذا ناديك الإضافي، لذلك لم يُفعَّل له اشتراك تجريبي تلقائي — الأندية الإضافية تحتاج موافقة فريق منصة ملعبي أولًا. سنتواصل معك بمجرد المراجعة، ويمكنك متابعة حالة الاشتراك من صفحة الإعدادات.
+                  {t('onboarding.success.noTrialMessage')}
                 </p>
               </>
             )}
             <Button onClick={() => navigate('/app', { replace: true })} className="mt-2">
-              الذهاب إلى لوحة التحكم
+              {t('onboarding.success.goToDashboard')}
             </Button>
           </CardContent>
         </Card>
@@ -114,44 +119,44 @@ export function OnboardingPage() {
     <div className="mx-auto max-w-lg px-4 py-12">
       <Card>
         <CardHeader>
-          <CardTitle>إعداد ناديك — الخطوة {step} من 3</CardTitle>
+          <CardTitle>{t('onboarding.wizard.titleWithStep', { step })}</CardTitle>
         </CardHeader>
         <CardContent className="flex flex-col gap-4">
           {step === 1 && (
             <>
-              <label className="text-sm font-medium text-text-secondary">نوع النشاط</label>
+              <label className="text-sm font-medium text-text-secondary">{t('onboarding.wizard.step1.businessTypeLabel')}</label>
               <Select value={businessType} onValueChange={setBusinessType}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
-                  {BUSINESS_TYPES.map((t) => (
-                    <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>
+                  {BUSINESS_TYPES.map((bt) => (
+                    <SelectItem key={bt.value} value={bt.value}>{t(bt.labelKey)}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>
-              <Button onClick={() => setStep(2)}>التالي</Button>
+              <Button onClick={() => setStep(2)}>{t('onboarding.wizard.step1.next')}</Button>
             </>
           )}
 
           {step === 2 && (
             <>
-              <label className="text-sm font-medium text-text-secondary">اسم النادي (بالعربية)</label>
+              <label className="text-sm font-medium text-text-secondary">{t('onboarding.wizard.step2.clubNameArLabel')}</label>
               <Input required value={clubNameAr} onChange={(e) => setClubNameAr(e.target.value)} />
-              <label className="text-sm font-medium text-text-secondary">اسم النادي (بالإنجليزية، اختياري)</label>
+              <label className="text-sm font-medium text-text-secondary">{t('onboarding.wizard.step2.clubNameEnLabel')}</label>
               <Input value={clubNameEn} onChange={(e) => setClubNameEn(e.target.value)} />
               <div className="flex gap-2">
-                <Button variant="outline" onClick={() => setStep(1)}>السابق</Button>
-                <Button onClick={() => setStep(3)} disabled={!clubNameAr.trim()}>التالي</Button>
+                <Button variant="outline" onClick={() => setStep(1)}>{t('onboarding.wizard.step2.back')}</Button>
+                <Button onClick={() => setStep(3)} disabled={!clubNameAr.trim()}>{t('onboarding.wizard.step2.next')}</Button>
               </div>
             </>
           )}
 
           {step === 3 && (
             <>
-              <label className="text-sm font-medium text-text-secondary">اسم الفرع الأول</label>
+              <label className="text-sm font-medium text-text-secondary">{t('onboarding.wizard.step3.branchNameLabel')}</label>
               <Input required value={branchName} onChange={(e) => setBranchName(e.target.value)} />
-              <label className="text-sm font-medium text-text-secondary">المدينة</label>
+              <label className="text-sm font-medium text-text-secondary">{t('onboarding.wizard.step3.cityLabel')}</label>
               <Input required value={city} onChange={(e) => setCity(e.target.value)} />
-              <label className="text-sm font-medium text-text-secondary">رقم الهاتف</label>
+              <label className="text-sm font-medium text-text-secondary">{t('onboarding.wizard.step3.phoneLabel')}</label>
               <Input required value={phone} onChange={(e) => setPhone(e.target.value)} />
               {submitError && (
                 <p role="alert" className="text-sm text-status-danger">
@@ -159,12 +164,12 @@ export function OnboardingPage() {
                 </p>
               )}
               <div className="flex gap-2">
-                <Button variant="outline" onClick={() => setStep(2)}>السابق</Button>
+                <Button variant="outline" onClick={() => setStep(2)}>{t('onboarding.wizard.step3.back')}</Button>
                 <Button
                   onClick={() => onboardMutation.mutate()}
                   disabled={onboardMutation.isPending || !branchName.trim() || !city.trim() || !phone.trim()}
                 >
-                  {onboardMutation.isPending ? 'جارٍ الإنشاء...' : 'إنشاء النادي وبدء التجربة المجانية'}
+                  {onboardMutation.isPending ? t('onboarding.wizard.step3.submitting') : t('onboarding.wizard.step3.submit')}
                 </Button>
               </div>
             </>

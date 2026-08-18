@@ -1,4 +1,5 @@
 import { useQuery } from '@tanstack/react-query'
+import { useTranslation } from 'react-i18next'
 import { supabase } from '@/lib/supabase/client'
 import { PageHeader } from '@/components/ui/page-header'
 import { StatusBadge } from '@/components/ui/status-badge'
@@ -37,27 +38,28 @@ async function fetchMyPlayers(): Promise<PortalPlayer[]> {
   return (players ?? []) as unknown as PortalPlayer[]
 }
 
-const SUB_STATUS_LABELS: Record<string, string> = {
-  pending: 'بانتظار التفعيل',
-  active: 'نشط',
-  frozen: 'مجمّد',
-  expired: 'منتهي',
-  cancelled: 'ملغي',
-}
-
 export function PortalAcademyPage() {
+  const { t } = useTranslation()
   const { data: players = [], isLoading, error } = useQuery({ queryKey: ['portal', 'my-players'], queryFn: fetchMyPlayers })
+
+  const SUB_STATUS_LABELS: Record<string, string> = {
+    pending: t('academy.subscriptionStatusLabels.pending'),
+    active: t('academy.subscriptionStatusLabels.active'),
+    frozen: t('academy.subscriptionStatusLabels.frozen'),
+    expired: t('academy.subscriptionStatusLabels.expired'),
+    cancelled: t('academy.subscriptionStatusLabels.cancelled'),
+  }
 
   return (
     <div className="flex flex-col gap-5">
-      <PageHeader title="أكاديميتي" description="أبنائي المسجّلون في الأكاديمية" />
+      <PageHeader title={t('portal.academyPage.title')} description={t('portal.academyPage.description')} />
 
-      {isLoading && <p className="text-sm text-text-secondary">جارٍ التحميل...</p>}
-      {error && <p className="text-sm text-status-danger">تعذّر تحميل البيانات.</p>}
+      {isLoading && <p className="text-sm text-text-secondary">{t('portal.academyPage.loading')}</p>}
+      {error && <p className="text-sm text-status-danger">{t('portal.academyPage.loadError')}</p>}
 
       {!isLoading && players.length === 0 && (
         <p className="rounded-lg border border-dashed border-border p-6 text-center text-sm text-text-secondary">
-          لا يوجد لاعبون مرتبطون بحسابك حاليًا.
+          {t('portal.academyPage.emptyTitle')}
         </p>
       )}
 
@@ -77,7 +79,7 @@ export function PortalAcademyPage() {
             <div className="flex flex-1 flex-col gap-1.5">
               <p className="font-medium">{p.full_name}</p>
               {activeEnrollments.length === 0 ? (
-                <p className="text-xs text-text-secondary">غير مسجّل حاليًا</p>
+                <p className="text-xs text-text-secondary">{t('portal.academyPage.notEnrolled')}</p>
               ) : (
                 activeEnrollments.map((enrollment) => {
                   const sub = enrollment.subscriptions?.[0]

@@ -1,5 +1,6 @@
 import { useState, type FormEvent } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { useTranslation } from 'react-i18next'
 import { supabase } from '@/lib/supabase/client'
 import { PageHeader } from '@/components/ui/page-header'
 import { Button } from '@/components/ui/button'
@@ -42,6 +43,7 @@ async function fetchMyCustomerRecords(): Promise<MyCustomerRecord[]> {
 }
 
 export function PortalProfilePage() {
+  const { t } = useTranslation()
   const queryClient = useQueryClient()
   const { data: records = [], isLoading } = useQuery({ queryKey: ['portal', 'my-customer-records'], queryFn: fetchMyCustomerRecords })
   const [selectedClubId, setSelectedClubId] = useState<string | null>(null)
@@ -86,7 +88,7 @@ export function PortalProfilePage() {
       void queryClient.invalidateQueries({ queryKey: ['portal', 'my-customer-records'] })
       setTimeout(() => setSaved(false), 3000)
     },
-    onError: (error) => setFormError(translateSupabaseError(error, 'تعذّر حفظ التعديلات.')),
+    onError: (error) => setFormError(translateSupabaseError(error, t('portal.profilePage.saveError'))),
   })
 
   function handleSubmit(e: FormEvent) {
@@ -97,19 +99,19 @@ export function PortalProfilePage() {
 
   return (
     <div className="flex flex-col gap-5">
-      <PageHeader title="حسابي" description="بيانات التواصل الخاصة بك" />
+      <PageHeader title={t('portal.profilePage.title')} description={t('portal.profilePage.description')} />
 
-      {isLoading && <p className="text-sm text-text-secondary">جارٍ التحميل...</p>}
+      {isLoading && <p className="text-sm text-text-secondary">{t('portal.profilePage.loading')}</p>}
 
       {!isLoading && !record && (
         <p className="rounded-lg border border-dashed border-border p-6 text-center text-sm text-text-secondary">
-          لا توجد بيانات مرتبطة بحسابك.
+          {t('portal.profilePage.emptyTitle')}
         </p>
       )}
 
       {records.length > 1 && (
         <div className="flex flex-col gap-1.5">
-          <label className="text-sm font-medium text-text-secondary">النادي</label>
+          <label className="text-sm font-medium text-text-secondary">{t('portal.profilePage.clubLabel')}</label>
           <Select value={record?.club_id ?? ''} onValueChange={setSelectedClubId}>
             <SelectTrigger><SelectValue /></SelectTrigger>
             <SelectContent>
@@ -118,36 +120,36 @@ export function PortalProfilePage() {
               ))}
             </SelectContent>
           </Select>
-          <p className="text-xs text-text-secondary">حسابك مرتبط بأكثر من نادي -- اختر النادي لتعديل بياناتك فيه.</p>
+          <p className="text-xs text-text-secondary">{t('portal.profilePage.multiClubHint')}</p>
         </div>
       )}
 
       {record && (
         <form onSubmit={handleSubmit} className="flex flex-col gap-4">
           <div className="rounded-lg border border-border bg-muted/20 p-3">
-            <p className="text-xs text-text-secondary">الاسم</p>
+            <p className="text-xs text-text-secondary">{t('portal.profilePage.nameLabel')}</p>
             <p className="font-medium">{record.full_name}</p>
-            <p className="mt-1 text-xs text-text-secondary">لتعديل الاسم، تواصل مع النادي.</p>
+            <p className="mt-1 text-xs text-text-secondary">{t('portal.profilePage.nameEditHint')}</p>
           </div>
 
           <div className="flex flex-col gap-1.5">
-            <label className="text-sm font-medium text-text-secondary">رقم الهاتف</label>
+            <label className="text-sm font-medium text-text-secondary">{t('portal.profilePage.phoneLabel')}</label>
             <Input value={mobile} onChange={(e) => setMobile(e.target.value)} />
           </div>
           <div className="flex flex-col gap-1.5">
-            <label className="text-sm font-medium text-text-secondary">واتساب</label>
+            <label className="text-sm font-medium text-text-secondary">{t('portal.profilePage.whatsappLabel')}</label>
             <Input value={whatsapp} onChange={(e) => setWhatsapp(e.target.value)} />
           </div>
           <div className="flex flex-col gap-1.5">
-            <label className="text-sm font-medium text-text-secondary">البريد الإلكتروني</label>
+            <label className="text-sm font-medium text-text-secondary">{t('portal.profilePage.emailLabel')}</label>
             <Input type="email" value={email} onChange={(e) => setEmail(e.target.value)} />
           </div>
 
           {formError && <p className="text-sm text-status-danger">{formError}</p>}
-          {saved && <p className="text-sm text-status-success">تم الحفظ.</p>}
+          {saved && <p className="text-sm text-status-success">{t('portal.profilePage.saved')}</p>}
 
           <Button type="submit" disabled={saveMutation.isPending}>
-            {saveMutation.isPending ? 'جارٍ الحفظ...' : 'حفظ التعديلات'}
+            {saveMutation.isPending ? t('portal.profilePage.saving') : t('portal.profilePage.saveChanges')}
           </Button>
         </form>
       )}

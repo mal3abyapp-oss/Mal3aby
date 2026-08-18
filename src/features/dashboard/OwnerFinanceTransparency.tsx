@@ -1,9 +1,11 @@
 import { useQuery } from '@tanstack/react-query'
 import { useNavigate } from 'react-router-dom'
+import { useTranslation } from 'react-i18next'
 import { supabase } from '@/lib/supabase/client'
 import { useAuth } from '@/app/providers/AuthProvider'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { formatMoney } from '@/lib/domain/billing'
+import { useDirection } from '@/app/providers/DirectionProvider'
 
 // Gate 13 #61: an owner finance transparency section, right on the page
 // they land on daily -- not another report they have to remember to open.
@@ -47,8 +49,10 @@ async function fetchTodayFinance(clubId: string): Promise<TodayFinanceSummary> {
 }
 
 export function OwnerFinanceTransparency() {
+  const { t } = useTranslation()
   const { currentClubId } = useAuth()
   const navigate = useNavigate()
+  const { locale } = useDirection()
 
   const { data, isLoading } = useQuery({
     queryKey: ['owner-finance-transparency', currentClubId],
@@ -64,19 +68,19 @@ export function OwnerFinanceTransparency() {
   return (
     <Card>
       <CardHeader>
-        <CardTitle className="text-base">شفافية مالية — اليوم</CardTitle>
+        <CardTitle className="text-base">{t('dashboard.ownerFinanceTransparency.title')}</CardTitle>
       </CardHeader>
       <CardContent className="flex flex-col gap-3">
         {data.byEmployee.length === 0 ? (
-          <p className="text-sm text-text-secondary">لا توجد تحصيلات اليوم بعد.</p>
+          <p className="text-sm text-text-secondary">{t('dashboard.ownerFinanceTransparency.noCollectionsToday')}</p>
         ) : (
           <div>
-            <p className="mb-1 text-xs font-medium text-text-secondary">التحصيلات حسب الموظف</p>
+            <p className="mb-1 text-xs font-medium text-text-secondary">{t('dashboard.ownerFinanceTransparency.collectionsByEmployee')}</p>
             <ul className="flex flex-col gap-1">
               {data.byEmployee.map((e) => (
                 <li key={e.user_id ?? 'unknown'} className="flex justify-between rounded-md border border-border p-2 text-sm">
                   <span>{e.full_name}</span>
-                  <span>{formatMoney(e.amount)} — {e.payment_count} دفعة</span>
+                  <span>{formatMoney(e.amount, 'EGP', locale)} — {t('dashboard.ownerFinanceTransparency.paymentCount', { count: e.payment_count })}</span>
                 </li>
               ))}
             </ul>
@@ -92,11 +96,11 @@ export function OwnerFinanceTransparency() {
             onClick={() => navigate('/app/reports/exceptions')}
             className="flex items-center justify-between gap-2 rounded-md border border-status-warning/40 bg-status-warning/5 p-2.5 text-start text-sm hover:bg-status-warning/10"
           >
-            <span>يوجد استثناءات مالية اليوم</span>
+            <span>{t('dashboard.ownerFinanceTransparency.hasExceptionsToday')}</span>
             <span className="text-xs text-text-secondary tabular-nums">
-              {data.discountsToday > 0 && `خصومات ${formatMoney(data.discountsToday)}`}
+              {data.discountsToday > 0 && t('dashboard.ownerFinanceTransparency.discounts', { amount: formatMoney(data.discountsToday, 'EGP', locale) })}
               {data.discountsToday > 0 && data.refundsToday > 0 && ' — '}
-              {data.refundsToday > 0 && `مستردات ${formatMoney(data.refundsToday)}`}
+              {data.refundsToday > 0 && t('dashboard.ownerFinanceTransparency.refunds', { amount: formatMoney(data.refundsToday, 'EGP', locale) })}
             </span>
           </button>
         )}

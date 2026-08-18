@@ -1,5 +1,6 @@
 import { useQuery } from '@tanstack/react-query'
 import { Link } from 'react-router-dom'
+import { useTranslation } from 'react-i18next'
 import { supabase } from '@/lib/supabase/client'
 import {
   Dialog,
@@ -11,6 +12,7 @@ import { StatusBadge } from '@/components/ui/status-badge'
 import { MoneyDisplay } from '@/components/ui/money-display'
 import { BOOKING_STATUS_LABELS, BOOKING_STATUS_TONE } from '@/lib/domain/booking'
 import { fetchInvoicePaymentSummaries } from '@/lib/domain/billing'
+import { useDirection } from '@/app/providers/DirectionProvider'
 import { MessageCircle } from 'lucide-react'
 
 // IA restructuring (Phase 8): same "independent but connected"
@@ -98,8 +100,6 @@ async function fetchCustomerActivity(customerId: string): Promise<CustomerActivi
   }
 }
 
-const RELATIONSHIP_LABELS: Record<string, string> = { father: 'الأب', mother: 'الأم', guardian: 'ولي أمر', other: 'أخرى' }
-
 // Master IA/UX audit (Club Side Customer 360 phase): the bookings list
 // here was a single flat "آخر الحجوزات" list with no distinction between
 // what's coming up vs. what already happened -- a staff member checking
@@ -116,6 +116,8 @@ function bucketBookings(bookings: CustomerActivity['bookings']) {
 }
 
 export function CustomerDetailDialog({ customerId, customerName, onOpenChange }: { customerId: string | null; customerName: string; onOpenChange: (open: boolean) => void }) {
+  const { t } = useTranslation()
+  const { locale } = useDirection()
   const { data, isLoading } = useQuery({
     queryKey: ['customer-activity', customerId],
     queryFn: () => fetchCustomerActivity(customerId!),
@@ -135,12 +137,12 @@ export function CustomerDetailDialog({ customerId, customerName, onOpenChange }:
       <DialogContent className="max-h-[85vh] max-w-lg overflow-y-auto">
         <DialogHeader><DialogTitle>{customerName}</DialogTitle></DialogHeader>
         {isLoading ? (
-          <p className="text-sm text-text-secondary">جارٍ التحميل...</p>
+          <p className="text-sm text-text-secondary">{t('common.loading')}</p>
         ) : data ? (
           <div className="flex flex-col gap-4">
             {totalOutstanding > 0 && (
               <div className="rounded-lg border border-status-danger/30 bg-status-danger/5 p-3">
-                <span className="text-sm text-text-secondary">إجمالي المستحق: </span>
+                <span className="text-sm text-text-secondary">{t('customers.detail.totalOutstanding')} </span>
                 <MoneyDisplay amount={totalOutstanding} tone="danger" />
               </div>
             )}
@@ -150,23 +152,23 @@ export function CustomerDetailDialog({ customerId, customerName, onOpenChange }:
                 <span className="flex items-center gap-1.5 text-text-secondary">
                   <MessageCircle className="size-3.5" />
                   {whatsappSummary.failedCount > 0
-                    ? `فشل إرسال ${whatsappSummary.failedCount} رسالة واتساب لهذا العميل`
-                    : `أُرسلت ${whatsappSummary.sentCount} رسالة واتساب لهذا العميل ✓`}
+                    ? t('customers.detail.whatsappFailed', { count: whatsappSummary.failedCount })
+                    : t('customers.detail.whatsappSent', { count: whatsappSummary.sentCount })}
                 </span>
                 <Link to="/app/whatsapp" className="font-medium text-accent-foreground hover:underline">
-                  عرض النشاط
+                  {t('customers.detail.viewActivity')}
                 </Link>
               </div>
             )}
 
             {data.linkedPlayers.length > 0 && (
               <div>
-                <p className="mb-2 text-sm font-medium text-text-secondary">اللاعبون المرتبطون</p>
+                <p className="mb-2 text-sm font-medium text-text-secondary">{t('customers.detail.linkedPlayers')}</p>
                 <div className="flex flex-col gap-1.5">
                   {data.linkedPlayers.map((p) => (
                     <div key={p.id} className="flex items-center justify-between rounded-md border border-border p-2 text-sm">
                       <span>{p.name}</span>
-                      <span className="text-text-secondary">{RELATIONSHIP_LABELS[p.relationship] ?? p.relationship}</span>
+                      <span className="text-text-secondary">{t(`customers.relationshipLabels.${p.relationship}`, { defaultValue: p.relationship })}</span>
                     </div>
                   ))}
                 </div>
@@ -176,14 +178,14 @@ export function CustomerDetailDialog({ customerId, customerName, onOpenChange }:
             {(() => {
               const { upcoming, past, cancelledOrNoShow } = bucketBookings(data.bookings)
               const groups: { title: string; rows: CustomerActivity['bookings'] }[] = [
-                { title: 'القادمة', rows: upcoming },
-                { title: 'السابقة', rows: past },
-                { title: 'ملغاة / لم يحضر', rows: cancelledOrNoShow },
+                { title: t('customers.detail.upcoming'), rows: upcoming },
+                { title: t('customers.detail.past'), rows: past },
+                { title: t('customers.detail.cancelledOrNoShow'), rows: cancelledOrNoShow },
               ]
               return (
                 <div>
                   <div className="mb-2 flex items-center justify-between">
-                    <p className="text-sm font-medium text-text-secondary">الحجوزات</p>
+                    <p className="text-sm font-medium text-text-secondary">{t('customers.detail.bookings')}</p>
                     {/* Booking rows aren't individually clickable into
                         BookingDetailSheet -- that sheet is opened from
                         state on BookingsPage (a full BookingRow object,
@@ -192,11 +194,11 @@ export function CustomerDetailDialog({ customerId, customerName, onOpenChange }:
                         infrastructure. Links to the list instead, same
                         as this dialog's field-name precedent. */}
                     <Link to="/app/bookings" className="text-xs font-medium text-accent-foreground hover:underline">
-                      عرض كل الحجوزات
+                      {t('customers.detail.viewAllBookings')}
                     </Link>
                   </div>
                   {data.bookings.length === 0 ? (
-                    <p className="text-sm text-text-secondary">لا يوجد حجوزات بعد.</p>
+                    <p className="text-sm text-text-secondary">{t('customers.detail.noBookingsYet')}</p>
                   ) : (
                     <div className="flex flex-col gap-3">
                       {groups.filter((g) => g.rows.length > 0).map((g) => (
@@ -208,10 +210,10 @@ export function CustomerDetailDialog({ customerId, customerName, onOpenChange }:
                                 <div>
                                   <p>{b.fieldName}</p>
                                   <p className="text-xs text-text-secondary tabular-nums">
-                                    <bdi>{new Date(b.startAt).toLocaleString('ar-EG', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}</bdi>
+                                    <bdi>{new Date(b.startAt).toLocaleString(locale === 'en' ? 'en-US' : 'ar-EG', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}</bdi>
                                   </p>
                                 </div>
-                                <StatusBadge tone={BOOKING_STATUS_TONE[b.status] ?? 'neutral'} label={BOOKING_STATUS_LABELS[b.status] ?? b.status} />
+                                <StatusBadge tone={BOOKING_STATUS_TONE[b.status] ?? 'neutral'} label={t(`bookings.statusLabels.${b.status}`, { defaultValue: BOOKING_STATUS_LABELS[b.status] ?? b.status })} />
                               </div>
                             ))}
                           </div>
@@ -224,9 +226,9 @@ export function CustomerDetailDialog({ customerId, customerName, onOpenChange }:
             })()}
 
             <div>
-              <p className="mb-2 text-sm font-medium text-text-secondary">الفواتير</p>
+              <p className="mb-2 text-sm font-medium text-text-secondary">{t('customers.detail.invoices')}</p>
               {data.invoices.length === 0 ? (
-                <p className="text-sm text-text-secondary">لا توجد فواتير بعد.</p>
+                <p className="text-sm text-text-secondary">{t('customers.detail.noInvoicesYet')}</p>
               ) : (
                 <div className="flex flex-col gap-1.5">
                   {data.invoices.map((i) => (
@@ -238,7 +240,7 @@ export function CustomerDetailDialog({ customerId, customerName, onOpenChange }:
                       <span className="text-accent-foreground"><bdi>{i.invoiceNumber}</bdi></span>
                       <div className="flex items-center gap-2">
                         <MoneyDisplay amount={i.total} size="sm" />
-                        {i.outstanding > 0 && <StatusBadge tone="danger" label={`متبقي ${i.outstanding.toFixed(0)}`} />}
+                        {i.outstanding > 0 && <StatusBadge tone="danger" label={t('customers.detail.remaining', { amount: i.outstanding.toFixed(0) })} />}
                       </div>
                     </Link>
                   ))}

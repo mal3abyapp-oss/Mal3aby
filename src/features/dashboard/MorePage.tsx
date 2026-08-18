@@ -1,4 +1,5 @@
 import { Link } from 'react-router-dom'
+import { useTranslation } from 'react-i18next'
 import { PageHeader } from '@/components/ui/page-header'
 import { Card, CardContent } from '@/components/ui/card'
 import { Users, Receipt, Wallet, BarChart3, UserCog, Settings, ChevronRight, CircleDollarSign, Building2, ShieldCheck, MessageCircle } from 'lucide-react'
@@ -43,32 +44,33 @@ import { canSeeNavDomain, type NavDomain } from '@/lib/domain/navigation'
 // a second one invented for mobile.
 interface MoreItem {
   to: string
-  label: string
-  description: string
+  labelKey: string
+  descriptionKey: string
   icon: LucideIcon
   domain: NavDomain
 }
 
 const ITEMS: MoreItem[] = [
-  { to: '/app/customers', label: 'العملاء', description: 'البحث عن العملاء وإدارة بياناتهم', icon: Users, domain: 'customers' },
-  { to: '/app/billing', label: 'الفواتير والمدفوعات', description: 'سجل الفواتير والمدفوعات والمستحقات', icon: Receipt, domain: 'finance' },
-  { to: '/app/outstanding', label: 'المستحقات', description: 'الفواتير غير المسددة بالكامل', icon: CircleDollarSign, domain: 'finance' },
-  { to: '/app/cash-shift', label: 'وردية النقدية', description: 'فتح وإغلاق وردية الصندوق النقدي', icon: Wallet, domain: 'finance' },
-  { to: '/app/reports', label: 'التقارير', description: 'تقارير الإيرادات والإشغال والأكاديمية', icon: BarChart3, domain: 'reports' },
-  { to: '/app/fields', label: 'الفروع والملاعب', description: 'فروع النادي، الملاعب، مواعيد العمل، والأسعار', icon: Building2, domain: 'settings' },
-  { to: '/app/whatsapp', label: 'واتساب', description: 'الاتصال، النشاط، وضوابط الإرسال', icon: MessageCircle, domain: 'whatsapp' },
-  { to: '/app/staff', label: 'الموظفون', description: 'إدارة الموظفين وأدوارهم', icon: UserCog, domain: 'staff' },
-  { to: '/app/audit-log', label: 'سجل التدقيق', description: 'سجل كل العمليات الحساسة في النادي', icon: ShieldCheck, domain: 'settings' },
-  { to: '/app/settings', label: 'الإعدادات', description: 'هوية النادي، الأكاديمية، المدفوعات، والاشتراك', icon: Settings, domain: 'settings' },
+  { to: '/app/customers', labelKey: 'nav.customers', descriptionKey: 'dashboard.more.customersDesc', icon: Users, domain: 'customers' },
+  { to: '/app/billing', labelKey: 'nav.billing', descriptionKey: 'dashboard.more.billingDesc', icon: Receipt, domain: 'finance' },
+  { to: '/app/outstanding', labelKey: 'nav.outstanding', descriptionKey: 'dashboard.more.outstandingDesc', icon: CircleDollarSign, domain: 'finance' },
+  { to: '/app/cash-shift', labelKey: 'nav.cashShift', descriptionKey: 'dashboard.more.cashShiftDesc', icon: Wallet, domain: 'finance' },
+  { to: '/app/reports', labelKey: 'nav.reports', descriptionKey: 'dashboard.more.reportsDesc', icon: BarChart3, domain: 'reports' },
+  { to: '/app/fields', labelKey: 'nav.fields', descriptionKey: 'dashboard.more.fieldsDesc', icon: Building2, domain: 'settings' },
+  { to: '/app/whatsapp', labelKey: 'nav.whatsapp', descriptionKey: 'dashboard.more.whatsappDesc', icon: MessageCircle, domain: 'whatsapp' },
+  { to: '/app/staff', labelKey: 'nav.staff', descriptionKey: 'dashboard.more.staffDesc', icon: UserCog, domain: 'staff' },
+  { to: '/app/audit-log', labelKey: 'nav.auditLog', descriptionKey: 'dashboard.more.auditLogDesc', icon: ShieldCheck, domain: 'settings' },
+  { to: '/app/settings', labelKey: 'nav.settings', descriptionKey: 'dashboard.more.settingsDesc', icon: Settings, domain: 'settings' },
 ]
 
 export function MorePage() {
+  const { t } = useTranslation()
   const { currentMembership } = useAuth()
   const visibleItems = ITEMS.filter((item) => canSeeNavDomain(currentMembership?.roleKey, item.domain))
 
   return (
     <div>
-      <PageHeader title="المزيد" />
+      <PageHeader title={t('nav.more')} />
       <div className="flex flex-col gap-2">
         {visibleItems.map((item) => (
           <Link key={item.to} to={item.to}>
@@ -76,8 +78,8 @@ export function MorePage() {
               <CardContent className="flex items-center gap-3 p-4">
                 <item.icon className="size-5 shrink-0 text-text-secondary" />
                 <div className="min-w-0 flex-1">
-                  <p className="font-medium">{item.label}</p>
-                  <p className="truncate text-sm text-text-secondary">{item.description}</p>
+                  <p className="font-medium">{t(item.labelKey)}</p>
+                  <p className="truncate text-sm text-text-secondary">{t(item.descriptionKey)}</p>
                 </div>
                 {/* Master IA/UX audit (RTL phase): base icon is the
                     LTR-correct "forward" direction (right), rtl:

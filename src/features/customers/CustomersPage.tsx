@@ -1,6 +1,7 @@
 import { useState, type FormEvent } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { useTranslation } from 'react-i18next'
 import { supabase } from '@/lib/supabase/client'
 import { useAuth } from '@/app/providers/AuthProvider'
 import { PageHeader } from '@/components/ui/page-header'
@@ -75,6 +76,7 @@ function normalizeMobile(input: string): string {
 }
 
 export function CustomersPage() {
+  const { t } = useTranslation()
   const { currentClubId } = useAuth()
   const queryClient = useQueryClient()
   // Master IA/UX audit (Reports decomposition phase): reports must not
@@ -148,7 +150,7 @@ export function CustomersPage() {
       void queryClient.invalidateQueries({ queryKey: ['customers', currentClubId] })
     },
     onError: (error) =>
-      setFormError(translateSupabaseError(error, editingCustomer ? 'تعذّر حفظ التعديلات، حاول مرة أخرى.' : 'تعذّرت الإضافة، حاول مرة أخرى.')),
+      setFormError(translateSupabaseError(error, editingCustomer ? t('customers.saveEditError') : t('customers.addError'))),
   })
 
   function handleSubmit(e: FormEvent) {
@@ -160,26 +162,26 @@ export function CustomersPage() {
   const columns: DataTableColumn<CustomerRow>[] = [
     {
       key: 'name',
-      header: 'الاسم',
+      header: t('common.name'),
       render: (c) => (
         <button className="text-accent-foreground hover:underline" onClick={() => setViewingCustomer(c)}>
           {c.fullName}
         </button>
       ),
     },
-    { key: 'mobile', header: 'الهاتف', render: (c) => c.mobileDisplay ?? '—' },
-    { key: 'email', header: 'البريد الإلكتروني', render: (c) => c.email ?? '—' },
+    { key: 'mobile', header: t('common.phone'), render: (c) => c.mobileDisplay ?? '—' },
+    { key: 'email', header: t('common.email'), render: (c) => c.email ?? '—' },
     {
       key: 'outstanding',
-      header: 'المستحق',
-      render: (c) => (c.outstanding && c.outstanding > 0 ? <span className="font-medium text-status-danger tabular-nums">{c.outstanding.toFixed(0)} ج.م</span> : <span className="text-status-success">—</span>),
+      header: t('customers.outstanding'),
+      render: (c) => (c.outstanding && c.outstanding > 0 ? <span className="font-medium text-status-danger tabular-nums">{c.outstanding.toFixed(0)} {t('common.currency')}</span> : <span className="text-status-success">—</span>),
     },
     {
       key: 'actions',
       header: '',
       render: (c) => (
         <button className="text-xs text-text-secondary hover:text-accent-foreground hover:underline" onClick={() => openEditDialog(c)}>
-          تعديل
+          {t('common.edit')}
         </button>
       ),
     },
@@ -188,28 +190,28 @@ export function CustomersPage() {
   return (
     <div>
       <PageHeader
-        title="العملاء"
-        description="البحث عن العملاء وإضافتهم"
+        title={t('customers.page.title')}
+        description={t('customers.page.description')}
         actions={
           <Dialog open={dialogOpen} onOpenChange={(open) => { setDialogOpen(open); if (!open) setEditingCustomer(null) }}>
             <DialogTrigger asChild>
-              <Button onClick={openCreateDialog}>إضافة عميل</Button>
+              <Button onClick={openCreateDialog}>{t('customers.addCustomer')}</Button>
             </DialogTrigger>
             <DialogContent>
               <DialogHeader>
-                <DialogTitle>{editingCustomer ? 'تعديل بيانات العميل' : 'إضافة عميل'}</DialogTitle>
+                <DialogTitle>{editingCustomer ? t('customers.editCustomer') : t('customers.addCustomer')}</DialogTitle>
               </DialogHeader>
               <form onSubmit={handleSubmit} className="flex flex-col gap-4">
                 <div className="flex flex-col gap-1.5">
-                  <label className="text-sm font-medium text-text-secondary">الاسم الكامل</label>
+                  <label className="text-sm font-medium text-text-secondary">{t('customers.fullName')}</label>
                   <Input required value={fullName} onChange={(e) => setFullName(e.target.value)} />
                 </div>
                 <div className="flex flex-col gap-1.5">
-                  <label className="text-sm font-medium text-text-secondary">رقم الهاتف</label>
+                  <label className="text-sm font-medium text-text-secondary">{t('common.phone')}</label>
                   <Input value={mobile} onChange={(e) => setMobile(e.target.value)} />
                 </div>
                 <div className="flex flex-col gap-1.5">
-                  <label className="text-sm font-medium text-text-secondary">البريد الإلكتروني (اختياري)</label>
+                  <label className="text-sm font-medium text-text-secondary">{t('customers.emailOptional')}</label>
                   <Input type="email" value={email} onChange={(e) => setEmail(e.target.value)} />
                 </div>
                 {formError && (
@@ -218,7 +220,7 @@ export function CustomersPage() {
                   </p>
                 )}
                 <Button type="submit" disabled={saveMutation.isPending}>
-                  {saveMutation.isPending ? 'جارٍ الحفظ...' : editingCustomer ? 'حفظ التعديلات' : 'إضافة'}
+                  {saveMutation.isPending ? t('common.saving') : editingCustomer ? t('customers.saveChanges') : t('common.add')}
                 </Button>
               </form>
             </DialogContent>
@@ -228,7 +230,7 @@ export function CustomersPage() {
 
       <div className="mb-4">
         <Input
-          placeholder="بحث بالاسم أو رقم الهاتف"
+          placeholder={t('customers.searchPlaceholder')}
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           className="max-w-sm"
@@ -240,8 +242,8 @@ export function CustomersPage() {
         rows={customers}
         rowKey={(c) => c.id}
         isLoading={isLoading}
-        emptyTitle="لا يوجد عملاء"
-        emptyDescription="أضف أول عميل لبدء إدارة قاعدة عملاء النادي"
+        emptyTitle={t('customers.emptyTitle')}
+        emptyDescription={t('customers.emptyDescription')}
       />
 
       <CustomerDetailDialog

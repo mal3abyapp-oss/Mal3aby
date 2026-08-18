@@ -1,10 +1,12 @@
 import { useEffect, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { useSearchParams } from 'react-router-dom'
+import { useTranslation } from 'react-i18next'
 import QRCode from 'qrcode'
 import { supabase } from '@/lib/supabase/client'
 import { PageHeader } from '@/components/ui/page-header'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { useDirection } from '@/app/providers/DirectionProvider'
 
 // Gate 3 — "My QR": shows a scannable QR for a selected upcoming
 // booking. Reuses the same ensure_booking_qr() RPC the staff-side
@@ -30,6 +32,8 @@ async function fetchUpcomingBookings(): Promise<UpcomingBooking[]> {
 }
 
 export function PortalQrPage() {
+  const { t } = useTranslation()
+  const { locale } = useDirection()
   const { data: bookings = [], isLoading } = useQuery({ queryKey: ['portal', 'qr-bookings'], queryFn: fetchUpcomingBookings })
   const [selectedId, setSelectedId] = useState<string>('')
   const [qrDataUrl, setQrDataUrl] = useState<string | null>(null)
@@ -70,7 +74,7 @@ export function PortalQrPage() {
     const { data, error } = await supabase.rpc('ensure_booking_qr', { p_booking_id: id })
     setLoadingQr(false)
     if (error || !data) {
-      setQrError('تعذّر إنشاء رمز QR لهذا الحجز.')
+      setQrError(t('portal.qrPage.generateError'))
       return
     }
     const url = await QRCode.toDataURL(data as string, { width: 240, margin: 1 })
@@ -79,44 +83,44 @@ export function PortalQrPage() {
 
   return (
     <div className="flex flex-col gap-5">
-      <PageHeader title="رمزي" description="رمز QR لتسجيل الحضور عند الوصول" />
+      <PageHeader title={t('portal.qrPage.title')} description={t('portal.qrPage.description')} />
 
-      {isLoading && <p className="text-sm text-text-secondary">جارٍ التحميل...</p>}
+      {isLoading && <p className="text-sm text-text-secondary">{t('portal.qrPage.loading')}</p>}
 
       {!isLoading && preselectNotFound && (
         <p role="alert" className="rounded-lg border border-status-warning/30 bg-status-warning/5 p-3 text-sm text-status-warning">
-          لم يتم العثور على الحجز المطلوب — قد يكون قد انتهى أو أُلغي. اختر حجزًا من القائمة أدناه.
+          {t('portal.qrPage.bookingNotFound')}
         </p>
       )}
 
       {!isLoading && bookings.length === 0 && (
         <p className="rounded-lg border border-dashed border-border p-6 text-center text-sm text-text-secondary">
-          لا توجد حجوزات قادمة.
+          {t('portal.qrPage.emptyTitle')}
         </p>
       )}
 
       {bookings.length > 0 && (
         <Select value={selectedId} onValueChange={handleSelect}>
           <SelectTrigger>
-            <SelectValue placeholder="اختر حجزًا لعرض رمزه" />
+            <SelectValue placeholder={t('portal.qrPage.choosePlaceholder')} />
           </SelectTrigger>
           <SelectContent>
             {bookings.map((b) => (
               <SelectItem key={b.id} value={b.id}>
-                {b.fields?.name} — {new Date(b.start_at).toLocaleDateString('ar-EG', { day: 'numeric', month: 'long' })}
+                {b.fields?.name} — {new Date(b.start_at).toLocaleDateString(locale === 'en' ? 'en-US' : 'ar-EG', { day: 'numeric', month: 'long' })}
               </SelectItem>
             ))}
           </SelectContent>
         </Select>
       )}
 
-      {loadingQr && <p className="text-sm text-text-secondary">جارٍ إنشاء الرمز...</p>}
+      {loadingQr && <p className="text-sm text-text-secondary">{t('portal.qrPage.generating')}</p>}
       {qrError && <p className="text-sm text-status-danger">{qrError}</p>}
 
       {qrDataUrl && (
         <div className="flex flex-col items-center gap-2 rounded-lg border border-border bg-surface p-6">
-          <img src={qrDataUrl} alt="رمز QR" className="size-60" />
-          <p className="text-xs text-text-secondary">اعرض هذا الرمز عند وصولك للنادي</p>
+          <img src={qrDataUrl} alt={t('portal.qrPage.qrAlt')} className="size-60" />
+          <p className="text-xs text-text-secondary">{t('portal.qrPage.showAtClubHint')}</p>
         </div>
       )}
     </div>

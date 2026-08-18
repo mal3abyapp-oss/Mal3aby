@@ -1,4 +1,5 @@
 import { useState, type FormEvent } from 'react'
+import { useTranslation } from 'react-i18next'
 import { supabase } from '@/lib/supabase/client'
 import { PageHeader } from '@/components/ui/page-header'
 import { Card, CardContent } from '@/components/ui/card'
@@ -8,6 +9,7 @@ import { Button } from '@/components/ui/button'
 // contact_requests: anon INSERT only, no SELECT — a submitter can never
 // read back other submissions (see DATABASE_BLUEPRINT.md#contact_requests).
 export function ContactPage() {
+  const { t } = useTranslation()
   const [name, setName] = useState('')
   const [phone, setPhone] = useState('')
   const [email, setEmail] = useState('')
@@ -33,7 +35,7 @@ export function ContactPage() {
     setSubmitting(false)
 
     if (insertError) {
-      setError('تعذّر إرسال الطلب، حاول مرة أخرى.')
+      setError(t('publicSite.contact.submitError'))
       return
     }
 
@@ -42,28 +44,38 @@ export function ContactPage() {
 
   return (
     <div className="mx-auto max-w-xl px-4 py-12">
-      <PageHeader title="تواصل معنا" description="سنرد عليك في أقرب وقت ممكن" />
+      <PageHeader title={t('publicSite.contact.title')} description={t('publicSite.contact.description')} />
       <Card>
         <CardContent className="pt-6">
           {submitted ? (
-            <p className="text-center text-status-success">تم إرسال طلبك بنجاح، سنتواصل معك قريبًا.</p>
+            <p className="text-center text-status-success">{t('publicSite.contact.submittedMessage')}</p>
           ) : (
             <form onSubmit={handleSubmit} className="flex flex-col gap-4">
-              <Input placeholder="الاسم" required value={name} onChange={(e) => setName(e.target.value)} />
-              <Input placeholder="رقم الهاتف" required value={phone} onChange={(e) => setPhone(e.target.value)} />
               <Input
-                placeholder="البريد الإلكتروني (اختياري)"
+                placeholder={t('publicSite.contact.namePlaceholder')}
+                required
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+              />
+              <Input
+                placeholder={t('publicSite.contact.phonePlaceholder')}
+                required
+                value={phone}
+                onChange={(e) => setPhone(e.target.value)}
+              />
+              <Input
+                placeholder={t('publicSite.contact.emailPlaceholder')}
                 type="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
               />
               <Input
-                placeholder="اسم النادي/الأكاديمية (اختياري)"
+                placeholder={t('publicSite.contact.businessNamePlaceholder')}
                 value={businessName}
                 onChange={(e) => setBusinessName(e.target.value)}
               />
               <textarea
-                placeholder="رسالتك (اختياري)"
+                placeholder={t('publicSite.contact.messagePlaceholder')}
                 className="min-h-24 rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm"
                 value={message}
                 onChange={(e) => setMessage(e.target.value)}
@@ -74,7 +86,7 @@ export function ContactPage() {
                 </p>
               )}
               <Button type="submit" disabled={submitting}>
-                {submitting ? 'جارٍ الإرسال...' : 'إرسال'}
+                {submitting ? t('publicSite.contact.sending') : t('publicSite.contact.submit')}
               </Button>
             </form>
           )}

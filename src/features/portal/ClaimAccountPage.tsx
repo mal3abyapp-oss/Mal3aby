@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { useTranslation } from 'react-i18next'
 import { supabase } from '@/lib/supabase/client'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -34,6 +35,7 @@ async function fetchClubs(): Promise<ClubOption[]> {
 }
 
 export function ClaimAccountPage({ onClaimed }: { onClaimed: () => void }) {
+  const { t } = useTranslation()
   const queryClient = useQueryClient()
   const [clubId, setClubId] = useState('')
   const [mobile, setMobile] = useState('')
@@ -59,7 +61,7 @@ export function ClaimAccountPage({ onClaimed }: { onClaimed: () => void }) {
     setSearchError(null)
     setMatches(null)
     if (!clubId || !mobile.trim()) {
-      setSearchError('اختر النادي وأدخل رقم الهاتف المسجّل لديه.')
+      setSearchError(t('portal.claimAccountPage.missingFieldsError'))
       return
     }
     setSearching(true)
@@ -75,12 +77,12 @@ export function ClaimAccountPage({ onClaimed }: { onClaimed: () => void }) {
     })
     setSearching(false)
     if (error) {
-      setSearchError(translateSupabaseError(error, 'تعذّر البحث، حاول مرة أخرى.'))
+      setSearchError(translateSupabaseError(error, t('portal.claimAccountPage.searchGenericError')))
       return
     }
     setMatches(data ?? [])
     if (!data || data.length === 0) {
-      setSearchError('لم يتم العثور على بيانات مطابقة. تواصل مع النادي إذا كنت متأكدًا أنك عميل مسجّل.')
+      setSearchError(t('portal.claimAccountPage.noMatchError'))
     }
   }
 
@@ -96,22 +98,22 @@ export function ClaimAccountPage({ onClaimed }: { onClaimed: () => void }) {
       void queryClient.invalidateQueries({ queryKey: ['portal'] })
       onClaimed()
     },
-    onError: (error) => setClaimError(translateSupabaseError(error, 'تعذّر ربط الحساب، حاول مرة أخرى.')),
+    onError: (error) => setClaimError(translateSupabaseError(error, t('portal.claimAccountPage.claimGenericError'))),
   })
 
   return (
     <div className="mx-auto flex min-h-[70vh] max-w-sm flex-col justify-center gap-4 px-4 py-12">
       <Card>
         <CardHeader>
-          <CardTitle className="text-center text-lg">ربط حسابك ببياناتك في النادي</CardTitle>
+          <CardTitle className="text-center text-lg">{t('portal.claimAccountPage.title')}</CardTitle>
         </CardHeader>
         <CardContent className="flex flex-col gap-4">
           <p className="text-center text-sm text-text-secondary">
-            إذا سبق وحجزت ملعبًا أو سجّلت في الأكاديمية، يمكنك ربط حسابك ببياناتك لرؤية حجوزاتك واشتراكاتك هنا.
+            {t('portal.claimAccountPage.description')}
           </p>
 
           <div className="flex flex-col gap-1.5">
-            <label className="text-sm font-medium text-text-secondary">النادي</label>
+            <label className="text-sm font-medium text-text-secondary">{t('portal.claimAccountPage.clubLabel')}</label>
             <select
               className="h-10 rounded-md border border-border bg-background px-3 text-sm"
               value={clubId}
@@ -120,7 +122,7 @@ export function ClaimAccountPage({ onClaimed }: { onClaimed: () => void }) {
                 setMatches(null)
               }}
             >
-              <option value="">اختر النادي...</option>
+              <option value="">{t('portal.claimAccountPage.clubPlaceholder')}</option>
               {clubs.map((c) => (
                 <option key={c.id} value={c.id}>
                   {c.name_ar}
@@ -130,19 +132,19 @@ export function ClaimAccountPage({ onClaimed }: { onClaimed: () => void }) {
           </div>
 
           <div className="flex flex-col gap-1.5">
-            <label className="text-sm font-medium text-text-secondary">رقم الهاتف المسجّل لدى النادي</label>
-            <Input value={mobile} onChange={(e) => setMobile(e.target.value)} placeholder="01xxxxxxxxx" />
+            <label className="text-sm font-medium text-text-secondary">{t('portal.claimAccountPage.mobileLabel')}</label>
+            <Input value={mobile} onChange={(e) => setMobile(e.target.value)} placeholder={t('portal.claimAccountPage.mobilePlaceholder')} />
           </div>
 
           {searchError && <p className="text-sm text-status-danger">{searchError}</p>}
 
           <Button onClick={handleSearch} disabled={searching}>
-            {searching ? 'جارٍ البحث...' : 'بحث'}
+            {searching ? t('portal.claimAccountPage.searching') : t('portal.claimAccountPage.search')}
           </Button>
 
           {matches && matches.length > 0 && (
             <div className="flex flex-col gap-2 rounded-lg border border-border p-3">
-              <p className="text-sm text-text-secondary">هل هذه بياناتك؟</p>
+              <p className="text-sm text-text-secondary">{t('portal.claimAccountPage.isThisYou')}</p>
               {matches.map((m) => (
                 <div key={m.id} className="flex items-center justify-between gap-2 rounded-md bg-muted/30 p-2">
                   <div>
@@ -150,7 +152,7 @@ export function ClaimAccountPage({ onClaimed }: { onClaimed: () => void }) {
                     <p className="text-xs text-text-secondary tabular-nums">{m.mobile_display}</p>
                   </div>
                   <Button size="sm" onClick={() => claimMutation.mutate(m.id)} disabled={claimMutation.isPending}>
-                    {claimMutation.isPending ? '...' : 'نعم، هذا أنا'}
+                    {claimMutation.isPending ? t('portal.claimAccountPage.claiming') : t('portal.claimAccountPage.confirmClaim')}
                   </Button>
                 </div>
               ))}

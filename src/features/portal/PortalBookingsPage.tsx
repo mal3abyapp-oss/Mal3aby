@@ -1,5 +1,6 @@
 import { useQuery } from '@tanstack/react-query'
 import { Link } from 'react-router-dom'
+import { useTranslation } from 'react-i18next'
 import { supabase } from '@/lib/supabase/client'
 import { StatusBadge } from '@/components/ui/status-badge'
 import { PageHeader } from '@/components/ui/page-header'
@@ -7,6 +8,7 @@ import { MoneyDisplay } from '@/components/ui/money-display'
 import { BOOKING_STATUS_LABELS, BOOKING_STATUS_TONE } from '@/lib/domain/booking'
 import { formatInstant } from '@/lib/domain/time'
 import { fetchInvoicePaymentSummaries, type InvoicePaymentSummary } from '@/lib/domain/billing'
+import { useDirection } from '@/app/providers/DirectionProvider'
 import { QrCode, Receipt } from 'lucide-react'
 
 // Gate 3 — first real screen of the Unified User Dashboard: My
@@ -47,6 +49,7 @@ async function fetchOutstandingByInvoice(invoiceIds: string[]): Promise<Map<stri
 }
 
 export function PortalBookingsPage() {
+  const { t } = useTranslation()
   const { data: bookings = [], isLoading } = useQuery({ queryKey: ['portal', 'my-bookings'], queryFn: fetchMyBookings })
 
   const invoiceIds = bookings.map((b) => b.invoice_id).filter((id): id is string => !!id)
@@ -62,19 +65,19 @@ export function PortalBookingsPage() {
 
   return (
     <div className="flex flex-col gap-5">
-      <PageHeader title="حجوزاتي" description="جميع حجوزاتك للملاعب" />
+      <PageHeader title={t('portal.bookingsPage.title')} description={t('portal.bookingsPage.description')} />
 
-      {isLoading && <p className="text-sm text-text-secondary">جارٍ التحميل...</p>}
+      {isLoading && <p className="text-sm text-text-secondary">{t('portal.bookingsPage.loading')}</p>}
 
       {!isLoading && bookings.length === 0 && (
         <p className="rounded-lg border border-dashed border-border p-6 text-center text-sm text-text-secondary">
-          لا توجد حجوزات بعد.
+          {t('portal.bookingsPage.emptyTitle')}
         </p>
       )}
 
       {upcoming.length > 0 && (
         <div className="flex flex-col gap-2">
-          <h2 className="text-sm font-semibold text-text-secondary">القادمة</h2>
+          <h2 className="text-sm font-semibold text-text-secondary">{t('portal.bookingsPage.upcoming')}</h2>
           {upcoming.map((b) => (
             <BookingCard key={b.id} booking={b} outstanding={b.invoice_id ? summaries?.get(b.invoice_id) : undefined} />
           ))}
@@ -83,7 +86,7 @@ export function PortalBookingsPage() {
 
       {past.length > 0 && (
         <div className="flex flex-col gap-2">
-          <h2 className="text-sm font-semibold text-text-secondary">السابقة</h2>
+          <h2 className="text-sm font-semibold text-text-secondary">{t('portal.bookingsPage.past')}</h2>
           {past.map((b) => (
             <BookingCard key={b.id} booking={b} outstanding={b.invoice_id ? summaries?.get(b.invoice_id) : undefined} />
           ))}
@@ -104,6 +107,8 @@ export function PortalBookingsPage() {
 const CAN_SHOW_QR_STATUSES = new Set(['confirmed', 'pending_payment'])
 
 function BookingCard({ booking, outstanding }: { booking: PortalBooking; outstanding?: InvoicePaymentSummary }) {
+  const { t } = useTranslation()
+  const { locale } = useDirection()
   const tz = booking.clubs?.timezone ?? 'UTC'
   const showQrLink = CAN_SHOW_QR_STATUSES.has(booking.status) && new Date(booking.start_at).getTime() >= Date.now()
   return (
@@ -121,16 +126,19 @@ function BookingCard({ booking, outstanding }: { booking: PortalBooking; outstan
               same pattern as BookingDetailSheet's time-range display. */}
           <p className="text-xs text-text-secondary tabular-nums">
             <bdi>
-              {formatInstant(booking.start_at, tz, { day: 'numeric', month: 'long' })}
+              {formatInstant(booking.start_at, tz, { day: 'numeric', month: 'long' }, locale)}
               {' — '}
-              {formatInstant(booking.start_at, tz, { hour: '2-digit', minute: '2-digit' })}
+              {formatInstant(booking.start_at, tz, { hour: '2-digit', minute: '2-digit' }, locale)}
               {' - '}
-              {formatInstant(booking.end_at, tz, { hour: '2-digit', minute: '2-digit' })}
+              {formatInstant(booking.end_at, tz, { hour: '2-digit', minute: '2-digit' }, locale)}
             </bdi>
           </p>
         </div>
         <div className="flex flex-col items-end gap-1">
-          <StatusBadge tone={BOOKING_STATUS_TONE[booking.status] ?? 'neutral'} label={BOOKING_STATUS_LABELS[booking.status] ?? booking.status} />
+          <StatusBadge
+            tone={BOOKING_STATUS_TONE[booking.status] ?? 'neutral'}
+            label={t(`bookings.statusLabels.${booking.status}`, { defaultValue: BOOKING_STATUS_LABELS[booking.status] ?? booking.status })}
+          />
           {/* RTL sweep finding: was the one remaining hand-rolled money
               display in the codebase, bypassing MoneyDisplay's bidi
               isolation. */}
@@ -142,7 +150,7 @@ function BookingCard({ booking, outstanding }: { booking: PortalBooking; outstan
               paid booking shows no extra chip (booking status already
               reads "مؤكد"/confirmed, no need to also say "paid"). */}
           {outstanding && outstanding.outstanding > 0.01 && (
-            <StatusBadge tone="danger" label={`متبقي ${outstanding.outstanding.toFixed(0)} ج.م`} />
+            <StatusBadge tone="danger" label={t('portal.bookingsPage.outstandingChip', { amount: outstanding.outstanding.toFixed(0) })} />
           )}
         </div>
       </div>
@@ -151,13 +159,13 @@ function BookingCard({ booking, outstanding }: { booking: PortalBooking; outstan
           {showQrLink && (
             <Link to={`/portal/qr?bookingId=${booking.id}`} className="flex items-center gap-1 font-medium text-accent-foreground hover:underline">
               <QrCode className="size-3.5" />
-              رمز الحضور
+              {t('portal.bookingsPage.attendanceQrLink')}
             </Link>
           )}
           {booking.invoice_id && (
             <Link to={`/portal/payments?invoiceId=${booking.invoice_id}`} className="flex items-center gap-1 font-medium text-accent-foreground hover:underline">
               <Receipt className="size-3.5" />
-              الفاتورة والدفع
+              {t('portal.bookingsPage.invoicePaymentLink')}
             </Link>
           )}
         </div>

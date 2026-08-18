@@ -1,5 +1,6 @@
 import { useQuery } from '@tanstack/react-query'
 import { useNavigate } from 'react-router-dom'
+import { useTranslation } from 'react-i18next'
 import { supabase } from '@/lib/supabase/client'
 import { useAuth } from '@/app/providers/AuthProvider'
 import { PageHeader } from '@/components/ui/page-header'
@@ -8,6 +9,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { StatusBadge } from '@/components/ui/status-badge'
 import { Button } from '@/components/ui/button'
 import { formatMoney } from '@/lib/domain/billing'
+import { useDirection } from '@/app/providers/DirectionProvider'
 import { FirstRunChecklist } from '@/features/dashboard/FirstRunChecklist'
 import { AttentionNeeded } from '@/features/dashboard/AttentionNeeded'
 import { OwnerFinanceTransparency } from '@/features/dashboard/OwnerFinanceTransparency'
@@ -77,6 +79,8 @@ async function fetchAcademyRisk(clubId: string): Promise<AcademyRisk> {
 // new routing infra).
 function BookingListCard({ title, bookings }: { title: string; bookings: DashboardData['now_bookings'] }) {
   const navigate = useNavigate()
+  const { t } = useTranslation()
+  const { locale } = useDirection()
   return (
     <Card>
       <CardHeader>
@@ -84,7 +88,7 @@ function BookingListCard({ title, bookings }: { title: string; bookings: Dashboa
       </CardHeader>
       <CardContent className="flex flex-col gap-2">
         {bookings.length === 0 ? (
-          <p className="text-sm text-text-secondary">لا يوجد</p>
+          <p className="text-sm text-text-secondary">{t('common.noData')}</p>
         ) : (
           bookings.map((b) => (
             <button
@@ -98,11 +102,11 @@ function BookingListCard({ title, bookings }: { title: string; bookings: Dashboa
               </div>
               <div className="text-end">
                 <p className="tabular-nums text-text-secondary">
-                  {new Date(b.start_at).toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit' })}
+                  {new Date(b.start_at).toLocaleTimeString(locale === 'en' ? 'en-US' : 'ar-EG', { hour: '2-digit', minute: '2-digit' })}
                 </p>
                 <StatusBadge
                   tone={b.status === 'confirmed' || b.status === 'checked_in' ? 'success' : 'warning'}
-                  label={BOOKING_STATUS_LABELS[b.status] ?? b.status}
+                  label={t(`bookings.statusLabels.${b.status}`, { defaultValue: BOOKING_STATUS_LABELS[b.status] ?? b.status })}
                 />
               </div>
             </button>
@@ -115,23 +119,24 @@ function BookingListCard({ title, bookings }: { title: string; bookings: Dashboa
 
 function QuickActionButtons({ isManager }: { isManager: boolean }) {
   const navigate = useNavigate()
+  const { t } = useTranslation()
   return (
     <div className="mb-4 flex flex-wrap gap-2">
       <Button size="sm" onClick={() => navigate('/app/bookings')}>
-        <CalendarPlus className="size-4" /> حجز جديد
+        <CalendarPlus className="size-4" /> {t('dashboard.today.newBooking')}
       </Button>
       <Button size="sm" variant="outline" onClick={() => navigate('/app/billing')}>
-        <Wallet className="size-4" /> تحصيل دفعة
+        <Wallet className="size-4" /> {t('dashboard.today.collectPayment')}
       </Button>
       <Button size="sm" variant="outline" onClick={() => navigate('/scan')}>
-        <ScanLine className="size-4" /> مسح QR
+        <ScanLine className="size-4" /> {t('dashboard.today.scanQr')}
       </Button>
       <Button size="sm" variant="outline" onClick={() => navigate('/app/customers')}>
-        <UserPlus className="size-4" /> إضافة عميل
+        <UserPlus className="size-4" /> {t('dashboard.today.addCustomer')}
       </Button>
       {isManager && (
         <Button size="sm" variant="outline" onClick={() => navigate('/app/academy')}>
-          <GraduationCap className="size-4" /> الأكاديمية
+          <GraduationCap className="size-4" /> {t('nav.academy')}
         </Button>
       )}
     </div>
@@ -139,7 +144,9 @@ function QuickActionButtons({ isManager }: { isManager: boolean }) {
 }
 
 export function TodayPage() {
+  const { t } = useTranslation()
   const { currentClubId, currentMembership } = useAuth()
+  const { locale } = useDirection()
   const roleKey = currentMembership?.roleKey
 
   const isManager = roleKey === 'club_owner' || roleKey === 'club_manager' || roleKey === 'branch_manager'
@@ -167,32 +174,32 @@ export function TodayPage() {
 
   return (
     <div>
-      <PageHeader title="اليوم" />
+      <PageHeader title={t('nav.today')} />
       <FirstRunChecklist />
 
       {(isManager || isReception) && <QuickActionButtons isManager={isManager} />}
 
-      {isLoading && <p className="text-sm text-text-secondary">جارٍ التحميل...</p>}
+      {isLoading && <p className="text-sm text-text-secondary">{t('common.loading')}</p>}
 
       {data && (isManager || isReception) && (
         <div className="mb-6 grid grid-cols-2 gap-3 md:grid-cols-4">
-          <StatCard label="حجوزات اليوم" value={data.bookings_today_count} icon={CalendarDays} to="/app/bookings" />
-          <StatCard label="تم تسجيل الحضور" value={data.checked_in_count} icon={CheckCircle2} tone="success" to="/app/bookings" />
+          <StatCard label={t('dashboard.today.bookingsToday')} value={data.bookings_today_count} icon={CalendarDays} to="/app/bookings" />
+          <StatCard label={t('dashboard.today.checkedIn')} value={data.checked_in_count} icon={CheckCircle2} tone="success" to="/app/bookings" />
           <StatCard
-            label="الملاعب المشغولة الآن"
+            label={t('dashboard.today.fieldsOccupiedNow')}
             value={`${data.fields_occupied_now_count} / ${data.fields_active_count}`}
             icon={Landmark}
             to="/app/fields"
           />
           {isManager && (
-            <StatCard label="إيرادات اليوم" value={formatMoney(data.revenue_today)} icon={Wallet} to="/app/billing" />
+            <StatCard label={t('dashboard.today.revenueToday')} value={formatMoney(data.revenue_today, 'EGP', locale)} icon={Wallet} to="/app/billing" />
           )}
         </div>
       )}
 
       {data && isManager && data.outstanding_total > 0 && (
         <div className="mb-6">
-          <StatCard label="إجمالي المستحقات" value={formatMoney(data.outstanding_total)} tone="danger" to="/app/outstanding" />
+          <StatCard label={t('dashboard.today.totalOutstanding')} value={formatMoney(data.outstanding_total, 'EGP', locale)} tone="danger" to="/app/outstanding" />
         </div>
       )}
 
@@ -208,10 +215,10 @@ export function TodayPage() {
           links since they're clickable now rather than dead numbers. */}
       {isManager && academyRisk && (
         <div className="mb-6 grid grid-cols-2 gap-3 md:grid-cols-4">
-          <StatCard label="اشتراكات نشطة" value={academyRisk.activeSubscriptions} icon={GraduationCap} to="/app/academy" />
-          <StatCard label="اشتراكات غير مدفوعة" value={academyRisk.unpaid} tone={academyRisk.unpaid > 0 ? 'danger' : 'default'} to="/app/academy" />
-          <StatCard label="حصص اليوم" value={academyRisk.sessionsToday} to="/app/academy" />
-          <StatCard label="عملاء جدد اليوم" value={academyRisk.newCustomersToday} tone="success" to="/app/customers" />
+          <StatCard label={t('dashboard.today.activeSubscriptions')} value={academyRisk.activeSubscriptions} icon={GraduationCap} to="/app/academy" />
+          <StatCard label={t('dashboard.today.unpaidSubscriptions')} value={academyRisk.unpaid} tone={academyRisk.unpaid > 0 ? 'danger' : 'default'} to="/app/academy" />
+          <StatCard label={t('dashboard.today.sessionsToday')} value={academyRisk.sessionsToday} to="/app/academy" />
+          <StatCard label={t('dashboard.today.newCustomersToday')} value={academyRisk.newCustomersToday} tone="success" to="/app/customers" />
         </div>
       )}
 
@@ -229,8 +236,8 @@ export function TodayPage() {
 
       {data && (isManager || isReception) && (
         <div className="grid gap-4 md:grid-cols-2">
-          <BookingListCard title="الآن (NOW)" bookings={data.now_bookings} />
-          <BookingListCard title="التالي (NEXT)" bookings={data.next_bookings} />
+          <BookingListCard title={t('dashboard.today.now')} bookings={data.now_bookings} />
+          <BookingListCard title={t('dashboard.today.next')} bookings={data.next_bookings} />
         </div>
       )}
     </div>

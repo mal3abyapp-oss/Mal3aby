@@ -1,5 +1,6 @@
 import { useQuery } from '@tanstack/react-query'
 import { Link } from 'react-router-dom'
+import { useTranslation } from 'react-i18next'
 import { supabase } from '@/lib/supabase/client'
 import { useAuth } from '@/app/providers/AuthProvider'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -41,6 +42,7 @@ async function fetchChecklistState(clubId: string) {
 }
 
 export function FirstRunChecklist() {
+  const { t } = useTranslation()
   const { currentClubId } = useAuth()
   const { data } = useQuery({
     queryKey: ['first-run-checklist', currentClubId],
@@ -53,18 +55,18 @@ export function FirstRunChecklist() {
   }
 
   const items = [
-    { label: 'أضف موظفًا', done: !!data?.hasStaff, to: '/app/staff' },
-    { label: 'أضف أول عميل', done: !!data?.hasCustomer, to: '/app/customers' },
+    { label: t('dashboard.checklist.addStaff'), done: !!data?.hasStaff, to: '/app/staff' },
+    { label: t('dashboard.checklist.addFirstCustomer'), done: !!data?.hasCustomer, to: '/app/customers' },
     // Fields live under Settings -> إعدادات الحجوزات (moved there in
     // the P1-7 usability pass) -- not a standalone /app/fields route.
-    { label: 'أضف ملعبًا', done: !!data?.hasField, to: '/app/settings' },
-    { label: 'أنشئ أول حجز', done: !!data?.hasBooking, to: '/app/bookings' },
+    { label: t('dashboard.checklist.addField'), done: !!data?.hasField, to: '/app/settings' },
+    { label: t('dashboard.checklist.createFirstBooking'), done: !!data?.hasBooking, to: '/app/bookings' },
   ]
 
   return (
     <Card className="mb-4">
       <CardHeader className="flex flex-row items-center justify-between">
-        <CardTitle className="text-base">خطوات البداية</CardTitle>
+        <CardTitle className="text-base">{t('dashboard.checklist.title')}</CardTitle>
         <button
           className="text-xs text-text-secondary hover:underline"
           onClick={() => {
@@ -72,7 +74,7 @@ export function FirstRunChecklist() {
             window.location.reload()
           }}
         >
-          إخفاء
+          {t('dashboard.checklist.hide')}
         </button>
       </CardHeader>
       <CardContent className="flex flex-col gap-2">
