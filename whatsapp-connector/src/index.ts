@@ -69,6 +69,58 @@ function validateRequiredEnv(): void {
  * state (reconnecting/failed/etc.) through the normal state-change
  * path regardless -- this handler exists only to stop an OS-level
  * process death, not to hide or suppress a real per-club failure.
+ *
+ * P1 OPEN INVESTIGATION (2026-08-18, send-hang follow-up -- NOT changed
+ * without evidence): Node's own documentation is explicit that resuming
+ * normal execution after an uncaughtException is unsafe -- the process
+ * may be left in an undefined state (a half-mutated data structure, a
+ * corrupted internal map, a promise chain missing its resolution). If
+ * that ever applies to Baileys' own internal state (its retry queue,
+ * its pending-query correlation maps that waitForMessage()/query() rely
+ * on), the exact observable symptom would be indistinguishable from
+ * what this session's send-hang investigation found: connection.update
+ * still reports 'connected', but a later sendMessage() hangs or behaves
+ * incorrectly because some internal Baileys promise/map was left
+ * mid-mutation when the guard caught its exception.
+ *
+ * ProcessDiagnostics.ts's counters+timestamps (ONLY additive
+ * instrumentation added so far, not yet deployed -- ac0ee03 is the
+ * currently-live image; this fix is committed locally as b64fe37,
+ * blocked on git push permission, see the standing external-blocker
+ * report) exist SPECIFICALLY to test this correlation once live: does
+ * an uncaughtException/unhandledRejection timestamp fall shortly BEFORE
+ * a send-hang timestamp (SendDiagnostics.ts)? That correlation is the
+ * evidence bar this redesign is gated on -- it has NOT been checked yet
+ * (requires the still-blocked container rebuild to observe on a real
+ * connector process; wrangler tail cannot see this process's own
+ * stdout, confirmed empirically earlier in this same investigation).
+ *
+ * IF that correlation is found, the redesign is NOT "let the process
+ * crash and die" (which is the exact prior incident this guard was
+ * built to prevent -- losing every club's queue processing, not just
+ * one). The correct shape, per the explicit request, is:
+ *   1. Log full diagnostic context (generation, last send stage, last
+ *      connection state) -- same non-secret fields already captured.
+ *   2. Call process.exit(1) deliberately (a clean, intentional
+ *      termination, not an uncontrolled crash) rather than continuing
+ *      to run past line 84 below.
+ *   3. Let Cloudflare's Container platform's own supervision restart
+ *      the process (already the normal container lifecycle -- no new
+ *      mechanism needed; onActivityExpired()/ensureRunning() in
+ *      WhatsAppAccountObject.ts already bring a stopped container back
+ *      up when shouldStayAwake is true).
+ *   4. restoreAllPersistedSessions() (already called at every process
+ *      start, unconditionally) restores the SAME session from the
+ *      encrypted Postgres store -- proven live this session (twice: a
+ *      container rollout and an explicit controlled restart both
+ *      restored the same phone number with no new QR).
+ * This trades "one exception affects only the club whose operation
+ * triggered it" for "one exception restarts the whole container" --
+ * still bounded and self-healing (not a crash loop, since the
+ * underlying cause of the exception would need to recur to trigger it
+ * again), and directly addresses Node's own safety warning instead of
+ * indefinitely swallowing it. NOT implemented here -- the evidence this
+ * redesign depends on has not been gathered yet.
  */
 function installCrashGuards(): void {
   process.on('uncaughtException', (err) => {

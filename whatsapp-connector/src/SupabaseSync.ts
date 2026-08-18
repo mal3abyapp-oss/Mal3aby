@@ -188,4 +188,78 @@ export class SupabaseSync {
     })
     if (rpcError) throw new Error(`whatsapp_connector_report_send_result failed: ${rpcError.message}`)
   }
+
+  /**
+   * WhatsApp Health & Root Cause Center -- writes one delivery trace
+   * row. Best-effort: a failure here must NEVER block or fail the
+   * actual send/report_send_result path (observability must not become
+   * a new reason for the real feature to break, per the explicit
+   * "observability yourself must not cause new outages" requirement) --
+   * callers should catch and log, never let this throw propagate into
+   * QueueConsumer.processRow()'s own control flow.
+   */
+  async writeDeliveryTrace(trace: {
+    clubId: string
+    notificationQueueId: string | null
+    attemptNumber: number
+    templateKey: string
+    mediaType: string | null
+    mediaIntent: string | null
+    socketGeneration: number | null
+    containerInstanceId: string | null
+    stageTimeline: Array<{ stage: string; at: string }>
+    lastStageReached: string | null
+    startedAt: string
+    finishedAt: string | null
+    elapsedMs: number | null
+    outcome: 'success' | 'failed' | 'timed_out' | 'unknown'
+    rootCauseCode: string | null
+    rootCauseConfidence: 'high' | 'medium' | 'low' | 'unproven' | null
+    errorSummary: string | null
+    hasProviderReference: boolean
+  }): Promise<string | null> {
+    const { data, error } = await this.client.rpc('whatsapp_connector_write_delivery_trace', {
+      p_club_id: trace.clubId,
+      p_notification_queue_id: trace.notificationQueueId,
+      p_attempt_number: trace.attemptNumber,
+      p_template_key: trace.templateKey,
+      p_media_type: trace.mediaType,
+      p_media_intent: trace.mediaIntent,
+      p_socket_generation: trace.socketGeneration,
+      p_container_instance_id: trace.containerInstanceId,
+      p_stage_timeline: trace.stageTimeline,
+      p_last_stage_reached: trace.lastStageReached,
+      p_started_at: trace.startedAt,
+      p_finished_at: trace.finishedAt,
+      p_elapsed_ms: trace.elapsedMs,
+      p_outcome: trace.outcome,
+      p_root_cause_code: trace.rootCauseCode,
+      p_root_cause_confidence: trace.rootCauseConfidence,
+      p_error_summary: trace.errorSummary,
+      p_has_provider_reference: trace.hasProviderReference,
+    })
+    if (error) throw new Error(`whatsapp_connector_write_delivery_trace failed: ${error.message}`)
+    return (data as string) ?? null
+  }
+
+  /** WhatsApp Health & Root Cause Center -- opens/escalates/resolves an incident based on real trace evidence. Same best-effort contract as writeDeliveryTrace(). */
+  async upsertIncident(params: {
+    clubId: string
+    outcome: 'success' | 'failed' | 'timed_out' | 'unknown'
+    rootCauseCode: string | null
+    rootCauseConfidence: 'high' | 'medium' | 'low' | 'unproven' | null
+    automaticRecoveryPerformed?: boolean
+    automaticRecoveryDetail?: string
+  }): Promise<string | null> {
+    const { data, error } = await this.client.rpc('whatsapp_connector_upsert_incident', {
+      p_club_id: params.clubId,
+      p_outcome: params.outcome,
+      p_root_cause_code: params.rootCauseCode,
+      p_root_cause_confidence: params.rootCauseConfidence,
+      p_automatic_recovery_performed: params.automaticRecoveryPerformed ?? false,
+      p_automatic_recovery_detail: params.automaticRecoveryDetail ?? null,
+    })
+    if (error) throw new Error(`whatsapp_connector_upsert_incident failed: ${error.message}`)
+    return (data as string) ?? null
+  }
 }

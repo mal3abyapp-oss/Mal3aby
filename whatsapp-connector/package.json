@@ -10,7 +10,8 @@
     "start": "node --env-file=.env dist/index.js",
     "test": "tsx --env-file=.env src/selfTest.ts",
     "test:media": "tsx src/mediaTest.ts",
-    "test:send-reliability": "tsx src/sendReliabilityTest.ts"
+    "test:send-reliability": "tsx src/sendReliabilityTest.ts",
+    "test:root-cause": "tsx src/rootCauseClassifierTest.ts"
   },
   "dependencies": {
     "@hapi/boom": "^9.1.4",

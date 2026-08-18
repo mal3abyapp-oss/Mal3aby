@@ -75,6 +75,16 @@ export class TenantConnectionManager {
     return this.providers.get(clubId)?.getConnectionState() ?? 'disconnected'
   }
 
+  /** WhatsApp Health & Root Cause Center -- whether a provider instance exists at all for this club, distinct from its connection state (a provider can exist but be disconnected/reconnecting). */
+  hasProvider(clubId: string): boolean {
+    return this.providers.has(clubId)
+  }
+
+  /** WhatsApp Health & Root Cause Center -- this club's own diagnostics snapshot, or null if no provider exists yet. */
+  getProviderDiagnostics(clubId: string) {
+    return this.providers.get(clubId)?.getDiagnostics() ?? null
+  }
+
   /**
    * Attempts to restore every club that has a persisted (encrypted)
    * session in Postgres, without requiring a fresh QR scan -- called

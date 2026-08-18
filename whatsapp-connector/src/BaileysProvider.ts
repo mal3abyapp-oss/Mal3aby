@@ -10,7 +10,7 @@ import path from 'node:path'
 import { mkdir, rm } from 'node:fs/promises'
 import { createHash, randomInt } from 'node:crypto'
 import type { ConnectionState, MediaAttachment, SendMessageResult, WhatsAppProvider } from './WhatsAppProvider.js'
-import { recordSendStart, recordSendStage, recordSendOutcome } from './SendDiagnostics.js'
+import { recordSendStart, recordSendStage, recordSendOutcome, recordConnectionOpen } from './SendDiagnostics.js'
 
 /**
  * BaileysProvider -- the ONLY file in this service allowed to import
@@ -158,8 +158,27 @@ function withJitter(baseMs: number): number {
 }
 
 /**
- * ROOT CAUSE FOUND (adversarial send-reliability investigation,
- * 2026-08-18) -- REPLACES the diagnosis this comment used to record.
+ * WORKING HYPOTHESIS, evidence-backed but NOT YET CONFIRMED live
+ * (adversarial send-reliability investigation, 2026-08-18) -- what
+ * this comment used to record as the diagnosis is retained below for
+ * the reasoning trail, but per explicit direction: raising
+ * SEND_TIMEOUT_MS to 75s must not be treated as a proven root cause
+ * until a live production A/B test (fresh restored session, plain-text
+ * send, NO external timeout shorter than Baileys' own, full
+ * generation/timestamp/outcome logging, run to its natural conclusion)
+ * confirms the send actually succeeds in the 45-75s window this fix
+ * opens up. Three possible outcomes once that test runs, and only one
+ * of them confirms this diagnosis:
+ *   (A) send succeeds between 45-75s -> confirms the 45s wrapper was
+ *       really the cause.
+ *   (B) Baileys itself throws its own query-timeout error around 60s ->
+ *       75s is NOT the fix; continue diagnosing the USync/session/
+ *       protocol/WhatsApp-response path.
+ *   (C) send still hangs past Baileys' own internal timeout -> the
+ *       installed package's actual timeout/config/query mechanism
+ *       needs re-examination; the analysis below was wrong somewhere.
+ * The reasoning below (traced from the installed package's own source)
+ * is what motivated trying this fix -- it is not itself the proof.
  *
  * The original 45s SEND_TIMEOUT_MS was NOT catching a genuine
  * `socket.sendMessage()` hang -- it was racing, and always winning
@@ -400,6 +419,12 @@ export class BaileysProvider implements WhatsAppProvider {
         const phone = socket.user?.id?.split(':')[0] ?? undefined
         this.setState('connected', { connectedPhoneNumber: phone })
         this.connectedSince = Date.now()
+        // Production A/B test requirement (2026-08-18): a later send
+        // attempt's SendDiagnostics record needs to know exactly when
+        // THIS generation's connection opened, so a reader can compute
+        // "how long after connect was this send attempted" from /status
+        // without guessing.
+        recordConnectionOpen(this.clubId, myGeneration)
 
         // Fix item 7: do NOT reset reconnectAttempts immediately on
         // open -- only after this connection has held for a real
@@ -545,12 +570,17 @@ export class BaileysProvider implements WhatsAppProvider {
       recordSendStage(this.clubId, 'text_sent', Date.now() - sendStartedAt)
     } catch (err) {
       const timedOut = (err as Error).message.includes('never resolved')
-      recordSendOutcome(this.clubId, timedOut ? 'timed_out' : 'failed', Date.now() - sendStartedAt)
+      recordSendOutcome(this.clubId, timedOut ? 'timed_out' : 'failed', Date.now() - sendStartedAt, {
+        // Only a genuinely Baileys-reported error carries diagnostic
+        // value here -- our own timeout text is already fully captured
+        // by `outcome === 'timed_out'` and adds nothing beyond it.
+        baileysErrorMessage: timedOut ? undefined : (err as Error).message,
+      })
       return { success: false, error: (err as Error).message }
     }
 
     if (!media) {
-      recordSendOutcome(this.clubId, 'success', Date.now() - sendStartedAt)
+      recordSendOutcome(this.clubId, 'success', Date.now() - sendStartedAt, { hasProviderReference: !!textProviderReference })
       return { success: true, providerReference: textProviderReference }
     }
 
@@ -567,8 +597,9 @@ export class BaileysProvider implements WhatsAppProvider {
         'media',
       )
       recordSendStage(this.clubId, 'media_sent', Date.now() - sendStartedAt)
-      recordSendOutcome(this.clubId, 'success', Date.now() - sendStartedAt)
-      return { success: true, providerReference: mediaResult?.key?.id ?? textProviderReference }
+      const finalProviderReference = mediaResult?.key?.id ?? textProviderReference
+      recordSendOutcome(this.clubId, 'success', Date.now() - sendStartedAt, { hasProviderReference: !!finalProviderReference })
+      return { success: true, providerReference: finalProviderReference }
     } catch (err) {
       // Text already went out to the customer's phone at this point --
       // documented above and in WhatsAppProvider's interface comment.
@@ -578,7 +609,9 @@ export class BaileysProvider implements WhatsAppProvider {
       // resent on retry" risk is the honest, tested trade-off, not a
       // hidden one.
       const timedOut = (err as Error).message.includes('never resolved')
-      recordSendOutcome(this.clubId, timedOut ? 'timed_out' : 'failed', Date.now() - sendStartedAt)
+      recordSendOutcome(this.clubId, timedOut ? 'timed_out' : 'failed', Date.now() - sendStartedAt, {
+        baileysErrorMessage: timedOut ? undefined : (err as Error).message,
+      })
       return { success: false, error: `text sent but media failed: ${(err as Error).message}` }
     }
   }

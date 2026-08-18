@@ -10,7 +10,7 @@
  *
  * Run with: npx tsx src/sendReliabilityTest.ts
  */
-import { recordSendStart, recordSendStage, recordSendOutcome, getSendDiagnosticsSnapshot } from './SendDiagnostics.js'
+import { recordSendStart, recordSendStage, recordSendOutcome, recordConnectionOpen, getSendDiagnosticsSnapshot } from './SendDiagnostics.js'
 import { recordUncaughtException, recordUnhandledRejection, getProcessDiagnosticsSnapshot } from './ProcessDiagnostics.js'
 
 let failures = 0
@@ -93,13 +93,35 @@ async function main() {
   )
 
   // 4. SendDiagnostics.ts -- never records message content, only club
-  // id/generation/template key/stage/elapsed/outcome.
+  // id/generation/template key/stage/timestamps/elapsed/outcome/whether
+  // a provider reference exists.
   const testClubId = 'testclub'
+  recordConnectionOpen(testClubId, 3)
   recordSendStart(testClubId, 3, 'booking-cancelled')
   recordSendStage(testClubId, 'text_sent', 42)
-  recordSendOutcome(testClubId, 'success', 55)
+  recordSendOutcome(testClubId, 'success', 55, { hasProviderReference: true })
   const snapshot = getSendDiagnosticsSnapshot()
   const record = snapshot.find((r) => r.clubId === testClubId)
+  check(
+    'SendDiagnostics records connectionOpenAt (from a prior recordConnectionOpen for the same generation) and resolvedAt on completion',
+    !!record && typeof record.connectionOpenAt === 'string' && typeof record.resolvedAt === 'string' && record.hasProviderReference === true,
+  )
+
+  // 4b. A genuinely Baileys-reported error (outcome bucket B/C
+  // evidence for the production A/B test) is captured verbatim when
+  // the caller (BaileysProvider.ts) supplies one -- SendDiagnostics
+  // itself just stores whatever it's given; the actual "never for a
+  // real timeout" guarantee lives in BaileysProvider.ts's own call
+  // site (it only passes baileysErrorMessage when `!timedOut`), not
+  // here. This test covers the storage half of that contract.
+  const failedClubId = 'failedclub'
+  recordSendStart(failedClubId, 1, 'booking-cancelled')
+  recordSendOutcome(failedClubId, 'failed', 1200, { baileysErrorMessage: 'Boom: Connection Closed' })
+  const failedRecord = getSendDiagnosticsSnapshot().find((r) => r.clubId === failedClubId)
+  check(
+    'a genuinely Baileys-reported failure stores its error message for later inspection',
+    !!failedRecord && failedRecord.outcome === 'failed' && failedRecord.baileysErrorMessage === 'Boom: Connection Closed',
+  )
   check('SendDiagnostics records the expected fields for a completed send', !!record && record.generation === 3 && record.templateKey === 'booking-cancelled' && record.outcome === 'success' && record.elapsedMs === 55)
 
   // 5. ProcessDiagnostics.ts -- counters increment, never store the
