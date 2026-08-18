@@ -100,6 +100,11 @@ export function startHealthServer(sync: SupabaseSync, connections: TenantConnect
       const diagnostics = connections.getAllDiagnostics()
       const anyConnected = diagnostics.some((d) => d.state === 'connected')
       const anyReconnecting = diagnostics.some((d) => d.state === 'connecting' || d.state === 'reconnecting')
+      // DIAGNOSTIC (root-cause investigation, item 8 -- "check memory
+      // usage and whether the process exceeds the configured Container
+      // instance limits"): process.memoryUsage() has no secret content,
+      // safe to expose on this already-internal-token-gated endpoint.
+      const mem = process.memoryUsage()
 
       res.writeHead(200, { 'content-type': 'application/json' })
       res.end(
@@ -111,6 +116,14 @@ export function startHealthServer(sync: SupabaseSync, connections: TenantConnect
           anyConnected,
           anyReconnecting,
           shouldStayAwake: anyConnected || anyReconnecting,
+          pid: process.pid,
+          uptimeSeconds: Math.round(process.uptime()),
+          memoryMb: {
+            rss: Math.round(mem.rss / 1024 / 1024),
+            heapUsed: Math.round(mem.heapUsed / 1024 / 1024),
+            heapTotal: Math.round(mem.heapTotal / 1024 / 1024),
+            external: Math.round(mem.external / 1024 / 1024),
+          },
         }),
       )
       return
@@ -122,6 +135,19 @@ export function startHealthServer(sync: SupabaseSync, connections: TenantConnect
 
   server.listen(port, () => {
     console.log(`[connector] health server listening on port ${port} (/health, /ready, /status)`)
+  })
+
+  // DIAGNOSTIC (root-cause investigation, item 9 -- "check whether
+  // required port 8080 remains listening continuously until shutdown;
+  // if the process stops listening before the restart, identify why").
+  // A 'close' with no preceding shutdown() log line, or an 'error'
+  // event at all, would be direct evidence the HTTP listener itself is
+  // failing independent of the Node process's own exit path.
+  server.on('close', () => {
+    console.log(`[diag] health server 'close' event pid=${process.pid} at=${new Date().toISOString()}`)
+  })
+  server.on('error', (err) => {
+    console.error(`[diag] health server 'error' event pid=${process.pid} at=${new Date().toISOString()}:`, err.message)
   })
 
   return server

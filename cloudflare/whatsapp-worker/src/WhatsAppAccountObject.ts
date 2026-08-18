@@ -175,6 +175,9 @@ export class WhatsAppAccountObject extends Container<Env> {
    * that was causing the premature-sleep race.
    */
   async onStart(): Promise<void> {
+    // DIAGNOSTIC (root-cause investigation, per explicit user
+    // methodology): identity + timestamp only, no secrets.
+    console.log(`[lifecycle] onStart club=${this.clubIdShort()} at=${new Date().toISOString()}`)
     this.renewActivityTimeout()
     await this.ctx.storage.delete(LAST_POLL_AT_KEY)
     await this.ctx.storage.put<AccountStartState>(START_STATE_KEY, { startedAt: Date.now() })
@@ -186,9 +189,44 @@ export class WhatsAppAccountObject extends Container<Env> {
    * stop, crash, host-level restart). Clears the "running" record so a
    * subsequent ensureRunning() call correctly re-starts rather than
    * assuming a container is still alive when it is not.
+   *
+   * DIAGNOSTIC (root-cause investigation): the real, installed
+   * @cloudflare/containers@0.0.13 API passes `{ exitCode: number,
+   * reason: 'exit' | 'runtime_signal' }` to this hook (confirmed via
+   * the package's own .d.ts) -- the PREVIOUS version of this method
+   * ignored both fields entirely, discarding exactly the evidence
+   * needed to determine who/what stopped the container and why. Now
+   * logged (identity + timestamp + exitCode + reason only -- no
+   * secrets, no session data).
    */
-  async onStop(): Promise<void> {
+  async onStop(params: { exitCode: number; reason: 'exit' | 'runtime_signal' }): Promise<void> {
+    console.log(
+      `[lifecycle] onStop club=${this.clubIdShort()} at=${new Date().toISOString()} exitCode=${params.exitCode} reason=${params.reason}`,
+    )
     await this.ctx.storage.delete(START_STATE_KEY)
+  }
+
+  /**
+   * DIAGNOSTIC (root-cause investigation): the real installed package
+   * exposes no separate onActivityExpired() hook -- confirmed by
+   * reading node_modules/@cloudflare/containers/dist/index.d.ts's full
+   * public surface (onStart/onStop/onError only). A container put to
+   * sleep by stopDueToInactivity() (the base class's own internal
+   * inactivity path) still routes through this SAME onStop() callback
+   * -- so onStop()'s own `reason` field is the only place that
+   * distinguishes an inactivity-driven stop from anything else, and it
+   * is logged above.
+   */
+  onError(error: unknown): never {
+    console.log(`[lifecycle] onError club=${this.clubIdShort()} at=${new Date().toISOString()} error=${error instanceof Error ? error.message : String(error)}`)
+    throw error
+  }
+
+  private clubIdShort(): string {
+    // this.ctx.id is the Durable Object's own id -- not directly the
+    // clubId string, but stable per-instance and safe to log (no
+    // secret, no PII) as a correlation handle across log lines.
+    return this.ctx.id.toString().slice(0, 12)
   }
 
   /**
@@ -204,6 +242,17 @@ export class WhatsAppAccountObject extends Container<Env> {
    */
   async ensureRunning(): Promise<void> {
     const existing = await this.ctx.storage.get<AccountStartState>(START_STATE_KEY)
+    // DIAGNOSTIC (root-cause investigation, item 10 -- "check whether
+    // any Worker/DO alarm, scheduled request, management call, or
+    // deployment causes the recycle"): every ensureRunning() call is
+    // logged with whether it short-circuited (container already
+    // believed running) or actually called startAndWaitForPorts() --
+    // this is the ONLY code path in this repo that can start the
+    // container, so if a restart is happening, exactly one of these
+    // two log lines will appear immediately before it, or NEITHER
+    // will (proving the restart is not driven by anything in this
+    // Worker's own code at all, i.e. a genuine platform-level event).
+    console.log(`[lifecycle] ensureRunning club=${this.clubIdShort()} at=${new Date().toISOString()} alreadyRunning=${!!existing}`)
     if (existing) return
     await this.startAndWaitForPorts()
   }
@@ -307,6 +356,13 @@ export class WhatsAppAccountObject extends Container<Env> {
       shouldStayAwake: false,
       status: `tick_error:${(err as Error).message}`,
     }))
+    // DIAGNOSTIC (root-cause investigation): correlates against onStop
+    // to determine whether a restart happens WHILE a poll believes the
+    // container should stay awake (which would mean something OTHER
+    // than this Worker's own polling logic is terminating it), vs.
+    // AFTER a poll genuinely reports shouldStayAwake=false (which would
+    // point back at the keep-awake logic after all).
+    console.log(`[lifecycle] runHealthPollTick club=${this.clubIdShort()} at=${new Date().toISOString()} result=${JSON.stringify(result)}`)
 
     if (result.status === 'not_started') {
       // The container was never started (or onStop already cleared the

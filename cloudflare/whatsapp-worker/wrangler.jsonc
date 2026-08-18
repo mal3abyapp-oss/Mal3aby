@@ -56,19 +56,24 @@
       // GitHub-hosted runner (real Docker, no local dependency), since
       // the local dev machine has no working Docker daemon.
       //
-      // v2-media: MAL3ABY WHATSAPP QR IMAGE + INVOICE DOCUMENT DELIVERY
-      // -- adds QrImage.ts/InvoicePdf.ts media generation and
-      // media-aware sendMessage(). Traceable to: git commit ba81fb1,
-      // GitHub Actions run 32123381441, tag v2-media, digest
+      // v3-timeout-fix: wraps every socket.sendMessage() call (text and
+      // media) in an explicit 45s timeout -- a real hang was found live
+      // where sendMessage() never resolved or rejected, stalling an
+      // entire claimed batch indefinitely (see BaileysProvider.ts's
+      // withSendTimeout() doc comment for the full live evidence).
+      // Traceable to: git commit e359404, GitHub Actions run
+      // 32131143382, tag v3-timeout-fix, digest
+      // sha256:5a562395ea5696647fb81eb7a09aaffe505317f9af50bfe6ae1daf238bea1cf8.
+      // (Prior: v2-media, commit ba81fb1, run 32123381441, digest
       // sha256:a080242072d44d176db628c2580d278d5091302fe5df4415f15d109598c24b2c.
-      // (Prior: v1, commit 17c64406fee997bf7e626a1f30c1c6b30f4255ea, run
+      // v1, commit 17c64406fee997bf7e626a1f30c1c6b30f4255ea, run
       // 32111047189, digest sha256:6a229c291d2580fc235d9fecd0f7d1d9eda6f9a14d00d80a1b12f2b4863ec08c.)
       // To ship a new connector version: bump the tag in a new
       // workflow_dispatch run, then update this image reference to
       // match -- never silently reuse the same tag for different code
       // (the digest above is the actual content-addressed proof of
       // what's running, keep it in sync with the tag).
-      "image": "registry.cloudflare.com/35ac10727701095866b16c276b4a33d1/mala3by-whatsapp-connector:v2-media",
+      "image": "registry.cloudflare.com/35ac10727701095866b16c276b4a33d1/mala3by-whatsapp-connector:v3-timeout-fix",
       // One container instance per WhatsApp account (one Durable
       // Object = one container, directive rule 21's chosen model --
       // NOT a shared container serving multiple clubs, which would

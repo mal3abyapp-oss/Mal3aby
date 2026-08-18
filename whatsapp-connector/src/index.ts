@@ -72,13 +72,47 @@ function validateRequiredEnv(): void {
 function installCrashGuards(): void {
   process.on('uncaughtException', (err) => {
     console.error('[connector] uncaught exception (process kept alive):', err instanceof Error ? err.message : err)
+    if (err instanceof Error && err.stack) console.error('[connector] stack:', err.stack)
   })
   process.on('unhandledRejection', (reason) => {
     console.error('[connector] unhandled promise rejection (process kept alive):', reason instanceof Error ? reason.message : reason)
+    if (reason instanceof Error && reason.stack) console.error('[connector] stack:', reason.stack)
+  })
+}
+
+/**
+ * DIAGNOSTIC (root-cause investigation into the ~3-minute container
+ * restart cycle observed live during the MAL3ABY WHATSAPP QR IMAGE +
+ * INVOICE DOCUMENT DELIVERY task, per the explicit methodology
+ * requested): full process-lifecycle logging -- start timestamp, PID,
+ * every signal received, beforeExit, and the final exit code. No
+ * secrets logged. This is what lets a live `wrangler tail`/container
+ * log capture answer, definitively: does this Node process exit on its
+ * own (and if so, via what exact path/signal), or is it killed
+ * externally with no signal ever observed at the process level (which
+ * would point at the underlying Firecracker microVM/container runtime
+ * being torn down out from under the process, not the process itself
+ * choosing to exit)?
+ */
+function installLifecycleDiagnostics(): void {
+  const startedAt = new Date().toISOString()
+  console.log(`[diag] process start pid=${process.pid} at=${startedAt}`)
+
+  for (const signal of ['SIGTERM', 'SIGINT', 'SIGHUP', 'SIGQUIT'] as const) {
+    process.on(signal, () => {
+      console.log(`[diag] received signal=${signal} pid=${process.pid} at=${new Date().toISOString()}`)
+    })
+  }
+  process.on('beforeExit', (code) => {
+    console.log(`[diag] beforeExit code=${code} pid=${process.pid} at=${new Date().toISOString()}`)
+  })
+  process.on('exit', (code) => {
+    console.log(`[diag] exit code=${code} pid=${process.pid} at=${new Date().toISOString()}`)
   })
 }
 
 async function main() {
+  installLifecycleDiagnostics()
   validateRequiredEnv()
   installCrashGuards()
 
@@ -123,8 +157,8 @@ async function main() {
   // closes every socket cleanly first, which is what actually stops
   // the storm at its root cause rather than just widening retry caps
   // on the receiving end.
-  const shutdown = () => {
-    console.log('[connector] shutting down...')
+  const shutdown = (signal: string) => {
+    console.log(`[connector] shutting down (triggered by ${signal})...`)
     connectionPoller.stop()
     queueConsumer.stop()
     healthServer.close()
@@ -133,8 +167,8 @@ async function main() {
       .catch((err) => console.error('[connector] error during graceful shutdown (exiting anyway):', (err as Error).message))
       .finally(() => process.exit(0))
   }
-  process.on('SIGINT', shutdown)
-  process.on('SIGTERM', shutdown)
+  process.on('SIGINT', () => shutdown('SIGINT'))
+  process.on('SIGTERM', () => shutdown('SIGTERM'))
 }
 
 main().catch((err) => {
