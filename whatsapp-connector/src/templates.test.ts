@@ -262,6 +262,36 @@ check('booking-confirmed-paid omits the invoice link when invoice_token is absen
   assert.ok(msg.includes('/qr/qrtok-paid-1'), 'the QR link should still be present')
 })
 
+// -----------------------------------------------------------------
+// Secure Booking Page language hand-off (directive Sections 28-32/40):
+// the /qr/ and /verify/ links must carry ?lang=ar|en matching the
+// message's own language, so a first-time anonymous visitor's Secure
+// Booking Page opens already in the right language instead of forcing
+// a guess/re-detection.
+// -----------------------------------------------------------------
+
+check('booking-created (ar) QR link carries ?lang=ar', () => {
+  const msg = renderTemplate('booking-created', 'ar', { ...BASE_VARS, booking_qr_token: 'qrtok-lang-1' })
+  assert.ok(msg.includes('/qr/qrtok-lang-1?lang=ar'), 'expected ?lang=ar suffix on the AR booking-created QR link')
+})
+
+check('booking-created (en) QR link carries ?lang=en', () => {
+  const msg = renderTemplate('booking-created', 'en', { ...BASE_VARS, booking_qr_token: 'qrtok-lang-2' })
+  assert.ok(msg.includes('/qr/qrtok-lang-2?lang=en'), 'expected ?lang=en suffix on the EN booking-created QR link')
+})
+
+check('booking-confirmed-paid (ar) QR and invoice links both carry ?lang=ar', () => {
+  const msg = renderTemplate('booking-confirmed-paid', 'ar', PAID_VARS)
+  assert.ok(msg.includes('/qr/qrtok-paid-1?lang=ar'), 'expected ?lang=ar suffix on the QR link')
+  assert.ok(msg.includes('/verify/invtok-paid-1?lang=ar'), 'expected ?lang=ar suffix on the invoice link')
+})
+
+check('booking-confirmed-paid (en) QR and invoice links both carry ?lang=en', () => {
+  const msg = renderTemplate('booking-confirmed-paid', 'en', PAID_VARS)
+  assert.ok(msg.includes('/qr/qrtok-paid-1?lang=en'), 'expected ?lang=en suffix on the QR link')
+  assert.ok(msg.includes('/verify/invtok-paid-1?lang=en'), 'expected ?lang=en suffix on the invoice link')
+})
+
 console.log(`\n[templates.test] ${passed} test(s) passed.`)
 if (process.exitCode) {
   console.error('[templates.test] SOME TESTS FAILED.')

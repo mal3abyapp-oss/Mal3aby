@@ -73,5 +73,54 @@
     "label": "Language",
     "arabic": "العربية",
     "english": "English"
+  },
+  "secureBooking": {
+    "title": "Booking details",
+    "loading": "Loading...",
+    "club": "Club",
+    "branch": "Branch",
+    "field": "Field",
+    "sport": "Sport",
+    "date": "Date",
+    "time": "Time",
+    "bookingRef": "Booking #",
+    "bookingStatus": "Booking status",
+    "paymentSummary": "Payment summary",
+    "total": "Total",
+    "paid": "Paid",
+    "outstanding": "Outstanding",
+    "paymentStatus": "Payment status",
+    "attendanceQr": "Entry code",
+    "attendanceQrHint": "Show this code to staff when you arrive",
+    "viewFullScreen": "View full screen",
+    "closeFullScreen": "Close",
+    "viewInvoice": "View invoice",
+    "bookingStatusLabels": {
+      "pending_payment": "Awaiting payment",
+      "confirmed": "Confirmed",
+      "checked_in": "Checked in",
+      "completed": "Completed",
+      "cancelled": "Cancelled",
+      "no_show": "No-show"
+    },
+    "paymentStatusLabels": {
+      "draft": "Draft",
+      "void": "Voided",
+      "unpaid": "Unpaid",
+      "partially_paid": "Partially paid",
+      "paid": "Fully paid",
+      "partially_refunded": "Partially refunded",
+      "refunded": "Fully refunded"
+    },
+    "states": {
+      "expiredTitle": "This code has expired",
+      "expiredMessage": "This booking's entry code has expired. Contact the club if you need a new one.",
+      "cancelledTitle": "Booking cancelled",
+      "cancelledMessage": "This booking was cancelled and its entry code is no longer valid.",
+      "alreadyUsedTitle": "This code was already used",
+      "alreadyUsedMessage": "Attendance was already checked in with this code.",
+      "invalidTitle": "Invalid code",
+      "invalidMessage": "No matching booking was found for this code. Make sure you opened the correct link, or contact the club directly."
+    }
   }
 }

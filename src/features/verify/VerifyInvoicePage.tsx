@@ -1,8 +1,10 @@
-import { useParams } from 'react-router-dom'
+import { useEffect } from 'react'
+import { useParams, useSearchParams } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { supabase } from '@/lib/supabase/client'
 import { StatusBadge } from '@/components/ui/status-badge'
 import { formatMoney, PAYMENT_STATUS_LABELS, PAYMENT_STATUS_TONE, type PaymentStatus } from '@/lib/domain/billing'
+import { useDirection } from '@/app/providers/DirectionProvider'
 import { CheckCircle2, XCircle } from 'lucide-react'
 
 // Task #86: public invoice verification page. Reachable with NO login
@@ -56,6 +58,24 @@ async function verifyInvoice(token: string): Promise<VerificationResult> {
 
 export function VerifyInvoicePage() {
   const { token } = useParams<{ token: string }>()
+  const [searchParams] = useSearchParams()
+  const { direction, locale, setLocale } = useDirection()
+
+  // Secure Booking Page language hand-off (directive Sections 28-32/40):
+  // invoiceUrl() now appends ?lang=ar|en matching the WhatsApp message's
+  // own language -- honored here the same way SecureBookingPage does,
+  // one-time on mount, so an English customer's "View invoice" link
+  // opens with the correct direction set immediately. Full copy
+  // translation for this page is tracked under the broader English
+  // localization sweep (this page's own strings stay Arabic-only for
+  // now) -- this only fixes direction/RTL-vs-LTR, not every string.
+  useEffect(() => {
+    const langParam = searchParams.get('lang')
+    if ((langParam === 'ar' || langParam === 'en') && langParam !== locale) {
+      setLocale(langParam)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   const { data, isLoading, isError } = useQuery({
     queryKey: ['verify-invoice', token],
@@ -65,7 +85,7 @@ export function VerifyInvoicePage() {
   })
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-page-bg p-4">
+    <div dir={direction} className="flex min-h-screen items-center justify-center bg-page-bg p-4">
       <div className="w-full max-w-sm rounded-xl border border-border bg-surface p-6 text-center shadow">
         <p className="mb-4 text-sm font-medium text-text-secondary">التحقق من فاتورة</p>
 

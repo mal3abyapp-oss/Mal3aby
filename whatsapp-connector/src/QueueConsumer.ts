@@ -239,7 +239,7 @@ export class QueueConsumer {
   private async buildMediaAttachment(row: Awaited<ReturnType<SupabaseSync['claimNextBatch']>>[number]): Promise<MediaAttachment> {
     if (row.mediaIntent === 'booking_qr') {
       const token = row.variables?.booking_qr_token
-      const url = bookingQrUrl(token)
+      const url = bookingQrUrl(token, row.language)
       if (!url) {
         // Directive rule 4: never send a QR image for an event without
         // an active credential -- a missing/empty token here means the

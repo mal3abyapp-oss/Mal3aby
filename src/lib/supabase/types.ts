@@ -2021,6 +2021,8 @@ export type Database = {
           language: string
           last_attempt_at: string | null
           last_error: string | null
+          media_intent: string | null
+          media_type: string | null
           next_attempt_at: string | null
           priority: string
           provider_reference: string | null
@@ -2044,6 +2046,8 @@ export type Database = {
           language?: string
           last_attempt_at?: string | null
           last_error?: string | null
+          media_intent?: string | null
+          media_type?: string | null
           next_attempt_at?: string | null
           priority?: string
           provider_reference?: string | null
@@ -2067,6 +2071,8 @@ export type Database = {
           language?: string
           last_attempt_at?: string | null
           last_error?: string | null
+          media_intent?: string | null
+          media_type?: string | null
           next_attempt_at?: string | null
           priority?: string
           provider_reference?: string | null
@@ -3524,7 +3530,9 @@ export type Database = {
           connected_at: string | null
           connected_phone_number: string | null
           last_error: string | null
+          last_generation: number
           last_seen_at: string | null
+          last_state_seq: number
           last_successful_send_at: string | null
           qr_expires_at: string | null
           qr_payload: string | null
@@ -3540,7 +3548,9 @@ export type Database = {
           connected_at?: string | null
           connected_phone_number?: string | null
           last_error?: string | null
+          last_generation?: number
           last_seen_at?: string | null
+          last_state_seq?: number
           last_successful_send_at?: string | null
           qr_expires_at?: string | null
           qr_payload?: string | null
@@ -3556,7 +3566,9 @@ export type Database = {
           connected_at?: string | null
           connected_phone_number?: string | null
           last_error?: string | null
+          last_generation?: number
           last_seen_at?: string | null
+          last_state_seq?: number
           last_successful_send_at?: string | null
           qr_expires_at?: string | null
           qr_payload?: string | null
@@ -3623,6 +3635,206 @@ export type Database = {
             referencedColumns: ["club_id"]
           },
         ]
+      }
+      whatsapp_delivery_traces: {
+        Row: {
+          attempt_number: number
+          club_id: string
+          container_instance_id: string | null
+          created_at: string
+          elapsed_ms: number | null
+          error_summary: string | null
+          finished_at: string | null
+          has_provider_reference: boolean
+          id: string
+          last_stage_reached: string | null
+          media_intent: string | null
+          media_type: string | null
+          notification_queue_id: string | null
+          outcome: string | null
+          root_cause_code: string | null
+          root_cause_confidence: string | null
+          socket_generation: number | null
+          stage_timeline: Json
+          started_at: string
+          template_key: string
+          trace_id: string
+        }
+        Insert: {
+          attempt_number?: number
+          club_id: string
+          container_instance_id?: string | null
+          created_at?: string
+          elapsed_ms?: number | null
+          error_summary?: string | null
+          finished_at?: string | null
+          has_provider_reference?: boolean
+          id?: string
+          last_stage_reached?: string | null
+          media_intent?: string | null
+          media_type?: string | null
+          notification_queue_id?: string | null
+          outcome?: string | null
+          root_cause_code?: string | null
+          root_cause_confidence?: string | null
+          socket_generation?: number | null
+          stage_timeline?: Json
+          started_at?: string
+          template_key: string
+          trace_id?: string
+        }
+        Update: {
+          attempt_number?: number
+          club_id?: string
+          container_instance_id?: string | null
+          created_at?: string
+          elapsed_ms?: number | null
+          error_summary?: string | null
+          finished_at?: string | null
+          has_provider_reference?: boolean
+          id?: string
+          last_stage_reached?: string | null
+          media_intent?: string | null
+          media_type?: string | null
+          notification_queue_id?: string | null
+          outcome?: string | null
+          root_cause_code?: string | null
+          root_cause_confidence?: string | null
+          socket_generation?: number | null
+          stage_timeline?: Json
+          started_at?: string
+          template_key?: string
+          trace_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "whatsapp_delivery_traces_club_id_fkey"
+            columns: ["club_id"]
+            isOneToOne: false
+            referencedRelation: "clubs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "whatsapp_delivery_traces_club_id_fkey"
+            columns: ["club_id"]
+            isOneToOne: false
+            referencedRelation: "commercial_entitlements_usage"
+            referencedColumns: ["club_id"]
+          },
+          {
+            foreignKeyName: "whatsapp_delivery_traces_notification_queue_id_fkey"
+            columns: ["notification_queue_id"]
+            isOneToOne: false
+            referencedRelation: "notification_queue"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      whatsapp_incidents: {
+        Row: {
+          affected_duration_seconds: number | null
+          affected_message_count: number
+          automatic_recovery_detail: string | null
+          automatic_recovery_performed: boolean
+          club_id: string
+          created_at: string
+          first_successful_send_after_fix_at: string | null
+          fix_applied: string | null
+          id: string
+          manual_action_required: boolean
+          resolved_at: string | null
+          root_cause_code: string | null
+          root_cause_confidence: string | null
+          severity: string
+          started_at: string
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          affected_duration_seconds?: number | null
+          affected_message_count?: number
+          automatic_recovery_detail?: string | null
+          automatic_recovery_performed?: boolean
+          club_id: string
+          created_at?: string
+          first_successful_send_after_fix_at?: string | null
+          fix_applied?: string | null
+          id?: string
+          manual_action_required?: boolean
+          resolved_at?: string | null
+          root_cause_code?: string | null
+          root_cause_confidence?: string | null
+          severity: string
+          started_at?: string
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          affected_duration_seconds?: number | null
+          affected_message_count?: number
+          automatic_recovery_detail?: string | null
+          automatic_recovery_performed?: boolean
+          club_id?: string
+          created_at?: string
+          first_successful_send_after_fix_at?: string | null
+          fix_applied?: string | null
+          id?: string
+          manual_action_required?: boolean
+          resolved_at?: string | null
+          root_cause_code?: string | null
+          root_cause_confidence?: string | null
+          severity?: string
+          started_at?: string
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "whatsapp_incidents_club_id_fkey"
+            columns: ["club_id"]
+            isOneToOne: false
+            referencedRelation: "clubs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "whatsapp_incidents_club_id_fkey"
+            columns: ["club_id"]
+            isOneToOne: false
+            referencedRelation: "commercial_entitlements_usage"
+            referencedColumns: ["club_id"]
+          },
+          {
+            foreignKeyName: "whatsapp_incidents_root_cause_code_fkey"
+            columns: ["root_cause_code"]
+            isOneToOne: false
+            referencedRelation: "whatsapp_root_cause_codes"
+            referencedColumns: ["code"]
+          },
+        ]
+      }
+      whatsapp_root_cause_codes: {
+        Row: {
+          code: string
+          explanation_ar: string
+          explanation_en: string
+          layer: string
+          severity: string
+        }
+        Insert: {
+          code: string
+          explanation_ar: string
+          explanation_en: string
+          layer: string
+          severity: string
+        }
+        Update: {
+          code?: string
+          explanation_ar?: string
+          explanation_en?: string
+          layer?: string
+          severity?: string
+        }
+        Relationships: []
       }
     }
     Views: {
@@ -3888,7 +4100,7 @@ export type Database = {
         Returns: undefined
       }
       cancel_pending_whatsapp_for_booking: {
-        Args: { p_booking_id: string }
+        Args: { p_booking_id: string; p_exclude_event_id?: string }
         Returns: number
       }
       cancel_platform_subscription: {
@@ -4052,6 +4264,8 @@ export type Database = {
           p_event_id: string
           p_expires_at?: string
           p_language: string
+          p_media_intent?: string
+          p_media_type?: string
           p_priority?: string
           p_recipient_customer_id: string
           p_scheduled_at?: string
@@ -4253,7 +4467,11 @@ export type Database = {
       }
       normalize_mobile: { Args: { p_mobile: string }; Returns: string }
       notification_source_still_valid: {
-        Args: { p_reference_id: string; p_reference_type: string }
+        Args: {
+          p_event_type?: string
+          p_reference_id: string
+          p_reference_type: string
+        }
         Returns: boolean
       }
       open_cash_shift: {
@@ -4307,6 +4525,8 @@ export type Database = {
           p_customer_id: string
           p_dedup_key?: string
           p_event_id: string
+          p_media_intent?: string
+          p_media_type?: string
           p_priority?: string
           p_template_key: string
           p_variables: Json
@@ -4396,12 +4616,20 @@ export type Database = {
         Returns: {
           booking_ref: string
           booking_status: string
+          branch_name: string
+          club_name: string
+          customer_name: string
           end_at: string
           field_name: string
+          invoice_token_available: boolean
+          outstanding: number
+          paid: number
+          payment_status: string
           result: string
           sport: string
           start_at: string
           timezone: string
+          total: number
         }[]
       }
       verify_invoice_public: {
@@ -4434,6 +4662,8 @@ export type Database = {
           club_id: string
           id: string
           language: string
+          media_intent: string
+          media_type: string
           recipient_customer_id: string
           recipient_phone: string
           template_key: string
@@ -4441,6 +4671,25 @@ export type Database = {
         }[]
       }
       whatsapp_connector_expire_stale: { Args: never; Returns: number }
+      whatsapp_connector_get_invoice_document_data: {
+        Args: { p_invoice_id: string }
+        Returns: {
+          booking_ref: string
+          club_id: string
+          club_name: string
+          currency: string
+          customer_name: string
+          field_name: string
+          invoice_id: string
+          invoice_number: string
+          issued_at: string
+          outstanding: number
+          paid: number
+          payment_status: string
+          refunded: number
+          total: number
+        }[]
+      }
       whatsapp_connector_list_accounts: {
         Args: never
         Returns: {
@@ -4466,14 +4715,54 @@ export type Database = {
           p_club_id: string
           p_connected_phone_number?: string
           p_error?: string
+          p_generation?: number
           p_qr_payload?: string
           p_qr_ttl_seconds?: number
+          p_state_seq?: number
           p_status: string
         }
         Returns: undefined
       }
       whatsapp_connector_store_session: {
         Args: { p_club_id: string; p_session_credentials_encrypted: string }
+        Returns: undefined
+      }
+      whatsapp_connector_upsert_incident: {
+        Args: {
+          p_automatic_recovery_detail?: string
+          p_automatic_recovery_performed?: boolean
+          p_club_id: string
+          p_outcome: string
+          p_root_cause_code: string
+          p_root_cause_confidence: string
+        }
+        Returns: string
+      }
+      whatsapp_connector_write_delivery_trace: {
+        Args: {
+          p_attempt_number: number
+          p_club_id: string
+          p_container_instance_id: string
+          p_elapsed_ms: number
+          p_error_summary: string
+          p_finished_at: string
+          p_has_provider_reference: boolean
+          p_last_stage_reached: string
+          p_media_intent: string
+          p_media_type: string
+          p_notification_queue_id: string
+          p_outcome: string
+          p_root_cause_code: string
+          p_root_cause_confidence: string
+          p_socket_generation: number
+          p_stage_timeline: Json
+          p_started_at: string
+          p_template_key: string
+        }
+        Returns: string
+      }
+      whatsapp_observability_retention_cleanup: {
+        Args: never
         Returns: undefined
       }
       write_audit_log: {

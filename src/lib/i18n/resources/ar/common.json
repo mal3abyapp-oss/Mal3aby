@@ -73,5 +73,54 @@
     "label": "اللغة",
     "arabic": "العربية",
     "english": "English"
+  },
+  "secureBooking": {
+    "title": "تفاصيل الحجز",
+    "loading": "جارٍ التحميل...",
+    "club": "النادي",
+    "branch": "الفرع",
+    "field": "الملعب",
+    "sport": "النشاط",
+    "date": "التاريخ",
+    "time": "الوقت",
+    "bookingRef": "رقم الحجز",
+    "bookingStatus": "حالة الحجز",
+    "paymentSummary": "ملخص الدفع",
+    "total": "الإجمالي",
+    "paid": "المدفوع",
+    "outstanding": "المتبقي",
+    "paymentStatus": "حالة السداد",
+    "attendanceQr": "رمز الحضور",
+    "attendanceQrHint": "اعرض هذا الرمز لموظفي الاستقبال عند الوصول",
+    "viewFullScreen": "عرض بملء الشاشة",
+    "closeFullScreen": "إغلاق",
+    "viewInvoice": "عرض الفاتورة",
+    "bookingStatusLabels": {
+      "pending_payment": "بانتظار الدفع",
+      "confirmed": "مؤكد",
+      "checked_in": "تم تسجيل الحضور",
+      "completed": "مكتمل",
+      "cancelled": "ملغي",
+      "no_show": "لم يحضر"
+    },
+    "paymentStatusLabels": {
+      "draft": "مسودة",
+      "void": "ملغاة",
+      "unpaid": "غير مدفوعة",
+      "partially_paid": "مدفوعة جزئيًا",
+      "paid": "مدفوعة بالكامل",
+      "partially_refunded": "مستردة جزئيًا",
+      "refunded": "مستردة بالكامل"
+    },
+    "states": {
+      "expiredTitle": "انتهت صلاحية الرمز",
+      "expiredMessage": "انتهت صلاحية رمز الحضور الخاص بهذا الحجز. تواصل مع النادي إذا كنت بحاجة إلى رمز جديد.",
+      "cancelledTitle": "الحجز ملغي",
+      "cancelledMessage": "هذا الحجز ملغي ولم يعد رمز الحضور صالحًا.",
+      "alreadyUsedTitle": "تم استخدام الرمز بالفعل",
+      "alreadyUsedMessage": "تم تسجيل الحضور بهذا الرمز مسبقًا.",
+      "invalidTitle": "رمز غير صالح",
+      "invalidMessage": "لم يتم العثور على حجز مطابق لهذا الرمز. تأكد من فتح الرابط الصحيح، أو تواصل مع النادي مباشرة."
+    }
   }
 }
