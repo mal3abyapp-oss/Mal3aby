@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '@/lib/supabase/client'
 import { useAuth } from '@/app/providers/AuthProvider'
@@ -45,10 +46,10 @@ interface LimitDef {
   usedField: 'branches_used' | 'fields_used' | 'academy_used'
 }
 
-const LIMITS: LimitDef[] = [
-  { key: 'branch_limit', label: 'الفروع', limitField: 'branch_limit', usedField: 'branches_used' },
-  { key: 'field_limit', label: 'الملاعب', limitField: 'field_limit', usedField: 'fields_used' },
-  { key: 'academy_limit', label: 'برامج الأكاديمية', limitField: 'academy_limit', usedField: 'academy_used' },
+const LIMIT_DEFS: Omit<LimitDef, 'label'>[] = [
+  { key: 'branch_limit', limitField: 'branch_limit', usedField: 'branches_used' },
+  { key: 'field_limit', limitField: 'field_limit', usedField: 'fields_used' },
+  { key: 'academy_limit', limitField: 'academy_limit', usedField: 'academy_used' },
 ]
 
 async function fetchUsage(clubId: string): Promise<UsageRow | null> {
@@ -62,6 +63,7 @@ async function fetchUsage(clubId: string): Promise<UsageRow | null> {
 }
 
 function UpgradeRequestDialog({ limitType, label }: { limitType: LimitDef['key']; label: string }) {
+  const { t } = useTranslation()
   const { currentClubId } = useAuth()
   const queryClient = useQueryClient()
   const [open, setOpen] = useState(false)
@@ -83,33 +85,33 @@ function UpgradeRequestDialog({ limitType, label }: { limitType: LimitDef['key']
       setFormError(null)
       void queryClient.invalidateQueries({ queryKey: ['commercial-upgrade-requests', currentClubId] })
     },
-    onError: (error) => setFormError(translateSupabaseError(error, 'تعذّر إرسال طلب الترقية.')),
+    onError: (error) => setFormError(translateSupabaseError(error, t('clubs.entitlements.sendError'))),
   })
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        <Button size="sm" variant="outline">طلب زيادة الحد</Button>
+        <Button size="sm" variant="outline">{t('clubs.entitlements.requestUpgrade')}</Button>
       </DialogTrigger>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>طلب زيادة حد {label}</DialogTitle>
+          <DialogTitle>{t('clubs.entitlements.requestUpgradeTitle', { label })}</DialogTitle>
           <DialogDescription>
-            سيصل هذا الطلب لفريق منصة ملعبي للمراجعة. الحد الحالي والاستخدام الحالي يُرفقان تلقائيًا بالطلب.
+            {t('clubs.entitlements.requestUpgradeDescription')}
           </DialogDescription>
         </DialogHeader>
         <textarea
           className="min-h-20 rounded-md border border-border bg-background p-2 text-sm"
-          placeholder="أي تفاصيل إضافية تريد إضافتها (اختياري)"
+          placeholder={t('clubs.entitlements.notePlaceholder')}
           value={note}
           onChange={(e) => setNote(e.target.value)}
           rows={3}
         />
         {formError && <p className="text-sm text-status-danger">{formError}</p>}
         <DialogFooter>
-          <Button variant="outline" onClick={() => setOpen(false)}>إلغاء</Button>
+          <Button variant="outline" onClick={() => setOpen(false)}>{t('clubs.entitlements.cancel')}</Button>
           <Button onClick={() => mutation.mutate()} disabled={mutation.isPending}>
-            {mutation.isPending ? 'جارٍ الإرسال...' : 'إرسال الطلب'}
+            {mutation.isPending ? t('clubs.entitlements.sending') : t('clubs.entitlements.sendRequest')}
           </Button>
         </DialogFooter>
       </DialogContent>
@@ -127,13 +129,14 @@ async function fetchPendingRequests(clubId: string) {
   return data
 }
 
-const LIMIT_TYPE_LABELS: Record<string, string> = {
-  branch_limit: 'الفروع',
-  field_limit: 'الملاعب',
-  academy_limit: 'برامج الأكاديمية',
-}
-
 export function EntitlementsCard() {
+  const { t } = useTranslation()
+  const LIMIT_TYPE_LABELS: Record<string, string> = {
+    branch_limit: t('clubs.entitlements.limitLabels.branch_limit'),
+    field_limit: t('clubs.entitlements.limitLabels.field_limit'),
+    academy_limit: t('clubs.entitlements.limitLabels.academy_limit'),
+  }
+  const LIMITS: LimitDef[] = LIMIT_DEFS.map((def) => ({ ...def, label: LIMIT_TYPE_LABELS[def.key] as string }))
   const { currentClubId, currentMembership } = useAuth()
   const isOwnerOrManager = currentMembership?.roleKey === 'club_owner' || currentMembership?.roleKey === 'club_manager'
 
@@ -154,13 +157,13 @@ export function EntitlementsCard() {
   return (
     <Card>
       <CardHeader>
-        <CardTitle className="text-base">حدود الخطة التجارية</CardTitle>
+        <CardTitle className="text-base">{t('clubs.entitlements.cardTitle')}</CardTitle>
       </CardHeader>
       <CardContent>
         {isLoading ? (
           <Skeleton className="h-24 w-full" />
         ) : !data ? (
-          <p className="text-sm text-text-secondary">لا توجد حدود تجارية مُعرّفة لهذا النادي.</p>
+          <p className="text-sm text-text-secondary">{t('clubs.entitlements.noLimits')}</p>
         ) : (
           <div className="flex flex-col gap-3">
             {LIMITS.map((def) => {
@@ -176,19 +179,19 @@ export function EntitlementsCard() {
                   <div className="flex flex-col gap-1">
                     <span className="text-sm font-medium">{def.label}</span>
                     <span className="text-sm text-text-secondary tabular-nums">
-                      {used} {unlimited ? '(بلا حد)' : `/ ${limit}`}
+                      {used} {unlimited ? t('clubs.entitlements.unlimited') : `/ ${limit}`}
                     </span>
                   </div>
                   <div className="flex items-center gap-2">
                     {atOrOverLimit && (
-                      <StatusBadge tone="danger" label="تم بلوغ الحد" />
+                      <StatusBadge tone="danger" label={t('clubs.entitlements.atLimit')} />
                     )}
                     {nearLimit && (
-                      <StatusBadge tone="warning" label="قارب على الاكتمال" />
+                      <StatusBadge tone="warning" label={t('clubs.entitlements.nearLimit')} />
                     )}
                     {isOwnerOrManager && atOrOverLimit && (
                       hasPendingRequest ? (
-                        <StatusBadge tone="neutral" label="طلب الترقية قيد المراجعة" />
+                        <StatusBadge tone="neutral" label={t('clubs.entitlements.upgradePending')} />
                       ) : (
                         <UpgradeRequestDialog limitType={def.key} label={def.label} />
                       )
@@ -201,7 +204,9 @@ export function EntitlementsCard() {
               <div className="mt-1 flex items-start gap-2 rounded-lg border border-status-warning/40 bg-status-warning/10 p-3 text-sm text-status-warning">
                 <AlertTriangle className="mt-0.5 size-4 shrink-0" />
                 <span>
-                  لديك طلب ترقية قيد المراجعة لـ: {pendingRequests.map((r) => LIMIT_TYPE_LABELS[r.limit_type] ?? r.limit_type).join('، ')}.
+                  {t('clubs.entitlements.pendingRequestsNotice', {
+                    types: pendingRequests.map((r) => LIMIT_TYPE_LABELS[r.limit_type] ?? r.limit_type).join(t('academy.structure.listSeparator')),
+                  })}
                 </span>
               </div>
             )}

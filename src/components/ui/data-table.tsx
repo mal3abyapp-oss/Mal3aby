@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react'
+import { useTranslation } from 'react-i18next'
 import { cn } from '@/lib/utils'
 import { EmptyState } from '@/components/ui/empty-state'
 import { Skeleton } from '@/components/ui/skeleton'
@@ -31,10 +32,12 @@ export function DataTable<T>({
   rows,
   rowKey,
   isLoading,
-  emptyTitle = 'لا توجد بيانات',
+  emptyTitle,
   emptyDescription,
   className,
 }: DataTableProps<T>) {
+  const { t } = useTranslation()
+  const resolvedEmptyTitle = emptyTitle ?? t('common.noData')
   if (isLoading) {
     return (
       <div className={cn('space-y-2', className)}>
@@ -46,7 +49,7 @@ export function DataTable<T>({
   }
 
   if (rows.length === 0) {
-    return <EmptyState title={emptyTitle} description={emptyDescription} />
+    return <EmptyState title={resolvedEmptyTitle} description={emptyDescription} />
   }
 
   return (

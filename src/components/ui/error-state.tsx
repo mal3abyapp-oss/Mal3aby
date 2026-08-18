@@ -1,4 +1,5 @@
 import { AlertTriangle } from 'lucide-react'
+import { useTranslation } from 'react-i18next'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 
@@ -12,14 +13,16 @@ export interface ErrorStateProps {
   className?: string
 }
 
-export function ErrorState({ message = 'حدث خطأ، حاول مرة أخرى', onRetry, className }: ErrorStateProps) {
+export function ErrorState({ message, onRetry, className }: ErrorStateProps) {
+  const { t } = useTranslation()
+  const resolvedMessage = message ?? t('errorState.defaultMessage')
   return (
     <div className={cn('flex flex-col items-center justify-center gap-3 py-12 text-center', className)}>
       <AlertTriangle className="size-10 text-status-danger" aria-hidden="true" />
-      <p className="font-medium text-text-primary">{message}</p>
+      <p className="font-medium text-text-primary">{resolvedMessage}</p>
       {onRetry && (
         <Button variant="outline" size="sm" onClick={onRetry}>
-          إعادة المحاولة
+          {t('errorState.retry')}
         </Button>
       )}
     </div>

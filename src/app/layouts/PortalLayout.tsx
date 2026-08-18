@@ -1,4 +1,5 @@
 import { NavLink, Outlet } from 'react-router-dom'
+import { useTranslation } from 'react-i18next'
 import { useAuth } from '@/app/providers/AuthProvider'
 import { CalendarDays, GraduationCap, Wallet, QrCode, User, LogOut } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
@@ -11,7 +12,7 @@ import { LanguageSwitcher } from '@/components/ui/language-switcher'
 // customer is far more likely to be on a phone than a desk.
 interface NavItem {
   to: string
-  label: string
+  labelKey: string
   icon: LucideIcon
 }
 
@@ -24,14 +25,15 @@ interface NavItem {
 // time any nav click is even possible), so this is a pure improvement,
 // not a behavior change for existing users.
 const navItems: NavItem[] = [
-  { to: '/portal/bookings', label: 'حجوزاتي', icon: CalendarDays },
-  { to: '/portal/academy', label: 'أكاديميتي', icon: GraduationCap },
-  { to: '/portal/payments', label: 'مدفوعاتي', icon: Wallet },
-  { to: '/portal/qr', label: 'رمزي', icon: QrCode },
-  { to: '/portal/profile', label: 'حسابي', icon: User },
+  { to: '/portal/bookings', labelKey: 'portal.nav.bookings', icon: CalendarDays },
+  { to: '/portal/academy', labelKey: 'portal.nav.academy', icon: GraduationCap },
+  { to: '/portal/payments', labelKey: 'portal.nav.payments', icon: Wallet },
+  { to: '/portal/qr', labelKey: 'portal.nav.qr', icon: QrCode },
+  { to: '/portal/profile', labelKey: 'portal.nav.profile', icon: User },
 ]
 
 export function PortalLayout() {
+  const { t } = useTranslation()
   const { signOut } = useAuth()
 
   return (
@@ -45,7 +47,7 @@ export function PortalLayout() {
             className="flex items-center gap-1.5 text-sm text-text-secondary hover:text-status-danger"
           >
             <LogOut className="size-4" />
-            خروج
+            {t('portal.logout')}
           </button>
         </div>
       </header>
@@ -66,7 +68,7 @@ export function PortalLayout() {
             }
           >
             <item.icon className="size-5" />
-            {item.label}
+            {t(item.labelKey)}
           </NavLink>
         ))}
       </nav>

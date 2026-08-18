@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '@/lib/supabase/client'
 import { useAuth } from '@/app/providers/AuthProvider'
@@ -17,6 +18,7 @@ import {
 } from '@/components/ui/select'
 import { formatMoney } from '@/lib/domain/billing'
 import { translateSupabaseError } from '@/lib/errors'
+import { useDirection } from '@/app/providers/DirectionProvider'
 import { Wallet } from 'lucide-react'
 
 // Gate 13 #62 (lean V1) + Master Payment Directive Phase 1: cash shift /
@@ -101,10 +103,10 @@ async function fetchOpenShiftStatus(shiftId: string) {
   return data as unknown as { opening_float: number; cash_collected: number; cash_refunded: number; expected_cash: number }
 }
 
-const STATUS_LABELS: Record<string, string> = { open: 'مفتوحة', closed: 'مغلقة' }
-
 export function CashShiftPage() {
+  const { t } = useTranslation()
   const { currentClubId } = useAuth()
+  const { locale } = useDirection()
   const queryClient = useQueryClient()
   const [selectedBranchId, setSelectedBranchId] = useState<string>('')
   const [openingFloat, setOpeningFloat] = useState('')
@@ -135,8 +137,8 @@ export function CashShiftPage() {
   const openMutation = useMutation({
     mutationFn: async () => {
       const float = Number(openingFloat)
-      if (!selectedBranchId) throw new Error('اختر الفرع أولًا')
-      if (Number.isNaN(float) || float < 0) throw new Error('أدخل رصيدًا افتتاحيًا صحيحًا')
+      if (!selectedBranchId) throw new Error(t('billing.cashShift.errors.selectBranchFirst'))
+      if (Number.isNaN(float) || float < 0) throw new Error(t('billing.cashShift.errors.invalidOpeningFloat'))
       const { error } = await supabase.rpc('open_cash_shift', {
         p_club_id: currentClubId!,
         p_branch_id: selectedBranchId,
@@ -149,14 +151,14 @@ export function CashShiftPage() {
       setOpeningFloat('')
       setFormError(null)
     },
-    onError: (err) => setFormError(err instanceof Error ? err.message : translateSupabaseError(err, 'حدث خطأ غير متوقع')),
+    onError: (err) => setFormError(err instanceof Error ? err.message : translateSupabaseError(err, t('billing.cashShift.errors.genericError'))),
   })
 
   const closeMutation = useMutation({
     mutationFn: async () => {
       const count = Number(closingCount)
-      if (!closingShiftId) throw new Error('لا توجد وردية محددة')
-      if (Number.isNaN(count) || count < 0) throw new Error('أدخل المبلغ المُعدود فعليًا')
+      if (!closingShiftId) throw new Error(t('billing.cashShift.errors.noShiftSelected'))
+      if (Number.isNaN(count) || count < 0) throw new Error(t('billing.cashShift.errors.invalidClosingCount'))
       const { error } = await supabase.rpc('close_cash_shift', {
         p_shift_id: closingShiftId,
         p_closing_count: count,
@@ -171,39 +173,44 @@ export function CashShiftPage() {
       setClosingNotes('')
       setFormError(null)
     },
-    onError: (err) => setFormError(err instanceof Error ? err.message : translateSupabaseError(err, 'حدث خطأ غير متوقع')),
+    onError: (err) => setFormError(err instanceof Error ? err.message : translateSupabaseError(err, t('billing.cashShift.errors.genericError'))),
   })
 
   const openBranchIds = new Set((data?.open ?? []).map((s) => s.branch_id))
   const branchesWithoutOpenShift = branches.filter((b) => !openBranchIds.has(b.id))
 
+  const statusLabels: Record<string, string> = {
+    open: t('billing.cashShift.statusLabels.open'),
+    closed: t('billing.cashShift.statusLabels.closed'),
+  }
+
   const historyColumns: DataTableColumn<ShiftHistoryRow>[] = [
-    { key: 'branch', header: 'الفرع', render: (s) => s.branch_name },
-    { key: 'opened_by', header: 'فتحها', render: (s) => s.opened_by_name ?? '—' },
-    { key: 'opened_at', header: 'وقت الفتح', render: (s) => new Date(s.opened_at).toLocaleString('ar-EG') },
-    { key: 'closed_at', header: 'وقت الإغلاق', render: (s) => (s.closed_at ? new Date(s.closed_at).toLocaleString('ar-EG') : '—') },
-    { key: 'opening_float', header: 'الرصيد الافتتاحي', render: (s) => formatMoney(s.opening_float) },
-    { key: 'expected', header: 'المتوقع', render: (s) => (s.expected_cash === null ? '—' : formatMoney(s.expected_cash)) },
-    { key: 'counted', header: 'المعدود فعليًا', render: (s) => (s.closing_count === null ? '—' : formatMoney(s.closing_count)) },
+    { key: 'branch', header: t('billing.cashShift.historyCard.table.branch'), render: (s) => s.branch_name },
+    { key: 'opened_by', header: t('billing.cashShift.historyCard.table.openedBy'), render: (s) => s.opened_by_name ?? '—' },
+    { key: 'opened_at', header: t('billing.cashShift.historyCard.table.openedAt'), render: (s) => new Date(s.opened_at).toLocaleString('ar-EG') },
+    { key: 'closed_at', header: t('billing.cashShift.historyCard.table.closedAt'), render: (s) => (s.closed_at ? new Date(s.closed_at).toLocaleString('ar-EG') : '—') },
+    { key: 'opening_float', header: t('billing.cashShift.historyCard.table.openingFloat'), render: (s) => formatMoney(s.opening_float, 'EGP', locale) },
+    { key: 'expected', header: t('billing.cashShift.historyCard.table.expected'), render: (s) => (s.expected_cash === null ? '—' : formatMoney(s.expected_cash, 'EGP', locale)) },
+    { key: 'counted', header: t('billing.cashShift.historyCard.table.counted'), render: (s) => (s.closing_count === null ? '—' : formatMoney(s.closing_count, 'EGP', locale)) },
     {
       key: 'variance',
-      header: 'الفرق',
+      header: t('billing.cashShift.historyCard.table.variance'),
       render: (s) => {
         if (s.variance === null) return '—'
         const tone = s.variance === 0 ? 'text-status-success' : s.variance > 0 ? 'text-status-info' : 'text-status-danger'
-        return <span className={tone}>{s.variance > 0 ? '+' : ''}{formatMoney(s.variance)}</span>
+        return <span className={tone}>{s.variance > 0 ? '+' : ''}{formatMoney(s.variance, 'EGP', locale)}</span>
       },
     },
     {
       key: 'status',
-      header: 'الحالة',
-      render: (s) => <StatusBadge tone={s.status === 'open' ? 'warning' : 'neutral'} label={STATUS_LABELS[s.status] ?? s.status} />,
+      header: t('billing.cashShift.historyCard.table.status'),
+      render: (s) => <StatusBadge tone={s.status === 'open' ? 'warning' : 'neutral'} label={statusLabels[s.status] ?? s.status} />,
     },
   ]
 
   return (
     <div>
-      <PageHeader title="وردية النقدية" description="فتح وإغلاق وردية الصندوق النقدي لكل فرع، مع تسوية تلقائية مقابل المدفوعات النقدية الفعلية" />
+      <PageHeader title={t('billing.cashShift.title')} description={t('billing.cashShift.description')} />
 
       {formError && (
         <div className="mb-4 rounded-md border border-status-danger/40 bg-status-danger/5 p-3 text-sm text-status-danger">{formError}</div>
@@ -215,45 +222,45 @@ export function CashShiftPage() {
             <Card key={shift.id}>
               <CardHeader>
                 <CardTitle className="flex items-center justify-between text-base">
-                  <span>وردية مفتوحة — {shift.branch_name}</span>
-                  <StatusBadge tone="warning" label="مفتوحة" />
+                  <span>{t('billing.cashShift.openShiftCard.heading', { branch: shift.branch_name })}</span>
+                  <StatusBadge tone="warning" label={t('billing.cashShift.statusLabels.open')} />
                 </CardTitle>
               </CardHeader>
               <CardContent className="flex flex-col gap-3">
                 <p className="text-sm text-text-secondary">
-                  فتحها {shift.opened_by_name ?? '—'} — {new Date(shift.opened_at).toLocaleString('ar-EG')}
+                  {t('billing.cashShift.openShiftCard.openedBy', { name: shift.opened_by_name ?? '—', date: new Date(shift.opened_at).toLocaleString('ar-EG') })}
                 </p>
                 {closingShiftId === shift.id && liveStatus ? (
                   <>
                     <div className="grid grid-cols-3 gap-2 text-sm">
                       <div>
-                        <p className="text-text-secondary">الرصيد الافتتاحي</p>
-                        <p className="font-medium tabular-nums">{formatMoney(liveStatus.opening_float)}</p>
+                        <p className="text-text-secondary">{t('billing.cashShift.openShiftCard.openingFloat')}</p>
+                        <p className="font-medium tabular-nums">{formatMoney(liveStatus.opening_float, 'EGP', locale)}</p>
                       </div>
                       <div>
-                        <p className="text-text-secondary">نقدًا محصّل</p>
-                        <p className="font-medium tabular-nums">{formatMoney(liveStatus.cash_collected)}</p>
+                        <p className="text-text-secondary">{t('billing.cashShift.openShiftCard.cashCollected')}</p>
+                        <p className="font-medium tabular-nums">{formatMoney(liveStatus.cash_collected, 'EGP', locale)}</p>
                       </div>
                       <div>
-                        <p className="text-text-secondary">المتوقع بالدرج الآن</p>
-                        <p className="font-medium tabular-nums">{formatMoney(liveStatus.expected_cash)}</p>
+                        <p className="text-text-secondary">{t('billing.cashShift.openShiftCard.expectedNow')}</p>
+                        <p className="font-medium tabular-nums">{formatMoney(liveStatus.expected_cash, 'EGP', locale)}</p>
                       </div>
                     </div>
                     <div className="flex flex-col gap-2">
-                      <label className="text-sm font-medium">المبلغ المعدود فعليًا في الدرج</label>
+                      <label className="text-sm font-medium">{t('billing.cashShift.openShiftCard.closingCountLabel')}</label>
                       <Input type="number" value={closingCount} onChange={(e) => setClosingCount(e.target.value)} placeholder="0.00" />
-                      <label className="text-sm font-medium">ملاحظات (اختياري)</label>
-                      <Input value={closingNotes} onChange={(e) => setClosingNotes(e.target.value)} placeholder="سبب الفرق إن وجد" />
+                      <label className="text-sm font-medium">{t('billing.cashShift.openShiftCard.notesLabel')}</label>
+                      <Input value={closingNotes} onChange={(e) => setClosingNotes(e.target.value)} placeholder={t('billing.cashShift.openShiftCard.notesPlaceholder')} />
                       <div className="flex gap-2">
                         <Button size="sm" onClick={() => closeMutation.mutate()} disabled={closeMutation.isPending}>
-                          تأكيد الإغلاق
+                          {t('billing.cashShift.openShiftCard.confirmClose')}
                         </Button>
-                        <Button size="sm" variant="outline" onClick={() => setClosingShiftId(null)}>إلغاء</Button>
+                        <Button size="sm" variant="outline" onClick={() => setClosingShiftId(null)}>{t('billing.cashShift.openShiftCard.cancel')}</Button>
                       </div>
                     </div>
                   </>
                 ) : (
-                  <Button size="sm" variant="outline" onClick={() => setClosingShiftId(shift.id)}>إغلاق الوردية</Button>
+                  <Button size="sm" variant="outline" onClick={() => setClosingShiftId(shift.id)}>{t('billing.cashShift.openShiftCard.closeShift')}</Button>
                 )}
               </CardContent>
             </Card>
@@ -263,12 +270,12 @@ export function CashShiftPage() {
 
       {branchesWithoutOpenShift.length > 0 && (
         <Card className="mb-6">
-          <CardHeader><CardTitle className="text-base">فتح وردية جديدة</CardTitle></CardHeader>
+          <CardHeader><CardTitle className="text-base">{t('billing.cashShift.newShiftCard.heading')}</CardTitle></CardHeader>
           <CardContent className="flex flex-col gap-3 md:flex-row md:items-end">
             <div className="flex flex-col gap-1">
-              <label className="text-sm font-medium">الفرع</label>
+              <label className="text-sm font-medium">{t('billing.cashShift.newShiftCard.branchLabel')}</label>
               <Select value={selectedBranchId} onValueChange={setSelectedBranchId}>
-                <SelectTrigger className="w-56"><SelectValue placeholder="اختر الفرع" /></SelectTrigger>
+                <SelectTrigger className="w-56"><SelectValue placeholder={t('billing.cashShift.newShiftCard.branchPlaceholder')} /></SelectTrigger>
                 <SelectContent>
                   {branchesWithoutOpenShift.map((b) => (
                     <SelectItem key={b.id} value={b.id}>{b.name}</SelectItem>
@@ -277,25 +284,25 @@ export function CashShiftPage() {
               </Select>
             </div>
             <div className="flex flex-col gap-1">
-              <label className="text-sm font-medium">الرصيد الافتتاحي</label>
+              <label className="text-sm font-medium">{t('billing.cashShift.newShiftCard.openingFloatLabel')}</label>
               <Input type="number" value={openingFloat} onChange={(e) => setOpeningFloat(e.target.value)} placeholder="0.00" className="w-40" />
             </div>
             <Button onClick={() => openMutation.mutate()} disabled={openMutation.isPending}>
-              <Wallet className="me-1 size-4" /> فتح الوردية
+              <Wallet className="me-1 size-4" /> {t('billing.cashShift.newShiftCard.openShift')}
             </Button>
           </CardContent>
         </Card>
       )}
 
       <Card>
-        <CardHeader><CardTitle className="text-base">سجل الورديات</CardTitle></CardHeader>
+        <CardHeader><CardTitle className="text-base">{t('billing.cashShift.historyCard.heading')}</CardTitle></CardHeader>
         <CardContent>
           <DataTable
             columns={historyColumns}
             rows={data?.history ?? []}
             rowKey={(s) => s.id}
             isLoading={isLoading}
-            emptyTitle="لا توجد ورديات بعد"
+            emptyTitle={t('billing.cashShift.historyCard.emptyTitle')}
           />
         </CardContent>
       </Card>

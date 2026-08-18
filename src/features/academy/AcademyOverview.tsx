@@ -1,5 +1,6 @@
 import { useQuery } from '@tanstack/react-query'
 import { useNavigate } from 'react-router-dom'
+import { useTranslation } from 'react-i18next'
 import { supabase } from '@/lib/supabase/client'
 import { useAuth } from '@/app/providers/AuthProvider'
 import { StatCard } from '@/components/ui/stat-card'
@@ -93,6 +94,7 @@ async function fetchOverview(clubId: string): Promise<OverviewData> {
 }
 
 export function AcademyOverview({ onNavigateTab }: { onNavigateTab: (tab: 'players' | 'structure' | 'enrollments') => void }) {
+  const { t } = useTranslation()
   const { currentClubId } = useAuth()
   const navigate = useNavigate()
 
@@ -102,34 +104,34 @@ export function AcademyOverview({ onNavigateTab }: { onNavigateTab: (tab: 'playe
     enabled: !!currentClubId,
   })
 
-  if (isLoading || !data) return <p className="mt-4 text-sm text-text-secondary">جارٍ التحميل...</p>
+  if (isLoading || !data) return <p className="mt-4 text-sm text-text-secondary">{t('academy.loading')}</p>
 
   return (
     <div className="mt-4 flex flex-col gap-4">
       <div className="flex flex-wrap gap-2">
         <Button size="sm" onClick={() => onNavigateTab('players')}>
-          <UserPlus className="size-4" /> إضافة لاعب
+          <UserPlus className="size-4" /> {t('academy.overview.addPlayer')}
         </Button>
         <Button size="sm" variant="outline" onClick={() => onNavigateTab('enrollments')}>
-          <ClipboardList className="size-4" /> تسجيل لاعب في مجموعة
+          <ClipboardList className="size-4" /> {t('academy.overview.enrollInGroup')}
         </Button>
         <Button size="sm" variant="outline" onClick={() => navigate('/app')}>
-          <CheckSquare className="size-4" /> تسجيل الحضور
+          <CheckSquare className="size-4" /> {t('academy.overview.markAttendance')}
         </Button>
       </div>
 
       <div className="grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-6">
-        <StatCard label="حصص اليوم" value={data.sessionsToday} />
-        <StatCard label="حضور غير مسجّل" value={data.sessionsUnmarked} tone={data.sessionsUnmarked > 0 ? 'warning' : 'default'} />
-        <StatCard label="لاعبون نشطون" value={data.activePlayers} />
-        <StatCard label="اشتراكات نشطة" value={data.activeSubscriptions} tone="success" />
-        <StatCard label="على وشك الانتهاء" value={data.expiringSoon} tone={data.expiringSoon > 0 ? 'warning' : 'default'} />
-        <StatCard label="فواتير مستحقة" value={data.outstandingCount} tone={data.outstandingCount > 0 ? 'danger' : 'default'} />
+        <StatCard label={t('academy.overview.sessionsToday')} value={data.sessionsToday} />
+        <StatCard label={t('academy.overview.sessionsUnmarked')} value={data.sessionsUnmarked} tone={data.sessionsUnmarked > 0 ? 'warning' : 'default'} />
+        <StatCard label={t('academy.overview.activePlayers')} value={data.activePlayers} />
+        <StatCard label={t('academy.overview.activeSubscriptions')} value={data.activeSubscriptions} tone="success" />
+        <StatCard label={t('academy.overview.expiringSoon')} value={data.expiringSoon} tone={data.expiringSoon > 0 ? 'warning' : 'default'} />
+        <StatCard label={t('academy.overview.outstandingInvoices')} value={data.outstandingCount} tone={data.outstandingCount > 0 ? 'danger' : 'default'} />
       </div>
 
       {data.groupsNearCapacity.length > 0 && (
         <Card>
-          <CardHeader><CardTitle className="text-base">مجموعات قاربت على الاكتمال</CardTitle></CardHeader>
+          <CardHeader><CardTitle className="text-base">{t('academy.overview.groupsNearCapacity')}</CardTitle></CardHeader>
           <CardContent className="flex flex-col gap-2">
             {data.groupsNearCapacity.map((g) => (
               <button

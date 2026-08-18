@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
+import { useTranslation } from 'react-i18next'
 import { supabase } from '@/lib/supabase/client'
 import { useAuth } from '@/app/providers/AuthProvider'
 import { PageHeader } from '@/components/ui/page-header'
@@ -136,6 +137,7 @@ async function fetchOperatingHours(clubId: string) {
 }
 
 function FieldColumnHeader({ field, clubId, date, clubTimezone }: { field: FieldWithBranch; clubId: string; date: string; clubTimezone?: string }) {
+  const { t } = useTranslation()
   const dayOfWeek = new Date(`${date}T12:00:00`).getDay()
   const { data: hoursRows = [] } = useQuery({
     queryKey: ['field-operating-hours-all', clubId],
@@ -149,16 +151,17 @@ function FieldColumnHeader({ field, clubId, date, clubTimezone }: { field: Field
     <div className="flex flex-col gap-0.5 p-2">
       <p className="font-semibold">{field.name}</p>
       <p className="text-xs text-text-secondary">
-        {hours.isUnrestricted ? 'مفتوح على مدار اليوم' : hours.isClosed ? 'مغلق اليوم' : `${hours.openTime?.slice(0, 5)} — ${hours.closeTime?.slice(0, 5)}`}
+        {hours.isUnrestricted ? t('bookings.page.openAllDay') : hours.isClosed ? t('bookings.page.closedToday') : `${hours.openTime?.slice(0, 5)} — ${hours.closeTime?.slice(0, 5)}`}
       </p>
       <p className="text-xs font-medium text-accent tabular-nums">
-        {currentPrice != null ? `${currentPrice.toFixed(0)} ج.م/ساعة الآن` : 'السعر متغيّر حسب الوقت'}
+        {currentPrice != null ? t('bookings.page.pricePerHourNow', { price: currentPrice.toFixed(0) }) : t('bookings.page.priceVariesByTime')}
       </p>
     </div>
   )
 }
 
 export function BookingsPage() {
+  const { t } = useTranslation()
   const { currentClubId } = useAuth()
   const queryClient = useQueryClient()
   const isMobile = useIsMobile()
@@ -254,11 +257,11 @@ export function BookingsPage() {
   if (isMobile) {
     return (
       <div className="flex flex-col gap-3">
-        <PageHeader title="الحجوزات" description="" className="pb-0" />
+        <PageHeader title={t('bookings.page.title')} description="" className="pb-0" />
         {fields.length === 0 ? (
-          <p className="text-sm text-text-secondary">لا توجد ملاعب بعد. أضف ملعبًا من الإعدادات أولاً.</p>
+          <p className="text-sm text-text-secondary">{t('bookings.page.noFieldsSettings')}</p>
         ) : !clubTimezone ? (
-          <p className="text-sm text-text-secondary">جارٍ التحميل...</p>
+          <p className="text-sm text-text-secondary">{t('bookings.page.loading')}</p>
         ) : (
           <BookingsMobileView
             date={date}
@@ -293,15 +296,15 @@ export function BookingsPage() {
   return (
     <div className="flex flex-col gap-4">
       <PageHeader
-        title="الحجوزات"
-        description="التقويم اليومي للملاعب"
+        title={t('bookings.page.title')}
+        description={t('bookings.page.description')}
         actions={
           <div className="flex items-center gap-2">
             {branches.length > 1 && (
               <Select value={branchId ?? 'all'} onValueChange={(v) => setBranchId(v === 'all' ? null : v)}>
                 <SelectTrigger className="w-40"><SelectValue /></SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="all">كل الفروع</SelectItem>
+                  <SelectItem value="all">{t('bookings.page.allBranches')}</SelectItem>
                   {branches.map((b) => (
                     <SelectItem key={b.id} value={b.id}>{b.name}</SelectItem>
                   ))}
@@ -316,9 +319,9 @@ export function BookingsPage() {
                 directions after an earlier version of this fix had the
                 base/rotated icons swapped (rtl:rotate-180 only helps if
                 the UNROTATED state is already correct for LTR). */}
-            <Button variant="outline" size="icon" aria-label="اليوم السابق" onClick={() => shiftDate(-1)}><ChevronLeft className="size-4 rtl:rotate-180" /></Button>
-            <Button variant="outline" size="sm" onClick={() => setDate(new Date().toISOString().slice(0, 10))}>اليوم</Button>
-            <Button variant="outline" size="icon" aria-label="اليوم التالي" onClick={() => shiftDate(1)}><ChevronRight className="size-4 rtl:rotate-180" /></Button>
+            <Button variant="outline" size="icon" aria-label={t('bookings.page.previousDay')} onClick={() => shiftDate(-1)}><ChevronLeft className="size-4 rtl:rotate-180" /></Button>
+            <Button variant="outline" size="sm" onClick={() => setDate(new Date().toISOString().slice(0, 10))}>{t('common.today')}</Button>
+            <Button variant="outline" size="icon" aria-label={t('bookings.page.nextDay')} onClick={() => shiftDate(1)}><ChevronRight className="size-4 rtl:rotate-180" /></Button>
             <input
               type="date"
               value={date}
@@ -330,13 +333,13 @@ export function BookingsPage() {
       />
 
       {fields.length === 0 ? (
-        <p className="text-sm text-text-secondary">لا توجد ملاعب بعد. أضف ملعبًا من صفحة النادي أولاً.</p>
+        <p className="text-sm text-text-secondary">{t('bookings.page.noFields')}</p>
       ) : (
         <div className="max-h-[calc(100vh-220px)] overflow-auto rounded-lg border border-border">
           <table className="w-full border-collapse text-sm">
             <thead className="sticky top-0 z-20 bg-surface">
               <tr>
-                <th className="sticky start-0 z-30 w-20 border-b border-border bg-surface p-2 text-start text-xs text-text-secondary">الوقت</th>
+                <th className="sticky start-0 z-30 w-20 border-b border-border bg-surface p-2 text-start text-xs text-text-secondary">{t('common.time')}</th>
                 {fields.map((f) => (
                   <th key={f.id} className="min-w-[180px] border-b border-s border-border bg-surface text-start font-normal">
                     <FieldColumnHeader field={f} clubId={currentClubId!} date={date} clubTimezone={clubTimezone} />
@@ -377,7 +380,7 @@ export function BookingsPage() {
                               className={cn('flex h-full w-full flex-col gap-0.5 rounded-md border p-1.5 text-start text-xs transition hover:brightness-95', toneClass)}
                             >
                               <span className="font-semibold">{b.customerName}</span>
-                              <span>{BOOKING_STATUS_LABELS[b.status] ?? b.status}</span>
+                              <span>{t(`bookings.statusLabels.${b.status}`, { defaultValue: BOOKING_STATUS_LABELS[b.status] ?? b.status })}</span>
                             </button>
                           </td>
                         )
@@ -390,7 +393,7 @@ export function BookingsPage() {
                         return (
                           <td key={f.id} rowSpan={durationSlots} className="border-s border-border p-1 align-top">
                             <div className="flex h-full w-full flex-col gap-0.5 rounded-md border border-dashed border-status-danger/40 bg-status-danger/5 p-1.5 text-xs text-status-danger">
-                              <span className="font-semibold">{FIELD_BLOCK_TYPE_LABELS[blk.type] ?? blk.type}</span>
+                              <span className="font-semibold">{t(`bookings.fieldBlockTypeLabels.${blk.type}`, { defaultValue: FIELD_BLOCK_TYPE_LABELS[blk.type] ?? blk.type })}</span>
                               {blk.reason && <span className="text-status-danger/80">{blk.reason}</span>}
                             </div>
                           </td>
@@ -400,7 +403,7 @@ export function BookingsPage() {
                       if (isClosedNow) {
                         return (
                           <td key={f.id} className="border-b border-s border-border bg-muted/50 p-1 text-center text-[10px] text-text-secondary/60">
-                            مغلق
+                            {t('bookings.page.closed')}
                           </td>
                         )
                       }
@@ -422,7 +425,7 @@ export function BookingsPage() {
           </table>
         </div>
       )}
-      {isLoading && <p className="text-sm text-text-secondary">جارٍ التحميل...</p>}
+      {isLoading && <p className="text-sm text-text-secondary">{t('bookings.page.loading')}</p>}
 
       <QuickBookingSheet
         slot={slotSelection}

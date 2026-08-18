@@ -2,6 +2,7 @@ import { useRef, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Link } from 'react-router-dom'
 import QRCode from 'qrcode'
+import { useTranslation } from 'react-i18next'
 import { supabase } from '@/lib/supabase/client'
 import {
   Sheet,
@@ -17,6 +18,7 @@ import { BOOKING_STATUS_LABELS, BOOKING_STATUS_TONE, type BookingRow } from '@/l
 import { formatInstant } from '@/lib/domain/time'
 import { fetchInvoicePaymentSummaries, PAYMENT_METHOD_LABELS, PAYMENT_STATUS_LABELS, type InvoicePaymentSummary } from '@/lib/domain/billing'
 import { translateSupabaseError } from '@/lib/errors'
+import { useDirection } from '@/app/providers/DirectionProvider'
 import {
   Select,
   SelectContent,
@@ -110,6 +112,8 @@ export function BookingDetailSheet({
   onOpenChange: (open: boolean) => void
   onChanged: () => void
 }) {
+  const { t } = useTranslation()
+  const { locale } = useDirection()
   const [cancelReason, setCancelReason] = useState('')
   const [showCancelForm, setShowCancelForm] = useState(false)
   // Owner-level review finding (P1, confirmed live): "تسجيل عدم حضور"
@@ -174,7 +178,7 @@ export function BookingDetailSheet({
       const dataUrl = await QRCode.toDataURL(rawToken, { width: 240, margin: 1 })
       setQrDataUrl(dataUrl)
     },
-    onError: () => setActionError('تعذّر إنشاء رمز QR.'),
+    onError: () => setActionError(t('bookings.detail.qrError')),
   })
 
   const cancelMutation = useMutation({
@@ -187,7 +191,7 @@ export function BookingDetailSheet({
       onOpenChange(false)
       onChanged()
     },
-    onError: () => setActionError('تعذّر إلغاء الحجز.'),
+    onError: () => setActionError(t('bookings.detail.cancelError')),
   })
 
   const noShowMutation = useMutation({
@@ -201,7 +205,7 @@ export function BookingDetailSheet({
       onOpenChange(false)
       onChanged()
     },
-    onError: () => setActionError('تعذّر تسجيل عدم الحضور.'),
+    onError: () => setActionError(t('bookings.detail.noShowError')),
   })
 
   const outstanding = invoiceSummary ? invoiceSummary.outstanding : booking?.totalPrice ?? 0
@@ -210,9 +214,9 @@ export function BookingDetailSheet({
     mutationFn: async () => {
       if (!booking?.invoiceId) throw new Error('no invoice to collect against')
       const amount = Number(collectAmount)
-      if (!amount || amount <= 0) throw new Error('أدخل مبلغًا صحيحًا')
+      if (!amount || amount <= 0) throw new Error(t('bookings.detail.invalidAmountError'))
       if (amount - outstanding > 0.01) {
-        throw new Error(`المبلغ (${amount.toFixed(2)}) يتجاوز المتبقي (${outstanding.toFixed(2)})`)
+        throw new Error(t('bookings.detail.amountExceedsOutstanding', { amount: amount.toFixed(2), outstanding: outstanding.toFixed(2) }))
       }
       if (!collectIdempotencyKeyRef.current) {
         collectIdempotencyKeyRef.current = crypto.randomUUID()
@@ -233,7 +237,7 @@ export function BookingDetailSheet({
       void queryClient.invalidateQueries({ queryKey: ['booking-invoice-summary', booking?.invoiceId] })
       onChanged()
     },
-    onError: (error) => setActionError(error instanceof Error && !('code' in error) ? error.message : translateSupabaseError(error, 'تعذّر تسجيل الدفعة.')),
+    onError: (error) => setActionError(error instanceof Error && !('code' in error) ? error.message : translateSupabaseError(error, t('bookings.detail.collectError'))),
   })
 
   return (
@@ -253,20 +257,20 @@ export function BookingDetailSheet({
     >
       <SheetContent className="flex w-full flex-col overflow-y-auto sm:max-w-md">
         <SheetHeader>
-          <SheetTitle>تفاصيل الحجز</SheetTitle>
+          <SheetTitle>{t('bookings.detail.title')}</SheetTitle>
         </SheetHeader>
 
         {booking && (
           <div className="flex flex-1 flex-col gap-4 py-4 text-sm">
             <div className="flex items-center justify-between">
-              <StatusBadge tone={BOOKING_STATUS_TONE[booking.status] ?? 'neutral'} label={BOOKING_STATUS_LABELS[booking.status] ?? booking.status} />
+              <StatusBadge tone={BOOKING_STATUS_TONE[booking.status] ?? 'neutral'} label={t(`bookings.statusLabels.${booking.status}`, { defaultValue: BOOKING_STATUS_LABELS[booking.status] ?? booking.status })} />
               <span className="text-xs text-text-secondary tabular-nums">
-                {formatInstant(booking.startAt, clubTimezone, { day: 'numeric', month: 'long' })}
+                {formatInstant(booking.startAt, clubTimezone, { day: 'numeric', month: 'long' }, locale)}
               </span>
             </div>
 
             <div className="rounded-lg border border-border p-3">
-              <p className="text-xs text-text-secondary">العميل</p>
+              <p className="text-xs text-text-secondary">{t('bookings.detail.customer')}</p>
               <Link to={`/app/customers?q=${encodeURIComponent(booking.customerName)}`} className="font-semibold text-accent-foreground hover:underline">
                 {booking.customerName}
               </Link>
@@ -275,21 +279,21 @@ export function BookingDetailSheet({
 
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <p className="text-xs text-text-secondary">الملعب</p>
+                <p className="text-xs text-text-secondary">{t('bookings.detail.field')}</p>
                 <Link to="/app/fields" className="font-medium text-accent-foreground hover:underline">
                   {fieldName}
                 </Link>
               </div>
               <div>
-                <p className="text-xs text-text-secondary">الوقت</p>
+                <p className="text-xs text-text-secondary">{t('bookings.detail.time')}</p>
                 {/* Same RTL bidi-swap risk as StatCard's composite values
                     (owner-level review finding) -- isolates the time
                     range's direction from the surrounding Arabic context. */}
                 <p className="font-medium tabular-nums">
                   <bdi>
-                    {formatInstant(booking.startAt, clubTimezone, { hour: '2-digit', minute: '2-digit' })}
+                    {formatInstant(booking.startAt, clubTimezone, { hour: '2-digit', minute: '2-digit' }, locale)}
                     {' — '}
-                    {formatInstant(booking.endAt, clubTimezone, { hour: '2-digit', minute: '2-digit' })}
+                    {formatInstant(booking.endAt, clubTimezone, { hour: '2-digit', minute: '2-digit' }, locale)}
                   </bdi>
                 </p>
               </div>
@@ -300,7 +304,7 @@ export function BookingDetailSheet({
             <div className="flex flex-col gap-1.5">
               {booking.invoiceId && (
                 <div className="flex justify-between">
-                  <span className="text-text-secondary">رقم الفاتورة</span>
+                  <span className="text-text-secondary">{t('bookings.detail.invoiceNumber')}</span>
                   <Link
                     to={`/app/billing?invoice=${booking.invoiceId}`}
                     className="font-medium text-accent-foreground hover:underline"
@@ -310,39 +314,39 @@ export function BookingDetailSheet({
                 </div>
               )}
               <div className="flex justify-between">
-                <span className="text-text-secondary">الإجمالي</span>
-                <span className="tabular-nums font-medium">{booking.totalPrice.toFixed(0)} ج.م</span>
+                <span className="text-text-secondary">{t('bookings.detail.total')}</span>
+                <span className="tabular-nums font-medium">{booking.totalPrice.toFixed(0)} {t('common.currency')}</span>
               </div>
               {invoiceSummary && (
                 <>
                   <div className="flex justify-between">
-                    <span className="text-text-secondary">المدفوع</span>
-                    <span className="tabular-nums text-status-success">{invoiceSummary.paid.toFixed(0)} ج.م</span>
+                    <span className="text-text-secondary">{t('bookings.detail.paid')}</span>
+                    <span className="tabular-nums text-status-success">{invoiceSummary.paid.toFixed(0)} {t('common.currency')}</span>
                   </div>
                   {invoiceSummary.refunded > 0 && (
                     <div className="flex justify-between">
-                      <span className="text-text-secondary">مسترد</span>
-                      <span className="tabular-nums text-status-warning">{invoiceSummary.refunded.toFixed(0)} ج.م</span>
+                      <span className="text-text-secondary">{t('bookings.detail.refunded')}</span>
+                      <span className="tabular-nums text-status-warning">{invoiceSummary.refunded.toFixed(0)} {t('common.currency')}</span>
                     </div>
                   )}
                   <div className="flex justify-between font-semibold">
-                    <span>المتبقي</span>
+                    <span>{t('bookings.detail.outstanding')}</span>
                     {outstanding > 0 ? (
                       <Link to={`/app/billing?invoice=${booking.invoiceId}`} className="tabular-nums text-status-danger hover:underline">
-                        {outstanding.toFixed(0)} ج.م
+                        {outstanding.toFixed(0)} {t('common.currency')}
                       </Link>
                     ) : (
-                      <span className="tabular-nums">{outstanding.toFixed(0)} ج.م</span>
+                      <span className="tabular-nums">{outstanding.toFixed(0)} {t('common.currency')}</span>
                     )}
                   </div>
                   <div className="flex justify-between text-xs text-text-secondary">
-                    <span>حالة الدفع</span>
+                    <span>{t('bookings.detail.paymentStatus')}</span>
                     <span>{PAYMENT_STATUS_LABELS[invoiceSummary.paymentStatus]}</span>
                   </div>
                 </>
               )}
               {!booking.invoiceId && (
-                <p className="text-xs text-text-secondary">لا توجد فاتورة مرتبطة بهذا الحجز.</p>
+                <p className="text-xs text-text-secondary">{t('bookings.detail.noInvoice')}</p>
               )}
             </div>
 
@@ -354,7 +358,7 @@ export function BookingDetailSheet({
                       type="number"
                       min={0}
                       step="0.01"
-                      placeholder={`المبلغ (المتبقي ${outstanding.toFixed(0)})`}
+                      placeholder={t('bookings.detail.amountPlaceholder', { amount: outstanding.toFixed(0) })}
                       value={collectAmount}
                       onChange={(e) => setCollectAmount(e.target.value)}
                     />
@@ -373,9 +377,9 @@ export function BookingDetailSheet({
                       disabled={!collectAmount || collectPaymentMutation.isPending}
                       onClick={() => collectPaymentMutation.mutate()}
                     >
-                      {collectPaymentMutation.isPending ? 'جارٍ التسجيل...' : 'تأكيد التحصيل'}
+                      {collectPaymentMutation.isPending ? t('bookings.detail.recording') : t('bookings.detail.confirmCollect')}
                     </Button>
-                    <Button variant="ghost" size="sm" onClick={() => { setShowCollectForm(false); setCollectAmount(''); collectIdempotencyKeyRef.current = null }}>تراجع</Button>
+                    <Button variant="ghost" size="sm" onClick={() => { setShowCollectForm(false); setCollectAmount(''); collectIdempotencyKeyRef.current = null }}>{t('bookings.detail.undo')}</Button>
                   </div>
                 </div>
               ) : (
@@ -383,7 +387,7 @@ export function BookingDetailSheet({
                   size="sm"
                   onClick={() => { setCollectAmount(outstanding.toFixed(2)); setShowCollectForm(true) }}
                 >
-                  تحصيل الدفعة
+                  {t('bookings.detail.collectPayment')}
                 </Button>
               )
             )}
@@ -392,7 +396,7 @@ export function BookingDetailSheet({
               <>
                 <Separator />
                 <div>
-                  <p className="text-xs text-text-secondary">ملاحظات</p>
+                  <p className="text-xs text-text-secondary">{t('bookings.detail.notes')}</p>
                   <p>{booking.notes}</p>
                 </div>
               </>
@@ -405,13 +409,13 @@ export function BookingDetailSheet({
                   <span className="flex items-center gap-1.5 text-text-secondary">
                     <MessageCircle className="size-3.5" />
                     {whatsappSummary.failedCount > 0
-                      ? `فشل إرسال ${whatsappSummary.failedCount} رسالة واتساب`
+                      ? t('bookings.detail.whatsappFailed', { count: whatsappSummary.failedCount })
                       : whatsappSummary.pendingCount > 0
-                        ? 'رسالة واتساب قيد الإرسال'
-                        : `أُرسلت ${whatsappSummary.sentCount} رسالة واتساب ✓`}
+                        ? t('bookings.detail.whatsappPending')
+                        : t('bookings.detail.whatsappSent', { count: whatsappSummary.sentCount })}
                   </span>
                   <Link to="/app/whatsapp" className="font-medium text-accent-foreground hover:underline">
-                    عرض النشاط
+                    {t('bookings.detail.viewActivity')}
                   </Link>
                 </div>
               </>
@@ -422,10 +426,10 @@ export function BookingDetailSheet({
                 <Separator />
                 <div className="flex flex-col items-center gap-2">
                   {qrDataUrl ? (
-                    <img src={qrDataUrl} alt="رمز QR للحجز" className="size-40 rounded-md border border-border" />
+                    <img src={qrDataUrl} alt={t('bookings.detail.qrAlt')} className="size-40 rounded-md border border-border" />
                   ) : (
                     <Button variant="outline" size="sm" className="w-full" disabled={qrMutation.isPending} onClick={() => qrMutation.mutate()}>
-                      {qrMutation.isPending ? 'جارٍ الإنشاء...' : 'عرض رمز QR لتسجيل الحضور'}
+                      {qrMutation.isPending ? t('bookings.detail.generatingQr') : t('bookings.detail.viewQr')}
                     </Button>
                   )}
                 </div>
@@ -435,17 +439,17 @@ export function BookingDetailSheet({
             {(booking.status === 'confirmed' || booking.status === 'checked_in') && (
               showNoShowConfirm ? (
                 <div className="flex flex-col gap-2">
-                  <p className="text-sm text-text-secondary">تأكيد تسجيل عدم حضور العميل لهذا الحجز؟</p>
+                  <p className="text-sm text-text-secondary">{t('bookings.detail.confirmNoShowMessage')}</p>
                   <div className="flex gap-2">
                     <Button variant="destructive" size="sm" disabled={noShowMutation.isPending} onClick={() => noShowMutation.mutate()}>
-                      {noShowMutation.isPending ? 'جارٍ التسجيل...' : 'تأكيد عدم الحضور'}
+                      {noShowMutation.isPending ? t('bookings.detail.recordingNoShow') : t('bookings.detail.confirmNoShow')}
                     </Button>
-                    <Button variant="ghost" size="sm" onClick={() => setShowNoShowConfirm(false)}>تراجع</Button>
+                    <Button variant="ghost" size="sm" onClick={() => setShowNoShowConfirm(false)}>{t('bookings.detail.undo')}</Button>
                   </div>
                 </div>
               ) : (
                 <Button variant="outline" size="sm" onClick={() => setShowNoShowConfirm(true)}>
-                  تسجيل عدم حضور
+                  {t('bookings.detail.markNoShow')}
                 </Button>
               )
             )}
@@ -455,17 +459,17 @@ export function BookingDetailSheet({
                 <Separator />
                 {showCancelForm ? (
                   <div className="flex flex-col gap-2">
-                    <Input placeholder="سبب الإلغاء" value={cancelReason} onChange={(e) => setCancelReason(e.target.value)} />
+                    <Input placeholder={t('bookings.detail.cancelReasonPlaceholder')} value={cancelReason} onChange={(e) => setCancelReason(e.target.value)} />
                     <div className="flex gap-2">
                       <Button variant="destructive" size="sm" disabled={!cancelReason.trim() || cancelMutation.isPending} onClick={() => cancelMutation.mutate()}>
-                        تأكيد الإلغاء
+                        {t('bookings.detail.confirmCancel')}
                       </Button>
-                      <Button variant="ghost" size="sm" onClick={() => setShowCancelForm(false)}>تراجع</Button>
+                      <Button variant="ghost" size="sm" onClick={() => setShowCancelForm(false)}>{t('bookings.detail.undo')}</Button>
                     </div>
                   </div>
                 ) : (
                   <Button variant="ghost" size="sm" className="text-status-danger hover:text-status-danger" onClick={() => setShowCancelForm(true)}>
-                    إلغاء الحجز
+                    {t('bookings.detail.cancelBooking')}
                   </Button>
                 )}
               </>

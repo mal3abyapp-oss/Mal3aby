@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { useSearchParams } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import QRCode from 'qrcode'
@@ -33,6 +34,7 @@ import {
 } from '@/lib/domain/billing'
 import { Trash2 } from 'lucide-react'
 import { translateSupabaseError } from '@/lib/errors'
+import { useDirection } from '@/app/providers/DirectionProvider'
 
 // Invoice list, invoice detail (view + print), payment collection form,
 // refund flow. Print CSS via @media print rules scoped to #invoice-print.
@@ -49,7 +51,7 @@ interface InvoiceListRow {
   issuedAt: string | null
 }
 
-const SOURCE_LABELS: Record<string, string> = { booking: 'حجز', subscription: 'اشتراك أكاديمية' }
+const SOURCE_KEYS = new Set(['booking', 'subscription'])
 
 // Master Payment Directive task #81: was total - sum(payment_allocations)
 // computed locally, missing refund netting -- the primary invoice list
@@ -82,7 +84,7 @@ async function fetchInvoices(clubId: string) {
       paid: summary?.paid ?? 0,
       outstanding: summary?.outstanding ?? total,
       paymentStatus: summary?.paymentStatus ?? 'unpaid',
-      source: SOURCE_LABELS[items[0]?.reference_type ?? ''] ?? 'أخرى',
+      source: SOURCE_KEYS.has(items[0]?.reference_type ?? '') ? (items[0]!.reference_type as string) : 'other',
       issuedAt: row.issued_at,
     }
   })
@@ -170,10 +172,17 @@ async function fetchInvoicePayments(invoiceId: string) {
   }))
 }
 
-const INVOICE_STATUS_LABELS: Record<string, string> = { draft: 'مسودة', issued: 'صادرة', void: 'ملغاة' }
+const DEFAULT_INVOICE_STATUS_KEY = 'billing.invoiceStatusLabels.draft'
+const INVOICE_STATUS_LABEL_KEYS: Record<string, string> = {
+  draft: DEFAULT_INVOICE_STATUS_KEY,
+  issued: 'billing.invoiceStatusLabels.issued',
+  void: 'billing.invoiceStatusLabels.void',
+}
 
 export function BillingPage() {
   const { currentClubId } = useAuth()
+  const { t } = useTranslation()
+  const { locale } = useDirection()
   const queryClient = useQueryClient()
   const [searchParams] = useSearchParams()
   // Master IA/UX audit (Club Side Booking 360 phase): BookingDetailSheet
@@ -211,7 +220,7 @@ export function BillingPage() {
       void queryClient.invalidateQueries({ queryKey: ['invoices', currentClubId] })
       invalidateDetail()
     },
-    onError: (error) => setFormError(translateSupabaseError(error, 'تعذّر مراجعة طلب الدفع.')),
+    onError: (error) => setFormError(translateSupabaseError(error, t('billing.reviewClaim.genericError'))),
   })
 
   const { data: detail } = useQuery({
@@ -306,9 +315,9 @@ export function BillingPage() {
     mutationFn: async () => {
       if (!selectedInvoiceId) throw new Error('no invoice selected')
       const validLines = splitLines.filter((l) => Number(l.amount) > 0)
-      if (validLines.length === 0) throw new Error('أدخل مبلغًا واحدًا على الأقل')
+      if (validLines.length === 0) throw new Error(t('billing.recordPayment.enterAtLeastOneAmount'))
       if (outstandingForSelected !== null && splitTotal - outstandingForSelected > 0.01) {
-        throw new Error(`إجمالي الدفعات (${splitTotal.toFixed(2)}) يتجاوز المبلغ المتبقي (${outstandingForSelected.toFixed(2)})`)
+        throw new Error(t('billing.recordPayment.amountExceedsOutstanding', { total: splitTotal.toFixed(2), outstanding: outstandingForSelected.toFixed(2) }))
       }
       // Sequential, not parallel -- each record_payment() call re-checks
       // the outstanding balance server-side against the latest state, so
@@ -341,7 +350,7 @@ export function BillingPage() {
       setFormError(null)
       invalidateDetail()
     },
-    onError: (error) => setFormError(error instanceof Error && !('code' in error) ? error.message : translateSupabaseError(error, 'تعذّر تسجيل الدفعة.')),
+    onError: (error) => setFormError(error instanceof Error && !('code' in error) ? error.message : translateSupabaseError(error, t('billing.recordPayment.genericError'))),
   })
 
   // task #85: create_refund() succeeds server-side but the UI never
@@ -388,7 +397,7 @@ export function BillingPage() {
       setRefundReason('')
       invalidateDetail()
     },
-    onError: (error) => setFormError(translateSupabaseError(error, 'تعذّر تنفيذ الاسترجاع — قد يتجاوز الرصيد القابل للاسترجاع.')),
+    onError: (error) => setFormError(translateSupabaseError(error, t('billing.refund.genericError'))),
   })
 
   // V1 Implementation Gap Audit (2026-08-16): void_invoice had a working,
@@ -409,32 +418,32 @@ export function BillingPage() {
       setFormError(null)
       invalidateDetail()
     },
-    onError: (error) => setFormError(translateSupabaseError(error, 'تعذّر إلغاء الفاتورة.')),
+    onError: (error) => setFormError(translateSupabaseError(error, t('billing.voidInvoice.genericError'))),
   })
 
   const columns: DataTableColumn<InvoiceListRow>[] = [
     {
       key: 'number',
-      header: 'رقم الفاتورة',
+      header: t('billing.table.invoiceNumber'),
       render: (r) => (
         <button className="text-accent-foreground hover:underline" onClick={() => setSelectedInvoiceId(r.id)}>
           <bdi>{r.invoiceNumber}</bdi>
         </button>
       ),
     },
-    { key: 'customer', header: 'العميل', render: (r) => r.customerName },
-    { key: 'source', header: 'المصدر', render: (r) => r.source },
-    { key: 'date', header: 'التاريخ', render: (r) => (r.issuedAt ? new Date(r.issuedAt).toLocaleDateString('ar-EG') : '—') },
-    { key: 'total', header: 'الإجمالي', render: (r) => <MoneyDisplay amount={r.total} size="sm" /> },
-    { key: 'paid', header: 'المدفوع', render: (r) => <MoneyDisplay amount={r.paid} size="sm" tone={r.paid > 0 ? 'success' : 'default'} /> },
-    { key: 'outstanding', header: 'المتبقي', render: (r) => (r.outstanding > 0 ? <MoneyDisplay amount={r.outstanding} size="sm" tone="danger" /> : <span className="text-status-success text-sm">—</span>) },
+    { key: 'customer', header: t('billing.table.customer'), render: (r) => r.customerName },
+    { key: 'source', header: t('billing.table.source'), render: (r) => t(`billing.sourceLabels.${r.source}`) },
+    { key: 'date', header: t('billing.table.date'), render: (r) => (r.issuedAt ? new Date(r.issuedAt).toLocaleDateString(locale === 'en' ? 'en-US' : 'ar-EG') : '—') },
+    { key: 'total', header: t('billing.table.total'), render: (r) => <MoneyDisplay amount={r.total} size="sm" /> },
+    { key: 'paid', header: t('billing.table.paid'), render: (r) => <MoneyDisplay amount={r.paid} size="sm" tone={r.paid > 0 ? 'success' : 'default'} /> },
+    { key: 'outstanding', header: t('billing.table.outstanding'), render: (r) => (r.outstanding > 0 ? <MoneyDisplay amount={r.outstanding} size="sm" tone="danger" /> : <span className="text-status-success text-sm">—</span>) },
     {
       key: 'status',
-      header: 'الحالة',
+      header: t('billing.table.status'),
       render: (r) => (
         <StatusBadge
           tone={r.status === 'issued' ? 'success' : r.status === 'void' ? 'neutral' : 'warning'}
-          label={INVOICE_STATUS_LABELS[r.status] ?? r.status}
+          label={t(INVOICE_STATUS_LABEL_KEYS[r.status] ?? DEFAULT_INVOICE_STATUS_KEY)}
         />
       ),
     },
@@ -449,11 +458,11 @@ export function BillingPage() {
 
   return (
     <div>
-      <PageHeader title="الفواتير والمدفوعات" description="سجل الفواتير والمدفوعات" />
+      <PageHeader title={t('billing.page.title')} description={t('billing.page.description')} />
 
       {pendingClaims.length > 0 && (
         <div className="mb-4 rounded-lg border border-status-warning/40 bg-status-warning/5 p-4">
-          <p className="mb-2 font-medium">طلبات دفع بانتظار المراجعة ({pendingClaims.length})</p>
+          <p className="mb-2 font-medium">{t('billing.pendingClaims.heading', { count: pendingClaims.length })}</p>
           <div className="flex flex-col gap-2">
             {pendingClaims.map((c) => (
               <div key={c.id} className="flex flex-col gap-2 rounded-md border border-border bg-surface p-3 text-sm md:flex-row md:items-center md:justify-between">
@@ -461,16 +470,16 @@ export function BillingPage() {
                   <p className="font-medium">{c.customerName} — <bdi>{c.invoiceNumber}</bdi></p>
                   <p className="text-xs text-text-secondary">
                     {c.methodName ?? '—'} — <MoneyDisplay amount={c.claimedAmount} size="sm" />
-                    {c.reference && ` — مرجع: ${c.reference}`}
+                    {c.reference && ` — ${t('billing.pendingClaims.reference', { reference: c.reference })}`}
                     {c.proofNote && ` — ${c.proofNote}`}
                   </p>
                 </div>
                 <div className="flex gap-2">
                   <Button size="sm" onClick={() => reviewClaimMutation.mutate({ claimId: c.id, approve: true })} disabled={reviewClaimMutation.isPending}>
-                    تأكيد
+                    {t('billing.pendingClaims.confirm')}
                   </Button>
                   <Button size="sm" variant="outline" onClick={() => reviewClaimMutation.mutate({ claimId: c.id, approve: false })} disabled={reviewClaimMutation.isPending}>
-                    رفض
+                    {t('billing.pendingClaims.reject')}
                   </Button>
                 </div>
               </div>
@@ -481,29 +490,29 @@ export function BillingPage() {
 
       <div className="mb-4 grid grid-cols-2 gap-3 md:grid-cols-4">
         <div className="rounded-lg border border-border p-3">
-          <p className="text-xs text-text-secondary">إجمالي المستحقات</p>
+          <p className="text-xs text-text-secondary">{t('billing.stats.totalOutstanding')}</p>
           <MoneyDisplay amount={totalOutstanding} size="lg" tone={totalOutstanding > 0 ? 'danger' : 'default'} />
         </div>
         <div className="rounded-lg border border-border p-3">
-          <p className="text-xs text-text-secondary">تحصيل اليوم</p>
+          <p className="text-xs text-text-secondary">{t('billing.stats.collectedToday')}</p>
           <MoneyDisplay amount={totalCollectedToday} size="lg" tone="success" />
         </div>
         <div className="rounded-lg border border-border p-3">
-          <p className="text-xs text-text-secondary">فواتير مدفوعة جزئيًا</p>
+          <p className="text-xs text-text-secondary">{t('billing.stats.partiallyPaidInvoices')}</p>
           <p className="text-2xl font-bold tabular-nums">{partialCount}</p>
         </div>
         <div className="rounded-lg border border-border p-3">
-          <p className="text-xs text-text-secondary">عملاء عليهم مستحقات</p>
+          <p className="text-xs text-text-secondary">{t('billing.stats.customersWithDues')}</p>
           <p className="text-2xl font-bold tabular-nums text-status-danger">{owingCustomersCount}</p>
         </div>
       </div>
 
-      <DataTable columns={columns} rows={invoices} rowKey={(r) => r.id} isLoading={isLoading} emptyTitle="لا توجد فواتير" />
+      <DataTable columns={columns} rows={invoices} rowKey={(r) => r.id} isLoading={isLoading} emptyTitle={t('billing.table.emptyTitle')} />
 
       <Dialog open={!!selectedInvoiceId} onOpenChange={(open) => !open && setSelectedInvoiceId(null)}>
         <DialogContent className="max-w-2xl">
           <DialogHeader>
-            <DialogTitle>فاتورة <bdi>{detail?.invoice_number}</bdi></DialogTitle>
+            <DialogTitle>{t('billing.detail.invoicePrefix')} <bdi>{detail?.invoice_number}</bdi></DialogTitle>
           </DialogHeader>
           {detail && (
             <div className="flex flex-col gap-4">
@@ -513,7 +522,7 @@ export function BillingPage() {
               >
                 <div className="mb-3 flex justify-between">
                   <div>
-                    <p className="font-bold">فاتورة رقم <bdi>{detail.invoice_number}</bdi></p>
+                    <p className="font-bold">{t('billing.detail.invoicePrefix')} <bdi>{detail.invoice_number}</bdi></p>
                     <p className="text-text-secondary">
                       {(detail.customers as unknown as { full_name: string })?.full_name}
                     </p>
@@ -521,7 +530,7 @@ export function BillingPage() {
                   <div className="flex flex-col items-end gap-1 print:hidden">
                     <StatusBadge
                       tone={detail.status === 'issued' ? 'success' : 'neutral'}
-                      label={INVOICE_STATUS_LABELS[detail.status] ?? detail.status}
+                      label={t(INVOICE_STATUS_LABEL_KEYS[detail.status] ?? DEFAULT_INVOICE_STATUS_KEY)}
                     />
                     {paymentSummary && (
                       <StatusBadge
@@ -533,19 +542,19 @@ export function BillingPage() {
                 </div>
                 {verifyQrDataUrl && (
                   <div className="mb-3 flex items-center gap-2">
-                    <img src={verifyQrDataUrl} alt="رمز التحقق من الفاتورة" className="size-20" />
+                    <img src={verifyQrDataUrl} alt={t('billing.detail.verifyQrAlt')} className="size-20" />
                     <p className="text-xs text-text-secondary">
-                      امسح الرمز للتحقق من صحة الفاتورة وحالة السداد.
+                      {t('billing.detail.verifyQrHint')}
                     </p>
                   </div>
                 )}
                 <table className="w-full text-start">
                   <thead>
                     <tr className="border-b border-border">
-                      <th className="p-1 text-start">البند</th>
-                      <th className="p-1 text-start">الكمية</th>
-                      <th className="p-1 text-start">السعر</th>
-                      <th className="p-1 text-start">الإجمالي</th>
+                      <th className="p-1 text-start">{t('billing.detail.itemHeader')}</th>
+                      <th className="p-1 text-start">{t('billing.detail.quantityHeader')}</th>
+                      <th className="p-1 text-start">{t('billing.detail.priceHeader')}</th>
+                      <th className="p-1 text-start">{t('billing.detail.totalHeader')}</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -561,18 +570,18 @@ export function BillingPage() {
                 </table>
                 <div className="mt-3 flex flex-col items-end gap-1">
                   <div className="flex items-center gap-2">
-                    <span className="text-xs text-text-secondary">الإجمالي</span>
+                    <span className="text-xs text-text-secondary">{t('billing.detail.total')}</span>
                     <MoneyDisplay amount={Number(detail.total)} size="lg" />
                   </div>
                   {paymentSummary && paymentSummary.paid > 0 && (
                     <div className="flex items-center gap-2 print:hidden">
-                      <span className="text-xs text-text-secondary">المدفوع</span>
+                      <span className="text-xs text-text-secondary">{t('billing.detail.paid')}</span>
                       <MoneyDisplay amount={paymentSummary.paid} size="sm" tone="success" />
                     </div>
                   )}
                   {paymentSummary && paymentSummary.outstanding > 0 && (
                     <div className="flex items-center gap-2">
-                      <span className="text-xs text-text-secondary">المتبقي</span>
+                      <span className="text-xs text-text-secondary">{t('billing.detail.outstanding')}</span>
                       <MoneyDisplay amount={paymentSummary.outstanding} size="lg" tone="danger" />
                     </div>
                   )}
@@ -584,18 +593,18 @@ export function BillingPage() {
                   <SelectTrigger className="w-32"><SelectValue /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="a4">A4</SelectItem>
-                    <SelectItem value="80mm">إيصال 80mm</SelectItem>
+                    <SelectItem value="80mm">{t('billing.detail.receiptSize80mm')}</SelectItem>
                   </SelectContent>
                 </Select>
                 <Button variant="outline" size="sm" className="w-fit" onClick={() => window.print()}>
-                  طباعة
+                  {t('billing.detail.print')}
                 </Button>
               </div>
 
               <div className="print:hidden">
-                <p className="mb-2 font-medium">المدفوعات</p>
+                <p className="mb-2 font-medium">{t('billing.detail.paymentsHeading')}</p>
                 {payments.length === 0 ? (
-                  <p className="text-sm text-text-secondary">لا توجد مدفوعات بعد.</p>
+                  <p className="text-sm text-text-secondary">{t('billing.detail.noPayments')}</p>
                 ) : (
                   <ul className="flex flex-col gap-1">
                     {payments.map((p) => (
@@ -603,7 +612,7 @@ export function BillingPage() {
                         <span>
                           <MoneyDisplay amount={p.amount} size="sm" /> — {PAYMENT_METHOD_LABELS[p.method] ?? p.method}
                           {p.receivedByName && (
-                            <span className="text-text-secondary"> — حصّلها {p.receivedByName}</span>
+                            <span className="text-text-secondary"> — {t('billing.detail.collectedBy', { name: p.receivedByName })}</span>
                           )}
                         </span>
                         <Button
@@ -611,7 +620,7 @@ export function BillingPage() {
                           variant="ghost"
                           onClick={() => setRefundPaymentId(p.id)}
                         >
-                          استرجاع
+                          {t('billing.detail.refund')}
                         </Button>
                       </li>
                     ))}
@@ -622,20 +631,20 @@ export function BillingPage() {
               {detail.status === 'issued' && outstandingForSelected !== null && outstandingForSelected > 0 && (
                 <div className="flex flex-col gap-2 border-t border-border pt-3 print:hidden">
                   <div className="flex items-center justify-between">
-                    <p className="font-medium">تسجيل دفعة</p>
+                    <p className="font-medium">{t('billing.recordPayment.heading')}</p>
                     <p className="text-xs text-text-secondary">
-                      المتبقي: <span className="font-medium text-status-danger">{outstandingForSelected.toFixed(2)}</span>
+                      {t('billing.recordPayment.outstandingPrefix')} <span className="font-medium text-status-danger">{outstandingForSelected.toFixed(2)}</span>
                     </p>
                   </div>
                   <p className="text-xs text-text-secondary">
-                    يمكن تسجيل الدفعة بأكثر من طريقة دفع في نفس العملية (مثال: جزء نقدًا وجزء بالبطاقة).
+                    {t('billing.recordPayment.splitHint')}
                   </p>
                   <div className="flex flex-col gap-2">
                     {splitLines.map((line, idx) => (
                       <div key={line.key} className="flex gap-2">
                         <Input
                           type="number"
-                          placeholder="المبلغ"
+                          placeholder={t('billing.recordPayment.amountPlaceholder')}
                           value={line.amount}
                           onChange={(e) =>
                             setSplitLines((prev) => prev.map((l) => (l.key === line.key ? { ...l, amount: e.target.value } : l)))
@@ -657,7 +666,7 @@ export function BillingPage() {
                             size="sm"
                             variant="ghost"
                             onClick={() => setSplitLines((prev) => prev.filter((l) => l.key !== line.key))}
-                            aria-label="حذف السطر"
+                            aria-label={t('billing.recordPayment.deleteLine')}
                           >
                             <Trash2 className="size-4" />
                           </Button>
@@ -668,7 +677,7 @@ export function BillingPage() {
                             variant="outline"
                             onClick={() => setSplitLines((prev) => [...prev, { key: crypto.randomUUID(), amount: '', method: 'cash' }])}
                           >
-                            + طريقة أخرى
+                            {t('billing.recordPayment.addMethod')}
                           </Button>
                         )}
                       </div>
@@ -676,9 +685,9 @@ export function BillingPage() {
                   </div>
                   {splitLines.length > 1 && splitTotal > 0 && (
                     <p className="text-xs text-text-secondary">
-                      إجمالي الدفعات: <span className="font-medium">{splitTotal.toFixed(2)}</span>
+                      {t('billing.recordPayment.totalPaymentsPrefix')} <span className="font-medium">{splitTotal.toFixed(2)}</span>
                       {splitTotal - outstandingForSelected > 0.01 && (
-                        <span className="text-status-danger"> — يتجاوز المتبقي</span>
+                        <span className="text-status-danger"> {t('billing.recordPayment.exceedsOutstanding')}</span>
                       )}
                     </p>
                   )}
@@ -687,16 +696,16 @@ export function BillingPage() {
                     disabled={splitTotal <= 0 || recordPaymentMutation.isPending || splitTotal - outstandingForSelected > 0.01}
                     onClick={() => recordPaymentMutation.mutate()}
                   >
-                    {recordPaymentMutation.isPending ? 'جارٍ التسجيل...' : 'تسجيل الدفعة'}
+                    {recordPaymentMutation.isPending ? t('billing.recordPayment.submitting') : t('billing.recordPayment.submit')}
                   </Button>
                 </div>
               )}
 
               {detail.status === 'issued' && payments.length === 0 && (
                 <div className="flex flex-col gap-2 border-t border-border pt-3 print:hidden">
-                  <p className="font-medium">إلغاء الفاتورة</p>
-                  <p className="text-xs text-text-secondary">متاح فقط للفواتير التي لم تُسجَّل عليها أي دفعة بعد.</p>
-                  <Input placeholder="سبب الإلغاء" value={voidReason} onChange={(e) => setVoidReason(e.target.value)} />
+                  <p className="font-medium">{t('billing.voidInvoice.heading')}</p>
+                  <p className="text-xs text-text-secondary">{t('billing.voidInvoice.hint')}</p>
+                  <Input placeholder={t('billing.voidInvoice.reasonPlaceholder')} value={voidReason} onChange={(e) => setVoidReason(e.target.value)} />
                   <Button
                     variant="destructive"
                     size="sm"
@@ -704,7 +713,7 @@ export function BillingPage() {
                     disabled={!voidReason.trim() || voidMutation.isPending}
                     onClick={() => voidMutation.mutate()}
                   >
-                    {voidMutation.isPending ? 'جارٍ الإلغاء...' : 'إلغاء الفاتورة'}
+                    {voidMutation.isPending ? t('billing.voidInvoice.submitting') : t('billing.voidInvoice.submit')}
                   </Button>
                 </div>
               )}
@@ -720,13 +729,13 @@ export function BillingPage() {
       <Dialog open={!!refundPaymentId} onOpenChange={(open) => !open && setRefundPaymentId(null)}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>استرجاع دفعة</DialogTitle>
+            <DialogTitle>{t('billing.refund.dialogTitle')}</DialogTitle>
           </DialogHeader>
           <div className="flex flex-col gap-3">
-            <Input type="number" placeholder="مبلغ الاسترجاع" value={refundAmount} onChange={(e) => setRefundAmount(e.target.value)} />
-            <Input placeholder="سبب الاسترجاع" value={refundReason} onChange={(e) => setRefundReason(e.target.value)} />
+            <Input type="number" placeholder={t('billing.refund.amountPlaceholder')} value={refundAmount} onChange={(e) => setRefundAmount(e.target.value)} />
+            <Input placeholder={t('billing.refund.reasonPlaceholder')} value={refundReason} onChange={(e) => setRefundReason(e.target.value)} />
             <Button disabled={!refundAmount || !refundReason.trim() || refundMutation.isPending} onClick={() => refundMutation.mutate()}>
-              تأكيد الاسترجاع
+              {t('billing.refund.submit')}
             </Button>
           </div>
         </DialogContent>
@@ -735,18 +744,18 @@ export function BillingPage() {
       <Dialog open={!!refundReceipt} onOpenChange={(open) => !open && setRefundReceipt(null)}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>إيصال استرجاع</DialogTitle>
+            <DialogTitle>{t('billing.refund.receiptTitle')}</DialogTitle>
           </DialogHeader>
           {refundReceipt && (
             <div className="flex flex-col gap-3">
               <div data-print-size={printSize} className="print-target visible-for-print rounded-md border border-border p-4 text-sm print:border-0">
-                <p className="mb-2 font-bold">إيصال استرجاع</p>
+                <p className="mb-2 font-bold">{t('billing.refund.receiptTitle')}</p>
                 <div className="flex flex-col gap-1">
-                  <p>الفاتورة: <bdi>{refundReceipt.invoiceNumber}</bdi></p>
-                  <p>العميل: {refundReceipt.customerName}</p>
-                  <p>طريقة الدفع الأصلية: {PAYMENT_METHOD_LABELS[refundReceipt.method] ?? refundReceipt.method}</p>
-                  <p>السبب: {refundReceipt.reason}</p>
-                  <p>التاريخ: {new Date(refundReceipt.refundedAt).toLocaleString('ar-EG')}</p>
+                  <p>{t('billing.refund.receiptInvoicePrefix')} <bdi>{refundReceipt.invoiceNumber}</bdi></p>
+                  <p>{t('billing.refund.receiptCustomer', { name: refundReceipt.customerName })}</p>
+                  <p>{t('billing.refund.receiptOriginalMethod', { method: PAYMENT_METHOD_LABELS[refundReceipt.method] ?? refundReceipt.method })}</p>
+                  <p>{t('billing.refund.receiptReason', { reason: refundReceipt.reason })}</p>
+                  <p>{t('billing.refund.receiptDate', { date: new Date(refundReceipt.refundedAt).toLocaleString(locale === 'en' ? 'en-US' : 'ar-EG') })}</p>
                 </div>
                 <div className="mt-3 flex justify-end">
                   <MoneyDisplay amount={refundReceipt.refundAmount} size="lg" tone="danger" />
@@ -757,14 +766,14 @@ export function BillingPage() {
                   <SelectTrigger className="w-32"><SelectValue /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="a4">A4</SelectItem>
-                    <SelectItem value="80mm">إيصال 80mm</SelectItem>
+                    <SelectItem value="80mm">{t('billing.detail.receiptSize80mm')}</SelectItem>
                   </SelectContent>
                 </Select>
                 <Button variant="outline" size="sm" className="w-fit" onClick={() => window.print()}>
-                  طباعة
+                  {t('billing.detail.print')}
                 </Button>
                 <Button variant="ghost" size="sm" className="w-fit" onClick={() => setRefundReceipt(null)}>
-                  إغلاق
+                  {t('common.close')}
                 </Button>
               </div>
             </div>

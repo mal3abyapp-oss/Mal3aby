@@ -1,10 +1,11 @@
 import { useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '@/lib/supabase/client'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { translateSupabaseError } from '@/lib/errors'
-import { DAY_NAMES_AR, type PricingRuleRow } from '@/lib/domain/fields'
+import { type PricingRuleRow } from '@/lib/domain/fields'
 import { useResolvedFieldPrice } from '@/features/bookings/useFieldPricing'
 
 // P1-6 (critical usability fix pass, 2026-08-16): the old pricing UX
@@ -36,9 +37,9 @@ function groupWeeklyRules(rules: PricingRuleRow[]) {
   })
 }
 
-function formatDayRange(days: number[]): string {
-  if (days.length === 7) return 'كل أيام الأسبوع'
-  if (days.length === 1) return DAY_NAMES_AR[days[0] as number] ?? '—'
+function formatDayRange(days: number[], dayNames: string[], t: (key: string) => string): string {
+  if (days.length === 7) return t('clubs.pricingEditor.allWeekDays')
+  if (days.length === 1) return dayNames[days[0] as number] ?? '—'
   // Contiguous range check against the display week order (Sat..Fri).
   const order = [6, 0, 1, 2, 3, 4, 5]
   const indices = days.map((d) => order.indexOf(d)).sort((a, b) => a - b)
@@ -48,9 +49,9 @@ function formatDayRange(days: number[]): string {
     const lastIdx = indices[indices.length - 1] as number
     const firstDay = order[firstIdx] as number
     const lastDay = order[lastIdx] as number
-    return `${DAY_NAMES_AR[firstDay]}–${DAY_NAMES_AR[lastDay]}`
+    return `${dayNames[firstDay]}–${dayNames[lastDay]}`
   }
-  return days.map((d) => DAY_NAMES_AR[d] ?? '—').join('، ')
+  return days.map((d) => dayNames[d] ?? '—').join(t('academy.structure.listSeparator'))
 }
 
 export function PricingEditor({
@@ -62,6 +63,8 @@ export function PricingEditor({
   clubId: string
   pricingRules: PricingRuleRow[]
 }) {
+  const { t } = useTranslation()
+  const dayNames = [0, 1, 2, 3, 4, 5, 6].map((d) => t(`academy.structure.dayOfWeekLabels.${d}`))
   const queryClient = useQueryClient()
   const [showAdvanced, setShowAdvanced] = useState(false)
 
@@ -104,7 +107,7 @@ export function PricingEditor({
       void queryClient.invalidateQueries({ queryKey: ['pricing-rules', fieldId] })
       void queryClient.invalidateQueries({ queryKey: ['resolve-field-price'] })
     },
-    onError: (error) => setFormError(translateSupabaseError(error, 'تعذّرت إضافة السعر.')),
+    onError: (error) => setFormError(translateSupabaseError(error, t('clubs.pricingEditor.addPriceError'))),
   })
 
   const addSpecialMutation = useMutation({
@@ -126,7 +129,7 @@ export function PricingEditor({
       setFormError(null)
       void queryClient.invalidateQueries({ queryKey: ['pricing-rules', fieldId] })
     },
-    onError: (error) => setFormError(translateSupabaseError(error, 'تعذّرت إضافة السعر الخاص.')),
+    onError: (error) => setFormError(translateSupabaseError(error, t('clubs.pricingEditor.addSpecialPriceError'))),
   })
 
   const deleteMutation = useMutation({
@@ -148,33 +151,33 @@ export function PricingEditor({
     <div className="flex flex-col gap-4">
       {/* Current effective price -- always visible, server-resolved */}
       <div className="rounded-lg border border-accent/30 bg-accent/5 p-3 text-sm">
-        <span className="text-text-secondary">السعر الحالي الآن: </span>
+        <span className="text-text-secondary">{t('clubs.pricingEditor.currentPriceNow')}</span>
         {currentPriceLoading ? (
-          <span>جارٍ الحساب...</span>
+          <span>{t('clubs.pricingEditor.calculating')}</span>
         ) : currentPrice != null ? (
-          <span className="font-semibold tabular-nums">{currentPrice.toFixed(0)} ج.م/ساعة</span>
+          <span className="font-semibold tabular-nums">{t('clubs.pricingEditor.pricePerHour', { price: currentPrice.toFixed(0) })}</span>
         ) : (
-          <span className="text-status-danger">لا يوجد سعر معتمد للوقت الحالي</span>
+          <span className="text-status-danger">{t('clubs.pricingEditor.noApprovedPrice')}</span>
         )}
       </div>
 
       {pricingRules.length === 0 && (
         <p className="rounded-md bg-status-warning/10 p-2 text-sm text-status-warning">
-          لا توجد أسعار محددة — لن يمكن إتمام أي حجز على هذا الملعب حتى تتم إضافة سعر واحد على الأقل.
+          {t('clubs.pricingEditor.noPricesWarning')}
         </p>
       )}
 
       {/* Human-readable weekly summary */}
       {weeklyGroups.length > 0 && (
         <div className="flex flex-col gap-1.5 rounded-lg border border-border p-3 text-sm">
-          <p className="font-medium text-text-secondary">الأسعار الأسبوعية</p>
+          <p className="font-medium text-text-secondary">{t('clubs.pricingEditor.weeklyPricesHeading')}</p>
           {weeklyGroups.map((g, i) => (
             <div key={i} className="flex items-center justify-between">
-              <span>{formatDayRange(g.days)} — {g.startTime.slice(0, 5)}–{g.endTime.slice(0, 5)}</span>
+              <span>{formatDayRange(g.days, dayNames, t)} — {g.startTime.slice(0, 5)}–{g.endTime.slice(0, 5)}</span>
               <div className="flex items-center gap-2">
-                <span className="font-medium tabular-nums">{g.price} ج.م</span>
+                <span className="font-medium tabular-nums">{t('clubs.pricingEditor.price', { price: g.price })}</span>
                 <button className="text-xs text-status-danger hover:underline" onClick={() => deleteMutation.mutate(g.ruleIds)} disabled={deleteMutation.isPending}>
-                  حذف
+                  {t('clubs.pricingEditor.delete')}
                 </button>
               </div>
             </div>
@@ -184,14 +187,14 @@ export function PricingEditor({
 
       {specialRules.length > 0 && (
         <div className="flex flex-col gap-1.5 rounded-lg border border-border p-3 text-sm">
-          <p className="font-medium text-text-secondary">أسعار خاصة (تواريخ محددة)</p>
+          <p className="font-medium text-text-secondary">{t('clubs.pricingEditor.specialPricesHeading')}</p>
           {specialRules.map((r) => (
             <div key={r.id} className="flex items-center justify-between">
               <span>{r.dateSpecific}</span>
               <div className="flex items-center gap-2">
-                <span className="font-medium tabular-nums">{r.pricePerHour} ج.م</span>
+                <span className="font-medium tabular-nums">{t('clubs.pricingEditor.price', { price: r.pricePerHour })}</span>
                 <button className="text-xs text-status-danger hover:underline" onClick={() => deleteMutation.mutate([r.id])} disabled={deleteMutation.isPending}>
-                  حذف
+                  {t('clubs.pricingEditor.delete')}
                 </button>
               </div>
             </div>
@@ -201,9 +204,9 @@ export function PricingEditor({
 
       {/* Add weekly price */}
       <div className="flex flex-col gap-2 border-t border-border pt-3">
-        <label className="text-sm font-medium text-text-secondary">إضافة سعر أسبوعي</label>
+        <label className="text-sm font-medium text-text-secondary">{t('clubs.pricingEditor.addWeeklyPriceLabel')}</label>
         <div className="flex flex-wrap gap-1.5">
-          {DAY_NAMES_AR.map((name, i) => (
+          {dayNames.map((name, i) => (
             <button
               key={i}
               type="button"
@@ -218,32 +221,32 @@ export function PricingEditor({
           <Input type="time" value={newStart} onChange={(e) => setNewStart(e.target.value)} />
           <Input type="time" value={newEnd} onChange={(e) => setNewEnd(e.target.value)} />
         </div>
-        <Input type="number" min="0" step="0.01" placeholder="السعر بالساعة (ج.م)" value={newPrice} onChange={(e) => setNewPrice(e.target.value)} />
+        <Input type="number" min="0" step="0.01" placeholder={t('clubs.pricingEditor.pricePerHourPlaceholder')} value={newPrice} onChange={(e) => setNewPrice(e.target.value)} />
         {showAdvanced && (
           <div className="flex flex-col gap-1">
-            <label className="text-xs text-text-secondary">الأولوية (رقم أعلى = يفوز عند تداخل فترتين)</label>
+            <label className="text-xs text-text-secondary">{t('clubs.pricingEditor.priorityLabel')}</label>
             <Input type="number" min="1" value={newPriority} onChange={(e) => setNewPriority(e.target.value)} />
           </div>
         )}
         <button type="button" className="self-start text-xs text-accent hover:underline" onClick={() => setShowAdvanced((v) => !v)}>
-          {showAdvanced ? 'إخفاء الخيارات المتقدمة' : 'خيارات متقدمة'}
+          {showAdvanced ? t('clubs.pricingEditor.hideAdvanced') : t('clubs.pricingEditor.showAdvanced')}
         </button>
         <Button
           size="sm"
           disabled={newDays.length === 0 || !newPrice || Number(newPrice) <= 0 || newStart >= newEnd || addWeeklyMutation.isPending}
           onClick={() => addWeeklyMutation.mutate()}
         >
-          {addWeeklyMutation.isPending ? 'جارٍ الإضافة...' : 'إضافة السعر'}
+          {addWeeklyMutation.isPending ? t('clubs.pricingEditor.adding') : t('clubs.pricingEditor.addPrice')}
         </Button>
-        {newStart >= newEnd && <p role="alert" className="text-xs text-status-danger">وقت البداية يجب أن يكون قبل وقت النهاية</p>}
+        {newStart >= newEnd && <p role="alert" className="text-xs text-status-danger">{t('clubs.pricingEditor.startBeforeEndError')}</p>}
       </div>
 
       {/* Add special-date override */}
       <div className="flex flex-col gap-2 border-t border-border pt-3">
-        <label className="text-sm font-medium text-text-secondary">سعر خاص بمناسبة/عطلة (تاريخ محدد)</label>
+        <label className="text-sm font-medium text-text-secondary">{t('clubs.pricingEditor.specialPriceLabel')}</label>
         <div className="flex gap-2">
           <Input type="date" value={specialDate} onChange={(e) => setSpecialDate(e.target.value)} className="flex-1" />
-          <Input type="number" min="0" step="0.01" placeholder="السعر" value={specialPrice} onChange={(e) => setSpecialPrice(e.target.value)} className="flex-1" />
+          <Input type="number" min="0" step="0.01" placeholder={t('clubs.pricingEditor.pricePlaceholder')} value={specialPrice} onChange={(e) => setSpecialPrice(e.target.value)} className="flex-1" />
         </div>
         <Button
           size="sm"
@@ -251,9 +254,9 @@ export function PricingEditor({
           disabled={!specialDate || !specialPrice || Number(specialPrice) <= 0 || addSpecialMutation.isPending}
           onClick={() => addSpecialMutation.mutate()}
         >
-          {addSpecialMutation.isPending ? 'جارٍ الإضافة...' : 'إضافة سعر خاص'}
+          {addSpecialMutation.isPending ? t('clubs.pricingEditor.adding') : t('clubs.pricingEditor.addSpecialPrice')}
         </Button>
-        <p className="text-xs text-text-secondary">يتجاوز السعر الخاص أي سعر أسبوعي في نفس التاريخ طوال اليوم.</p>
+        <p className="text-xs text-text-secondary">{t('clubs.pricingEditor.specialPriceHint')}</p>
       </div>
 
       {formError && <p role="alert" className="text-sm text-status-danger">{formError}</p>}

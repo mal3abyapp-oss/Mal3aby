@@ -1,5 +1,6 @@
 import { useState, type FormEvent } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
+import { useTranslation } from 'react-i18next'
 import { supabase } from '@/lib/supabase/client'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -36,6 +37,7 @@ async function hasAnyLinkedCustomerRecord(): Promise<boolean> {
 }
 
 export function LoginPage() {
+  const { t } = useTranslation()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [submitting, setSubmitting] = useState(false)
@@ -54,8 +56,8 @@ export function LoginPage() {
 
     if (signInError) {
       // Never surface the raw provider error string (docs pattern: error-state
-      // never shows raw DB/HTTP errors) — map to a safe, generic Arabic message.
-      setError('بيانات الدخول غير صحيحة، أو الحساب غير مفعّل بعد.')
+      // never shows raw DB/HTTP errors) — map to a safe, generic localized message.
+      setError(t('auth.loginError'))
       return
     }
 
@@ -80,13 +82,13 @@ export function LoginPage() {
     <div className="mx-auto flex min-h-[70vh] max-w-sm items-center justify-center px-4 py-12">
       <Card className="w-full">
         <CardHeader>
-          <CardTitle className="text-center text-xl">تسجيل الدخول</CardTitle>
+          <CardTitle className="text-center text-xl">{t('auth.login')}</CardTitle>
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit} className="flex flex-col gap-4">
             <div className="flex flex-col gap-1.5">
               <label htmlFor="email" className="text-sm font-medium text-text-secondary">
-                البريد الإلكتروني
+                {t('auth.emailLabel')}
               </label>
               <Input
                 id="email"
@@ -99,7 +101,7 @@ export function LoginPage() {
             </div>
             <div className="flex flex-col gap-1.5">
               <label htmlFor="password" className="text-sm font-medium text-text-secondary">
-                كلمة المرور
+                {t('auth.passwordLabel')}
               </label>
               <Input
                 id="password"
@@ -118,15 +120,15 @@ export function LoginPage() {
             )}
 
             <Button type="submit" disabled={submitting} className="mt-2">
-              {submitting ? 'جارٍ الدخول...' : 'دخول'}
+              {submitting ? t('auth.loggingIn') : t('auth.login')}
             </Button>
 
             <div className="flex justify-between text-sm text-text-secondary">
               <Link to="/forgot-password" className="hover:underline">
-                نسيت كلمة المرور؟
+                {t('auth.forgotPassword')}
               </Link>
               <Link to="/signup" className="hover:underline">
-                إنشاء حساب جديد
+                {t('auth.createNewAccount')}
               </Link>
             </div>
           </form>

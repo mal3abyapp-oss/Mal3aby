@@ -1,4 +1,5 @@
 import { Link, Outlet } from 'react-router-dom'
+import { useTranslation } from 'react-i18next'
 import { Button } from '@/components/ui/button'
 import { MessageCircle, Mail, Phone } from 'lucide-react'
 import { LanguageSwitcher } from '@/components/ui/language-switcher'
@@ -7,6 +8,8 @@ import { LanguageSwitcher } from '@/components/ui/language-switcher'
 // and docs/DESIGN_SYSTEM.md#public-website-visual-system.
 // No authentication required for anything rendered inside this layout.
 export function PublicLayout() {
+  const { t } = useTranslation()
+
   return (
     <div className="flex min-h-screen flex-col bg-page-bg">
       <header className="sticky top-0 z-40 border-b border-border bg-surface/95 backdrop-blur">
@@ -15,18 +18,18 @@ export function PublicLayout() {
             ملعبي <span className="text-text-secondary">| Mala3by</span>
           </Link>
           <nav className="hidden items-center gap-6 text-sm font-medium text-text-secondary md:flex">
-            <Link to="/" className="hover:text-text-primary">الرئيسية</Link>
-            <a href="/#features" className="hover:text-text-primary">المزايا</a>
-            <Link to="/pricing" className="hover:text-text-primary">الأسعار</Link>
-            <Link to="/contact" className="hover:text-text-primary">تواصل معنا</Link>
+            <Link to="/" className="hover:text-text-primary">{t('publicSite.nav.home')}</Link>
+            <a href="/#features" className="hover:text-text-primary">{t('publicSite.nav.features')}</a>
+            <Link to="/pricing" className="hover:text-text-primary">{t('publicSite.nav.pricing')}</Link>
+            <Link to="/contact" className="hover:text-text-primary">{t('publicSite.nav.contact')}</Link>
           </nav>
           <div className="flex items-center gap-3">
             <LanguageSwitcher />
             <Button variant="ghost" size="sm" asChild>
-              <Link to="/login">تسجيل الدخول</Link>
+              <Link to="/login">{t('publicSite.nav.login')}</Link>
             </Button>
             <Button size="sm" className="bg-accent text-accent-foreground hover:bg-accent/90" asChild>
-              <Link to="/signup">ابدأ مجانًا</Link>
+              <Link to="/signup">{t('publicSite.nav.startFree')}</Link>
             </Button>
           </div>
         </div>
@@ -40,17 +43,17 @@ export function PublicLayout() {
         <div className="mx-auto grid max-w-6xl grid-cols-2 gap-8 px-4 py-10 md:grid-cols-4">
           <div>
             <p className="font-bold">ملعبي | Mala3by</p>
-            <p className="mt-2 text-sm text-white/60">منصة إدارة الأندية والأكاديميات والملاعب</p>
+            <p className="mt-2 text-sm text-white/60">{t('publicSite.footer.tagline')}</p>
           </div>
           <div className="flex flex-col gap-2 text-sm text-white/70">
-            <Link to="/">الرئيسية</Link>
-            <a href="/#features">المزايا</a>
-            <Link to="/pricing">الأسعار</Link>
-            <Link to="/contact">تواصل معنا</Link>
+            <Link to="/">{t('publicSite.nav.home')}</Link>
+            <a href="/#features">{t('publicSite.nav.features')}</a>
+            <Link to="/pricing">{t('publicSite.nav.pricing')}</Link>
+            <Link to="/contact">{t('publicSite.nav.contact')}</Link>
           </div>
           <div className="flex flex-col gap-2 text-sm text-white/70">
-            <Link to="/terms">الشروط والأحكام</Link>
-            <Link to="/privacy">سياسة الخصوصية</Link>
+            <Link to="/terms">{t('publicSite.nav.terms')}</Link>
+            <Link to="/privacy">{t('publicSite.nav.privacy')}</Link>
           </div>
           <div className="flex flex-col gap-2 text-sm text-white/70">
             <span className="flex items-center gap-2">
@@ -65,7 +68,7 @@ export function PublicLayout() {
               rel="noreferrer"
               className="flex items-center gap-2 hover:text-white"
             >
-              <MessageCircle className="size-4" /> واتساب
+              <MessageCircle className="size-4" /> {t('publicSite.nav.whatsapp')}
             </a>
           </div>
         </div>

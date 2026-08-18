@@ -1,4 +1,5 @@
 import { useQuery } from '@tanstack/react-query'
+import { useTranslation } from 'react-i18next'
 import { supabase } from '@/lib/supabase/client'
 import { useAuth } from '@/app/providers/AuthProvider'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -10,16 +11,10 @@ import { AlertTriangle } from 'lucide-react'
 // restricted club_platform_subscription_summary view (never the raw
 // platform_subscriptions table — ADR-035). Full Platform Owner console is
 // Phase 3c.
-const ACCESS_LABELS: Record<string, { label: string; tone: 'success' | 'warning' | 'danger' }> = {
-  full: { label: 'نشط بالكامل', tone: 'success' },
-  grace: { label: 'فترة سماح', tone: 'warning' },
-  blocked: { label: 'موقوف', tone: 'danger' },
-}
-
-const KIND_LABELS: Record<string, string> = {
-  trial: 'تجربة مجانية',
-  paid: 'مدفوع',
-  complimentary: 'مجاني (منحة)',
+const ACCESS_TONE: Record<string, 'success' | 'warning' | 'danger'> = {
+  full: 'success',
+  grace: 'warning',
+  blocked: 'danger',
 }
 
 async function fetchSubscriptionSummary(clubId: string) {
@@ -34,6 +29,7 @@ async function fetchSubscriptionSummary(clubId: string) {
 }
 
 export function PlatformSubscriptionCard() {
+  const { t } = useTranslation()
   const { currentClubId } = useAuth()
 
   const { data, isLoading } = useQuery({
@@ -45,7 +41,7 @@ export function PlatformSubscriptionCard() {
   return (
     <Card>
       <CardHeader>
-        <CardTitle className="text-base">اشتراك المنصة</CardTitle>
+        <CardTitle className="text-base">{t('clubs.platformSubscriptionCard.title')}</CardTitle>
       </CardHeader>
       <CardContent>
         {isLoading ? (
@@ -64,33 +60,39 @@ export function PlatformSubscriptionCard() {
           <div className="flex items-start gap-2 rounded-lg border border-status-warning/40 bg-status-warning/10 p-3 text-sm text-status-warning">
             <AlertTriangle className="mt-0.5 size-4 shrink-0" />
             <div className="flex flex-col gap-1">
-              <span className="font-medium">بانتظار موافقة منصة ملعبي</span>
+              <span className="font-medium">{t('clubs.platformSubscriptionCard.pendingTitle')}</span>
               <span className="text-status-warning/90">
-                لم يتم تفعيل اشتراك تجاري لهذا النادي بعد. الأندية الإضافية (بعد النادي الأول) لا تحصل على تجربة مجانية تلقائية — يحتاج هذا النادي لموافقة فريق منصة ملعبي قبل استخدامه فعليًا. سنتواصل معك بمجرد المراجعة.
+                {t('clubs.platformSubscriptionCard.pendingDescription')}
               </span>
             </div>
           </div>
         ) : (
           <div className="flex flex-col gap-2 text-sm">
             <div className="flex items-center gap-2">
-              <span className="text-text-secondary">الحالة:</span>
+              <span className="text-text-secondary">{t('clubs.platformSubscriptionCard.statusLabel')}</span>
               <StatusBadge
-                tone={ACCESS_LABELS[data.effective_access ?? 'blocked']?.tone ?? 'neutral'}
-                label={ACCESS_LABELS[data.effective_access ?? 'blocked']?.label ?? data.effective_access ?? '—'}
+                tone={ACCESS_TONE[data.effective_access ?? 'blocked'] ?? 'neutral'}
+                label={
+                  data.effective_access && ACCESS_TONE[data.effective_access]
+                    ? t(`clubs.platformSubscriptionCard.accessLabels.${data.effective_access}`)
+                    : (data.effective_access ?? '—')
+                }
               />
             </div>
             <div>
-              <span className="text-text-secondary">نوع الاشتراك: </span>
-              {KIND_LABELS[data.subscription_kind ?? ''] ?? data.subscription_kind}
+              <span className="text-text-secondary">{t('clubs.platformSubscriptionCard.kindLabel')}</span>
+              {data.subscription_kind && ['trial', 'paid', 'complimentary'].includes(data.subscription_kind)
+                ? t(`clubs.platformSubscriptionCard.kindLabels.${data.subscription_kind}`)
+                : data.subscription_kind}
             </div>
             {data.plan_name_snapshot && (
               <div>
-                <span className="text-text-secondary">الخطة: </span>
+                <span className="text-text-secondary">{t('clubs.platformSubscriptionCard.planLabel')}</span>
                 {data.plan_name_snapshot}
               </div>
             )}
             <div>
-              <span className="text-text-secondary">تاريخ الانتهاء: </span>
+              <span className="text-text-secondary">{t('clubs.platformSubscriptionCard.endDateLabel')}</span>
               {data.end_at ? new Date(data.end_at).toLocaleDateString('ar-EG') : '—'}
             </div>
           </div>

@@ -1,4 +1,5 @@
 import { useState, type FormEvent } from 'react'
+import { useTranslation } from 'react-i18next'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '@/lib/supabase/client'
 import { useAuth } from '@/app/providers/AuthProvider'
@@ -21,8 +22,6 @@ import {
   DialogTrigger,
 } from '@/components/ui/dialog'
 import {
-  DAY_OF_WEEK_LABELS,
-  GROUP_STATUS_LABELS,
   type AgeGroupRow,
   type GroupRow,
   type ProgramRow,
@@ -146,8 +145,25 @@ async function fetchCoaches(clubId: string) {
 }
 
 export function ProgramsGroupsSection() {
+  const { t } = useTranslation()
   const { currentClubId } = useAuth()
   const queryClient = useQueryClient()
+
+  const DAY_OF_WEEK_LABELS: Record<number, string> = {
+    0: t('academy.structure.dayOfWeekLabels.0'),
+    1: t('academy.structure.dayOfWeekLabels.1'),
+    2: t('academy.structure.dayOfWeekLabels.2'),
+    3: t('academy.structure.dayOfWeekLabels.3'),
+    4: t('academy.structure.dayOfWeekLabels.4'),
+    5: t('academy.structure.dayOfWeekLabels.5'),
+    6: t('academy.structure.dayOfWeekLabels.6'),
+  }
+
+  const GROUP_STATUS_LABELS: Record<string, string> = {
+    active: t('academy.structure.groupStatusLabels.active'),
+    full: t('academy.structure.groupStatusLabels.full'),
+    closed: t('academy.structure.groupStatusLabels.closed'),
+  }
 
   const [programDialogOpen, setProgramDialogOpen] = useState(false)
   const [programName, setProgramName] = useState('')
@@ -353,7 +369,7 @@ export function ProgramsGroupsSection() {
   const groupColumns: DataTableColumn<GroupRow>[] = [
     {
       key: 'name',
-      header: 'المجموعة',
+      header: t('academy.enrollments.group'),
       render: (g) => (
         <button
           className="text-accent-foreground hover:underline"
@@ -370,31 +386,31 @@ export function ProgramsGroupsSection() {
         </button>
       ),
     },
-    { key: 'program', header: 'البرنامج', render: (g) => g.programName ?? '—' },
-    { key: 'season', header: 'الموسم', render: (g) => g.seasonName ?? '—' },
+    { key: 'program', header: t('academy.structure.program'), render: (g) => g.programName ?? '—' },
+    { key: 'season', header: t('academy.structure.season'), render: (g) => g.seasonName ?? '—' },
     {
       key: 'capacity',
-      header: 'السعة',
+      header: t('academy.structure.capacity'),
       render: (g) => {
         const enrolled = enrolledCounts.get(g.id) ?? 0
         const remaining = g.capacity - enrolled
         return (
           <span className={remaining <= 2 ? 'font-medium text-status-warning' : ''}>
-            <bdi>{enrolled}/{g.capacity}</bdi> {remaining <= 2 && remaining >= 0 && `(متبقي ${remaining})`}
+            <bdi>{enrolled}/{g.capacity}</bdi> {remaining <= 2 && remaining >= 0 && t('academy.structure.capacityRemaining', { count: remaining })}
           </span>
         )
       },
     },
     {
       key: 'next-session',
-      header: 'الجلسة القادمة',
+      header: t('academy.structure.nextSession'),
       render: (g) => {
         const next = nextSessionByGroup.get(g.id)
         if (!next) return <span className="text-text-secondary">—</span>
         return <span className="tabular-nums">{next.date} {next.time}</span>
       },
     },
-    { key: 'status', header: 'الحالة', render: (g) => <StatusBadge tone={g.status === 'active' ? 'success' : 'neutral'} label={GROUP_STATUS_LABELS[g.status] ?? g.status} /> },
+    { key: 'status', header: t('academy.structure.status'), render: (g) => <StatusBadge tone={g.status === 'active' ? 'success' : 'neutral'} label={GROUP_STATUS_LABELS[g.status] ?? g.status} /> },
   ]
 
   return (
@@ -402,91 +418,91 @@ export function ProgramsGroupsSection() {
       <div className="flex flex-wrap items-center gap-2">
         <Dialog open={programDialogOpen} onOpenChange={setProgramDialogOpen}>
           <DialogTrigger asChild>
-            <Button variant="outline" size="sm">برنامج جديد</Button>
+            <Button variant="outline" size="sm">{t('academy.structure.newProgram')}</Button>
           </DialogTrigger>
           <DialogContent>
-            <DialogHeader><DialogTitle>برنامج جديد</DialogTitle></DialogHeader>
+            <DialogHeader><DialogTitle>{t('academy.structure.newProgram')}</DialogTitle></DialogHeader>
             <form onSubmit={handleCreateProgram} className="flex flex-col gap-3">
-              <Input required placeholder="الاسم (عربي)" value={programNameAr} onChange={(e) => setProgramNameAr(e.target.value)} />
-              <Input required placeholder="الاسم (إنجليزي)" value={programName} onChange={(e) => setProgramName(e.target.value)} />
-              <Button type="submit" disabled={createProgramMutation.isPending}>إضافة</Button>
+              <Input required placeholder={t('academy.structure.nameArabic')} value={programNameAr} onChange={(e) => setProgramNameAr(e.target.value)} />
+              <Input required placeholder={t('academy.structure.nameEnglish')} value={programName} onChange={(e) => setProgramName(e.target.value)} />
+              <Button type="submit" disabled={createProgramMutation.isPending}>{t('academy.structure.add')}</Button>
             </form>
           </DialogContent>
         </Dialog>
 
         <Dialog open={seasonDialogOpen} onOpenChange={setSeasonDialogOpen}>
           <DialogTrigger asChild>
-            <Button variant="outline" size="sm">موسم جديد</Button>
+            <Button variant="outline" size="sm">{t('academy.structure.newSeason')}</Button>
           </DialogTrigger>
           <DialogContent>
-            <DialogHeader><DialogTitle>موسم جديد</DialogTitle></DialogHeader>
+            <DialogHeader><DialogTitle>{t('academy.structure.newSeason')}</DialogTitle></DialogHeader>
             <form onSubmit={handleCreateSeason} className="flex flex-col gap-3">
               <Select value={seasonProgramId} onValueChange={setSeasonProgramId}>
-                <SelectTrigger><SelectValue placeholder="البرنامج (اختياري)" /></SelectTrigger>
+                <SelectTrigger><SelectValue placeholder={t('academy.structure.programOptional')} /></SelectTrigger>
                 <SelectContent>
                   {programs.map((p) => <SelectItem key={p.id} value={p.id}>{p.nameAr}</SelectItem>)}
                 </SelectContent>
               </Select>
-              <Input required placeholder="اسم الموسم" value={seasonName} onChange={(e) => setSeasonName(e.target.value)} />
+              <Input required placeholder={t('academy.structure.seasonName')} value={seasonName} onChange={(e) => setSeasonName(e.target.value)} />
               <Input required type="date" value={seasonStart} onChange={(e) => setSeasonStart(e.target.value)} />
               <Input required type="date" value={seasonEnd} onChange={(e) => setSeasonEnd(e.target.value)} />
-              <Button type="submit" disabled={createSeasonMutation.isPending}>إضافة</Button>
+              <Button type="submit" disabled={createSeasonMutation.isPending}>{t('academy.structure.add')}</Button>
             </form>
           </DialogContent>
         </Dialog>
 
         <Dialog open={ageGroupDialogOpen} onOpenChange={setAgeGroupDialogOpen}>
           <DialogTrigger asChild>
-            <Button variant="outline" size="sm">فئة عمرية جديدة</Button>
+            <Button variant="outline" size="sm">{t('academy.structure.newAgeGroup')}</Button>
           </DialogTrigger>
           <DialogContent>
-            <DialogHeader><DialogTitle>فئة عمرية جديدة</DialogTitle></DialogHeader>
+            <DialogHeader><DialogTitle>{t('academy.structure.newAgeGroup')}</DialogTitle></DialogHeader>
             <form onSubmit={handleCreateAgeGroup} className="flex flex-col gap-3">
-              <Input required placeholder="مثال: U10" value={ageGroupName} onChange={(e) => setAgeGroupName(e.target.value)} />
-              <Button type="submit" disabled={createAgeGroupMutation.isPending}>إضافة</Button>
+              <Input required placeholder={t('academy.structure.ageGroupExample')} value={ageGroupName} onChange={(e) => setAgeGroupName(e.target.value)} />
+              <Button type="submit" disabled={createAgeGroupMutation.isPending}>{t('academy.structure.add')}</Button>
             </form>
           </DialogContent>
         </Dialog>
 
         <Dialog open={groupDialogOpen} onOpenChange={setGroupDialogOpen}>
           <DialogTrigger asChild>
-            <Button size="sm">مجموعة جديدة</Button>
+            <Button size="sm">{t('academy.structure.newGroup')}</Button>
           </DialogTrigger>
           <DialogContent>
-            <DialogHeader><DialogTitle>مجموعة جديدة</DialogTitle></DialogHeader>
+            <DialogHeader><DialogTitle>{t('academy.structure.newGroup')}</DialogTitle></DialogHeader>
             <form onSubmit={handleCreateGroup} className="flex flex-col gap-3">
-              <Input required placeholder="اسم المجموعة" value={groupName} onChange={(e) => setGroupName(e.target.value)} />
+              <Input required placeholder={t('academy.structure.groupName')} value={groupName} onChange={(e) => setGroupName(e.target.value)} />
               <Select value={groupBranchId} onValueChange={setGroupBranchId}>
-                <SelectTrigger><SelectValue placeholder="الفرع" /></SelectTrigger>
+                <SelectTrigger><SelectValue placeholder={t('academy.structure.branch')} /></SelectTrigger>
                 <SelectContent>{branches.map((b) => <SelectItem key={b.id} value={b.id}>{b.name}</SelectItem>)}</SelectContent>
               </Select>
               <Select value={groupProgramId} onValueChange={setGroupProgramId}>
-                <SelectTrigger><SelectValue placeholder="البرنامج" /></SelectTrigger>
+                <SelectTrigger><SelectValue placeholder={t('academy.structure.program')} /></SelectTrigger>
                 <SelectContent>{programs.map((p) => <SelectItem key={p.id} value={p.id}>{p.nameAr}</SelectItem>)}</SelectContent>
               </Select>
               <Select value={groupSeasonId} onValueChange={setGroupSeasonId}>
-                <SelectTrigger><SelectValue placeholder="الموسم" /></SelectTrigger>
+                <SelectTrigger><SelectValue placeholder={t('academy.structure.season')} /></SelectTrigger>
                 <SelectContent>{seasons.map((s) => <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>)}</SelectContent>
               </Select>
               <Select value={groupAgeGroupId} onValueChange={setGroupAgeGroupId}>
-                <SelectTrigger><SelectValue placeholder="الفئة العمرية (اختياري)" /></SelectTrigger>
+                <SelectTrigger><SelectValue placeholder={t('academy.structure.ageGroupOptional')} /></SelectTrigger>
                 <SelectContent>{ageGroups.map((a) => <SelectItem key={a.id} value={a.id}>{a.name}</SelectItem>)}</SelectContent>
               </Select>
               <Select value={groupCoachId} onValueChange={setGroupCoachId}>
-                <SelectTrigger><SelectValue placeholder="المدرب (اختياري)" /></SelectTrigger>
+                <SelectTrigger><SelectValue placeholder={t('academy.structure.coachOptional')} /></SelectTrigger>
                 <SelectContent>{coaches.map((c) => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}</SelectContent>
               </Select>
               <Select value={groupFieldId} onValueChange={setGroupFieldId}>
-                <SelectTrigger><SelectValue placeholder="الملعب (اختياري)" /></SelectTrigger>
+                <SelectTrigger><SelectValue placeholder={t('academy.structure.fieldOptional')} /></SelectTrigger>
                 <SelectContent>{fields.map((f) => <SelectItem key={f.id} value={f.id}>{f.name}</SelectItem>)}</SelectContent>
               </Select>
-              <Input required type="number" min={1} placeholder="السعة" value={groupCapacity} onChange={(e) => setGroupCapacity(e.target.value)} />
+              <Input required type="number" min={1} placeholder={t('academy.structure.capacityPlaceholder')} value={groupCapacity} onChange={(e) => setGroupCapacity(e.target.value)} />
               <div className="flex flex-col gap-1">
-                <label className="text-xs text-text-secondary">سعر الاشتراك الشهري (ج.م) — يُستخدم تلقائيًا عند تسجيل لاعب</label>
-                <Input type="number" min={0} placeholder="سعر الاشتراك" value={groupSubscriptionPrice} onChange={(e) => setGroupSubscriptionPrice(e.target.value)} />
+                <label className="text-xs text-text-secondary">{t('academy.structure.monthlySubscriptionPrice')}</label>
+                <Input type="number" min={0} placeholder={t('academy.structure.subscriptionPricePlaceholder')} value={groupSubscriptionPrice} onChange={(e) => setGroupSubscriptionPrice(e.target.value)} />
               </div>
               <Button type="submit" disabled={!groupBranchId || !groupProgramId || !groupSeasonId || createGroupMutation.isPending}>
-                إضافة
+                {t('academy.structure.add')}
               </Button>
             </form>
           </DialogContent>
@@ -498,8 +514,8 @@ export function ProgramsGroupsSection() {
         rows={groups}
         rowKey={(g) => g.id}
         isLoading={groupsLoading}
-        emptyTitle="لا توجد مجموعات"
-        emptyDescription="أنشئ برنامجًا وموسمًا ثم مجموعة لبدء إدارة الأكاديمية"
+        emptyTitle={t('academy.structure.emptyTitle')}
+        emptyDescription={t('academy.structure.emptyDescription')}
       />
 
       <Dialog open={!!selectedGroup} onOpenChange={(open) => !open && setSelectedGroup(null)}>
@@ -508,28 +524,28 @@ export function ProgramsGroupsSection() {
           <div className="flex flex-col gap-3">
             {selectedGroup && (
               <div className="grid grid-cols-2 gap-2 rounded-lg border border-border bg-muted/20 p-3 text-sm">
-                <div><span className="text-text-secondary">البرنامج: </span>{selectedGroup.programName ?? '—'}</div>
-                <div><span className="text-text-secondary">الموسم: </span>{selectedGroup.seasonName ?? '—'}</div>
-                <div><span className="text-text-secondary">الفئة العمرية: </span>{selectedGroup.ageGroupName ?? '—'}</div>
-                <div><span className="text-text-secondary">الفرع: </span>{selectedGroup.branchName ?? '—'}</div>
-                <div><span className="text-text-secondary">الملعب: </span>{selectedGroup.fieldName ?? 'غير محدد'}</div>
+                <div><span className="text-text-secondary">{t('academy.structure.program')}: </span>{selectedGroup.programName ?? '—'}</div>
+                <div><span className="text-text-secondary">{t('academy.structure.season')}: </span>{selectedGroup.seasonName ?? '—'}</div>
+                <div><span className="text-text-secondary">{t('academy.structure.ageGroup')}: </span>{selectedGroup.ageGroupName ?? '—'}</div>
+                <div><span className="text-text-secondary">{t('academy.structure.branch')}: </span>{selectedGroup.branchName ?? '—'}</div>
+                <div><span className="text-text-secondary">{t('academy.structure.field')}: </span>{selectedGroup.fieldName ?? t('academy.structure.fieldUnspecified')}</div>
                 <div>
-                  <span className="text-text-secondary">السعة: </span>
+                  <span className="text-text-secondary">{t('academy.structure.capacity')}: </span>
                   {enrolledCounts.get(selectedGroup.id) ?? 0}/{selectedGroup.capacity}
                 </div>
                 <div>
-                  <span className="text-text-secondary">سعر الاشتراك: </span>
-                  {selectedGroup.subscriptionPrice != null ? `${selectedGroup.subscriptionPrice} ج.م/شهر` : <span className="text-status-danger">غير محدد</span>}
+                  <span className="text-text-secondary">{t('academy.structure.subscriptionPrice')}: </span>
+                  {selectedGroup.subscriptionPrice != null ? t('academy.structure.pricePerMonth', { price: selectedGroup.subscriptionPrice }) : <span className="text-status-danger">{t('academy.structure.subscriptionPriceUnspecified')}</span>}
                 </div>
                 {scheduleSlots.length > 0 && (
                   <div className="col-span-2">
-                    <span className="text-text-secondary">الجدول: </span>
-                    {scheduleSlots.map((s) => `${DAY_OF_WEEK_LABELS[s.dayOfWeek]} ${s.startTime.slice(0, 5)}–${s.endTime.slice(0, 5)}`).join('، ')}
+                    <span className="text-text-secondary">{t('academy.structure.schedule')}: </span>
+                    {scheduleSlots.map((s) => `${DAY_OF_WEEK_LABELS[s.dayOfWeek]} ${s.startTime.slice(0, 5)}–${s.endTime.slice(0, 5)}`).join(t('academy.structure.listSeparator'))}
                   </div>
                 )}
                 {nextSessionByGroup.get(selectedGroup.id) && (
                   <div className="col-span-2">
-                    <span className="text-text-secondary">الجلسة القادمة: </span>
+                    <span className="text-text-secondary">{t('academy.structure.nextSession')}: </span>
                     {nextSessionByGroup.get(selectedGroup.id)!.date} — {nextSessionByGroup.get(selectedGroup.id)!.time}
                   </div>
                 )}
@@ -537,23 +553,23 @@ export function ProgramsGroupsSection() {
             )}
 
             <div className="flex flex-col gap-2 border-b border-border pb-3">
-              <p className="text-sm font-medium text-text-secondary">السعة والتعيينات</p>
-              <Input type="number" min={1} value={editGroupCapacity} onChange={(e) => setEditGroupCapacity(e.target.value)} placeholder="السعة" />
+              <p className="text-sm font-medium text-text-secondary">{t('academy.structure.capacityAndAssignments')}</p>
+              <Input type="number" min={1} value={editGroupCapacity} onChange={(e) => setEditGroupCapacity(e.target.value)} placeholder={t('academy.structure.capacityPlaceholder')} />
               <div className="flex flex-col gap-1">
-                <label className="text-xs text-text-secondary">سعر الاشتراك الشهري (ج.م)</label>
-                <Input type="number" min={0} value={editGroupSubscriptionPrice} onChange={(e) => setEditGroupSubscriptionPrice(e.target.value)} placeholder="سعر الاشتراك" />
+                <label className="text-xs text-text-secondary">{t('academy.structure.monthlySubscriptionPriceLabel')}</label>
+                <Input type="number" min={0} value={editGroupSubscriptionPrice} onChange={(e) => setEditGroupSubscriptionPrice(e.target.value)} placeholder={t('academy.structure.subscriptionPricePlaceholder')} />
               </div>
               <Select value={editGroupCoachId || 'none'} onValueChange={(v) => setEditGroupCoachId(v === 'none' ? '' : v)}>
-                <SelectTrigger><SelectValue placeholder="المدرب" /></SelectTrigger>
+                <SelectTrigger><SelectValue placeholder={t('academy.structure.coach')} /></SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="none">بدون مدرب</SelectItem>
+                  <SelectItem value="none">{t('academy.structure.noCoach')}</SelectItem>
                   {coaches.map((c) => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
                 </SelectContent>
               </Select>
               <Select value={editGroupFieldId || 'none'} onValueChange={(v) => setEditGroupFieldId(v === 'none' ? '' : v)}>
-                <SelectTrigger><SelectValue placeholder="الملعب" /></SelectTrigger>
+                <SelectTrigger><SelectValue placeholder={t('academy.structure.fieldLabel')} /></SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="none">بدون ملعب محدد</SelectItem>
+                  <SelectItem value="none">{t('academy.structure.noField')}</SelectItem>
                   {fields.map((f) => <SelectItem key={f.id} value={f.id}>{f.name}</SelectItem>)}
                 </SelectContent>
               </Select>
@@ -561,24 +577,24 @@ export function ProgramsGroupsSection() {
                 <Select value={editGroupStatus} onValueChange={setEditGroupStatus}>
                   <SelectTrigger className="w-32"><SelectValue /></SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="active">نشط</SelectItem>
-                    <SelectItem value="inactive">غير نشط</SelectItem>
+                    <SelectItem value="active">{t('academy.structure.statusActive')}</SelectItem>
+                    <SelectItem value="inactive">{t('academy.structure.statusInactive')}</SelectItem>
                   </SelectContent>
                 </Select>
                 <Button size="sm" disabled={!editGroupCapacity || updateGroupMutation.isPending} onClick={() => updateGroupMutation.mutate()}>
-                  {updateGroupMutation.isPending ? 'جارٍ الحفظ...' : 'حفظ'}
+                  {updateGroupMutation.isPending ? t('academy.structure.saving') : t('academy.structure.save')}
                 </Button>
               </div>
             </div>
 
-            <p className="text-sm font-medium text-text-secondary">الجدول الأسبوعي</p>
+            <p className="text-sm font-medium text-text-secondary">{t('academy.structure.weeklySchedule')}</p>
             {scheduleSlots.length === 0 ? (
-              <p className="text-sm text-text-secondary">لا يوجد مواعيد بعد.</p>
+              <p className="text-sm text-text-secondary">{t('academy.structure.noSlotsYet')}</p>
             ) : (
               <ul className="flex flex-col gap-1">
                 {scheduleSlots.map((s) => (
                   <li key={s.id} className="rounded-md border border-border p-2 text-sm">
-                    {DAY_OF_WEEK_LABELS[s.dayOfWeek]} — {s.startTime.slice(0, 5)} إلى {s.endTime.slice(0, 5)}
+                    {t('academy.structure.slotRange', { day: DAY_OF_WEEK_LABELS[s.dayOfWeek], start: s.startTime.slice(0, 5), end: s.endTime.slice(0, 5) })}
                   </li>
                 ))}
               </ul>
@@ -597,7 +613,7 @@ export function ProgramsGroupsSection() {
                 <Input type="time" value={slotEnd} onChange={(e) => setSlotEnd(e.target.value)} />
               </div>
               <Button size="sm" disabled={addSlotMutation.isPending} onClick={() => addSlotMutation.mutate()}>
-                إضافة موعد
+                {t('academy.structure.addSlot')}
               </Button>
             </div>
             {scheduleSlots.length > 0 && (
@@ -608,10 +624,10 @@ export function ProgramsGroupsSection() {
                   disabled={generateSessionsMutation.isPending}
                   onClick={() => generateSessionsMutation.mutate()}
                 >
-                  {generateSessionsMutation.isPending ? 'جارٍ التوليد...' : 'توليد جلسات الأسابيع الأربعة القادمة'}
+                  {generateSessionsMutation.isPending ? t('academy.structure.generatingSessions') : t('academy.structure.generateSessions')}
                 </Button>
                 {generateSessionsMutation.data !== undefined && (
-                  <p className="mt-2 text-sm text-text-secondary">تم إنشاء {generateSessionsMutation.data} جلسة جديدة.</p>
+                  <p className="mt-2 text-sm text-text-secondary">{t('academy.structure.sessionsGenerated', { count: generateSessionsMutation.data })}</p>
                 )}
               </div>
             )}

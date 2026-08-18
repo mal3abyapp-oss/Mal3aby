@@ -225,9 +225,9 @@ export function AppLayout() {
 
         {subSummary?.subscription_kind === 'trial' && subSummary.effective_access === 'full' && (
           <div className="flex items-center justify-between gap-3 bg-status-info/10 px-4 py-2 text-sm text-status-info">
-            <span>تجربتك المجانية تنتهي خلال {daysRemaining} يوم</span>
+            <span>{t('appShell.trialEnding', { days: daysRemaining })}</span>
             <NavLink to="/app/subscription" className="font-medium hover:underline">
-              عرض الاشتراك
+              {t('appShell.viewSubscription')}
             </NavLink>
           </div>
         )}
@@ -235,19 +235,19 @@ export function AppLayout() {
           <div className="flex items-center justify-between gap-3 bg-status-danger/10 px-4 py-2 text-sm text-status-danger">
             <span>
               {subSummary.subscription_kind === 'trial'
-                ? 'انتهت التجربة المجانية — تواصل معنا لتفعيل الاشتراك'
-                : 'الاشتراك منتهٍ — تواصل معنا لتفعيل الاشتراك'}
+                ? t('appShell.trialExpired')
+                : t('appShell.subscriptionExpired')}
             </span>
             <NavLink to="/app/subscription" className="font-medium hover:underline">
-              عرض الاشتراك
+              {t('appShell.viewSubscription')}
             </NavLink>
           </div>
         )}
         {subSummary?.effective_access === 'grace' && (
           <div className="flex items-center justify-between gap-3 bg-status-warning/10 px-4 py-2 text-sm text-status-warning">
-            <span>اشتراكك في فترة السماح — العمليات الجديدة موقوفة مؤقتًا</span>
+            <span>{t('appShell.subscriptionGrace')}</span>
             <NavLink to="/app/subscription" className="font-medium hover:underline">
-              عرض الاشتراك
+              {t('appShell.viewSubscription')}
             </NavLink>
           </div>
         )}

@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { useQuery } from '@tanstack/react-query'
 import { supabase } from '@/lib/supabase/client'
 import { useAuth } from '@/app/providers/AuthProvider'
@@ -60,8 +61,7 @@ async function fetchOutstanding(clubId: string) {
     .filter((row) => (row.outstanding ?? 0) > 0)
 }
 
-function toCsv(rows: InvoiceRow[]): string {
-  const header = ['رقم الفاتورة', 'العميل', 'الإجمالي', 'المستحق', 'تاريخ الاستحقاق', 'أيام التأخير']
+function toCsv(rows: InvoiceRow[], header: string[]): string {
   const lines = rows.map((r) =>
     [r.invoiceNumber, r.customerName, r.total, r.outstanding ?? '', r.dueDate ?? '', r.daysOverdue ?? '']
       .map((v) => `"${String(v).replace(/"/g, '""')}"`)
@@ -72,6 +72,7 @@ function toCsv(rows: InvoiceRow[]): string {
 
 export function OutstandingPage() {
   const { currentClubId } = useAuth()
+  const { t } = useTranslation()
   const [filter, setFilter] = useState<FilterKey>('all')
 
   const { data: invoices = [], isLoading } = useQuery({
@@ -88,7 +89,14 @@ export function OutstandingPage() {
   })
 
   function handleExport() {
-    const csv = toCsv(filtered)
+    const csv = toCsv(filtered, [
+      t('billing.outstandingPage.csvHeader.invoiceNumber'),
+      t('billing.outstandingPage.csvHeader.customer'),
+      t('billing.outstandingPage.csvHeader.total'),
+      t('billing.outstandingPage.csvHeader.outstanding'),
+      t('billing.outstandingPage.csvHeader.dueDate'),
+      t('billing.outstandingPage.csvHeader.daysOverdue'),
+    ])
     const blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8;' })
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a')
@@ -101,19 +109,19 @@ export function OutstandingPage() {
   }
 
   const columns: DataTableColumn<InvoiceRow>[] = [
-    { key: 'number', header: 'رقم الفاتورة', render: (r) => r.invoiceNumber },
-    { key: 'customer', header: 'العميل', render: (r) => r.customerName },
-    { key: 'total', header: 'الإجمالي', render: (r) => <MoneyDisplay amount={r.total} size="sm" /> },
-    { key: 'outstanding', header: 'المستحق', render: (r) => <MoneyDisplay amount={r.outstanding ?? 0} size="sm" tone="danger" /> },
-    { key: 'due', header: 'الاستحقاق', render: (r) => (r.dueDate ? new Date(r.dueDate).toLocaleDateString('ar-EG') : '—') },
+    { key: 'number', header: t('billing.outstandingPage.table.invoiceNumber'), render: (r) => r.invoiceNumber },
+    { key: 'customer', header: t('billing.outstandingPage.table.customer'), render: (r) => r.customerName },
+    { key: 'total', header: t('billing.outstandingPage.table.total'), render: (r) => <MoneyDisplay amount={r.total} size="sm" /> },
+    { key: 'outstanding', header: t('billing.outstandingPage.table.outstanding'), render: (r) => <MoneyDisplay amount={r.outstanding ?? 0} size="sm" tone="danger" /> },
+    { key: 'due', header: t('billing.outstandingPage.table.due'), render: (r) => (r.dueDate ? new Date(r.dueDate).toLocaleDateString('ar-EG') : '—') },
     {
       key: 'status',
-      header: 'الحالة',
+      header: t('billing.outstandingPage.table.status'),
       render: (r) =>
         (r.daysOverdue ?? 0) > 0 ? (
-          <StatusBadge tone="danger" label={`متأخر ${r.daysOverdue} يوم`} />
+          <StatusBadge tone="danger" label={t('billing.outstandingPage.overdueDays', { days: r.daysOverdue })} />
         ) : (
-          <StatusBadge tone="warning" label="مستحق" />
+          <StatusBadge tone="warning" label={t('billing.outstandingPage.due')} />
         ),
     },
   ]
@@ -121,11 +129,11 @@ export function OutstandingPage() {
   return (
     <div>
       <PageHeader
-        title="المستحقات"
-        description="الفواتير غير المسددة بالكامل"
+        title={t('billing.outstandingPage.title')}
+        description={t('billing.outstandingPage.description')}
         actions={
           <Button variant="outline" onClick={handleExport} disabled={filtered.length === 0}>
-            تصدير CSV
+            {t('billing.outstandingPage.exportCsv')}
           </Button>
         }
       />
@@ -134,9 +142,9 @@ export function OutstandingPage() {
         <Select value={filter} onValueChange={(v) => setFilter(v as FilterKey)}>
           <SelectTrigger><SelectValue /></SelectTrigger>
           <SelectContent>
-            <SelectItem value="all">الكل</SelectItem>
-            <SelectItem value="due_today">مستحق اليوم</SelectItem>
-            <SelectItem value="overdue">متأخر</SelectItem>
+            <SelectItem value="all">{t('billing.outstandingPage.filterAll')}</SelectItem>
+            <SelectItem value="due_today">{t('billing.outstandingPage.filterDueToday')}</SelectItem>
+            <SelectItem value="overdue">{t('billing.outstandingPage.filterOverdue')}</SelectItem>
           </SelectContent>
         </Select>
       </div>
@@ -146,8 +154,8 @@ export function OutstandingPage() {
         rows={filtered}
         rowKey={(r) => r.id}
         isLoading={isLoading}
-        emptyTitle="لا توجد مستحقات"
-        emptyDescription="جميع الفواتير مسددة بالكامل"
+        emptyTitle={t('billing.outstandingPage.emptyTitle')}
+        emptyDescription={t('billing.outstandingPage.emptyDescription')}
       />
     </div>
   )

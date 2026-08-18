@@ -1,4 +1,5 @@
 import { useState, type FormEvent } from 'react'
+import { useTranslation } from 'react-i18next'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '@/lib/supabase/client'
 import { useAuth } from '@/app/providers/AuthProvider'
@@ -129,14 +130,16 @@ async function fetchOperatingHours(fieldId: string) {
 }
 
 function FieldCurrentPriceCell({ fieldId, date }: { fieldId: string; date: string }) {
+  const { t } = useTranslation()
   const nowTime = new Date().toTimeString().slice(0, 5)
   const { data: price, isLoading } = useResolvedFieldPrice(fieldId, date, `${nowTime}:00`, `${nowTime}:00`)
   if (isLoading) return <span className="text-text-secondary">...</span>
-  if (price == null) return <span className="text-status-danger">لا يوجد سعر</span>
-  return <span className="font-medium tabular-nums">{price.toFixed(0)} ج.م/ساعة</span>
+  if (price == null) return <span className="text-status-danger">{t('clubs.fieldsManagement.noPrice')}</span>
+  return <span className="font-medium tabular-nums">{t('clubs.fieldsManagement.pricePerHour', { price: price.toFixed(0) })}</span>
 }
 
 export function FieldsManagement() {
+  const { t } = useTranslation()
   const { currentClubId } = useAuth()
   const queryClient = useQueryClient()
   const [createDialogOpen, setCreateDialogOpen] = useState(false)
@@ -216,7 +219,7 @@ export function FieldsManagement() {
   const fieldColumns: DataTableColumn<FieldRow>[] = [
     {
       key: 'name',
-      header: 'الملعب',
+      header: t('clubs.fieldsManagement.columns.field'),
       render: (f) => (
         <button
           className="text-accent-foreground hover:underline"
@@ -229,35 +232,35 @@ export function FieldsManagement() {
         </button>
       ),
     },
-    { key: 'sport', header: 'الرياضة', render: (f) => f.sport },
+    { key: 'sport', header: t('clubs.fieldsManagement.columns.sport'), render: (f) => f.sport },
     {
       key: 'hours',
-      header: 'مواعيد اليوم',
+      header: t('clubs.fieldsManagement.columns.hoursToday'),
       render: (f) => {
         const hours = resolveHoursForDay(allHoursRows, f.id, dayOfWeek)
-        if (hours.isUnrestricted) return <span className="text-text-secondary">مفتوح على مدار اليوم</span>
-        if (hours.isClosed) return <span className="text-status-danger">مغلق اليوم</span>
+        if (hours.isUnrestricted) return <span className="text-text-secondary">{t('clubs.fieldsManagement.openAllDay')}</span>
+        if (hours.isClosed) return <span className="text-status-danger">{t('clubs.fieldsManagement.closedToday')}</span>
         return <span className="tabular-nums">{hours.openTime?.slice(0, 5)}–{hours.closeTime?.slice(0, 5)}</span>
       },
     },
     {
       key: 'price',
-      header: 'السعر الحالي',
+      header: t('clubs.fieldsManagement.columns.currentPrice'),
       render: (f) => <FieldCurrentPriceCell fieldId={f.id} date={today} />,
     },
     {
       key: 'today',
-      header: 'حجوزات اليوم',
+      header: t('clubs.fieldsManagement.columns.todayBookings'),
       render: (f) => <span className="tabular-nums">{todayBookings.filter((b) => b.field_id === f.id).length}</span>,
     },
     {
       key: 'blocked',
-      header: 'الحالة الآن',
+      header: t('clubs.fieldsManagement.columns.currentStatus'),
       render: (f) => {
         const isBlocked = activeBlocks.some((b) => b.field_id === f.id)
-        if (isBlocked) return <StatusBadge tone="danger" label="مغلق مؤقتًا" />
-        if (f.status !== 'active') return <StatusBadge tone="neutral" label="غير نشط" />
-        return <StatusBadge tone="success" label="متاح" />
+        if (isBlocked) return <StatusBadge tone="danger" label={t('clubs.fieldsManagement.temporarilyClosed')} />
+        if (f.status !== 'active') return <StatusBadge tone="neutral" label={t('clubs.fieldsManagement.inactive')} />
+        return <StatusBadge tone="success" label={t('clubs.fieldsManagement.available')} />
       },
     },
   ]
@@ -265,28 +268,28 @@ export function FieldsManagement() {
   return (
     <Card>
       <CardHeader className="flex flex-row items-center justify-between">
-        <CardTitle className="text-base">الملاعب والتسعير</CardTitle>
+        <CardTitle className="text-base">{t('clubs.fieldsManagement.cardTitle')}</CardTitle>
         <Dialog open={createDialogOpen} onOpenChange={setCreateDialogOpen}>
           <DialogTrigger asChild>
-            <Button size="sm">إضافة ملعب</Button>
+            <Button size="sm">{t('clubs.fieldsManagement.addField')}</Button>
           </DialogTrigger>
           <DialogContent>
             <DialogHeader>
-              <DialogTitle>إضافة ملعب</DialogTitle>
+              <DialogTitle>{t('clubs.fieldsManagement.addFieldTitle')}</DialogTitle>
             </DialogHeader>
             <form onSubmit={handleCreateField} className="flex flex-col gap-4">
               <div className="flex flex-col gap-1.5">
-                <label className="text-sm font-medium text-text-secondary">الاسم</label>
+                <label className="text-sm font-medium text-text-secondary">{t('clubs.fieldsManagement.nameLabel')}</label>
                 <Input required value={fieldName} onChange={(e) => setFieldName(e.target.value)} />
               </div>
               <div className="flex flex-col gap-1.5">
-                <label className="text-sm font-medium text-text-secondary">الرياضة</label>
+                <label className="text-sm font-medium text-text-secondary">{t('clubs.fieldsManagement.sportLabel')}</label>
                 <Input required value={fieldSport} onChange={(e) => setFieldSport(e.target.value)} />
               </div>
               <div className="flex flex-col gap-1.5">
-                <label className="text-sm font-medium text-text-secondary">الفرع</label>
+                <label className="text-sm font-medium text-text-secondary">{t('clubs.fieldsManagement.branchLabel')}</label>
                 <Select value={fieldBranchId} onValueChange={setFieldBranchId}>
-                  <SelectTrigger><SelectValue placeholder="اختر فرعًا" /></SelectTrigger>
+                  <SelectTrigger><SelectValue placeholder={t('clubs.fieldsManagement.chooseBranch')} /></SelectTrigger>
                   <SelectContent>
                     {branches.map((b) => (
                       <SelectItem key={b.id} value={b.id}>{b.name}</SelectItem>
@@ -295,10 +298,10 @@ export function FieldsManagement() {
                 </Select>
               </div>
               <Button type="submit" disabled={createFieldMutation.isPending || !fieldBranchId}>
-                {createFieldMutation.isPending ? 'جارٍ الإضافة...' : 'إضافة'}
+                {createFieldMutation.isPending ? t('clubs.fieldsManagement.adding') : t('clubs.fieldsManagement.add')}
               </Button>
               <p className="text-xs text-text-secondary">
-                بعد الإضافة، افتح الملعب لإعداد مواعيد العمل والأسعار قبل أن يصبح قابلاً للحجز فعليًا.
+                {t('clubs.fieldsManagement.addFieldHint')}
               </p>
             </form>
           </DialogContent>
@@ -310,15 +313,15 @@ export function FieldsManagement() {
           rows={fields}
           rowKey={(f) => f.id}
           isLoading={isLoading}
-          emptyTitle="لا توجد ملاعب"
-          emptyDescription="أضف أول ملعب لبدء إدارة الحجوزات"
+          emptyTitle={t('clubs.fieldsManagement.emptyTitle')}
+          emptyDescription={t('clubs.fieldsManagement.emptyDescription')}
         />
       </CardContent>
 
       <Dialog open={!!manageField} onOpenChange={(open) => !open && setManageField(null)}>
         <DialogContent className="max-w-lg max-h-[85vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>إعداد {manageField?.name}</DialogTitle>
+            <DialogTitle>{t('clubs.fieldsManagement.manageDialogTitle', { name: manageField?.name })}</DialogTitle>
           </DialogHeader>
 
           <div className="flex gap-1 border-b border-border">
@@ -326,13 +329,13 @@ export function FieldsManagement() {
               className={`px-3 py-2 text-sm font-medium ${manageTab === 'hours' ? 'border-b-2 border-accent text-text-primary' : 'text-text-secondary'}`}
               onClick={() => setManageTab('hours')}
             >
-              مواعيد العمل
+              {t('clubs.fieldsManagement.tabHours')}
             </button>
             <button
               className={`px-3 py-2 text-sm font-medium ${manageTab === 'pricing' ? 'border-b-2 border-accent text-text-primary' : 'text-text-secondary'}`}
               onClick={() => setManageTab('pricing')}
             >
-              الأسعار
+              {t('clubs.fieldsManagement.tabPricing')}
             </button>
           </div>
 

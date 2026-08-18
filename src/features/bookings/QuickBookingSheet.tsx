@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { useTranslation } from 'react-i18next'
 import { supabase } from '@/lib/supabase/client'
 import { translateSupabaseError } from '@/lib/errors'
 import {
@@ -15,6 +16,7 @@ import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { useResolvedFieldPrice, useClubTimezone } from './useFieldPricing'
 import { toInstant } from '@/lib/domain/time'
+import { useDirection } from '@/app/providers/DirectionProvider'
 
 // Section E3 — Quick Booking: a right-side drawer opened from an empty
 // calendar slot. Price is ALWAYS server-resolved (resolve_field_price)
@@ -44,13 +46,7 @@ async function fetchCustomers(clubId: string, search: string) {
   return (data ?? []) as Customer[]
 }
 
-const DURATIONS = [
-  { value: '0.5', label: '30 دقيقة' },
-  { value: '1', label: 'ساعة واحدة' },
-  { value: '1.5', label: 'ساعة ونصف' },
-  { value: '2', label: 'ساعتان' },
-  { value: '3', label: '3 ساعات' },
-]
+const DURATION_VALUES = ['0.5', '1', '1.5', '2', '3'] as const
 
 export function QuickBookingSheet({
   slot,
@@ -63,6 +59,8 @@ export function QuickBookingSheet({
   onOpenChange: (open: boolean) => void
   onCreated: () => void
 }) {
+  const { t } = useTranslation()
+  const { locale } = useDirection()
   const queryClient = useQueryClient()
   const { data: clubTimezone } = useClubTimezone(clubId)
   const [customerId, setCustomerId] = useState('')
@@ -98,6 +96,8 @@ export function QuickBookingSheet({
       setRecurringResult(null)
     }
   }, [slot])
+
+  const durations = DURATION_VALUES.map((value) => ({ value, label: t(`bookings.quick.durations.${value}`) }))
 
   const { data: customers = [] } = useQuery({
     queryKey: ['customers-search', clubId, customerSearch],
@@ -136,7 +136,7 @@ export function QuickBookingSheet({
       setShowNewCustomer(false)
       void queryClient.invalidateQueries({ queryKey: ['customers-search', clubId] })
     },
-    onError: () => setFormError('تعذّر إضافة العميل.'),
+    onError: () => setFormError(t('bookings.quick.addCustomerError')),
   })
 
   const bookMutation = useMutation({
@@ -199,17 +199,17 @@ export function QuickBookingSheet({
       }
     },
     onError: (error) =>
-      setFormError(translateSupabaseError(error, 'تعذّر إنشاء الحجز — قد يكون الموعد محجوزًا بالفعل أو غير مصرّح به.')),
+      setFormError(translateSupabaseError(error, t('bookings.quick.createError'))),
   })
 
   return (
     <Sheet open={!!slot} onOpenChange={onOpenChange}>
       <SheetContent className="flex w-full flex-col overflow-y-auto sm:max-w-md">
         <SheetHeader>
-          <SheetTitle>حجز جديد</SheetTitle>
+          <SheetTitle>{t('bookings.quick.title')}</SheetTitle>
           {slot && (
             <SheetDescription>
-              {slot.fieldName} — {new Date(slot.date).toLocaleDateString('ar-EG', { weekday: 'long', day: 'numeric', month: 'long' })}
+              {slot.fieldName} — {new Date(slot.date).toLocaleDateString(locale === 'en' ? 'en-US' : 'ar-EG', { weekday: 'long', day: 'numeric', month: 'long' })}
             </SheetDescription>
           )}
         </SheetHeader>
@@ -219,11 +219,11 @@ export function QuickBookingSheet({
             {/* Field / Date / Time summary */}
             <div className="grid grid-cols-2 gap-3 rounded-lg border border-border bg-muted/30 p-3 text-sm">
               <div>
-                <p className="text-xs text-text-secondary">الملعب</p>
+                <p className="text-xs text-text-secondary">{t('bookings.quick.field')}</p>
                 <p className="font-medium">{slot.fieldName}</p>
               </div>
               <div>
-                <p className="text-xs text-text-secondary">الوقت</p>
+                <p className="text-xs text-text-secondary">{t('bookings.quick.time')}</p>
                 {/* Same RTL bidi-swap risk as StatCard's composite values
                     (owner-level review finding). */}
                 <p className="font-medium tabular-nums"><bdi>{slot.startTime} — {endTime}</bdi></p>
@@ -232,11 +232,11 @@ export function QuickBookingSheet({
 
             {/* Duration */}
             <div className="flex flex-col gap-1.5">
-              <label className="text-sm font-medium text-text-secondary">المدة</label>
+              <label className="text-sm font-medium text-text-secondary">{t('bookings.quick.duration')}</label>
               <Select value={duration} onValueChange={setDuration}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
-                  {DURATIONS.map((d) => (
+                  {durations.map((d) => (
                     <SelectItem key={d.value} value={d.value}>{d.label}</SelectItem>
                   ))}
                 </SelectContent>
@@ -246,24 +246,24 @@ export function QuickBookingSheet({
             {/* Customer */}
             <div className="flex flex-col gap-1.5">
               <div className="flex items-center justify-between">
-                <label className="text-sm font-medium text-text-secondary">العميل</label>
+                <label className="text-sm font-medium text-text-secondary">{t('bookings.quick.customer')}</label>
                 <button type="button" className="text-xs text-accent hover:underline" onClick={() => setShowNewCustomer((v) => !v)}>
-                  {showNewCustomer ? 'اختيار عميل موجود' : '+ عميل جديد'}
+                  {showNewCustomer ? t('bookings.quick.chooseExistingCustomer') : t('bookings.quick.newCustomer')}
                 </button>
               </div>
               {showNewCustomer ? (
                 <div className="flex flex-col gap-2 rounded-md border border-border p-2">
-                  <Input placeholder="الاسم" value={newCustomerName} onChange={(e) => setNewCustomerName(e.target.value)} />
-                  <Input placeholder="رقم الموبايل" value={newCustomerMobile} onChange={(e) => setNewCustomerMobile(e.target.value)} />
+                  <Input placeholder={t('bookings.quick.namePlaceholder')} value={newCustomerName} onChange={(e) => setNewCustomerName(e.target.value)} />
+                  <Input placeholder={t('bookings.quick.mobilePlaceholder')} value={newCustomerMobile} onChange={(e) => setNewCustomerMobile(e.target.value)} />
                   <Button size="sm" disabled={!newCustomerName.trim() || createCustomerMutation.isPending} onClick={() => createCustomerMutation.mutate()}>
-                    {createCustomerMutation.isPending ? 'جارٍ الإضافة...' : 'إضافة العميل'}
+                    {createCustomerMutation.isPending ? t('bookings.quick.adding') : t('bookings.quick.addCustomer')}
                   </Button>
                 </div>
               ) : (
                 <>
-                  <Input placeholder="ابحث بالاسم أو الموبايل..." value={customerSearch} onChange={(e) => setCustomerSearch(e.target.value)} />
+                  <Input placeholder={t('bookings.quick.searchPlaceholder')} value={customerSearch} onChange={(e) => setCustomerSearch(e.target.value)} />
                   <Select value={customerId} onValueChange={setCustomerId}>
-                    <SelectTrigger><SelectValue placeholder="اختر عميلاً" /></SelectTrigger>
+                    <SelectTrigger><SelectValue placeholder={t('bookings.quick.chooseCustomerPlaceholder')} /></SelectTrigger>
                     <SelectContent>
                       {customers.map((c) => (
                         <SelectItem key={c.id} value={c.id}>
@@ -279,24 +279,24 @@ export function QuickBookingSheet({
             {/* Price -- server resolved, always visible before confirmation */}
             <div className="rounded-lg border border-accent/30 bg-accent/5 p-3">
               {priceLoading ? (
-                <p className="text-sm text-text-secondary">جارٍ حساب السعر...</p>
+                <p className="text-sm text-text-secondary">{t('bookings.quick.calculatingPrice')}</p>
               ) : resolvedPrice != null ? (
                 <div className="flex flex-col gap-1 text-sm">
                   <div className="flex justify-between">
-                    <span className="text-text-secondary">سعر الساعة</span>
-                    <span className="tabular-nums">{(resolvedPrice / Number(duration)).toFixed(0)} ج.م</span>
+                    <span className="text-text-secondary">{t('bookings.quick.pricePerHour')}</span>
+                    <span className="tabular-nums">{(resolvedPrice / Number(duration)).toFixed(0)} {t('common.currency')}</span>
                   </div>
                   <div className="flex justify-between">
-                    <span className="text-text-secondary">المدة</span>
-                    <span className="tabular-nums">{duration} ساعة</span>
+                    <span className="text-text-secondary">{t('bookings.quick.duration')}</span>
+                    <span className="tabular-nums">{t('bookings.quick.duration_hours', { count: Number(duration) })}</span>
                   </div>
                   <div className="mt-1 flex justify-between border-t border-accent/20 pt-1 font-semibold">
-                    <span>{isRecurring ? 'سعر كل حجز' : 'الإجمالي'}</span>
-                    <span className="tabular-nums">{resolvedPrice.toFixed(0)} ج.م</span>
+                    <span>{isRecurring ? t('bookings.quick.pricePerBooking') : t('bookings.quick.total')}</span>
+                    <span className="tabular-nums">{resolvedPrice.toFixed(0)} {t('common.currency')}</span>
                   </div>
                 </div>
               ) : (
-                <p className="text-sm text-status-danger">تعذّر حساب السعر لهذا الموعد.</p>
+                <p className="text-sm text-status-danger">{t('bookings.quick.priceError')}</p>
               )}
             </div>
 
@@ -308,11 +308,11 @@ export function QuickBookingSheet({
             <div className="flex flex-col gap-2 rounded-lg border border-border p-3">
               <label className="flex items-center gap-2 text-sm font-medium">
                 <input type="checkbox" checked={isRecurring} onChange={(e) => setIsRecurring(e.target.checked)} className="size-4" />
-                حجز متكرر أسبوعيًا
+                {t('bookings.quick.recurringWeekly')}
               </label>
               {isRecurring && (
                 <div className="flex flex-col gap-1.5">
-                  <label className="text-xs text-text-secondary">عدد المرات</label>
+                  <label className="text-xs text-text-secondary">{t('bookings.quick.occurrenceCount')}</label>
                   <Input
                     type="number"
                     min={1}
@@ -321,7 +321,7 @@ export function QuickBookingSheet({
                     onChange={(e) => setOccurrenceCount(e.target.value)}
                   />
                   <p className="text-xs text-text-secondary">
-                    سيتم إنشاء حجز كل أسبوع في نفس اليوم والوقت، بدءًا من هذا التاريخ.
+                    {t('bookings.quick.recurringHint')}
                   </p>
                 </div>
               )}
@@ -332,22 +332,22 @@ export function QuickBookingSheet({
                 pending_payment booking created elsewhere). */}
             {!isRecurring && (
               <div className="flex flex-col gap-2">
-                <label className="text-sm font-medium text-text-secondary">الدفع</label>
+                <label className="text-sm font-medium text-text-secondary">{t('bookings.quick.payment')}</label>
                 <div className="flex gap-2">
                   <Button type="button" variant={payNow ? 'default' : 'outline'} size="sm" onClick={() => setPayNow(true)}>
-                    دفع الآن
+                    {t('bookings.quick.payNow')}
                   </Button>
                   <Button type="button" variant={!payNow ? 'default' : 'outline'} size="sm" onClick={() => setPayNow(false)}>
-                    بانتظار الدفع
+                    {t('bookings.quick.awaitingPayment')}
                   </Button>
                 </div>
                 {payNow && (
                   <Select value={paymentMethod} onValueChange={setPaymentMethod}>
                     <SelectTrigger><SelectValue /></SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="cash">نقدًا</SelectItem>
-                      <SelectItem value="card">بطاقة</SelectItem>
-                      <SelectItem value="transfer">تحويل بنكي</SelectItem>
+                      <SelectItem value="cash">{t('bookings.quick.cash')}</SelectItem>
+                      <SelectItem value="card">{t('bookings.quick.card')}</SelectItem>
+                      <SelectItem value="transfer">{t('bookings.quick.bankTransfer')}</SelectItem>
                     </SelectContent>
                   </Select>
                 )}
@@ -357,14 +357,14 @@ export function QuickBookingSheet({
             {recurringResult && (
               <div className="rounded-lg border border-status-info/30 bg-status-info/5 p-3 text-sm">
                 <p className="font-medium">
-                  تم إنشاء {recurringResult.created} من {recurringResult.requested} حجز.
+                  {t('bookings.quick.recurringSummary', { created: recurringResult.created, requested: recurringResult.requested })}
                 </p>
                 {recurringResult.conflicted.length > 0 && (
                   <p className="mt-1 text-status-warning">
-                    {recurringResult.conflicted.length} موعد تعارض مع حجوزات موجودة ولم يتم إنشاؤه.
+                    {t('bookings.quick.recurringConflicts', { count: recurringResult.conflicted.length })}
                   </p>
                 )}
-                <Button size="sm" className="mt-2" onClick={() => onOpenChange(false)}>تم</Button>
+                <Button size="sm" className="mt-2" onClick={() => onOpenChange(false)}>{t('bookings.quick.done')}</Button>
               </div>
             )}
 
@@ -378,7 +378,7 @@ export function QuickBookingSheet({
             disabled={!customerId || !resolvedPrice || !clubTimezone || bookMutation.isPending || !!recurringResult || (isRecurring && (!occurrenceCount || Number(occurrenceCount) < 1 || Number(occurrenceCount) > 52))}
             onClick={() => bookMutation.mutate()}
           >
-            {bookMutation.isPending ? 'جارٍ الحجز...' : isRecurring ? 'تأكيد الحجوزات المتكررة' : 'تأكيد الحجز'}
+            {bookMutation.isPending ? t('bookings.quick.booking') : isRecurring ? t('bookings.quick.confirmRecurring') : t('bookings.quick.confirmBooking')}
           </Button>
         </SheetFooter>
       </SheetContent>

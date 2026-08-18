@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next'
 import { PageHeader } from '@/components/ui/page-header'
 import { BranchesCard } from '@/features/clubs/BranchesCard'
 import { FieldsManagement } from '@/features/clubs/FieldsManagement'
@@ -15,17 +16,21 @@ import { FieldsManagement } from '@/features/clubs/FieldsManagement'
 // that section now covers only true club-identity settings (name,
 // currency, timezone).
 export function BranchesFieldsPage() {
+  const { t } = useTranslation()
   return (
     <div className="flex flex-col gap-6">
-      <PageHeader title="الفروع والملاعب" description="فروع النادي، الملاعب، مواعيد العمل، والأسعار" />
+      <PageHeader
+        title={t('clubs.branchesFieldsPage.title')}
+        description={t('clubs.branchesFieldsPage.description')}
+      />
 
       <section className="flex flex-col gap-4">
-        <h2 className="text-sm font-semibold text-text-secondary">الفروع</h2>
+        <h2 className="text-sm font-semibold text-text-secondary">{t('clubs.branchesFieldsPage.branchesHeading')}</h2>
         <BranchesCard />
       </section>
 
       <section className="flex flex-col gap-4">
-        <h2 className="text-sm font-semibold text-text-secondary">الملاعب</h2>
+        <h2 className="text-sm font-semibold text-text-secondary">{t('clubs.branchesFieldsPage.fieldsHeading')}</h2>
         <FieldsManagement />
       </section>
     </div>

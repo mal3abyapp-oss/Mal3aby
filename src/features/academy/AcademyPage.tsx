@@ -1,5 +1,6 @@
 import { useState, type FormEvent } from 'react'
 import { Link } from 'react-router-dom'
+import { useTranslation } from 'react-i18next'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import QRCode from 'qrcode'
 import { supabase } from '@/lib/supabase/client'
@@ -34,13 +35,6 @@ import type { PlayerRow, GuardianLinkRow } from '@/lib/domain/people'
 // Programs/Groups/Sessions/Enrollment is Phase 10-12's scope -- this is
 // the concrete Phase 4 deliverable (player CRUD + guardian linking UI)
 // placed on its documented route ahead of the rest of the phase.
-const RELATIONSHIP_LABELS: Record<string, string> = {
-  father: 'الأب',
-  mother: 'الأم',
-  guardian: 'ولي أمر',
-  other: 'أخرى',
-}
-
 async function fetchPlayers(clubId: string, search: string) {
   let query = supabase
     .from('players_safe')
@@ -98,6 +92,7 @@ async function searchCustomers(clubId: string, search: string) {
 }
 
 export function AcademyPage() {
+  const { t } = useTranslation()
   const { currentClubId, currentMembership } = useAuth()
   const queryClient = useQueryClient()
   const [activeTab, setActiveTab] = useState<'overview' | 'players' | 'structure' | 'enrollments'>('overview')
@@ -112,6 +107,13 @@ export function AcademyPage() {
   const [guardianSearch, setGuardianSearch] = useState('')
   const [selectedGuardianId, setSelectedGuardianId] = useState('')
   const [relationship, setRelationship] = useState('father')
+
+  const RELATIONSHIP_LABELS: Record<string, string> = {
+    father: t('academy.relationshipLabels.father'),
+    mother: t('academy.relationshipLabels.mother'),
+    guardian: t('academy.relationshipLabels.guardian'),
+    other: t('academy.relationshipLabels.other'),
+  }
 
   // V1 Implementation Gap Audit (2026-08-16): the player detail dialog
   // showed only guardians + QR -- no way to correct a player's own name/
@@ -157,7 +159,7 @@ export function AcademyPage() {
       setFormError(null)
       void queryClient.invalidateQueries({ queryKey: ['players', currentClubId] })
     },
-    onError: () => setFormError('تعذّرت الإضافة، حاول مرة أخرى.'),
+    onError: () => setFormError(t('academy.players.addError')),
   })
 
   const linkGuardianMutation = useMutation({
@@ -219,7 +221,7 @@ export function AcademyPage() {
   const columns: DataTableColumn<PlayerRow>[] = [
     {
       key: 'name',
-      header: 'الاسم',
+      header: t('common.name'),
       render: (p) => (
         <button
           className="text-accent-foreground hover:underline"
@@ -235,8 +237,8 @@ export function AcademyPage() {
         </button>
       ),
     },
-    { key: 'dob', header: 'تاريخ الميلاد', render: (p) => p.dateOfBirth ?? '—' },
-    { key: 'status', header: 'الحالة', render: (p) => (p.status === 'active' ? 'نشط' : 'غير نشط') },
+    { key: 'dob', header: t('academy.players.dateOfBirth'), render: (p) => p.dateOfBirth ?? '—' },
+    { key: 'status', header: t('academy.players.status'), render: (p) => (p.status === 'active' ? t('academy.players.statusActive') : t('academy.players.statusInactive')) },
   ]
 
   if (currentMembership?.roleKey === 'coach') {
@@ -245,14 +247,14 @@ export function AcademyPage() {
 
   return (
     <div>
-      <PageHeader title="الأكاديمية" description="إدارة اللاعبين والبرامج والمجموعات" />
+      <PageHeader title={t('academy.title')} description={t('academy.description')} />
 
       <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as typeof activeTab)}>
         <TabsList>
-          <TabsTrigger value="overview">نظرة عامة</TabsTrigger>
-          <TabsTrigger value="players">اللاعبون</TabsTrigger>
-          <TabsTrigger value="structure">البرامج والمجموعات</TabsTrigger>
-          <TabsTrigger value="enrollments">التسجيلات والاشتراكات</TabsTrigger>
+          <TabsTrigger value="overview">{t('academy.tabs.overview')}</TabsTrigger>
+          <TabsTrigger value="players">{t('academy.tabs.players')}</TabsTrigger>
+          <TabsTrigger value="structure">{t('academy.tabs.structure')}</TabsTrigger>
+          <TabsTrigger value="enrollments">{t('academy.tabs.enrollments')}</TabsTrigger>
         </TabsList>
 
         <TabsContent value="overview">
@@ -262,26 +264,26 @@ export function AcademyPage() {
         <TabsContent value="players">
           <div className="mb-4 mt-4 flex items-center justify-between gap-3">
             <Input
-              placeholder="بحث بالاسم"
+              placeholder={t('academy.players.searchByName')}
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               className="max-w-sm"
             />
             <Dialog open={createDialogOpen} onOpenChange={setCreateDialogOpen}>
               <DialogTrigger asChild>
-                <Button>إضافة لاعب</Button>
+                <Button>{t('academy.players.addPlayer')}</Button>
               </DialogTrigger>
               <DialogContent>
                 <DialogHeader>
-                  <DialogTitle>إضافة لاعب</DialogTitle>
+                  <DialogTitle>{t('academy.players.addPlayer')}</DialogTitle>
                 </DialogHeader>
                 <form onSubmit={handleCreateSubmit} className="flex flex-col gap-4">
                   <div className="flex flex-col gap-1.5">
-                    <label className="text-sm font-medium text-text-secondary">الاسم الكامل</label>
+                    <label className="text-sm font-medium text-text-secondary">{t('academy.players.fullName')}</label>
                     <Input required value={playerName} onChange={(e) => setPlayerName(e.target.value)} />
                   </div>
                   <div className="flex flex-col gap-1.5">
-                    <label className="text-sm font-medium text-text-secondary">تاريخ الميلاد</label>
+                    <label className="text-sm font-medium text-text-secondary">{t('academy.players.dateOfBirth')}</label>
                     <Input type="date" value={playerDob} onChange={(e) => setPlayerDob(e.target.value)} />
                   </div>
                   {formError && (
@@ -290,7 +292,7 @@ export function AcademyPage() {
                     </p>
                   )}
                   <Button type="submit" disabled={createPlayerMutation.isPending}>
-                    {createPlayerMutation.isPending ? 'جارٍ الإضافة...' : 'إضافة'}
+                    {createPlayerMutation.isPending ? t('academy.players.adding') : t('academy.players.add')}
                   </Button>
                 </form>
               </DialogContent>
@@ -302,8 +304,8 @@ export function AcademyPage() {
             rows={players}
             rowKey={(p) => p.id}
             isLoading={isLoading}
-            emptyTitle="لا يوجد لاعبون"
-            emptyDescription="أضف أول لاعب لبدء إدارة الأكاديمية"
+            emptyTitle={t('academy.players.emptyTitle')}
+            emptyDescription={t('academy.players.emptyDescription')}
           />
 
           <Dialog
@@ -326,21 +328,21 @@ export function AcademyPage() {
                   </div>
                 )}
                 <div className="flex flex-col gap-2 border-b border-border pb-4">
-                  <label className="text-sm font-medium text-text-secondary">الاسم الكامل</label>
+                  <label className="text-sm font-medium text-text-secondary">{t('academy.players.fullName')}</label>
                   <Input value={editName} onChange={(e) => setEditName(e.target.value)} />
                   <div className="flex gap-2">
                     <div className="flex flex-1 flex-col gap-1">
-                      <label className="text-xs text-text-secondary">تاريخ الميلاد</label>
+                      <label className="text-xs text-text-secondary">{t('academy.players.dateOfBirth')}</label>
                       <Input type="date" value={editDob} onChange={(e) => setEditDob(e.target.value)} />
                     </div>
                     <div className="flex flex-1 flex-col gap-1">
-                      <label className="text-xs text-text-secondary">الجنس</label>
+                      <label className="text-xs text-text-secondary">{t('academy.players.gender')}</label>
                       <Select value={editGender || 'unspecified'} onValueChange={(v) => setEditGender(v === 'unspecified' ? '' : v)}>
                         <SelectTrigger><SelectValue /></SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="unspecified">غير محدد</SelectItem>
-                          <SelectItem value="male">ذكر</SelectItem>
-                          <SelectItem value="female">أنثى</SelectItem>
+                          <SelectItem value="unspecified">{t('academy.players.genderUnspecified')}</SelectItem>
+                          <SelectItem value="male">{t('academy.players.genderMale')}</SelectItem>
+                          <SelectItem value="female">{t('academy.players.genderFemale')}</SelectItem>
                         </SelectContent>
                       </Select>
                     </div>
@@ -349,27 +351,27 @@ export function AcademyPage() {
                     <Select value={editStatus} onValueChange={setEditStatus}>
                       <SelectTrigger className="w-32"><SelectValue /></SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="active">نشط</SelectItem>
-                        <SelectItem value="inactive">غير نشط</SelectItem>
+                        <SelectItem value="active">{t('academy.players.statusActive')}</SelectItem>
+                        <SelectItem value="inactive">{t('academy.players.statusInactive')}</SelectItem>
                       </SelectContent>
                     </Select>
                     <Button size="sm" disabled={!editName.trim() || updatePlayerMutation.isPending} onClick={() => updatePlayerMutation.mutate()}>
-                      {updatePlayerMutation.isPending ? 'جارٍ الحفظ...' : 'حفظ'}
+                      {updatePlayerMutation.isPending ? t('academy.players.saving') : t('academy.players.save')}
                     </Button>
                   </div>
                 </div>
                 <div className="flex flex-col items-center gap-2 border-b border-border pb-4">
                   {playerQrDataUrl ? (
-                    <img src={playerQrDataUrl} alt="بطاقة QR للاعب" className="size-40" />
+                    <img src={playerQrDataUrl} alt={t('academy.players.qrAlt')} className="size-40" />
                   ) : (
                     <Button variant="outline" size="sm" disabled={playerQrMutation.isPending} onClick={() => playerQrMutation.mutate()}>
-                      {playerQrMutation.isPending ? 'جارٍ الإنشاء...' : 'عرض بطاقة QR'}
+                      {playerQrMutation.isPending ? t('academy.players.generatingQr') : t('academy.players.viewQr')}
                     </Button>
                   )}
                 </div>
-                <p className="text-sm font-medium text-text-secondary">أولياء الأمر</p>
+                <p className="text-sm font-medium text-text-secondary">{t('academy.players.guardians')}</p>
                 {guardianLinks.length === 0 ? (
-                  <p className="text-sm text-text-secondary">لا يوجد أولياء أمور مرتبطون بعد.</p>
+                  <p className="text-sm text-text-secondary">{t('academy.players.noGuardians')}</p>
                 ) : (
                   <ul className="flex flex-col gap-2">
                     {guardianLinks.map((g) => (
@@ -377,7 +379,7 @@ export function AcademyPage() {
                         <span>{g.customerName}</span>
                         <span className="text-text-secondary">
                           {RELATIONSHIP_LABELS[g.relationship] ?? g.relationship}
-                          {g.isPrimary && ' (أساسي)'}
+                          {g.isPrimary && ` ${t('academy.players.primary')}`}
                         </span>
                       </li>
                     ))}
@@ -385,9 +387,9 @@ export function AcademyPage() {
                 )}
 
                 <div className="flex flex-col gap-2 border-t border-border pt-4">
-                  <label className="text-sm font-medium text-text-secondary">ربط ولي أمر جديد</label>
+                  <label className="text-sm font-medium text-text-secondary">{t('academy.players.linkNewGuardian')}</label>
                   <Input
-                    placeholder="بحث عن عميل بالاسم"
+                    placeholder={t('academy.players.searchCustomerByName')}
                     value={guardianSearch}
                     onChange={(e) => {
                       setGuardianSearch(e.target.value)
@@ -396,7 +398,7 @@ export function AcademyPage() {
                   />
                   {guardianCandidates.length > 0 && (
                     <Select value={selectedGuardianId} onValueChange={setSelectedGuardianId}>
-                      <SelectTrigger><SelectValue placeholder="اختر عميلاً" /></SelectTrigger>
+                      <SelectTrigger><SelectValue placeholder={t('academy.players.chooseCustomer')} /></SelectTrigger>
                       <SelectContent>
                         {guardianCandidates.map((c) => (
                           <SelectItem key={c.id} value={c.id}>
@@ -419,7 +421,7 @@ export function AcademyPage() {
                     disabled={!selectedGuardianId || linkGuardianMutation.isPending}
                     onClick={() => linkGuardianMutation.mutate()}
                   >
-                    ربط
+                    {t('academy.players.link')}
                   </Button>
                 </div>
               </div>
@@ -440,9 +442,9 @@ export function AcademyPage() {
               duplicate mount so the policy stays discoverable from the
               enrollment workflow without re-rendering it here. */}
           <p className="mt-4 text-sm text-text-secondary">
-            سياسة تفعيل الاشتراك تُدار من{' '}
+            {t('academy.enrollments.activationPolicyManagedFrom')}{' '}
             <Link to="/app/settings" className="text-accent-foreground hover:underline">
-              صفحة الإعدادات
+              {t('academy.enrollments.settingsPage')}
             </Link>
             .
           </p>

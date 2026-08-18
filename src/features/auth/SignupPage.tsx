@@ -1,5 +1,6 @@
 import { useState, type FormEvent } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
+import { useTranslation } from 'react-i18next'
 import { supabase } from '@/lib/supabase/client'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -12,6 +13,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 // email confirmation is disabled/deferred — see PROJECT_STATE.md's known
 // gap note on the mailer rate limit).
 export function SignupPage() {
+  const { t } = useTranslation()
   const [fullName, setFullName] = useState('')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
@@ -34,7 +36,7 @@ export function SignupPage() {
     setSubmitting(false)
 
     if (signUpError) {
-      setError('تعذّر إنشاء الحساب. تأكد من صحة البيانات أو أن البريد غير مستخدم من قبل.')
+      setError(t('auth.signupError'))
       return
     }
 
@@ -49,28 +51,28 @@ export function SignupPage() {
     <div className="mx-auto flex min-h-[70vh] max-w-sm items-center justify-center px-4 py-12">
       <Card className="w-full">
         <CardHeader>
-          <CardTitle className="text-center text-xl">إنشاء حساب جديد</CardTitle>
+          <CardTitle className="text-center text-xl">{t('auth.signup')}</CardTitle>
         </CardHeader>
         <CardContent>
           {needsConfirmation ? (
             <p className="text-center text-sm text-text-secondary">
-              تم إنشاء حسابك. يرجى تأكيد بريدك الإلكتروني ثم{' '}
+              {t('auth.confirmationSentPrefix')}{' '}
               <Link to="/login" className="text-accent-foreground hover:underline">
-                تسجيل الدخول
+                {t('auth.login')}
               </Link>{' '}
-              لإكمال إعداد ناديك.
+              {t('auth.confirmationSentSuffix')}
             </p>
           ) : (
             <form onSubmit={handleSubmit} className="flex flex-col gap-4">
               <div className="flex flex-col gap-1.5">
                 <label htmlFor="full-name" className="text-sm font-medium text-text-secondary">
-                  الاسم الكامل
+                  {t('auth.fullNameLabel')}
                 </label>
                 <Input id="full-name" required value={fullName} onChange={(e) => setFullName(e.target.value)} />
               </div>
               <div className="flex flex-col gap-1.5">
                 <label htmlFor="signup-email" className="text-sm font-medium text-text-secondary">
-                  البريد الإلكتروني
+                  {t('auth.emailLabel')}
                 </label>
                 <Input
                   id="signup-email"
@@ -83,7 +85,7 @@ export function SignupPage() {
               </div>
               <div className="flex flex-col gap-1.5">
                 <label htmlFor="signup-password" className="text-sm font-medium text-text-secondary">
-                  كلمة المرور
+                  {t('auth.passwordLabel')}
                 </label>
                 <Input
                   id="signup-password"
@@ -103,13 +105,13 @@ export function SignupPage() {
               )}
 
               <Button type="submit" disabled={submitting} className="mt-2">
-                {submitting ? 'جارٍ الإنشاء...' : 'إنشاء حساب وبدء التجربة المجانية'}
+                {submitting ? t('auth.creatingAccount') : t('auth.signupSubmit')}
               </Button>
 
               <p className="text-center text-sm text-text-secondary">
-                لديك حساب بالفعل؟{' '}
+                {t('auth.hasAccount')}{' '}
                 <Link to="/login" className="text-accent-foreground hover:underline">
-                  تسجيل الدخول
+                  {t('auth.login')}
                 </Link>
               </p>
             </form>

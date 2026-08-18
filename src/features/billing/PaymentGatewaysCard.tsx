@@ -1,4 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { useTranslation } from 'react-i18next'
 import { supabase } from '@/lib/supabase/client'
 import { useAuth } from '@/app/providers/AuthProvider'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -58,6 +59,7 @@ async function fetchGatewayConfigs(clubId: string): Promise<GatewayConfigRow[]> 
 }
 
 export function PaymentGatewaysCard() {
+  const { t } = useTranslation()
   const { currentClubId } = useAuth()
   const queryClient = useQueryClient()
   const [draftKeys, setDraftKeys] = useState<Record<GatewayName, string>>({ stripe: '', paypal: '' })
@@ -86,21 +88,21 @@ export function PaymentGatewaysCard() {
       queryClient.invalidateQueries({ queryKey: ['payment-gateway-configs', currentClubId] })
       setFormError(null)
     },
-    onError: (err) => setFormError(err instanceof Error ? err.message : translateSupabaseError(err, 'تعذّر حفظ إعدادات بوابة الدفع')),
+    onError: (err) => setFormError(err instanceof Error ? err.message : translateSupabaseError(err, t('billing.paymentGatewaysCard.saveError'))),
   })
 
   return (
     <Card>
       <CardHeader>
-        <CardTitle className="text-base">بوابات الدفع الإلكتروني</CardTitle>
+        <CardTitle className="text-base">{t('billing.paymentGatewaysCard.title')}</CardTitle>
       </CardHeader>
       <CardContent className="flex flex-col gap-3">
         <p className="text-xs text-text-secondary">
-          هذه البنية جاهزة لربط Stripe و PayPal لاحقًا، ولا يوجد حاليًا حساب فعلي مفعّل لأي منهما. تفعيل الخيار هنا لا يجعل الدفع الإلكتروني متاحًا للعملاء إلا بعد ربط بيانات اعتماد حقيقية من طرف الخادم.
+          {t('billing.paymentGatewaysCard.description')}
         </p>
         {formError && <p className="text-sm text-status-danger">{formError}</p>}
         {isLoading ? (
-          <p className="text-sm text-text-secondary">جارٍ التحميل...</p>
+          <p className="text-sm text-text-secondary">{t('billing.paymentGatewaysCard.loading')}</p>
         ) : (
           configs.map((c) => (
             <div key={c.gateway} className="flex flex-col gap-2 rounded-md border border-border p-3 text-sm">
@@ -111,7 +113,7 @@ export function PaymentGatewaysCard() {
                 </div>
                 <StatusBadge
                   tone={c.hasServerCredentials ? 'success' : 'neutral'}
-                  label={c.hasServerCredentials ? 'متصلة' : 'غير متصلة'}
+                  label={c.hasServerCredentials ? t('billing.paymentGatewaysCard.connected') : t('billing.paymentGatewaysCard.notConnected')}
                 />
               </div>
               <div className="flex flex-col gap-2 md:flex-row md:items-center">
@@ -134,7 +136,7 @@ export function PaymentGatewaysCard() {
                       })
                     }
                   >
-                    {c.enabled ? 'إيقاف' : 'تفعيل'}
+                    {c.enabled ? t('billing.paymentGatewaysCard.disable') : t('billing.paymentGatewaysCard.enable')}
                   </Button>
                   <Button
                     size="sm"
@@ -147,7 +149,7 @@ export function PaymentGatewaysCard() {
                       })
                     }
                   >
-                    حفظ المفتاح
+                    {t('billing.paymentGatewaysCard.saveKey')}
                   </Button>
                 </div>
               </div>

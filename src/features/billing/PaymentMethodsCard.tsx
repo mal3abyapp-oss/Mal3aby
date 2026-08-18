@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '@/lib/supabase/client'
 import { useAuth } from '@/app/providers/AuthProvider'
@@ -49,33 +50,33 @@ interface PaymentMethodRow {
   displayOrder: number
 }
 
-const UNDERLYING_METHOD_LABELS: Record<UnderlyingMethod, string> = {
-  cash: 'نقدًا',
-  card: 'بطاقة / نقطة بيع',
-  bank_transfer: 'تحويل بنكي',
-  wallet: 'محفظة إلكترونية',
-  other: 'أخرى / يدوية',
+const UNDERLYING_METHOD_LABEL_KEYS: Record<UnderlyingMethod, string> = {
+  cash: 'billing.paymentMethods.underlyingMethodLabels.cash',
+  card: 'billing.paymentMethods.underlyingMethodLabels.card',
+  bank_transfer: 'billing.paymentMethods.underlyingMethodLabels.bank_transfer',
+  wallet: 'billing.paymentMethods.underlyingMethodLabels.wallet',
+  other: 'billing.paymentMethods.underlyingMethodLabels.other',
 }
 
 // Which "details" fields to collect per underlying method -- matches
 // Sections 31 (InstaPay), 33 (wallets), 34 (bank accounts).
-const DETAIL_FIELDS: Record<UnderlyingMethod, { key: string; label: string }[]> = {
+const DETAIL_FIELDS: Record<UnderlyingMethod, { key: string; labelKey: string }[]> = {
   cash: [],
-  card: [{ key: 'terminal_reference', label: 'مرجع الماكينة (اختياري)' }],
+  card: [{ key: 'terminal_reference', labelKey: 'billing.paymentMethods.detailFields.terminalReference' }],
   bank_transfer: [
-    { key: 'bank_name', label: 'اسم البنك' },
-    { key: 'account_holder', label: 'اسم صاحب الحساب' },
-    { key: 'account_number', label: 'رقم الحساب' },
-    { key: 'iban', label: 'IBAN' },
-    { key: 'swift', label: 'SWIFT / BIC' },
+    { key: 'bank_name', labelKey: 'billing.paymentMethods.detailFields.bankName' },
+    { key: 'account_holder', labelKey: 'billing.paymentMethods.detailFields.accountHolder' },
+    { key: 'account_number', labelKey: 'billing.paymentMethods.detailFields.accountNumber' },
+    { key: 'iban', labelKey: 'billing.paymentMethods.detailFields.iban' },
+    { key: 'swift', labelKey: 'billing.paymentMethods.detailFields.swift' },
   ],
   wallet: [
-    { key: 'phone', label: 'رقم الهاتف' },
-    { key: 'beneficiary', label: 'اسم المستفيد' },
+    { key: 'phone', labelKey: 'billing.paymentMethods.detailFields.phone' },
+    { key: 'beneficiary', labelKey: 'billing.paymentMethods.detailFields.beneficiary' },
   ],
   other: [
-    { key: 'phone', label: 'رقم الهاتف (اختياري)' },
-    { key: 'link', label: 'رابط الدفع (اختياري)' },
+    { key: 'phone', labelKey: 'billing.paymentMethods.detailFields.phoneOptional' },
+    { key: 'link', labelKey: 'billing.paymentMethods.detailFields.linkOptional' },
   ],
 }
 
@@ -104,6 +105,7 @@ async function fetchPaymentMethods(clubId: string): Promise<PaymentMethodRow[]> 
 
 export function PaymentMethodsCard() {
   const { currentClubId } = useAuth()
+  const { t } = useTranslation()
   const queryClient = useQueryClient()
   const [dialogOpen, setDialogOpen] = useState(false)
   const [underlyingMethod, setUnderlyingMethod] = useState<UnderlyingMethod>('bank_transfer')
@@ -132,7 +134,7 @@ export function PaymentMethodsCard() {
 
   const createMutation = useMutation({
     mutationFn: async () => {
-      if (!nameAr.trim() || !nameEn.trim()) throw new Error('أدخل الاسم بالعربية والإنجليزية')
+      if (!nameAr.trim() || !nameEn.trim()) throw new Error(t('billing.paymentMethods.nameRequiredError'))
       const { error } = await supabase.from('payment_method_configs').insert({
         club_id: currentClubId!,
         underlying_method: underlyingMethod,
@@ -150,7 +152,7 @@ export function PaymentMethodsCard() {
       setDialogOpen(false)
       resetForm()
     },
-    onError: (err) => setFormError(err instanceof Error ? err.message : translateSupabaseError(err, 'تعذّر إضافة طريقة الدفع')),
+    onError: (err) => setFormError(err instanceof Error ? err.message : translateSupabaseError(err, t('billing.paymentMethods.addError'))),
   })
 
   const toggleActiveMutation = useMutation({
@@ -172,39 +174,39 @@ export function PaymentMethodsCard() {
   return (
     <Card>
       <CardHeader className="flex flex-row items-center justify-between">
-        <CardTitle className="text-base">طرق الدفع</CardTitle>
+        <CardTitle className="text-base">{t('billing.paymentMethods.cardTitle')}</CardTitle>
         <Dialog open={dialogOpen} onOpenChange={(open) => { setDialogOpen(open); if (!open) resetForm() }}>
           <Button size="sm" variant="outline" onClick={() => setDialogOpen(true)}>
-            <Plus className="me-1 size-4" /> إضافة طريقة دفع
+            <Plus className="me-1 size-4" /> {t('billing.paymentMethods.addMethod')}
           </Button>
           <DialogContent>
-            <DialogHeader><DialogTitle>إضافة طريقة دفع</DialogTitle></DialogHeader>
+            <DialogHeader><DialogTitle>{t('billing.paymentMethods.dialogTitle')}</DialogTitle></DialogHeader>
             <div className="flex flex-col gap-3">
               {formError && <p className="text-sm text-status-danger">{formError}</p>}
               <div className="flex flex-col gap-1">
-                <label className="text-sm font-medium">نوع الطريقة</label>
+                <label className="text-sm font-medium">{t('billing.paymentMethods.methodTypeLabel')}</label>
                 <Select value={underlyingMethod} onValueChange={(v) => { setUnderlyingMethod(v as UnderlyingMethod); setDetailValues({}) }}>
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
-                    {(Object.keys(UNDERLYING_METHOD_LABELS) as UnderlyingMethod[]).map((m) => (
-                      <SelectItem key={m} value={m}>{UNDERLYING_METHOD_LABELS[m]}</SelectItem>
+                    {(Object.keys(UNDERLYING_METHOD_LABEL_KEYS) as UnderlyingMethod[]).map((m) => (
+                      <SelectItem key={m} value={m}>{t(UNDERLYING_METHOD_LABEL_KEYS[m])}</SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
               </div>
               <div className="grid gap-3 md:grid-cols-2">
                 <div className="flex flex-col gap-1">
-                  <label className="text-sm font-medium">الاسم (بالعربية)</label>
-                  <Input value={nameAr} onChange={(e) => setNameAr(e.target.value)} placeholder="مثال: فودافون كاش" />
+                  <label className="text-sm font-medium">{t('billing.paymentMethods.nameArLabel')}</label>
+                  <Input value={nameAr} onChange={(e) => setNameAr(e.target.value)} placeholder={t('billing.paymentMethods.nameArPlaceholder')} />
                 </div>
                 <div className="flex flex-col gap-1">
-                  <label className="text-sm font-medium">الاسم (بالإنجليزية)</label>
+                  <label className="text-sm font-medium">{t('billing.paymentMethods.nameEnLabel')}</label>
                   <Input value={nameEn} onChange={(e) => setNameEn(e.target.value)} placeholder="e.g. Vodafone Cash" />
                 </div>
               </div>
               {DETAIL_FIELDS[underlyingMethod].map((field) => (
                 <div key={field.key} className="flex flex-col gap-1">
-                  <label className="text-sm font-medium">{field.label}</label>
+                  <label className="text-sm font-medium">{t(field.labelKey)}</label>
                   <Input
                     value={detailValues[field.key] ?? ''}
                     onChange={(e) => setDetailValues((prev) => ({ ...prev, [field.key]: e.target.value }))}
@@ -212,15 +214,15 @@ export function PaymentMethodsCard() {
                 </div>
               ))}
               <div className="flex flex-col gap-1">
-                <label className="text-sm font-medium">تعليمات للعميل (اختياري)</label>
-                <Input value={instructionsAr} onChange={(e) => setInstructionsAr(e.target.value)} placeholder="مثال: اذكر رقم الفاتورة عند التحويل" />
+                <label className="text-sm font-medium">{t('billing.paymentMethods.instructionsLabel')}</label>
+                <Input value={instructionsAr} onChange={(e) => setInstructionsAr(e.target.value)} placeholder={t('billing.paymentMethods.instructionsPlaceholder')} />
               </div>
               <label className="flex items-center gap-2 text-sm">
                 <input type="checkbox" checked={customerVisible} onChange={(e) => setCustomerVisible(e.target.checked)} className="size-4" />
-                إظهار هذه الطريقة للعملاء عند الدفع
+                {t('billing.paymentMethods.customerVisibleCheckbox')}
               </label>
               <Button onClick={() => createMutation.mutate()} disabled={createMutation.isPending}>
-                حفظ
+                {t('billing.paymentMethods.save')}
               </Button>
             </div>
           </DialogContent>
@@ -228,9 +230,9 @@ export function PaymentMethodsCard() {
       </CardHeader>
       <CardContent className="flex flex-col gap-2">
         {isLoading ? (
-          <p className="text-sm text-text-secondary">جارٍ التحميل...</p>
+          <p className="text-sm text-text-secondary">{t('billing.paymentMethods.loading')}</p>
         ) : methods.length === 0 ? (
-          <p className="text-sm text-text-secondary">لا توجد طرق دفع بعد.</p>
+          <p className="text-sm text-text-secondary">{t('billing.paymentMethods.empty')}</p>
         ) : (
           methods.map((m) => (
             <div key={m.id} className="flex flex-col gap-2 rounded-md border border-border p-3 text-sm md:flex-row md:items-center md:justify-between">
@@ -239,19 +241,19 @@ export function PaymentMethodsCard() {
                 <div>
                   <p className="font-medium">{m.nameAr}</p>
                   <p className="text-xs text-text-secondary">
-                    {UNDERLYING_METHOD_LABELS[m.underlyingMethod]}
+                    {t(UNDERLYING_METHOD_LABEL_KEYS[m.underlyingMethod])}
                     {Object.entries(m.details).filter(([, v]) => v).map(([, v]) => ` — ${v}`).join('')}
                   </p>
                 </div>
               </div>
               <div className="flex items-center gap-2">
-                <StatusBadge tone={m.customerVisible ? 'success' : 'neutral'} label={m.customerVisible ? 'ظاهرة للعملاء' : 'مخفية عن العملاء'} />
-                <StatusBadge tone={m.isActive ? 'success' : 'danger'} label={m.isActive ? 'نشطة' : 'موقوفة'} />
+                <StatusBadge tone={m.customerVisible ? 'success' : 'neutral'} label={m.customerVisible ? t('billing.paymentMethods.visibleToCustomers') : t('billing.paymentMethods.hiddenFromCustomers')} />
+                <StatusBadge tone={m.isActive ? 'success' : 'danger'} label={m.isActive ? t('billing.paymentMethods.active') : t('billing.paymentMethods.suspended')} />
                 <Button size="sm" variant="outline" onClick={() => toggleVisibleMutation.mutate({ id: m.id, customerVisible: m.customerVisible })}>
-                  {m.customerVisible ? 'إخفاء' : 'إظهار'}
+                  {m.customerVisible ? t('billing.paymentMethods.hide') : t('billing.paymentMethods.show')}
                 </Button>
                 <Button size="sm" variant="outline" onClick={() => toggleActiveMutation.mutate({ id: m.id, isActive: m.isActive })}>
-                  {m.isActive ? 'إيقاف' : 'تفعيل'}
+                  {m.isActive ? t('billing.paymentMethods.deactivate') : t('billing.paymentMethods.activate')}
                 </Button>
               </div>
             </div>

@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { BrowserQRCodeReader } from '@zxing/browser'
 import { supabase } from '@/lib/supabase/client'
@@ -32,13 +33,6 @@ interface RosterPlayer {
   playerId: string
   playerName: string
   attendanceStatus: string | null
-}
-
-const ATTENDANCE_LABELS: Record<string, string> = {
-  present: 'حاضر',
-  absent: 'غائب',
-  excused: 'معذور',
-  late: 'متأخر',
 }
 
 async function fetchTodaySessions(clubId: string) {
@@ -84,11 +78,19 @@ async function fetchRoster(groupId: string, sessionId: string): Promise<RosterPl
 }
 
 export function CoachTodayView() {
+  const { t } = useTranslation()
   const { currentClubId } = useAuth()
   const queryClient = useQueryClient()
   const [selectedSession, setSelectedSession] = useState<SessionRow | null>(null)
   const [scanOpen, setScanOpen] = useState(false)
   const [scanResult, setScanResult] = useState<{ result: string } | null>(null)
+
+  const ATTENDANCE_LABELS: Record<string, string> = {
+    present: t('academy.coachToday.attendanceLabels.present'),
+    absent: t('academy.coachToday.attendanceLabels.absent'),
+    excused: t('academy.coachToday.attendanceLabels.excused'),
+    late: t('academy.coachToday.attendanceLabels.late'),
+  }
 
   const { data: sessions = [], isLoading } = useQuery({
     queryKey: ['coach-today-sessions', currentClubId],
@@ -141,13 +143,13 @@ export function CoachTodayView() {
 
   return (
     <div>
-      <PageHeader title="جلسات اليوم" description="جلسات التدريب المجدولة اليوم" />
+      <PageHeader title={t('academy.coachToday.title')} description={t('academy.coachToday.description')} />
 
-      {isLoading && <p className="text-sm text-text-secondary">جارٍ التحميل...</p>}
+      {isLoading && <p className="text-sm text-text-secondary">{t('academy.coachToday.loading')}</p>}
 
       <div className="flex flex-col gap-3">
         {sessions.length === 0 && !isLoading && (
-          <p className="text-sm text-text-secondary">لا توجد جلسات مجدولة اليوم.</p>
+          <p className="text-sm text-text-secondary">{t('academy.coachToday.noSessions')}</p>
         )}
         {sessions.map((s) => (
           <Card key={s.id} className="cursor-pointer" onClick={() => setSelectedSession(s)}>
@@ -166,16 +168,16 @@ export function CoachTodayView() {
       <Dialog open={!!selectedSession} onOpenChange={(open) => !open && setSelectedSession(null)}>
         <DialogContent className="max-w-lg">
           <DialogHeader>
-            <DialogTitle>{selectedSession?.groupName} — تسجيل الحضور</DialogTitle>
+            <DialogTitle>{t('academy.coachToday.attendanceDialogTitle', { group: selectedSession?.groupName })}</DialogTitle>
           </DialogHeader>
           <div className="flex flex-col gap-3">
             <Button variant="outline" size="sm" className="w-fit" onClick={() => void handleScan()}>
               <ScanLine className="me-2 size-4" />
-              مسح QR للحضور
+              {t('academy.coachToday.scanQr')}
             </Button>
 
             {roster.length === 0 ? (
-              <p className="text-sm text-text-secondary">لا يوجد لاعبون مسجلون في هذه المجموعة.</p>
+              <p className="text-sm text-text-secondary">{t('academy.coachToday.noRoster')}</p>
             ) : (
               <ul className="flex flex-col gap-2">
                 {roster.map((p) => (
@@ -212,13 +214,13 @@ export function CoachTodayView() {
 
       <Dialog open={scanOpen} onOpenChange={setScanOpen}>
         <DialogContent>
-          <DialogHeader><DialogTitle>مسح بطاقة اللاعب</DialogTitle></DialogHeader>
+          <DialogHeader><DialogTitle>{t('academy.coachToday.scanPlayerCard')}</DialogTitle></DialogHeader>
           <div className="flex flex-col items-center gap-3">
             <video id="coach-qr-video" className="w-full rounded-md" muted playsInline />
             {scanResult && (
               <StatusBadge
                 tone={scanResult.result === 'success' ? 'success' : 'danger'}
-                label={scanResult.result === 'success' ? 'تم تسجيل الحضور' : 'فشل المسح'}
+                label={scanResult.result === 'success' ? t('academy.coachToday.checkedIn') : t('academy.coachToday.scanFailed')}
               />
             )}
           </div>

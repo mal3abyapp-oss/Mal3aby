@@ -1,8 +1,8 @@
 import { useQuery } from '@tanstack/react-query'
+import { useTranslation } from 'react-i18next'
 import { supabase } from '@/lib/supabase/client'
 import { StatusBadge } from '@/components/ui/status-badge'
 import { MoneyDisplay } from '@/components/ui/money-display'
-import { SUBSCRIPTION_STATUS_LABELS } from '@/lib/domain/academy'
 import { fetchInvoicePaymentSummaries } from '@/lib/domain/billing'
 
 // Section I4 — Player Profile: a player's own detail dialog previously
@@ -100,16 +100,26 @@ async function fetchPlayerStatus(playerId: string): Promise<PlayerStatus> {
 }
 
 export function PlayerStatusPanel({ playerId }: { playerId: string }) {
+  const { t } = useTranslation()
+
+  const SUBSCRIPTION_STATUS_LABELS: Record<string, string> = {
+    pending: t('academy.subscriptionStatusLabels.pending'),
+    active: t('academy.subscriptionStatusLabels.active'),
+    frozen: t('academy.subscriptionStatusLabels.frozen'),
+    expired: t('academy.subscriptionStatusLabels.expired'),
+    cancelled: t('academy.subscriptionStatusLabels.cancelled'),
+  }
+
   const { data, isLoading } = useQuery({
     queryKey: ['player-status', playerId],
     queryFn: () => fetchPlayerStatus(playerId),
     enabled: !!playerId,
   })
 
-  if (isLoading || !data) return <p className="text-sm text-text-secondary">جارٍ التحميل...</p>
+  if (isLoading || !data) return <p className="text-sm text-text-secondary">{t('academy.playerStatus.loading')}</p>
 
   if (data.enrollments.length === 0) {
-    return <p className="rounded-md bg-muted/30 p-2 text-sm text-text-secondary">هذا اللاعب غير مسجّل في أي مجموعة حاليًا.</p>
+    return <p className="rounded-md bg-muted/30 p-2 text-sm text-text-secondary">{t('academy.playerStatus.notEnrolled')}</p>
   }
 
   return (
@@ -131,28 +141,28 @@ export function PlayerStatusPanel({ playerId }: { playerId: string }) {
           </div>
           {enrollment.startDate && enrollment.endDate && (
             <p className="text-text-secondary">
-              من {enrollment.startDate} إلى {enrollment.endDate}
+              {t('academy.playerStatus.dateRange', { start: enrollment.startDate, end: enrollment.endDate })}
               {enrollment.effectiveEndDate && enrollment.effectiveEndDate !== enrollment.endDate && (
-                <span className="text-status-warning"> (فعليًا حتى {enrollment.effectiveEndDate} بعد التجميد)</span>
+                <span className="text-status-warning">{t('academy.playerStatus.effectiveEndSuffix', { date: enrollment.effectiveEndDate })}</span>
               )}
             </p>
           )}
           <div className="flex items-center justify-between">
-            <span className="text-text-secondary">المستحق</span>
+            <span className="text-text-secondary">{t('academy.playerStatus.outstanding')}</span>
             {enrollment.outstanding > 0 ? (
               <MoneyDisplay amount={enrollment.outstanding} tone="danger" size="sm" />
             ) : (
-              <span className="text-status-success">مدفوع بالكامل</span>
+              <span className="text-status-success">{t('academy.playerStatus.fullyPaid')}</span>
             )}
           </div>
         </div>
       ))}
       <div className="flex items-center justify-between rounded-lg border border-border bg-muted/20 p-3 text-sm">
-        <span className="text-text-secondary">نسبة الحضور</span>
+        <span className="text-text-secondary">{t('academy.playerStatus.attendanceRate')}</span>
         {data.attendanceRate != null ? (
           <span className="tabular-nums font-medium"><bdi>{data.attendanceRate}% ({data.attendanceCount.present}/{data.attendanceCount.total})</bdi></span>
         ) : (
-          <span className="text-text-secondary">لا يوجد سجل حضور بعد</span>
+          <span className="text-text-secondary">{t('academy.playerStatus.noAttendanceRecord')}</span>
         )}
       </div>
     </div>

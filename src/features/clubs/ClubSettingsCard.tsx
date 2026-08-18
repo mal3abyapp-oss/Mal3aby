@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { useTranslation } from 'react-i18next'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '@/lib/supabase/client'
 import { useAuth } from '@/app/providers/AuthProvider'
@@ -22,12 +23,6 @@ import { translateSupabaseError } from '@/lib/errors'
 const CURRENCIES = ['EGP', 'SAR', 'AED', 'USD']
 const TIMEZONES = ['Africa/Cairo', 'Asia/Riyadh', 'Asia/Dubai']
 
-const CLUB_STATUS_LABELS: Record<string, string> = {
-  active: 'نشط',
-  suspended: 'موقوف',
-  closed: 'مغلق',
-}
-
 interface ClubSettings {
   id: string
   name: string
@@ -45,6 +40,7 @@ async function fetchClub(clubId: string): Promise<ClubSettings> {
 }
 
 export function ClubSettingsCard() {
+  const { t } = useTranslation()
   const { currentClubId } = useAuth()
   const queryClient = useQueryClient()
 
@@ -78,7 +74,7 @@ export function ClubSettingsCard() {
       setFormError(null)
       void queryClient.invalidateQueries({ queryKey: ['club-settings', currentClubId] })
     },
-    onError: (error) => setFormError(translateSupabaseError(error, 'تعذّر حفظ بيانات النادي.')),
+    onError: (error) => setFormError(translateSupabaseError(error, t('clubs.clubSettingsCard.saveError'))),
   })
 
   if (!club) return null
@@ -86,21 +82,21 @@ export function ClubSettingsCard() {
   return (
     <Card>
       <CardHeader className="flex flex-row items-center justify-between">
-        <CardTitle className="text-base">بيانات النادي</CardTitle>
-        <StatusBadge tone={club.status === 'active' ? 'success' : 'danger'} label={CLUB_STATUS_LABELS[club.status] ?? club.status} />
+        <CardTitle className="text-base">{t('clubs.clubSettingsCard.title')}</CardTitle>
+        <StatusBadge tone={club.status === 'active' ? 'success' : 'danger'} label={t(`clubs.clubSettingsCard.statusLabels.${club.status}`, { defaultValue: club.status })} />
       </CardHeader>
       <CardContent className="flex flex-col gap-2">
         <div className="flex flex-col gap-1.5">
-          <label className="text-sm font-medium text-text-secondary">اسم النادي (بالعربية)</label>
+          <label className="text-sm font-medium text-text-secondary">{t('clubs.clubSettingsCard.nameArLabel')}</label>
           <Input value={nameAr} onChange={(e) => setNameAr(e.target.value)} />
         </div>
         <div className="flex flex-col gap-1.5">
-          <label className="text-sm font-medium text-text-secondary">اسم النادي (بالإنجليزية)</label>
+          <label className="text-sm font-medium text-text-secondary">{t('clubs.clubSettingsCard.nameEnLabel')}</label>
           <Input value={nameEn} onChange={(e) => setNameEn(e.target.value)} />
         </div>
         <div className="flex gap-2">
           <div className="flex flex-1 flex-col gap-1.5">
-            <label className="text-sm font-medium text-text-secondary">العملة</label>
+            <label className="text-sm font-medium text-text-secondary">{t('clubs.clubSettingsCard.currencyLabel')}</label>
             <Select value={currency} onValueChange={setCurrency}>
               <SelectTrigger><SelectValue /></SelectTrigger>
               <SelectContent>
@@ -109,7 +105,7 @@ export function ClubSettingsCard() {
             </Select>
           </div>
           <div className="flex flex-1 flex-col gap-1.5">
-            <label className="text-sm font-medium text-text-secondary">المنطقة الزمنية</label>
+            <label className="text-sm font-medium text-text-secondary">{t('clubs.clubSettingsCard.timezoneLabel')}</label>
             <Select value={timezone} onValueChange={setTimezone}>
               <SelectTrigger><SelectValue /></SelectTrigger>
               <SelectContent>
@@ -120,9 +116,9 @@ export function ClubSettingsCard() {
         </div>
         {formError && <p role="alert" className="text-sm text-status-danger">{formError}</p>}
         <Button size="sm" className="w-fit" disabled={!nameAr.trim() || saveClubMutation.isPending} onClick={() => saveClubMutation.mutate()}>
-          {saveClubMutation.isPending ? 'جارٍ الحفظ...' : 'حفظ بيانات النادي'}
+          {saveClubMutation.isPending ? t('clubs.clubSettingsCard.saving') : t('clubs.clubSettingsCard.save')}
         </Button>
-        <p className="text-xs text-text-secondary">حالة النادي (نشط/موقوف/مغلق) إدارية ولا يمكن تعديلها من هنا.</p>
+        <p className="text-xs text-text-secondary">{t('clubs.clubSettingsCard.statusHint')}</p>
       </CardContent>
     </Card>
   )

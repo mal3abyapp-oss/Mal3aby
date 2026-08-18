@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '@/lib/supabase/client'
 import { translateSupabaseError } from '@/lib/errors'
@@ -23,9 +24,6 @@ import {
   DialogTrigger,
 } from '@/components/ui/dialog'
 import {
-  ACTIVATION_POLICY_LABELS,
-  SUBSCRIPTION_PLAN_LABELS,
-  SUBSCRIPTION_STATUS_LABELS,
   type EnrollmentRow,
   type SubscriptionRow,
 } from '@/lib/domain/academy'
@@ -98,7 +96,23 @@ async function fetchGuardiansForPlayer(playerId: string) {
 }
 
 export function EnrollmentSection() {
+  const { t } = useTranslation()
   const { currentClubId, currentMembership } = useAuth()
+
+  const SUBSCRIPTION_PLAN_LABELS: Record<string, string> = {
+    monthly: t('academy.subscriptionPlanLabels.monthly'),
+    quarterly: t('academy.subscriptionPlanLabels.quarterly'),
+    season: t('academy.subscriptionPlanLabels.season'),
+    package: t('academy.subscriptionPlanLabels.package'),
+  }
+
+  const SUBSCRIPTION_STATUS_LABELS: Record<string, string> = {
+    pending: t('academy.subscriptionStatusLabels.pending'),
+    active: t('academy.subscriptionStatusLabels.active'),
+    frozen: t('academy.subscriptionStatusLabels.frozen'),
+    expired: t('academy.subscriptionStatusLabels.expired'),
+    cancelled: t('academy.subscriptionStatusLabels.cancelled'),
+  }
   const queryClient = useQueryClient()
 
   const [wizardOpen, setWizardOpen] = useState(false)
@@ -186,7 +200,7 @@ export function EnrollmentSection() {
       void queryClient.invalidateQueries({ queryKey: ['enrollments', currentClubId] })
     },
     onError: (error) =>
-      setWizardError(translateSupabaseError(error, 'تعذّر إتمام التسجيل — تحقق من توفر مكان في المجموعة أو صلاحياتك.')),
+      setWizardError(translateSupabaseError(error, t('academy.enrollments.enrollError'))),
   })
 
   const freezeMutation = useMutation({
@@ -224,40 +238,40 @@ export function EnrollmentSection() {
   const columns: DataTableColumn<EnrollmentRow>[] = [
     {
       key: 'player',
-      header: 'اللاعب',
+      header: t('academy.enrollments.player'),
       render: (e) => (
         <button className="text-accent-foreground hover:underline" onClick={() => setSelectedEnrollment(e)}>
           {e.playerName ?? '—'}
         </button>
       ),
     },
-    { key: 'group', header: 'المجموعة', render: (e) => e.groupName ?? '—' },
-    { key: 'status', header: 'الحالة', render: (e) => <StatusBadge tone={e.status === 'active' ? 'success' : 'neutral'} label={e.status === 'active' ? 'نشط' : 'منسحب'} /> },
+    { key: 'group', header: t('academy.enrollments.group'), render: (e) => e.groupName ?? '—' },
+    { key: 'status', header: t('academy.enrollments.status'), render: (e) => <StatusBadge tone={e.status === 'active' ? 'success' : 'neutral'} label={e.status === 'active' ? t('academy.enrollments.statusActive') : t('academy.enrollments.statusWithdrawn')} /> },
   ]
 
   return (
     <div className="mt-6 flex flex-col gap-4">
       <div className="flex items-center justify-between">
-        <p className="text-sm text-text-secondary">تسجيل لاعب في مجموعة وإنشاء اشتراكه</p>
+        <p className="text-sm text-text-secondary">{t('academy.enrollments.manageSubtitle')}</p>
         <Dialog open={wizardOpen} onOpenChange={setWizardOpen}>
           <DialogTrigger asChild>
-            <Button size="sm">تسجيل جديد</Button>
+            <Button size="sm">{t('academy.enrollments.newEnrollment')}</Button>
           </DialogTrigger>
           <DialogContent>
-            <DialogHeader><DialogTitle>معالج التسجيل</DialogTitle></DialogHeader>
+            <DialogHeader><DialogTitle>{t('academy.enrollments.wizardTitle')}</DialogTitle></DialogHeader>
             <div className="flex flex-col gap-3">
               <Select value={wizardPlayerId} onValueChange={(v) => { setWizardPlayerId(v); setWizardGuardianId('') }}>
-                <SelectTrigger><SelectValue placeholder="اللاعب" /></SelectTrigger>
+                <SelectTrigger><SelectValue placeholder={t('academy.enrollments.player')} /></SelectTrigger>
                 <SelectContent>{players.map((p) => <SelectItem key={p.id} value={p.id}>{p.full_name}</SelectItem>)}</SelectContent>
               </Select>
               {guardians.length > 0 && (
                 <Select value={wizardGuardianId} onValueChange={setWizardGuardianId}>
-                  <SelectTrigger><SelectValue placeholder="ولي الأمر (للفوترة)" /></SelectTrigger>
-                  <SelectContent>{guardians.map((g) => <SelectItem key={g.id} value={g.id}>{g.name}{g.isPrimary ? ' (أساسي)' : ''}</SelectItem>)}</SelectContent>
+                  <SelectTrigger><SelectValue placeholder={t('academy.enrollments.guardianForBilling')} /></SelectTrigger>
+                  <SelectContent>{guardians.map((g) => <SelectItem key={g.id} value={g.id}>{g.name}{g.isPrimary ? ` ${t('academy.players.primary')}` : ''}</SelectItem>)}</SelectContent>
                 </Select>
               )}
               <Select value={wizardGroupId} onValueChange={setWizardGroupId}>
-                <SelectTrigger><SelectValue placeholder="المجموعة" /></SelectTrigger>
+                <SelectTrigger><SelectValue placeholder={t('academy.enrollments.group')} /></SelectTrigger>
                 <SelectContent>{groups.map((g) => <SelectItem key={g.id} value={g.id}>{g.name}</SelectItem>)}</SelectContent>
               </Select>
               <Select value={wizardPlanType} onValueChange={setWizardPlanType}>
@@ -281,11 +295,11 @@ export function EnrollmentSection() {
                   {selectedGroupForPrice?.subscription_price != null ? (
                     <div className="flex flex-col gap-1">
                       <div className="flex justify-between">
-                        <span className="text-text-secondary">سعر الاشتراك المعتمد</span>
-                        <span className="font-medium tabular-nums">{Number(wizardPrice).toFixed(0)} ج.م</span>
+                        <span className="text-text-secondary">{t('academy.enrollments.approvedSubscriptionPrice')}</span>
+                        <span className="font-medium tabular-nums">{Number(wizardPrice).toFixed(0)} {t('common.currency')}</span>
                       </div>
                       <div className="flex items-center justify-between">
-                        <span className="text-text-secondary">الخصم</span>
+                        <span className="text-text-secondary">{t('academy.enrollments.discount')}</span>
                         <Input
                           type="number"
                           min={0}
@@ -296,13 +310,13 @@ export function EnrollmentSection() {
                         />
                       </div>
                       <div className="mt-1 flex justify-between border-t border-accent/20 pt-1 font-semibold">
-                        <span>الإجمالي</span>
-                        <span className="tabular-nums">{Math.max(Number(wizardPrice) - Number(wizardDiscount || 0), 0).toFixed(0)} ج.م</span>
+                        <span>{t('academy.enrollments.total')}</span>
+                        <span className="tabular-nums">{Math.max(Number(wizardPrice) - Number(wizardDiscount || 0), 0).toFixed(0)} {t('common.currency')}</span>
                       </div>
                     </div>
                   ) : (
                     <p className="text-status-danger">
-                      لا يوجد سعر معتمد لهذه المجموعة — حدد سعر الاشتراك من صفحة البرامج والمجموعات أولاً.
+                      {t('academy.enrollments.noApprovedPrice')}
                     </p>
                   )}
                 </div>
@@ -312,7 +326,7 @@ export function EnrollmentSection() {
                 disabled={!wizardPlayerId || !wizardGuardianId || !wizardGroupId || !wizardStart || !wizardEnd || selectedGroupForPrice?.subscription_price == null || enrollMutation.isPending}
                 onClick={() => enrollMutation.mutate()}
               >
-                {enrollMutation.isPending ? 'جارٍ التسجيل...' : 'تسجيل وإنشاء الاشتراك'}
+                {enrollMutation.isPending ? t('academy.enrollments.enrolling') : t('academy.enrollments.enrollAndCreateSubscription')}
               </Button>
             </div>
           </DialogContent>
@@ -324,19 +338,19 @@ export function EnrollmentSection() {
         rows={enrollments}
         rowKey={(e) => e.id}
         isLoading={isLoading}
-        emptyTitle="لا يوجد تسجيلات"
-        emptyDescription="سجّل أول لاعب في مجموعة لبدء الاشتراكات"
+        emptyTitle={t('academy.enrollments.emptyTitle')}
+        emptyDescription={t('academy.enrollments.emptyDescription')}
       />
 
       <Dialog open={!!selectedEnrollment} onOpenChange={(open) => !open && setSelectedEnrollment(null)}>
         <DialogContent>
-          <DialogHeader><DialogTitle>اشتراك {selectedEnrollment?.playerName}</DialogTitle></DialogHeader>
+          <DialogHeader><DialogTitle>{t('academy.enrollments.subscriptionOf', { name: selectedEnrollment?.playerName })}</DialogTitle></DialogHeader>
           {subscription ? (
             <div className="flex flex-col gap-3 text-sm">
-              <p>الخطة: {SUBSCRIPTION_PLAN_LABELS[subscription.planType] ?? subscription.planType}</p>
-              <p>من {subscription.startDate} إلى {subscription.endDate}</p>
+              <p>{t('academy.enrollments.plan', { plan: SUBSCRIPTION_PLAN_LABELS[subscription.planType] ?? subscription.planType })}</p>
+              <p>{t('academy.enrollments.dateRange', { start: subscription.startDate, end: subscription.endDate })}</p>
               {effectiveEndQuery.data && effectiveEndQuery.data !== subscription.endDate && (
-                <p className="text-status-warning">تاريخ الانتهاء الفعلي (بعد التجميد): {effectiveEndQuery.data}</p>
+                <p className="text-status-warning">{t('academy.enrollments.effectiveEndDate', { date: effectiveEndQuery.data })}</p>
               )}
               <MoneyDisplay amount={subscription.price - subscription.discount} size="lg" />
               <StatusBadge
@@ -346,26 +360,26 @@ export function EnrollmentSection() {
 
               {subscription.status === 'pending' && currentMembership?.roleKey && ['club_manager', 'academy_manager'].includes(currentMembership.roleKey) && (
                 <Button size="sm" variant="outline" disabled={activateMutation.isPending} onClick={() => activateMutation.mutate()}>
-                  تفعيل يدوي
+                  {t('academy.enrollments.manualActivation')}
                 </Button>
               )}
 
               {(subscription.status === 'active' || subscription.status === 'frozen') && (
                 <div className="flex flex-col gap-2 border-t border-border pt-3">
-                  <p className="font-medium">تجميد الاشتراك</p>
+                  <p className="font-medium">{t('academy.enrollments.freezeSubscription')}</p>
                   <div className="flex gap-2">
                     <Input type="date" value={freezeStart} onChange={(e) => setFreezeStart(e.target.value)} />
                     <Input type="date" value={freezeEnd} onChange={(e) => setFreezeEnd(e.target.value)} />
                   </div>
-                  <Input placeholder="السبب" value={freezeReason} onChange={(e) => setFreezeReason(e.target.value)} />
+                  <Input placeholder={t('academy.enrollments.reason')} value={freezeReason} onChange={(e) => setFreezeReason(e.target.value)} />
                   <Button size="sm" disabled={!freezeStart || !freezeEnd || freezeMutation.isPending} onClick={() => freezeMutation.mutate()}>
-                    تجميد
+                    {t('academy.enrollments.freeze')}
                   </Button>
                 </div>
               )}
             </div>
           ) : (
-            <p className="text-sm text-text-secondary">لا يوجد اشتراك مرتبط.</p>
+            <p className="text-sm text-text-secondary">{t('academy.enrollments.noSubscription')}</p>
           )}
         </DialogContent>
       </Dialog>
@@ -376,8 +390,15 @@ export function EnrollmentSection() {
 // Simple activation-policy dropdown -- club_owner-scoped setting, kept
 // minimal per ADR-013 ("a simple dropdown ... is sufficient").
 export function ActivationPolicySetting() {
+  const { t } = useTranslation()
   const { currentClubId } = useAuth()
   const queryClient = useQueryClient()
+
+  const ACTIVATION_POLICY_LABELS: Record<string, string> = {
+    manual: t('academy.activationPolicyLabels.manual'),
+    first_payment: t('academy.activationPolicyLabels.first_payment'),
+    full_payment: t('academy.activationPolicyLabels.full_payment'),
+  }
 
   const { data: policy } = useQuery({
     queryKey: ['activation-policy', currentClubId],
@@ -399,7 +420,7 @@ export function ActivationPolicySetting() {
 
   return (
     <div className="flex items-center gap-3">
-      <label className="text-sm font-medium text-text-secondary">سياسة تفعيل الاشتراك</label>
+      <label className="text-sm font-medium text-text-secondary">{t('academy.enrollments.activationPolicy')}</label>
       <Select value={policy ?? 'first_payment'} onValueChange={(v) => updateMutation.mutate(v)}>
         <SelectTrigger className="w-48"><SelectValue /></SelectTrigger>
         <SelectContent>

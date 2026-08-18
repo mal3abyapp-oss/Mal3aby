@@ -1,5 +1,6 @@
 import { useState, type FormEvent } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { useTranslation } from 'react-i18next'
 import { supabase } from '@/lib/supabase/client'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -9,6 +10,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 // session is already established by Supabase's own redirect handling by
 // the time this page renders; we just call updateUser with the new password.
 export function ResetPasswordPage() {
+  const { t } = useTranslation()
   const [password, setPassword] = useState('')
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -25,7 +27,7 @@ export function ResetPasswordPage() {
     setSubmitting(false)
 
     if (updateError) {
-      setError('تعذّر تحديث كلمة المرور. جرّب طلب رابط إعادة تعيين جديد.')
+      setError(t('auth.resetPasswordPage.updateError'))
       return
     }
 
@@ -37,16 +39,16 @@ export function ResetPasswordPage() {
     <div className="mx-auto flex min-h-[70vh] max-w-sm items-center justify-center px-4 py-12">
       <Card className="w-full">
         <CardHeader>
-          <CardTitle className="text-center text-xl">تعيين كلمة مرور جديدة</CardTitle>
+          <CardTitle className="text-center text-xl">{t('auth.resetPasswordPage.title')}</CardTitle>
         </CardHeader>
         <CardContent>
           {done ? (
-            <p className="text-center text-sm text-status-success">تم تحديث كلمة المرور بنجاح.</p>
+            <p className="text-center text-sm text-status-success">{t('auth.resetPasswordPage.successMessage')}</p>
           ) : (
             <form onSubmit={handleSubmit} className="flex flex-col gap-4">
               <Input
                 type="password"
-                placeholder="كلمة المرور الجديدة"
+                placeholder={t('auth.resetPasswordPage.newPasswordPlaceholder')}
                 required
                 minLength={8}
                 value={password}
@@ -58,7 +60,7 @@ export function ResetPasswordPage() {
                 </p>
               )}
               <Button type="submit" disabled={submitting}>
-                {submitting ? 'جارٍ الحفظ...' : 'حفظ كلمة المرور'}
+                {submitting ? t('auth.resetPasswordPage.saving') : t('auth.resetPasswordPage.savePassword')}
               </Button>
             </form>
           )}

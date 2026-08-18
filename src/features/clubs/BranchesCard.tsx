@@ -1,4 +1,5 @@
 import { useState, type FormEvent } from 'react'
+import { useTranslation } from 'react-i18next'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '@/lib/supabase/client'
 import { useAuth } from '@/app/providers/AuthProvider'
@@ -50,6 +51,7 @@ async function fetchBranches(clubId: string): Promise<BranchRow[]> {
 }
 
 export function BranchesCard() {
+  const { t } = useTranslation()
   const { currentClubId } = useAuth()
   const queryClient = useQueryClient()
   const [editingBranch, setEditingBranch] = useState<BranchRow | null>(null)
@@ -112,7 +114,7 @@ export function BranchesCard() {
       void queryClient.invalidateQueries({ queryKey: ['branches-for-bookings', currentClubId] })
       void queryClient.invalidateQueries({ queryKey: ['branches-for-fields', currentClubId] })
     },
-    onError: (error) => setFormError(translateSupabaseError(error, 'تعذّر حفظ بيانات الفرع.')),
+    onError: (error) => setFormError(translateSupabaseError(error, t('clubs.branchesCard.saveError'))),
   })
 
   function handleSubmit(e: FormEvent) {
@@ -123,24 +125,24 @@ export function BranchesCard() {
   const formFields = (
     <>
       <div className="flex flex-col gap-1.5">
-        <label className="text-sm font-medium text-text-secondary">اسم الفرع</label>
+        <label className="text-sm font-medium text-text-secondary">{t('clubs.branchesCard.nameLabel')}</label>
         <Input required value={name} onChange={(e) => setName(e.target.value)} />
       </div>
       <div className="flex flex-col gap-1.5">
-        <label className="text-sm font-medium text-text-secondary">كود الفرع</label>
+        <label className="text-sm font-medium text-text-secondary">{t('clubs.branchesCard.codeLabel')}</label>
         <Input required value={branchCode} onChange={(e) => setBranchCode(e.target.value.toUpperCase())} />
       </div>
       <div className="flex flex-col gap-1.5">
-        <label className="text-sm font-medium text-text-secondary">العنوان</label>
+        <label className="text-sm font-medium text-text-secondary">{t('clubs.branchesCard.addressLabel')}</label>
         <Input value={address} onChange={(e) => setAddress(e.target.value)} />
       </div>
       <div className="flex flex-col gap-1.5">
-        <label className="text-sm font-medium text-text-secondary">رقم الهاتف</label>
+        <label className="text-sm font-medium text-text-secondary">{t('clubs.branchesCard.phoneLabel')}</label>
         <Input value={phone} onChange={(e) => setPhone(e.target.value)} />
       </div>
       {formError && <p role="alert" className="text-sm text-status-danger">{formError}</p>}
       <Button type="submit" disabled={!name.trim() || !branchCode.trim() || saveMutation.isPending}>
-        {saveMutation.isPending ? 'جارٍ الحفظ...' : 'حفظ'}
+        {saveMutation.isPending ? t('clubs.branchesCard.saving') : t('clubs.branchesCard.save')}
       </Button>
     </>
   )
@@ -148,20 +150,20 @@ export function BranchesCard() {
   return (
     <Card>
       <CardHeader className="flex flex-row items-center justify-between">
-        <CardTitle className="text-base">الفروع</CardTitle>
+        <CardTitle className="text-base">{t('clubs.branchesCard.title')}</CardTitle>
         <Dialog open={createOpen} onOpenChange={setCreateOpen}>
           <DialogTrigger asChild>
-            <Button size="sm" onClick={openCreate}>إضافة فرع</Button>
+            <Button size="sm" onClick={openCreate}>{t('clubs.branchesCard.addBranch')}</Button>
           </DialogTrigger>
           <DialogContent>
-            <DialogHeader><DialogTitle>إضافة فرع</DialogTitle></DialogHeader>
+            <DialogHeader><DialogTitle>{t('clubs.branchesCard.addBranch')}</DialogTitle></DialogHeader>
             <form onSubmit={handleSubmit} className="flex flex-col gap-4">{formFields}</form>
           </DialogContent>
         </Dialog>
       </CardHeader>
       <CardContent className="flex flex-col gap-2">
-        {isLoading && <p className="text-sm text-text-secondary">جارٍ التحميل...</p>}
-        {!isLoading && branches.length === 0 && <p className="text-sm text-text-secondary">لا توجد فروع بعد.</p>}
+        {isLoading && <p className="text-sm text-text-secondary">{t('clubs.branchesCard.loading')}</p>}
+        {!isLoading && branches.length === 0 && <p className="text-sm text-text-secondary">{t('clubs.branchesCard.noBranches')}</p>}
         {branches.map((b) => (
           <button
             key={b.id}
@@ -172,14 +174,14 @@ export function BranchesCard() {
               <p className="font-medium">{b.name} <span className="text-xs text-text-secondary">({b.branchCode})</span></p>
               {b.address && <p className="text-xs text-text-secondary">{b.address}</p>}
             </div>
-            <StatusBadge tone={b.status === 'active' ? 'success' : 'neutral'} label={b.status === 'active' ? 'نشط' : b.status} />
+            <StatusBadge tone={b.status === 'active' ? 'success' : 'neutral'} label={b.status === 'active' ? t('clubs.branchesCard.active') : b.status} />
           </button>
         ))}
       </CardContent>
 
       <Dialog open={!!editingBranch} onOpenChange={(open) => !open && setEditingBranch(null)}>
         <DialogContent>
-          <DialogHeader><DialogTitle>تعديل {editingBranch?.name}</DialogTitle></DialogHeader>
+          <DialogHeader><DialogTitle>{t('clubs.branchesCard.editTitle', { name: editingBranch?.name })}</DialogTitle></DialogHeader>
           <form onSubmit={handleSubmit} className="flex flex-col gap-4">{formFields}</form>
         </DialogContent>
       </Dialog>

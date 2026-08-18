@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { Button } from '@/components/ui/button'
 import { ChevronRight, ChevronLeft } from 'lucide-react'
 import { cn } from '@/lib/utils'
@@ -6,6 +7,7 @@ import { BOOKING_STATUS_LABELS, BOOKING_STATUS_TONE, FIELD_BLOCK_TYPE_LABELS, ty
 import { StatusBadge } from '@/components/ui/status-badge'
 import { resolveHoursForDay, useResolvedFieldPrice } from './useFieldPricing'
 import { fromInstant, formatInstant } from '@/lib/domain/time'
+import { useDirection } from '@/app/providers/DirectionProvider'
 import type { QuickBookingSlot } from './QuickBookingSheet'
 
 // V1 Operational Product Rebuild -- Section F (Mobile Bookings): a
@@ -44,6 +46,8 @@ export function BookingsMobileView({
   onSlotSelect: (slot: QuickBookingSlot) => void
   onBookingSelect: (booking: BookingRow) => void
 }) {
+  const { t } = useTranslation()
+  const { locale } = useDirection()
   const [selectedFieldId, setSelectedFieldId] = useState<string | null>(fields[0]?.id ?? null)
   const activeFieldId = selectedFieldId ?? fields[0]?.id ?? null
   const activeField = fields.find((f) => f.id === activeFieldId)
@@ -102,11 +106,11 @@ export function BookingsMobileView({
             forward=right), rtl:rotate-180 flips for RTL. Verified live
             in both directions after an earlier version had this
             backwards. */}
-        <Button variant="outline" size="icon" aria-label="اليوم السابق" onClick={() => shiftDate(-1)}><ChevronLeft className="size-4 rtl:rotate-180" /></Button>
+        <Button variant="outline" size="icon" aria-label={t('bookings.page.previousDay')} onClick={() => shiftDate(-1)}><ChevronLeft className="size-4 rtl:rotate-180" /></Button>
         <Button variant="outline" size="sm" className="flex-1" onClick={() => onDateChange(new Date().toISOString().slice(0, 10))}>
-          {isToday ? 'اليوم' : new Date(`${date}T12:00:00`).toLocaleDateString('ar-EG', { weekday: 'long', day: 'numeric', month: 'long' })}
+          {isToday ? t('common.today') : new Date(`${date}T12:00:00`).toLocaleDateString(locale === 'en' ? 'en-US' : 'ar-EG', { weekday: 'long', day: 'numeric', month: 'long' })}
         </Button>
-        <Button variant="outline" size="icon" aria-label="اليوم التالي" onClick={() => shiftDate(1)}><ChevronRight className="size-4 rtl:rotate-180" /></Button>
+        <Button variant="outline" size="icon" aria-label={t('bookings.page.nextDay')} onClick={() => shiftDate(1)}><ChevronRight className="size-4 rtl:rotate-180" /></Button>
       </div>
 
       {/* Field chips */}
@@ -129,21 +133,21 @@ export function BookingsMobileView({
       {isToday && activeField && (
         <div className="grid grid-cols-2 gap-2">
           <div className={cn('rounded-lg border p-2.5 text-sm', nowBusy ? 'border-status-danger/30 bg-status-danger/5' : 'border-status-success/30 bg-status-success/5')}>
-            <p className="text-xs text-text-secondary">الآن</p>
+            <p className="text-xs text-text-secondary">{t('bookings.mobile.now')}</p>
             {nowBusy ? (
               <p className="font-medium text-status-danger">{nowBusy.customerName}</p>
             ) : (
-              <p className="font-medium text-status-success">متاح الآن</p>
+              <p className="font-medium text-status-success">{t('bookings.mobile.availableNow')}</p>
             )}
           </div>
           <div className="rounded-lg border border-border p-2.5 text-sm">
-            <p className="text-xs text-text-secondary">التالي</p>
+            <p className="text-xs text-text-secondary">{t('bookings.mobile.next')}</p>
             {nextBooking ? (
               <p className="font-medium tabular-nums">
-                {formatInstant(nextBooking.startAt, clubTimezone, { hour: '2-digit', minute: '2-digit' })} — {nextBooking.customerName}
+                {formatInstant(nextBooking.startAt, clubTimezone, { hour: '2-digit', minute: '2-digit' }, locale)} — {nextBooking.customerName}
               </p>
             ) : (
-              <p className="text-text-secondary">لا يوجد حجوزات قادمة</p>
+              <p className="text-text-secondary">{t('bookings.mobile.noUpcomingBookings')}</p>
             )}
           </div>
         </div>
@@ -152,15 +156,15 @@ export function BookingsMobileView({
       {/* Current price banner */}
       {activeField && (
         <div className="rounded-lg border border-accent/30 bg-accent/5 p-2.5 text-sm">
-          <span className="text-text-secondary">السعر الآن: </span>
+          <span className="text-text-secondary">{t('bookings.mobile.priceNow')}</span>
           {currentPrice != null ? (
-            <span className="font-semibold tabular-nums">{currentPrice.toFixed(0)} ج.م/ساعة</span>
+            <span className="font-semibold tabular-nums">{t('bookings.mobile.pricePerHour', { price: currentPrice.toFixed(0) })}</span>
           ) : (
-            <span className="text-status-danger">لا يوجد سعر معتمد</span>
+            <span className="text-status-danger">{t('bookings.mobile.noApprovedPrice')}</span>
           )}
           {hours && (
             <span className="ms-2 text-text-secondary">
-              {hours.isUnrestricted ? '(مفتوح على مدار اليوم)' : hours.isClosed ? '(مغلق اليوم)' : `(${hours.openTime?.slice(0, 5)}–${hours.closeTime?.slice(0, 5)})`}
+              {hours.isUnrestricted ? `(${t('bookings.page.openAllDay')})` : hours.isClosed ? `(${t('bookings.page.closedToday')})` : `(${hours.openTime?.slice(0, 5)}–${hours.closeTime?.slice(0, 5)})`}
             </span>
           )}
         </div>
@@ -187,7 +191,7 @@ export function BookingsMobileView({
                   <span className="text-xs text-text-secondary tabular-nums">{label}</span>
                   <span className="font-medium">{b.customerName}</span>
                 </div>
-                <StatusBadge tone={BOOKING_STATUS_TONE[b.status] ?? 'neutral'} label={BOOKING_STATUS_LABELS[b.status] ?? b.status} />
+                <StatusBadge tone={BOOKING_STATUS_TONE[b.status] ?? 'neutral'} label={t(`bookings.statusLabels.${b.status}`, { defaultValue: BOOKING_STATUS_LABELS[b.status] ?? b.status })} />
               </button>
             )
           }
@@ -200,7 +204,7 @@ export function BookingsMobileView({
               <div key={hour} className="flex items-center justify-between gap-2 bg-status-danger/5 p-3">
                 <div className="flex flex-col">
                   <span className="text-xs text-text-secondary tabular-nums">{label}</span>
-                  <span className="font-medium text-status-danger">{FIELD_BLOCK_TYPE_LABELS[blk.type] ?? blk.type}</span>
+                  <span className="font-medium text-status-danger">{t(`bookings.fieldBlockTypeLabels.${blk.type}`, { defaultValue: FIELD_BLOCK_TYPE_LABELS[blk.type] ?? blk.type })}</span>
                 </div>
                 {blk.reason && <span className="text-xs text-status-danger/80">{blk.reason}</span>}
               </div>
@@ -211,7 +215,7 @@ export function BookingsMobileView({
             return (
               <div key={hour} className="flex items-center gap-3 bg-muted/30 p-3 text-text-secondary/60">
                 <span className="text-xs tabular-nums">{label}</span>
-                <span className="text-sm">مغلق</span>
+                <span className="text-sm">{t('bookings.mobile.closed')}</span>
               </div>
             )
           }
@@ -223,7 +227,7 @@ export function BookingsMobileView({
               className="flex items-center gap-3 p-3 text-start active:bg-accent/10"
             >
               <span className="text-xs text-text-secondary tabular-nums">{label}</span>
-              <span className="text-sm text-status-success">متاح</span>
+              <span className="text-sm text-status-success">{t('bookings.mobile.available')}</span>
             </button>
           )
         })}

@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { NavLink, Outlet } from 'react-router-dom'
+import { useTranslation } from 'react-i18next'
 import { cn } from '@/lib/utils'
 import { Sheet, SheetContent, SheetTitle } from '@/components/ui/sheet'
 import { Button } from '@/components/ui/button'
@@ -37,56 +38,57 @@ import type { LucideIcon } from 'lucide-react'
 // Award (was duplicating Plans' Sparkles).
 interface NavItem {
   to: string
-  label: string
+  labelKey: string
   icon: LucideIcon
 }
 
 interface NavSection {
-  title: string | null
+  titleKey: string | null
   items: NavItem[]
 }
 
 const navSections: NavSection[] = [
   {
-    title: null,
-    items: [{ to: '/platform', label: 'نظرة عامة', icon: LayoutDashboard }],
+    titleKey: null,
+    items: [{ to: '/platform', labelKey: 'platform.nav.overview', icon: LayoutDashboard }],
   },
   {
-    title: 'الأندية',
+    titleKey: 'platform.nav.sectionClubs',
     items: [
-      { to: '/platform/clubs', label: 'كل الأندية', icon: Building2 },
-      { to: '/platform/owners', label: 'أصحاب الأندية', icon: Users },
+      { to: '/platform/clubs', labelKey: 'platform.nav.allClubs', icon: Building2 },
+      { to: '/platform/owners', labelKey: 'platform.nav.clubOwners', icon: Users },
     ],
   },
   {
-    title: 'التجارة',
+    titleKey: 'platform.nav.sectionCommerce',
     items: [
-      { to: '/platform/plans', label: 'الخطط', icon: Sparkles },
-      { to: '/platform/leads', label: 'طلبات التواصل', icon: Inbox },
+      { to: '/platform/plans', labelKey: 'platform.nav.plans', icon: Sparkles },
+      { to: '/platform/leads', labelKey: 'platform.nav.leads', icon: Inbox },
     ],
   },
   {
-    title: 'المراقبة',
+    titleKey: 'platform.nav.sectionMonitoring',
     items: [
-      { to: '/platform/reports', label: 'التقارير', icon: BarChart3 },
-      { to: '/platform/alerts', label: 'التنبيهات', icon: Bell },
-      { to: '/platform/trials', label: 'التجارب المجانية', icon: Award },
-      { to: '/platform/audit', label: 'سجل التدقيق', icon: ShieldCheck },
+      { to: '/platform/reports', labelKey: 'platform.nav.reports', icon: BarChart3 },
+      { to: '/platform/alerts', labelKey: 'platform.nav.alerts', icon: Bell },
+      { to: '/platform/trials', labelKey: 'platform.nav.trials', icon: Award },
+      { to: '/platform/audit', labelKey: 'platform.nav.auditLog', icon: ShieldCheck },
     ],
   },
   {
-    title: null,
-    items: [{ to: '/platform/settings', label: 'الإعدادات', icon: Settings }],
+    titleKey: null,
+    items: [{ to: '/platform/settings', labelKey: 'platform.nav.settings', icon: Settings }],
   },
 ]
 
 function PlatformNavList({ onNavigate }: { onNavigate?: () => void }) {
+  const { t } = useTranslation()
   return (
     <nav className="flex flex-1 flex-col gap-4 px-2">
       {navSections.map((section, i) => (
-        <div key={section.title ?? `section-${i}`} className="flex flex-col gap-1">
-          {section.title && (
-            <p className="px-3 pb-1 text-xs font-semibold text-white/40">{section.title}</p>
+        <div key={section.titleKey ?? `section-${i}`} className="flex flex-col gap-1">
+          {section.titleKey && (
+            <p className="px-3 pb-1 text-xs font-semibold text-white/40">{t(section.titleKey)}</p>
           )}
           {section.items.map((item) => (
             <NavLink
@@ -102,7 +104,7 @@ function PlatformNavList({ onNavigate }: { onNavigate?: () => void }) {
               }
             >
               <item.icon className="size-4" />
-              {item.label}
+              {t(item.labelKey)}
             </NavLink>
           ))}
         </div>
@@ -120,6 +122,7 @@ export function PlatformLayout() {
   // mobile bottom nav. Fixed with a hamburger + slide-in Sheet reusing
   // the exact same navSections/NavLink markup as the desktop sidebar
   // (no navigation model duplicated, just presented in two containers).
+  const { t } = useTranslation()
   const [mobileNavOpen, setMobileNavOpen] = useState(false)
 
   return (
@@ -149,7 +152,7 @@ export function PlatformLayout() {
             <Button
               variant="ghost"
               size="icon"
-              aria-label="فتح قائمة التنقل"
+              aria-label={t('platform.openNavAria')}
               onClick={() => setMobileNavOpen(true)}
             >
               <Menu className="size-5" />

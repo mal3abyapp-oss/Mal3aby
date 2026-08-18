@@ -1,10 +1,11 @@
 import { useEffect, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '@/lib/supabase/client'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { translateSupabaseError } from '@/lib/errors'
-import { DAY_NAMES_AR, type OperatingHoursRow } from '@/lib/domain/fields'
+import { type OperatingHoursRow } from '@/lib/domain/fields'
 
 // P1-5 (critical usability fix pass, 2026-08-16): the old hours UX was
 // "pick one day -> enter times -> save -> repeat seven times." This is
@@ -18,7 +19,7 @@ interface DaySchedule {
   closeTime: string
 }
 
-const WEEK_START_SATURDAY = 6 // DAY_NAMES_AR/day_of_week: 0=Sunday..6=Saturday. Display Saturday-first (Mala3by's week).
+const WEEK_START_SATURDAY = 6 // day_of_week: 0=Sunday..6=Saturday. Display Saturday-first (Mala3by's week).
 const DISPLAY_ORDER = [6, 0, 1, 2, 3, 4, 5]
 
 type Schedule = [DaySchedule, DaySchedule, DaySchedule, DaySchedule, DaySchedule, DaySchedule, DaySchedule]
@@ -49,6 +50,8 @@ export function OperatingHoursEditor({
   hasAnyConfigured: boolean
   operatingHours: OperatingHoursRow[]
 }) {
+  const { t } = useTranslation()
+  const dayNames = [0, 1, 2, 3, 4, 5, 6].map((d) => t(`academy.structure.dayOfWeekLabels.${d}`))
   const queryClient = useQueryClient()
   const [schedule, setSchedule] = useState<Schedule>(() => buildInitialSchedule(operatingHours))
   const [saveError, setSaveError] = useState<string | null>(null)
@@ -121,7 +124,7 @@ export function OperatingHoursEditor({
       void queryClient.invalidateQueries({ queryKey: ['operating-hours', fieldId] })
       void queryClient.invalidateQueries({ queryKey: ['field-operating-hours-all', clubId] })
     },
-    onError: (error) => setSaveError(translateSupabaseError(error, 'تعذّر حفظ مواعيد العمل.')),
+    onError: (error) => setSaveError(translateSupabaseError(error, t('clubs.operatingHoursEditor.saveError'))),
   })
 
   const hasTimeError = schedule.some((d) => d.isOpen && d.openTime >= d.closeTime)
@@ -130,7 +133,7 @@ export function OperatingHoursEditor({
     <div className="flex flex-col gap-4">
       {!hasAnyConfigured && !dirty && (
         <p className="rounded-md bg-status-warning/10 p-2 text-sm text-status-warning">
-          لم يتم تحديد مواعيد عمل بعد — الملعب متاح للحجز على مدار اليوم بدون قيود. حدد مواعيد الأسبوع أدناه لتقييد الحجز بساعات العمل الفعلية.
+          {t('clubs.operatingHoursEditor.noHoursWarning')}
         </p>
       )}
 
@@ -148,18 +151,18 @@ export function OperatingHoursEditor({
               >
                 <span className={`absolute top-0.5 size-5 rounded-full bg-white shadow transition-transform ${d.isOpen ? 'translate-x-0.5' : 'translate-x-5'}`} />
               </button>
-              <span className="w-16 shrink-0 text-sm font-medium">{DAY_NAMES_AR[day]}</span>
+              <span className="w-16 shrink-0 text-sm font-medium">{dayNames[day]}</span>
               {d.isOpen ? (
                 <div className="flex flex-1 items-center gap-2">
                   <Input type="time" value={d.openTime} onChange={(e) => updateDay(day, { openTime: e.target.value })} className="w-32" />
-                  <span className="text-text-secondary">إلى</span>
+                  <span className="text-text-secondary">{t('clubs.operatingHoursEditor.to')}</span>
                   <Input type="time" value={d.closeTime} onChange={(e) => updateDay(day, { closeTime: e.target.value })} className="w-32" />
                   {d.openTime >= d.closeTime && (
-                    <span className="text-xs text-status-danger">وقت الفتح يجب أن يسبق الإغلاق</span>
+                    <span className="text-xs text-status-danger">{t('clubs.operatingHoursEditor.openBeforeCloseError')}</span>
                   )}
                 </div>
               ) : (
-                <span className="flex-1 text-sm text-text-secondary">مغلق</span>
+                <span className="flex-1 text-sm text-text-secondary">{t('clubs.operatingHoursEditor.closed')}</span>
               )}
             </div>
           )
@@ -168,10 +171,10 @@ export function OperatingHoursEditor({
 
       <div className="flex flex-wrap gap-2">
         <Button type="button" variant="outline" size="sm" onClick={copySaturdayToAll}>
-          نسخ السبت لكل الأيام
+          {t('clubs.operatingHoursEditor.copySaturdayToAll')}
         </Button>
         <Button type="button" variant="outline" size="sm" onClick={applyToWeekdays}>
-          تطبيق على أيام الأسبوع (عدا الجمعة)
+          {t('clubs.operatingHoursEditor.applyToWeekdays')}
         </Button>
       </div>
 
@@ -181,7 +184,7 @@ export function OperatingHoursEditor({
         disabled={saveMutation.isPending || hasTimeError || !dirty}
         onClick={() => saveMutation.mutate()}
       >
-        {saveMutation.isPending ? 'جارٍ الحفظ...' : 'حفظ مواعيد الأسبوع'}
+        {saveMutation.isPending ? t('clubs.operatingHoursEditor.saving') : t('clubs.operatingHoursEditor.save')}
       </Button>
     </div>
   )
