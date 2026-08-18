@@ -156,6 +156,52 @@ function withJitter(baseMs: number): number {
   return baseMs + randomInt(-jitterRange, jitterRange + 1)
 }
 
+/**
+ * REAL BUG found live (MAL3ABY WHATSAPP QR IMAGE + INVOICE DOCUMENT
+ * DELIVERY task): `socket.sendMessage()` has no built-in timeout of its
+ * own -- confirmed live via a genuinely stuck notification_queue row:
+ * 3 rows claimed together in one batch sat in `status='processing'`
+ * for 5+ minutes with ZERO error recorded and a simultaneously healthy,
+ * `connected`, actively-reporting `whatsapp_accounts` row, meaning the
+ * connector process was alive and the WhatsApp connection was alive,
+ * but the specific `socket.sendMessage()` call itself never resolved
+ * OR rejected -- a genuine hang, not a network-level timeout Baileys
+ * itself would eventually surface as an error (that DOES happen
+ * sometimes, confirmed by the earlier "Timed Out" errors seen during
+ * this same investigation -- this is a DIFFERENT, worse failure mode
+ * where not even that internal timeout fires). Because
+ * QueueConsumer.pollOnce() processes one claimed row at a time in a
+ * simple loop, a single hung sendMessage() call blocks the ENTIRE
+ * batch indefinitely -- not just that one row.
+ *
+ * Fix: wrap every sendMessage() call in an explicit, bounded timeout
+ * here at the provider layer, so a hang can never propagate further
+ * than this one call. 45s is generous for a real WhatsApp media
+ * upload+send round-trip (QR PNGs are a few KB, invoice PDFs tens of
+ * KB) while still being far short of blocking the whole queue
+ * indefinitely -- a genuinely stuck send now surfaces as a normal,
+ * reportable failure through the existing capped-retry path instead of
+ * silently starving every other queued notification.
+ */
+const SEND_TIMEOUT_MS = 45_000
+
+function withSendTimeout<T>(promise: Promise<T>, label: string): Promise<T> {
+  return new Promise<T>((resolve, reject) => {
+    const timer = setTimeout(() => {
+      reject(new Error(`${label} send timed out after ${SEND_TIMEOUT_MS}ms (socket.sendMessage() never resolved)`))
+    }, SEND_TIMEOUT_MS)
+    promise
+      .then((value) => {
+        clearTimeout(timer)
+        resolve(value)
+      })
+      .catch((err) => {
+        clearTimeout(timer)
+        reject(err)
+      })
+  })
+}
+
 export interface BaileysProviderHooks {
   onStateChange?: (state: ConnectionState, detail?: { qr?: string; qrTtlSeconds?: number; connectedPhoneNumber?: string; error?: string }) => void
   /** Called whenever Baileys persists updated credentials to the local auth dir -- the caller is responsible for encrypting the dir's contents and pushing to Supabase (see SessionStore.encryptAuthDirForClub). */
@@ -462,7 +508,7 @@ export class BaileysProvider implements WhatsAppProvider {
     const jid = `${toPhoneDigitsOnly}@s.whatsapp.net`
     let textProviderReference: string | undefined
     try {
-      const textResult = await this.socket.sendMessage(jid, { text: body })
+      const textResult = await withSendTimeout(this.socket.sendMessage(jid, { text: body }), 'text')
       textProviderReference = textResult?.key?.id ?? undefined
     } catch (err) {
       return { success: false, error: (err as Error).message }
@@ -473,15 +519,17 @@ export class BaileysProvider implements WhatsAppProvider {
     }
 
     try {
-      const mediaResult =
+      const mediaResult = await withSendTimeout(
         media.kind === 'image'
-          ? await this.socket.sendMessage(jid, { image: media.buffer, caption: media.caption })
-          : await this.socket.sendMessage(jid, {
+          ? this.socket.sendMessage(jid, { image: media.buffer, caption: media.caption })
+          : this.socket.sendMessage(jid, {
               document: media.buffer,
               mimetype: media.mimetype ?? 'application/octet-stream',
               fileName: media.fileName ?? 'attachment',
               caption: media.caption,
-            })
+            }),
+        'media',
+      )
       return { success: true, providerReference: mediaResult?.key?.id ?? textProviderReference }
     } catch (err) {
       // Text already went out to the customer's phone at this point --

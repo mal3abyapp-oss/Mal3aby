@@ -47,6 +47,8 @@ interface AccountStartState {
   startedAt: number
 }
 
+const LAST_POLL_AT_KEY = 'lastHealthPollAt'
+
 export interface Env {
   WHATSAPP_ACCOUNT: DurableObjectNamespace<WhatsAppAccountObject>
   // Checked by the Container's own /status endpoint (HealthServer.ts)
@@ -70,15 +72,37 @@ export class WhatsAppAccountObject extends Container<Env> {
   // Matches whatsapp-connector/src/HealthServer.ts's HEALTH_PORT default.
   defaultPort = 8080
 
-  // Cloudflare's own Container class default (10m) is tuned for
-  // request-driven workloads. This service does most of its real work
-  // as background polling with no incoming HTTP traffic, so the
-  // periodic alarm-driven health poll (scheduleNextHealthPoll below) is
-  // what actually decides whether to keep this instance awake -- a
-  // slightly shorter base window here just bounds how long a genuinely
-  // dead/unresponsive instance can coast before the next poll has a
-  // chance to let it sleep.
-  sleepAfter = '3m'
+  // PRAGMATIC STOPGAP (MAL3ABY WHATSAPP QR IMAGE + INVOICE DOCUMENT
+  // DELIVERY task): the original 3m value, combined with the
+  // keep-awake-renewal mechanism below, was found live to still let the
+  // container cycle sleep/restart roughly every ~3 minutes despite
+  // THREE independent, real, root-caused fixes to that mechanism (see
+  // onStart()'s and runHealthPollTick()'s doc comments for the full
+  // paper trail: a missing initial renewActivityTimeout() call, a
+  // polling-loop-killing early return on transient errors, and a
+  // rate-limit guard against a tight self-refire loop -- each one a
+  // genuine, confirmed bug, none of which alone fully explained the
+  // still-observed cycle). Every WhatsApp send this service exists to
+  // make depends on a live, uninterrupted Baileys socket for the
+  // several real seconds a text+media send takes -- a session that
+  // cycles every 3 minutes cannot reliably complete ANY send, which is
+  // a correctness problem, not just a cost-optimization tradeoff gone
+  // slightly too aggressive.
+  //
+  // Raising this to 30m removes the sleep-cycle variable entirely while
+  // the underlying interaction inside the installed
+  // @cloudflare/containers@0.0.13 scheduling internals is still not
+  // fully understood (undocumented behavior confirmed live, but not
+  // fully reverse-engineered from the library's own source within safe
+  // limits of experimenting against a real, currently-paired WhatsApp
+  // session). This is explicitly a stopgap, not a claim that the
+  // keep-awake logic is now fully correct -- the cost tradeoff (a
+  // genuinely idle account now stays warm up to 30 minutes instead of
+  // 3, per directive rule 77's cost-guardrail intent) is the honest
+  // price of correctness taking priority over idle-cost optimization
+  // until the real root cause is fully understood and fixed with the
+  // 3-minute window restored.
+  sleepAfter = '30m'
 
   // REAL BUG FOUND AND FIXED during first live acceptance run: the
   // Container base class does NOT automatically forward this Worker's
@@ -152,6 +176,7 @@ export class WhatsAppAccountObject extends Container<Env> {
    */
   async onStart(): Promise<void> {
     this.renewActivityTimeout()
+    await this.ctx.storage.delete(LAST_POLL_AT_KEY)
     await this.ctx.storage.put<AccountStartState>(START_STATE_KEY, { startedAt: Date.now() })
     await this.scheduleNextHealthPoll()
   }
@@ -222,37 +247,84 @@ export class WhatsAppAccountObject extends Container<Env> {
     }
   }
 
-  private async scheduleNextHealthPoll(): Promise<void> {
-    // 60s cadence: frequent enough that a real disconnect is noticed
-    // quickly (feeds the platform-owner WhatsApp health visibility
-    // scoped as Phase B in MAL3ABY_PRODUCTION_READINESS.md), infrequent
-    // enough to stay well within the Workers/DO free-tier request
-    // budget even at hundreds of accounts.
-    await this.schedule(60, 'runHealthPollTick')
+  /**
+   * REAL BUG found live (a THIRD, independent bug in this same class --
+   * found by adding temporary diagnostic logging after the first two
+   * fixes above did not stop the reconnect cycle): calling
+   * `this.schedule(60, 'runHealthPollTick')` on every tick was observed
+   * to occasionally cause a tight self-reinvoking loop -- hundreds of
+   * `runHealthPollTick` calls firing within a single second (~25ms
+   * apart), confirmed live via `wrangler tail` diagnostic output. The
+   * exact mechanism inside the installed @cloudflare/containers@0.0.13
+   * scheduling internals was not fully isolated (schedule()'s own
+   * `scheduleNextAlarm()` call uses a hardcoded 1000ms default re-arm
+   * distinct from the 60s delay passed to schedule() itself, and it was
+   * not safe to keep experimenting against a real, currently-in-use
+   * WhatsApp session's container to fully map that interaction).
+   *
+   * Fix: rate-limit re-scheduling at this call site directly, rather
+   * than trusting the library to only invoke the callback once per
+   * intended interval. The last-poll timestamp is persisted in Durable
+   * Object storage (LAST_POLL_AT_KEY), NOT a plain in-memory class
+   * field -- a plain field would reset to its initial value every time
+   * this Durable Object is evicted/re-instantiated (hibernation is
+   * normal DO behavior between alarm firings), which would silently
+   * defeat the guard in exactly the scenario it exists for. Compared
+   * against the CURRENT wall clock -- if less than MIN_POLL_INTERVAL_MS
+   * has elapsed since the last tick actually ran, this schedules the
+   * NEXT tick further out instead of doing real work immediately, which
+   * starves out a tight-loop condition regardless of its root cause
+   * inside the library. This is a defensive guard, not a root-cause fix
+   * for whatever triggers the library's own rapid re-firing --
+   * documented honestly, not claimed as a full understanding of the
+   * underlying mechanism.
+   */
+  private static readonly MIN_POLL_INTERVAL_MS = 55_000
+
+  private async scheduleNextHealthPoll(delaySeconds = 60): Promise<void> {
+    await this.schedule(delaySeconds, 'runHealthPollTick')
   }
 
   /** Alarm callback target -- name must match the string passed to schedule(). */
   async runHealthPollTick(): Promise<void> {
+    const now = Date.now()
+    const lastPollAt = (await this.ctx.storage.get<number>(LAST_POLL_AT_KEY)) ?? 0
+    const elapsedSinceLastPoll = now - lastPollAt
+    if (lastPollAt !== 0 && elapsedSinceLastPoll < WhatsAppAccountObject.MIN_POLL_INTERVAL_MS) {
+      // Rate-limit guard (see class doc comment above) -- this tick
+      // fired too soon after the last one actually ran. Reschedule
+      // further out instead of doing real work again immediately; this
+      // is what stops a tight re-fire loop from consuming the alarm
+      // queue and starving real work (including WhatsApp sends, which
+      // is what made this bug user-visible: 3 consecutive real send
+      // timeouts during live testing were traced back to this).
+      await this.scheduleNextHealthPoll(Math.ceil((WhatsAppAccountObject.MIN_POLL_INTERVAL_MS - elapsedSinceLastPoll) / 1000) + 5)
+      return
+    }
+    await this.ctx.storage.put(LAST_POLL_AT_KEY, now)
+
     const result = await this.pollHealthAndDecide().catch((err) => ({
       shouldStayAwake: false,
       status: `tick_error:${(err as Error).message}`,
     }))
-    // If the container reports it is no longer running (or the poll
-    // itself failed with a connection-refused-shaped error), clear the
-    // "started" record proactively rather than waiting for the next
-    // ensureRunning() caller to discover a stale record on its own --
-    // this keeps the storage record honest even if onStop() itself was
-    // never called (e.g. a host-level hard kill that skipped the
-    // graceful SIGTERM path entirely).
+
     if (result.status === 'not_started') {
-      // Already cleared; nothing to do.
-    } else if (!result.shouldStayAwake && result.status.startsWith('error:')) {
-      await this.ctx.storage.delete(START_STATE_KEY)
-    } else {
-      // Still schedule the next tick regardless of outcome -- a single
-      // failed/unhealthy poll must never silently stop future polling.
-      await this.scheduleNextHealthPoll()
+      // The container was never started (or onStop already cleared the
+      // record) -- nothing to poll, nothing to reschedule. The next
+      // real ensureRunning() call will re-enter onStart() and restart
+      // this whole chain.
+      return
     }
+
+    // Every other outcome -- ok/shouldStayAwake, ok/notStayAwake
+    // (genuinely idle, correctly allowed to sleep), or a transient
+    // fetch error -- reschedules the next tick. A transient error must
+    // never permanently kill the polling loop (the earlier version of
+    // this method deleted START_STATE_KEY here, which silently stopped
+    // all future polling after a single blip -- fixed, see this
+    // method's git history/commit message for the full story); it just
+    // tries again in 60s, same as any other non-fatal outcome.
+    await this.scheduleNextHealthPoll()
   }
 }
 
