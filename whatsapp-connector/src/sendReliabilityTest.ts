@@ -1,17 +1,24 @@
 /**
  * sendReliabilityTest.ts -- regression coverage for the send-hang
- * root-cause fix (2026-08-18): the external SEND_TIMEOUT_MS safety-net
- * must stay ABOVE Baileys' own defaultQueryTimeoutMs (60000), otherwise
- * our own timeout preempts a legitimate, bounded Baileys operation
- * (getUSyncDevices()'s USync query, unavoidable on the first send to
- * any JID after every process start/restart) and misreports it as a
- * hang. This never opens a real Baileys/WhatsApp connection -- it
- * covers the timeout race and the diagnostics modules in isolation.
+ * investigation (2026-08-18). TRUE root cause (confirmed via a
+ * decisive, controlled A/B test, see BaileysProvider.ts's
+ * toWhatsAppJid() doc comment): an unnormalized "+"-prefixed phone
+ * number produced a malformed JID WhatsApp's servers never usefully
+ * responded to, causing Baileys' own internal query() to hang for its
+ * full ~60s ceiling -- nothing to do with the database/queue layer,
+ * Baileys' USync mechanism, or Cloudflare's network. The
+ * SEND_TIMEOUT_MS-vs-Baileys-defaultQueryTimeoutMs margin tested below
+ * remains real defense-in-depth (a genuinely different hang could still
+ * occur), but is no longer the load-bearing fix -- toWhatsAppJid()'s
+ * own normalization is. This file never opens a real Baileys/WhatsApp
+ * connection -- it covers the timeout margin, the JID normalization,
+ * and the diagnostics modules in isolation.
  *
  * Run with: npx tsx src/sendReliabilityTest.ts
  */
 import { recordSendStart, recordSendStage, recordSendOutcome, recordConnectionOpen, getSendDiagnosticsSnapshot } from './SendDiagnostics.js'
 import { recordUncaughtException, recordUnhandledRejection, getProcessDiagnosticsSnapshot } from './ProcessDiagnostics.js'
+import { toWhatsAppJid } from './BaileysProvider.js'
 
 let failures = 0
 function check(name: string, condition: boolean, detail?: string): void {
@@ -90,6 +97,29 @@ async function main() {
     'production SEND_TIMEOUT_MS (75s) stays above the installed Baileys package\'s own defaultQueryTimeoutMs',
     typeof baileysDefaultQueryTimeoutMs === 'number' && OUR_PRODUCTION_SEND_TIMEOUT_MS > baileysDefaultQueryTimeoutMs,
     `baileys defaultQueryTimeoutMs=${baileysDefaultQueryTimeoutMs}, ours=${OUR_PRODUCTION_SEND_TIMEOUT_MS}`,
+  )
+
+  // 3b. THE actual, confirmed root-cause fix: toWhatsAppJid() must
+  // strip a "+" prefix -- this is the exact real-world input every
+  // queue-driven caller passes (notification_queue.recipient_phone /
+  // customers.normalized_mobile both store the E.164 "+"-prefixed
+  // form). Regression-proven live: "+971502061209" hung for 59,999ms
+  // (Baileys' own "Timed Out" error); "971502061209" resolved in 240ms
+  // on the identical socket generation, seconds apart
+  // (jidFormatIsolationTest.ts).
+  check(
+    'toWhatsAppJid() strips a "+" prefix -- the exact real-world value that caused every queue-driven send to hang for ~60s',
+    toWhatsAppJid('+971502061209') === '971502061209@s.whatsapp.net',
+    toWhatsAppJid('+971502061209'),
+  )
+  check(
+    'toWhatsAppJid() is a no-op for an already-digits-only number (the shape every direct-call test in this investigation used)',
+    toWhatsAppJid('971502061209') === '971502061209@s.whatsapp.net',
+  )
+  check(
+    'toWhatsAppJid() strips other non-digit characters too (spaces, dashes, parentheses) -- not just "+", since any of them would produce the same malformed-JID hang',
+    toWhatsAppJid('+971 50-206 (1209)') === '971502061209@s.whatsapp.net',
+    toWhatsAppJid('+971 50-206 (1209)'),
   )
 
   // 4. SendDiagnostics.ts -- never records message content, only club

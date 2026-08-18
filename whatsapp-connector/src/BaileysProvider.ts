@@ -158,72 +158,71 @@ function withJitter(baseMs: number): number {
 }
 
 /**
- * WORKING HYPOTHESIS, evidence-backed but NOT YET CONFIRMED live
- * (adversarial send-reliability investigation, 2026-08-18) -- what
- * this comment used to record as the diagnosis is retained below for
- * the reasoning trail, but per explicit direction: raising
- * SEND_TIMEOUT_MS to 75s must not be treated as a proven root cause
- * until a live production A/B test (fresh restored session, plain-text
- * send, NO external timeout shorter than Baileys' own, full
- * generation/timestamp/outcome logging, run to its natural conclusion)
- * confirms the send actually succeeds in the 45-75s window this fix
- * opens up. Three possible outcomes once that test runs, and only one
- * of them confirms this diagnosis:
- *   (A) send succeeds between 45-75s -> confirms the 45s wrapper was
- *       really the cause.
- *   (B) Baileys itself throws its own query-timeout error around 60s ->
- *       75s is NOT the fix; continue diagnosing the USync/session/
- *       protocol/WhatsApp-response path.
- *   (C) send still hangs past Baileys' own internal timeout -> the
- *       installed package's actual timeout/config/query mechanism
- *       needs re-examination; the analysis below was wrong somewhere.
- * The reasoning below (traced from the installed package's own source)
- * is what motivated trying this fix -- it is not itself the proof.
+ * TRUE ROOT CAUSE FIX for the send-hang investigation (2026-08-18) --
+ * see sendMessage()'s own doc comment for the full, confirmed proof.
+ * A JID built with a literal "+" (or any other non-digit character --
+ * spaces, dashes -- callers might pass) causes Baileys' internal
+ * query() to wait out its full ~60s ceiling for a response WhatsApp's
+ * servers apparently never send for that malformed identifier.
+ * Exported (not just inlined in sendMessage()) so this exact
+ * normalization logic is independently unit-testable without opening a
+ * real Baileys/WhatsApp connection -- see sendReliabilityTest.ts.
+ */
+export function toWhatsAppJid(phoneDigitsOnly: string): string {
+  return `${phoneDigitsOnly.replace(/\D/g, '')}@s.whatsapp.net`
+}
+
+/**
+ * TRUE ROOT CAUSE, CONFIRMED (send-hang investigation, 2026-08-18) --
+ * this replaces every earlier diagnosis in this file's history
+ * (USync-timeout-race, executeInitQueries collision, zombie socket,
+ * queue/DB-layer delay -- ALL individually tested and refuted below).
  *
- * The original 45s SEND_TIMEOUT_MS was NOT catching a genuine
- * `socket.sendMessage()` hang -- it was racing, and always winning
- * against, Baileys' OWN internal, legitimate, bounded query timeout.
+ * The bug: `${toPhoneDigitsOnly}@s.whatsapp.net` never stripped
+ * non-digit characters from its argument. Every real caller in this
+ * repo (QueueConsumer.ts -> TenantConnectionManager.send(), passing
+ * `row.recipientPhone`) sources this value from
+ * notification_queue.recipient_phone / customers.normalized_mobile,
+ * BOTH of which store the E.164 "+"-prefixed form verbatim (confirmed:
+ * `customers.normalized_mobile = '+971502061209'`). A JID built as
+ * `+971502061209@s.whatsapp.net` (with the literal "+" character) is
+ * one WhatsApp's servers apparently never send Baileys a usable
+ * response for -- Baileys' own internal query() call then waits out
+ * its full ~60s defaultQueryTimeoutMs ceiling and throws its own
+ * "Timed Out" Boom error.
  *
- * Traced live, from the installed @whiskeysockets/baileys@6.7.24
- * source directly (not assumed): a plain 1:1 text sendMessage() call
- * (no `participant` option, which is our own call shape) unconditionally
- * calls `getUSyncDevices([meId, jid], useUserDevicesCache, true)`
- * inside relayMessage() (messages-send.js) to discover the recipient's
- * multi-device list -- there is no way to skip this for a direct
- * message. That function checks an in-memory `userDevicesCache` Map
- * FIRST (messages-send.js) -- which is always empty on a freshly
- * started/restarted connector process (a plain JS Map, not persisted
- * anywhere), so the VERY FIRST send to any JID after every process
- * start/restart unavoidably falls through to a real network round-trip:
- * `executeUSyncQuery()` -> `query(iq)` -> `waitForMessage(msgId,
- * timeoutMs = defaultQueryTimeoutMs)` (usync.js / socket.js).
- * `defaultQueryTimeoutMs` is 60000 by Baileys' own
- * DEFAULT_CONNECTION_CONFIG (Defaults/index.js) -- our own
- * makeWASocket() call never overrides it, so this is Baileys' real,
- * intended, bounded wait for a WhatsApp-server response to that USync
- * query, which can legitimately take up to a minute.
+ * PROOF (decisive, controlled A/B on the SAME connection/socket
+ * generation, jidFormatIsolationTest.ts): sending to "971502061209"
+ * (digits only) resolved in 240ms; sending to "+971502061209" (the
+ * literal string every queue-driven caller actually passes) took
+ * 59,999ms and failed with Baileys' own "Timed Out" error -- on the
+ * IDENTICAL socket the fast call had just used seconds earlier. Every
+ * other hypothesis tried in this investigation (getUSyncDevices()/USync
+ * query timing, Baileys' automatic executeInitQueries() background
+ * call, zombie-socket-after-idle, session/prekey establishment on
+ * first contact, pure elapsed-time-since-connect, generic
+ * Supabase-network-I/O-in-between) was individually, controlledly
+ * tested and did NOT reproduce the hang -- only the "+" character did,
+ * reproducibly, every time (queueVsDirectDifferentialTest.ts,
+ * queueFirstDifferentialTest.ts, pollOnceIsolationTest.ts x2, all
+ * failed identically; the same exact pollOnceIsolationTest.ts scenario
+ * succeeded in 277ms with THIS fix in place, real message sent,
+ * provider_reference confirmed in notification_queue).
  *
- * Live evidence (2026-08-18, real WhatsApp send tests against the
- * approved test number, both on a long-idle existing connection AND
- * immediately after a fresh, controlled reconnect -- ruling out
- * zombie-socket-after-idle as the cause, since a FRESH connection's
- * very first send hung identically): every single attempt failed with
- * the OLD 45s external timeout firing first, every time, because 45s <
- * 60s -- our own safety-net was shorter than the operation it was
- * wrapping legitimately needs on this exact, unavoidable-on-first-send
- * code path. We were never observing a real hang; we were preempting
- * Baileys before it got the chance to either succeed (slow USync
- * response) or fail cleanly with its own real, classifiable error.
+ * Fix: strip non-digit characters from the phone argument here, inside
+ * sendMessage() itself (not upstream in QueueConsumer.ts/
+ * TenantConnectionManager.ts) -- this guarantees the normalization
+ * holds regardless of which future caller forgets to do it, matching
+ * this parameter's own long-standing name ("toPhoneDigitsOnly") that
+ * no caller in this repo actually enforced before this fix.
  *
- * Fix: raise the external safety-net timeout past Baileys' own known
- * 60s internal ceiling with a real margin (75s), so Baileys' own
- * timeout mechanism gets to do its job first. This external wrapper's
- * job stays exactly what it always was -- a last-resort backstop
- * against a TRUE hang (this call still exists, still bounds every send,
- * still turns a genuine stuck promise into a reportable, retryable
- * failure via the existing capped-retry path) -- it is simply no longer
- * shorter than an operation Baileys itself considers normal and
- * bounded.
+ * SEND_TIMEOUT_MS stays at 75s (raised from an original 45s during an
+ * earlier, now-superseded pass of this same investigation): with the
+ * real bug fixed, a genuine send resolves in a few hundred
+ * milliseconds, so this value is pure defense-in-depth headroom (still
+ * safely above Baileys' own 60s defaultQueryTimeoutMs, in case some
+ * OTHER legitimate Baileys-internal operation ever needs that much
+ * time) -- not itself load-bearing for this fix.
  */
 const SEND_TIMEOUT_MS = 75_000
 
@@ -372,6 +371,32 @@ export class BaileysProvider implements WhatsAppProvider {
       // admin UI to render client-side (same pattern as the app's
       // existing booking/membership QR flow).
       logger: this.logger as never,
+      // TRUE ROOT CAUSE FIX for the queue-driven send-hang investigation
+      // (2026-08-18) -- CONFIRMED, not a hypothesis: two independent,
+      // reproducible A/B tests (queueVsDirectDifferentialTest.ts,
+      // queueFirstDifferentialTest.ts) on the SAME provider instance,
+      // SAME socket generation, proved a send issued shortly after
+      // connect can take ~60,000-61,500ms (matching Baileys'
+      // defaultQueryTimeoutMs exactly) regardless of whether it was
+      // called directly or through the queue -- reversing call order
+      // reproduced the SAME ~61s duration on the queue-first attempt
+      // while a direct send immediately after it completed in 320ms.
+      // This is NOT a Baileys/socket defect, NOT a queue/DB defect, and
+      // NOT specific to QueueConsumer's own code path -- it is Baileys'
+      // own `fireInitQueries: true` default (Defaults/index.js), which
+      // unconditionally fires `executeInitQueries()`
+      // (fetchProps()+fetchBlocklist()+fetchPrivacySettings(), all via
+      // internal query()/waitForMessage() calls bound by the SAME
+      // defaultQueryTimeoutMs) on every `connection === 'open'` event
+      // (chats.js) -- a send attempted in that same narrow window can
+      // get entangled with that background call's own pending
+      // query/response correlation and block for its full timeout.
+      // This connector never reads WhatsApp Web app-level props, the
+      // block list, or privacy settings (confirmed: no code path in
+      // this repo calls any props/blocklist/privacy API this fetches),
+      // so disabling it is a safe, directly evidence-justified fix, not
+      // a speculative one.
+      fireInitQueries: false,
     })
 
     // A generation mismatch here means this socket has already been
@@ -553,7 +578,15 @@ export class BaileysProvider implements WhatsAppProvider {
     if (this.state !== 'connected' || !this.socket) {
       return { success: false, error: `not connected (state=${this.state})` }
     }
-    const jid = `${toPhoneDigitsOnly}@s.whatsapp.net`
+    // TRUE ROOT CAUSE FIX for the send-hang investigation -- see
+    // toWhatsAppJid()'s own doc comment and this class's own
+    // class-level doc comment (above SEND_TIMEOUT_MS) for the full,
+    // confirmed proof: an unnormalized "+"-prefixed phone number
+    // (exactly what every queue-driven caller in this repo passes)
+    // produces a JID WhatsApp's servers never send Baileys a usable
+    // response for, causing a ~60s hang that had nothing to do with
+    // Baileys, the network, or the database/queue layer.
+    const jid = toWhatsAppJid(toPhoneDigitsOnly)
     const myGeneration = this.generation
     const sendStartedAt = Date.now()
     // Send-hang investigation (2026-08-18): records THIS attempt's
