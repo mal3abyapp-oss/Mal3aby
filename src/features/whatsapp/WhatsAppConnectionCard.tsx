@@ -1,8 +1,10 @@
 import { useEffect, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import QRCode from 'qrcode'
 import { supabase } from '@/lib/supabase/client'
 import { useAuth } from '@/app/providers/AuthProvider'
+import { useDirection } from '@/app/providers/DirectionProvider'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { StatusBadge, type StatusTone } from '@/components/ui/status-badge'
@@ -51,19 +53,6 @@ interface StatusData {
   qrExpiresAt: string | null
 }
 
-const STATUS_LABELS: Record<WhatsAppStatus, string> = {
-  disconnected: 'غير متصل',
-  qr_required: 'بانتظار مسح الرمز',
-  connecting: 'جارٍ الاتصال...',
-  connected: 'متصل',
-  reconnecting: 'جارٍ إعادة الاتصال...',
-  degraded: 'الاتصال غير مستقر',
-  logged_out: 'تم تسجيل الخروج من الهاتف',
-  restricted: 'الحساب مقيّد',
-  failed: 'فشل الاتصال',
-  error: 'حدث خطأ',
-}
-
 const STATUS_TONE: Record<WhatsAppStatus, StatusTone> = {
   disconnected: 'neutral',
   qr_required: 'warning',
@@ -97,9 +86,9 @@ async function fetchQr(clubId: string): Promise<string | null> {
   return data?.[0]?.qr_payload ?? null
 }
 
-function formatDateTime(iso: string | null): string {
+function formatDateTime(iso: string | null, locale: 'ar' | 'en'): string {
   if (!iso) return '—'
-  return new Date(iso).toLocaleString('ar-EG', { dateStyle: 'medium', timeStyle: 'short' })
+  return new Date(iso).toLocaleString(locale === 'en' ? 'en-US' : 'ar-EG', { dateStyle: 'medium', timeStyle: 'short' })
 }
 
 // How long we tolerate "connecting/qr_required with no QR yet" before
@@ -115,6 +104,20 @@ function formatDateTime(iso: string | null): string {
 const QR_WAIT_TIMEOUT_MS = 20000
 
 export function WhatsAppConnectionCard() {
+  const { t } = useTranslation()
+  const { locale } = useDirection()
+  const STATUS_LABELS: Record<WhatsAppStatus, string> = {
+    disconnected: t('whatsapp.statusLabels.disconnected'),
+    qr_required: t('whatsapp.statusLabels.qr_required'),
+    connecting: t('whatsapp.statusLabels.connecting'),
+    connected: t('whatsapp.statusLabels.connected'),
+    reconnecting: t('whatsapp.statusLabels.reconnecting'),
+    degraded: t('whatsapp.statusLabels.degraded'),
+    logged_out: t('whatsapp.statusLabels.logged_out'),
+    restricted: t('whatsapp.statusLabels.restricted'),
+    failed: t('whatsapp.statusLabels.failed'),
+    error: t('whatsapp.statusLabels.error'),
+  }
   const { currentClubId } = useAuth()
   const queryClient = useQueryClient()
   const [qrDataUrl, setQrDataUrl] = useState<string | null>(null)
@@ -203,7 +206,7 @@ export function WhatsAppConnectionCard() {
       setQrWaitStartedAt(Date.now())
       queryClient.invalidateQueries({ queryKey: ['whatsapp-status', currentClubId] })
     },
-    onError: (err) => setActionError(err instanceof Error ? err.message : translateSupabaseError(err, 'تعذّر بدء الاتصال')),
+    onError: (err) => setActionError(err instanceof Error ? err.message : translateSupabaseError(err, t('whatsapp.connectionCard.startError'))),
   })
 
   // "إعادة المحاولة" after a timeout re-sends the same pairing intent
@@ -222,7 +225,7 @@ export function WhatsAppConnectionCard() {
       queryClient.invalidateQueries({ queryKey: ['whatsapp-status', currentClubId] })
       queryClient.invalidateQueries({ queryKey: ['whatsapp-qr', currentClubId] })
     },
-    onError: (err) => setActionError(err instanceof Error ? err.message : translateSupabaseError(err, 'تعذّر إعادة المحاولة')),
+    onError: (err) => setActionError(err instanceof Error ? err.message : translateSupabaseError(err, t('whatsapp.connectionCard.retryError'))),
   })
 
   const disconnectMutation = useMutation({
@@ -234,7 +237,7 @@ export function WhatsAppConnectionCard() {
       setActionError(null)
       queryClient.invalidateQueries({ queryKey: ['whatsapp-status', currentClubId] })
     },
-    onError: (err) => setActionError(err instanceof Error ? err.message : translateSupabaseError(err, 'تعذّر قطع الاتصال')),
+    onError: (err) => setActionError(err instanceof Error ? err.message : translateSupabaseError(err, t('whatsapp.connectionCard.disconnectError'))),
   })
 
   const currentStatus = status?.status ?? 'disconnected'
@@ -244,12 +247,12 @@ export function WhatsAppConnectionCard() {
       <CardHeader className="flex flex-row items-center justify-between">
         <CardTitle className="flex items-center gap-2 text-base">
           <MessageCircle className="size-4 text-status-success" />
-          واتساب
+          {t('whatsapp.connectionCard.title')}
         </CardTitle>
         {!isLoading && <StatusBadge tone={STATUS_TONE[currentStatus]} label={STATUS_LABELS[currentStatus]} />}
       </CardHeader>
       <CardContent className="flex flex-col gap-4">
-        {isLoading && <p className="text-sm text-text-secondary">جارٍ التحميل...</p>}
+        {isLoading && <p className="text-sm text-text-secondary">{t('whatsapp.connectionCard.loading')}</p>}
         {actionError && <p className="text-sm text-status-danger">{actionError}</p>}
         {!isLoading && status?.lastError && (currentStatus === 'error' || currentStatus === 'failed' || currentStatus === 'restricted' || currentStatus === 'degraded') && (
           <p className="text-sm text-status-danger">{status.lastError}</p>
@@ -263,15 +266,15 @@ export function WhatsAppConnectionCard() {
                   label text -- <bdi> isolates them from the
                   surrounding bidi context so they can't visually
                   reorder. */}
-              <p className="font-medium">الرقم المتصل: <bdi>{status?.connectedPhoneNumber ?? '—'}</bdi></p>
-              <p className="text-xs text-text-secondary">متصل منذ: {formatDateTime(status?.connectedAt ?? null)}</p>
-              <p className="text-xs text-text-secondary">آخر ظهور: {formatDateTime(status?.lastSeenAt ?? null)}</p>
+              <p className="font-medium">{t('whatsapp.connectionCard.connectedNumberPrefix')} <bdi>{status?.connectedPhoneNumber ?? '—'}</bdi></p>
+              <p className="text-xs text-text-secondary">{t('whatsapp.connectionCard.connectedSincePrefix')} {formatDateTime(status?.connectedAt ?? null, locale)}</p>
+              <p className="text-xs text-text-secondary">{t('whatsapp.connectionCard.lastSeenPrefix')} {formatDateTime(status?.lastSeenAt ?? null, locale)}</p>
             </div>
             <p className="text-sm text-text-secondary">
-              سيتم إرسال رسائل تأكيد الحجز والدفع تلقائيًا عبر هذا الرقم حسب إعدادات إشعارات واتساب.
+              {t('whatsapp.connectionCard.autoSendHint')}
             </p>
             <Button variant="outline" size="sm" className="self-start" onClick={() => disconnectMutation.mutate()} disabled={disconnectMutation.isPending}>
-              قطع الاتصال
+              {t('whatsapp.connectionCard.disconnect')}
             </Button>
           </div>
         )}
@@ -280,40 +283,40 @@ export function WhatsAppConnectionCard() {
           <div className="flex flex-col items-center gap-3 text-center">
             {qrDataUrl ? (
               <>
-                <img src={qrDataUrl} alt="رمز QR لربط واتساب" className="size-60 rounded-md border border-border" />
+                <img src={qrDataUrl} alt={t('whatsapp.connectionCard.qrAlt')} className="size-60 rounded-md border border-border" />
                 <p className="text-sm text-text-secondary">
-                  افتح واتساب على هاتفك ← الإعدادات ← الأجهزة المرتبطة ← ربط جهاز، ثم امسح هذا الرمز.
+                  {t('whatsapp.connectionCard.qrInstructions')}
                 </p>
-                <p className="text-xs text-text-secondary">ينتهي الرمز خلال دقيقة وسيتم تحديثه تلقائيًا.</p>
+                <p className="text-xs text-text-secondary">{t('whatsapp.connectionCard.qrExpiryHint')}</p>
                 <Button variant="outline" size="sm" onClick={() => disconnectMutation.mutate()} disabled={disconnectMutation.isPending}>
-                  إلغاء
+                  {t('whatsapp.connectionCard.cancel')}
                 </Button>
               </>
             ) : qrTimedOut ? (
               // Honest failure state -- never leave the UI stuck on
-              // "جارٍ توليد رمز QR..." forever. This means either the
+              // "generating QR..." forever. This means either the
               // local whatsapp-connector service is not running, or it
               // cannot reach Supabase -- both are real operational
               // problems the connector's own logs must be checked for,
               // not something this screen can fix on its own.
               <>
                 <p className="text-sm text-status-danger">
-                  تعذر الوصول إلى خدمة واتساب. تحقق من تشغيل خدمة الاتصال ثم حاول مرة أخرى.
+                  {t('whatsapp.connectionCard.timeoutMessage')}
                 </p>
                 <div className="flex gap-2">
                   <Button size="sm" onClick={() => retryMutation.mutate()} disabled={retryMutation.isPending}>
-                    إعادة المحاولة
+                    {t('whatsapp.connectionCard.retry')}
                   </Button>
                   <Button variant="outline" size="sm" onClick={() => disconnectMutation.mutate()} disabled={disconnectMutation.isPending}>
-                    إلغاء
+                    {t('whatsapp.connectionCard.cancel')}
                   </Button>
                 </div>
               </>
             ) : (
               <>
-                <p className="text-sm text-text-secondary">جارٍ توليد رمز QR...</p>
+                <p className="text-sm text-text-secondary">{t('whatsapp.connectionCard.generatingQr')}</p>
                 <Button variant="outline" size="sm" onClick={() => disconnectMutation.mutate()} disabled={disconnectMutation.isPending}>
-                  إلغاء
+                  {t('whatsapp.connectionCard.cancel')}
                 </Button>
               </>
             )}
@@ -329,21 +332,21 @@ export function WhatsAppConnectionCard() {
             <div className="flex flex-col gap-3">
               <p className="text-sm text-text-secondary">
                 {currentStatus === 'restricted'
-                  ? 'الحساب مقيّد من واتساب حاليًا. راجع حالة الحساب على هاتفك قبل إعادة الربط.'
-                  : 'اربط رقم واتساب الخاص بالنادي لإرسال تأكيدات الحجز والدفع والفواتير تلقائيًا للعملاء.'}
+                  ? t('whatsapp.connectionCard.restrictedHint')
+                  : t('whatsapp.connectionCard.connectHint')}
               </p>
               <Button size="sm" className="self-start" onClick={() => connectMutation.mutate()} disabled={connectMutation.isPending}>
-                ربط واتساب
+                {t('whatsapp.connectionCard.connect')}
               </Button>
             </div>
           )}
 
         {!isLoading && currentStatus === 'reconnecting' && (
-          <p className="text-sm text-text-secondary">انقطع الاتصال مؤقتًا، جارٍ إعادة المحاولة...</p>
+          <p className="text-sm text-text-secondary">{t('whatsapp.connectionCard.reconnecting')}</p>
         )}
 
         {!isLoading && currentStatus === 'degraded' && (
-          <p className="text-sm text-text-secondary">الاتصال غير مستقر حاليًا. سيتم استئناف الإرسال تلقائيًا عند تحسّن الاتصال.</p>
+          <p className="text-sm text-text-secondary">{t('whatsapp.connectionCard.degraded')}</p>
         )}
       </CardContent>
     </Card>

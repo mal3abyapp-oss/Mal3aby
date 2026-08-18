@@ -1,10 +1,12 @@
 import { useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { PageHeader } from '@/components/ui/page-header'
 import { Button } from '@/components/ui/button'
 import { StatCard } from '@/components/ui/stat-card'
 import { formatMoney, PAYMENT_METHOD_LABELS } from '@/lib/domain/billing'
 import { rowsToCsv, downloadCsv } from '@/lib/csv'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { useDirection } from '@/app/providers/DirectionProvider'
 import { Wallet, Download } from 'lucide-react'
 import { useDateRange, useDateRangeReport } from './hooks/useDateRangeReport'
 import { DateRangeFilter } from './components/DateRangeFilter'
@@ -29,6 +31,8 @@ interface RevenueReport {
 }
 
 export function ReportRevenuePage() {
+  const { t } = useTranslation()
+  const { locale } = useDirection()
   const { startDate, setStartDate, endDate, setEndDate } = useDateRange()
   const [method, setMethod] = useState<string>('all')
   const { data, isLoading } = useDateRangeReport<RevenueReport>(
@@ -40,40 +44,40 @@ export function ReportRevenuePage() {
 
   return (
     <div>
-      <PageHeader title="التقارير" description="تقرير الإيرادات -- حسب طريقة الدفع واليوم" />
+      <PageHeader title={t('reports.title')} description={t('reports.revenue.description')} />
       <ReportsNav />
       <DateRangeFilter startDate={startDate} endDate={endDate} onStart={setStartDate} onEnd={setEndDate} />
       <div className="mb-4 w-48">
         <Select value={method} onValueChange={setMethod}>
           <SelectTrigger><SelectValue /></SelectTrigger>
           <SelectContent>
-            <SelectItem value="all">كل طرق الدفع</SelectItem>
-            <SelectItem value="cash">نقدًا</SelectItem>
-            <SelectItem value="card">بطاقة</SelectItem>
-            <SelectItem value="bank_transfer">تحويل بنكي</SelectItem>
-            <SelectItem value="wallet">محفظة إلكترونية</SelectItem>
-            <SelectItem value="other">أخرى</SelectItem>
+            <SelectItem value="all">{t('reports.revenue.allMethods')}</SelectItem>
+            <SelectItem value="cash">{t('billing.paymentMethods.underlyingMethodLabels.cash')}</SelectItem>
+            <SelectItem value="card">{t('billing.paymentMethods.underlyingMethodLabels.card')}</SelectItem>
+            <SelectItem value="bank_transfer">{t('billing.paymentMethods.underlyingMethodLabels.bank_transfer')}</SelectItem>
+            <SelectItem value="wallet">{t('billing.paymentMethods.underlyingMethodLabels.wallet')}</SelectItem>
+            <SelectItem value="other">{t('billing.paymentMethods.underlyingMethodLabels.other')}</SelectItem>
           </SelectContent>
         </Select>
       </div>
-      {isLoading && <p className="text-sm text-text-secondary">جارٍ التحميل...</p>}
+      {isLoading && <p className="text-sm text-text-secondary">{t('reports.loading')}</p>}
       {data && (
         <>
           <div className="mb-6 grid grid-cols-2 gap-3 md:grid-cols-3">
-            <StatCard label="إجمالي الإيرادات" value={formatMoney(data.total_revenue)} icon={Wallet} />
-            <StatCard label="إجمالي المستردات" value={formatMoney(data.refunds_total)} tone="danger" />
+            <StatCard label={t('reports.revenue.totalRevenue')} value={formatMoney(data.total_revenue, 'EGP', locale)} icon={Wallet} />
+            <StatCard label={t('reports.revenue.totalRefunds')} value={formatMoney(data.refunds_total, 'EGP', locale)} tone="danger" />
           </div>
           <div className="grid gap-4 md:grid-cols-2">
             <div>
-              <p className="mb-2 font-medium">حسب طريقة الدفع</p>
+              <p className="mb-2 font-medium">{t('reports.revenue.byMethod')}</p>
               {data.by_method.length === 0 ? (
-                <p className="text-sm text-text-secondary">لا توجد بيانات</p>
+                <p className="text-sm text-text-secondary">{t('reports.noData')}</p>
               ) : (
                 <ul className="flex flex-col gap-1">
                   {data.by_method.map((m) => (
                     <li key={m.method} className="flex justify-between rounded-md border border-border p-2 text-sm">
                       <span>{PAYMENT_METHOD_LABELS[m.method] ?? m.method}</span>
-                      <span>{formatMoney(m.revenue)}</span>
+                      <span>{formatMoney(m.revenue, 'EGP', locale)}</span>
                     </li>
                   ))}
                 </ul>
@@ -81,7 +85,7 @@ export function ReportRevenuePage() {
             </div>
             <div>
               <div className="mb-2 flex items-center justify-between">
-                <p className="font-medium">حسب اليوم</p>
+                <p className="font-medium">{t('reports.revenue.byDay')}</p>
                 {data.by_day.length > 0 && (
                   <Button
                     size="sm"
@@ -89,23 +93,23 @@ export function ReportRevenuePage() {
                     onClick={() =>
                       downloadCsv(
                         `revenue-${startDate}-${endDate}.csv`,
-                        rowsToCsv(data.by_day, { date: 'التاريخ', revenue: 'الإيرادات' }),
+                        rowsToCsv(data.by_day, { date: t('reports.revenue.csvHeader.date'), revenue: t('reports.revenue.csvHeader.revenue') }),
                       )
                     }
                   >
                     <Download className="me-1 size-4" />
-                    تصدير CSV
+                    {t('reports.exportCsv')}
                   </Button>
                 )}
               </div>
               {data.by_day.length === 0 ? (
-                <p className="text-sm text-text-secondary">لا توجد بيانات</p>
+                <p className="text-sm text-text-secondary">{t('reports.noData')}</p>
               ) : (
                 <ul className="flex flex-col gap-1">
                   {data.by_day.map((d) => (
                     <li key={d.date} className="flex justify-between rounded-md border border-border p-2 text-sm">
                       <span className="tabular-nums">{d.date}</span>
-                      <span>{formatMoney(d.revenue)}</span>
+                      <span>{formatMoney(d.revenue, 'EGP', locale)}</span>
                     </li>
                   ))}
                 </ul>

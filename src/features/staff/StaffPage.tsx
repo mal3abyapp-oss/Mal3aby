@@ -1,4 +1,5 @@
 import { useState, type FormEvent } from 'react'
+import { useTranslation } from 'react-i18next'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '@/lib/supabase/client'
 import { useAuth } from '@/app/providers/AuthProvider'
@@ -29,13 +30,13 @@ import type { StaffRow } from '@/lib/domain/staff'
 // mechanism in the approved schema (club_memberships.user_id is a hard FK
 // to auth.users). The person must already have a Mala3by account.
 const ASSIGNABLE_ROLES = [
-  { key: 'club_manager', labelAr: 'مدير النادي' },
-  { key: 'branch_manager', labelAr: 'مدير الفرع' },
-  { key: 'receptionist', labelAr: 'موظف استقبال' },
-  { key: 'accountant', labelAr: 'محاسب' },
-  { key: 'academy_manager', labelAr: 'مدير الأكاديمية' },
-  { key: 'coach', labelAr: 'مدرب' },
-  { key: 'scanner', labelAr: 'ماسح QR' },
+  { key: 'club_manager', labelKey: 'staff.roles.club_manager' },
+  { key: 'branch_manager', labelKey: 'staff.roles.branch_manager' },
+  { key: 'receptionist', labelKey: 'staff.roles.receptionist' },
+  { key: 'accountant', labelKey: 'staff.roles.accountant' },
+  { key: 'academy_manager', labelKey: 'staff.roles.academy_manager' },
+  { key: 'coach', labelKey: 'staff.roles.coach' },
+  { key: 'scanner', labelKey: 'staff.roles.scanner' },
 ]
 
 // V1 Critical Fix Pass (2026-08-16): fetchStaff previously left-embedded
@@ -89,6 +90,7 @@ async function fetchStaff(clubId: string): Promise<StaffRow[]> {
 }
 
 export function StaffPage() {
+  const { t } = useTranslation()
   const { currentClubId } = useAuth()
   const queryClient = useQueryClient()
   const [dialogOpen, setDialogOpen] = useState(false)
@@ -119,7 +121,7 @@ export function StaffPage() {
     },
     onError: () => {
       // Never surface the raw RPC error string to the user.
-      setFormError('تعذّرت الإضافة — تأكد من أن البريد الإلكتروني يخص حسابًا مسجّلاً بالفعل في ملعبي.')
+      setFormError(t('staff.inviteError'))
     },
   })
 
@@ -144,24 +146,24 @@ export function StaffPage() {
   const columns: DataTableColumn<StaffRow>[] = [
     {
       key: 'name',
-      header: 'الاسم',
+      header: t('staff.columns.name'),
       render: (r) =>
-        r.fullName ?? <span className="text-text-secondary">لم يسجّل الدخول بعد</span>,
+        r.fullName ?? <span className="text-text-secondary">{t('staff.notLoggedInYet')}</span>,
     },
-    { key: 'role', header: 'الدور', render: (r) => r.roleNameAr },
+    { key: 'role', header: t('staff.columns.role'), render: (r) => r.roleNameAr },
     {
       key: 'branches',
-      header: 'نطاق الفروع',
-      render: (r) => (r.branchNames.length === 0 ? 'كل الفروع' : r.branchNames.join('، ')),
+      header: t('staff.columns.branchScope'),
+      render: (r) => (r.branchNames.length === 0 ? t('staff.allBranches') : r.branchNames.join(t('staff.branchListSeparator'))),
     },
     {
       key: 'status',
-      header: 'الحالة',
+      header: t('staff.columns.status'),
       render: (r) =>
         r.status === 'active' ? (
-          <StatusBadge tone="success" label="نشط" />
+          <StatusBadge tone="success" label={t('staff.statusActive')} />
         ) : (
-          <StatusBadge tone="neutral" label="غير نشط" />
+          <StatusBadge tone="neutral" label={t('staff.statusInactive')} />
         ),
     },
     {
@@ -175,7 +177,7 @@ export function StaffPage() {
             onClick={() => deactivateMutation.mutate(r.membershipId)}
             disabled={deactivateMutation.isPending}
           >
-            إلغاء التفعيل
+            {t('staff.deactivate')}
           </Button>
         ) : null,
     },
@@ -184,21 +186,21 @@ export function StaffPage() {
   return (
     <div>
       <PageHeader
-        title="الموظفون"
-        description="إدارة موظفي النادي وأدوارهم ونطاق الفروع"
+        title={t('staff.title')}
+        description={t('staff.description')}
         actions={
           <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
             <DialogTrigger asChild>
-              <Button>إضافة موظف</Button>
+              <Button>{t('staff.addStaff')}</Button>
             </DialogTrigger>
             <DialogContent>
               <DialogHeader>
-                <DialogTitle>إضافة موظف</DialogTitle>
+                <DialogTitle>{t('staff.addStaff')}</DialogTitle>
               </DialogHeader>
               <form onSubmit={handleInviteSubmit} className="flex flex-col gap-4">
                 <div className="flex flex-col gap-1.5">
                   <label htmlFor="staff-email" className="text-sm font-medium text-text-secondary">
-                    البريد الإلكتروني (لحساب موجود بالفعل)
+                    {t('staff.emailLabel')}
                   </label>
                   <Input
                     id="staff-email"
@@ -209,7 +211,7 @@ export function StaffPage() {
                   />
                 </div>
                 <div className="flex flex-col gap-1.5">
-                  <label className="text-sm font-medium text-text-secondary">الدور</label>
+                  <label className="text-sm font-medium text-text-secondary">{t('staff.roleLabel')}</label>
                   <Select value={roleKey} onValueChange={setRoleKey}>
                     <SelectTrigger>
                       <SelectValue />
@@ -217,7 +219,7 @@ export function StaffPage() {
                     <SelectContent>
                       {ASSIGNABLE_ROLES.map((r) => (
                         <SelectItem key={r.key} value={r.key}>
-                          {r.labelAr}
+                          {t(r.labelKey)}
                         </SelectItem>
                       ))}
                     </SelectContent>
@@ -229,7 +231,7 @@ export function StaffPage() {
                   </p>
                 )}
                 <Button type="submit" disabled={inviteMutation.isPending}>
-                  {inviteMutation.isPending ? 'جارٍ الإضافة...' : 'إضافة'}
+                  {inviteMutation.isPending ? t('staff.adding') : t('staff.addStaff')}
                 </Button>
               </form>
             </DialogContent>
@@ -242,8 +244,8 @@ export function StaffPage() {
         rows={staff}
         rowKey={(r) => r.membershipId}
         isLoading={isLoading}
-        emptyTitle="لا يوجد موظفون بعد"
-        emptyDescription="أضف أول موظف لبدء إدارة صلاحيات النادي"
+        emptyTitle={t('staff.emptyTitle')}
+        emptyDescription={t('staff.emptyDescription')}
       />
     </div>
   )

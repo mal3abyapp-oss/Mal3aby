@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { useTranslation } from 'react-i18next'
 import { BrowserQRCodeReader, type IScannerControls } from '@zxing/browser'
 import { supabase } from '@/lib/supabase/client'
 import { Button } from '@/components/ui/button'
@@ -26,22 +27,32 @@ type ValidateResult = {
 // qr_mark_attendance previously checked enrollment status but never the
 // player's actual paid subscription status, so a frozen/expired/
 // cancelled member could still check in).
-const OUTCOME_LABELS: Record<string, { label: string; tone: 'success' | 'danger' | 'warning' }> = {
-  success: { label: 'صالح', tone: 'success' },
-  already_used: { label: 'تم استخدامه بالفعل', tone: 'warning' },
-  expired: { label: 'منتهي الصلاحية', tone: 'danger' },
-  invalid: { label: 'غير صالح', tone: 'danger' },
-  wrong_club: { label: 'لا ينتمي لهذا النادي', tone: 'danger' },
-  permission_denied: { label: 'لا تملك صلاحية هذا الإجراء', tone: 'danger' },
-  subscription_inactive: { label: 'الاشتراك غير نشط', tone: 'danger' },
+const OUTCOME_TONES: Record<string, 'success' | 'danger' | 'warning'> = {
+  success: 'success',
+  already_used: 'warning',
+  expired: 'danger',
+  invalid: 'danger',
+  wrong_club: 'danger',
+  permission_denied: 'danger',
+  subscription_inactive: 'danger',
 }
 
-const SUBSCRIPTION_STATUS_LABELS: Record<string, string> = {
-  pending: 'بانتظار التفعيل',
-  active: 'نشط',
-  frozen: 'مجمّد',
-  expired: 'منتهي',
-  cancelled: 'ملغي',
+const OUTCOME_LABEL_KEYS: Record<string, string> = {
+  success: 'scanner.outcomes.success',
+  already_used: 'scanner.outcomes.already_used',
+  expired: 'scanner.outcomes.expired',
+  invalid: 'scanner.outcomes.invalid',
+  wrong_club: 'scanner.outcomes.wrong_club',
+  permission_denied: 'scanner.outcomes.permission_denied',
+  subscription_inactive: 'scanner.outcomes.subscription_inactive',
+}
+
+const SUBSCRIPTION_STATUS_LABEL_KEYS: Record<string, string> = {
+  pending: 'scanner.subscriptionStatus.pending',
+  active: 'scanner.subscriptionStatus.active',
+  frozen: 'scanner.subscriptionStatus.frozen',
+  expired: 'scanner.subscriptionStatus.expired',
+  cancelled: 'scanner.subscriptionStatus.cancelled',
 }
 
 interface OpenSession {
@@ -63,6 +74,7 @@ async function fetchOpenSessionsForCoach(): Promise<OpenSession[]> {
 }
 
 export function ScanPage() {
+  const { t } = useTranslation()
   const navigate = useNavigate()
   const videoRef = useRef<HTMLVideoElement>(null)
   const controlsRef = useRef<IScannerControls | null>(null)
@@ -95,7 +107,7 @@ export function ScanPage() {
         setScanning(false)
         void handleValidate(token)
       })
-      .catch(() => setCameraError('تعذّر الوصول إلى الكاميرا. تأكد من منح الإذن.'))
+      .catch(() => setCameraError(t('scanner.cameraError')))
 
     return () => {
       cancelled = true
@@ -156,7 +168,10 @@ export function ScanPage() {
     setScanning(true)
   }
 
-  const outcome = confirmResult ? OUTCOME_LABELS[confirmResult] : validated ? OUTCOME_LABELS[validated.result] : null
+  const outcomeKey = confirmResult ?? validated?.result ?? null
+  const outcome = outcomeKey
+    ? { label: t(OUTCOME_LABEL_KEYS[outcomeKey] ?? outcomeKey), tone: OUTCOME_TONES[outcomeKey] ?? 'danger' }
+    : null
 
   return (
     <div className="flex min-h-screen flex-col bg-dark-base text-white">
@@ -165,10 +180,10 @@ export function ScanPage() {
             "back" direction (left), rtl:rotate-180 flips it for RTL.
             Verified live in both directions after an earlier version
             had this backwards. */}
-        <button onClick={() => navigate(-1)} aria-label="رجوع">
+        <button onClick={() => navigate(-1)} aria-label={t('scanner.back')}>
           <ArrowLeft className="size-5 rtl:rotate-180" />
         </button>
-        <h1 className="text-lg font-bold">مسح QR</h1>
+        <h1 className="text-lg font-bold">{t('scanner.title')}</h1>
       </header>
 
       {scanning && !cameraError && (
@@ -184,7 +199,7 @@ export function ScanPage() {
         <div className="flex flex-1 flex-col items-center justify-center gap-3 p-6 text-center">
           <ShieldAlert className="size-10 text-status-danger" />
           <p>{cameraError}</p>
-          <Button onClick={() => { setCameraError(null); setScanning(true) }}>إعادة المحاولة</Button>
+          <Button onClick={() => { setCameraError(null); setScanning(true) }}>{t('scanner.retry')}</Button>
         </div>
       )}
 
@@ -209,7 +224,7 @@ export function ScanPage() {
               {validated.display_subtitle && <p className="text-sm text-white/60">{validated.display_subtitle}</p>}
               {validated.subscription_status && (
                 <span className={`rounded-full px-3 py-1 text-xs font-medium ${validated.subscription_status === 'active' ? 'bg-status-success/20 text-status-success' : 'bg-status-danger/20 text-status-danger'}`}>
-                  الاشتراك: {SUBSCRIPTION_STATUS_LABELS[validated.subscription_status] ?? validated.subscription_status}
+                  {t('scanner.subscriptionPrefix')} {t(SUBSCRIPTION_STATUS_LABEL_KEYS[validated.subscription_status] ?? validated.subscription_status)}
                 </span>
               )}
             </div>
@@ -224,41 +239,41 @@ export function ScanPage() {
           )}
           <p className="text-xl font-bold">{outcome?.label}</p>
           {validated.result === 'success' && validated.reference_type === 'booking' && (
-            <p className="text-white/60">حجز — بانتظار تأكيد تسجيل الحضور</p>
+            <p className="text-white/60">{t('scanner.bookingAwaitingCheckin')}</p>
           )}
           {validated.result === 'success' && validated.reference_type === 'player_membership' && (
-            <p className="text-white/60">عضوية أكاديمية — اختر الجلسة لتسجيل الحضور</p>
+            <p className="text-white/60">{t('scanner.membershipChooseSession')}</p>
           )}
 
           <div className="mt-4 flex w-full max-w-xs flex-col gap-2">
             {validated.result === 'success' && validated.reference_type === 'booking' && (
               <Button size="lg" disabled={busy} onClick={() => void handleConfirm()}>
-                {busy ? 'جارٍ التأكيد...' : 'تأكيد تسجيل الحضور'}
+                {busy ? t('scanner.confirming') : t('scanner.confirmCheckin')}
               </Button>
             )}
             {validated.result === 'success' && validated.reference_type === 'player_membership' && (
               <>
                 {openSessions.length === 0 ? (
-                  <p className="text-sm text-white/60">لا توجد جلسات اليوم لمجموعاتك.</p>
+                  <p className="text-sm text-white/60">{t('scanner.noSessionsToday')}</p>
                 ) : (
                   <select
                     className="h-10 rounded-md border border-white/20 bg-white/10 px-2 text-sm text-white"
                     value={selectedSessionId}
                     onChange={(e) => setSelectedSessionId(e.target.value)}
                   >
-                    <option value="">اختر الجلسة...</option>
+                    <option value="">{t('scanner.chooseSessionPlaceholder')}</option>
                     {openSessions.map((s) => (
                       <option key={s.id} value={s.id} className="text-black">{s.group_name}</option>
                     ))}
                   </select>
                 )}
                 <Button size="lg" disabled={busy || !selectedSessionId} onClick={() => void handleAttendanceMark()}>
-                  {busy ? 'جارٍ التسجيل...' : 'تسجيل الحضور'}
+                  {busy ? t('scanner.recordingAttendance') : t('scanner.markAttendance')}
                 </Button>
               </>
             )}
             <Button variant="outline" size="lg" className="border-white/20 bg-transparent text-white hover:bg-white/10" onClick={resetToScan}>
-              مسح رمز آخر
+              {t('scanner.scanAnother')}
             </Button>
           </div>
         </div>
@@ -275,7 +290,7 @@ export function ScanPage() {
           )}
           <p className="text-xl font-bold">{outcome?.label}</p>
           <Button size="lg" className="mt-4 w-full max-w-xs" onClick={resetToScan}>
-            مسح رمز آخر
+            {t('scanner.scanAnother')}
           </Button>
         </div>
       )}

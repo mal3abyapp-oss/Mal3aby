@@ -1,4 +1,5 @@
 import { NavLink } from 'react-router-dom'
+import { useTranslation } from 'react-i18next'
 import { cn } from '@/lib/utils'
 import {
   LayoutDashboard,
@@ -23,49 +24,50 @@ import type { LucideIcon } from 'lucide-react'
 // per screen" applied for real, not just visually.
 interface ReportNavItem {
   to: string
-  label: string
+  labelKey: string
   icon: LucideIcon
   end?: boolean
 }
 
 interface ReportNavGroup {
-  title: string | null
+  titleKey: string | null
   items: ReportNavItem[]
 }
 
 const REPORT_NAV: ReportNavGroup[] = [
-  { title: null, items: [{ to: '/app/reports', label: 'نظرة عامة', icon: LayoutDashboard, end: true }] },
+  { titleKey: null, items: [{ to: '/app/reports', labelKey: 'reports.nav.overview', icon: LayoutDashboard, end: true }] },
   {
-    title: 'التشغيل',
+    titleKey: 'reports.nav.sectionOperations',
     items: [
-      { to: '/app/reports/bookings', label: 'الحجوزات', icon: CalendarCheck2 },
-      { to: '/app/reports/occupancy', label: 'إشغال الملاعب', icon: Landmark },
+      { to: '/app/reports/bookings', labelKey: 'reports.nav.bookings', icon: CalendarCheck2 },
+      { to: '/app/reports/occupancy', labelKey: 'reports.nav.occupancy', icon: Landmark },
     ],
   },
   {
-    title: 'المالية',
+    titleKey: 'reports.nav.sectionFinance',
     items: [
-      { to: '/app/reports/revenue', label: 'الإيرادات', icon: Wallet },
-      { to: '/app/reports/collections', label: 'التحصيلات', icon: HandCoins },
-      { to: '/app/reports/payment-methods', label: 'تسوية طرق الدفع', icon: Banknote },
-      { to: '/app/reports/exceptions', label: 'الاستثناءات المالية', icon: ReceiptText },
+      { to: '/app/reports/revenue', labelKey: 'reports.nav.revenue', icon: Wallet },
+      { to: '/app/reports/collections', labelKey: 'reports.nav.collections', icon: HandCoins },
+      { to: '/app/reports/payment-methods', labelKey: 'reports.nav.paymentMethods', icon: Banknote },
+      { to: '/app/reports/exceptions', labelKey: 'reports.nav.exceptions', icon: ReceiptText },
     ],
   },
   {
-    title: 'الأكاديمية والعملاء',
+    titleKey: 'reports.nav.sectionAcademyCustomers',
     items: [
-      { to: '/app/reports/academy', label: 'الأكاديمية', icon: GraduationCap },
-      { to: '/app/reports/customers', label: 'العملاء', icon: Users },
+      { to: '/app/reports/academy', labelKey: 'reports.nav.academy', icon: GraduationCap },
+      { to: '/app/reports/customers', labelKey: 'reports.nav.customers', icon: Users },
     ],
   },
 ]
 
 export function ReportsNav() {
+  const { t } = useTranslation()
   return (
     <nav className="mb-4 flex flex-wrap gap-4">
       {REPORT_NAV.map((group, i) => (
-        <div key={group.title ?? `group-${i}`} className="flex flex-col gap-1">
-          {group.title && <p className="px-1 text-xs font-medium text-text-secondary">{group.title}</p>}
+        <div key={group.titleKey ?? `group-${i}`} className="flex flex-col gap-1">
+          {group.titleKey && <p className="px-1 text-xs font-medium text-text-secondary">{t(group.titleKey)}</p>}
           <div className="flex flex-wrap gap-1 rounded-lg bg-muted p-1">
             {group.items.map((item) => (
               <NavLink
@@ -82,7 +84,7 @@ export function ReportsNav() {
                 }
               >
                 <item.icon className="size-4" />
-                {item.label}
+                {t(item.labelKey)}
               </NavLink>
             ))}
           </div>

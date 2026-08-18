@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { useQuery } from '@tanstack/react-query'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '@/lib/supabase/client'
@@ -31,6 +32,7 @@ async function search(clubId: string, term: string): Promise<SearchResults> {
 }
 
 export function GlobalSearch() {
+  const { t } = useTranslation()
   const { currentClubId } = useAuth()
   const navigate = useNavigate()
   const [term, setTerm] = useState('')
@@ -49,7 +51,7 @@ export function GlobalSearch() {
       <div className="relative">
         <Search className="pointer-events-none absolute start-3 top-1/2 size-4 -translate-y-1/2 text-text-secondary" />
         <Input
-          placeholder="بحث..."
+          placeholder={t('search.placeholder')}
           className="ps-9"
           value={term}
           onChange={(e) => setTerm(e.target.value)}
@@ -60,12 +62,12 @@ export function GlobalSearch() {
       {focused && term.trim().length >= 2 && (
         <div className="absolute z-50 mt-1 w-full rounded-md border border-border bg-surface p-2 shadow-lg">
           {!hasResults ? (
-            <p className="p-2 text-sm text-text-secondary">لا توجد نتائج</p>
+            <p className="p-2 text-sm text-text-secondary">{t('search.noResults')}</p>
           ) : (
             <div className="flex flex-col gap-3 text-sm">
               {data.customers.length > 0 && (
                 <div>
-                  <p className="px-2 text-xs font-medium text-text-secondary">العملاء</p>
+                  <p className="px-2 text-xs font-medium text-text-secondary">{t('search.customers')}</p>
                   {data.customers.map((c) => (
                     <button
                       key={c.id}
@@ -79,7 +81,7 @@ export function GlobalSearch() {
               )}
               {data.players.length > 0 && (
                 <div>
-                  <p className="px-2 text-xs font-medium text-text-secondary">اللاعبون</p>
+                  <p className="px-2 text-xs font-medium text-text-secondary">{t('search.players')}</p>
                   {data.players.map((p) => (
                     <button
                       key={p.id}
@@ -93,7 +95,7 @@ export function GlobalSearch() {
               )}
               {data.invoices.length > 0 && (
                 <div>
-                  <p className="px-2 text-xs font-medium text-text-secondary">الفواتير</p>
+                  <p className="px-2 text-xs font-medium text-text-secondary">{t('search.invoices')}</p>
                   {data.invoices.map((i) => (
                     <button
                       key={i.id}

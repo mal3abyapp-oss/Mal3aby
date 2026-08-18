@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
+import { useTranslation } from 'react-i18next'
 import { supabase } from '@/lib/supabase/client'
 import { useAuth } from '@/app/providers/AuthProvider'
 import { StatusBadge, type StatusTone } from '@/components/ui/status-badge'
@@ -33,28 +34,27 @@ interface ActivityRow {
   attempts: number
 }
 
-const TEMPLATE_LABELS: Record<string, string> = {
-  'booking-created': 'إنشاء حجز',
-  'booking-confirmed': 'تأكيد حجز',
+// Template/status label text lives in i18n resources under
+// whatsapp.page.activityTab.templateLabels / .statusLabels (see
+// WhatsAppActivityTab render below) -- these keys are the lookup keys,
+// not the display text.
+const TEMPLATE_LABEL_KEYS = [
+  'booking-created',
+  'booking-confirmed',
   // Duplicate-message fix (2026-08-18): the merged booking+payment
   // message queued by _create_booking_internal() when a payment is
   // recorded in the same transaction as booking creation -- see
   // whatsapp-connector/src/templates.ts's 'booking-confirmed-paid'.
-  'booking-confirmed-paid': 'تأكيد حجز مع الدفع',
-  'booking-cancelled': 'إلغاء حجز',
-  'payment-received': 'استلام دفعة',
-  'payment-refunded': 'استرداد دفعة',
-  'invoice-created': 'إصدار فاتورة',
-}
+  'booking-confirmed-paid',
+  'booking-cancelled',
+  'payment-received',
+  'payment-refunded',
+  'invoice-created',
+] as const
 
-const STATUS_LABELS: Record<string, string> = {
-  pending: 'قيد الانتظار',
-  retrying: 'إعادة محاولة',
-  sent: 'أُرسلت',
-  failed: 'فشلت نهائيًا',
-  expired: 'منتهية الصلاحية',
-  cancelled: 'أُلغيت',
-}
+const STATUS_LABEL_KEYS = ['pending', 'retrying', 'sent', 'failed', 'expired', 'cancelled'] as const
+
+const STATUS_LABEL_KEYS_WITH_ALL = ['all', ...STATUS_LABEL_KEYS] as const
 
 const STATUS_TONE: Record<string, StatusTone> = {
   pending: 'neutral',
@@ -91,12 +91,13 @@ async function fetchActivity(clubId: string, status: string): Promise<ActivityRo
   }))
 }
 
-function formatDateTime(iso: string | null): string {
+function formatDateTime(iso: string | null, locale: string): string {
   if (!iso) return '—'
-  return new Date(iso).toLocaleString('ar-EG', { dateStyle: 'medium', timeStyle: 'short' })
+  return new Date(iso).toLocaleString(locale === 'ar' ? 'ar-EG' : 'en-US', { dateStyle: 'medium', timeStyle: 'short' })
 }
 
 export function WhatsAppActivityTab() {
+  const { t, i18n } = useTranslation()
   const { currentClubId } = useAuth()
   const [statusFilter, setStatusFilter] = useState('all')
 
@@ -113,50 +114,56 @@ export function WhatsAppActivityTab() {
         <Select value={statusFilter} onValueChange={setStatusFilter}>
           <SelectTrigger><SelectValue /></SelectTrigger>
           <SelectContent>
-            <SelectItem value="all">كل الحالات</SelectItem>
-            <SelectItem value="sent">أُرسلت</SelectItem>
-            <SelectItem value="pending">قيد الانتظار</SelectItem>
-            <SelectItem value="retrying">إعادة محاولة</SelectItem>
-            <SelectItem value="failed">فشلت نهائيًا</SelectItem>
-            <SelectItem value="expired">منتهية الصلاحية</SelectItem>
-            <SelectItem value="cancelled">أُلغيت</SelectItem>
+            {STATUS_LABEL_KEYS_WITH_ALL.map((key) => (
+              <SelectItem key={key} value={key}>
+                {t(`whatsapp.page.activityTab.statusLabels.${key}`)}
+              </SelectItem>
+            ))}
           </SelectContent>
         </Select>
       </div>
 
-      {isLoading && <p className="text-sm text-text-secondary">جارٍ التحميل...</p>}
+      {isLoading && <p className="text-sm text-text-secondary">{t('common.loading')}</p>}
       {!isLoading && rows.length === 0 && (
-        <p className="text-sm text-text-secondary">لا توجد رسائل واتساب في هذا النطاق بعد.</p>
+        <p className="text-sm text-text-secondary">{t('whatsapp.page.activityTab.emptyTitle')}</p>
       )}
       {!isLoading && rows.length > 0 && (
         <div className="overflow-x-auto">
           <table className="w-full text-start text-sm">
             <thead>
               <tr className="border-b border-border text-text-secondary">
-                <th className="p-2 text-start">الرسالة</th>
-                <th className="p-2 text-start">المستلم</th>
-                <th className="p-2 text-start">الحالة</th>
-                <th className="p-2 text-start">التوقيت</th>
-                <th className="p-2 text-start">آخر محاولة</th>
+                <th className="p-2 text-start">{t('whatsapp.page.activityTab.columns.message')}</th>
+                <th className="p-2 text-start">{t('whatsapp.page.activityTab.columns.recipient')}</th>
+                <th className="p-2 text-start">{t('whatsapp.page.activityTab.columns.status')}</th>
+                <th className="p-2 text-start">{t('whatsapp.page.activityTab.columns.timing')}</th>
+                <th className="p-2 text-start">{t('whatsapp.page.activityTab.columns.lastAttempt')}</th>
               </tr>
             </thead>
             <tbody>
-              {rows.map((r) => (
-                <tr key={r.id} className="border-b border-border">
-                  <td className="p-2 font-medium">{TEMPLATE_LABELS[r.templateKey] ?? r.templateKey}</td>
-                  <td className="p-2 tabular-nums">{r.recipientPhone ?? '—'}</td>
-                  <td className="p-2">
-                    <StatusBadge tone={STATUS_TONE[r.status] ?? 'neutral'} label={STATUS_LABELS[r.status] ?? r.status} />
-                    {r.status === 'failed' && r.lastError && (
-                      <p className="mt-1 text-xs text-status-danger">{r.lastError}</p>
-                    )}
-                  </td>
-                  <td className="p-2 text-xs text-text-secondary">{formatDateTime(r.scheduledAt)}</td>
-                  <td className="p-2 text-xs text-text-secondary">
-                    {r.lastAttemptAt ? `${formatDateTime(r.lastAttemptAt)} (${r.attempts})` : '—'}
-                  </td>
-                </tr>
-              ))}
+              {rows.map((r) => {
+                const templateLabel = (TEMPLATE_LABEL_KEYS as readonly string[]).includes(r.templateKey)
+                  ? t(`whatsapp.page.activityTab.templateLabels.${r.templateKey}`)
+                  : r.templateKey
+                const statusLabel = (STATUS_LABEL_KEYS as readonly string[]).includes(r.status)
+                  ? t(`whatsapp.page.activityTab.statusLabels.${r.status}`)
+                  : r.status
+                return (
+                  <tr key={r.id} className="border-b border-border">
+                    <td className="p-2 font-medium">{templateLabel}</td>
+                    <td className="p-2 tabular-nums">{r.recipientPhone ?? '—'}</td>
+                    <td className="p-2">
+                      <StatusBadge tone={STATUS_TONE[r.status] ?? 'neutral'} label={statusLabel} />
+                      {r.status === 'failed' && r.lastError && (
+                        <p className="mt-1 text-xs text-status-danger">{r.lastError}</p>
+                      )}
+                    </td>
+                    <td className="p-2 text-xs text-text-secondary">{formatDateTime(r.scheduledAt, i18n.language)}</td>
+                    <td className="p-2 text-xs text-text-secondary">
+                      {r.lastAttemptAt ? `${formatDateTime(r.lastAttemptAt, i18n.language)} (${r.attempts})` : '—'}
+                    </td>
+                  </tr>
+                )
+              })}
             </tbody>
           </table>
         </div>

@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useParams } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { useTranslation } from 'react-i18next'
 import { supabase } from '@/lib/supabase/client'
 import { PageHeader } from '@/components/ui/page-header'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -25,23 +26,18 @@ import {
 } from '@/components/ui/select'
 import { LIFECYCLE_STATUS_LABELS, SUBSCRIPTION_KIND_LABELS, ACCESS_TONE, ACCESS_LABEL } from './labels'
 import { actionLabel, entityLabel } from '@/lib/domain/audit'
+import { useDirection } from '@/app/providers/DirectionProvider'
 
 // Per-club detail: Overview / Current Subscription / History / Payment
 // History / Access Status / Audit, plus the Actions panel wired to every
 // Phase 3b/3c RPC. This is the single highest-surface-area screen in the
 // Platform Owner console.
 
-const LIMIT_TYPE_LABELS: Record<string, string> = {
-  branch_limit: 'الفروع',
-  field_limit: 'الملاعب',
-  academy_limit: 'برامج الأكاديمية',
-}
-
-const REQUEST_STATUS_LABELS: Record<string, { label: string; tone: 'success' | 'warning' | 'danger' | 'neutral' }> = {
-  pending: { label: 'قيد المراجعة', tone: 'warning' },
-  reviewed: { label: 'تمت المراجعة', tone: 'neutral' },
-  approved: { label: 'تمت الموافقة', tone: 'success' },
-  dismissed: { label: 'مرفوض', tone: 'danger' },
+const REQUEST_STATUS_TONE: Record<string, 'success' | 'warning' | 'danger' | 'neutral'> = {
+  pending: 'warning',
+  reviewed: 'neutral',
+  approved: 'success',
+  dismissed: 'danger',
 }
 
 // See labels.ts: subscription_kind/lifecycle_status were rendered as
@@ -114,6 +110,8 @@ async function fetchUpgradeRequests(clubId: string) {
 }
 
 export function PlatformClubDetailPage() {
+  const { t } = useTranslation()
+  const { locale } = useDirection()
   const { clubId } = useParams<{ clubId: string }>()
   const queryClient = useQueryClient()
   const [reasonDialogAction, setReasonDialogAction] = useState<null | 'cancel' | 'reverse' | 'suspend'>(null)
@@ -171,6 +169,18 @@ export function PlatformClubDetailPage() {
   const currentSub = subscriptions.find((s) => s.lifecycle_status !== 'cancelled')
   const pendingRequests = upgradeRequests.filter((r) => r.status === 'pending')
 
+  const limitTypeLabel: Record<string, string> = {
+    branch_limit: t('platform.clubDetailPage.limitTypeLabels.branch_limit'),
+    field_limit: t('platform.clubDetailPage.limitTypeLabels.field_limit'),
+    academy_limit: t('platform.clubDetailPage.limitTypeLabels.academy_limit'),
+  }
+  const requestStatusLabel: Record<string, string> = {
+    pending: t('platform.clubDetailPage.requestStatusLabels.pending'),
+    reviewed: t('platform.clubDetailPage.requestStatusLabels.reviewed'),
+    approved: t('platform.clubDetailPage.requestStatusLabels.approved'),
+    dismissed: t('platform.clubDetailPage.requestStatusLabels.dismissed'),
+  }
+
   function invalidateAll() {
     void queryClient.invalidateQueries({ queryKey: ['platform-club-access', clubId] })
     void queryClient.invalidateQueries({ queryKey: ['platform-club-subs', clubId] })
@@ -194,7 +204,7 @@ export function PlatformClubDetailPage() {
       if (error) throw error
     },
     onSuccess: invalidateAll,
-    onError: () => setActionError('تعذّر بدء التجربة المجانية.'),
+    onError: () => setActionError(t('platform.clubDetailPage.errors.startTrial')),
   })
 
   const activateMutation = useMutation({
@@ -208,7 +218,7 @@ export function PlatformClubDetailPage() {
       if (error) throw error
     },
     onSuccess: invalidateAll,
-    onError: () => setActionError('تعذّر التفعيل — تأكد من اختيار خطة.'),
+    onError: () => setActionError(t('platform.clubDetailPage.errors.activate')),
   })
 
   const renewMutation = useMutation({
@@ -220,7 +230,7 @@ export function PlatformClubDetailPage() {
       if (error) throw error
     },
     onSuccess: invalidateAll,
-    onError: () => setActionError('تعذّر التجديد.'),
+    onError: () => setActionError(t('platform.clubDetailPage.errors.renew')),
   })
 
   const changePlanMutation = useMutation({
@@ -234,7 +244,7 @@ export function PlatformClubDetailPage() {
       if (error) throw error
     },
     onSuccess: invalidateAll,
-    onError: () => setActionError('تعذّر تغيير الخطة.'),
+    onError: () => setActionError(t('platform.clubDetailPage.errors.changePlan')),
   })
 
   const extendGraceMutation = useMutation({
@@ -247,7 +257,7 @@ export function PlatformClubDetailPage() {
       if (error) throw error
     },
     onSuccess: invalidateAll,
-    onError: () => setActionError('تعذّر تمديد فترة السماح.'),
+    onError: () => setActionError(t('platform.clubDetailPage.errors.extendGrace')),
   })
 
   const suspendMutation = useMutation({
@@ -260,7 +270,7 @@ export function PlatformClubDetailPage() {
       setReasonText('')
       void queryClient.invalidateQueries({ queryKey: ['platform-club', clubId] })
     },
-    onError: () => setActionError('تعذّر إيقاف النادي.'),
+    onError: () => setActionError(t('platform.clubDetailPage.errors.suspend')),
   })
 
   const reactivateMutation = useMutation({
@@ -269,7 +279,7 @@ export function PlatformClubDetailPage() {
       if (error) throw error
     },
     onSuccess: () => void queryClient.invalidateQueries({ queryKey: ['platform-club', clubId] }),
-    onError: () => setActionError('تعذّر إعادة تفعيل النادي.'),
+    onError: () => setActionError(t('platform.clubDetailPage.errors.reactivate')),
   })
 
   const cancelMutation = useMutation({
@@ -286,7 +296,7 @@ export function PlatformClubDetailPage() {
       setReasonDialogAction(null)
       setReasonText('')
     },
-    onError: () => setActionError('تعذّر الإلغاء.'),
+    onError: () => setActionError(t('platform.clubDetailPage.errors.cancel')),
   })
 
   const recordPaymentMutation = useMutation({
@@ -301,7 +311,7 @@ export function PlatformClubDetailPage() {
       if (error) throw error
     },
     onSuccess: invalidateAll,
-    onError: () => setActionError('تعذّر تسجيل الدفعة.'),
+    onError: () => setActionError(t('platform.clubDetailPage.errors.recordPayment')),
   })
 
   const reverseMutation = useMutation({
@@ -314,7 +324,7 @@ export function PlatformClubDetailPage() {
       setReasonDialogAction(null)
       setReasonText('')
     },
-    onError: () => setActionError('تعذّر عكس الدفعة.'),
+    onError: () => setActionError(t('platform.clubDetailPage.errors.reversePayment')),
   })
 
   // Task #54: commercial_entitlements/commercial_upgrade_requests both
@@ -341,7 +351,7 @@ export function PlatformClubDetailPage() {
       invalidateEntitlements()
       setEditingLimits(false)
     },
-    onError: () => setActionError('تعذّر حفظ الحدود التجارية.'),
+    onError: () => setActionError(t('platform.clubDetailPage.errors.saveLimits')),
   })
 
   const resolveUpgradeRequestMutation = useMutation({
@@ -354,20 +364,26 @@ export function PlatformClubDetailPage() {
       if (error) throw error
     },
     onSuccess: invalidateEntitlements,
-    onError: () => setActionError('تعذّر تحديث حالة الطلب.'),
+    onError: () => setActionError(t('platform.clubDetailPage.errors.updateRequestStatus')),
   })
 
   const invoiceColumns: DataTableColumn<(typeof invoices)[number]>[] = [
-    { key: 'number', header: 'رقم الفاتورة', render: (i) => <bdi>{i.invoice_number}</bdi> },
-    { key: 'amount', header: 'المبلغ', render: (i) => <MoneyDisplay amount={Number(i.amount)} size="sm" /> },
-    { key: 'due', header: 'الاستحقاق', render: (i) => new Date(i.due_date).toLocaleDateString('ar-EG') },
+    { key: 'number', header: t('platform.clubDetailPage.invoiceColumns.number'), render: (i) => <bdi>{i.invoice_number}</bdi> },
+    { key: 'amount', header: t('platform.clubDetailPage.invoiceColumns.amount'), render: (i) => <MoneyDisplay amount={Number(i.amount)} size="sm" /> },
+    { key: 'due', header: t('platform.clubDetailPage.invoiceColumns.due'), render: (i) => new Date(i.due_date).toLocaleDateString('ar-EG') },
     {
       key: 'status',
-      header: 'الحالة',
+      header: t('platform.clubDetailPage.invoiceColumns.status'),
       render: (i) => (
         <StatusBadge
           tone={i.status === 'paid' ? 'success' : i.status === 'void' ? 'neutral' : 'warning'}
-          label={i.status === 'paid' ? 'مدفوعة' : i.status === 'void' ? 'ملغاة' : 'قيد الانتظار'}
+          label={
+            i.status === 'paid'
+              ? t('platform.clubDetailPage.invoiceStatusLabels.paid')
+              : i.status === 'void'
+                ? t('platform.clubDetailPage.invoiceStatusLabels.void')
+                : t('platform.clubDetailPage.invoiceStatusLabels.pending')
+          }
         />
       ),
     },
@@ -380,7 +396,7 @@ export function PlatformClubDetailPage() {
         if (i.status === 'pending') {
           return (
             <Button size="sm" variant="outline" onClick={() => recordPaymentMutation.mutate(i.id)}>
-              تسجيل دفعة
+              {t('platform.clubDetailPage.recordPayment')}
             </Button>
           )
         }
@@ -394,7 +410,7 @@ export function PlatformClubDetailPage() {
                 setReasonTarget(activePayment.id)
               }}
             >
-              عكس الدفعة
+              {t('platform.clubDetailPage.reversePayment')}
             </Button>
           )
         }
@@ -406,9 +422,16 @@ export function PlatformClubDetailPage() {
   return (
     <div>
       <PageHeader
-        title={club?.name_ar ?? '...'}
+        title={club?.name_ar ?? t('platform.clubDetailPage.loadingTitle')}
         description={club?.club_code ? <bdi>{club.club_code}</bdi> : undefined}
-        actions={club && <StatusBadge tone={club.status === 'active' ? 'success' : 'danger'} label={club.status === 'active' ? 'نشط' : 'موقوف'} />}
+        actions={
+          club && (
+            <StatusBadge
+              tone={club.status === 'active' ? 'success' : 'danger'}
+              label={club.status === 'active' ? t('platform.clubDetailPage.clubStatusActive') : t('platform.clubDetailPage.clubStatusSuspended')}
+            />
+          )
+        }
       />
 
       {actionError && (
@@ -420,17 +443,19 @@ export function PlatformClubDetailPage() {
       <div className="mb-4 grid gap-4 md:grid-cols-3">
         <Card>
           <CardHeader>
-            <CardTitle className="text-base">حالة الاشتراك</CardTitle>
+            <CardTitle className="text-base">{t('platform.clubDetailPage.subscriptionStatusCard.title')}</CardTitle>
           </CardHeader>
           <CardContent className="flex flex-col gap-2 text-sm">
             <StatusBadge
               tone={ACCESS_TONE[access ?? 'blocked'] ?? 'danger'}
-              label={ACCESS_LABEL[access ?? 'blocked'] ?? 'موقوف'}
+              label={ACCESS_LABEL[access ?? 'blocked'] ?? t('platform.clubDetailPage.clubStatusSuspended')}
             />
             {currentSub && (
               <>
-                <p>النوع: {SUBSCRIPTION_KIND_LABELS[currentSub.subscription_kind] ?? currentSub.subscription_kind}</p>
-                <p>ينتهي: <bdi>{new Date(currentSub.end_at).toLocaleDateString('ar-EG')}</bdi></p>
+                <p>{t('platform.clubDetailPage.subscriptionStatusCard.type', { type: SUBSCRIPTION_KIND_LABELS[currentSub.subscription_kind] ?? currentSub.subscription_kind })}</p>
+                <p>
+                  {t('platform.clubDetailPage.subscriptionStatusCard.endsAtPrefix')} <bdi>{new Date(currentSub.end_at).toLocaleDateString('ar-EG')}</bdi>
+                </p>
               </>
             )}
           </CardContent>
@@ -438,17 +463,17 @@ export function PlatformClubDetailPage() {
 
         <Card className="md:col-span-2">
           <CardHeader>
-            <CardTitle className="text-base">إجراءات</CardTitle>
+            <CardTitle className="text-base">{t('platform.clubDetailPage.actionsCard.title')}</CardTitle>
           </CardHeader>
           <CardContent className="flex flex-wrap gap-2">
             {!currentSub && (
               <>
                 <Button size="sm" onClick={() => startTrialMutation.mutate()} disabled={startTrialMutation.isPending}>
-                  بدء تجربة مجانية
+                  {t('platform.clubDetailPage.actionsCard.startTrial')}
                 </Button>
                 <div className="flex items-center gap-2">
                   <Select value={selectedPlanId} onValueChange={setSelectedPlanId}>
-                    <SelectTrigger className="w-40"><SelectValue placeholder="اختر خطة" /></SelectTrigger>
+                    <SelectTrigger className="w-40"><SelectValue placeholder={t('platform.clubDetailPage.actionsCard.choosePlanPlaceholder')} /></SelectTrigger>
                     <SelectContent>
                       {plans.map((p) => (
                         <SelectItem key={p.id} value={p.id}>{p.name_ar}</SelectItem>
@@ -456,7 +481,7 @@ export function PlatformClubDetailPage() {
                     </SelectContent>
                   </Select>
                   <Button size="sm" onClick={() => activateMutation.mutate()} disabled={activateMutation.isPending}>
-                    تفعيل
+                    {t('platform.clubDetailPage.actionsCard.activate')}
                   </Button>
                 </div>
               </>
@@ -464,11 +489,11 @@ export function PlatformClubDetailPage() {
             {currentSub && (
               <>
                 <Button size="sm" variant="outline" onClick={() => renewMutation.mutate()} disabled={renewMutation.isPending}>
-                  تجديد
+                  {t('platform.clubDetailPage.actionsCard.renew')}
                 </Button>
                 <div className="flex items-center gap-2">
                   <Select value={selectedPlanId} onValueChange={setSelectedPlanId}>
-                    <SelectTrigger className="w-40"><SelectValue placeholder="خطة جديدة" /></SelectTrigger>
+                    <SelectTrigger className="w-40"><SelectValue placeholder={t('platform.clubDetailPage.actionsCard.newPlanPlaceholder')} /></SelectTrigger>
                     <SelectContent>
                       {plans.map((p) => (
                         <SelectItem key={p.id} value={p.id}>{p.name_ar}</SelectItem>
@@ -476,11 +501,11 @@ export function PlatformClubDetailPage() {
                     </SelectContent>
                   </Select>
                   <Button size="sm" variant="outline" onClick={() => changePlanMutation.mutate()} disabled={changePlanMutation.isPending}>
-                    تغيير الخطة
+                    {t('platform.clubDetailPage.actionsCard.changePlan')}
                   </Button>
                 </div>
                 <Button size="sm" variant="outline" onClick={() => extendGraceMutation.mutate(14)} disabled={extendGraceMutation.isPending}>
-                  تمديد فترة السماح (14 يوم)
+                  {t('platform.clubDetailPage.actionsCard.extendGrace')}
                 </Button>
                 <Button
                   size="sm"
@@ -490,7 +515,7 @@ export function PlatformClubDetailPage() {
                     setReasonTarget(currentSub.id)
                   }}
                 >
-                  إلغاء الاشتراك
+                  {t('platform.clubDetailPage.actionsCard.cancelSubscription')}
                 </Button>
               </>
             )}
@@ -504,11 +529,11 @@ export function PlatformClubDetailPage() {
                 }}
                 disabled={suspendMutation.isPending}
               >
-                إيقاف النادي
+                {t('platform.clubDetailPage.actionsCard.suspendClub')}
               </Button>
             ) : (
               <Button size="sm" variant="outline" onClick={() => reactivateMutation.mutate()} disabled={reactivateMutation.isPending}>
-                إعادة تفعيل النادي
+                {t('platform.clubDetailPage.actionsCard.reactivateClub')}
               </Button>
             )}
           </CardContent>
@@ -517,7 +542,7 @@ export function PlatformClubDetailPage() {
 
       <Card className="mb-4">
         <CardHeader className="flex flex-row items-center justify-between">
-          <CardTitle className="text-base">الحدود التجارية</CardTitle>
+          <CardTitle className="text-base">{t('platform.clubDetailPage.limitsCard.title')}</CardTitle>
           {!editingLimits && (
             <Button
               size="sm"
@@ -529,33 +554,33 @@ export function PlatformClubDetailPage() {
                 setEditingLimits(true)
               }}
             >
-              تعديل الحدود
+              {t('platform.clubDetailPage.limitsCard.editLimits')}
             </Button>
           )}
         </CardHeader>
         <CardContent className="flex flex-col gap-4">
           {editingLimits ? (
             <div className="flex flex-col gap-3">
-              <p className="text-xs text-text-secondary">اترك الحقل فارغًا لجعل الحد بلا نهاية.</p>
+              <p className="text-xs text-text-secondary">{t('platform.clubDetailPage.limitsCard.emptyFieldHint')}</p>
               <div className="grid gap-3 md:grid-cols-3">
                 <div className="flex flex-col gap-1.5">
-                  <label className="text-sm font-medium text-text-secondary">حد الفروع</label>
-                  <Input type="number" min="0" value={branchLimitInput} onChange={(e) => setBranchLimitInput(e.target.value)} placeholder="بلا حد" />
+                  <label className="text-sm font-medium text-text-secondary">{t('platform.clubDetailPage.limitsCard.branchLimitLabel')}</label>
+                  <Input type="number" min="0" value={branchLimitInput} onChange={(e) => setBranchLimitInput(e.target.value)} placeholder={t('platform.clubDetailPage.limitsCard.unlimitedPlaceholder')} />
                 </div>
                 <div className="flex flex-col gap-1.5">
-                  <label className="text-sm font-medium text-text-secondary">حد الملاعب</label>
-                  <Input type="number" min="0" value={fieldLimitInput} onChange={(e) => setFieldLimitInput(e.target.value)} placeholder="بلا حد" />
+                  <label className="text-sm font-medium text-text-secondary">{t('platform.clubDetailPage.limitsCard.fieldLimitLabel')}</label>
+                  <Input type="number" min="0" value={fieldLimitInput} onChange={(e) => setFieldLimitInput(e.target.value)} placeholder={t('platform.clubDetailPage.limitsCard.unlimitedPlaceholder')} />
                 </div>
                 <div className="flex flex-col gap-1.5">
-                  <label className="text-sm font-medium text-text-secondary">حد برامج الأكاديمية</label>
-                  <Input type="number" min="0" value={academyLimitInput} onChange={(e) => setAcademyLimitInput(e.target.value)} placeholder="بلا حد" />
+                  <label className="text-sm font-medium text-text-secondary">{t('platform.clubDetailPage.limitsCard.academyLimitLabel')}</label>
+                  <Input type="number" min="0" value={academyLimitInput} onChange={(e) => setAcademyLimitInput(e.target.value)} placeholder={t('platform.clubDetailPage.limitsCard.unlimitedPlaceholder')} />
                 </div>
               </div>
               <div className="flex gap-2">
                 <Button size="sm" onClick={() => saveLimitsMutation.mutate()} disabled={saveLimitsMutation.isPending}>
-                  {saveLimitsMutation.isPending ? 'جارٍ الحفظ...' : 'حفظ الحدود'}
+                  {saveLimitsMutation.isPending ? t('platform.clubDetailPage.limitsCard.saving') : t('platform.clubDetailPage.limitsCard.saveLimits')}
                 </Button>
-                <Button size="sm" variant="outline" onClick={() => setEditingLimits(false)}>إلغاء</Button>
+                <Button size="sm" variant="outline" onClick={() => setEditingLimits(false)}>{t('platform.clubDetailPage.limitsCard.cancel')}</Button>
               </div>
             </div>
           ) : (
@@ -566,8 +591,8 @@ export function PlatformClubDetailPage() {
                 const used = usage?.[usedKey] ?? 0
                 return (
                   <div key={key} className="rounded-lg border border-border p-3">
-                    <p className="text-sm font-medium">{LIMIT_TYPE_LABELS[key]}</p>
-                    <p className="text-sm text-text-secondary tabular-nums">{used} {limit === null ? '(بلا حد)' : `/ ${limit}`}</p>
+                    <p className="text-sm font-medium">{limitTypeLabel[key]}</p>
+                    <p className="text-sm text-text-secondary tabular-nums">{used} {limit === null ? t('platform.clubDetailPage.limitsCard.unlimited') : `/ ${limit}`}</p>
                   </div>
                 )
               })}
@@ -576,11 +601,15 @@ export function PlatformClubDetailPage() {
 
           {pendingRequests.length > 0 && (
             <div className="flex flex-col gap-2 rounded-lg border border-status-warning/40 bg-status-warning/10 p-3">
-              <p className="text-sm font-medium text-status-warning">طلبات ترقية قيد المراجعة ({pendingRequests.length})</p>
+              <p className="text-sm font-medium text-status-warning">{t('platform.clubDetailPage.limitsCard.pendingRequestsHeading', { count: pendingRequests.length })}</p>
               {pendingRequests.map((r) => (
                 <div key={r.id} className="flex flex-wrap items-center justify-between gap-2 rounded-md bg-surface p-2 text-sm">
                   <span>
-                    {LIMIT_TYPE_LABELS[r.limit_type] ?? r.limit_type} — الحد الحالي {r.current_limit ?? 'بلا حد'} / الاستخدام {r.current_usage}
+                    {t('platform.clubDetailPage.limitsCard.requestSummary', {
+                      label: limitTypeLabel[r.limit_type] ?? r.limit_type,
+                      limit: r.current_limit ?? t('platform.clubDetailPage.limitsCard.requestUnlimited'),
+                      usage: r.current_usage,
+                    })}
                     {r.note && <span className="text-text-secondary"> — {r.note}</span>}
                   </span>
                   <div className="flex gap-2">
@@ -589,7 +618,7 @@ export function PlatformClubDetailPage() {
                       onClick={() => resolveUpgradeRequestMutation.mutate({ requestId: r.id, status: 'approved' })}
                       disabled={resolveUpgradeRequestMutation.isPending}
                     >
-                      موافقة
+                      {t('platform.clubDetailPage.limitsCard.approve')}
                     </Button>
                     <Button
                       size="sm"
@@ -597,7 +626,7 @@ export function PlatformClubDetailPage() {
                       onClick={() => resolveUpgradeRequestMutation.mutate({ requestId: r.id, status: 'dismissed' })}
                       disabled={resolveUpgradeRequestMutation.isPending}
                     >
-                      رفض
+                      {t('platform.clubDetailPage.limitsCard.reject')}
                     </Button>
                   </div>
                 </div>
@@ -609,63 +638,63 @@ export function PlatformClubDetailPage() {
 
       <Tabs defaultValue="history">
         <TabsList>
-          <TabsTrigger value="history">سجل الاشتراكات</TabsTrigger>
-          <TabsTrigger value="invoices">الفواتير والمدفوعات</TabsTrigger>
-          <TabsTrigger value="requests">طلبات الترقية</TabsTrigger>
-          <TabsTrigger value="audit">سجل التدقيق</TabsTrigger>
+          <TabsTrigger value="history">{t('platform.clubDetailPage.tabs.history')}</TabsTrigger>
+          <TabsTrigger value="invoices">{t('platform.clubDetailPage.tabs.invoices')}</TabsTrigger>
+          <TabsTrigger value="requests">{t('platform.clubDetailPage.tabs.requests')}</TabsTrigger>
+          <TabsTrigger value="audit">{t('platform.clubDetailPage.tabs.audit')}</TabsTrigger>
         </TabsList>
         <TabsContent value="history">
           <DataTable
             columns={[
-              { key: 'kind', header: 'النوع', render: (s: (typeof subscriptions)[number]) => SUBSCRIPTION_KIND_LABELS[s.subscription_kind] ?? s.subscription_kind },
-              { key: 'plan', header: 'الخطة', render: (s: (typeof subscriptions)[number]) => s.plan_name_snapshot ?? '—' },
-              { key: 'start', header: 'البداية', render: (s: (typeof subscriptions)[number]) => new Date(s.start_at).toLocaleDateString('ar-EG') },
-              { key: 'end', header: 'النهاية', render: (s: (typeof subscriptions)[number]) => new Date(s.end_at).toLocaleDateString('ar-EG') },
-              { key: 'status', header: 'الحالة', render: (s: (typeof subscriptions)[number]) => LIFECYCLE_STATUS_LABELS[s.lifecycle_status] ?? s.lifecycle_status },
+              { key: 'kind', header: t('platform.clubDetailPage.historyColumns.kind'), render: (s: (typeof subscriptions)[number]) => SUBSCRIPTION_KIND_LABELS[s.subscription_kind] ?? s.subscription_kind },
+              { key: 'plan', header: t('platform.clubDetailPage.historyColumns.plan'), render: (s: (typeof subscriptions)[number]) => s.plan_name_snapshot ?? '—' },
+              { key: 'start', header: t('platform.clubDetailPage.historyColumns.start'), render: (s: (typeof subscriptions)[number]) => new Date(s.start_at).toLocaleDateString('ar-EG') },
+              { key: 'end', header: t('platform.clubDetailPage.historyColumns.end'), render: (s: (typeof subscriptions)[number]) => new Date(s.end_at).toLocaleDateString('ar-EG') },
+              { key: 'status', header: t('platform.clubDetailPage.historyColumns.status'), render: (s: (typeof subscriptions)[number]) => LIFECYCLE_STATUS_LABELS[s.lifecycle_status] ?? s.lifecycle_status },
             ]}
             rows={subscriptions}
             rowKey={(s) => s.id}
-            emptyTitle="لا يوجد سجل اشتراكات"
+            emptyTitle={t('platform.clubDetailPage.historyEmptyTitle')}
           />
         </TabsContent>
         <TabsContent value="invoices">
-          <DataTable columns={invoiceColumns} rows={invoices} rowKey={(i) => i.id} emptyTitle="لا توجد فواتير" />
+          <DataTable columns={invoiceColumns} rows={invoices} rowKey={(i) => i.id} emptyTitle={t('platform.clubDetailPage.invoicesEmptyTitle')} />
         </TabsContent>
         <TabsContent value="requests">
           <DataTable
             columns={[
-              { key: 'type', header: 'النوع', render: (r: (typeof upgradeRequests)[number]) => LIMIT_TYPE_LABELS[r.limit_type] ?? r.limit_type },
-              { key: 'limit', header: 'الحد وقت الطلب', render: (r: (typeof upgradeRequests)[number]) => r.current_limit ?? 'بلا حد' },
-              { key: 'usage', header: 'الاستخدام وقت الطلب', render: (r: (typeof upgradeRequests)[number]) => r.current_usage },
-              { key: 'note', header: 'ملاحظة', render: (r: (typeof upgradeRequests)[number]) => r.note ?? '—' },
-              { key: 'created', header: 'تاريخ الطلب', render: (r: (typeof upgradeRequests)[number]) => new Date(r.created_at).toLocaleDateString('ar-EG') },
+              { key: 'type', header: t('platform.clubDetailPage.requestsColumns.type'), render: (r: (typeof upgradeRequests)[number]) => limitTypeLabel[r.limit_type] ?? r.limit_type },
+              { key: 'limit', header: t('platform.clubDetailPage.requestsColumns.limitAtRequest'), render: (r: (typeof upgradeRequests)[number]) => r.current_limit ?? t('platform.clubDetailPage.limitsCard.requestUnlimited') },
+              { key: 'usage', header: t('platform.clubDetailPage.requestsColumns.usageAtRequest'), render: (r: (typeof upgradeRequests)[number]) => r.current_usage },
+              { key: 'note', header: t('platform.clubDetailPage.requestsColumns.note'), render: (r: (typeof upgradeRequests)[number]) => r.note ?? '—' },
+              { key: 'created', header: t('platform.clubDetailPage.requestsColumns.createdAt'), render: (r: (typeof upgradeRequests)[number]) => new Date(r.created_at).toLocaleDateString('ar-EG') },
               {
                 key: 'status',
-                header: 'الحالة',
+                header: t('platform.clubDetailPage.requestsColumns.status'),
                 render: (r: (typeof upgradeRequests)[number]) => (
                   <StatusBadge
-                    tone={REQUEST_STATUS_LABELS[r.status]?.tone ?? 'neutral'}
-                    label={REQUEST_STATUS_LABELS[r.status]?.label ?? r.status}
+                    tone={REQUEST_STATUS_TONE[r.status] ?? 'neutral'}
+                    label={requestStatusLabel[r.status] ?? r.status}
                   />
                 ),
               },
             ]}
             rows={upgradeRequests}
             rowKey={(r) => r.id}
-            emptyTitle="لا توجد طلبات ترقية"
+            emptyTitle={t('platform.clubDetailPage.requestsEmptyTitle')}
           />
         </TabsContent>
         <TabsContent value="audit">
           <DataTable
             columns={[
-              { key: 'action', header: 'الإجراء', render: (a: (typeof auditRows)[number]) => actionLabel(a.action) },
-              { key: 'entity', header: 'الكيان', render: (a: (typeof auditRows)[number]) => entityLabel(a.entity_type) },
-              { key: 'time', header: 'الوقت', render: (a: (typeof auditRows)[number]) => new Date(a.created_at).toLocaleString('ar-EG') },
-              { key: 'reason', header: 'السبب', render: (a: (typeof auditRows)[number]) => a.reason ?? '—' },
+              { key: 'action', header: t('platform.clubDetailPage.auditColumns.action'), render: (a: (typeof auditRows)[number]) => actionLabel(a.action, locale) },
+              { key: 'entity', header: t('platform.clubDetailPage.auditColumns.entity'), render: (a: (typeof auditRows)[number]) => entityLabel(a.entity_type, locale) },
+              { key: 'time', header: t('platform.clubDetailPage.auditColumns.time'), render: (a: (typeof auditRows)[number]) => new Date(a.created_at).toLocaleString(locale === 'en' ? 'en-US' : 'ar-EG') },
+              { key: 'reason', header: t('platform.clubDetailPage.auditColumns.reason'), render: (a: (typeof auditRows)[number]) => a.reason ?? '—' },
             ]}
             rows={auditRows}
             rowKey={(a) => a.id}
-            emptyTitle="لا يوجد سجل تدقيق"
+            emptyTitle={t('platform.clubDetailPage.auditEmptyTitle')}
           />
         </TabsContent>
       </Tabs>
@@ -674,16 +703,20 @@ export function PlatformClubDetailPage() {
         <DialogContent>
           <DialogHeader>
             <DialogTitle>
-              {reasonDialogAction === 'cancel' ? 'سبب الإلغاء' : reasonDialogAction === 'suspend' ? 'سبب إيقاف النادي' : 'سبب عكس الدفعة'}
+              {reasonDialogAction === 'cancel'
+                ? t('platform.clubDetailPage.reasonDialog.cancelTitle')
+                : reasonDialogAction === 'suspend'
+                  ? t('platform.clubDetailPage.reasonDialog.suspendTitle')
+                  : t('platform.clubDetailPage.reasonDialog.reverseTitle')}
             </DialogTitle>
           </DialogHeader>
           <div className="flex flex-col gap-3">
             {reasonDialogAction === 'suspend' && (
               <p className="text-sm text-status-danger">
-                سيتم إيقاف النادي بالكامل عن العمل على المنصة فورًا. هذا إجراء حساس يُسجَّل في سجل التدقيق.
+                {t('platform.clubDetailPage.reasonDialog.suspendWarning')}
               </p>
             )}
-            <Input value={reasonText} onChange={(e) => setReasonText(e.target.value)} placeholder="السبب مطلوب" />
+            <Input value={reasonText} onChange={(e) => setReasonText(e.target.value)} placeholder={t('platform.clubDetailPage.reasonDialog.reasonPlaceholder')} />
             <Button
               variant={reasonDialogAction === 'suspend' ? 'destructive' : 'default'}
               disabled={!reasonText.trim() || cancelMutation.isPending || reverseMutation.isPending || suspendMutation.isPending}
@@ -694,7 +727,7 @@ export function PlatformClubDetailPage() {
                 else reverseMutation.mutate({ paymentId: reasonTarget, reason: reasonText })
               }}
             >
-              {reasonDialogAction === 'suspend' ? 'تأكيد الإيقاف' : 'تأكيد'}
+              {reasonDialogAction === 'suspend' ? t('platform.clubDetailPage.reasonDialog.confirmSuspend') : t('platform.clubDetailPage.reasonDialog.confirm')}
             </Button>
           </div>
         </DialogContent>

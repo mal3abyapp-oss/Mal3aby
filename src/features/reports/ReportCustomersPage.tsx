@@ -1,9 +1,11 @@
 import { Link } from 'react-router-dom'
+import { useTranslation } from 'react-i18next'
 import { PageHeader } from '@/components/ui/page-header'
 import { Button } from '@/components/ui/button'
 import { StatCard } from '@/components/ui/stat-card'
 import { formatMoney } from '@/lib/domain/billing'
 import { rowsToCsv, downloadCsv } from '@/lib/csv'
+import { useDirection } from '@/app/providers/DirectionProvider'
 import { Users, Download } from 'lucide-react'
 import { useDateRange, useDateRangeReport } from './hooks/useDateRangeReport'
 import { DateRangeFilter } from './components/DateRangeFilter'
@@ -19,22 +21,24 @@ interface CustomerReport {
 }
 
 export function ReportCustomersPage() {
+  const { t } = useTranslation()
+  const { locale } = useDirection()
   const { startDate, setStartDate, endDate, setEndDate } = useDateRange()
   const { data, isLoading } = useDateRangeReport<CustomerReport>('get_customer_activity_report', startDate, endDate)
 
   return (
     <div>
-      <PageHeader title="التقارير" description="تقرير العملاء -- عملاء جدد وأعلى العملاء إنفاقًا" />
+      <PageHeader title={t('reports.title')} description={t('reports.customers.description')} />
       <ReportsNav />
       <DateRangeFilter startDate={startDate} endDate={endDate} onStart={setStartDate} onEnd={setEndDate} />
-      {isLoading && <p className="text-sm text-text-secondary">جارٍ التحميل...</p>}
+      {isLoading && <p className="text-sm text-text-secondary">{t('reports.loading')}</p>}
       {data && (
         <>
           <div className="mb-6">
-            <StatCard label="عملاء جدد" value={data.new_customers} icon={Users} to="/app/customers" />
+            <StatCard label={t('reports.customers.newCustomers')} value={data.new_customers} icon={Users} to="/app/customers" />
           </div>
           <div className="mb-2 flex items-center justify-between">
-            <p className="font-medium">أعلى العملاء إنفاقًا</p>
+            <p className="font-medium">{t('reports.customers.topSpenders')}</p>
             {data.top_customers.length > 0 && (
               <Button
                 size="sm"
@@ -42,17 +46,17 @@ export function ReportCustomersPage() {
                 onClick={() =>
                   downloadCsv(
                     `customers-${startDate}-${endDate}.csv`,
-                    rowsToCsv(data.top_customers, { customer_name: 'العميل', total_spend: 'إجمالي الإنفاق', booking_count: 'عدد الحجوزات' }),
+                    rowsToCsv(data.top_customers, { customer_name: t('reports.customers.csvHeader.customer'), total_spend: t('reports.customers.csvHeader.totalSpend'), booking_count: t('reports.customers.csvHeader.bookingCount') }),
                   )
                 }
               >
                 <Download className="me-1 size-4" />
-                تصدير CSV
+                {t('reports.exportCsv')}
               </Button>
             )}
           </div>
           {data.top_customers.length === 0 ? (
-            <p className="text-sm text-text-secondary">لا توجد بيانات</p>
+            <p className="text-sm text-text-secondary">{t('reports.noData')}</p>
           ) : (
             <ul className="flex flex-col gap-1">
               {data.top_customers.map((c) => (
@@ -60,7 +64,7 @@ export function ReportCustomersPage() {
                   <Link to={`/app/customers?q=${encodeURIComponent(c.customer_name)}`} className="font-medium text-accent-foreground hover:underline">
                     {c.customer_name}
                   </Link>
-                  <span>{formatMoney(c.total_spend)} — {c.booking_count} حجز</span>
+                  <span>{formatMoney(c.total_spend, 'EGP', locale)} — {t('reports.customers.bookingCountSuffix', { count: c.booking_count })}</span>
                 </li>
               ))}
             </ul>

@@ -1,7 +1,9 @@
 import { useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '@/lib/supabase/client'
 import { useAuth } from '@/app/providers/AuthProvider'
+import { useDirection } from '@/app/providers/DirectionProvider'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -19,20 +21,17 @@ import { translateSupabaseError } from '@/lib/errors'
 
 interface CategorySetting {
   category: string
-  label: string
   enabled: boolean
 }
 
-const CATEGORY_LABELS: Record<string, string> = {
-  booking_confirmations: 'تأكيدات الحجز',
-  booking_reminders: 'تذكيرات الحجز',
-  payment_confirmations: 'إيصالات الدفع',
-  refund_notifications: 'إشعارات الاسترداد',
-  academy_notifications: 'إشعارات الأكاديمية',
-  subscription_reminders: 'تذكيرات الاشتراك',
-}
-
-const CATEGORY_ORDER = Object.keys(CATEGORY_LABELS)
+const CATEGORY_ORDER = [
+  'booking_confirmations',
+  'booking_reminders',
+  'payment_confirmations',
+  'refund_notifications',
+  'academy_notifications',
+  'subscription_reminders',
+]
 
 interface SafetySettings {
   whatsappNotificationsEnabled: boolean
@@ -76,7 +75,6 @@ async function fetchCategorySettings(clubId: string): Promise<CategorySetting[]>
   // every category the UI offers is shown even if no row exists yet.
   return CATEGORY_ORDER.map((category) => ({
     category,
-    label: CATEGORY_LABELS[category] ?? category,
     enabled: byCategory.get(category) ?? true,
   }))
 }
@@ -136,12 +134,22 @@ async function fetchAccountHealth(clubId: string): Promise<AccountHealth | null>
   }
 }
 
-function formatDateTime(iso: string | null): string {
+function formatDateTime(iso: string | null, locale: 'ar' | 'en'): string {
   if (!iso) return '—'
-  return new Date(iso).toLocaleString('ar-EG', { dateStyle: 'medium', timeStyle: 'short' })
+  return new Date(iso).toLocaleString(locale === 'en' ? 'en-US' : 'ar-EG', { dateStyle: 'medium', timeStyle: 'short' })
 }
 
 export function MessagingSafetyCard() {
+  const { t } = useTranslation()
+  const { locale } = useDirection()
+  const CATEGORY_LABELS: Record<string, string> = {
+    booking_confirmations: t('whatsapp.categoryLabels.booking_confirmations'),
+    booking_reminders: t('whatsapp.categoryLabels.booking_reminders'),
+    payment_confirmations: t('whatsapp.categoryLabels.payment_confirmations'),
+    refund_notifications: t('whatsapp.categoryLabels.refund_notifications'),
+    academy_notifications: t('whatsapp.categoryLabels.academy_notifications'),
+    subscription_reminders: t('whatsapp.categoryLabels.subscription_reminders'),
+  }
   const { currentClubId } = useAuth()
   const queryClient = useQueryClient()
   const [formError, setFormError] = useState<string | null>(null)
@@ -181,7 +189,7 @@ export function MessagingSafetyCard() {
       if (error) throw error
     },
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['notification-category-settings', currentClubId] }),
-    onError: (err) => setFormError(err instanceof Error ? err.message : translateSupabaseError(err, 'تعذّر تحديث الإعداد')),
+    onError: (err) => setFormError(err instanceof Error ? err.message : translateSupabaseError(err, t('whatsapp.messagingSafetyCard.updateCategoryError'))),
   })
 
   const [draft, setDraft] = useState<Partial<SafetySettings>>({})
@@ -212,7 +220,7 @@ export function MessagingSafetyCard() {
       setDraft({})
       queryClient.invalidateQueries({ queryKey: ['messaging-safety-settings', currentClubId] })
     },
-    onError: (err) => setFormError(err instanceof Error ? err.message : translateSupabaseError(err, 'تعذّر حفظ الإعدادات')),
+    onError: (err) => setFormError(err instanceof Error ? err.message : translateSupabaseError(err, t('whatsapp.messagingSafetyCard.saveSettingsError'))),
   })
 
   const isLoading = categoriesLoading || settingsLoading
@@ -220,19 +228,19 @@ export function MessagingSafetyCard() {
   return (
     <Card>
       <CardHeader>
-        <CardTitle className="text-base">ضوابط الإرسال والأمان</CardTitle>
+        <CardTitle className="text-base">{t('whatsapp.messagingSafetyCard.title')}</CardTitle>
         <p className="text-xs text-text-secondary">
-          تحكم في نوع الرسائل المرسلة عبر واتساب وتوقيتها لتقليل الإزعاج والتكرار. لا يوجد رقم "آمن" مضمون لعدد الرسائل في الساعة -- هذه الإعدادات لحماية العملاء واستقرار الخدمة، وليست وسيلة للتحايل على قواعد واتساب.
+          {t('whatsapp.messagingSafetyCard.description')}
         </p>
       </CardHeader>
       <CardContent className="flex flex-col gap-6">
-        {isLoading && <p className="text-sm text-text-secondary">جارٍ التحميل...</p>}
+        {isLoading && <p className="text-sm text-text-secondary">{t('whatsapp.messagingSafetyCard.loading')}</p>}
         {formError && <p className="text-sm text-status-danger">{formError}</p>}
 
         {!isLoading && (
           <>
             <div className="flex flex-col gap-2">
-              <h3 className="text-sm font-medium">أنواع الإشعارات المفعّلة</h3>
+              <h3 className="text-sm font-medium">{t('whatsapp.messagingSafetyCard.enabledCategoriesHeading')}</h3>
               {categories.map((c) => (
                 <label key={c.category} className="flex items-center gap-2 text-sm">
                   <input
@@ -241,18 +249,18 @@ export function MessagingSafetyCard() {
                     onChange={() => toggleCategoryMutation.mutate({ category: c.category, enabled: c.enabled })}
                     className="size-4"
                   />
-                  {c.label}
+                  {CATEGORY_LABELS[c.category] ?? c.category}
                 </label>
               ))}
               <p className="text-xs text-text-secondary">
-                الرسائل التسويقية غير مدعومة في هذه المرحلة -- لا يُستخدم اتصال واتساب لإرسال رسائل جماعية.
+                {t('whatsapp.messagingSafetyCard.marketingHint')}
               </p>
             </div>
 
             {effective && (
               <div className="flex flex-col gap-4 border-t border-border pt-4">
                 <div className="flex flex-col gap-2">
-                  <h3 className="text-sm font-medium">ساعات الهدوء</h3>
+                  <h3 className="text-sm font-medium">{t('whatsapp.messagingSafetyCard.quietHoursHeading')}</h3>
                   <label className="flex items-center gap-2 text-sm">
                     <input
                       type="checkbox"
@@ -260,12 +268,12 @@ export function MessagingSafetyCard() {
                       onChange={(e) => setDraft((d) => ({ ...d, quietHoursEnabled: e.target.checked }))}
                       className="size-4"
                     />
-                    تفعيل ساعات الهدوء (تأجيل الرسائل غير العاجلة)
+                    {t('whatsapp.messagingSafetyCard.enableQuietHours')}
                   </label>
                   {effective.quietHoursEnabled && (
                     <div className="grid grid-cols-2 gap-3">
                       <div className="flex flex-col gap-1">
-                        <label className="text-xs text-text-secondary">من</label>
+                        <label className="text-xs text-text-secondary">{t('whatsapp.messagingSafetyCard.quietHoursFrom')}</label>
                         <Input
                           type="time"
                           value={effective.quietHoursStart}
@@ -273,7 +281,7 @@ export function MessagingSafetyCard() {
                         />
                       </div>
                       <div className="flex flex-col gap-1">
-                        <label className="text-xs text-text-secondary">إلى</label>
+                        <label className="text-xs text-text-secondary">{t('whatsapp.messagingSafetyCard.quietHoursTo')}</label>
                         <Input
                           type="time"
                           value={effective.quietHoursEnd}
@@ -289,18 +297,18 @@ export function MessagingSafetyCard() {
                       onChange={(e) => setDraft((d) => ({ ...d, quietHoursBypassCritical: e.target.checked }))}
                       className="size-4"
                     />
-                    السماح للإشعارات العاجلة (مثل إلغاء الحجز من النادي) بتجاوز ساعات الهدوء
+                    {t('whatsapp.messagingSafetyCard.bypassCriticalLabel')}
                   </label>
                 </div>
 
                 <div className="flex flex-col gap-2">
-                  <h3 className="text-sm font-medium">التحكم في معدل الإرسال</h3>
+                  <h3 className="text-sm font-medium">{t('whatsapp.messagingSafetyCard.rateLimitHeading')}</h3>
                   <p className="text-xs text-text-secondary">
-                    حدود تحفظ استقرار الخدمة وتمنع اندفاع الرسائل دفعة واحدة -- ليست ضمانًا لعدد "آمن" من واتساب.
+                    {t('whatsapp.messagingSafetyCard.rateLimitHint')}
                   </p>
                   <div className="grid grid-cols-2 gap-3">
                     <div className="flex flex-col gap-1">
-                      <label className="text-xs text-text-secondary">الحد الأقصى بالدقيقة</label>
+                      <label className="text-xs text-text-secondary">{t('whatsapp.messagingSafetyCard.maxPerMinuteLabel')}</label>
                       <Input
                         type="number"
                         min={1}
@@ -309,7 +317,7 @@ export function MessagingSafetyCard() {
                       />
                     </div>
                     <div className="flex flex-col gap-1">
-                      <label className="text-xs text-text-secondary">الحد الأقصى بالساعة</label>
+                      <label className="text-xs text-text-secondary">{t('whatsapp.messagingSafetyCard.maxPerHourLabel')}</label>
                       <Input
                         type="number"
                         min={1}
@@ -319,7 +327,7 @@ export function MessagingSafetyCard() {
                     </div>
                   </div>
                   <div className="flex flex-col gap-1">
-                    <label className="text-xs text-text-secondary">أقل فاصل زمني بين رسالتين لنفس العميل (بالدقائق)</label>
+                    <label className="text-xs text-text-secondary">{t('whatsapp.messagingSafetyCard.minMinutesBetweenSendsLabel')}</label>
                     <Input
                       type="number"
                       min={0}
@@ -334,71 +342,71 @@ export function MessagingSafetyCard() {
                       onChange={(e) => setDraft((d) => ({ ...d, circuitBreakerEnabled: e.target.checked }))}
                       className="size-4"
                     />
-                    إيقاف الإرسال تلقائيًا مؤقتًا عند ارتفاع نسبة الفشل
+                    {t('whatsapp.messagingSafetyCard.circuitBreakerLabel')}
                   </label>
                 </div>
 
                 <div className="flex flex-col gap-1">
-                  <label className="text-xs text-text-secondary">اللغة الافتراضية عند عدم تحديد لغة العميل</label>
+                  <label className="text-xs text-text-secondary">{t('whatsapp.messagingSafetyCard.defaultLanguageLabel')}</label>
                   <select
                     value={effective.defaultLanguage}
                     onChange={(e) => setDraft((d) => ({ ...d, defaultLanguage: e.target.value as 'ar' | 'en' }))}
                     className="h-9 rounded-md border border-border bg-background px-3 text-sm"
                   >
-                    <option value="ar">العربية</option>
-                    <option value="en">English</option>
+                    <option value="ar">{t('language.arabic')}</option>
+                    <option value="en">{t('language.english')}</option>
                   </select>
                 </div>
 
                 <Button size="sm" className="self-start" onClick={() => saveMutation.mutate()} disabled={saveMutation.isPending || Object.keys(draft).length === 0}>
-                  حفظ ضوابط الإرسال
+                  {t('whatsapp.messagingSafetyCard.saveButton')}
                 </Button>
               </div>
             )}
 
             <div className="flex flex-col gap-2 border-t border-border pt-4">
-              <h3 className="text-sm font-medium">تشخيص قائمة الانتظار</h3>
+              <h3 className="text-sm font-medium">{t('whatsapp.messagingSafetyCard.diagnosticsHeading')}</h3>
               {diagnostics ? (
                 <div className="grid grid-cols-2 gap-2 text-sm sm:grid-cols-3">
                   <div className="rounded-md border border-border p-2">
-                    <p className="text-xs text-text-secondary">قيد الانتظار</p>
+                    <p className="text-xs text-text-secondary">{t('whatsapp.messagingSafetyCard.pending')}</p>
                     <p className="font-medium">{diagnostics.pendingCount}</p>
                   </div>
                   <div className="rounded-md border border-border p-2">
-                    <p className="text-xs text-text-secondary">إعادة محاولة</p>
+                    <p className="text-xs text-text-secondary">{t('whatsapp.messagingSafetyCard.retrying')}</p>
                     <p className="font-medium">{diagnostics.retryingCount}</p>
                   </div>
                   <div className="rounded-md border border-border p-2">
-                    <p className="text-xs text-text-secondary">منتهية الصلاحية</p>
+                    <p className="text-xs text-text-secondary">{t('whatsapp.messagingSafetyCard.expired')}</p>
                     <p className="font-medium">{diagnostics.expiredCount}</p>
                   </div>
                   <div className="rounded-md border border-border p-2">
-                    <p className="text-xs text-text-secondary">فشلت نهائيًا</p>
+                    <p className="text-xs text-text-secondary">{t('whatsapp.messagingSafetyCard.failedFinal')}</p>
                     <p className="font-medium">{diagnostics.failedCount}</p>
                   </div>
                   <div className="rounded-md border border-border p-2">
-                    <p className="text-xs text-text-secondary">أُرسلت</p>
+                    <p className="text-xs text-text-secondary">{t('whatsapp.messagingSafetyCard.sent')}</p>
                     <p className="font-medium">{diagnostics.sentCount}</p>
                   </div>
                   <div className="rounded-md border border-border p-2">
-                    <p className="text-xs text-text-secondary">أقدم رسالة منتظرة</p>
-                    <p className="font-medium">{formatDateTime(diagnostics.oldestPendingCreatedAt)}</p>
+                    <p className="text-xs text-text-secondary">{t('whatsapp.messagingSafetyCard.oldestPending')}</p>
+                    <p className="font-medium">{formatDateTime(diagnostics.oldestPendingCreatedAt, locale)}</p>
                   </div>
                 </div>
               ) : (
-                <p className="text-sm text-text-secondary">لا توجد بيانات بعد -- لم يتم إرسال أي رسائل واتساب حتى الآن.</p>
+                <p className="text-sm text-text-secondary">{t('whatsapp.messagingSafetyCard.diagnosticsEmpty')}</p>
               )}
               {accountHealth?.circuitBreakerOpenUntil && new Date(accountHealth.circuitBreakerOpenUntil) > new Date() && (
                 <p className="text-xs text-status-danger">
-                  الإرسال متوقف مؤقتًا (قاطع الدائرة نشط) حتى {formatDateTime(accountHealth.circuitBreakerOpenUntil)}
+                  {t('whatsapp.messagingSafetyCard.circuitBreakerActivePrefix')} {formatDateTime(accountHealth.circuitBreakerOpenUntil, locale)}
                   {accountHealth.circuitBreakerReason ? ` -- ${accountHealth.circuitBreakerReason}` : ''}
                 </p>
               )}
               {accountHealth?.lastSuccessfulSendAt && (
-                <p className="text-xs text-text-secondary">آخر إرسال ناجح: {formatDateTime(accountHealth.lastSuccessfulSendAt)}</p>
+                <p className="text-xs text-text-secondary">{t('whatsapp.messagingSafetyCard.lastSuccessfulSend', { date: formatDateTime(accountHealth.lastSuccessfulSendAt, locale) })}</p>
               )}
               {accountHealth?.lastError && (
-                <p className="text-xs text-status-danger">آخر خطأ: {accountHealth.lastError}</p>
+                <p className="text-xs text-status-danger">{t('whatsapp.messagingSafetyCard.lastErrorPrefix')} {accountHealth.lastError}</p>
               )}
             </div>
           </>

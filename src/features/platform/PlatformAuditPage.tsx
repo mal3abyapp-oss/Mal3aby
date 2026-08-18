@@ -1,11 +1,13 @@
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
+import { useTranslation } from 'react-i18next'
 import { supabase } from '@/lib/supabase/client'
 import { PageHeader } from '@/components/ui/page-header'
 import { DataTable, type DataTableColumn } from '@/components/ui/data-table'
 import { Button } from '@/components/ui/button'
 import { actionLabel, entityLabel } from '@/lib/domain/audit'
+import { useDirection } from '@/app/providers/DirectionProvider'
 
 // IA restructuring (Phase 3): two real findings from
 // MAL3ABY_INFORMATION_ARCHITECTURE_AUDIT.md fixed here --
@@ -55,6 +57,8 @@ async function fetchAudit(offset: number): Promise<{ rows: AuditRow[]; hasMore: 
 }
 
 export function PlatformAuditPage() {
+  const { t } = useTranslation()
+  const { locale } = useDirection()
   const [pages, setPages] = useState(1)
   const { data, isLoading, isFetching } = useQuery({
     queryKey: ['platform-audit', pages],
@@ -67,32 +71,32 @@ export function PlatformAuditPage() {
   const rows = data?.rows ?? []
 
   const columns: DataTableColumn<AuditRow>[] = [
-    { key: 'time', header: 'الوقت', render: (r) => new Date(r.created_at).toLocaleString('ar-EG') },
+    { key: 'time', header: t('platform.auditPage.time'), render: (r) => new Date(r.created_at).toLocaleString(locale === 'en' ? 'en-US' : 'ar-EG') },
     {
       key: 'club',
-      header: 'النادي',
+      header: t('platform.auditPage.club'),
       render: (r) =>
         r.club_id ? (
           <Link to={`/platform/clubs/${r.club_id}`} className="text-accent-foreground hover:underline">
-            {r.club_name ?? 'نادٍ'}
+            {r.club_name ?? t('platform.auditPage.clubFallback')}
           </Link>
         ) : (
-          'مستوى المنصة'
+          t('platform.auditPage.platformLevel')
         ),
     },
-    { key: 'action', header: 'الإجراء', render: (r) => actionLabel(r.action) },
-    { key: 'entity', header: 'الكيان', render: (r) => entityLabel(r.entity_type) },
-    { key: 'reason', header: 'السبب', render: (r) => r.reason ?? '—' },
+    { key: 'action', header: t('platform.auditPage.action'), render: (r) => actionLabel(r.action, locale) },
+    { key: 'entity', header: t('platform.auditPage.entity'), render: (r) => entityLabel(r.entity_type, locale) },
+    { key: 'reason', header: t('platform.auditPage.reason'), render: (r) => r.reason ?? '—' },
   ]
 
   return (
     <div>
-      <PageHeader title="سجل التدقيق" description="سجل غير قابل للتعديل لكل إجراء حساس على مستوى المنصة" />
-      <DataTable columns={columns} rows={rows} rowKey={(r) => r.id} isLoading={isLoading} emptyTitle="لا يوجد سجل تدقيق بعد" />
+      <PageHeader title={t('platform.auditPage.title')} description={t('platform.auditPage.description')} />
+      <DataTable columns={columns} rows={rows} rowKey={(r) => r.id} isLoading={isLoading} emptyTitle={t('platform.auditPage.emptyTitle')} />
       {data?.hasMore && (
         <div className="mt-4 flex justify-center">
           <Button variant="outline" onClick={() => setPages((p) => p + 1)} disabled={isFetching}>
-            {isFetching ? 'جارٍ التحميل...' : 'تحميل المزيد'}
+            {isFetching ? t('platform.auditPage.loadingMore') : t('platform.auditPage.loadMore')}
           </Button>
         </div>
       )}

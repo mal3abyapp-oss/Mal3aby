@@ -1,5 +1,6 @@
 import { useQuery } from '@tanstack/react-query'
 import { Link } from 'react-router-dom'
+import { useTranslation } from 'react-i18next'
 import { supabase } from '@/lib/supabase/client'
 import { PageHeader } from '@/components/ui/page-header'
 import { DataTable, type DataTableColumn } from '@/components/ui/data-table'
@@ -125,6 +126,7 @@ async function fetchUsageReport() {
 }
 
 export function PlatformReportsPage() {
+  const { t } = useTranslation()
   const { data: subReport = [] } = useQuery({ queryKey: ['report-subscriptions'], queryFn: fetchSubscriptionReport })
   const { data: revenueReport = [] } = useQuery({ queryKey: ['report-revenue'], queryFn: fetchRevenueReport })
   const { data: renewalReport = [] } = useQuery({ queryKey: ['report-renewals'], queryFn: fetchRenewalReport })
@@ -134,47 +136,54 @@ export function PlatformReportsPage() {
   const subColumns: DataTableColumn<SubRow>[] = [
     {
       key: 'club',
-      header: 'النادي',
+      header: t('platform.reportsPage.subscriptionColumns.club'),
       render: (r) => (
         <Link to={`/platform/clubs/${r.club_id}`} className="text-accent-foreground hover:underline">
           {r.club_name}
         </Link>
       ),
     },
-    { key: 'plan', header: 'الخطة', render: (r) => r.plan_name_snapshot ?? '—' },
-    { key: 'status', header: 'الحالة', render: (r) => LIFECYCLE_STATUS_LABELS[r.lifecycle_status] ?? r.lifecycle_status },
-    { key: 'start', header: 'البداية', render: (r) => new Date(r.start_at).toLocaleDateString('ar-EG') },
-    { key: 'end', header: 'النهاية', render: (r) => new Date(r.end_at).toLocaleDateString('ar-EG') },
-    { key: 'price', header: 'السعر', render: (r) => <MoneyDisplay amount={r.price_snapshot} size="sm" /> },
+    { key: 'plan', header: t('platform.reportsPage.subscriptionColumns.plan'), render: (r) => r.plan_name_snapshot ?? '—' },
+    {
+      key: 'status',
+      header: t('platform.reportsPage.subscriptionColumns.status'),
+      render: (r) =>
+        t(`platform.reportsPage.lifecycleStatusLabels.${r.lifecycle_status}`, {
+          defaultValue: LIFECYCLE_STATUS_LABELS[r.lifecycle_status] ?? r.lifecycle_status,
+        }),
+    },
+    { key: 'start', header: t('platform.reportsPage.subscriptionColumns.start'), render: (r) => new Date(r.start_at).toLocaleDateString('ar-EG') },
+    { key: 'end', header: t('platform.reportsPage.subscriptionColumns.end'), render: (r) => new Date(r.end_at).toLocaleDateString('ar-EG') },
+    { key: 'price', header: t('platform.reportsPage.subscriptionColumns.price'), render: (r) => <MoneyDisplay amount={r.price_snapshot} size="sm" /> },
   ]
 
   const revenueColumns: DataTableColumn<RevenueRow>[] = [
-    { key: 'month', header: 'الشهر', render: (r) => r.month },
-    { key: 'method', header: 'طريقة الدفع', render: (r) => r.method },
-    { key: 'amount', header: 'المبلغ', render: (r) => <MoneyDisplay amount={r.amount} size="sm" /> },
+    { key: 'month', header: t('platform.reportsPage.revenueColumns.month'), render: (r) => r.month },
+    { key: 'method', header: t('platform.reportsPage.revenueColumns.method'), render: (r) => r.method },
+    { key: 'amount', header: t('platform.reportsPage.revenueColumns.amount'), render: (r) => <MoneyDisplay amount={r.amount} size="sm" /> },
   ]
 
   const renewalColumns: DataTableColumn<(typeof renewalReport)[number]>[] = [
     {
       key: 'club',
-      header: 'النادي',
+      header: t('platform.reportsPage.renewalColumns.club'),
       render: (r) => (
         <Link to={`/platform/clubs/${r.club_id}`} className="text-accent-foreground hover:underline">
           {r.club_name}
         </Link>
       ),
     },
-    { key: 'end', header: 'تاريخ الانتهاء', render: (r) => new Date(r.end_at).toLocaleDateString('ar-EG') },
+    { key: 'end', header: t('platform.reportsPage.renewalColumns.end'), render: (r) => new Date(r.end_at).toLocaleDateString('ar-EG') },
     {
       key: 'status',
-      header: 'الحالة',
+      header: t('platform.reportsPage.renewalColumns.status'),
       render: (r) =>
         r.daysLeft < 0 ? (
-          <StatusBadge tone="danger" label="منتهٍ" />
+          <StatusBadge tone="danger" label={t('platform.reportsPage.statusExpired')} />
         ) : r.expiringSoon ? (
-          <StatusBadge tone="warning" label={`${r.daysLeft} أيام متبقية`} />
+          <StatusBadge tone="warning" label={t('platform.reportsPage.daysLeftPlural', { count: r.daysLeft })} />
         ) : (
-          <StatusBadge tone="success" label={`${r.daysLeft} يوم متبقٍ`} />
+          <StatusBadge tone="success" label={t('platform.reportsPage.daysLeftSingular', { count: r.daysLeft })} />
         ),
     },
   ]
@@ -182,61 +191,66 @@ export function PlatformReportsPage() {
   const growthColumns: DataTableColumn<(typeof growthReport)[number]>[] = [
     {
       key: 'club',
-      header: 'النادي',
+      header: t('platform.reportsPage.growthColumns.club'),
       render: (r) => (
         <Link to={`/platform/clubs/${r.id}`} className="text-accent-foreground hover:underline">
           {r.name_ar}
         </Link>
       ),
     },
-    { key: 'status', header: 'الحالة', render: (r) => CLUB_STATUS_LABELS[r.status] ?? r.status },
-    { key: 'created', header: 'تاريخ الإنشاء', render: (r) => new Date(r.created_at).toLocaleDateString('ar-EG') },
+    {
+      key: 'status',
+      header: t('platform.reportsPage.growthColumns.status'),
+      render: (r) =>
+        t(`platform.ownersPage.clubStatusLabels.${r.status}`, { defaultValue: CLUB_STATUS_LABELS[r.status] ?? r.status }),
+    },
+    { key: 'created', header: t('platform.reportsPage.growthColumns.created'), render: (r) => new Date(r.created_at).toLocaleDateString('ar-EG') },
   ]
 
   const usageColumns: DataTableColumn<(typeof usageReport)[number]>[] = [
     {
       key: 'club',
-      header: 'النادي',
+      header: t('platform.reportsPage.usageColumns.club'),
       render: (r) => (
         <Link to={`/platform/clubs/${r.club_id}`} className="text-accent-foreground hover:underline">
           {r.club_name}
         </Link>
       ),
     },
-    { key: 'branches', header: 'الفروع', render: (r) => r.branchCount },
-    { key: 'staff', header: 'الموظفون', render: (r) => r.staffCount },
+    { key: 'branches', header: t('platform.reportsPage.usageColumns.branches'), render: (r) => r.branchCount },
+    { key: 'staff', header: t('platform.reportsPage.usageColumns.staff'), render: (r) => r.staffCount },
   ]
 
   return (
     <div>
-      <PageHeader title="التقارير" description="تقارير المنصة الخمسة" />
+      <PageHeader title={t('platform.reportsPage.title')} description={t('platform.reportsPage.description')} />
       <Tabs defaultValue="subscription">
         <TabsList>
-          <TabsTrigger value="subscription">الاشتراكات</TabsTrigger>
-          <TabsTrigger value="revenue">الإيرادات</TabsTrigger>
-          <TabsTrigger value="renewal">التجديدات</TabsTrigger>
-          <TabsTrigger value="growth">النمو</TabsTrigger>
-          <TabsTrigger value="usage">الاستخدام</TabsTrigger>
+          <TabsTrigger value="subscription">{t('platform.reportsPage.tabs.subscription')}</TabsTrigger>
+          <TabsTrigger value="revenue">{t('platform.reportsPage.tabs.revenue')}</TabsTrigger>
+          <TabsTrigger value="renewal">{t('platform.reportsPage.tabs.renewal')}</TabsTrigger>
+          <TabsTrigger value="growth">{t('platform.reportsPage.tabs.growth')}</TabsTrigger>
+          <TabsTrigger value="usage">{t('platform.reportsPage.tabs.usage')}</TabsTrigger>
         </TabsList>
         <TabsContent value="subscription">
-          <DataTable columns={subColumns} rows={subReport} rowKey={(r) => `${r.club_id}-${r.start_at}`} emptyTitle="لا توجد بيانات" />
+          <DataTable columns={subColumns} rows={subReport} rowKey={(r) => `${r.club_id}-${r.start_at}`} emptyTitle={t('platform.reportsPage.emptyTitle')} />
         </TabsContent>
         <TabsContent value="revenue">
           <DataTable
             columns={revenueColumns}
             rows={revenueReport}
             rowKey={(r) => `${r.month}-${r.method}-${r.amount}`}
-            emptyTitle="لا توجد بيانات"
+            emptyTitle={t('platform.reportsPage.emptyTitle')}
           />
         </TabsContent>
         <TabsContent value="renewal">
-          <DataTable columns={renewalColumns} rows={renewalReport} rowKey={(r) => `${r.club_id}-${r.end_at}`} emptyTitle="لا توجد بيانات" />
+          <DataTable columns={renewalColumns} rows={renewalReport} rowKey={(r) => `${r.club_id}-${r.end_at}`} emptyTitle={t('platform.reportsPage.emptyTitle')} />
         </TabsContent>
         <TabsContent value="growth">
-          <DataTable columns={growthColumns} rows={growthReport} rowKey={(r) => r.id} emptyTitle="لا توجد بيانات" />
+          <DataTable columns={growthColumns} rows={growthReport} rowKey={(r) => r.id} emptyTitle={t('platform.reportsPage.emptyTitle')} />
         </TabsContent>
         <TabsContent value="usage">
-          <DataTable columns={usageColumns} rows={usageReport} rowKey={(r) => r.club_id} emptyTitle="لا توجد بيانات" />
+          <DataTable columns={usageColumns} rows={usageReport} rowKey={(r) => r.club_id} emptyTitle={t('platform.reportsPage.emptyTitle')} />
         </TabsContent>
       </Tabs>
     </div>

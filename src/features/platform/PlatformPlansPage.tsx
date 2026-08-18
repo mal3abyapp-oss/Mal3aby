@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { useTranslation } from 'react-i18next'
 import { supabase } from '@/lib/supabase/client'
 import { PageHeader } from '@/components/ui/page-header'
 import { DataTable, type DataTableColumn } from '@/components/ui/data-table'
@@ -34,6 +35,7 @@ async function fetchPlans(): Promise<PlanRow[]> {
 const INTERVAL_LABEL: Record<string, string> = { month: 'شهر', year: 'سنة' }
 
 export function PlatformPlansPage() {
+  const { t } = useTranslation()
   const queryClient = useQueryClient()
   const { data: plans = [], isLoading } = useQuery({ queryKey: ['platform-plans-all'], queryFn: fetchPlans })
 
@@ -74,7 +76,7 @@ export function PlatformPlansPage() {
   const columns: DataTableColumn<PlanRow>[] = [
     {
       key: 'name',
-      header: 'الخطة',
+      header: t('platform.plansPage.columns.plan'),
       render: (p) => (
         <button
           className="text-accent-foreground hover:underline"
@@ -90,21 +92,29 @@ export function PlatformPlansPage() {
     },
     {
       key: 'interval',
-      header: 'المدة',
-      render: (p) => `${p.billing_interval_count} ${INTERVAL_LABEL[p.billing_interval] ?? p.billing_interval}`,
+      header: t('platform.plansPage.columns.interval'),
+      render: (p) =>
+        `${p.billing_interval_count} ${t(`platform.plansPage.intervalLabels.${p.billing_interval}`, {
+          defaultValue: INTERVAL_LABEL[p.billing_interval] ?? p.billing_interval,
+        })}`,
     },
-    { key: 'price', header: 'السعر', render: (p) => <MoneyDisplay amount={Number(p.price)} currency={p.currency} size="sm" /> },
+    { key: 'price', header: t('platform.plansPage.columns.price'), render: (p) => <MoneyDisplay amount={Number(p.price)} currency={p.currency} size="sm" /> },
     {
       key: 'public',
-      header: 'النشر',
-      render: (p) => (p.is_public ? <StatusBadge tone="success" label="منشورة" /> : <StatusBadge tone="neutral" label="غير منشورة" />),
+      header: t('platform.plansPage.columns.publish'),
+      render: (p) =>
+        p.is_public ? (
+          <StatusBadge tone="success" label={t('platform.plansPage.published')} />
+        ) : (
+          <StatusBadge tone="neutral" label={t('platform.plansPage.unpublished')} />
+        ),
     },
     {
       key: 'actions',
       header: '',
       render: (p) => (
         <Button size="sm" variant="outline" onClick={() => toggleMutation.mutate({ id: p.id, isPublic: p.is_public })}>
-          {p.is_public ? 'إلغاء النشر' : 'نشر'}
+          {p.is_public ? t('platform.plansPage.unpublish') : t('platform.plansPage.publish')}
         </Button>
       ),
     },
@@ -112,26 +122,26 @@ export function PlatformPlansPage() {
 
   return (
     <div>
-      <PageHeader title="الخطط" description="إدارة خطط اشتراك المنصة" />
-      <DataTable columns={columns} rows={plans} rowKey={(p) => p.id} isLoading={isLoading} emptyTitle="لا توجد خطط" />
+      <PageHeader title={t('platform.plansPage.title')} description={t('platform.plansPage.description')} />
+      <DataTable columns={columns} rows={plans} rowKey={(p) => p.id} isLoading={isLoading} emptyTitle={t('platform.plansPage.emptyTitle')} />
 
       <Dialog open={!!editingPlan} onOpenChange={(open) => !open && setEditingPlan(null)}>
         <DialogContent>
-          <DialogHeader><DialogTitle>تعديل خطة {editingPlan?.name_ar}</DialogTitle></DialogHeader>
+          <DialogHeader><DialogTitle>{t('platform.plansPage.editDialog.title', { name: editingPlan?.name_ar })}</DialogTitle></DialogHeader>
           <div className="flex flex-col gap-3">
             <div className="flex flex-col gap-1.5">
-              <label className="text-sm font-medium text-text-secondary">اسم الخطة</label>
+              <label className="text-sm font-medium text-text-secondary">{t('platform.plansPage.editDialog.nameLabel')}</label>
               <Input value={editName} onChange={(e) => setEditName(e.target.value)} />
             </div>
             <div className="flex flex-col gap-1.5">
-              <label className="text-sm font-medium text-text-secondary">السعر ({editingPlan?.currency})</label>
+              <label className="text-sm font-medium text-text-secondary">{t('platform.plansPage.editDialog.priceLabel', { currency: editingPlan?.currency })}</label>
               <Input type="number" min="0" step="0.01" value={editPrice} onChange={(e) => setEditPrice(e.target.value)} />
             </div>
             <p className="text-xs text-text-secondary">
-              تعديل السعر لا يغيّر أي اشتراك تم إنشاؤه بالفعل بالسعر السابق — يُطبَّق فقط على الاشتراكات الجديدة.
+              {t('platform.plansPage.editDialog.priceChangeNote')}
             </p>
             <Button disabled={!editName.trim() || !editPrice || Number(editPrice) <= 0 || updatePlanMutation.isPending} onClick={() => updatePlanMutation.mutate()}>
-              {updatePlanMutation.isPending ? 'جارٍ الحفظ...' : 'حفظ'}
+              {updatePlanMutation.isPending ? t('platform.plansPage.editDialog.saving') : t('platform.plansPage.editDialog.save')}
             </Button>
           </div>
         </DialogContent>

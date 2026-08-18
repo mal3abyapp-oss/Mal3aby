@@ -1,9 +1,11 @@
 import { Link } from 'react-router-dom'
+import { useTranslation } from 'react-i18next'
 import { PageHeader } from '@/components/ui/page-header'
 import { Button } from '@/components/ui/button'
 import { StatCard } from '@/components/ui/stat-card'
 import { formatMoney } from '@/lib/domain/billing'
 import { BOOKING_STATUS_LABELS } from '@/lib/domain/booking'
+import { useDirection } from '@/app/providers/DirectionProvider'
 import { rowsToCsv, downloadCsv } from '@/lib/csv'
 import { Download } from 'lucide-react'
 import { useDateRange, useDateRangeReport } from './hooks/useDateRangeReport'
@@ -24,29 +26,31 @@ interface BookingReport {
 }
 
 export function ReportBookingsPage() {
+  const { t } = useTranslation()
+  const { locale } = useDirection()
   const { startDate, setStartDate, endDate, setEndDate } = useDateRange()
   const { data, isLoading } = useDateRangeReport<BookingReport>('get_booking_report', startDate, endDate)
 
   return (
     <div>
-      <PageHeader title="التقارير" description="تقرير الحجوزات -- الحالة، الفروع، ومعدل الإلغاء" />
+      <PageHeader title={t('reports.title')} description={t('reports.bookings.description')} />
       <ReportsNav />
       <DateRangeFilter startDate={startDate} endDate={endDate} onStart={setStartDate} onEnd={setEndDate} />
-      {isLoading && <p className="text-sm text-text-secondary">جارٍ التحميل...</p>}
+      {isLoading && <p className="text-sm text-text-secondary">{t('reports.loading')}</p>}
       {data && (
         <>
           <div className="mb-6 grid grid-cols-2 gap-3 md:grid-cols-3">
             <StatCard
-              label="نسبة الإلغاء"
+              label={t('reports.bookings.cancellationRate')}
               value={data.cancellation_rate !== null ? `${data.cancellation_rate}%` : '—'}
               tone={data.cancellation_rate !== null && data.cancellation_rate > 15 ? 'danger' : undefined}
             />
-            <StatCard label="متوسط قيمة الحجز" value={data.average_booking_value !== null ? formatMoney(data.average_booking_value) : '—'} />
+            <StatCard label={t('reports.bookings.averageBookingValue')} value={data.average_booking_value !== null ? formatMoney(data.average_booking_value, 'EGP', locale) : '—'} />
           </div>
           <div className="grid gap-4 md:grid-cols-2">
             <div>
               <div className="mb-2 flex items-center justify-between">
-                <p className="font-medium">حسب الحالة</p>
+                <p className="font-medium">{t('reports.bookings.byStatus')}</p>
                 {data.by_status.length > 0 && (
                   <Button
                     size="sm"
@@ -56,18 +60,18 @@ export function ReportBookingsPage() {
                         `bookings-by-status-${startDate}-${endDate}.csv`,
                         rowsToCsv(
                           data.by_status.map((s) => ({ status: BOOKING_STATUS_LABELS[s.status] ?? s.status, count: s.count })),
-                          { status: 'الحالة', count: 'العدد' },
+                          { status: t('reports.bookings.csvHeader.status'), count: t('reports.bookings.csvHeader.count') },
                         ),
                       )
                     }
                   >
                     <Download className="me-1 size-4" />
-                    تصدير CSV
+                    {t('reports.exportCsv')}
                   </Button>
                 )}
               </div>
               {data.by_status.length === 0 ? (
-                <p className="text-sm text-text-secondary">لا توجد بيانات</p>
+                <p className="text-sm text-text-secondary">{t('reports.noData')}</p>
               ) : (
                 <ul className="flex flex-col gap-1">
                   {data.by_status.map((s) => (
@@ -80,7 +84,7 @@ export function ReportBookingsPage() {
                             manager can jump straight to those bookings
                             on the operational calendar. */}
                         <Button asChild size="sm" variant="ghost">
-                          <Link to="/app/bookings">عرض الحجوزات</Link>
+                          <Link to="/app/bookings">{t('reports.bookings.viewBookings')}</Link>
                         </Button>
                       </span>
                     </li>
@@ -89,15 +93,15 @@ export function ReportBookingsPage() {
               )}
             </div>
             <div>
-              <p className="mb-2 font-medium">حسب الفرع</p>
+              <p className="mb-2 font-medium">{t('reports.bookings.byBranch')}</p>
               {data.by_branch.length === 0 ? (
-                <p className="text-sm text-text-secondary">لا توجد فروع</p>
+                <p className="text-sm text-text-secondary">{t('reports.bookings.noBranches')}</p>
               ) : (
                 <ul className="flex flex-col gap-1">
                   {data.by_branch.map((b) => (
                     <li key={b.branch_id} className="flex justify-between rounded-md border border-border p-2 text-sm">
                       <span>{b.branch_name}</span>
-                      <span className="tabular-nums">{b.booking_count} حجز</span>
+                      <span className="tabular-nums">{t('reports.bookings.bookingsCountSuffix', { count: b.booking_count })}</span>
                     </li>
                   ))}
                 </ul>

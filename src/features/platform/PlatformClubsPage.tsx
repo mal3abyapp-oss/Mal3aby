@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { Link } from 'react-router-dom'
+import { useTranslation } from 'react-i18next'
 import { supabase } from '@/lib/supabase/client'
 import { PageHeader } from '@/components/ui/page-header'
 import { DataTable, type DataTableColumn } from '@/components/ui/data-table'
@@ -47,6 +48,7 @@ async function fetchClubs(offset: number): Promise<{ rows: ClubRow[]; hasMore: b
 }
 
 export function PlatformClubsPage() {
+  const { t } = useTranslation()
   const [pages, setPages] = useState(1)
   const { data, isLoading, isFetching } = useQuery({
     queryKey: ['platform-clubs', pages],
@@ -61,40 +63,40 @@ export function PlatformClubsPage() {
   const columns: DataTableColumn<ClubRow>[] = [
     {
       key: 'name',
-      header: 'النادي',
+      header: t('platform.clubsPage.columns.club'),
       render: (c) => (
         <Link to={`/platform/clubs/${c.id}`} className="font-medium text-accent-foreground hover:underline">
           {c.name_ar}
         </Link>
       ),
     },
-    { key: 'code', header: 'الكود', render: (c) => <bdi>{c.club_code}</bdi> },
+    { key: 'code', header: t('platform.clubsPage.columns.code'), render: (c) => <bdi>{c.club_code}</bdi> },
     {
       key: 'status',
-      header: 'الحالة الإدارية',
+      header: t('platform.clubsPage.columns.adminStatus'),
       render: (c) => <StatusBadge tone={c.status === 'active' ? 'success' : 'danger'} label={CLUB_STATUS_LABELS[c.status] ?? c.status} />,
     },
     {
       key: 'access',
-      header: 'حالة الاشتراك',
+      header: t('platform.clubsPage.columns.subscriptionStatus'),
       render: (c) => <StatusBadge tone={ACCESS_TONE[c.access] ?? 'neutral'} label={ACCESS_LABEL[c.access] ?? c.access} />,
     },
   ]
 
   return (
     <div>
-      <PageHeader title="الأندية" description="جميع الأندية المسجّلة في المنصة" />
+      <PageHeader title={t('platform.clubsPage.title')} description={t('platform.clubsPage.description')} />
       <DataTable
         columns={columns}
         rows={clubs}
         rowKey={(c) => c.id}
         isLoading={isLoading}
-        emptyTitle="لا توجد أندية بعد"
+        emptyTitle={t('platform.clubsPage.emptyTitle')}
       />
       {data?.hasMore && (
         <div className="mt-4 flex justify-center">
           <Button variant="outline" onClick={() => setPages((p) => p + 1)} disabled={isFetching}>
-            {isFetching ? 'جارٍ التحميل...' : 'تحميل المزيد'}
+            {isFetching ? t('platform.clubsPage.loadingMore') : t('platform.clubsPage.loadMore')}
           </Button>
         </div>
       )}

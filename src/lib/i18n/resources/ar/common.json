@@ -26,9 +26,474 @@
     "nav": {
       "bookings": "حجوزاتي",
       "academy": "أكاديميتي",
+      "payments": "مدفوعاتي",
       "qr": "رمزي",
       "profile": "حسابي"
+    },
+    "logout": "خروج",
+    "academyPage": {
+      "title": "أكاديميتي",
+      "description": "أبنائي المسجّلون في الأكاديمية",
+      "loading": "جارٍ التحميل...",
+      "loadError": "تعذّر تحميل البيانات.",
+      "emptyTitle": "لا يوجد لاعبون مرتبطون بحسابك حاليًا.",
+      "notEnrolled": "غير مسجّل حاليًا"
+    },
+    "bookingsPage": {
+      "title": "حجوزاتي",
+      "description": "جميع حجوزاتك للملاعب",
+      "loading": "جارٍ التحميل...",
+      "emptyTitle": "لا توجد حجوزات بعد.",
+      "upcoming": "القادمة",
+      "past": "السابقة",
+      "outstandingChip": "متبقي {{amount}} ج.م",
+      "attendanceQrLink": "رمز الحضور",
+      "invoicePaymentLink": "الفاتورة والدفع"
+    },
+    "paymentsPage": {
+      "title": "مدفوعاتي",
+      "description": "فواتيرك وحالة السداد وطرق الدفع",
+      "loading": "جارٍ التحميل...",
+      "invoiceNotFound": "لم يتم العثور على الفاتورة المطلوبة. تصفح فواتيرك أدناه.",
+      "emptyTitle": "لا توجد فواتير بعد.",
+      "total": "الإجمالي {{amount}}",
+      "paid": "المدفوع {{amount}}",
+      "outstanding": "المتبقي {{amount}}",
+      "payNow": "دفع الآن",
+      "claimDialog": {
+        "titlePrefix": "دفع فاتورة",
+        "selectMethodError": "اختر طريقة الدفع أولًا",
+        "invalidAmountError": "أدخل مبلغًا صحيحًا",
+        "referenceRequiredError": "هذه الطريقة تتطلب رقم مرجعي للتحويل",
+        "genericError": "تعذّر إرسال طلب الدفع",
+        "submittedMessage": "تم إرسال طلبك بنجاح. سيقوم فريق النادي بمراجعته وتأكيده قريبًا.",
+        "submittedHint": "لن يتغير حساب فاتورتك إلى \"مدفوعة\" إلا بعد تأكيد النادي للتحويل.",
+        "close": "إغلاق",
+        "outstandingAmount": "المبلغ المتبقي: {{amount}}",
+        "methodLabel": "طريقة الدفع",
+        "noMethodsAvailable": "لا توجد طرق دفع متاحة حاليًا. تواصل مع النادي.",
+        "amountTransferredLabel": "المبلغ الذي حوّلته",
+        "referenceLabel": "الرقم المرجعي للتحويل",
+        "optionalSuffix": "(اختياري)",
+        "proofNoteLabel": "ملاحظة إثبات إضافية (اختياري)",
+        "proofNotePlaceholder": "مثال: رابط لقطة شاشة التحويل",
+        "submit": "إرسال طلب الدفع"
+      }
+    },
+    "profilePage": {
+      "title": "حسابي",
+      "description": "بيانات التواصل الخاصة بك",
+      "loading": "جارٍ التحميل...",
+      "emptyTitle": "لا توجد بيانات مرتبطة بحسابك.",
+      "clubLabel": "النادي",
+      "multiClubHint": "حسابك مرتبط بأكثر من نادي -- اختر النادي لتعديل بياناتك فيه.",
+      "nameLabel": "الاسم",
+      "nameEditHint": "لتعديل الاسم، تواصل مع النادي.",
+      "phoneLabel": "رقم الهاتف",
+      "whatsappLabel": "واتساب",
+      "emailLabel": "البريد الإلكتروني",
+      "saveError": "تعذّر حفظ التعديلات.",
+      "saved": "تم الحفظ.",
+      "saving": "جارٍ الحفظ...",
+      "saveChanges": "حفظ التعديلات"
+    },
+    "qrPage": {
+      "title": "رمزي",
+      "description": "رمز QR لتسجيل الحضور عند الوصول",
+      "loading": "جارٍ التحميل...",
+      "bookingNotFound": "لم يتم العثور على الحجز المطلوب — قد يكون قد انتهى أو أُلغي. اختر حجزًا من القائمة أدناه.",
+      "emptyTitle": "لا توجد حجوزات قادمة.",
+      "choosePlaceholder": "اختر حجزًا لعرض رمزه",
+      "generateError": "تعذّر إنشاء رمز QR لهذا الحجز.",
+      "generating": "جارٍ إنشاء الرمز...",
+      "qrAlt": "رمز QR",
+      "showAtClubHint": "اعرض هذا الرمز عند وصولك للنادي"
+    },
+    "claimAccountPage": {
+      "title": "ربط حسابك ببياناتك في النادي",
+      "description": "إذا سبق وحجزت ملعبًا أو سجّلت في الأكاديمية، يمكنك ربط حسابك ببياناتك لرؤية حجوزاتك واشتراكاتك هنا.",
+      "clubLabel": "النادي",
+      "clubPlaceholder": "اختر النادي...",
+      "mobileLabel": "رقم الهاتف المسجّل لدى النادي",
+      "mobilePlaceholder": "01xxxxxxxxx",
+      "missingFieldsError": "اختر النادي وأدخل رقم الهاتف المسجّل لديه.",
+      "searchGenericError": "تعذّر البحث، حاول مرة أخرى.",
+      "noMatchError": "لم يتم العثور على بيانات مطابقة. تواصل مع النادي إذا كنت متأكدًا أنك عميل مسجّل.",
+      "searching": "جارٍ البحث...",
+      "search": "بحث",
+      "isThisYou": "هل هذه بياناتك؟",
+      "confirmClaim": "نعم، هذا أنا",
+      "claiming": "...",
+      "claimGenericError": "تعذّر ربط الحساب، حاول مرة أخرى."
     }
+  },
+  "platform": {
+    "nav": {
+      "overview": "نظرة عامة",
+      "sectionClubs": "الأندية",
+      "allClubs": "كل الأندية",
+      "clubOwners": "أصحاب الأندية",
+      "sectionCommerce": "التجارة",
+      "plans": "الخطط",
+      "leads": "طلبات التواصل",
+      "sectionMonitoring": "المراقبة",
+      "reports": "التقارير",
+      "alerts": "التنبيهات",
+      "trials": "التجارب المجانية",
+      "auditLog": "سجل التدقيق",
+      "settings": "الإعدادات"
+    },
+    "openNavAria": "فتح قائمة التنقل",
+    "alertsPage": {
+      "title": "التنبيهات",
+      "description": "تنبيهات تلقائية مبنية على قواعد -- بدون خدمة إشعارات خارجية",
+      "emptyTitle": "لا توجد تنبيهات حاليًا",
+      "kindLabels": {
+        "expiring_soon": "اشتراك ينتهي قريبًا",
+        "overdue_grace": "في فترة السماح",
+        "trial_ending": "تجربة مجانية تنتهي قريبًا",
+        "no_subscription": "لا يوجد اشتراك مسجّل — يحتاج مراجعة"
+      },
+      "daysLeftSuffix": " — {{days}} يوم متبقٍ"
+    },
+    "auditPage": {
+      "title": "سجل التدقيق",
+      "description": "سجل غير قابل للتعديل لكل إجراء حساس على مستوى المنصة",
+      "time": "الوقت",
+      "club": "النادي",
+      "platformLevel": "مستوى المنصة",
+      "clubFallback": "نادٍ",
+      "action": "الإجراء",
+      "entity": "الكيان",
+      "reason": "السبب",
+      "emptyTitle": "لا يوجد سجل تدقيق بعد",
+      "loadingMore": "جارٍ التحميل...",
+      "loadMore": "تحميل المزيد"
+    },
+    "clubDetailPage": {
+      "loadingTitle": "...",
+      "limitTypeLabels": {
+        "branch_limit": "الفروع",
+        "field_limit": "الملاعب",
+        "academy_limit": "برامج الأكاديمية"
+      },
+      "requestStatusLabels": {
+        "pending": "قيد المراجعة",
+        "reviewed": "تمت المراجعة",
+        "approved": "تمت الموافقة",
+        "dismissed": "مرفوض"
+      },
+      "errors": {
+        "startTrial": "تعذّر بدء التجربة المجانية.",
+        "activate": "تعذّر التفعيل — تأكد من اختيار خطة.",
+        "renew": "تعذّر التجديد.",
+        "changePlan": "تعذّر تغيير الخطة.",
+        "extendGrace": "تعذّر تمديد فترة السماح.",
+        "suspend": "تعذّر إيقاف النادي.",
+        "reactivate": "تعذّر إعادة تفعيل النادي.",
+        "cancel": "تعذّر الإلغاء.",
+        "recordPayment": "تعذّر تسجيل الدفعة.",
+        "reversePayment": "تعذّر عكس الدفعة.",
+        "saveLimits": "تعذّر حفظ الحدود التجارية.",
+        "updateRequestStatus": "تعذّر تحديث حالة الطلب."
+      },
+      "invoiceColumns": {
+        "number": "رقم الفاتورة",
+        "amount": "المبلغ",
+        "due": "الاستحقاق",
+        "status": "الحالة"
+      },
+      "invoiceStatusLabels": {
+        "paid": "مدفوعة",
+        "void": "ملغاة",
+        "pending": "قيد الانتظار"
+      },
+      "recordPayment": "تسجيل دفعة",
+      "reversePayment": "عكس الدفعة",
+      "clubStatusActive": "نشط",
+      "clubStatusSuspended": "موقوف",
+      "subscriptionStatusCard": {
+        "title": "حالة الاشتراك",
+        "type": "النوع: {{type}}",
+        "endsAtPrefix": "ينتهي:"
+      },
+      "actionsCard": {
+        "title": "إجراءات",
+        "startTrial": "بدء تجربة مجانية",
+        "choosePlanPlaceholder": "اختر خطة",
+        "activate": "تفعيل",
+        "renew": "تجديد",
+        "newPlanPlaceholder": "خطة جديدة",
+        "changePlan": "تغيير الخطة",
+        "extendGrace": "تمديد فترة السماح (14 يوم)",
+        "cancelSubscription": "إلغاء الاشتراك",
+        "suspendClub": "إيقاف النادي",
+        "reactivateClub": "إعادة تفعيل النادي"
+      },
+      "limitsCard": {
+        "title": "الحدود التجارية",
+        "editLimits": "تعديل الحدود",
+        "emptyFieldHint": "اترك الحقل فارغًا لجعل الحد بلا نهاية.",
+        "branchLimitLabel": "حد الفروع",
+        "fieldLimitLabel": "حد الملاعب",
+        "academyLimitLabel": "حد برامج الأكاديمية",
+        "unlimitedPlaceholder": "بلا حد",
+        "saving": "جارٍ الحفظ...",
+        "saveLimits": "حفظ الحدود",
+        "cancel": "إلغاء",
+        "unlimited": "(بلا حد)",
+        "pendingRequestsHeading": "طلبات ترقية قيد المراجعة ({{count}})",
+        "requestSummary": "{{label}} — الحد الحالي {{limit}} / الاستخدام {{usage}}",
+        "requestUnlimited": "بلا حد",
+        "approve": "موافقة",
+        "reject": "رفض"
+      },
+      "tabs": {
+        "history": "سجل الاشتراكات",
+        "invoices": "الفواتير والمدفوعات",
+        "requests": "طلبات الترقية",
+        "audit": "سجل التدقيق"
+      },
+      "historyColumns": {
+        "kind": "النوع",
+        "plan": "الخطة",
+        "start": "البداية",
+        "end": "النهاية",
+        "status": "الحالة"
+      },
+      "historyEmptyTitle": "لا يوجد سجل اشتراكات",
+      "invoicesEmptyTitle": "لا توجد فواتير",
+      "requestsColumns": {
+        "type": "النوع",
+        "limitAtRequest": "الحد وقت الطلب",
+        "usageAtRequest": "الاستخدام وقت الطلب",
+        "note": "ملاحظة",
+        "createdAt": "تاريخ الطلب",
+        "status": "الحالة"
+      },
+      "requestsEmptyTitle": "لا توجد طلبات ترقية",
+      "auditColumns": {
+        "action": "الإجراء",
+        "entity": "الكيان",
+        "time": "الوقت",
+        "reason": "السبب"
+      },
+      "auditEmptyTitle": "لا يوجد سجل تدقيق",
+      "reasonDialog": {
+        "cancelTitle": "سبب الإلغاء",
+        "suspendTitle": "سبب إيقاف النادي",
+        "reverseTitle": "سبب عكس الدفعة",
+        "suspendWarning": "سيتم إيقاف النادي بالكامل عن العمل على المنصة فورًا. هذا إجراء حساس يُسجَّل في سجل التدقيق.",
+        "reasonPlaceholder": "السبب مطلوب",
+        "confirmSuspend": "تأكيد الإيقاف",
+        "confirm": "تأكيد"
+      }
+    },
+    "clubsPage": {
+      "title": "الأندية",
+      "description": "جميع الأندية المسجّلة في المنصة",
+      "columns": {
+        "club": "النادي",
+        "code": "الكود",
+        "adminStatus": "الحالة الإدارية",
+        "subscriptionStatus": "حالة الاشتراك"
+      },
+      "emptyTitle": "لا توجد أندية بعد",
+      "loadingMore": "جارٍ التحميل...",
+      "loadMore": "تحميل المزيد"
+    },
+    "leadsPage": {
+      "title": "طلبات التواصل",
+      "description": "العملاء المحتملون من موقع ملعبي العام",
+      "columns": {
+        "name": "الاسم",
+        "phone": "الهاتف",
+        "email": "البريد الإلكتروني",
+        "business": "النشاط",
+        "message": "الرسالة",
+        "date": "التاريخ",
+        "status": "الحالة"
+      },
+      "statusLabels": {
+        "new": "جديد",
+        "contacted": "تم التواصل",
+        "converted": "تم التحويل",
+        "closed": "مغلق"
+      },
+      "emptyTitle": "لا توجد طلبات تواصل بعد"
+    },
+    "overviewPage": {
+      "title": "نظرة عامة",
+      "description": "ملخص أداء المنصة",
+      "cards": {
+        "totalClubs": "إجمالي الأندية",
+        "activeClubs": "أندية نشطة",
+        "adminSuspendedClubs": "أندية موقوفة إداريًا",
+        "blockedAccessClubs": "أندية بوصول موقوف (اشتراك)",
+        "trialCount": "تجارب مجانية نشطة",
+        "expiringSoonCount": "اشتراكات تنتهي قريبًا",
+        "newClubsThisMonth": "أندية جديدة هذا الشهر"
+      },
+      "pendingUpgradeRequests": {
+        "title": "طلبات ترقية بانتظار المراجعة",
+        "description": "افتح صفحة النادي المعني من قائمة الأندية لمراجعتها"
+      },
+      "newLeads": {
+        "title": "طلبات تواصل جديدة",
+        "description": "انتقل إلى طلبات التواصل لمتابعتها"
+      },
+      "revenueThisMonth": "الإيرادات المحصّلة هذا الشهر"
+    },
+    "ownersPage": {
+      "title": "أصحاب الأندية",
+      "description": "جميع أصحاب الأندية المسجّلين على المنصة، وربط كل مالك بناديه",
+      "cards": {
+        "uniqueOwners": "إجمالي أصحاب الأندية",
+        "totalMemberships": "إجمالي عضويات الملكية",
+        "multiClubOwners": "أصحاب يملكون أكثر من نادٍ"
+      },
+      "searchPlaceholder": "ابحث بالاسم، البريد الإلكتروني، الهاتف، أو اسم النادي",
+      "clubCountSuffix": "{{count}} أندية",
+      "columns": {
+        "owner": "المالك",
+        "phone": "الهاتف",
+        "club": "النادي",
+        "code": "الكود",
+        "clubStatus": "حالة النادي",
+        "membershipStatus": "حالة العضوية",
+        "since": "مالك منذ"
+      },
+      "membershipStatusLabels": {
+        "active": "نشطة",
+        "suspended": "موقوفة",
+        "removed": "ملغاة"
+      },
+      "clubStatusLabels": {
+        "active": "نشط",
+        "suspended": "موقوف",
+        "closed": "مغلق"
+      },
+      "emptyTitle": "لا توجد نتائج مطابقة",
+      "emptyTitleNoOwners": "لا يوجد أصحاب أندية بعد"
+    },
+    "plansPage": {
+      "title": "الخطط",
+      "description": "إدارة خطط اشتراك المنصة",
+      "intervalLabels": {
+        "month": "شهر",
+        "year": "سنة"
+      },
+      "columns": {
+        "plan": "الخطة",
+        "interval": "المدة",
+        "price": "السعر",
+        "publish": "النشر"
+      },
+      "published": "منشورة",
+      "unpublished": "غير منشورة",
+      "unpublish": "إلغاء النشر",
+      "publish": "نشر",
+      "emptyTitle": "لا توجد خطط",
+      "editDialog": {
+        "title": "تعديل خطة {{name}}",
+        "nameLabel": "اسم الخطة",
+        "priceLabel": "السعر ({{currency}})",
+        "priceChangeNote": "تعديل السعر لا يغيّر أي اشتراك تم إنشاؤه بالفعل بالسعر السابق — يُطبَّق فقط على الاشتراكات الجديدة.",
+        "saving": "جارٍ الحفظ...",
+        "save": "حفظ"
+      }
+    },
+    "reportsPage": {
+      "title": "التقارير",
+      "description": "تقارير المنصة الخمسة",
+      "tabs": {
+        "subscription": "الاشتراكات",
+        "revenue": "الإيرادات",
+        "renewal": "التجديدات",
+        "growth": "النمو",
+        "usage": "الاستخدام"
+      },
+      "subscriptionColumns": {
+        "club": "النادي",
+        "plan": "الخطة",
+        "status": "الحالة",
+        "start": "البداية",
+        "end": "النهاية",
+        "price": "السعر"
+      },
+      "revenueColumns": {
+        "month": "الشهر",
+        "method": "طريقة الدفع",
+        "amount": "المبلغ"
+      },
+      "renewalColumns": {
+        "club": "النادي",
+        "end": "تاريخ الانتهاء",
+        "status": "الحالة"
+      },
+      "growthColumns": {
+        "club": "النادي",
+        "status": "الحالة",
+        "created": "تاريخ الإنشاء"
+      },
+      "usageColumns": {
+        "club": "النادي",
+        "branches": "الفروع",
+        "staff": "الموظفون"
+      },
+      "lifecycleStatusLabels": {
+        "trial": "تجربة مجانية",
+        "active": "نشط",
+        "cancelled": "ملغى"
+      },
+      "statusExpired": "منتهٍ",
+      "daysLeftPlural": "{{count}} أيام متبقية",
+      "daysLeftSingular": "{{count}} يوم متبقٍ",
+      "emptyTitle": "لا توجد بيانات"
+    },
+    "settingsPage": {
+      "title": "الإعدادات",
+      "description": "القيم الافتراضية على مستوى المنصة بالكامل",
+      "cardTitle": "التجربة المجانية وفترة السماح",
+      "loading": "جارٍ التحميل...",
+      "trialDaysLabel": "مدة التجربة المجانية الافتراضية (أيام)",
+      "trialDaysHint": "تُستخدم عند بدء أي نادٍ جديد لتجربة مجانية تلقائية أو يدوية، ما لم تُحدَّد مدة مختلفة صراحةً.",
+      "graceDaysLabel": "فترة السماح الافتراضية (أيام)",
+      "graceDaysHint": "المدة الافتراضية عند بدء اشتراك جديد. يمكن تمديدها لاشتراك محدد لاحقًا من صفحة تفاصيل النادي.",
+      "saving": "جارٍ الحفظ...",
+      "save": "حفظ",
+      "saved": "تم الحفظ",
+      "saveError": "تعذّر الحفظ، حاول مرة أخرى"
+    },
+    "trialsPage": {
+      "title": "التجارب المجانية",
+      "description": "جميع التجارب المجانية بدأت على المنصة",
+      "cards": {
+        "active": "نشطة",
+        "expired": "منتهية",
+        "cancelled": "ملغاة"
+      },
+      "columns": {
+        "club": "النادي",
+        "origin": "المصدر",
+        "start": "البداية",
+        "end": "النهاية",
+        "status": "الحالة"
+      },
+      "originAutomatic": "تلقائي",
+      "originManual": "يدوي",
+      "statusCancelled": "ملغاة",
+      "statusActive": "نشطة",
+      "statusExpired": "منتهية",
+      "emptyTitle": "لا توجد تجارب مجانية بعد"
+    }
+  },
+  "appShell": {
+    "trialEnding": "تجربتك المجانية تنتهي خلال {{days}} يوم",
+    "viewSubscription": "عرض الاشتراك",
+    "trialExpired": "انتهت التجربة المجانية — تواصل معنا لتفعيل الاشتراك",
+    "subscriptionExpired": "الاشتراك منتهٍ — تواصل معنا لتفعيل الاشتراك",
+    "subscriptionGrace": "اشتراكك في فترة السماح — العمليات الجديدة موقوفة مؤقتًا"
   },
   "common": {
     "save": "حفظ",
@@ -59,6 +524,131 @@
     "total": "الإجمالي",
     "currency": "ج.م"
   },
+  "bookings": {
+    "statusLabels": {
+      "pending_payment": "بانتظار الدفع",
+      "confirmed": "مؤكد",
+      "checked_in": "تم تسجيل الحضور",
+      "completed": "مكتمل",
+      "cancelled": "ملغي",
+      "no_show": "لم يحضر"
+    },
+    "fieldBlockTypeLabels": {
+      "maintenance": "صيانة",
+      "manual": "إغلاق يدوي",
+      "holiday": "إجازة"
+    },
+    "page": {
+      "title": "الحجوزات",
+      "description": "التقويم اليومي للملاعب",
+      "previousDay": "اليوم السابق",
+      "nextDay": "اليوم التالي",
+      "allBranches": "كل الفروع",
+      "closed": "مغلق",
+      "loading": "جارٍ التحميل...",
+      "noFields": "لا توجد ملاعب بعد. أضف ملعبًا من صفحة النادي أولاً.",
+      "noFieldsSettings": "لا توجد ملاعب بعد. أضف ملعبًا من الإعدادات أولاً.",
+      "openAllDay": "مفتوح على مدار اليوم",
+      "closedToday": "مغلق اليوم",
+      "pricePerHourNow": "{{price}} ج.م/ساعة الآن",
+      "priceVariesByTime": "السعر متغيّر حسب الوقت"
+    },
+    "detail": {
+      "title": "تفاصيل الحجز",
+      "customer": "العميل",
+      "field": "الملعب",
+      "time": "الوقت",
+      "invoiceNumber": "رقم الفاتورة",
+      "total": "الإجمالي",
+      "paid": "المدفوع",
+      "refunded": "مسترد",
+      "outstanding": "المتبقي",
+      "paymentStatus": "حالة الدفع",
+      "noInvoice": "لا توجد فاتورة مرتبطة بهذا الحجز.",
+      "amountPlaceholder": "المبلغ (المتبقي {{amount}})",
+      "recording": "جارٍ التسجيل...",
+      "confirmCollect": "تأكيد التحصيل",
+      "undo": "تراجع",
+      "collectPayment": "تحصيل الدفعة",
+      "notes": "ملاحظات",
+      "whatsappFailed": "فشل إرسال {{count}} رسالة واتساب",
+      "whatsappPending": "رسالة واتساب قيد الإرسال",
+      "whatsappSent": "أُرسلت {{count}} رسالة واتساب ✓",
+      "viewActivity": "عرض النشاط",
+      "qrAlt": "رمز QR للحجز",
+      "generatingQr": "جارٍ الإنشاء...",
+      "viewQr": "عرض رمز QR لتسجيل الحضور",
+      "confirmNoShowMessage": "تأكيد تسجيل عدم حضور العميل لهذا الحجز؟",
+      "recordingNoShow": "جارٍ التسجيل...",
+      "confirmNoShow": "تأكيد عدم الحضور",
+      "markNoShow": "تسجيل عدم حضور",
+      "cancelReasonPlaceholder": "سبب الإلغاء",
+      "confirmCancel": "تأكيد الإلغاء",
+      "cancelBooking": "إلغاء الحجز",
+      "qrError": "تعذّر إنشاء رمز QR.",
+      "cancelError": "تعذّر إلغاء الحجز.",
+      "noShowError": "تعذّر تسجيل عدم الحضور.",
+      "invalidAmountError": "أدخل مبلغًا صحيحًا",
+      "amountExceedsOutstanding": "المبلغ ({{amount}}) يتجاوز المتبقي ({{outstanding}})",
+      "collectError": "تعذّر تسجيل الدفعة."
+    },
+    "mobile": {
+      "now": "الآن",
+      "next": "التالي",
+      "availableNow": "متاح الآن",
+      "noUpcomingBookings": "لا يوجد حجوزات قادمة",
+      "priceNow": "السعر الآن: ",
+      "pricePerHour": "{{price}} ج.م/ساعة",
+      "noApprovedPrice": "لا يوجد سعر معتمد",
+      "closed": "مغلق",
+      "available": "متاح"
+    },
+    "quick": {
+      "title": "حجز جديد",
+      "field": "الملعب",
+      "time": "الوقت",
+      "duration": "المدة",
+      "durations": {
+        "0.5": "30 دقيقة",
+        "1": "ساعة واحدة",
+        "1.5": "ساعة ونصف",
+        "2": "ساعتان",
+        "3": "3 ساعات"
+      },
+      "customer": "العميل",
+      "chooseExistingCustomer": "اختيار عميل موجود",
+      "newCustomer": "+ عميل جديد",
+      "namePlaceholder": "الاسم",
+      "mobilePlaceholder": "رقم الموبايل",
+      "adding": "جارٍ الإضافة...",
+      "addCustomer": "إضافة العميل",
+      "searchPlaceholder": "ابحث بالاسم أو الموبايل...",
+      "chooseCustomerPlaceholder": "اختر عميلاً",
+      "calculatingPrice": "جارٍ حساب السعر...",
+      "pricePerHour": "سعر الساعة",
+      "duration_hours": "{{count}} ساعة",
+      "pricePerBooking": "سعر كل حجز",
+      "total": "الإجمالي",
+      "priceError": "تعذّر حساب السعر لهذا الموعد.",
+      "recurringWeekly": "حجز متكرر أسبوعيًا",
+      "occurrenceCount": "عدد المرات",
+      "recurringHint": "سيتم إنشاء حجز كل أسبوع في نفس اليوم والوقت، بدءًا من هذا التاريخ.",
+      "payment": "الدفع",
+      "payNow": "دفع الآن",
+      "awaitingPayment": "بانتظار الدفع",
+      "cash": "نقدًا",
+      "card": "بطاقة",
+      "bankTransfer": "تحويل بنكي",
+      "recurringSummary": "تم إنشاء {{created}} من {{requested}} حجز.",
+      "recurringConflicts": "{{count}} موعد تعارض مع حجوزات موجودة ولم يتم إنشاؤه.",
+      "done": "تم",
+      "addCustomerError": "تعذّر إضافة العميل.",
+      "createError": "تعذّر إنشاء الحجز — قد يكون الموعد محجوزًا بالفعل أو غير مصرّح به.",
+      "booking": "جارٍ الحجز...",
+      "confirmRecurring": "تأكيد الحجوزات المتكررة",
+      "confirmBooking": "تأكيد الحجز"
+    }
+  },
   "auth": {
     "login": "تسجيل الدخول",
     "signup": "إنشاء حساب جديد",
@@ -67,7 +657,159 @@
     "fullName": "الاسم الكامل",
     "loginError": "بيانات الدخول غير صحيحة، أو الحساب غير مفعّل بعد.",
     "signupSubmit": "إنشاء حساب وبدء التجربة المجانية",
-    "hasAccount": "لديك حساب بالفعل؟"
+    "hasAccount": "لديك حساب بالفعل؟",
+    "loggingIn": "جارٍ الدخول...",
+    "forgotPassword": "نسيت كلمة المرور؟",
+    "createNewAccount": "إنشاء حساب جديد",
+    "emailLabel": "البريد الإلكتروني",
+    "passwordLabel": "كلمة المرور",
+    "fullNameLabel": "الاسم الكامل",
+    "signupError": "تعذّر إنشاء الحساب. تأكد من صحة البيانات أو أن البريد غير مستخدم من قبل.",
+    "creatingAccount": "جارٍ الإنشاء...",
+    "confirmationSentPrefix": "تم إنشاء حسابك. يرجى تأكيد بريدك الإلكتروني ثم",
+    "confirmationSentSuffix": "لإكمال إعداد ناديك.",
+    "forgotPasswordPage": {
+      "title": "نسيت كلمة المرور؟",
+      "sentMessage": "إذا كان البريد الإلكتروني مسجّلاً لدينا، ستصلك رسالة لإعادة تعيين كلمة المرور.",
+      "emailPlaceholder": "البريد الإلكتروني",
+      "sending": "جارٍ الإرسال...",
+      "sendResetLink": "إرسال رابط إعادة التعيين",
+      "backToLogin": "العودة لتسجيل الدخول"
+    },
+    "resetPasswordPage": {
+      "title": "تعيين كلمة مرور جديدة",
+      "successMessage": "تم تحديث كلمة المرور بنجاح.",
+      "newPasswordPlaceholder": "كلمة المرور الجديدة",
+      "updateError": "تعذّر تحديث كلمة المرور. جرّب طلب رابط إعادة تعيين جديد.",
+      "saving": "جارٍ الحفظ...",
+      "savePassword": "حفظ كلمة المرور"
+    }
+  },
+  "whatsapp": {
+    "statusLabels": {
+      "disconnected": "غير متصل",
+      "qr_required": "بانتظار مسح الرمز",
+      "connecting": "جارٍ الاتصال...",
+      "connected": "متصل",
+      "reconnecting": "جارٍ إعادة الاتصال...",
+      "degraded": "الاتصال غير مستقر",
+      "logged_out": "تم تسجيل الخروج من الهاتف",
+      "restricted": "الحساب مقيّد",
+      "failed": "فشل الاتصال",
+      "error": "حدث خطأ"
+    },
+    "categoryLabels": {
+      "booking_confirmations": "تأكيدات الحجز",
+      "booking_reminders": "تذكيرات الحجز",
+      "payment_confirmations": "إيصالات الدفع",
+      "refund_notifications": "إشعارات الاسترداد",
+      "academy_notifications": "إشعارات الأكاديمية",
+      "subscription_reminders": "تذكيرات الاشتراك"
+    },
+    "messagingSafetyCard": {
+      "title": "ضوابط الإرسال والأمان",
+      "description": "تحكم في نوع الرسائل المرسلة عبر واتساب وتوقيتها لتقليل الإزعاج والتكرار. لا يوجد رقم \"آمن\" مضمون لعدد الرسائل في الساعة -- هذه الإعدادات لحماية العملاء واستقرار الخدمة، وليست وسيلة للتحايل على قواعد واتساب.",
+      "loading": "جارٍ التحميل...",
+      "updateCategoryError": "تعذّر تحديث الإعداد",
+      "saveSettingsError": "تعذّر حفظ الإعدادات",
+      "enabledCategoriesHeading": "أنواع الإشعارات المفعّلة",
+      "marketingHint": "الرسائل التسويقية غير مدعومة في هذه المرحلة -- لا يُستخدم اتصال واتساب لإرسال رسائل جماعية.",
+      "quietHoursHeading": "ساعات الهدوء",
+      "enableQuietHours": "تفعيل ساعات الهدوء (تأجيل الرسائل غير العاجلة)",
+      "quietHoursFrom": "من",
+      "quietHoursTo": "إلى",
+      "bypassCriticalLabel": "السماح للإشعارات العاجلة (مثل إلغاء الحجز من النادي) بتجاوز ساعات الهدوء",
+      "rateLimitHeading": "التحكم في معدل الإرسال",
+      "rateLimitHint": "حدود تحفظ استقرار الخدمة وتمنع اندفاع الرسائل دفعة واحدة -- ليست ضمانًا لعدد \"آمن\" من واتساب.",
+      "maxPerMinuteLabel": "الحد الأقصى بالدقيقة",
+      "maxPerHourLabel": "الحد الأقصى بالساعة",
+      "minMinutesBetweenSendsLabel": "أقل فاصل زمني بين رسالتين لنفس العميل (بالدقائق)",
+      "circuitBreakerLabel": "إيقاف الإرسال تلقائيًا مؤقتًا عند ارتفاع نسبة الفشل",
+      "defaultLanguageLabel": "اللغة الافتراضية عند عدم تحديد لغة العميل",
+      "saveButton": "حفظ ضوابط الإرسال",
+      "diagnosticsHeading": "تشخيص قائمة الانتظار",
+      "diagnosticsEmpty": "لا توجد بيانات بعد -- لم يتم إرسال أي رسائل واتساب حتى الآن.",
+      "pending": "قيد الانتظار",
+      "retrying": "إعادة محاولة",
+      "expired": "منتهية الصلاحية",
+      "failedFinal": "فشلت نهائيًا",
+      "sent": "أُرسلت",
+      "oldestPending": "أقدم رسالة منتظرة",
+      "circuitBreakerActivePrefix": "الإرسال متوقف مؤقتًا (قاطع الدائرة نشط) حتى",
+      "lastSuccessfulSend": "آخر إرسال ناجح: {{date}}",
+      "lastErrorPrefix": "آخر خطأ:"
+    },
+    "connectionCard": {
+      "title": "واتساب",
+      "loading": "جارٍ التحميل...",
+      "startError": "تعذّر بدء الاتصال",
+      "retryError": "تعذّر إعادة المحاولة",
+      "disconnectError": "تعذّر قطع الاتصال",
+      "connectedNumberPrefix": "الرقم المتصل:",
+      "connectedSincePrefix": "متصل منذ:",
+      "lastSeenPrefix": "آخر ظهور:",
+      "autoSendHint": "سيتم إرسال رسائل تأكيد الحجز والدفع تلقائيًا عبر هذا الرقم حسب إعدادات إشعارات واتساب.",
+      "disconnect": "قطع الاتصال",
+      "qrAlt": "رمز QR لربط واتساب",
+      "qrInstructions": "افتح واتساب على هاتفك ← الإعدادات ← الأجهزة المرتبطة ← ربط جهاز، ثم امسح هذا الرمز.",
+      "qrExpiryHint": "ينتهي الرمز خلال دقيقة وسيتم تحديثه تلقائيًا.",
+      "cancel": "إلغاء",
+      "timeoutMessage": "تعذر الوصول إلى خدمة واتساب. تحقق من تشغيل خدمة الاتصال ثم حاول مرة أخرى.",
+      "retry": "إعادة المحاولة",
+      "generatingQr": "جارٍ توليد رمز QR...",
+      "restrictedHint": "الحساب مقيّد من واتساب حاليًا. راجع حالة الحساب على هاتفك قبل إعادة الربط.",
+      "connectHint": "اربط رقم واتساب الخاص بالنادي لإرسال تأكيدات الحجز والدفع والفواتير تلقائيًا للعملاء.",
+      "connect": "ربط واتساب",
+      "reconnecting": "انقطع الاتصال مؤقتًا، جارٍ إعادة المحاولة...",
+      "degraded": "الاتصال غير مستقر حاليًا. سيتم استئناف الإرسال تلقائيًا عند تحسّن الاتصال."
+    },
+    "page": {
+      "title": "واتساب",
+      "description": "اتصال واتساب، رسائل مُرسلة، وضوابط الأمان",
+      "tabs": {
+        "overview": "نظرة عامة",
+        "activity": "النشاط",
+        "connection": "الاتصال",
+        "settings": "الإعدادات"
+      },
+      "overviewTab": {
+        "title": "حالة واتساب",
+        "loading": "جارٍ التحميل...",
+        "connectionLabel": "الاتصال:",
+        "pending": "قيد الانتظار",
+        "failedFinal": "فشلت نهائيًا",
+        "footerHint": "للاطلاع على كل رسالة على حدة راجع تبويب \"النشاط\"، ولإدارة الاتصال أو ضوابط الإرسال راجع \"الاتصال\"/\"الإعدادات\"."
+      },
+      "activityTab": {
+        "templateLabels": {
+          "booking-created": "إنشاء حجز",
+          "booking-confirmed": "تأكيد حجز",
+          "booking-confirmed-paid": "تأكيد حجز مع الدفع",
+          "booking-cancelled": "إلغاء حجز",
+          "payment-received": "استلام دفعة",
+          "payment-refunded": "استرداد دفعة",
+          "invoice-created": "إصدار فاتورة"
+        },
+        "statusLabels": {
+          "all": "كل الحالات",
+          "pending": "قيد الانتظار",
+          "retrying": "إعادة محاولة",
+          "sent": "أُرسلت",
+          "failed": "فشلت نهائيًا",
+          "expired": "منتهية الصلاحية",
+          "cancelled": "أُلغيت"
+        },
+        "loading": "جارٍ التحميل...",
+        "emptyTitle": "لا توجد رسائل واتساب في هذا النطاق بعد.",
+        "columns": {
+          "message": "الرسالة",
+          "recipient": "المستلم",
+          "status": "الحالة",
+          "timing": "التوقيت",
+          "lastAttempt": "آخر محاولة"
+        }
+      }
+    }
   },
   "language": {
     "label": "اللغة",
@@ -123,6 +865,879 @@
       "invalidMessage": "لم يتم العثور على حجز مطابق لهذا الرمز. تأكد من فتح الرابط الصحيح، أو تواصل مع النادي مباشرة."
     }
   },
+  "academy": {
+    "loading": "جارٍ التحميل...",
+    "title": "الأكاديمية",
+    "description": "إدارة اللاعبين والبرامج والمجموعات",
+    "tabs": {
+      "overview": "نظرة عامة",
+      "players": "اللاعبون",
+      "structure": "البرامج والمجموعات",
+      "enrollments": "التسجيلات والاشتراكات"
+    },
+    "overview": {
+      "addPlayer": "إضافة لاعب",
+      "enrollInGroup": "تسجيل لاعب في مجموعة",
+      "markAttendance": "تسجيل الحضور",
+      "sessionsToday": "حصص اليوم",
+      "sessionsUnmarked": "حضور غير مسجّل",
+      "activePlayers": "لاعبون نشطون",
+      "activeSubscriptions": "اشتراكات نشطة",
+      "expiringSoon": "على وشك الانتهاء",
+      "outstandingInvoices": "فواتير مستحقة",
+      "groupsNearCapacity": "مجموعات قاربت على الاكتمال"
+    },
+    "relationshipLabels": {
+      "father": "الأب",
+      "mother": "الأم",
+      "guardian": "ولي أمر",
+      "other": "أخرى"
+    },
+    "players": {
+      "searchByName": "بحث بالاسم",
+      "addPlayer": "إضافة لاعب",
+      "fullName": "الاسم الكامل",
+      "dateOfBirth": "تاريخ الميلاد",
+      "gender": "الجنس",
+      "genderUnspecified": "غير محدد",
+      "genderMale": "ذكر",
+      "genderFemale": "أنثى",
+      "status": "الحالة",
+      "statusActive": "نشط",
+      "statusInactive": "غير نشط",
+      "adding": "جارٍ الإضافة...",
+      "add": "إضافة",
+      "addError": "تعذّرت الإضافة، حاول مرة أخرى.",
+      "emptyTitle": "لا يوجد لاعبون",
+      "emptyDescription": "أضف أول لاعب لبدء إدارة الأكاديمية",
+      "saving": "جارٍ الحفظ...",
+      "save": "حفظ",
+      "qrAlt": "بطاقة QR للاعب",
+      "generatingQr": "جارٍ الإنشاء...",
+      "viewQr": "عرض بطاقة QR",
+      "guardians": "أولياء الأمر",
+      "noGuardians": "لا يوجد أولياء أمور مرتبطون بعد.",
+      "primary": "(أساسي)",
+      "linkNewGuardian": "ربط ولي أمر جديد",
+      "searchCustomerByName": "بحث عن عميل بالاسم",
+      "chooseCustomer": "اختر عميلاً",
+      "link": "ربط"
+    },
+    "enrollments": {
+      "manageSubtitle": "تسجيل لاعب في مجموعة وإنشاء اشتراكه",
+      "newEnrollment": "تسجيل جديد",
+      "wizardTitle": "معالج التسجيل",
+      "player": "اللاعب",
+      "guardianForBilling": "ولي الأمر (للفوترة)",
+      "group": "المجموعة",
+      "approvedSubscriptionPrice": "سعر الاشتراك المعتمد",
+      "discount": "الخصم",
+      "total": "الإجمالي",
+      "noApprovedPrice": "لا يوجد سعر معتمد لهذه المجموعة — حدد سعر الاشتراك من صفحة البرامج والمجموعات أولاً.",
+      "enrolling": "جارٍ التسجيل...",
+      "enrollAndCreateSubscription": "تسجيل وإنشاء الاشتراك",
+      "enrollError": "تعذّر إتمام التسجيل — تحقق من توفر مكان في المجموعة أو صلاحياتك.",
+      "emptyTitle": "لا يوجد تسجيلات",
+      "emptyDescription": "سجّل أول لاعب في مجموعة لبدء الاشتراكات",
+      "status": "الحالة",
+      "statusActive": "نشط",
+      "statusWithdrawn": "منسحب",
+      "subscriptionOf": "اشتراك {{name}}",
+      "plan": "الخطة: {{plan}}",
+      "dateRange": "من {{start}} إلى {{end}}",
+      "effectiveEndDate": "تاريخ الانتهاء الفعلي (بعد التجميد): {{date}}",
+      "manualActivation": "تفعيل يدوي",
+      "freezeSubscription": "تجميد الاشتراك",
+      "reason": "السبب",
+      "freeze": "تجميد",
+      "noSubscription": "لا يوجد اشتراك مرتبط.",
+      "activationPolicy": "سياسة تفعيل الاشتراك",
+      "activationPolicyManagedFrom": "سياسة تفعيل الاشتراك تُدار من",
+      "settingsPage": "صفحة الإعدادات"
+    },
+    "coachToday": {
+      "title": "جلسات اليوم",
+      "description": "جلسات التدريب المجدولة اليوم",
+      "loading": "جارٍ التحميل...",
+      "noSessions": "لا توجد جلسات مجدولة اليوم.",
+      "attendanceDialogTitle": "{{group}} — تسجيل الحضور",
+      "scanQr": "مسح QR للحضور",
+      "noRoster": "لا يوجد لاعبون مسجلون في هذه المجموعة.",
+      "scanPlayerCard": "مسح بطاقة اللاعب",
+      "checkedIn": "تم تسجيل الحضور",
+      "scanFailed": "فشل المسح",
+      "attendanceLabels": {
+        "present": "حاضر",
+        "absent": "غائب",
+        "excused": "معذور",
+        "late": "متأخر"
+      }
+    },
+    "playerStatus": {
+      "loading": "جارٍ التحميل...",
+      "notEnrolled": "هذا اللاعب غير مسجّل في أي مجموعة حاليًا.",
+      "dateRange": "من {{start}} إلى {{end}}",
+      "effectiveEndSuffix": " (فعليًا حتى {{date}} بعد التجميد)",
+      "outstanding": "المستحق",
+      "fullyPaid": "مدفوع بالكامل",
+      "attendanceRate": "نسبة الحضور",
+      "noAttendanceRecord": "لا يوجد سجل حضور بعد"
+    },
+    "structure": {
+      "program": "البرنامج",
+      "season": "الموسم",
+      "capacity": "السعة",
+      "capacityRemaining": "(متبقي {{count}})",
+      "nextSession": "الجلسة القادمة",
+      "status": "الحالة",
+      "newProgram": "برنامج جديد",
+      "nameArabic": "الاسم (عربي)",
+      "nameEnglish": "الاسم (إنجليزي)",
+      "add": "إضافة",
+      "newSeason": "موسم جديد",
+      "programOptional": "البرنامج (اختياري)",
+      "seasonName": "اسم الموسم",
+      "newAgeGroup": "فئة عمرية جديدة",
+      "ageGroupExample": "مثال: U10",
+      "newGroup": "مجموعة جديدة",
+      "groupName": "اسم المجموعة",
+      "branch": "الفرع",
+      "ageGroupOptional": "الفئة العمرية (اختياري)",
+      "coachOptional": "المدرب (اختياري)",
+      "fieldOptional": "الملعب (اختياري)",
+      "capacityPlaceholder": "السعة",
+      "monthlySubscriptionPrice": "سعر الاشتراك الشهري (ج.م) — يُستخدم تلقائيًا عند تسجيل لاعب",
+      "subscriptionPricePlaceholder": "سعر الاشتراك",
+      "emptyTitle": "لا توجد مجموعات",
+      "emptyDescription": "أنشئ برنامجًا وموسمًا ثم مجموعة لبدء إدارة الأكاديمية",
+      "ageGroup": "الفئة العمرية",
+      "field": "الملعب",
+      "fieldUnspecified": "غير محدد",
+      "subscriptionPrice": "سعر الاشتراك",
+      "subscriptionPriceUnspecified": "غير محدد",
+      "pricePerMonth": "{{price}} ج.م/شهر",
+      "schedule": "الجدول",
+      "listSeparator": "، ",
+      "capacityAndAssignments": "السعة والتعيينات",
+      "monthlySubscriptionPriceLabel": "سعر الاشتراك الشهري (ج.م)",
+      "coach": "المدرب",
+      "noCoach": "بدون مدرب",
+      "fieldLabel": "الملعب",
+      "noField": "بدون ملعب محدد",
+      "statusActive": "نشط",
+      "statusInactive": "غير نشط",
+      "saving": "جارٍ الحفظ...",
+      "save": "حفظ",
+      "weeklySchedule": "الجدول الأسبوعي",
+      "noSlotsYet": "لا يوجد مواعيد بعد.",
+      "slotRange": "{{day}} — {{start}} إلى {{end}}",
+      "addSlot": "إضافة موعد",
+      "generatingSessions": "جارٍ التوليد...",
+      "generateSessions": "توليد جلسات الأسابيع الأربعة القادمة",
+      "sessionsGenerated": "تم إنشاء {{count}} جلسة جديدة.",
+      "dayOfWeekLabels": {
+        "0": "الأحد",
+        "1": "الإثنين",
+        "2": "الثلاثاء",
+        "3": "الأربعاء",
+        "4": "الخميس",
+        "5": "الجمعة",
+        "6": "السبت"
+      },
+      "groupStatusLabels": {
+        "active": "نشطة",
+        "full": "مكتملة",
+        "closed": "مغلقة"
+      }
+    },
+    "subscriptionPlanLabels": {
+      "monthly": "شهري",
+      "quarterly": "ربع سنوي",
+      "season": "موسم كامل",
+      "package": "باقة"
+    },
+    "subscriptionStatusLabels": {
+      "pending": "بانتظار التفعيل",
+      "active": "نشط",
+      "frozen": "مجمّد",
+      "expired": "منتهي",
+      "cancelled": "ملغى"
+    },
+    "activationPolicyLabels": {
+      "manual": "تفعيل يدوي",
+      "first_payment": "عند أول دفعة",
+      "full_payment": "عند السداد الكامل"
+    }
+  },
+  "clubs": {
+    "branchesFieldsPage": {
+      "title": "الفروع والملاعب",
+      "description": "فروع النادي، الملاعب، مواعيد العمل، والأسعار",
+      "branchesHeading": "الفروع",
+      "fieldsHeading": "الملاعب"
+    },
+    "entitlements": {
+      "cardTitle": "حدود الخطة التجارية",
+      "noLimits": "لا توجد حدود تجارية مُعرّفة لهذا النادي.",
+      "unlimited": "(بلا حد)",
+      "atLimit": "تم بلوغ الحد",
+      "nearLimit": "قارب على الاكتمال",
+      "upgradePending": "طلب الترقية قيد المراجعة",
+      "requestUpgrade": "طلب زيادة الحد",
+      "requestUpgradeTitle": "طلب زيادة حد {{label}}",
+      "requestUpgradeDescription": "سيصل هذا الطلب لفريق منصة ملعبي للمراجعة. الحد الحالي والاستخدام الحالي يُرفقان تلقائيًا بالطلب.",
+      "notePlaceholder": "أي تفاصيل إضافية تريد إضافتها (اختياري)",
+      "cancel": "إلغاء",
+      "sending": "جارٍ الإرسال...",
+      "sendRequest": "إرسال الطلب",
+      "sendError": "تعذّر إرسال طلب الترقية.",
+      "pendingRequestsNotice": "لديك طلب ترقية قيد المراجعة لـ: {{types}}.",
+      "limitLabels": {
+        "branch_limit": "الفروع",
+        "field_limit": "الملاعب",
+        "academy_limit": "برامج الأكاديمية"
+      }
+    },
+    "fieldsManagement": {
+      "noPrice": "لا يوجد سعر",
+      "pricePerHour": "{{price}} ج.م/ساعة",
+      "cardTitle": "الملاعب والتسعير",
+      "addField": "إضافة ملعب",
+      "addFieldTitle": "إضافة ملعب",
+      "nameLabel": "الاسم",
+      "sportLabel": "الرياضة",
+      "branchLabel": "الفرع",
+      "chooseBranch": "اختر فرعًا",
+      "adding": "جارٍ الإضافة...",
+      "add": "إضافة",
+      "addFieldHint": "بعد الإضافة، افتح الملعب لإعداد مواعيد العمل والأسعار قبل أن يصبح قابلاً للحجز فعليًا.",
+      "emptyTitle": "لا توجد ملاعب",
+      "emptyDescription": "أضف أول ملعب لبدء إدارة الحجوزات",
+      "columns": {
+        "field": "الملعب",
+        "sport": "الرياضة",
+        "hoursToday": "مواعيد اليوم",
+        "currentPrice": "السعر الحالي",
+        "todayBookings": "حجوزات اليوم",
+        "currentStatus": "الحالة الآن"
+      },
+      "openAllDay": "مفتوح على مدار اليوم",
+      "closedToday": "مغلق اليوم",
+      "temporarilyClosed": "مغلق مؤقتًا",
+      "inactive": "غير نشط",
+      "available": "متاح",
+      "manageDialogTitle": "إعداد {{name}}",
+      "tabHours": "مواعيد العمل",
+      "tabPricing": "الأسعار"
+    },
+    "pricingEditor": {
+      "allWeekDays": "كل أيام الأسبوع",
+      "currentPriceNow": "السعر الحالي الآن: ",
+      "calculating": "جارٍ الحساب...",
+      "pricePerHour": "{{price}} ج.م/ساعة",
+      "noApprovedPrice": "لا يوجد سعر معتمد للوقت الحالي",
+      "noPricesWarning": "لا توجد أسعار محددة — لن يمكن إتمام أي حجز على هذا الملعب حتى تتم إضافة سعر واحد على الأقل.",
+      "weeklyPricesHeading": "الأسعار الأسبوعية",
+      "price": "{{price}} ج.م",
+      "delete": "حذف",
+      "specialPricesHeading": "أسعار خاصة (تواريخ محددة)",
+      "addWeeklyPriceLabel": "إضافة سعر أسبوعي",
+      "pricePerHourPlaceholder": "السعر بالساعة (ج.م)",
+      "priorityLabel": "الأولوية (رقم أعلى = يفوز عند تداخل فترتين)",
+      "hideAdvanced": "إخفاء الخيارات المتقدمة",
+      "showAdvanced": "خيارات متقدمة",
+      "adding": "جارٍ الإضافة...",
+      "addPrice": "إضافة السعر",
+      "startBeforeEndError": "وقت البداية يجب أن يكون قبل وقت النهاية",
+      "specialPriceLabel": "سعر خاص بمناسبة/عطلة (تاريخ محدد)",
+      "pricePlaceholder": "السعر",
+      "addSpecialPrice": "إضافة سعر خاص",
+      "specialPriceHint": "يتجاوز السعر الخاص أي سعر أسبوعي في نفس التاريخ طوال اليوم.",
+      "addPriceError": "تعذّرت إضافة السعر.",
+      "addSpecialPriceError": "تعذّرت إضافة السعر الخاص."
+    },
+    "branchesCard": {
+      "title": "الفروع",
+      "addBranch": "إضافة فرع",
+      "nameLabel": "اسم الفرع",
+      "codeLabel": "كود الفرع",
+      "addressLabel": "العنوان",
+      "phoneLabel": "رقم الهاتف",
+      "saving": "جارٍ الحفظ...",
+      "save": "حفظ",
+      "loading": "جارٍ التحميل...",
+      "noBranches": "لا توجد فروع بعد.",
+      "active": "نشط",
+      "editTitle": "تعديل {{name}}",
+      "saveError": "تعذّر حفظ بيانات الفرع."
+    },
+    "clubSettingsCard": {
+      "title": "بيانات النادي",
+      "statusLabels": {
+        "active": "نشط",
+        "suspended": "موقوف",
+        "closed": "مغلق"
+      },
+      "nameArLabel": "اسم النادي (بالعربية)",
+      "nameEnLabel": "اسم النادي (بالإنجليزية)",
+      "currencyLabel": "العملة",
+      "timezoneLabel": "المنطقة الزمنية",
+      "saving": "جارٍ الحفظ...",
+      "save": "حفظ بيانات النادي",
+      "statusHint": "حالة النادي (نشط/موقوف/مغلق) إدارية ولا يمكن تعديلها من هنا.",
+      "saveError": "تعذّر حفظ بيانات النادي."
+    },
+    "operatingHoursEditor": {
+      "noHoursWarning": "لم يتم تحديد مواعيد عمل بعد — الملعب متاح للحجز على مدار اليوم بدون قيود. حدد مواعيد الأسبوع أدناه لتقييد الحجز بساعات العمل الفعلية.",
+      "to": "إلى",
+      "openBeforeCloseError": "وقت الفتح يجب أن يسبق الإغلاق",
+      "closed": "مغلق",
+      "copySaturdayToAll": "نسخ السبت لكل الأيام",
+      "applyToWeekdays": "تطبيق على أيام الأسبوع (عدا الجمعة)",
+      "saving": "جارٍ الحفظ...",
+      "save": "حفظ مواعيد الأسبوع",
+      "saveError": "تعذّر حفظ مواعيد العمل."
+    },
+    "platformSubscriptionCard": {
+      "title": "اشتراك المنصة",
+      "accessLabels": {
+        "full": "نشط بالكامل",
+        "grace": "فترة سماح",
+        "blocked": "موقوف"
+      },
+      "kindLabels": {
+        "trial": "تجربة مجانية",
+        "paid": "مدفوع",
+        "complimentary": "مجاني (منحة)"
+      },
+      "pendingTitle": "بانتظار موافقة منصة ملعبي",
+      "pendingDescription": "لم يتم تفعيل اشتراك تجاري لهذا النادي بعد. الأندية الإضافية (بعد النادي الأول) لا تحصل على تجربة مجانية تلقائية — يحتاج هذا النادي لموافقة فريق منصة ملعبي قبل استخدامه فعليًا. سنتواصل معك بمجرد المراجعة.",
+      "statusLabel": "الحالة:",
+      "kindLabel": "نوع الاشتراك: ",
+      "planLabel": "الخطة: ",
+      "endDateLabel": "تاريخ الانتهاء: "
+    }
+  },
+  "billing": {
+    "sourceLabels": {
+      "booking": "حجز",
+      "subscription": "اشتراك أكاديمية",
+      "other": "أخرى"
+    },
+    "invoiceStatusLabels": {
+      "draft": "مسودة",
+      "issued": "صادرة",
+      "void": "ملغاة"
+    },
+    "pendingClaims": {
+      "heading": "طلبات دفع بانتظار المراجعة ({{count}})",
+      "reference": "مرجع: {{reference}}",
+      "confirm": "تأكيد",
+      "reject": "رفض"
+    },
+    "stats": {
+      "totalOutstanding": "إجمالي المستحقات",
+      "collectedToday": "تحصيل اليوم",
+      "partiallyPaidInvoices": "فواتير مدفوعة جزئيًا",
+      "customersWithDues": "عملاء عليهم مستحقات"
+    },
+    "page": {
+      "title": "الفواتير والمدفوعات",
+      "description": "سجل الفواتير والمدفوعات"
+    },
+    "table": {
+      "invoiceNumber": "رقم الفاتورة",
+      "customer": "العميل",
+      "source": "المصدر",
+      "date": "التاريخ",
+      "total": "الإجمالي",
+      "paid": "المدفوع",
+      "outstanding": "المتبقي",
+      "status": "الحالة",
+      "emptyTitle": "لا توجد فواتير"
+    },
+    "detail": {
+      "invoicePrefix": "فاتورة رقم",
+      "verifyQrAlt": "رمز التحقق من الفاتورة",
+      "verifyQrHint": "امسح الرمز للتحقق من صحة الفاتورة وحالة السداد.",
+      "itemHeader": "البند",
+      "quantityHeader": "الكمية",
+      "priceHeader": "السعر",
+      "totalHeader": "الإجمالي",
+      "total": "الإجمالي",
+      "paid": "المدفوع",
+      "outstanding": "المتبقي",
+      "receiptSize80mm": "إيصال 80mm",
+      "print": "طباعة",
+      "paymentsHeading": "المدفوعات",
+      "noPayments": "لا توجد مدفوعات بعد.",
+      "collectedBy": "حصّلها {{name}}",
+      "refund": "استرجاع"
+    },
+    "recordPayment": {
+      "heading": "تسجيل دفعة",
+      "outstandingPrefix": "المتبقي:",
+      "splitHint": "يمكن تسجيل الدفعة بأكثر من طريقة دفع في نفس العملية (مثال: جزء نقدًا وجزء بالبطاقة).",
+      "amountPlaceholder": "المبلغ",
+      "deleteLine": "حذف السطر",
+      "addMethod": "+ طريقة أخرى",
+      "totalPaymentsPrefix": "إجمالي الدفعات:",
+      "exceedsOutstanding": "— يتجاوز المتبقي",
+      "submitting": "جارٍ التسجيل...",
+      "submit": "تسجيل الدفعة",
+      "amountExceedsOutstanding": "إجمالي الدفعات ({{total}}) يتجاوز المبلغ المتبقي ({{outstanding}})",
+      "enterAtLeastOneAmount": "أدخل مبلغًا واحدًا على الأقل",
+      "genericError": "تعذّر تسجيل الدفعة."
+    },
+    "voidInvoice": {
+      "heading": "إلغاء الفاتورة",
+      "hint": "متاح فقط للفواتير التي لم تُسجَّل عليها أي دفعة بعد.",
+      "reasonPlaceholder": "سبب الإلغاء",
+      "submitting": "جارٍ الإلغاء...",
+      "submit": "إلغاء الفاتورة",
+      "genericError": "تعذّر إلغاء الفاتورة."
+    },
+    "refund": {
+      "dialogTitle": "استرجاع دفعة",
+      "amountPlaceholder": "مبلغ الاسترجاع",
+      "reasonPlaceholder": "سبب الاسترجاع",
+      "submit": "تأكيد الاسترجاع",
+      "genericError": "تعذّر تنفيذ الاسترجاع — قد يتجاوز الرصيد القابل للاسترجاع.",
+      "receiptTitle": "إيصال استرجاع",
+      "receiptInvoicePrefix": "الفاتورة:",
+      "receiptCustomer": "العميل: {{name}}",
+      "receiptOriginalMethod": "طريقة الدفع الأصلية: {{method}}",
+      "receiptReason": "السبب: {{reason}}",
+      "receiptDate": "التاريخ: {{date}}"
+    },
+    "reviewClaim": {
+      "genericError": "تعذّر مراجعة طلب الدفع."
+    },
+    "outstandingPage": {
+      "title": "المستحقات",
+      "description": "الفواتير غير المسددة بالكامل",
+      "exportCsv": "تصدير CSV",
+      "filterAll": "الكل",
+      "filterDueToday": "مستحق اليوم",
+      "filterOverdue": "متأخر",
+      "overdueDays": "متأخر {{days}} يوم",
+      "due": "مستحق",
+      "emptyTitle": "لا توجد مستحقات",
+      "emptyDescription": "جميع الفواتير مسددة بالكامل",
+      "table": {
+        "invoiceNumber": "رقم الفاتورة",
+        "customer": "العميل",
+        "total": "الإجمالي",
+        "outstanding": "المستحق",
+        "due": "الاستحقاق",
+        "status": "الحالة"
+      },
+      "csvHeader": {
+        "invoiceNumber": "رقم الفاتورة",
+        "customer": "العميل",
+        "total": "الإجمالي",
+        "outstanding": "المستحق",
+        "dueDate": "تاريخ الاستحقاق",
+        "daysOverdue": "أيام التأخير"
+      }
+    },
+    "paymentMethods": {
+      "underlyingMethodLabels": {
+        "cash": "نقدًا",
+        "card": "بطاقة / نقطة بيع",
+        "bank_transfer": "تحويل بنكي",
+        "wallet": "محفظة إلكترونية",
+        "other": "أخرى / يدوية"
+      },
+      "detailFields": {
+        "terminalReference": "مرجع الماكينة (اختياري)",
+        "bankName": "اسم البنك",
+        "accountHolder": "اسم صاحب الحساب",
+        "accountNumber": "رقم الحساب",
+        "iban": "IBAN",
+        "swift": "SWIFT / BIC",
+        "phone": "رقم الهاتف",
+        "beneficiary": "اسم المستفيد",
+        "phoneOptional": "رقم الهاتف (اختياري)",
+        "linkOptional": "رابط الدفع (اختياري)"
+      },
+      "cardTitle": "طرق الدفع",
+      "addMethod": "إضافة طريقة دفع",
+      "dialogTitle": "إضافة طريقة دفع",
+      "methodTypeLabel": "نوع الطريقة",
+      "nameArLabel": "الاسم (بالعربية)",
+      "nameArPlaceholder": "مثال: فودافون كاش",
+      "nameEnLabel": "الاسم (بالإنجليزية)",
+      "instructionsLabel": "تعليمات للعميل (اختياري)",
+      "instructionsPlaceholder": "مثال: اذكر رقم الفاتورة عند التحويل",
+      "customerVisibleCheckbox": "إظهار هذه الطريقة للعملاء عند الدفع",
+      "save": "حفظ",
+      "loading": "جارٍ التحميل...",
+      "empty": "لا توجد طرق دفع بعد.",
+      "visibleToCustomers": "ظاهرة للعملاء",
+      "hiddenFromCustomers": "مخفية عن العملاء",
+      "active": "نشطة",
+      "suspended": "موقوفة",
+      "hide": "إخفاء",
+      "show": "إظهار",
+      "deactivate": "إيقاف",
+      "activate": "تفعيل",
+      "nameRequiredError": "أدخل الاسم بالعربية والإنجليزية",
+      "addError": "تعذّر إضافة طريقة الدفع"
+    },
+    "subscriptionPage": {
+      "title": "اشتراك النادي",
+      "description": "حالة اشتراكك في منصة ملعبي",
+      "accessLabels": {
+        "full": "نشط",
+        "grace": "فترة سماح",
+        "blocked": "موقوف"
+      },
+      "currentStatus": "الحالة الحالية",
+      "loading": "جارٍ التحميل...",
+      "noActiveSubscription": "لا يوجد اشتراك نشط.",
+      "type": "النوع: {{type}}",
+      "typeTrial": "تجربة مجانية",
+      "plan": "الخطة: {{name}}",
+      "endDate": "تاريخ الانتهاء: {{date}}",
+      "availablePlans": "الخطط المتاحة",
+      "contactToActivate": "لتفعيل أو تجديد اشتراكك، تواصل معنا وسنقوم بتفعيله لك.",
+      "contactCta": "تواصل معنا لتفعيل الاشتراك"
+    },
+    "paymentGatewaysCard": {
+      "title": "بوابات الدفع الإلكتروني",
+      "description": "هذه البنية جاهزة لربط Stripe و PayPal لاحقًا، ولا يوجد حاليًا حساب فعلي مفعّل لأي منهما. تفعيل الخيار هنا لا يجعل الدفع الإلكتروني متاحًا للعملاء إلا بعد ربط بيانات اعتماد حقيقية من طرف الخادم.",
+      "loading": "جارٍ التحميل...",
+      "connected": "متصلة",
+      "notConnected": "غير متصلة",
+      "disable": "إيقاف",
+      "enable": "تفعيل",
+      "saveKey": "حفظ المفتاح",
+      "saveError": "تعذّر حفظ إعدادات بوابة الدفع"
+    },
+    "cashShift": {
+      "title": "وردية النقدية",
+      "description": "فتح وإغلاق وردية الصندوق النقدي لكل فرع، مع تسوية تلقائية مقابل المدفوعات النقدية الفعلية",
+      "statusLabels": {
+        "open": "مفتوحة",
+        "closed": "مغلقة"
+      },
+      "errors": {
+        "selectBranchFirst": "اختر الفرع أولًا",
+        "invalidOpeningFloat": "أدخل رصيدًا افتتاحيًا صحيحًا",
+        "noShiftSelected": "لا توجد وردية محددة",
+        "invalidClosingCount": "أدخل المبلغ المُعدود فعليًا",
+        "genericError": "حدث خطأ غير متوقع"
+      },
+      "openShiftCard": {
+        "heading": "وردية مفتوحة — {{branch}}",
+        "openedBy": "فتحها {{name}} — {{date}}",
+        "openingFloat": "الرصيد الافتتاحي",
+        "cashCollected": "نقدًا محصّل",
+        "expectedNow": "المتوقع بالدرج الآن",
+        "closingCountLabel": "المبلغ المعدود فعليًا في الدرج",
+        "notesLabel": "ملاحظات (اختياري)",
+        "notesPlaceholder": "سبب الفرق إن وجد",
+        "confirmClose": "تأكيد الإغلاق",
+        "cancel": "إلغاء",
+        "closeShift": "إغلاق الوردية"
+      },
+      "newShiftCard": {
+        "heading": "فتح وردية جديدة",
+        "branchLabel": "الفرع",
+        "branchPlaceholder": "اختر الفرع",
+        "openingFloatLabel": "الرصيد الافتتاحي",
+        "openShift": "فتح الوردية"
+      },
+      "historyCard": {
+        "heading": "سجل الورديات",
+        "table": {
+          "branch": "الفرع",
+          "openedBy": "فتحها",
+          "openedAt": "وقت الفتح",
+          "closedAt": "وقت الإغلاق",
+          "openingFloat": "الرصيد الافتتاحي",
+          "expected": "المتوقع",
+          "counted": "المعدود فعليًا",
+          "variance": "الفرق",
+          "status": "الحالة"
+        },
+        "emptyTitle": "لا توجد ورديات بعد"
+      }
+    }
+  },
+  "customers": {
+    "page": {
+      "title": "العملاء",
+      "description": "البحث عن العملاء وإضافتهم"
+    },
+    "addCustomer": "إضافة عميل",
+    "editCustomer": "تعديل بيانات العميل",
+    "fullName": "الاسم الكامل",
+    "emailOptional": "البريد الإلكتروني (اختياري)",
+    "saveChanges": "حفظ التعديلات",
+    "searchPlaceholder": "بحث بالاسم أو رقم الهاتف",
+    "emptyTitle": "لا يوجد عملاء",
+    "emptyDescription": "أضف أول عميل لبدء إدارة قاعدة عملاء النادي",
+    "outstanding": "المستحق",
+    "saveEditError": "تعذّر حفظ التعديلات، حاول مرة أخرى.",
+    "addError": "تعذّرت الإضافة، حاول مرة أخرى.",
+    "relationshipLabels": {
+      "father": "الأب",
+      "mother": "الأم",
+      "guardian": "ولي أمر",
+      "other": "أخرى"
+    },
+    "detail": {
+      "totalOutstanding": "إجمالي المستحق:",
+      "whatsappFailed": "فشل إرسال {{count}} رسالة واتساب لهذا العميل",
+      "whatsappSent": "أُرسلت {{count}} رسالة واتساب لهذا العميل ✓",
+      "viewActivity": "عرض النشاط",
+      "linkedPlayers": "اللاعبون المرتبطون",
+      "upcoming": "القادمة",
+      "past": "السابقة",
+      "cancelledOrNoShow": "ملغاة / لم يحضر",
+      "bookings": "الحجوزات",
+      "viewAllBookings": "عرض كل الحجوزات",
+      "noBookingsYet": "لا يوجد حجوزات بعد.",
+      "invoices": "الفواتير",
+      "noInvoicesYet": "لا توجد فواتير بعد.",
+      "remaining": "متبقي {{amount}}"
+    }
+  },
+  "dashboard": {
+    "checklist": {
+      "title": "خطوات البداية",
+      "hide": "إخفاء",
+      "addStaff": "أضف موظفًا",
+      "addFirstCustomer": "أضف أول عميل",
+      "addField": "أضف ملعبًا",
+      "createFirstBooking": "أنشئ أول حجز"
+    },
+    "more": {
+      "customersDesc": "البحث عن العملاء وإدارة بياناتهم",
+      "billingDesc": "سجل الفواتير والمدفوعات والمستحقات",
+      "outstandingDesc": "الفواتير غير المسددة بالكامل",
+      "cashShiftDesc": "فتح وإغلاق وردية الصندوق النقدي",
+      "reportsDesc": "تقارير الإيرادات والإشغال والأكاديمية",
+      "fieldsDesc": "فروع النادي، الملاعب، مواعيد العمل، والأسعار",
+      "whatsappDesc": "الاتصال، النشاط، وضوابط الإرسال",
+      "staffDesc": "إدارة الموظفين وأدوارهم",
+      "auditLogDesc": "سجل كل العمليات الحساسة في النادي",
+      "settingsDesc": "هوية النادي، الأكاديمية، المدفوعات، والاشتراك"
+    },
+    "today": {
+      "newBooking": "حجز جديد",
+      "collectPayment": "تحصيل دفعة",
+      "scanQr": "مسح QR",
+      "addCustomer": "إضافة عميل",
+      "bookingsToday": "حجوزات اليوم",
+      "checkedIn": "تم تسجيل الحضور",
+      "fieldsOccupiedNow": "الملاعب المشغولة الآن",
+      "revenueToday": "إيرادات اليوم",
+      "totalOutstanding": "إجمالي المستحقات",
+      "activeSubscriptions": "اشتراكات نشطة",
+      "unpaidSubscriptions": "اشتراكات غير مدفوعة",
+      "sessionsToday": "حصص اليوم",
+      "newCustomersToday": "عملاء جدد اليوم",
+      "now": "الآن (NOW)",
+      "next": "التالي (NEXT)"
+    },
+    "attentionNeeded": {
+      "title": "يحتاج انتباه",
+      "titleWithCount": "يحتاج انتباه ({{count}})",
+      "nothingNow": "لا يوجد ما يحتاج انتباهًا الآن.",
+      "unpaidBooking": "حجز مؤكد بدون دفع كامل — {{name}}",
+      "amountEgp": "{{amount}} ج.م",
+      "startingSoon": "موعد قريب لم يتم تسجيل الحضور — {{name}}",
+      "expiringSubscription": "اشتراك أكاديمية على وشك الانتهاء — {{name}}",
+      "chipLabels": {
+        "unpaid": "دفع",
+        "startingSoon": "عاجل",
+        "expiringSubscription": "تجديد"
+      }
+    },
+    "quickActionsPalette": {
+      "heading": "إجراءات سريعة",
+      "actions": {
+        "newBooking": "حجز جديد",
+        "newCustomer": "عميل جديد",
+        "collectPayment": "تحصيل دفعة",
+        "scanQr": "مسح QR",
+        "findInvoice": "البحث عن فاتورة"
+      }
+    },
+    "ownerFinanceTransparency": {
+      "title": "شفافية مالية — اليوم",
+      "noCollectionsToday": "لا توجد تحصيلات اليوم بعد.",
+      "collectionsByEmployee": "التحصيلات حسب الموظف",
+      "paymentCount": "{{count}} دفعة",
+      "hasExceptionsToday": "يوجد استثناءات مالية اليوم",
+      "discounts": "خصومات {{amount}}",
+      "refunds": "مستردات {{amount}}"
+    }
+  },
+  "reports": {
+    "nav": {
+      "overview": "نظرة عامة",
+      "sectionOperations": "التشغيل",
+      "bookings": "الحجوزات",
+      "occupancy": "إشغال الملاعب",
+      "sectionFinance": "المالية",
+      "revenue": "الإيرادات",
+      "collections": "التحصيلات",
+      "paymentMethods": "تسوية طرق الدفع",
+      "exceptions": "الاستثناءات المالية",
+      "sectionAcademyCustomers": "الأكاديمية والعملاء",
+      "academy": "الأكاديمية",
+      "customers": "العملاء"
+    },
+    "title": "التقارير",
+    "loading": "جارٍ التحميل...",
+    "noData": "لا توجد بيانات",
+    "exportCsv": "تصدير CSV",
+    "overview": {
+      "description": "نظرة عامة على أداء النادي -- كل رقم يؤدي إلى مصدره",
+      "cards": {
+        "totalRevenue": "إجمالي الإيرادات",
+        "currentOutstanding": "المستحقات الحالية",
+        "refunds": "المستردات",
+        "confirmedBookings": "حجوزات مؤكدة",
+        "cancelledBookings": "حجوزات ملغاة",
+        "bookedHours": "ساعات محجوزة",
+        "activeAcademyEnrollments": "تسجيلات نشطة بالأكاديمية",
+        "newCustomers": "عملاء جدد"
+      },
+      "revenueByDay": "الإيرادات حسب اليوم",
+      "csvHeader": {
+        "date": "التاريخ",
+        "revenue": "الإيرادات"
+      }
+    },
+    "academy": {
+      "description": "تقرير الأكاديمية -- التسجيلات والحضور والاشتراكات المنتهية قريبًا",
+      "activeEnrollments": "التسجيلات النشطة",
+      "attendanceRate": "نسبة الحضور",
+      "byGroup": "حسب المجموعة",
+      "noGroups": "لا توجد مجموعات",
+      "expiringSubscriptions": "اشتراكات تنتهي قريبًا",
+      "manageSubscriptions": "إدارة الاشتراكات",
+      "none": "لا توجد"
+    },
+    "bookings": {
+      "description": "تقرير الحجوزات -- الحالة، الفروع، ومعدل الإلغاء",
+      "cancellationRate": "نسبة الإلغاء",
+      "averageBookingValue": "متوسط قيمة الحجز",
+      "byStatus": "حسب الحالة",
+      "byBranch": "حسب الفرع",
+      "noBranches": "لا توجد فروع",
+      "viewBookings": "عرض الحجوزات",
+      "bookingsCountSuffix": "{{count}} حجز",
+      "csvHeader": {
+        "status": "الحالة",
+        "count": "العدد"
+      }
+    },
+    "collections": {
+      "description": "تقرير التحصيلات -- حسب الموظف والفرع",
+      "totalCollected": "إجمالي التحصيلات",
+      "byEmployee": "حسب الموظف",
+      "byBranch": "حسب الفرع",
+      "paymentCountSuffix": "{{count}} دفعة",
+      "csvHeader": {
+        "employee": "الموظف",
+        "amountCollected": "المبلغ المحصّل",
+        "paymentCount": "عدد الدفعات",
+        "branch": "الفرع"
+      }
+    },
+    "customers": {
+      "description": "تقرير العملاء -- عملاء جدد وأعلى العملاء إنفاقًا",
+      "newCustomers": "عملاء جدد",
+      "topSpenders": "أعلى العملاء إنفاقًا",
+      "bookingCountSuffix": "{{count}} حجز",
+      "csvHeader": {
+        "customer": "العميل",
+        "totalSpend": "إجمالي الإنفاق",
+        "bookingCount": "عدد الحجوزات"
+      }
+    },
+    "exceptions": {
+      "description": "الاستثناءات المالية -- خصومات، مستردات، وفواتير ملغاة",
+      "totalDiscounts": "إجمالي الخصومات",
+      "totalRefunds": "إجمالي المستردات",
+      "voidedInvoices": "فواتير ملغاة",
+      "discounts": "الخصومات",
+      "noDiscounts": "لا توجد خصومات في هذه الفترة",
+      "refunds": "المستردات",
+      "noRefunds": "لا توجد مستردات في هذه الفترة",
+      "appliedBy": "طبّقه {{name}}",
+      "refundedBy": "استرجعه {{name}}",
+      "noReasonRecorded": "بدون سبب مسجّل",
+      "csvHeader": {
+        "invoiceNumber": "رقم الفاتورة",
+        "customer": "العميل",
+        "discountAmount": "قيمة الخصم",
+        "totalPrice": "إجمالي الحجز",
+        "appliedBy": "طبّقه",
+        "date": "التاريخ",
+        "amount": "المبلغ",
+        "reason": "السبب",
+        "refundedBy": "استرجعه"
+      }
+    },
+    "occupancy": {
+      "description": "تقرير إشغال الملاعب",
+      "noFields": "لا توجد ملاعب",
+      "manageField": "إدارة الملعب",
+      "hoursAndBookingsSuffix": "{{hours}} ساعة — {{count}} حجز",
+      "csvHeader": {
+        "field": "الملعب",
+        "bookedHours": "ساعات محجوزة",
+        "bookingCount": "عدد الحجوزات"
+      }
+    },
+    "paymentMethods": {
+      "description": "تسوية طرق الدفع -- تحصيل، استرداد، وتأكيد يدوي لكل طريقة",
+      "totalCollected": "إجمالي التحصيلات",
+      "totalRefunded": "إجمالي المستردات",
+      "net": "الصافي",
+      "reconciliationByMethod": "التسوية حسب طريقة الدفع",
+      "reconcileError": "تعذّر تأكيد التسوية.",
+      "columns": {
+        "method": "طريقة الدفع",
+        "collected": "التحصيل",
+        "refunded": "المسترد",
+        "net": "الصافي",
+        "manualReconciliation": "التسوية اليدوية"
+      },
+      "collectedCountSuffix": "{{count}} دفعة",
+      "refundedCountSuffix": "{{amount}} — {{count}} استرداد",
+      "reconciled": "تمت التسوية ✓",
+      "confirmReconciliation": "تأكيد التسوية",
+      "reconciliationHistory": "سجل التسويات",
+      "csvHeader": {
+        "method": "طريقة الدفع",
+        "collected": "التحصيل",
+        "collectedCount": "عدد الدفعات",
+        "refunded": "المسترد",
+        "refundedCount": "عدد المستردات",
+        "net": "الصافي"
+      }
+    },
+    "revenue": {
+      "description": "تقرير الإيرادات -- حسب طريقة الدفع واليوم",
+      "allMethods": "كل طرق الدفع",
+      "byMethod": "حسب طريقة الدفع",
+      "byDay": "حسب اليوم",
+      "totalRevenue": "إجمالي الإيرادات",
+      "totalRefunds": "إجمالي المستردات",
+      "csvHeader": {
+        "date": "التاريخ",
+        "revenue": "الإيرادات"
+      }
+    }
+  },
   "verifyInvoice": {
     "title": "التحقق من فاتورة",
     "loading": "جارٍ التحقق...",
@@ -149,5 +1764,267 @@
       "partially_refunded": "مستردة جزئيًا",
       "refunded": "مستردة بالكامل"
     }
+  },
+  "settings": {
+    "title": "الإعدادات",
+    "description": "هوية النادي، سياسة الأكاديمية، المدفوعات، والاشتراك",
+    "clubSection": "النادي",
+    "academySection": "إعدادات الأكاديمية",
+    "activationPolicyTitle": "سياسة تفعيل الاشتراك",
+    "paymentsSection": "المدفوعات",
+    "notificationsSection": "الإشعارات",
+    "whatsappManagedNote": "اتصال واتساب، ضوابط الإرسال، وسجل الرسائل تُدار من صفحة واتساب المخصصة.",
+    "openWhatsappPage": "فتح صفحة واتساب",
+    "platformSubscriptionSection": "اشتراك المنصة",
+    "viewFullDetails": "عرض التفاصيل الكاملة"
+  },
+  "auditLog": {
+    "title": "سجل التدقيق",
+    "description": "سجل غير قابل للتعديل لكل الإجراءات الحساسة",
+    "columns": {
+      "time": "الوقت",
+      "action": "الإجراء",
+      "actor": "قام به",
+      "reason": "السبب"
+    },
+    "searchPlaceholder": "بحث بنوع الإجراء",
+    "emptyTitle": "لا يوجد سجلات",
+    "emptyDescription": "ستظهر الإجراءات الحساسة هنا فور حدوثها",
+    "unknownUser": "مستخدم غير معروف",
+    "reasonPrefix": "السبب:",
+    "technicalDetails": "تفاصيل تقنية",
+    "before": "قبل",
+    "after": "بعد",
+    "describe": {
+      "withAmount": "{{label}} بقيمة {{amount}}",
+      "exactMatch": "{{label}} — مطابقة تمامًا",
+      "variance": "{{label}} — فرق {{sign}}{{amount}}",
+      "withEntity": "{{label}} — {{entity}}"
+    }
+  },
+  "staff": {
+    "title": "الموظفون",
+    "description": "إدارة موظفي النادي وأدوارهم ونطاق الفروع",
+    "addStaff": "إضافة موظف",
+    "emailLabel": "البريد الإلكتروني (لحساب موجود بالفعل)",
+    "roleLabel": "الدور",
+    "adding": "جارٍ الإضافة...",
+    "inviteError": "تعذّرت الإضافة — تأكد من أن البريد الإلكتروني يخص حسابًا مسجّلاً بالفعل في ملعبي.",
+    "columns": {
+      "name": "الاسم",
+      "role": "الدور",
+      "branchScope": "نطاق الفروع",
+      "status": "الحالة"
+    },
+    "notLoggedInYet": "لم يسجّل الدخول بعد",
+    "allBranches": "كل الفروع",
+    "branchListSeparator": "، ",
+    "statusActive": "نشط",
+    "statusInactive": "غير نشط",
+    "deactivate": "إلغاء التفعيل",
+    "emptyTitle": "لا يوجد موظفون بعد",
+    "emptyDescription": "أضف أول موظف لبدء إدارة صلاحيات النادي",
+    "roles": {
+      "club_manager": "مدير النادي",
+      "branch_manager": "مدير الفرع",
+      "receptionist": "موظف استقبال",
+      "accountant": "محاسب",
+      "academy_manager": "مدير الأكاديمية",
+      "coach": "مدرب",
+      "scanner": "ماسح QR"
+    }
+  },
+  "scanner": {
+    "title": "مسح QR",
+    "back": "رجوع",
+    "cameraError": "تعذّر الوصول إلى الكاميرا. تأكد من منح الإذن.",
+    "retry": "إعادة المحاولة",
+    "subscriptionPrefix": "الاشتراك:",
+    "bookingAwaitingCheckin": "حجز — بانتظار تأكيد تسجيل الحضور",
+    "membershipChooseSession": "عضوية أكاديمية — اختر الجلسة لتسجيل الحضور",
+    "confirming": "جارٍ التأكيد...",
+    "confirmCheckin": "تأكيد تسجيل الحضور",
+    "noSessionsToday": "لا توجد جلسات اليوم لمجموعاتك.",
+    "chooseSessionPlaceholder": "اختر الجلسة...",
+    "recordingAttendance": "جارٍ التسجيل...",
+    "markAttendance": "تسجيل الحضور",
+    "scanAnother": "مسح رمز آخر",
+    "outcomes": {
+      "success": "صالح",
+      "already_used": "تم استخدامه بالفعل",
+      "expired": "منتهي الصلاحية",
+      "invalid": "غير صالح",
+      "wrong_club": "لا ينتمي لهذا النادي",
+      "permission_denied": "لا تملك صلاحية هذا الإجراء",
+      "subscription_inactive": "الاشتراك غير نشط"
+    },
+    "subscriptionStatus": {
+      "pending": "بانتظار التفعيل",
+      "active": "نشط",
+      "frozen": "مجمّد",
+      "expired": "منتهي",
+      "cancelled": "ملغي"
+    }
+  },
+  "search": {
+    "placeholder": "بحث...",
+    "noResults": "لا توجد نتائج",
+    "customers": "العملاء",
+    "players": "اللاعبون",
+    "invoices": "الفواتير"
+  },
+  "publicSite": {
+    "nav": {
+      "home": "الرئيسية",
+      "features": "المزايا",
+      "pricing": "الأسعار",
+      "contact": "تواصل معنا",
+      "login": "تسجيل الدخول",
+      "startFree": "ابدأ مجانًا",
+      "terms": "الشروط والأحكام",
+      "privacy": "سياسة الخصوصية",
+      "whatsapp": "واتساب"
+    },
+    "footer": {
+      "tagline": "منصة إدارة الأندية والأكاديميات والملاعب"
+    },
+    "contact": {
+      "title": "تواصل معنا",
+      "description": "سنرد عليك في أقرب وقت ممكن",
+      "submittedMessage": "تم إرسال طلبك بنجاح، سنتواصل معك قريبًا.",
+      "namePlaceholder": "الاسم",
+      "phonePlaceholder": "رقم الهاتف",
+      "emailPlaceholder": "البريد الإلكتروني (اختياري)",
+      "businessNamePlaceholder": "اسم النادي/الأكاديمية (اختياري)",
+      "messagePlaceholder": "رسالتك (اختياري)",
+      "submitError": "تعذّر إرسال الطلب، حاول مرة أخرى.",
+      "sending": "جارٍ الإرسال...",
+      "submit": "إرسال"
+    },
+    "pricing": {
+      "title": "الأسعار",
+      "description": "خطط اشتراك واضحة، بدون رسوم خفية",
+      "unavailable": "الخطط غير متاحة حاليًا.",
+      "startFreeTrial": "ابدأ تجربتك المجانية"
+    },
+    "home": {
+      "heroTitle": "إدارة ناديك وأكاديميتك وملاعبك من مكان واحد",
+      "heroSubtitle": "الحجوزات، الاشتراكات، اللاعبين، الفواتير، الحضور، QR والتقارير في نظام واحد سهل الاستخدام.",
+      "startFreeTrial": "ابدأ تجربتك المجانية",
+      "login": "تسجيل الدخول",
+      "trialBadge": "7 أيام مجانًا · بدون بطاقة بنكية",
+      "featuresTitle": "المزايا الأساسية",
+      "features": {
+        "bookings": "الحجوزات",
+        "academy": "الأكاديمية",
+        "invoicesAndPayments": "الفواتير والمدفوعات",
+        "qr": "QR",
+        "reports": "التقارير",
+        "staffManagement": "إدارة الموظفين"
+      },
+      "pricingTitle": "الأسعار"
+    },
+    "privacy": {
+      "title": "سياسة الخصوصية",
+      "lastUpdated": "آخر تحديث: 15 أغسطس 2026",
+      "section1": {
+        "title": "١. البيانات التي نجمعها",
+        "body": "عند إنشاء حساب: الاسم، البريد الإلكتروني، ورقم الهاتف. عند استخدام النظام: بيانات ناديك التشغيلية التي تُدخلها بنفسك (العملاء، اللاعبون، الحجوزات، الفواتير، الحضور) — لا نجمع أي بيانات إضافية عنك أو عن عملائك خارج ما تُدخله مباشرة في النظام."
+      },
+      "section2": {
+        "title": "٢. كيف نستخدم بياناتك",
+        "body": "نستخدم بياناتك فقط لتشغيل الخدمة: تسجيل الدخول، عرض بيانات ناديك، إصدار الفواتير، وإرسال رسائل تأكيد البريد الإلكتروني وإعادة تعيين كلمة المرور. لا نبيع بياناتك ولا نشاركها مع أي طرف ثالث لأغراض تسويقية."
+      },
+      "section3": {
+        "title": "٣. عزل البيانات بين الأندية",
+        "body": "كل نادٍ يرى بياناته الخاصة فقط. البنية التقنية للمنصة (سياسات أمان على مستوى قاعدة البيانات) تمنع أي نادٍ من الوصول إلى بيانات نادٍ آخر، بشكل مستقل عن واجهة الاستخدام."
+      },
+      "section4": {
+        "title": "٤. أين تُخزَّن بياناتك",
+        "body": "تُخزَّن البيانات لدى مزود خدمات سحابية (Supabase) باستخدام اتصال مشفّر. نحتفظ ببياناتك طالما كان حسابك نشطًا؛ عند إغلاق الحساب يمكنك طلب حذف بياناتك بالتواصل معنا."
+      },
+      "section5": {
+        "title": "٥. حقوقك",
+        "bodyPrefix": "يمكنك في أي وقت طلب الاطلاع على بياناتك، تصحيحها، أو حذفها بالتواصل معنا عبر صفحة",
+        "contactLink": "تواصل معنا"
+      }
+    },
+    "terms": {
+      "title": "الشروط والأحكام",
+      "lastUpdated": "آخر تحديث: 15 أغسطس 2026",
+      "section1": {
+        "title": "١. عن الخدمة",
+        "body": "ملعبي (Mala3by) منصة إدارة تشغيلية للأندية الرياضية والأكاديميات — الحجوزات، الفواتير والمدفوعات، اللاعبون والاشتراكات، الحضور عبر QR، والتقارير. باستخدامك الخدمة فإنك توافق على هذه الشروط."
+      },
+      "section2": {
+        "title": "٢. الحساب والاشتراك",
+        "body": "يبدأ كل نادٍ جديد بتجربة مجانية لمدة 7 أيام دون الحاجة لبطاقة بنكية، تُمنح مرة واحدة لكل مستخدم. بعد انتهاء التجربة، يتطلب الاستمرار في استخدام المنصة اشتراكًا مدفوعًا يُفعَّل بالتواصل مع فريق ملعبي. أنت مسؤول عن دقة بيانات ناديك وعن الحفاظ على سرية بيانات الدخول الخاصة بحسابك."
+      },
+      "section3": {
+        "title": "٣. البيانات التي تُدخلها",
+        "body": "بيانات العملاء واللاعبين والحجوزات والفواتير التي تُدخلها في نظامك تبقى ملكًا لك ولناديك. نحن نخزّنها لتشغيل الخدمة فقط ولا نستخدمها لأي غرض آخر خارج ما هو موضّح في سياسة الخصوصية."
+      },
+      "section4": {
+        "title": "٤. الدفع والفواتير",
+        "body": "رسوم الاشتراك في المنصة تُحصَّل حسب الخطة التي يختارها النادي، ولا تشمل مدفوعات النادي الخاصة بعملائه (تلك تُدار داخل نظامك الخاص ولا تمر عبر ملعبي). لا يتم خصم أي مبلغ تلقائيًا دون تأكيد صريح منك."
+      },
+      "section5": {
+        "title": "٥. إنهاء الخدمة",
+        "body": "يمكنك التوقف عن استخدام المنصة في أي وقت بالتواصل معنا. نحتفظ بحق تعليق الوصول عند إساءة استخدام واضحة للخدمة أو عدم سداد الاشتراك بعد فترة السماح المتفق عليها."
+      },
+      "section6": {
+        "title": "٦. التواصل",
+        "bodyPrefix": "لأي استفسار حول هذه الشروط، يمكنك التواصل معنا عبر صفحة",
+        "contactLink": "تواصل معنا"
+      }
+    }
+  },
+  "onboarding": {
+    "businessTypes": {
+      "club": "نادي",
+      "academy": "أكاديمية",
+      "fields": "ملاعب",
+      "sportsCenter": "مركز رياضي"
+    },
+    "defaultBranchName": "الفرع الرئيسي",
+    "createError": "تعذّر إنشاء النادي. حاول مرة أخرى.",
+    "loginRequired": "يجب تسجيل الدخول أولاً لإعداد ناديك.",
+    "success": {
+      "titleWithTrial": "تم إنشاء ناديك بنجاح!",
+      "trialActivated": "تم تفعيل التجربة المجانية لمدة 7 أيام.",
+      "titleNoTrial": "تم إنشاء النادي",
+      "noTrialMessage": "هذا ناديك الإضافي، لذلك لم يُفعَّل له اشتراك تجريبي تلقائي — الأندية الإضافية تحتاج موافقة فريق منصة ملعبي أولًا. سنتواصل معك بمجرد المراجعة، ويمكنك متابعة حالة الاشتراك من صفحة الإعدادات.",
+      "goToDashboard": "الذهاب إلى لوحة التحكم"
+    },
+    "wizard": {
+      "titleWithStep": "إعداد ناديك — الخطوة {{step}} من 3",
+      "step1": {
+        "businessTypeLabel": "نوع النشاط",
+        "next": "التالي"
+      },
+      "step2": {
+        "clubNameArLabel": "اسم النادي (بالعربية)",
+        "clubNameEnLabel": "اسم النادي (بالإنجليزية، اختياري)",
+        "back": "السابق",
+        "next": "التالي"
+      },
+      "step3": {
+        "branchNameLabel": "اسم الفرع الأول",
+        "cityLabel": "المدينة",
+        "phoneLabel": "رقم الهاتف",
+        "back": "السابق",
+        "submitting": "جارٍ الإنشاء...",
+        "submit": "إنشاء النادي وبدء التجربة المجانية"
+      }
+    }
+  },
+  "errorBoundary": {
+    "title": "حدث خطأ غير متوقع",
+    "description": "حاول إعادة تحميل الصفحة. إذا استمرت المشكلة، تواصل مع الدعم الفني.",
+    "reload": "إعادة تحميل الصفحة"
+  },
+  "errorState": {
+    "defaultMessage": "حدث خطأ، حاول مرة أخرى",
+    "retry": "إعادة المحاولة"
   }
 }

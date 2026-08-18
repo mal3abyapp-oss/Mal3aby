@@ -1,4 +1,5 @@
 import { Link } from 'react-router-dom'
+import { useTranslation } from 'react-i18next'
 import { useAuth } from '@/app/providers/AuthProvider'
 import { PageHeader } from '@/components/ui/page-header'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -40,23 +41,24 @@ import { PaymentGatewaysCard } from '@/features/billing/PaymentGatewaysCard'
 // identity, academy activation policy, payment method/gateway config,
 // and platform-subscription status.
 export function SettingsPage() {
+  const { t } = useTranslation()
   const { currentMembership } = useAuth()
   const isOwnerOrManager = currentMembership?.roleKey === 'club_owner' || currentMembership?.roleKey === 'club_manager'
 
   return (
     <div className="flex flex-col gap-6">
-      <PageHeader title="الإعدادات" description="هوية النادي، سياسة الأكاديمية، المدفوعات، والاشتراك" />
+      <PageHeader title={t('settings.title')} description={t('settings.description')} />
 
       <section className="flex flex-col gap-4">
-        <h2 className="text-sm font-semibold text-text-secondary">النادي</h2>
+        <h2 className="text-sm font-semibold text-text-secondary">{t('settings.clubSection')}</h2>
         <ClubSettingsCard />
       </section>
 
       {isOwnerOrManager && (
         <section className="flex flex-col gap-4">
-          <h2 className="text-sm font-semibold text-text-secondary">إعدادات الأكاديمية</h2>
+          <h2 className="text-sm font-semibold text-text-secondary">{t('settings.academySection')}</h2>
           <Card>
-            <CardHeader><CardTitle className="text-base">سياسة تفعيل الاشتراك</CardTitle></CardHeader>
+            <CardHeader><CardTitle className="text-base">{t('settings.activationPolicyTitle')}</CardTitle></CardHeader>
             <CardContent>
               <ActivationPolicySetting />
             </CardContent>
@@ -65,7 +67,7 @@ export function SettingsPage() {
       )}
 
       <section className="flex flex-col gap-4">
-        <h2 className="text-sm font-semibold text-text-secondary">المدفوعات</h2>
+        <h2 className="text-sm font-semibold text-text-secondary">{t('settings.paymentsSection')}</h2>
         <div className="grid gap-4 lg:grid-cols-2">
           <PaymentMethodsCard />
           <PaymentGatewaysCard />
@@ -73,12 +75,12 @@ export function SettingsPage() {
       </section>
 
       <section className="flex flex-col gap-4">
-        <h2 className="text-sm font-semibold text-text-secondary">الإشعارات</h2>
+        <h2 className="text-sm font-semibold text-text-secondary">{t('settings.notificationsSection')}</h2>
         <Card>
           <CardContent className="flex items-center justify-between pt-6">
-            <p className="text-sm text-text-secondary">اتصال واتساب، ضوابط الإرسال، وسجل الرسائل تُدار من صفحة واتساب المخصصة.</p>
+            <p className="text-sm text-text-secondary">{t('settings.whatsappManagedNote')}</p>
             <Button asChild size="sm" variant="outline">
-              <Link to="/app/whatsapp">فتح صفحة واتساب</Link>
+              <Link to="/app/whatsapp">{t('settings.openWhatsappPage')}</Link>
             </Button>
           </CardContent>
         </Card>
@@ -86,9 +88,9 @@ export function SettingsPage() {
 
       <section className="flex flex-col gap-4">
         <div className="flex items-center justify-between">
-          <h2 className="text-sm font-semibold text-text-secondary">اشتراك المنصة</h2>
+          <h2 className="text-sm font-semibold text-text-secondary">{t('settings.platformSubscriptionSection')}</h2>
           <Button asChild size="sm" variant="ghost">
-            <Link to="/app/subscription">عرض التفاصيل الكاملة</Link>
+            <Link to="/app/subscription">{t('settings.viewFullDetails')}</Link>
           </Button>
         </div>
         <div className="grid gap-4 md:grid-cols-2">

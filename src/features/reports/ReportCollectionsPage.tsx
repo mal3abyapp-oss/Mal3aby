@@ -1,8 +1,10 @@
+import { useTranslation } from 'react-i18next'
 import { PageHeader } from '@/components/ui/page-header'
 import { Button } from '@/components/ui/button'
 import { StatCard } from '@/components/ui/stat-card'
 import { formatMoney } from '@/lib/domain/billing'
 import { rowsToCsv, downloadCsv } from '@/lib/csv'
+import { useDirection } from '@/app/providers/DirectionProvider'
 import { HandCoins, Download } from 'lucide-react'
 import { useDateRange, useDateRangeReport } from './hooks/useDateRangeReport'
 import { DateRangeFilter } from './components/DateRangeFilter'
@@ -20,24 +22,26 @@ interface CollectionsReport {
 }
 
 export function ReportCollectionsPage() {
+  const { t } = useTranslation()
+  const { locale } = useDirection()
   const { startDate, setStartDate, endDate, setEndDate } = useDateRange()
   const { data, isLoading } = useDateRangeReport<CollectionsReport>('get_collections_report', startDate, endDate)
 
   return (
     <div>
-      <PageHeader title="التقارير" description="تقرير التحصيلات -- حسب الموظف والفرع" />
+      <PageHeader title={t('reports.title')} description={t('reports.collections.description')} />
       <ReportsNav />
       <DateRangeFilter startDate={startDate} endDate={endDate} onStart={setStartDate} onEnd={setEndDate} />
-      {isLoading && <p className="text-sm text-text-secondary">جارٍ التحميل...</p>}
+      {isLoading && <p className="text-sm text-text-secondary">{t('reports.loading')}</p>}
       {data && (
         <>
           <div className="mb-6">
-            <StatCard label="إجمالي التحصيلات" value={formatMoney(data.total_collected)} icon={HandCoins} />
+            <StatCard label={t('reports.collections.totalCollected')} value={formatMoney(data.total_collected, 'EGP', locale)} icon={HandCoins} />
           </div>
           <div className="grid gap-4 md:grid-cols-2">
             <div>
               <div className="mb-2 flex items-center justify-between">
-                <p className="font-medium">حسب الموظف</p>
+                <p className="font-medium">{t('reports.collections.byEmployee')}</p>
                 {data.by_employee.length > 0 && (
                   <Button
                     size="sm"
@@ -47,24 +51,24 @@ export function ReportCollectionsPage() {
                         `collections-by-employee-${startDate}-${endDate}.csv`,
                         rowsToCsv(
                           data.by_employee.map((e) => ({ full_name: e.full_name, amount: e.amount, payment_count: e.payment_count })),
-                          { full_name: 'الموظف', amount: 'المبلغ المحصّل', payment_count: 'عدد الدفعات' },
+                          { full_name: t('reports.collections.csvHeader.employee'), amount: t('reports.collections.csvHeader.amountCollected'), payment_count: t('reports.collections.csvHeader.paymentCount') },
                         ),
                       )
                     }
                   >
                     <Download className="me-1 size-4" />
-                    تصدير CSV
+                    {t('reports.exportCsv')}
                   </Button>
                 )}
               </div>
               {data.by_employee.length === 0 ? (
-                <p className="text-sm text-text-secondary">لا توجد بيانات</p>
+                <p className="text-sm text-text-secondary">{t('reports.noData')}</p>
               ) : (
                 <ul className="flex flex-col gap-1">
                   {data.by_employee.map((e) => (
                     <li key={e.user_id ?? 'unknown'} className="flex justify-between rounded-md border border-border p-2 text-sm">
                       <span>{e.full_name}</span>
-                      <span>{formatMoney(e.amount)} — {e.payment_count} دفعة</span>
+                      <span>{formatMoney(e.amount, 'EGP', locale)} — {t('reports.collections.paymentCountSuffix', { count: e.payment_count })}</span>
                     </li>
                   ))}
                 </ul>
@@ -72,7 +76,7 @@ export function ReportCollectionsPage() {
             </div>
             <div>
               <div className="mb-2 flex items-center justify-between">
-                <p className="font-medium">حسب الفرع</p>
+                <p className="font-medium">{t('reports.collections.byBranch')}</p>
                 {data.by_branch.length > 0 && (
                   <Button
                     size="sm"
@@ -82,24 +86,24 @@ export function ReportCollectionsPage() {
                         `collections-by-branch-${startDate}-${endDate}.csv`,
                         rowsToCsv(
                           data.by_branch.map((b) => ({ branch_name: b.branch_name, amount: b.amount, payment_count: b.payment_count })),
-                          { branch_name: 'الفرع', amount: 'المبلغ المحصّل', payment_count: 'عدد الدفعات' },
+                          { branch_name: t('reports.collections.csvHeader.branch'), amount: t('reports.collections.csvHeader.amountCollected'), payment_count: t('reports.collections.csvHeader.paymentCount') },
                         ),
                       )
                     }
                   >
                     <Download className="me-1 size-4" />
-                    تصدير CSV
+                    {t('reports.exportCsv')}
                   </Button>
                 )}
               </div>
               {data.by_branch.length === 0 ? (
-                <p className="text-sm text-text-secondary">لا توجد بيانات</p>
+                <p className="text-sm text-text-secondary">{t('reports.noData')}</p>
               ) : (
                 <ul className="flex flex-col gap-1">
                   {data.by_branch.map((b) => (
                     <li key={b.branch_id} className="flex justify-between rounded-md border border-border p-2 text-sm">
                       <span>{b.branch_name}</span>
-                      <span>{formatMoney(b.amount)} — {b.payment_count} دفعة</span>
+                      <span>{formatMoney(b.amount, 'EGP', locale)} — {t('reports.collections.paymentCountSuffix', { count: b.payment_count })}</span>
                     </li>
                   ))}
                 </ul>

@@ -1,5 +1,6 @@
 import { useQuery } from '@tanstack/react-query'
 import { Link } from 'react-router-dom'
+import { useTranslation } from 'react-i18next'
 import { supabase } from '@/lib/supabase/client'
 import { PageHeader } from '@/components/ui/page-header'
 import { EmptyState } from '@/components/ui/empty-state'
@@ -77,25 +78,27 @@ async function fetchAlerts(): Promise<AlertItem[]> {
   return alerts
 }
 
-const KIND_CONFIG = {
-  expiring_soon: { icon: Clock, label: 'اشتراك ينتهي قريبًا', tone: 'warning' as const },
-  overdue_grace: { icon: AlertTriangle, label: 'في فترة السماح', tone: 'danger' as const },
-  trial_ending: { icon: Sparkles, label: 'تجربة مجانية تنتهي قريبًا', tone: 'info' as const },
-  no_subscription: { icon: XCircle, label: 'لا يوجد اشتراك مسجّل — يحتاج مراجعة', tone: 'danger' as const },
+const KIND_ICON = {
+  expiring_soon: { icon: Clock, tone: 'warning' as const },
+  overdue_grace: { icon: AlertTriangle, tone: 'danger' as const },
+  trial_ending: { icon: Sparkles, tone: 'info' as const },
+  no_subscription: { icon: XCircle, tone: 'danger' as const },
 }
 
 export function PlatformAlertsPage() {
+  const { t } = useTranslation()
   const { data: alerts = [], isLoading } = useQuery({ queryKey: ['platform-alerts'], queryFn: fetchAlerts })
 
   return (
     <div>
-      <PageHeader title="التنبيهات" description="تنبيهات تلقائية مبنية على قواعد -- بدون خدمة إشعارات خارجية" />
+      <PageHeader title={t('platform.alertsPage.title')} description={t('platform.alertsPage.description')} />
       {isLoading ? null : alerts.length === 0 ? (
-        <EmptyState title="لا توجد تنبيهات حاليًا" />
+        <EmptyState title={t('platform.alertsPage.emptyTitle')} />
       ) : (
         <div className="flex flex-col gap-2">
           {alerts.map((a) => {
-            const config = KIND_CONFIG[a.kind]
+            const config = KIND_ICON[a.kind]
+            const label = t(`platform.alertsPage.kindLabels.${a.kind}`)
             return (
               <Card key={a.id}>
                 <CardContent className="flex items-center justify-between gap-3 p-4">
@@ -106,12 +109,12 @@ export function PlatformAlertsPage() {
                         {a.clubName}
                       </Link>
                       <p className="text-sm text-text-secondary">
-                        {config.label}
-                        {a.daysLeft !== null ? ` — ${a.daysLeft} يوم متبقٍ` : ''}
+                        {label}
+                        {a.daysLeft !== null ? t('platform.alertsPage.daysLeftSuffix', { days: a.daysLeft }) : ''}
                       </p>
                     </div>
                   </div>
-                  <StatusBadge tone={config.tone} label={config.label} />
+                  <StatusBadge tone={config.tone} label={label} />
                 </CardContent>
               </Card>
             )

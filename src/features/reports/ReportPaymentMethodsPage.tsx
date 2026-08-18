@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '@/lib/supabase/client'
 import { useAuth } from '@/app/providers/AuthProvider'
@@ -8,6 +9,7 @@ import { StatCard } from '@/components/ui/stat-card'
 import { formatMoney, PAYMENT_METHOD_LABELS } from '@/lib/domain/billing'
 import { rowsToCsv, downloadCsv } from '@/lib/csv'
 import { translateSupabaseError } from '@/lib/errors'
+import { useDirection } from '@/app/providers/DirectionProvider'
 import { Banknote, Download } from 'lucide-react'
 import { useDateRange, useDateRangeReport } from './hooks/useDateRangeReport'
 import { DateRangeFilter } from './components/DateRangeFilter'
@@ -66,7 +68,10 @@ async function fetchReconciliations(clubId: string, startDate: string, endDate: 
 }
 
 export function ReportPaymentMethodsPage() {
+  const { t } = useTranslation()
   const { currentClubId } = useAuth()
+  const { locale } = useDirection()
+  const dateLocale = locale === 'en' ? 'en-US' : 'ar-EG'
   const queryClient = useQueryClient()
   const { startDate, setStartDate, endDate, setEndDate } = useDateRange()
   const [reconcileError, setReconcileError] = useState<string | null>(null)
@@ -94,24 +99,24 @@ export function ReportPaymentMethodsPage() {
       setReconcileError(null)
       void queryClient.invalidateQueries({ queryKey: ['payment-reconciliations', currentClubId] })
     },
-    onError: (error) => setReconcileError(translateSupabaseError(error, 'تعذّر تأكيد التسوية.')),
+    onError: (error) => setReconcileError(translateSupabaseError(error, t('reports.paymentMethods.reconcileError'))),
   })
 
   return (
     <div>
-      <PageHeader title="التقارير" description="تسوية طرق الدفع -- تحصيل، استرداد، وتأكيد يدوي لكل طريقة" />
+      <PageHeader title={t('reports.title')} description={t('reports.paymentMethods.description')} />
       <ReportsNav />
       <DateRangeFilter startDate={startDate} endDate={endDate} onStart={setStartDate} onEnd={setEndDate} />
-      {isLoading && <p className="text-sm text-text-secondary">جارٍ التحميل...</p>}
+      {isLoading && <p className="text-sm text-text-secondary">{t('reports.loading')}</p>}
       {data && (
         <>
           <div className="mb-6 grid gap-4 sm:grid-cols-3">
-            <StatCard label="إجمالي التحصيلات" value={formatMoney(data.total_collected)} icon={Banknote} />
-            <StatCard label="إجمالي المستردات" value={formatMoney(data.total_refunded)} tone="danger" />
-            <StatCard label="الصافي" value={formatMoney(data.total_collected - data.total_refunded)} />
+            <StatCard label={t('reports.paymentMethods.totalCollected')} value={formatMoney(data.total_collected, 'EGP', locale)} icon={Banknote} />
+            <StatCard label={t('reports.paymentMethods.totalRefunded')} value={formatMoney(data.total_refunded, 'EGP', locale)} tone="danger" />
+            <StatCard label={t('reports.paymentMethods.net')} value={formatMoney(data.total_collected - data.total_refunded, 'EGP', locale)} />
           </div>
           <div className="mb-2 flex items-center justify-between">
-            <p className="font-medium">التسوية حسب طريقة الدفع</p>
+            <p className="font-medium">{t('reports.paymentMethods.reconciliationByMethod')}</p>
             {data.by_method.length > 0 && (
               <Button
                 size="sm"
@@ -129,49 +134,49 @@ export function ReportPaymentMethodsPage() {
                         net: m.net,
                       })),
                       {
-                        method: 'طريقة الدفع',
-                        collected: 'التحصيل',
-                        collected_count: 'عدد الدفعات',
-                        refunded: 'المسترد',
-                        refunded_count: 'عدد المستردات',
-                        net: 'الصافي',
+                        method: t('reports.paymentMethods.csvHeader.method'),
+                        collected: t('reports.paymentMethods.csvHeader.collected'),
+                        collected_count: t('reports.paymentMethods.csvHeader.collectedCount'),
+                        refunded: t('reports.paymentMethods.csvHeader.refunded'),
+                        refunded_count: t('reports.paymentMethods.csvHeader.refundedCount'),
+                        net: t('reports.paymentMethods.csvHeader.net'),
                       },
                     ),
                   )
                 }
               >
                 <Download className="me-1 size-4" />
-                تصدير CSV
+                {t('reports.exportCsv')}
               </Button>
             )}
           </div>
           {reconcileError && <p className="mb-2 text-sm text-status-danger">{reconcileError}</p>}
           {data.by_method.length === 0 ? (
-            <p className="text-sm text-text-secondary">لا توجد بيانات</p>
+            <p className="text-sm text-text-secondary">{t('reports.noData')}</p>
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full text-start text-sm">
                 <thead>
                   <tr className="border-b border-border text-text-secondary">
-                    <th className="p-2 text-start">طريقة الدفع</th>
-                    <th className="p-2 text-start">التحصيل</th>
-                    <th className="p-2 text-start">المسترد</th>
-                    <th className="p-2 text-start">الصافي</th>
-                    <th className="p-2 text-start">التسوية اليدوية</th>
+                    <th className="p-2 text-start">{t('reports.paymentMethods.columns.method')}</th>
+                    <th className="p-2 text-start">{t('reports.paymentMethods.columns.collected')}</th>
+                    <th className="p-2 text-start">{t('reports.paymentMethods.columns.refunded')}</th>
+                    <th className="p-2 text-start">{t('reports.paymentMethods.columns.net')}</th>
+                    <th className="p-2 text-start">{t('reports.paymentMethods.columns.manualReconciliation')}</th>
                   </tr>
                 </thead>
                 <tbody>
                   {data.by_method.map((m) => (
                     <tr key={m.method} className="border-b border-border">
                       <td className="p-2 font-medium">{PAYMENT_METHOD_LABELS[m.method] ?? m.method}</td>
-                      <td className="p-2">{formatMoney(m.collected)} — {m.collected_count} دفعة</td>
+                      <td className="p-2">{formatMoney(m.collected, 'EGP', locale)} — {t('reports.paymentMethods.collectedCountSuffix', { count: m.collected_count })}</td>
                       <td className="p-2 text-status-danger">
-                        {m.refunded > 0 ? `${formatMoney(m.refunded)} — ${m.refunded_count} استرداد` : '—'}
+                        {m.refunded > 0 ? t('reports.paymentMethods.refundedCountSuffix', { amount: formatMoney(m.refunded, 'EGP', locale), count: m.refunded_count }) : '—'}
                       </td>
-                      <td className="p-2 font-medium">{formatMoney(m.net)}</td>
+                      <td className="p-2 font-medium">{formatMoney(m.net, 'EGP', locale)}</td>
                       <td className="p-2">
                         {reconciledMethods.has(m.method) ? (
-                          <span className="text-status-success">تمت التسوية ✓</span>
+                          <span className="text-status-success">{t('reports.paymentMethods.reconciled')}</span>
                         ) : (
                           <Button
                             size="sm"
@@ -179,7 +184,7 @@ export function ReportPaymentMethodsPage() {
                             disabled={confirmMutation.isPending}
                             onClick={() => confirmMutation.mutate(m.method)}
                           >
-                            تأكيد التسوية
+                            {t('reports.paymentMethods.confirmReconciliation')}
                           </Button>
                         )}
                       </td>
@@ -191,16 +196,16 @@ export function ReportPaymentMethodsPage() {
           )}
           {reconciliations.length > 0 && (
             <div className="mt-6">
-              <p className="mb-2 font-medium">سجل التسويات</p>
+              <p className="mb-2 font-medium">{t('reports.paymentMethods.reconciliationHistory')}</p>
               <ul className="flex flex-col gap-1">
                 {reconciliations.map((r) => (
                   <li key={r.id} className="flex items-center justify-between rounded-md border border-border p-2 text-sm">
                     <span>
-                      {PAYMENT_METHOD_LABELS[r.method] ?? r.method} — {formatMoney(r.reconciled_total)}
+                      {PAYMENT_METHOD_LABELS[r.method] ?? r.method} — {formatMoney(r.reconciled_total, 'EGP', locale)}
                       {r.note && <span className="text-text-secondary"> — {r.note}</span>}
                     </span>
                     <span className="text-xs text-text-secondary">
-                      {new Date(r.reconciled_at).toLocaleString('ar-EG')}
+                      {new Date(r.reconciled_at).toLocaleString(dateLocale)}
                     </span>
                   </li>
                 ))}

@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { useTranslation } from 'react-i18next'
 import { supabase } from '@/lib/supabase/client'
 import { PageHeader } from '@/components/ui/page-header'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -40,6 +41,7 @@ async function updateSettings(values: PlatformSettingsRow) {
 }
 
 export function PlatformSettingsPage() {
+  const { t } = useTranslation()
   const queryClient = useQueryClient()
   const { data, isLoading } = useQuery({ queryKey: ['platform-settings'], queryFn: fetchSettings })
   const [trialDays, setTrialDays] = useState<string>('')
@@ -64,19 +66,19 @@ export function PlatformSettingsPage() {
 
   return (
     <div>
-      <PageHeader title="الإعدادات" description="القيم الافتراضية على مستوى المنصة بالكامل" />
+      <PageHeader title={t('platform.settingsPage.title')} description={t('platform.settingsPage.description')} />
 
       <Card className="max-w-lg">
         <CardHeader>
-          <CardTitle className="text-base">التجربة المجانية وفترة السماح</CardTitle>
+          <CardTitle className="text-base">{t('platform.settingsPage.cardTitle')}</CardTitle>
         </CardHeader>
         <CardContent className="flex flex-col gap-4">
           {isLoading ? (
-            <p className="text-sm text-text-secondary">جارٍ التحميل...</p>
+            <p className="text-sm text-text-secondary">{t('platform.settingsPage.loading')}</p>
           ) : (
             <>
               <div className="flex flex-col gap-1.5">
-                <label htmlFor="trial-days" className="text-sm font-medium text-text-secondary">مدة التجربة المجانية الافتراضية (أيام)</label>
+                <label htmlFor="trial-days" className="text-sm font-medium text-text-secondary">{t('platform.settingsPage.trialDaysLabel')}</label>
                 <Input
                   id="trial-days"
                   type="number"
@@ -85,12 +87,12 @@ export function PlatformSettingsPage() {
                   onChange={(e) => setTrialDays(e.target.value)}
                 />
                 <p className="text-xs text-text-secondary">
-                  تُستخدم عند بدء أي نادٍ جديد لتجربة مجانية تلقائية أو يدوية، ما لم تُحدَّد مدة مختلفة صراحةً.
+                  {t('platform.settingsPage.trialDaysHint')}
                 </p>
               </div>
 
               <div className="flex flex-col gap-1.5">
-                <label htmlFor="grace-days" className="text-sm font-medium text-text-secondary">فترة السماح الافتراضية (أيام)</label>
+                <label htmlFor="grace-days" className="text-sm font-medium text-text-secondary">{t('platform.settingsPage.graceDaysLabel')}</label>
                 <Input
                   id="grace-days"
                   type="number"
@@ -99,7 +101,7 @@ export function PlatformSettingsPage() {
                   onChange={(e) => setGraceDays(e.target.value)}
                 />
                 <p className="text-xs text-text-secondary">
-                  المدة الافتراضية عند بدء اشتراك جديد. يمكن تمديدها لاشتراك محدد لاحقًا من صفحة تفاصيل النادي.
+                  {t('platform.settingsPage.graceDaysHint')}
                 </p>
               </div>
 
@@ -109,10 +111,10 @@ export function PlatformSettingsPage() {
                   disabled={mutation.isPending || (!trialDays && !graceDays)}
                   onClick={() => mutation.mutate()}
                 >
-                  {mutation.isPending ? 'جارٍ الحفظ...' : 'حفظ'}
+                  {mutation.isPending ? t('platform.settingsPage.saving') : t('platform.settingsPage.save')}
                 </Button>
-                {saved && <span className="text-sm text-status-success">تم الحفظ</span>}
-                {mutation.isError && <span className="text-sm text-status-danger">تعذّر الحفظ، حاول مرة أخرى</span>}
+                {saved && <span className="text-sm text-status-success">{t('platform.settingsPage.saved')}</span>}
+                {mutation.isError && <span className="text-sm text-status-danger">{t('platform.settingsPage.saveError')}</span>}
               </div>
             </>
           )}

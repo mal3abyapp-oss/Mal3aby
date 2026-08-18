@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { useQuery } from '@tanstack/react-query'
 import { supabase } from '@/lib/supabase/client'
 import { useAuth } from '@/app/providers/AuthProvider'
@@ -13,6 +14,7 @@ import {
 } from '@/components/ui/dialog'
 import { formatMoney } from '@/lib/domain/billing'
 import { actionLabel, entityLabel } from '@/lib/domain/audit'
+import { useDirection } from '@/app/providers/DirectionProvider'
 
 // Gate 13 #60: this screen used to show the raw machine action string
 // ("booking.discount.apply"), the raw table name as "الكيان" ("booking"),
@@ -29,30 +31,38 @@ import { actionLabel, entityLabel } from '@/lib/domain/audit'
 // MAL3ABY_INFORMATION_ARCHITECTURE_AUDIT.md) share the exact same
 // vocabulary instead of a second, independently-maintained map.
 
-function describeAuditLog(r: AuditLogRow): string {
-  const label = actionLabel(r.action)
-  const entity = entityLabel(r.entityType)
+function describeAuditLog(
+  r: AuditLogRow,
+  locale: 'ar' | 'en' = 'ar',
+  t: (key: string, opts?: Record<string, unknown>) => string,
+): string {
+  const label = actionLabel(r.action, locale)
+  const entity = entityLabel(r.entityType, locale)
 
   // A few actions carry enough in before/after to say something more
   // specific than just the action label -- worth the extra detail since
   // this is exactly the kind of line a suspicious owner reads closely.
   const after = (r.after ?? {}) as Record<string, unknown>
   if (r.action === 'booking.discount.apply' && typeof after.discount_amount === 'number') {
-    return `${label} بقيمة ${formatMoney(after.discount_amount)}`
+    return t('auditLog.describe.withAmount', { label, amount: formatMoney(after.discount_amount, 'EGP', locale) })
   }
   if ((r.action === 'create_refund' || r.action === 'payment.refund') && typeof after.amount === 'number') {
-    return `${label} بقيمة ${formatMoney(after.amount)}`
+    return t('auditLog.describe.withAmount', { label, amount: formatMoney(after.amount, 'EGP', locale) })
   }
   if (r.action === 'payment.record' && typeof after.amount === 'number') {
-    return `${label} بقيمة ${formatMoney(after.amount)}`
+    return t('auditLog.describe.withAmount', { label, amount: formatMoney(after.amount, 'EGP', locale) })
   }
   if (r.action === 'cash_shift.close' && typeof after.variance === 'number') {
     const variance = after.variance
-    if (variance === 0) return `${label} — مطابقة تمامًا`
-    return `${label} — فرق ${variance > 0 ? '+' : ''}${formatMoney(variance)}`
+    if (variance === 0) return t('auditLog.describe.exactMatch', { label })
+    return t('auditLog.describe.variance', {
+      label,
+      sign: variance > 0 ? '+' : '',
+      amount: formatMoney(variance, 'EGP', locale),
+    })
   }
 
-  return `${label} — ${entity}`
+  return t('auditLog.describe.withEntity', { label, entity })
 }
 
 // Audit Log Viewer -- RLS already restricts visibility to club_owner/
@@ -119,7 +129,9 @@ async function fetchAuditLogs(clubId: string, search: string) {
 // a "الأمان وسجل التدقيق" heading instead of duplicating the query/table/
 // detail-dialog logic. AuditLogPage stays as a thin standalone wrapper.
 export function AuditLogSection() {
+  const { t } = useTranslation()
   const { currentClubId } = useAuth()
+  const { locale } = useDirection()
   const [search, setSearch] = useState('')
   const [selected, setSelected] = useState<AuditLogRow | null>(null)
 
@@ -132,26 +144,26 @@ export function AuditLogSection() {
   const columns: DataTableColumn<AuditLogRow>[] = [
     {
       key: 'time',
-      header: 'الوقت',
-      render: (r) => <span className="tabular-nums">{new Date(r.createdAt).toLocaleString('ar-EG')}</span>,
+      header: t('auditLog.columns.time'),
+      render: (r) => <span className="tabular-nums">{new Date(r.createdAt).toLocaleString(locale === 'en' ? 'en-US' : 'ar-EG')}</span>,
     },
     {
       key: 'action',
-      header: 'الإجراء',
+      header: t('auditLog.columns.action'),
       render: (r) => (
         <button className="text-accent-foreground hover:underline" onClick={() => setSelected(r)}>
-          {describeAuditLog(r)}
+          {describeAuditLog(r, locale, t)}
         </button>
       ),
     },
-    { key: 'actor', header: 'قام به', render: (r) => r.actorName ?? '—' },
-    { key: 'reason', header: 'السبب', render: (r) => r.reason ?? '—' },
+    { key: 'actor', header: t('auditLog.columns.actor'), render: (r) => r.actorName ?? '—' },
+    { key: 'reason', header: t('auditLog.columns.reason'), render: (r) => r.reason ?? '—' },
   ]
 
   return (
     <div>
       <div className="mb-4">
-        <Input placeholder="بحث بنوع الإجراء" value={search} onChange={(e) => setSearch(e.target.value)} className="max-w-sm" />
+        <Input placeholder={t('auditLog.searchPlaceholder')} value={search} onChange={(e) => setSearch(e.target.value)} className="max-w-sm" />
       </div>
 
       <DataTable
@@ -159,32 +171,32 @@ export function AuditLogSection() {
         rows={logs}
         rowKey={(r) => r.id}
         isLoading={isLoading}
-        emptyTitle="لا يوجد سجلات"
-        emptyDescription="ستظهر الإجراءات الحساسة هنا فور حدوثها"
+        emptyTitle={t('auditLog.emptyTitle')}
+        emptyDescription={t('auditLog.emptyDescription')}
       />
 
       <Dialog open={!!selected} onOpenChange={(open) => !open && setSelected(null)}>
         <DialogContent className="max-w-2xl">
           <DialogHeader>
-            <DialogTitle>{selected ? describeAuditLog(selected) : ''}</DialogTitle>
+            <DialogTitle>{selected ? describeAuditLog(selected, locale, t) : ''}</DialogTitle>
           </DialogHeader>
           {selected && (
             <div className="flex flex-col gap-4 text-sm">
               <p className="text-text-secondary">
-                {selected.actorName ?? 'مستخدم غير معروف'} — {new Date(selected.createdAt).toLocaleString('ar-EG')}
+                {selected.actorName ?? t('auditLog.unknownUser')} — {new Date(selected.createdAt).toLocaleString(locale === 'en' ? 'en-US' : 'ar-EG')}
               </p>
-              {selected.reason && <p>السبب: {selected.reason}</p>}
+              {selected.reason && <p>{t('auditLog.reasonPrefix')} {selected.reason}</p>}
               <details>
-                <summary className="cursor-pointer text-sm text-text-secondary">تفاصيل تقنية</summary>
+                <summary className="cursor-pointer text-sm text-text-secondary">{t('auditLog.technicalDetails')}</summary>
                 <div className="mt-3 grid grid-cols-2 gap-4">
                   <div>
-                    <p className="mb-1 font-medium text-text-secondary">قبل</p>
+                    <p className="mb-1 font-medium text-text-secondary">{t('auditLog.before')}</p>
                     <pre className="overflow-x-auto rounded-md border border-border bg-muted/30 p-2 text-xs" dir="ltr">
                       {selected.before ? JSON.stringify(selected.before, null, 2) : '—'}
                     </pre>
                   </div>
                   <div>
-                    <p className="mb-1 font-medium text-text-secondary">بعد</p>
+                    <p className="mb-1 font-medium text-text-secondary">{t('auditLog.after')}</p>
                     <pre className="overflow-x-auto rounded-md border border-border bg-muted/30 p-2 text-xs" dir="ltr">
                       {selected.after ? JSON.stringify(selected.after, null, 2) : '—'}
                     </pre>
@@ -200,9 +212,10 @@ export function AuditLogSection() {
 }
 
 export function AuditLogPage() {
+  const { t } = useTranslation()
   return (
     <div>
-      <PageHeader title="سجل التدقيق" description="سجل غير قابل للتعديل لكل الإجراءات الحساسة" />
+      <PageHeader title={t('auditLog.title')} description={t('auditLog.description')} />
       <AuditLogSection />
     </div>
   )

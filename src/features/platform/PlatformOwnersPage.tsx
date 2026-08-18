@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
+import { useTranslation } from 'react-i18next'
 import { supabase } from '@/lib/supabase/client'
 import { PageHeader } from '@/components/ui/page-header'
 import { StatCard } from '@/components/ui/stat-card'
@@ -38,6 +39,7 @@ async function fetchOwners(): Promise<OwnerRow[]> {
 const MEMBERSHIP_STATUS_LABELS: Record<string, string> = { active: 'نشطة', suspended: 'موقوفة', removed: 'ملغاة' }
 
 export function PlatformOwnersPage() {
+  const { t } = useTranslation()
   const [search, setSearch] = useState('')
   const { data: owners = [], isLoading } = useQuery({ queryKey: ['platform-owners'], queryFn: fetchOwners })
 
@@ -78,7 +80,7 @@ export function PlatformOwnersPage() {
   const columns: DataTableColumn<OwnerRow>[] = [
     {
       key: 'owner',
-      header: 'المالك',
+      header: t('platform.ownersPage.columns.owner'),
       render: (o, index, rows) => {
         const isFirstOfOwner = index === 0 || rows[index - 1]?.user_id !== o.user_id
         if (!isFirstOfOwner) return null
@@ -89,7 +91,7 @@ export function PlatformOwnersPage() {
               {o.full_name ?? '—'}
               {clubCount > 1 && (
                 <span className="ms-2 rounded-full bg-info/10 px-2 py-0.5 text-xs font-normal text-info">
-                  {clubCount} أندية
+                  {t('platform.ownersPage.clubCountSuffix', { count: clubCount })}
                 </span>
               )}
             </span>
@@ -98,48 +100,55 @@ export function PlatformOwnersPage() {
         )
       },
     },
-    { key: 'phone', header: 'الهاتف', render: (o) => (o.phone ? <bdi>{o.phone}</bdi> : '—') },
+    { key: 'phone', header: t('platform.ownersPage.columns.phone'), render: (o) => (o.phone ? <bdi>{o.phone}</bdi> : '—') },
     {
       key: 'club',
-      header: 'النادي',
+      header: t('platform.ownersPage.columns.club'),
       render: (o) => (
         <Link to={`/platform/clubs/${o.club_id}`} className="font-medium text-accent-foreground hover:underline">
           {o.club_name}
         </Link>
       ),
     },
-    { key: 'code', header: 'الكود', render: (o) => <bdi>{o.club_code}</bdi> },
+    { key: 'code', header: t('platform.ownersPage.columns.code'), render: (o) => <bdi>{o.club_code}</bdi> },
     {
       key: 'club_status',
-      header: 'حالة النادي',
+      header: t('platform.ownersPage.columns.clubStatus'),
       render: (o) => (
-        <StatusBadge tone={o.club_status === 'active' ? 'success' : 'danger'} label={CLUB_STATUS_LABELS[o.club_status] ?? o.club_status} />
+        <StatusBadge
+          tone={o.club_status === 'active' ? 'success' : 'danger'}
+          label={t(`platform.ownersPage.clubStatusLabels.${o.club_status}`, {
+            defaultValue: CLUB_STATUS_LABELS[o.club_status] ?? o.club_status,
+          })}
+        />
       ),
     },
     {
       key: 'membership_status',
-      header: 'حالة العضوية',
+      header: t('platform.ownersPage.columns.membershipStatus'),
       render: (o) => (
         <StatusBadge
           tone={o.membership_status === 'active' ? 'success' : 'neutral'}
-          label={MEMBERSHIP_STATUS_LABELS[o.membership_status] ?? o.membership_status}
+          label={t(`platform.ownersPage.membershipStatusLabels.${o.membership_status}`, {
+            defaultValue: MEMBERSHIP_STATUS_LABELS[o.membership_status] ?? o.membership_status,
+          })}
         />
       ),
     },
-    { key: 'since', header: 'مالك منذ', render: (o) => new Date(o.owner_since).toLocaleDateString('ar-EG') },
+    { key: 'since', header: t('platform.ownersPage.columns.since'), render: (o) => new Date(o.owner_since).toLocaleDateString('ar-EG') },
   ]
 
   return (
     <div>
-      <PageHeader title="أصحاب الأندية" description="جميع أصحاب الأندية المسجّلين على المنصة، وربط كل مالك بناديه" />
+      <PageHeader title={t('platform.ownersPage.title')} description={t('platform.ownersPage.description')} />
       <div className="mb-4 grid grid-cols-2 gap-4 md:grid-cols-3">
-        <StatCard label="إجمالي أصحاب الأندية" value={String(uniqueOwners)} />
-        <StatCard label="إجمالي عضويات الملكية" value={String(owners.length)} />
-        <StatCard label="أصحاب يملكون أكثر من نادٍ" value={String(multiClubOwners)} />
+        <StatCard label={t('platform.ownersPage.cards.uniqueOwners')} value={String(uniqueOwners)} />
+        <StatCard label={t('platform.ownersPage.cards.totalMemberships')} value={String(owners.length)} />
+        <StatCard label={t('platform.ownersPage.cards.multiClubOwners')} value={String(multiClubOwners)} />
       </div>
       <div className="mb-4 max-w-sm">
         <Input
-          placeholder="ابحث بالاسم، البريد الإلكتروني، الهاتف، أو اسم النادي"
+          placeholder={t('platform.ownersPage.searchPlaceholder')}
           value={search}
           onChange={(e) => setSearch(e.target.value)}
         />
@@ -149,7 +158,7 @@ export function PlatformOwnersPage() {
         rows={sortedFiltered}
         rowKey={(o) => o.membership_id}
         isLoading={isLoading}
-        emptyTitle={search ? 'لا توجد نتائج مطابقة' : 'لا يوجد أصحاب أندية بعد'}
+        emptyTitle={search ? t('platform.ownersPage.emptyTitle') : t('platform.ownersPage.emptyTitleNoOwners')}
       />
     </div>
   )

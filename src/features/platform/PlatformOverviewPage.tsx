@@ -1,5 +1,6 @@
 import { useQuery } from '@tanstack/react-query'
 import { Link } from 'react-router-dom'
+import { useTranslation } from 'react-i18next'
 import { supabase } from '@/lib/supabase/client'
 import { PageHeader } from '@/components/ui/page-header'
 import { StatCard } from '@/components/ui/stat-card'
@@ -109,11 +110,12 @@ async function fetchOverview(): Promise<OverviewData> {
 }
 
 export function PlatformOverviewPage() {
+  const { t } = useTranslation()
   const { data, isLoading } = useQuery({ queryKey: ['platform-overview'], queryFn: fetchOverview })
 
   return (
     <div>
-      <PageHeader title="نظرة عامة" description="ملخص أداء المنصة" />
+      <PageHeader title={t('platform.overviewPage.title')} description={t('platform.overviewPage.description')} />
       {/* Master IA/UX audit (Platform Owner phase, Audit 5): all 7 cards
           here were dead-ends -- no way to reach the underlying club list
           from the summary number, unlike Reports Overview's cards (fixed
@@ -125,28 +127,28 @@ export function PlatformOverviewPage() {
           cards where no finer-grained screen exists yet. Real filtering
           is a legitimate follow-up, logged, not built here. */}
       <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
-        <StatCard label="إجمالي الأندية" value={isLoading ? '—' : String(data?.totalClubs ?? 0)} to="/platform/clubs" />
-        <StatCard label="أندية نشطة" value={isLoading ? '—' : String(data?.activeClubs ?? 0)} to="/platform/clubs" />
+        <StatCard label={t('platform.overviewPage.cards.totalClubs')} value={isLoading ? '—' : String(data?.totalClubs ?? 0)} to="/platform/clubs" />
+        <StatCard label={t('platform.overviewPage.cards.activeClubs')} value={isLoading ? '—' : String(data?.activeClubs ?? 0)} to="/platform/clubs" />
         {/* Renamed from "أندية موقوفة" -- that label was ambiguous with
             "حالة الاشتراك: موقوف" on PlatformClubsPage, a different
             concept (subscription/billing access, not admin status).
             See blockedAccessClubs card below for that other signal. */}
-        <StatCard label="أندية موقوفة إداريًا" value={isLoading ? '—' : String(data?.adminSuspendedClubs ?? 0)} to="/platform/clubs" />
+        <StatCard label={t('platform.overviewPage.cards.adminSuspendedClubs')} value={isLoading ? '—' : String(data?.adminSuspendedClubs ?? 0)} to="/platform/clubs" />
         <StatCard
-          label="أندية بوصول موقوف (اشتراك)"
+          label={t('platform.overviewPage.cards.blockedAccessClubs')}
           value={isLoading ? '—' : String(data?.blockedAccessClubs ?? 0)}
           to="/platform/alerts"
         />
-        <StatCard label="تجارب مجانية نشطة" value={isLoading ? '—' : String(data?.trialCount ?? 0)} to="/platform/clubs" />
+        <StatCard label={t('platform.overviewPage.cards.trialCount')} value={isLoading ? '—' : String(data?.trialCount ?? 0)} to="/platform/clubs" />
         {/* Label no longer says "(7 أيام)" -- the underlying threshold is
             now isSubscriptionExpiringSoon() (3d trial / 7d paid), not a
             flat 7 days; see labels.ts. */}
         <StatCard
-          label="اشتراكات تنتهي قريبًا"
+          label={t('platform.overviewPage.cards.expiringSoonCount')}
           value={isLoading ? '—' : String(data?.expiringSoonCount ?? 0)}
           to="/platform/alerts"
         />
-        <StatCard label="أندية جديدة هذا الشهر" value={isLoading ? '—' : String(data?.newClubsThisMonth ?? 0)} to="/platform/clubs" />
+        <StatCard label={t('platform.overviewPage.cards.newClubsThisMonth')} value={isLoading ? '—' : String(data?.newClubsThisMonth ?? 0)} to="/platform/clubs" />
       </div>
 
       {/* Gate 13 #56: pending action items were invisible platform-wide --
@@ -161,8 +163,8 @@ export function PlatformOverviewPage() {
               <Card className="border-warning/40 bg-warning/5 transition-colors hover:bg-warning/10">
                 <CardContent className="flex items-center justify-between p-4">
                   <div>
-                    <p className="font-medium text-text-primary">طلبات ترقية بانتظار المراجعة</p>
-                    <p className="text-sm text-text-secondary">افتح صفحة النادي المعني من قائمة الأندية لمراجعتها</p>
+                    <p className="font-medium text-text-primary">{t('platform.overviewPage.pendingUpgradeRequests.title')}</p>
+                    <p className="text-sm text-text-secondary">{t('platform.overviewPage.pendingUpgradeRequests.description')}</p>
                   </div>
                   <span className="text-2xl font-semibold text-warning">{data?.pendingUpgradeRequests}</span>
                 </CardContent>
@@ -174,8 +176,8 @@ export function PlatformOverviewPage() {
               <Card className="border-info/40 bg-info/5 transition-colors hover:bg-info/10">
                 <CardContent className="flex items-center justify-between p-4">
                   <div>
-                    <p className="font-medium text-text-primary">طلبات تواصل جديدة</p>
-                    <p className="text-sm text-text-secondary">انتقل إلى طلبات التواصل لمتابعتها</p>
+                    <p className="font-medium text-text-primary">{t('platform.overviewPage.newLeads.title')}</p>
+                    <p className="text-sm text-text-secondary">{t('platform.overviewPage.newLeads.description')}</p>
                   </div>
                   <span className="text-2xl font-semibold text-info">{data?.newLeads}</span>
                 </CardContent>
@@ -187,7 +189,7 @@ export function PlatformOverviewPage() {
 
       <Card className="mt-4">
         <CardHeader>
-          <CardTitle className="text-base">الإيرادات المحصّلة هذا الشهر</CardTitle>
+          <CardTitle className="text-base">{t('platform.overviewPage.revenueThisMonth')}</CardTitle>
         </CardHeader>
         <CardContent>
           {isLoading ? '—' : <MoneyDisplay amount={data?.revenueThisMonth ?? 0} size="lg" />}

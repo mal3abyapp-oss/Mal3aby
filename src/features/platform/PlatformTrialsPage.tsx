@@ -1,5 +1,6 @@
 import { useQuery } from '@tanstack/react-query'
 import { Link } from 'react-router-dom'
+import { useTranslation } from 'react-i18next'
 import { supabase } from '@/lib/supabase/client'
 import { PageHeader } from '@/components/ui/page-header'
 import { StatCard } from '@/components/ui/stat-card'
@@ -36,6 +37,7 @@ async function fetchTrials(): Promise<TrialRow[]> {
 }
 
 export function PlatformTrialsPage() {
+  const { t } = useTranslation()
   const { data: trials = [], isLoading } = useQuery({ queryKey: ['platform-trials'], queryFn: fetchTrials })
 
   const now = new Date()
@@ -46,40 +48,44 @@ export function PlatformTrialsPage() {
   const columns: DataTableColumn<TrialRow>[] = [
     {
       key: 'club',
-      header: 'النادي',
+      header: t('platform.trialsPage.columns.club'),
       // IA restructuring (Phase 3): club name was plain text here,
       // inconsistent with every sibling screen (Clubs/Owners/Alerts)
       // which link into PlatformClubDetailPage -- confirmed dead-end
       // in MAL3ABY_INFORMATION_ARCHITECTURE_AUDIT.md.
-      render: (t) => (
-        <Link to={`/platform/clubs/${t.club_id}`} className="text-accent-foreground hover:underline">
-          {t.club_name}
+      render: (row) => (
+        <Link to={`/platform/clubs/${row.club_id}`} className="text-accent-foreground hover:underline">
+          {row.club_name}
         </Link>
       ),
     },
-    { key: 'origin', header: 'المصدر', render: (t) => (t.trial_origin === 'automatic' ? 'تلقائي' : 'يدوي') },
-    { key: 'start', header: 'البداية', render: (t) => new Date(t.start_at).toLocaleDateString('ar-EG') },
-    { key: 'end', header: 'النهاية', render: (t) => new Date(t.end_at).toLocaleDateString('ar-EG') },
+    {
+      key: 'origin',
+      header: t('platform.trialsPage.columns.origin'),
+      render: (row) => (row.trial_origin === 'automatic' ? t('platform.trialsPage.originAutomatic') : t('platform.trialsPage.originManual')),
+    },
+    { key: 'start', header: t('platform.trialsPage.columns.start'), render: (row) => new Date(row.start_at).toLocaleDateString('ar-EG') },
+    { key: 'end', header: t('platform.trialsPage.columns.end'), render: (row) => new Date(row.end_at).toLocaleDateString('ar-EG') },
     {
       key: 'status',
-      header: 'الحالة',
-      render: (t) => {
-        if (t.lifecycle_status === 'cancelled') return <StatusBadge tone="neutral" label="ملغاة" />
-        if (new Date(t.end_at) > now) return <StatusBadge tone="success" label="نشطة" />
-        return <StatusBadge tone="danger" label="منتهية" />
+      header: t('platform.trialsPage.columns.status'),
+      render: (row) => {
+        if (row.lifecycle_status === 'cancelled') return <StatusBadge tone="neutral" label={t('platform.trialsPage.statusCancelled')} />
+        if (new Date(row.end_at) > now) return <StatusBadge tone="success" label={t('platform.trialsPage.statusActive')} />
+        return <StatusBadge tone="danger" label={t('platform.trialsPage.statusExpired')} />
       },
     },
   ]
 
   return (
     <div>
-      <PageHeader title="التجارب المجانية" description="جميع التجارب المجانية بدأت على المنصة" />
+      <PageHeader title={t('platform.trialsPage.title')} description={t('platform.trialsPage.description')} />
       <div className="mb-4 grid grid-cols-3 gap-4">
-        <StatCard label="نشطة" value={String(active.length)} />
-        <StatCard label="منتهية" value={String(expired.length)} />
-        <StatCard label="ملغاة" value={String(cancelled.length)} />
+        <StatCard label={t('platform.trialsPage.cards.active')} value={String(active.length)} />
+        <StatCard label={t('platform.trialsPage.cards.expired')} value={String(expired.length)} />
+        <StatCard label={t('platform.trialsPage.cards.cancelled')} value={String(cancelled.length)} />
       </div>
-      <DataTable columns={columns} rows={trials} rowKey={(t) => t.id} isLoading={isLoading} emptyTitle="لا توجد تجارب مجانية بعد" />
+      <DataTable columns={columns} rows={trials} rowKey={(row) => row.id} isLoading={isLoading} emptyTitle={t('platform.trialsPage.emptyTitle')} />
     </div>
   )
 }

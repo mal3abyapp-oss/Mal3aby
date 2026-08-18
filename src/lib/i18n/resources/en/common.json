@@ -26,9 +26,474 @@
     "nav": {
       "bookings": "My Bookings",
       "academy": "My Academy",
+      "payments": "My Payments",
       "qr": "My QR",
       "profile": "My Account"
+    },
+    "logout": "Log out",
+    "academyPage": {
+      "title": "My Academy",
+      "description": "Your children enrolled in the academy",
+      "loading": "Loading...",
+      "loadError": "Couldn't load the data.",
+      "emptyTitle": "No players are linked to your account yet.",
+      "notEnrolled": "Not currently enrolled"
+    },
+    "bookingsPage": {
+      "title": "My Bookings",
+      "description": "All your field bookings",
+      "loading": "Loading...",
+      "emptyTitle": "No bookings yet.",
+      "upcoming": "Upcoming",
+      "past": "Past",
+      "outstandingChip": "{{amount}} EGP outstanding",
+      "attendanceQrLink": "Entry code",
+      "invoicePaymentLink": "Invoice & payment"
+    },
+    "paymentsPage": {
+      "title": "My Payments",
+      "description": "Your invoices, payment status, and payment methods",
+      "loading": "Loading...",
+      "invoiceNotFound": "The requested invoice wasn't found. Browse your invoices below.",
+      "emptyTitle": "No invoices yet.",
+      "total": "Total {{amount}}",
+      "paid": "Paid {{amount}}",
+      "outstanding": "Outstanding {{amount}}",
+      "payNow": "Pay now",
+      "claimDialog": {
+        "titlePrefix": "Pay invoice",
+        "selectMethodError": "Choose a payment method first",
+        "invalidAmountError": "Enter a valid amount",
+        "referenceRequiredError": "This method requires a transfer reference number",
+        "genericError": "Couldn't submit the payment request",
+        "submittedMessage": "Your request was submitted successfully. The club team will review and confirm it soon.",
+        "submittedHint": "Your invoice won't show as \"paid\" until the club confirms the transfer.",
+        "close": "Close",
+        "outstandingAmount": "Outstanding amount: {{amount}}",
+        "methodLabel": "Payment method",
+        "noMethodsAvailable": "No payment methods available right now. Contact the club.",
+        "amountTransferredLabel": "Amount you transferred",
+        "referenceLabel": "Transfer reference number",
+        "optionalSuffix": "(optional)",
+        "proofNoteLabel": "Additional proof note (optional)",
+        "proofNotePlaceholder": "e.g. link to a screenshot of the transfer",
+        "submit": "Submit payment request"
+      }
+    },
+    "profilePage": {
+      "title": "My Account",
+      "description": "Your contact details",
+      "loading": "Loading...",
+      "emptyTitle": "No data linked to your account.",
+      "clubLabel": "Club",
+      "multiClubHint": "Your account is linked to more than one club -- choose a club to edit your data there.",
+      "nameLabel": "Name",
+      "nameEditHint": "To change your name, contact the club.",
+      "phoneLabel": "Phone number",
+      "whatsappLabel": "WhatsApp",
+      "emailLabel": "Email",
+      "saveError": "Couldn't save the changes.",
+      "saved": "Saved.",
+      "saving": "Saving...",
+      "saveChanges": "Save changes"
+    },
+    "qrPage": {
+      "title": "My QR",
+      "description": "QR code for check-in on arrival",
+      "loading": "Loading...",
+      "bookingNotFound": "The requested booking wasn't found — it may have already passed or been cancelled. Choose a booking from the list below.",
+      "emptyTitle": "No upcoming bookings.",
+      "choosePlaceholder": "Choose a booking to view its code",
+      "generateError": "Couldn't generate the QR code for this booking.",
+      "generating": "Generating the code...",
+      "qrAlt": "QR code",
+      "showAtClubHint": "Show this code when you arrive at the club"
+    },
+    "claimAccountPage": {
+      "title": "Link your account to your club data",
+      "description": "If you've already booked a field or enrolled in the academy, you can link your account to your data to see your bookings and subscriptions here.",
+      "clubLabel": "Club",
+      "clubPlaceholder": "Choose a club...",
+      "mobileLabel": "Phone number on file with the club",
+      "mobilePlaceholder": "01xxxxxxxxx",
+      "missingFieldsError": "Choose a club and enter the phone number registered with it.",
+      "searchGenericError": "Couldn't search, please try again.",
+      "noMatchError": "No matching record was found. Contact the club if you're sure you're a registered customer.",
+      "searching": "Searching...",
+      "search": "Search",
+      "isThisYou": "Is this you?",
+      "confirmClaim": "Yes, this is me",
+      "claiming": "...",
+      "claimGenericError": "Couldn't link the account, please try again."
     }
+  },
+  "platform": {
+    "nav": {
+      "overview": "Overview",
+      "sectionClubs": "Clubs",
+      "allClubs": "All Clubs",
+      "clubOwners": "Club Owners",
+      "sectionCommerce": "Commerce",
+      "plans": "Plans",
+      "leads": "Leads",
+      "sectionMonitoring": "Monitoring",
+      "reports": "Reports",
+      "alerts": "Alerts",
+      "trials": "Free Trials",
+      "auditLog": "Audit Log",
+      "settings": "Settings"
+    },
+    "openNavAria": "Open navigation menu",
+    "alertsPage": {
+      "title": "Alerts",
+      "description": "Automatic rule-based alerts -- no external notification service",
+      "emptyTitle": "No alerts right now",
+      "kindLabels": {
+        "expiring_soon": "Subscription ending soon",
+        "overdue_grace": "In grace period",
+        "trial_ending": "Free trial ending soon",
+        "no_subscription": "No subscription on record -- needs review"
+      },
+      "daysLeftSuffix": " — {{days}} day(s) left"
+    },
+    "auditPage": {
+      "title": "Audit Log",
+      "description": "An immutable record of every sensitive platform-level action",
+      "time": "Time",
+      "club": "Club",
+      "platformLevel": "Platform level",
+      "clubFallback": "Club",
+      "action": "Action",
+      "entity": "Entity",
+      "reason": "Reason",
+      "emptyTitle": "No audit log yet",
+      "loadingMore": "Loading...",
+      "loadMore": "Load more"
+    },
+    "clubDetailPage": {
+      "loadingTitle": "...",
+      "limitTypeLabels": {
+        "branch_limit": "Branches",
+        "field_limit": "Fields",
+        "academy_limit": "Academy programs"
+      },
+      "requestStatusLabels": {
+        "pending": "Under review",
+        "reviewed": "Reviewed",
+        "approved": "Approved",
+        "dismissed": "Dismissed"
+      },
+      "errors": {
+        "startTrial": "Couldn't start the free trial.",
+        "activate": "Couldn't activate — make sure a plan is selected.",
+        "renew": "Couldn't renew.",
+        "changePlan": "Couldn't change the plan.",
+        "extendGrace": "Couldn't extend the grace period.",
+        "suspend": "Couldn't suspend the club.",
+        "reactivate": "Couldn't reactivate the club.",
+        "cancel": "Couldn't cancel.",
+        "recordPayment": "Couldn't record the payment.",
+        "reversePayment": "Couldn't reverse the payment.",
+        "saveLimits": "Couldn't save the commercial limits.",
+        "updateRequestStatus": "Couldn't update the request status."
+      },
+      "invoiceColumns": {
+        "number": "Invoice #",
+        "amount": "Amount",
+        "due": "Due date",
+        "status": "Status"
+      },
+      "invoiceStatusLabels": {
+        "paid": "Paid",
+        "void": "Voided",
+        "pending": "Pending"
+      },
+      "recordPayment": "Record payment",
+      "reversePayment": "Reverse payment",
+      "clubStatusActive": "Active",
+      "clubStatusSuspended": "Suspended",
+      "subscriptionStatusCard": {
+        "title": "Subscription status",
+        "type": "Type: {{type}}",
+        "endsAtPrefix": "Ends:"
+      },
+      "actionsCard": {
+        "title": "Actions",
+        "startTrial": "Start free trial",
+        "choosePlanPlaceholder": "Choose a plan",
+        "activate": "Activate",
+        "renew": "Renew",
+        "newPlanPlaceholder": "New plan",
+        "changePlan": "Change plan",
+        "extendGrace": "Extend grace period (14 days)",
+        "cancelSubscription": "Cancel subscription",
+        "suspendClub": "Suspend club",
+        "reactivateClub": "Reactivate club"
+      },
+      "limitsCard": {
+        "title": "Commercial limits",
+        "editLimits": "Edit limits",
+        "emptyFieldHint": "Leave a field empty to make the limit unlimited.",
+        "branchLimitLabel": "Branch limit",
+        "fieldLimitLabel": "Field limit",
+        "academyLimitLabel": "Academy program limit",
+        "unlimitedPlaceholder": "Unlimited",
+        "saving": "Saving...",
+        "saveLimits": "Save limits",
+        "cancel": "Cancel",
+        "unlimited": "(unlimited)",
+        "pendingRequestsHeading": "Upgrade requests under review ({{count}})",
+        "requestSummary": "{{label}} — current limit {{limit}} / usage {{usage}}",
+        "requestUnlimited": "unlimited",
+        "approve": "Approve",
+        "reject": "Reject"
+      },
+      "tabs": {
+        "history": "Subscription history",
+        "invoices": "Invoices & payments",
+        "requests": "Upgrade requests",
+        "audit": "Audit log"
+      },
+      "historyColumns": {
+        "kind": "Type",
+        "plan": "Plan",
+        "start": "Start",
+        "end": "End",
+        "status": "Status"
+      },
+      "historyEmptyTitle": "No subscription history",
+      "invoicesEmptyTitle": "No invoices",
+      "requestsColumns": {
+        "type": "Type",
+        "limitAtRequest": "Limit at request time",
+        "usageAtRequest": "Usage at request time",
+        "note": "Note",
+        "createdAt": "Request date",
+        "status": "Status"
+      },
+      "requestsEmptyTitle": "No upgrade requests",
+      "auditColumns": {
+        "action": "Action",
+        "entity": "Entity",
+        "time": "Time",
+        "reason": "Reason"
+      },
+      "auditEmptyTitle": "No audit log",
+      "reasonDialog": {
+        "cancelTitle": "Reason for cancellation",
+        "suspendTitle": "Reason for suspending the club",
+        "reverseTitle": "Reason for reversing the payment",
+        "suspendWarning": "The club will be immediately suspended from operating on the platform. This is a sensitive action and is recorded in the audit log.",
+        "reasonPlaceholder": "Reason is required",
+        "confirmSuspend": "Confirm suspension",
+        "confirm": "Confirm"
+      }
+    },
+    "clubsPage": {
+      "title": "Clubs",
+      "description": "All clubs registered on the platform",
+      "columns": {
+        "club": "Club",
+        "code": "Code",
+        "adminStatus": "Administrative status",
+        "subscriptionStatus": "Subscription status"
+      },
+      "emptyTitle": "No clubs yet",
+      "loadingMore": "Loading...",
+      "loadMore": "Load more"
+    },
+    "leadsPage": {
+      "title": "Leads",
+      "description": "Prospective customers from the Mala3by public site",
+      "columns": {
+        "name": "Name",
+        "phone": "Phone",
+        "email": "Email",
+        "business": "Business",
+        "message": "Message",
+        "date": "Date",
+        "status": "Status"
+      },
+      "statusLabels": {
+        "new": "New",
+        "contacted": "Contacted",
+        "converted": "Converted",
+        "closed": "Closed"
+      },
+      "emptyTitle": "No leads yet"
+    },
+    "overviewPage": {
+      "title": "Overview",
+      "description": "Platform performance summary",
+      "cards": {
+        "totalClubs": "Total clubs",
+        "activeClubs": "Active clubs",
+        "adminSuspendedClubs": "Administratively suspended clubs",
+        "blockedAccessClubs": "Clubs with blocked access (subscription)",
+        "trialCount": "Active free trials",
+        "expiringSoonCount": "Subscriptions expiring soon",
+        "newClubsThisMonth": "New clubs this month"
+      },
+      "pendingUpgradeRequests": {
+        "title": "Upgrade requests awaiting review",
+        "description": "Open the relevant club's page from the club list to review them"
+      },
+      "newLeads": {
+        "title": "New contact requests",
+        "description": "Go to Leads to follow up"
+      },
+      "revenueThisMonth": "Revenue collected this month"
+    },
+    "ownersPage": {
+      "title": "Club Owners",
+      "description": "All club owners registered on the platform, and each owner's linked clubs",
+      "cards": {
+        "uniqueOwners": "Total club owners",
+        "totalMemberships": "Total ownership memberships",
+        "multiClubOwners": "Owners with more than one club"
+      },
+      "searchPlaceholder": "Search by name, email, phone, or club name",
+      "clubCountSuffix": "{{count}} clubs",
+      "columns": {
+        "owner": "Owner",
+        "phone": "Phone",
+        "club": "Club",
+        "code": "Code",
+        "clubStatus": "Club status",
+        "membershipStatus": "Membership status",
+        "since": "Owner since"
+      },
+      "membershipStatusLabels": {
+        "active": "Active",
+        "suspended": "Suspended",
+        "removed": "Removed"
+      },
+      "clubStatusLabels": {
+        "active": "Active",
+        "suspended": "Suspended",
+        "closed": "Closed"
+      },
+      "emptyTitle": "No matching results",
+      "emptyTitleNoOwners": "No club owners yet"
+    },
+    "plansPage": {
+      "title": "Plans",
+      "description": "Manage platform subscription plans",
+      "intervalLabels": {
+        "month": "month",
+        "year": "year"
+      },
+      "columns": {
+        "plan": "Plan",
+        "interval": "Duration",
+        "price": "Price",
+        "publish": "Publish"
+      },
+      "published": "Published",
+      "unpublished": "Unpublished",
+      "unpublish": "Unpublish",
+      "publish": "Publish",
+      "emptyTitle": "No plans",
+      "editDialog": {
+        "title": "Edit plan {{name}}",
+        "nameLabel": "Plan name",
+        "priceLabel": "Price ({{currency}})",
+        "priceChangeNote": "Changing the price doesn't affect any subscription already created at the previous price -- it only applies to new subscriptions.",
+        "saving": "Saving...",
+        "save": "Save"
+      }
+    },
+    "reportsPage": {
+      "title": "Reports",
+      "description": "The platform's five reports",
+      "tabs": {
+        "subscription": "Subscriptions",
+        "revenue": "Revenue",
+        "renewal": "Renewals",
+        "growth": "Growth",
+        "usage": "Usage"
+      },
+      "subscriptionColumns": {
+        "club": "Club",
+        "plan": "Plan",
+        "status": "Status",
+        "start": "Start",
+        "end": "End",
+        "price": "Price"
+      },
+      "revenueColumns": {
+        "month": "Month",
+        "method": "Payment method",
+        "amount": "Amount"
+      },
+      "renewalColumns": {
+        "club": "Club",
+        "end": "End date",
+        "status": "Status"
+      },
+      "growthColumns": {
+        "club": "Club",
+        "status": "Status",
+        "created": "Created on"
+      },
+      "usageColumns": {
+        "club": "Club",
+        "branches": "Branches",
+        "staff": "Staff"
+      },
+      "lifecycleStatusLabels": {
+        "trial": "Free trial",
+        "active": "Active",
+        "cancelled": "Cancelled"
+      },
+      "statusExpired": "Expired",
+      "daysLeftPlural": "{{count}} days left",
+      "daysLeftSingular": "{{count}} day left",
+      "emptyTitle": "No data"
+    },
+    "settingsPage": {
+      "title": "Settings",
+      "description": "Platform-wide default values",
+      "cardTitle": "Free trial and grace period",
+      "loading": "Loading...",
+      "trialDaysLabel": "Default free trial length (days)",
+      "trialDaysHint": "Used when any new club starts an automatic or manual free trial, unless a different length is set explicitly.",
+      "graceDaysLabel": "Default grace period (days)",
+      "graceDaysHint": "The default length when a new subscription starts. It can be extended for a specific subscription later from the club detail page.",
+      "saving": "Saving...",
+      "save": "Save",
+      "saved": "Saved",
+      "saveError": "Couldn't save, try again"
+    },
+    "trialsPage": {
+      "title": "Free Trials",
+      "description": "All free trials started on the platform",
+      "cards": {
+        "active": "Active",
+        "expired": "Expired",
+        "cancelled": "Cancelled"
+      },
+      "columns": {
+        "club": "Club",
+        "origin": "Source",
+        "start": "Start",
+        "end": "End",
+        "status": "Status"
+      },
+      "originAutomatic": "Automatic",
+      "originManual": "Manual",
+      "statusCancelled": "Cancelled",
+      "statusActive": "Active",
+      "statusExpired": "Expired",
+      "emptyTitle": "No free trials yet"
+    }
+  },
+  "appShell": {
+    "trialEnding": "Your free trial ends in {{days}} days",
+    "viewSubscription": "View subscription",
+    "trialExpired": "Free trial expired — contact us to activate your subscription",
+    "subscriptionExpired": "Subscription expired — contact us to activate your subscription",
+    "subscriptionGrace": "Your subscription is in grace period — new operations are temporarily paused"
   },
   "common": {
     "save": "Save",
@@ -59,6 +524,131 @@
     "total": "Total",
     "currency": "EGP"
   },
+  "bookings": {
+    "statusLabels": {
+      "pending_payment": "Awaiting payment",
+      "confirmed": "Confirmed",
+      "checked_in": "Checked in",
+      "completed": "Completed",
+      "cancelled": "Cancelled",
+      "no_show": "No-show"
+    },
+    "fieldBlockTypeLabels": {
+      "maintenance": "Maintenance",
+      "manual": "Manual closure",
+      "holiday": "Holiday"
+    },
+    "page": {
+      "title": "Bookings",
+      "description": "Daily calendar for fields",
+      "previousDay": "Previous day",
+      "nextDay": "Next day",
+      "allBranches": "All branches",
+      "closed": "Closed",
+      "loading": "Loading...",
+      "noFields": "No fields yet. Add a field from the club page first.",
+      "noFieldsSettings": "No fields yet. Add a field from Settings first.",
+      "openAllDay": "Open all day",
+      "closedToday": "Closed today",
+      "pricePerHourNow": "{{price}} EGP/hour now",
+      "priceVariesByTime": "Price varies by time"
+    },
+    "detail": {
+      "title": "Booking details",
+      "customer": "Customer",
+      "field": "Field",
+      "time": "Time",
+      "invoiceNumber": "Invoice #",
+      "total": "Total",
+      "paid": "Paid",
+      "refunded": "Refunded",
+      "outstanding": "Outstanding",
+      "paymentStatus": "Payment status",
+      "noInvoice": "No invoice linked to this booking.",
+      "amountPlaceholder": "Amount (outstanding {{amount}})",
+      "recording": "Recording...",
+      "confirmCollect": "Confirm collection",
+      "undo": "Undo",
+      "collectPayment": "Collect payment",
+      "notes": "Notes",
+      "whatsappFailed": "{{count}} WhatsApp message(s) failed to send",
+      "whatsappPending": "WhatsApp message sending",
+      "whatsappSent": "{{count}} WhatsApp message(s) sent ✓",
+      "viewActivity": "View activity",
+      "qrAlt": "Booking QR code",
+      "generatingQr": "Generating...",
+      "viewQr": "View QR code for check-in",
+      "confirmNoShowMessage": "Confirm this customer as a no-show for this booking?",
+      "recordingNoShow": "Recording...",
+      "confirmNoShow": "Confirm no-show",
+      "markNoShow": "Mark no-show",
+      "cancelReasonPlaceholder": "Reason for cancellation",
+      "confirmCancel": "Confirm cancellation",
+      "cancelBooking": "Cancel booking",
+      "qrError": "Couldn't generate the QR code.",
+      "cancelError": "Couldn't cancel the booking.",
+      "noShowError": "Couldn't record the no-show.",
+      "invalidAmountError": "Enter a valid amount",
+      "amountExceedsOutstanding": "The amount ({{amount}}) exceeds the outstanding balance ({{outstanding}})",
+      "collectError": "Couldn't record the payment."
+    },
+    "mobile": {
+      "now": "Now",
+      "next": "Next",
+      "availableNow": "Available now",
+      "noUpcomingBookings": "No upcoming bookings",
+      "priceNow": "Price now: ",
+      "pricePerHour": "{{price}} EGP/hour",
+      "noApprovedPrice": "No approved price",
+      "closed": "Closed",
+      "available": "Available"
+    },
+    "quick": {
+      "title": "New booking",
+      "field": "Field",
+      "time": "Time",
+      "duration": "Duration",
+      "durations": {
+        "0.5": "30 minutes",
+        "1": "1 hour",
+        "1.5": "1.5 hours",
+        "2": "2 hours",
+        "3": "3 hours"
+      },
+      "customer": "Customer",
+      "chooseExistingCustomer": "Choose existing customer",
+      "newCustomer": "+ New customer",
+      "namePlaceholder": "Name",
+      "mobilePlaceholder": "Mobile number",
+      "adding": "Adding...",
+      "addCustomer": "Add customer",
+      "searchPlaceholder": "Search by name or mobile...",
+      "chooseCustomerPlaceholder": "Choose a customer",
+      "calculatingPrice": "Calculating price...",
+      "pricePerHour": "Price per hour",
+      "duration_hours": "{{count}} hour(s)",
+      "pricePerBooking": "Price per booking",
+      "total": "Total",
+      "priceError": "Couldn't calculate the price for this slot.",
+      "recurringWeekly": "Recurring weekly",
+      "occurrenceCount": "Number of occurrences",
+      "recurringHint": "A booking will be created every week on the same day and time, starting from this date.",
+      "payment": "Payment",
+      "payNow": "Pay now",
+      "awaitingPayment": "Awaiting payment",
+      "cash": "Cash",
+      "card": "Card",
+      "bankTransfer": "Bank transfer",
+      "recurringSummary": "{{created}} of {{requested}} booking(s) created.",
+      "recurringConflicts": "{{count}} slot(s) conflicted with existing bookings and weren't created.",
+      "done": "Done",
+      "addCustomerError": "Couldn't add the customer.",
+      "createError": "Couldn't create the booking — the slot may already be booked or not permitted.",
+      "booking": "Booking...",
+      "confirmRecurring": "Confirm recurring bookings",
+      "confirmBooking": "Confirm booking"
+    }
+  },
   "auth": {
     "login": "Log in",
     "signup": "Create a new account",
@@ -67,7 +657,159 @@
     "fullName": "Full name",
     "loginError": "Incorrect login details, or the account isn't activated yet.",
     "signupSubmit": "Create account and start free trial",
-    "hasAccount": "Already have an account?"
+    "hasAccount": "Already have an account?",
+    "loggingIn": "Logging in...",
+    "forgotPassword": "Forgot your password?",
+    "createNewAccount": "Create a new account",
+    "emailLabel": "Email",
+    "passwordLabel": "Password",
+    "fullNameLabel": "Full name",
+    "signupError": "Couldn't create the account. Make sure your details are correct or the email isn't already in use.",
+    "creatingAccount": "Creating...",
+    "confirmationSentPrefix": "Your account has been created. Please confirm your email, then",
+    "confirmationSentSuffix": "to finish setting up your club.",
+    "forgotPasswordPage": {
+      "title": "Forgot your password?",
+      "sentMessage": "If this email is registered with us, you'll receive a message to reset your password.",
+      "emailPlaceholder": "Email",
+      "sending": "Sending...",
+      "sendResetLink": "Send reset link",
+      "backToLogin": "Back to login"
+    },
+    "resetPasswordPage": {
+      "title": "Set a new password",
+      "successMessage": "Your password was updated successfully.",
+      "newPasswordPlaceholder": "New password",
+      "updateError": "Couldn't update the password. Try requesting a new reset link.",
+      "saving": "Saving...",
+      "savePassword": "Save password"
+    }
+  },
+  "whatsapp": {
+    "statusLabels": {
+      "disconnected": "Disconnected",
+      "qr_required": "Waiting for QR scan",
+      "connecting": "Connecting...",
+      "connected": "Connected",
+      "reconnecting": "Reconnecting...",
+      "degraded": "Connection unstable",
+      "logged_out": "Logged out from phone",
+      "restricted": "Account restricted",
+      "failed": "Connection failed",
+      "error": "An error occurred"
+    },
+    "categoryLabels": {
+      "booking_confirmations": "Booking confirmations",
+      "booking_reminders": "Booking reminders",
+      "payment_confirmations": "Payment receipts",
+      "refund_notifications": "Refund notifications",
+      "academy_notifications": "Academy notifications",
+      "subscription_reminders": "Subscription reminders"
+    },
+    "messagingSafetyCard": {
+      "title": "Sending controls & safety",
+      "description": "Control what kinds of WhatsApp messages are sent and when, to reduce annoyance and repetition. There is no guaranteed \"safe\" number of messages per hour -- these settings exist to protect customers and service stability, not to work around WhatsApp's rules.",
+      "loading": "Loading...",
+      "updateCategoryError": "Couldn't update the setting",
+      "saveSettingsError": "Couldn't save the settings",
+      "enabledCategoriesHeading": "Enabled notification types",
+      "marketingHint": "Marketing messages aren't supported at this stage -- the WhatsApp connection isn't used for bulk messaging.",
+      "quietHoursHeading": "Quiet hours",
+      "enableQuietHours": "Enable quiet hours (defer non-urgent messages)",
+      "quietHoursFrom": "From",
+      "quietHoursTo": "To",
+      "bypassCriticalLabel": "Allow urgent notifications (e.g. booking cancellation by the club) to bypass quiet hours",
+      "rateLimitHeading": "Send rate control",
+      "rateLimitHint": "Limits that preserve service stability and prevent a burst of messages at once -- not a guarantee of a \"safe\" number from WhatsApp.",
+      "maxPerMinuteLabel": "Maximum per minute",
+      "maxPerHourLabel": "Maximum per hour",
+      "minMinutesBetweenSendsLabel": "Minimum time between two messages to the same customer (minutes)",
+      "circuitBreakerLabel": "Automatically pause sending temporarily when the failure rate rises",
+      "defaultLanguageLabel": "Default language when the customer's language isn't set",
+      "saveButton": "Save sending controls",
+      "diagnosticsHeading": "Queue diagnostics",
+      "diagnosticsEmpty": "No data yet -- no WhatsApp messages have been sent so far.",
+      "pending": "Pending",
+      "retrying": "Retrying",
+      "expired": "Expired",
+      "failedFinal": "Failed permanently",
+      "sent": "Sent",
+      "oldestPending": "Oldest pending message",
+      "circuitBreakerActivePrefix": "Sending is temporarily paused (circuit breaker active) until",
+      "lastSuccessfulSend": "Last successful send: {{date}}",
+      "lastErrorPrefix": "Last error:"
+    },
+    "connectionCard": {
+      "title": "WhatsApp",
+      "loading": "Loading...",
+      "startError": "Couldn't start the connection",
+      "retryError": "Couldn't retry",
+      "disconnectError": "Couldn't disconnect",
+      "connectedNumberPrefix": "Connected number:",
+      "connectedSincePrefix": "Connected since:",
+      "lastSeenPrefix": "Last seen:",
+      "autoSendHint": "Booking and payment confirmation messages will be sent automatically through this number according to your WhatsApp notification settings.",
+      "disconnect": "Disconnect",
+      "qrAlt": "QR code to link WhatsApp",
+      "qrInstructions": "Open WhatsApp on your phone → Settings → Linked Devices → Link a Device, then scan this code.",
+      "qrExpiryHint": "The code expires in a minute and will refresh automatically.",
+      "cancel": "Cancel",
+      "timeoutMessage": "Couldn't reach the WhatsApp service. Check that the connector service is running, then try again.",
+      "retry": "Retry",
+      "generatingQr": "Generating QR code...",
+      "restrictedHint": "The account is currently restricted by WhatsApp. Check the account status on your phone before reconnecting.",
+      "connectHint": "Link the club's WhatsApp number to automatically send booking, payment, and invoice confirmations to customers.",
+      "connect": "Connect WhatsApp",
+      "reconnecting": "Connection dropped temporarily, retrying...",
+      "degraded": "The connection is currently unstable. Sending will resume automatically once the connection improves."
+    },
+    "page": {
+      "title": "WhatsApp",
+      "description": "WhatsApp connection, sent messages, and safety controls",
+      "tabs": {
+        "overview": "Overview",
+        "activity": "Activity",
+        "connection": "Connection",
+        "settings": "Settings"
+      },
+      "overviewTab": {
+        "title": "WhatsApp status",
+        "loading": "Loading...",
+        "connectionLabel": "Connection:",
+        "pending": "Pending",
+        "failedFinal": "Failed permanently",
+        "footerHint": "For a per-message log, see the \"Activity\" tab; to manage the connection or sending controls, see \"Connection\"/\"Settings\"."
+      },
+      "activityTab": {
+        "templateLabels": {
+          "booking-created": "Booking created",
+          "booking-confirmed": "Booking confirmed",
+          "booking-confirmed-paid": "Booking confirmed with payment",
+          "booking-cancelled": "Booking cancelled",
+          "payment-received": "Payment received",
+          "payment-refunded": "Payment refunded",
+          "invoice-created": "Invoice issued"
+        },
+        "statusLabels": {
+          "all": "All statuses",
+          "pending": "Pending",
+          "retrying": "Retrying",
+          "sent": "Sent",
+          "failed": "Failed permanently",
+          "expired": "Expired",
+          "cancelled": "Cancelled"
+        },
+        "loading": "Loading...",
+        "emptyTitle": "No WhatsApp messages in this range yet.",
+        "columns": {
+          "message": "Message",
+          "recipient": "Recipient",
+          "status": "Status",
+          "timing": "Timing",
+          "lastAttempt": "Last attempt"
+        }
+      }
+    }
   },
   "language": {
     "label": "Language",
@@ -123,6 +865,879 @@
       "invalidMessage": "No matching booking was found for this code. Make sure you opened the correct link, or contact the club directly."
     }
   },
+  "academy": {
+    "loading": "Loading...",
+    "title": "Academy",
+    "description": "Manage players, programs and groups",
+    "tabs": {
+      "overview": "Overview",
+      "players": "Players",
+      "structure": "Programs & Groups",
+      "enrollments": "Enrollments & Subscriptions"
+    },
+    "overview": {
+      "addPlayer": "Add player",
+      "enrollInGroup": "Enroll player in group",
+      "markAttendance": "Mark attendance",
+      "sessionsToday": "Sessions today",
+      "sessionsUnmarked": "Unmarked attendance",
+      "activePlayers": "Active players",
+      "activeSubscriptions": "Active subscriptions",
+      "expiringSoon": "Expiring soon",
+      "outstandingInvoices": "Outstanding invoices",
+      "groupsNearCapacity": "Groups nearing capacity"
+    },
+    "relationshipLabels": {
+      "father": "Father",
+      "mother": "Mother",
+      "guardian": "Guardian",
+      "other": "Other"
+    },
+    "players": {
+      "searchByName": "Search by name",
+      "addPlayer": "Add player",
+      "fullName": "Full name",
+      "dateOfBirth": "Date of birth",
+      "gender": "Gender",
+      "genderUnspecified": "Unspecified",
+      "genderMale": "Male",
+      "genderFemale": "Female",
+      "status": "Status",
+      "statusActive": "Active",
+      "statusInactive": "Inactive",
+      "adding": "Adding...",
+      "add": "Add",
+      "addError": "Couldn't add the player, please try again.",
+      "emptyTitle": "No players",
+      "emptyDescription": "Add your first player to start managing the academy",
+      "saving": "Saving...",
+      "save": "Save",
+      "qrAlt": "Player QR card",
+      "generatingQr": "Generating...",
+      "viewQr": "View QR card",
+      "guardians": "Guardians",
+      "noGuardians": "No guardians linked yet.",
+      "primary": "(Primary)",
+      "linkNewGuardian": "Link new guardian",
+      "searchCustomerByName": "Search for a customer by name",
+      "chooseCustomer": "Choose a customer",
+      "link": "Link"
+    },
+    "enrollments": {
+      "manageSubtitle": "Enroll a player in a group and create their subscription",
+      "newEnrollment": "New enrollment",
+      "wizardTitle": "Enrollment wizard",
+      "player": "Player",
+      "guardianForBilling": "Guardian (for billing)",
+      "group": "Group",
+      "approvedSubscriptionPrice": "Approved subscription price",
+      "discount": "Discount",
+      "total": "Total",
+      "noApprovedPrice": "No approved price for this group — set the subscription price on the Programs & Groups page first.",
+      "enrolling": "Enrolling...",
+      "enrollAndCreateSubscription": "Enroll and create subscription",
+      "enrollError": "Couldn't complete the enrollment — check the group has room or your permissions.",
+      "emptyTitle": "No enrollments",
+      "emptyDescription": "Enroll your first player in a group to start subscriptions",
+      "status": "Status",
+      "statusActive": "Active",
+      "statusWithdrawn": "Withdrawn",
+      "subscriptionOf": "{{name}}'s subscription",
+      "plan": "Plan: {{plan}}",
+      "dateRange": "From {{start}} to {{end}}",
+      "effectiveEndDate": "Effective end date (after freeze): {{date}}",
+      "manualActivation": "Activate manually",
+      "freezeSubscription": "Freeze subscription",
+      "reason": "Reason",
+      "freeze": "Freeze",
+      "noSubscription": "No linked subscription.",
+      "activationPolicy": "Subscription activation policy",
+      "activationPolicyManagedFrom": "The subscription activation policy is managed from the",
+      "settingsPage": "Settings page"
+    },
+    "coachToday": {
+      "title": "Today's sessions",
+      "description": "Training sessions scheduled today",
+      "loading": "Loading...",
+      "noSessions": "No sessions scheduled today.",
+      "attendanceDialogTitle": "{{group}} — Mark attendance",
+      "scanQr": "Scan QR for attendance",
+      "noRoster": "No players enrolled in this group.",
+      "scanPlayerCard": "Scan player card",
+      "checkedIn": "Attendance recorded",
+      "scanFailed": "Scan failed",
+      "attendanceLabels": {
+        "present": "Present",
+        "absent": "Absent",
+        "excused": "Excused",
+        "late": "Late"
+      }
+    },
+    "playerStatus": {
+      "loading": "Loading...",
+      "notEnrolled": "This player isn't enrolled in any group at the moment.",
+      "dateRange": "From {{start}} to {{end}}",
+      "effectiveEndSuffix": " (effectively until {{date}} after freeze)",
+      "outstanding": "Outstanding",
+      "fullyPaid": "Fully paid",
+      "attendanceRate": "Attendance rate",
+      "noAttendanceRecord": "No attendance record yet"
+    },
+    "structure": {
+      "program": "Program",
+      "season": "Season",
+      "capacity": "Capacity",
+      "capacityRemaining": "({{count}} left)",
+      "nextSession": "Next session",
+      "status": "Status",
+      "newProgram": "New program",
+      "nameArabic": "Name (Arabic)",
+      "nameEnglish": "Name (English)",
+      "add": "Add",
+      "newSeason": "New season",
+      "programOptional": "Program (optional)",
+      "seasonName": "Season name",
+      "newAgeGroup": "New age group",
+      "ageGroupExample": "e.g. U10",
+      "newGroup": "New group",
+      "groupName": "Group name",
+      "branch": "Branch",
+      "ageGroupOptional": "Age group (optional)",
+      "coachOptional": "Coach (optional)",
+      "fieldOptional": "Field (optional)",
+      "capacityPlaceholder": "Capacity",
+      "monthlySubscriptionPrice": "Monthly subscription price (EGP) — used automatically when enrolling a player",
+      "subscriptionPricePlaceholder": "Subscription price",
+      "emptyTitle": "No groups",
+      "emptyDescription": "Create a program and season, then a group, to start managing the academy",
+      "ageGroup": "Age group",
+      "field": "Field",
+      "fieldUnspecified": "Unspecified",
+      "subscriptionPrice": "Subscription price",
+      "subscriptionPriceUnspecified": "Unspecified",
+      "pricePerMonth": "EGP {{price}}/month",
+      "schedule": "Schedule",
+      "listSeparator": ", ",
+      "capacityAndAssignments": "Capacity & assignments",
+      "monthlySubscriptionPriceLabel": "Monthly subscription price (EGP)",
+      "coach": "Coach",
+      "noCoach": "No coach",
+      "fieldLabel": "Field",
+      "noField": "No field assigned",
+      "statusActive": "Active",
+      "statusInactive": "Inactive",
+      "saving": "Saving...",
+      "save": "Save",
+      "weeklySchedule": "Weekly schedule",
+      "noSlotsYet": "No time slots yet.",
+      "slotRange": "{{day}} — {{start}} to {{end}}",
+      "addSlot": "Add time slot",
+      "generatingSessions": "Generating...",
+      "generateSessions": "Generate sessions for the next 4 weeks",
+      "sessionsGenerated": "{{count}} new sessions created.",
+      "dayOfWeekLabels": {
+        "0": "Sunday",
+        "1": "Monday",
+        "2": "Tuesday",
+        "3": "Wednesday",
+        "4": "Thursday",
+        "5": "Friday",
+        "6": "Saturday"
+      },
+      "groupStatusLabels": {
+        "active": "Active",
+        "full": "Full",
+        "closed": "Closed"
+      }
+    },
+    "subscriptionPlanLabels": {
+      "monthly": "Monthly",
+      "quarterly": "Quarterly",
+      "season": "Full season",
+      "package": "Package"
+    },
+    "subscriptionStatusLabels": {
+      "pending": "Awaiting activation",
+      "active": "Active",
+      "frozen": "Frozen",
+      "expired": "Expired",
+      "cancelled": "Cancelled"
+    },
+    "activationPolicyLabels": {
+      "manual": "Manual activation",
+      "first_payment": "On first payment",
+      "full_payment": "On full payment"
+    }
+  },
+  "clubs": {
+    "branchesFieldsPage": {
+      "title": "Branches & Fields",
+      "description": "Club branches, fields, operating hours, and pricing",
+      "branchesHeading": "Branches",
+      "fieldsHeading": "Fields"
+    },
+    "entitlements": {
+      "cardTitle": "Commercial plan limits",
+      "noLimits": "No commercial limits defined for this club.",
+      "unlimited": "(unlimited)",
+      "atLimit": "Limit reached",
+      "nearLimit": "Nearing limit",
+      "upgradePending": "Upgrade request under review",
+      "requestUpgrade": "Request increase",
+      "requestUpgradeTitle": "Request {{label}} limit increase",
+      "requestUpgradeDescription": "This request will reach the Mala3by platform team for review. The current limit and usage are attached automatically.",
+      "notePlaceholder": "Any extra details you'd like to add (optional)",
+      "cancel": "Cancel",
+      "sending": "Sending...",
+      "sendRequest": "Send request",
+      "sendError": "Couldn't send the upgrade request.",
+      "pendingRequestsNotice": "You have a pending upgrade request for: {{types}}.",
+      "limitLabels": {
+        "branch_limit": "Branches",
+        "field_limit": "Fields",
+        "academy_limit": "Academy programs"
+      }
+    },
+    "fieldsManagement": {
+      "noPrice": "No price",
+      "pricePerHour": "EGP {{price}}/hour",
+      "cardTitle": "Fields & pricing",
+      "addField": "Add field",
+      "addFieldTitle": "Add field",
+      "nameLabel": "Name",
+      "sportLabel": "Sport",
+      "branchLabel": "Branch",
+      "chooseBranch": "Choose a branch",
+      "adding": "Adding...",
+      "add": "Add",
+      "addFieldHint": "After adding, open the field to set up operating hours and pricing before it can actually be booked.",
+      "emptyTitle": "No fields",
+      "emptyDescription": "Add your first field to start managing bookings",
+      "columns": {
+        "field": "Field",
+        "sport": "Sport",
+        "hoursToday": "Today's hours",
+        "currentPrice": "Current price",
+        "todayBookings": "Today's bookings",
+        "currentStatus": "Current status"
+      },
+      "openAllDay": "Open all day",
+      "closedToday": "Closed today",
+      "temporarilyClosed": "Temporarily closed",
+      "inactive": "Inactive",
+      "available": "Available",
+      "manageDialogTitle": "Set up {{name}}",
+      "tabHours": "Operating hours",
+      "tabPricing": "Pricing"
+    },
+    "pricingEditor": {
+      "allWeekDays": "All week",
+      "currentPriceNow": "Current price now: ",
+      "calculating": "Calculating...",
+      "pricePerHour": "EGP {{price}}/hour",
+      "noApprovedPrice": "No approved price for the current time",
+      "noPricesWarning": "No prices set — no booking can be completed for this field until at least one price is added.",
+      "weeklyPricesHeading": "Weekly prices",
+      "price": "EGP {{price}}",
+      "delete": "Delete",
+      "specialPricesHeading": "Special prices (specific dates)",
+      "addWeeklyPriceLabel": "Add weekly price",
+      "pricePerHourPlaceholder": "Price per hour (EGP)",
+      "priorityLabel": "Priority (higher number wins on overlap)",
+      "hideAdvanced": "Hide advanced options",
+      "showAdvanced": "Advanced options",
+      "adding": "Adding...",
+      "addPrice": "Add price",
+      "startBeforeEndError": "Start time must be before end time",
+      "specialPriceLabel": "Special price for an occasion/holiday (specific date)",
+      "pricePlaceholder": "Price",
+      "addSpecialPrice": "Add special price",
+      "specialPriceHint": "A special price overrides any weekly price on the same date for the whole day.",
+      "addPriceError": "Couldn't add the price.",
+      "addSpecialPriceError": "Couldn't add the special price."
+    },
+    "branchesCard": {
+      "title": "Branches",
+      "addBranch": "Add branch",
+      "nameLabel": "Branch name",
+      "codeLabel": "Branch code",
+      "addressLabel": "Address",
+      "phoneLabel": "Phone number",
+      "saving": "Saving...",
+      "save": "Save",
+      "loading": "Loading...",
+      "noBranches": "No branches yet.",
+      "active": "Active",
+      "editTitle": "Edit {{name}}",
+      "saveError": "Couldn't save the branch data."
+    },
+    "clubSettingsCard": {
+      "title": "Club settings",
+      "statusLabels": {
+        "active": "Active",
+        "suspended": "Suspended",
+        "closed": "Closed"
+      },
+      "nameArLabel": "Club name (Arabic)",
+      "nameEnLabel": "Club name (English)",
+      "currencyLabel": "Currency",
+      "timezoneLabel": "Timezone",
+      "saving": "Saving...",
+      "save": "Save club data",
+      "statusHint": "Club status (active/suspended/closed) is managed by admins and can't be changed from here.",
+      "saveError": "Couldn't save the club data."
+    },
+    "operatingHoursEditor": {
+      "noHoursWarning": "No operating hours set yet — the field is available for booking around the clock with no restrictions. Set the weekly hours below to limit bookings to actual operating hours.",
+      "to": "to",
+      "openBeforeCloseError": "Opening time must be before closing time",
+      "closed": "Closed",
+      "copySaturdayToAll": "Copy Saturday to all days",
+      "applyToWeekdays": "Apply to weekdays (except Friday)",
+      "saving": "Saving...",
+      "save": "Save weekly hours",
+      "saveError": "Couldn't save the operating hours."
+    },
+    "platformSubscriptionCard": {
+      "title": "Platform subscription",
+      "accessLabels": {
+        "full": "Fully active",
+        "grace": "Grace period",
+        "blocked": "Blocked"
+      },
+      "kindLabels": {
+        "trial": "Free trial",
+        "paid": "Paid",
+        "complimentary": "Complimentary"
+      },
+      "pendingTitle": "Awaiting Mal3aby platform approval",
+      "pendingDescription": "No commercial subscription has been activated for this club yet. Additional clubs (after the first one) don't get an automatic free trial — this club needs approval from the Mal3aby platform team before it can be used. We'll reach out once it's reviewed.",
+      "statusLabel": "Status:",
+      "kindLabel": "Subscription type: ",
+      "planLabel": "Plan: ",
+      "endDateLabel": "End date: "
+    }
+  },
+  "billing": {
+    "sourceLabels": {
+      "booking": "Booking",
+      "subscription": "Academy subscription",
+      "other": "Other"
+    },
+    "invoiceStatusLabels": {
+      "draft": "Draft",
+      "issued": "Issued",
+      "void": "Voided"
+    },
+    "pendingClaims": {
+      "heading": "Payment claims awaiting review ({{count}})",
+      "reference": "Reference: {{reference}}",
+      "confirm": "Confirm",
+      "reject": "Reject"
+    },
+    "stats": {
+      "totalOutstanding": "Total outstanding",
+      "collectedToday": "Collected today",
+      "partiallyPaidInvoices": "Partially paid invoices",
+      "customersWithDues": "Customers with dues"
+    },
+    "page": {
+      "title": "Billing & Payments",
+      "description": "Invoice and payment history"
+    },
+    "table": {
+      "invoiceNumber": "Invoice #",
+      "customer": "Customer",
+      "source": "Source",
+      "date": "Date",
+      "total": "Total",
+      "paid": "Paid",
+      "outstanding": "Outstanding",
+      "status": "Status",
+      "emptyTitle": "No invoices"
+    },
+    "detail": {
+      "invoicePrefix": "Invoice #",
+      "verifyQrAlt": "Invoice verification code",
+      "verifyQrHint": "Scan this code to verify the invoice and payment status.",
+      "itemHeader": "Item",
+      "quantityHeader": "Qty",
+      "priceHeader": "Price",
+      "totalHeader": "Total",
+      "total": "Total",
+      "paid": "Paid",
+      "outstanding": "Outstanding",
+      "receiptSize80mm": "80mm receipt",
+      "print": "Print",
+      "paymentsHeading": "Payments",
+      "noPayments": "No payments yet.",
+      "collectedBy": "Collected by {{name}}",
+      "refund": "Refund"
+    },
+    "recordPayment": {
+      "heading": "Record payment",
+      "outstandingPrefix": "Outstanding:",
+      "splitHint": "A payment can be recorded with more than one payment method at once (e.g. part cash, part card).",
+      "amountPlaceholder": "Amount",
+      "deleteLine": "Delete line",
+      "addMethod": "+ Another method",
+      "totalPaymentsPrefix": "Total payments:",
+      "exceedsOutstanding": "— exceeds outstanding",
+      "submitting": "Recording...",
+      "submit": "Record payment",
+      "amountExceedsOutstanding": "Total payments ({{total}}) exceed the outstanding amount ({{outstanding}})",
+      "enterAtLeastOneAmount": "Enter at least one amount",
+      "genericError": "Couldn't record the payment."
+    },
+    "voidInvoice": {
+      "heading": "Void invoice",
+      "hint": "Only available for invoices with no payments recorded yet.",
+      "reasonPlaceholder": "Reason for voiding",
+      "submitting": "Voiding...",
+      "submit": "Void invoice",
+      "genericError": "Couldn't void the invoice."
+    },
+    "refund": {
+      "dialogTitle": "Refund payment",
+      "amountPlaceholder": "Refund amount",
+      "reasonPlaceholder": "Refund reason",
+      "submit": "Confirm refund",
+      "genericError": "Couldn't process the refund — it may exceed the refundable balance.",
+      "receiptTitle": "Refund receipt",
+      "receiptInvoicePrefix": "Invoice:",
+      "receiptCustomer": "Customer: {{name}}",
+      "receiptOriginalMethod": "Original payment method: {{method}}",
+      "receiptReason": "Reason: {{reason}}",
+      "receiptDate": "Date: {{date}}"
+    },
+    "reviewClaim": {
+      "genericError": "Couldn't review the payment claim."
+    },
+    "outstandingPage": {
+      "title": "Outstanding",
+      "description": "Invoices not fully settled",
+      "exportCsv": "Export CSV",
+      "filterAll": "All",
+      "filterDueToday": "Due today",
+      "filterOverdue": "Overdue",
+      "overdueDays": "Overdue {{days}} days",
+      "due": "Due",
+      "emptyTitle": "No outstanding invoices",
+      "emptyDescription": "All invoices are fully settled",
+      "table": {
+        "invoiceNumber": "Invoice #",
+        "customer": "Customer",
+        "total": "Total",
+        "outstanding": "Outstanding",
+        "due": "Due date",
+        "status": "Status"
+      },
+      "csvHeader": {
+        "invoiceNumber": "Invoice #",
+        "customer": "Customer",
+        "total": "Total",
+        "outstanding": "Outstanding",
+        "dueDate": "Due date",
+        "daysOverdue": "Days overdue"
+      }
+    },
+    "paymentMethods": {
+      "underlyingMethodLabels": {
+        "cash": "Cash",
+        "card": "Card / POS",
+        "bank_transfer": "Bank transfer",
+        "wallet": "E-wallet",
+        "other": "Other / manual"
+      },
+      "detailFields": {
+        "terminalReference": "Terminal reference (optional)",
+        "bankName": "Bank name",
+        "accountHolder": "Account holder name",
+        "accountNumber": "Account number",
+        "iban": "IBAN",
+        "swift": "SWIFT / BIC",
+        "phone": "Phone number",
+        "beneficiary": "Beneficiary name",
+        "phoneOptional": "Phone number (optional)",
+        "linkOptional": "Payment link (optional)"
+      },
+      "cardTitle": "Payment methods",
+      "addMethod": "Add payment method",
+      "dialogTitle": "Add payment method",
+      "methodTypeLabel": "Method type",
+      "nameArLabel": "Name (Arabic)",
+      "nameArPlaceholder": "e.g. Vodafone Cash",
+      "nameEnLabel": "Name (English)",
+      "instructionsLabel": "Instructions for customer (optional)",
+      "instructionsPlaceholder": "e.g. Mention the invoice number when transferring",
+      "customerVisibleCheckbox": "Show this method to customers at checkout",
+      "save": "Save",
+      "loading": "Loading...",
+      "empty": "No payment methods yet.",
+      "visibleToCustomers": "Visible to customers",
+      "hiddenFromCustomers": "Hidden from customers",
+      "active": "Active",
+      "suspended": "Suspended",
+      "hide": "Hide",
+      "show": "Show",
+      "deactivate": "Deactivate",
+      "activate": "Activate",
+      "nameRequiredError": "Enter the name in both Arabic and English",
+      "addError": "Couldn't add the payment method"
+    },
+    "subscriptionPage": {
+      "title": "Club subscription",
+      "description": "Your subscription status on the Mala3by platform",
+      "accessLabels": {
+        "full": "Active",
+        "grace": "Grace period",
+        "blocked": "Suspended"
+      },
+      "currentStatus": "Current status",
+      "loading": "Loading...",
+      "noActiveSubscription": "No active subscription.",
+      "type": "Type: {{type}}",
+      "typeTrial": "Free trial",
+      "plan": "Plan: {{name}}",
+      "endDate": "End date: {{date}}",
+      "availablePlans": "Available plans",
+      "contactToActivate": "To activate or renew your subscription, contact us and we'll activate it for you.",
+      "contactCta": "Contact us to activate"
+    },
+    "paymentGatewaysCard": {
+      "title": "Online payment gateways",
+      "description": "This infrastructure is ready to connect Stripe and PayPal later, and neither has an active real account right now. Enabling an option here doesn't make online payment available to customers until real credentials are configured server-side.",
+      "loading": "Loading...",
+      "connected": "Connected",
+      "notConnected": "Not connected",
+      "disable": "Disable",
+      "enable": "Enable",
+      "saveKey": "Save key",
+      "saveError": "Couldn't save the payment gateway settings"
+    },
+    "cashShift": {
+      "title": "Cash Shift",
+      "description": "Open and close the cash drawer shift for each branch, with automatic reconciliation against actual cash payments",
+      "statusLabels": {
+        "open": "Open",
+        "closed": "Closed"
+      },
+      "errors": {
+        "selectBranchFirst": "Select a branch first",
+        "invalidOpeningFloat": "Enter a valid opening float",
+        "noShiftSelected": "No shift selected",
+        "invalidClosingCount": "Enter the actually counted amount",
+        "genericError": "An unexpected error occurred"
+      },
+      "openShiftCard": {
+        "heading": "Open shift — {{branch}}",
+        "openedBy": "Opened by {{name}} — {{date}}",
+        "openingFloat": "Opening float",
+        "cashCollected": "Cash collected",
+        "expectedNow": "Expected in drawer now",
+        "closingCountLabel": "Amount actually counted in the drawer",
+        "notesLabel": "Notes (optional)",
+        "notesPlaceholder": "Reason for the difference, if any",
+        "confirmClose": "Confirm close",
+        "cancel": "Cancel",
+        "closeShift": "Close shift"
+      },
+      "newShiftCard": {
+        "heading": "Open new shift",
+        "branchLabel": "Branch",
+        "branchPlaceholder": "Select branch",
+        "openingFloatLabel": "Opening float",
+        "openShift": "Open shift"
+      },
+      "historyCard": {
+        "heading": "Shift history",
+        "table": {
+          "branch": "Branch",
+          "openedBy": "Opened by",
+          "openedAt": "Opened at",
+          "closedAt": "Closed at",
+          "openingFloat": "Opening float",
+          "expected": "Expected",
+          "counted": "Counted",
+          "variance": "Variance",
+          "status": "Status"
+        },
+        "emptyTitle": "No shifts yet"
+      }
+    }
+  },
+  "customers": {
+    "page": {
+      "title": "Customers",
+      "description": "Search for customers and add them"
+    },
+    "addCustomer": "Add customer",
+    "editCustomer": "Edit customer",
+    "fullName": "Full name",
+    "emailOptional": "Email (optional)",
+    "saveChanges": "Save changes",
+    "searchPlaceholder": "Search by name or phone number",
+    "emptyTitle": "No customers",
+    "emptyDescription": "Add your first customer to start managing the club's customer base",
+    "outstanding": "Outstanding",
+    "saveEditError": "Couldn't save the changes, try again.",
+    "addError": "Couldn't add the customer, try again.",
+    "relationshipLabels": {
+      "father": "Father",
+      "mother": "Mother",
+      "guardian": "Guardian",
+      "other": "Other"
+    },
+    "detail": {
+      "totalOutstanding": "Total outstanding:",
+      "whatsappFailed": "{{count}} WhatsApp message(s) failed to send to this customer",
+      "whatsappSent": "{{count}} WhatsApp message(s) sent to this customer ✓",
+      "viewActivity": "View activity",
+      "linkedPlayers": "Linked players",
+      "upcoming": "Upcoming",
+      "past": "Past",
+      "cancelledOrNoShow": "Cancelled / No-show",
+      "bookings": "Bookings",
+      "viewAllBookings": "View all bookings",
+      "noBookingsYet": "No bookings yet.",
+      "invoices": "Invoices",
+      "noInvoicesYet": "No invoices yet.",
+      "remaining": "{{amount}} remaining"
+    }
+  },
+  "dashboard": {
+    "checklist": {
+      "title": "Getting started",
+      "hide": "Hide",
+      "addStaff": "Add a staff member",
+      "addFirstCustomer": "Add your first customer",
+      "addField": "Add a field",
+      "createFirstBooking": "Create your first booking"
+    },
+    "more": {
+      "customersDesc": "Search for customers and manage their data",
+      "billingDesc": "Invoice, payment, and outstanding records",
+      "outstandingDesc": "Invoices not yet fully paid",
+      "cashShiftDesc": "Open and close the cash register shift",
+      "reportsDesc": "Revenue, occupancy, and academy reports",
+      "fieldsDesc": "Club branches, fields, working hours, and pricing",
+      "whatsappDesc": "Connection, activity, and sending controls",
+      "staffDesc": "Manage staff and their roles",
+      "auditLogDesc": "Log of every sensitive operation in the club",
+      "settingsDesc": "Club identity, academy, payments, and subscription"
+    },
+    "today": {
+      "newBooking": "New booking",
+      "collectPayment": "Collect payment",
+      "scanQr": "Scan QR",
+      "addCustomer": "Add customer",
+      "bookingsToday": "Bookings today",
+      "checkedIn": "Checked in",
+      "fieldsOccupiedNow": "Fields occupied now",
+      "revenueToday": "Revenue today",
+      "totalOutstanding": "Total outstanding",
+      "activeSubscriptions": "Active subscriptions",
+      "unpaidSubscriptions": "Unpaid subscriptions",
+      "sessionsToday": "Sessions today",
+      "newCustomersToday": "New customers today",
+      "now": "Now (NOW)",
+      "next": "Next (NEXT)"
+    },
+    "attentionNeeded": {
+      "title": "Needs attention",
+      "titleWithCount": "Needs attention ({{count}})",
+      "nothingNow": "Nothing needs attention right now.",
+      "unpaidBooking": "Confirmed booking without full payment — {{name}}",
+      "amountEgp": "EGP {{amount}}",
+      "startingSoon": "Upcoming booking not checked in yet — {{name}}",
+      "expiringSubscription": "Academy subscription about to expire — {{name}}",
+      "chipLabels": {
+        "unpaid": "Payment",
+        "startingSoon": "Urgent",
+        "expiringSubscription": "Renewal"
+      }
+    },
+    "quickActionsPalette": {
+      "heading": "Quick actions",
+      "actions": {
+        "newBooking": "New booking",
+        "newCustomer": "New customer",
+        "collectPayment": "Collect payment",
+        "scanQr": "Scan QR",
+        "findInvoice": "Find invoice"
+      }
+    },
+    "ownerFinanceTransparency": {
+      "title": "Financial transparency — Today",
+      "noCollectionsToday": "No collections today yet.",
+      "collectionsByEmployee": "Collections by employee",
+      "paymentCount": "{{count}} payment(s)",
+      "hasExceptionsToday": "There are financial exceptions today",
+      "discounts": "Discounts {{amount}}",
+      "refunds": "Refunds {{amount}}"
+    }
+  },
+  "reports": {
+    "nav": {
+      "overview": "Overview",
+      "sectionOperations": "Operations",
+      "bookings": "Bookings",
+      "occupancy": "Field occupancy",
+      "sectionFinance": "Finance",
+      "revenue": "Revenue",
+      "collections": "Collections",
+      "paymentMethods": "Payment method reconciliation",
+      "exceptions": "Financial exceptions",
+      "sectionAcademyCustomers": "Academy & Customers",
+      "academy": "Academy",
+      "customers": "Customers"
+    },
+    "title": "Reports",
+    "loading": "Loading...",
+    "noData": "No data",
+    "exportCsv": "Export CSV",
+    "overview": {
+      "description": "Club performance overview -- every number drills down to its source",
+      "cards": {
+        "totalRevenue": "Total revenue",
+        "currentOutstanding": "Current outstanding",
+        "refunds": "Refunds",
+        "confirmedBookings": "Confirmed bookings",
+        "cancelledBookings": "Cancelled bookings",
+        "bookedHours": "Booked hours",
+        "activeAcademyEnrollments": "Active academy enrollments",
+        "newCustomers": "New customers"
+      },
+      "revenueByDay": "Revenue by day",
+      "csvHeader": {
+        "date": "Date",
+        "revenue": "Revenue"
+      }
+    },
+    "academy": {
+      "description": "Academy report -- enrollments, attendance, and subscriptions expiring soon",
+      "activeEnrollments": "Active enrollments",
+      "attendanceRate": "Attendance rate",
+      "byGroup": "By group",
+      "noGroups": "No groups",
+      "expiringSubscriptions": "Subscriptions expiring soon",
+      "manageSubscriptions": "Manage subscriptions",
+      "none": "None"
+    },
+    "bookings": {
+      "description": "Bookings report -- status, branches, and cancellation rate",
+      "cancellationRate": "Cancellation rate",
+      "averageBookingValue": "Average booking value",
+      "byStatus": "By status",
+      "byBranch": "By branch",
+      "noBranches": "No branches",
+      "viewBookings": "View bookings",
+      "bookingsCountSuffix": "{{count}} bookings",
+      "csvHeader": {
+        "status": "Status",
+        "count": "Count"
+      }
+    },
+    "collections": {
+      "description": "Collections report -- by employee and branch",
+      "totalCollected": "Total collected",
+      "byEmployee": "By employee",
+      "byBranch": "By branch",
+      "paymentCountSuffix": "{{count}} payment(s)",
+      "csvHeader": {
+        "employee": "Employee",
+        "amountCollected": "Amount collected",
+        "paymentCount": "Payment count",
+        "branch": "Branch"
+      }
+    },
+    "customers": {
+      "description": "Customers report -- new customers and top spenders",
+      "newCustomers": "New customers",
+      "topSpenders": "Top spenders",
+      "bookingCountSuffix": "{{count}} bookings",
+      "csvHeader": {
+        "customer": "Customer",
+        "totalSpend": "Total spend",
+        "bookingCount": "Booking count"
+      }
+    },
+    "exceptions": {
+      "description": "Financial exceptions -- discounts, refunds, and voided invoices",
+      "totalDiscounts": "Total discounts",
+      "totalRefunds": "Total refunds",
+      "voidedInvoices": "Voided invoices",
+      "discounts": "Discounts",
+      "noDiscounts": "No discounts in this period",
+      "refunds": "Refunds",
+      "noRefunds": "No refunds in this period",
+      "appliedBy": "applied by {{name}}",
+      "refundedBy": "refunded by {{name}}",
+      "noReasonRecorded": "No reason recorded",
+      "csvHeader": {
+        "invoiceNumber": "Invoice #",
+        "customer": "Customer",
+        "discountAmount": "Discount amount",
+        "totalPrice": "Booking total",
+        "appliedBy": "Applied by",
+        "date": "Date",
+        "amount": "Amount",
+        "reason": "Reason",
+        "refundedBy": "Refunded by"
+      }
+    },
+    "occupancy": {
+      "description": "Field occupancy report",
+      "noFields": "No fields",
+      "manageField": "Manage field",
+      "hoursAndBookingsSuffix": "{{hours}} hours — {{count}} bookings",
+      "csvHeader": {
+        "field": "Field",
+        "bookedHours": "Booked hours",
+        "bookingCount": "Booking count"
+      }
+    },
+    "paymentMethods": {
+      "description": "Payment method reconciliation -- collections, refunds, and manual confirmation per method",
+      "totalCollected": "Total collected",
+      "totalRefunded": "Total refunded",
+      "net": "Net",
+      "reconciliationByMethod": "Reconciliation by payment method",
+      "reconcileError": "Couldn't confirm the reconciliation.",
+      "columns": {
+        "method": "Payment method",
+        "collected": "Collected",
+        "refunded": "Refunded",
+        "net": "Net",
+        "manualReconciliation": "Manual reconciliation"
+      },
+      "collectedCountSuffix": "{{count}} payment(s)",
+      "refundedCountSuffix": "{{amount}} — {{count}} refund(s)",
+      "reconciled": "Reconciled",
+      "confirmReconciliation": "Confirm reconciliation",
+      "reconciliationHistory": "Reconciliation history",
+      "csvHeader": {
+        "method": "Payment method",
+        "collected": "Collected",
+        "collectedCount": "Payment count",
+        "refunded": "Refunded",
+        "refundedCount": "Refund count",
+        "net": "Net"
+      }
+    },
+    "revenue": {
+      "description": "Revenue report -- by payment method and day",
+      "allMethods": "All payment methods",
+      "byMethod": "By payment method",
+      "byDay": "By day",
+      "totalRevenue": "Total revenue",
+      "totalRefunds": "Total refunds",
+      "csvHeader": {
+        "date": "Date",
+        "revenue": "Revenue"
+      }
+    }
+  },
   "verifyInvoice": {
     "title": "Verify invoice",
     "loading": "Verifying...",
@@ -149,5 +1764,267 @@
       "partially_refunded": "Partially refunded",
       "refunded": "Fully refunded"
     }
+  },
+  "settings": {
+    "title": "Settings",
+    "description": "Club identity, academy policy, payments, and subscription",
+    "clubSection": "Club",
+    "academySection": "Academy settings",
+    "activationPolicyTitle": "Subscription activation policy",
+    "paymentsSection": "Payments",
+    "notificationsSection": "Notifications",
+    "whatsappManagedNote": "WhatsApp connection, sending controls, and message log are managed from the dedicated WhatsApp page.",
+    "openWhatsappPage": "Open WhatsApp page",
+    "platformSubscriptionSection": "Platform subscription",
+    "viewFullDetails": "View full details"
+  },
+  "auditLog": {
+    "title": "Audit Log",
+    "description": "An immutable record of every sensitive action",
+    "columns": {
+      "time": "Time",
+      "action": "Action",
+      "actor": "Performed by",
+      "reason": "Reason"
+    },
+    "searchPlaceholder": "Search by action type",
+    "emptyTitle": "No logs yet",
+    "emptyDescription": "Sensitive actions will appear here as soon as they happen",
+    "unknownUser": "Unknown user",
+    "reasonPrefix": "Reason:",
+    "technicalDetails": "Technical details",
+    "before": "Before",
+    "after": "After",
+    "describe": {
+      "withAmount": "{{label}} of {{amount}}",
+      "exactMatch": "{{label}} — exact match",
+      "variance": "{{label}} — difference {{sign}}{{amount}}",
+      "withEntity": "{{label}} — {{entity}}"
+    }
+  },
+  "staff": {
+    "title": "Staff",
+    "description": "Manage club staff, their roles, and branch scope",
+    "addStaff": "Add staff",
+    "emailLabel": "Email (for an existing account)",
+    "roleLabel": "Role",
+    "adding": "Adding...",
+    "inviteError": "Couldn't add the staff member — make sure the email belongs to an account already registered on Mala3by.",
+    "columns": {
+      "name": "Name",
+      "role": "Role",
+      "branchScope": "Branch scope",
+      "status": "Status"
+    },
+    "notLoggedInYet": "Hasn't logged in yet",
+    "allBranches": "All branches",
+    "branchListSeparator": ", ",
+    "statusActive": "Active",
+    "statusInactive": "Inactive",
+    "deactivate": "Deactivate",
+    "emptyTitle": "No staff yet",
+    "emptyDescription": "Add your first staff member to start managing club permissions",
+    "roles": {
+      "club_manager": "Club manager",
+      "branch_manager": "Branch manager",
+      "receptionist": "Receptionist",
+      "accountant": "Accountant",
+      "academy_manager": "Academy manager",
+      "coach": "Coach",
+      "scanner": "QR scanner"
+    }
+  },
+  "scanner": {
+    "title": "Scan QR",
+    "back": "Back",
+    "cameraError": "Couldn't access the camera. Make sure permission is granted.",
+    "retry": "Try again",
+    "subscriptionPrefix": "Subscription:",
+    "bookingAwaitingCheckin": "Booking — awaiting check-in confirmation",
+    "membershipChooseSession": "Academy membership — choose the session to mark attendance",
+    "confirming": "Confirming...",
+    "confirmCheckin": "Confirm check-in",
+    "noSessionsToday": "No sessions today for your groups.",
+    "chooseSessionPlaceholder": "Choose a session...",
+    "recordingAttendance": "Recording...",
+    "markAttendance": "Mark attendance",
+    "scanAnother": "Scan another code",
+    "outcomes": {
+      "success": "Valid",
+      "already_used": "Already used",
+      "expired": "Expired",
+      "invalid": "Invalid",
+      "wrong_club": "Doesn't belong to this club",
+      "permission_denied": "You don't have permission for this action",
+      "subscription_inactive": "Subscription isn't active"
+    },
+    "subscriptionStatus": {
+      "pending": "Awaiting activation",
+      "active": "Active",
+      "frozen": "Frozen",
+      "expired": "Expired",
+      "cancelled": "Cancelled"
+    }
+  },
+  "search": {
+    "placeholder": "Search...",
+    "noResults": "No results",
+    "customers": "Customers",
+    "players": "Players",
+    "invoices": "Invoices"
+  },
+  "publicSite": {
+    "nav": {
+      "home": "Home",
+      "features": "Features",
+      "pricing": "Pricing",
+      "contact": "Contact us",
+      "login": "Log in",
+      "startFree": "Start for free",
+      "terms": "Terms & Conditions",
+      "privacy": "Privacy Policy",
+      "whatsapp": "WhatsApp"
+    },
+    "footer": {
+      "tagline": "The platform for managing clubs, academies, and fields"
+    },
+    "contact": {
+      "title": "Contact us",
+      "description": "We'll get back to you as soon as possible",
+      "submittedMessage": "Your request was submitted successfully, we'll be in touch soon.",
+      "namePlaceholder": "Name",
+      "phonePlaceholder": "Phone number",
+      "emailPlaceholder": "Email (optional)",
+      "businessNamePlaceholder": "Club/academy name (optional)",
+      "messagePlaceholder": "Your message (optional)",
+      "submitError": "Couldn't submit the request, please try again.",
+      "sending": "Sending...",
+      "submit": "Submit"
+    },
+    "pricing": {
+      "title": "Pricing",
+      "description": "Clear subscription plans, no hidden fees",
+      "unavailable": "Plans aren't available right now.",
+      "startFreeTrial": "Start your free trial"
+    },
+    "home": {
+      "heroTitle": "Manage your club, academy, and fields from one place",
+      "heroSubtitle": "Bookings, subscriptions, players, invoices, attendance, QR, and reports in one easy-to-use system.",
+      "startFreeTrial": "Start your free trial",
+      "login": "Log in",
+      "trialBadge": "7 days free · No credit card required",
+      "featuresTitle": "Core features",
+      "features": {
+        "bookings": "Bookings",
+        "academy": "Academy",
+        "invoicesAndPayments": "Invoices & payments",
+        "qr": "QR",
+        "reports": "Reports",
+        "staffManagement": "Staff management"
+      },
+      "pricingTitle": "Pricing"
+    },
+    "privacy": {
+      "title": "Privacy Policy",
+      "lastUpdated": "Last updated: August 15, 2026",
+      "section1": {
+        "title": "1. Data We Collect",
+        "body": "When you create an account: your name, email address, and phone number. When you use the system: your club's operational data that you enter yourself (customers, players, bookings, invoices, attendance) — we do not collect any additional data about you or your customers beyond what you enter directly into the system."
+      },
+      "section2": {
+        "title": "2. How We Use Your Data",
+        "body": "We use your data only to operate the service: signing you in, displaying your club's data, issuing invoices, and sending email confirmation and password-reset messages. We do not sell your data or share it with any third party for marketing purposes."
+      },
+      "section3": {
+        "title": "3. Data Isolation Between Clubs",
+        "body": "Each club can only see its own data. The platform's technical architecture (database-level security policies) prevents any club from accessing another club's data, independent of the user interface."
+      },
+      "section4": {
+        "title": "4. Where Your Data Is Stored",
+        "body": "Data is stored with a cloud services provider (Supabase) over an encrypted connection. We retain your data for as long as your account is active; when you close your account, you may request deletion of your data by contacting us."
+      },
+      "section5": {
+        "title": "5. Your Rights",
+        "bodyPrefix": "You may at any time request to view, correct, or delete your data by contacting us via the",
+        "contactLink": "Contact us"
+      }
+    },
+    "terms": {
+      "title": "Terms & Conditions",
+      "lastUpdated": "Last updated: August 15, 2026",
+      "section1": {
+        "title": "1. About the Service",
+        "body": "Mala3by is an operations management platform for sports clubs and academies — bookings, invoices and payments, players and subscriptions, QR-based attendance, and reports. By using the service, you agree to these terms."
+      },
+      "section2": {
+        "title": "2. Account and Subscription",
+        "body": "Every new club starts with a 7-day free trial that requires no credit card, granted once per user. After the trial ends, continuing to use the platform requires a paid subscription activated by contacting the Mala3by team. You are responsible for the accuracy of your club's data and for keeping your account's login credentials confidential."
+      },
+      "section3": {
+        "title": "3. Data You Enter",
+        "body": "Customer, player, booking, and invoice data that you enter into your system remains the property of you and your club. We store it only to operate the service and do not use it for any other purpose beyond what is described in the Privacy Policy."
+      },
+      "section4": {
+        "title": "4. Payments and Invoices",
+        "body": "Platform subscription fees are charged according to the plan the club selects, and do not include the club's own payments from its customers (those are managed within your own system and do not pass through Mala3by). No amount is ever deducted automatically without your explicit confirmation."
+      },
+      "section5": {
+        "title": "5. Termination of Service",
+        "body": "You may stop using the platform at any time by contacting us. We reserve the right to suspend access in cases of clear misuse of the service or non-payment of the subscription after the agreed grace period."
+      },
+      "section6": {
+        "title": "6. Contact",
+        "bodyPrefix": "For any inquiry about these terms, you can contact us via the",
+        "contactLink": "Contact us"
+      }
+    }
+  },
+  "onboarding": {
+    "businessTypes": {
+      "club": "Club",
+      "academy": "Academy",
+      "fields": "Fields",
+      "sportsCenter": "Sports center"
+    },
+    "defaultBranchName": "Main branch",
+    "createError": "Couldn't create the club. Please try again.",
+    "loginRequired": "You must log in first to set up your club.",
+    "success": {
+      "titleWithTrial": "Your club was created successfully!",
+      "trialActivated": "Your 7-day free trial has been activated.",
+      "titleNoTrial": "Club created",
+      "noTrialMessage": "This is your additional club, so it wasn't automatically activated with a free trial — additional clubs need approval from the Mala3by platform team first. We'll be in touch once it's reviewed, and you can track the subscription status from the settings page.",
+      "goToDashboard": "Go to dashboard"
+    },
+    "wizard": {
+      "titleWithStep": "Set up your club — Step {{step}} of 3",
+      "step1": {
+        "businessTypeLabel": "Business type",
+        "next": "Next"
+      },
+      "step2": {
+        "clubNameArLabel": "Club name (Arabic)",
+        "clubNameEnLabel": "Club name (English, optional)",
+        "back": "Back",
+        "next": "Next"
+      },
+      "step3": {
+        "branchNameLabel": "First branch name",
+        "cityLabel": "City",
+        "phoneLabel": "Phone number",
+        "back": "Back",
+        "submitting": "Creating...",
+        "submit": "Create club and start free trial"
+      }
+    }
+  },
+  "errorBoundary": {
+    "title": "An unexpected error occurred",
+    "description": "Try reloading the page. If the problem persists, contact support.",
+    "reload": "Reload page"
+  },
+  "errorState": {
+    "defaultMessage": "An error occurred, please try again",
+    "retry": "Retry"
   }
 }
