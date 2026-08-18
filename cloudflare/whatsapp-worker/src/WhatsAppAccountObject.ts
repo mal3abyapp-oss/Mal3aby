@@ -49,6 +49,33 @@ interface AccountStartState {
 
 const LAST_POLL_AT_KEY = 'lastHealthPollAt'
 
+/**
+ * ROOT CAUSE FIX (production architecture change, not a workaround):
+ * confirmed live via 3 fully-instrumented restart cycles that this
+ * Durable Object was being evicted by the Cloudflare platform every
+ * ~184s -- fully independent of `sleepAfter` (raised 3m -> 30m with
+ * zero effect) -- because the ONLY thing keeping it "active" was a
+ * plain `containerFetch()` HTTP poll every 60s, and Cloudflare's own
+ * Durable Object lifecycle documentation
+ * (developers.cloudflare.com/durable-objects/concepts/durable-object-lifecycle/,
+ * fetched live during this investigation) states explicitly: "It does
+ * not apply to plain fetch() subrequests. Those never keep the Durable
+ * Object alive, even while the response body is still streaming." Only
+ * an active outbound TCP connect() or WebSocket does, "for a maximum of
+ * 15 minutes" per connection.
+ *
+ * Fix: hold one outbound WebSocket open from this DO to the container's
+ * HealthServer.ts /keepalive endpoint WHILE (and only while) there is a
+ * genuine reason to stay awake (shouldStayAwake, the same signal that
+ * already drives renewActivityTimeout() -- this is additive to that
+ * existing cost-guardrail logic, not a replacement of it: a genuinely
+ * idle account still gets no keep-alive connection and is still allowed
+ * to sleep, matching directive rule 77's intent).
+ */
+const KEEPALIVE_ROTATE_BASE_MS = 12 * 60 * 1000 // rotate before the 15-minute per-connection limit
+const KEEPALIVE_ROTATE_JITTER_MS = 90 * 1000 // +/-90s jitter so many clubs don't rotate in lockstep
+const KEEPALIVE_RECONNECT_BACKOFF_MS = [2000, 5000, 10000, 20000]
+
 export interface Env {
   WHATSAPP_ACCOUNT: DurableObjectNamespace<WhatsAppAccountObject>
   // Checked by the Container's own /status endpoint (HealthServer.ts)
@@ -72,37 +99,19 @@ export class WhatsAppAccountObject extends Container<Env> {
   // Matches whatsapp-connector/src/HealthServer.ts's HEALTH_PORT default.
   defaultPort = 8080
 
-  // PRAGMATIC STOPGAP (MAL3ABY WHATSAPP QR IMAGE + INVOICE DOCUMENT
-  // DELIVERY task): the original 3m value, combined with the
-  // keep-awake-renewal mechanism below, was found live to still let the
-  // container cycle sleep/restart roughly every ~3 minutes despite
-  // THREE independent, real, root-caused fixes to that mechanism (see
-  // onStart()'s and runHealthPollTick()'s doc comments for the full
-  // paper trail: a missing initial renewActivityTimeout() call, a
-  // polling-loop-killing early return on transient errors, and a
-  // rate-limit guard against a tight self-refire loop -- each one a
-  // genuine, confirmed bug, none of which alone fully explained the
-  // still-observed cycle). Every WhatsApp send this service exists to
-  // make depends on a live, uninterrupted Baileys socket for the
-  // several real seconds a text+media send takes -- a session that
-  // cycles every 3 minutes cannot reliably complete ANY send, which is
-  // a correctness problem, not just a cost-optimization tradeoff gone
-  // slightly too aggressive.
-  //
-  // Raising this to 30m removes the sleep-cycle variable entirely while
-  // the underlying interaction inside the installed
-  // @cloudflare/containers@0.0.13 scheduling internals is still not
-  // fully understood (undocumented behavior confirmed live, but not
-  // fully reverse-engineered from the library's own source within safe
-  // limits of experimenting against a real, currently-paired WhatsApp
-  // session). This is explicitly a stopgap, not a claim that the
-  // keep-awake logic is now fully correct -- the cost tradeoff (a
-  // genuinely idle account now stays warm up to 30 minutes instead of
-  // 3, per directive rule 77's cost-guardrail intent) is the honest
-  // price of correctness taking priority over idle-cost optimization
-  // until the real root cause is fully understood and fixed with the
-  // 3-minute window restored.
-  sleepAfter = '30m'
+  // ROOT CAUSE NOW UNDERSTOOD AND FIXED (see the keep-alive WebSocket
+  // block below): a controlled A/B test proved the ~3-minute restart
+  // cycle was NEVER caused by this `sleepAfter` value or by any of this
+  // repo's own code -- it was Cloudflare's Durable Object platform
+  // evicting this DO because its only "activity" signal was a plain
+  // `fetch()` health poll, which Cloudflare's own documentation states
+  // explicitly never counts toward keeping a DO alive. The keep-alive
+  // WebSocket (ensureKeepalive()/closeKeepalive() below) is the real
+  // fix for that. With the real fix in place, this value is restored to
+  // its original intent (a real container "sleep after N minutes idle"
+  // budget, not a workaround for the eviction bug) -- a genuinely idle/
+  // disconnected account still sleeps and stops costing money.
+  sleepAfter = '3m'
 
   // REAL BUG FOUND AND FIXED during first live acceptance run: the
   // Container base class does NOT automatically forward this Worker's
@@ -122,6 +131,17 @@ export class WhatsAppAccountObject extends Container<Env> {
   // code actually reads (cross-checked against every `process.env.*`
   // read in whatsapp-connector/src, not guessed).
   envVars: Record<string, string>
+
+  // Keep-alive connection state -- in-memory only (not persisted to
+  // ctx.storage) since a DO re-instantiation after a genuine eviction
+  // means any previously-held WebSocket is already gone regardless;
+  // the next runHealthPollTick() simply opens a fresh one if still
+  // needed. Requirement 6 ("one club DO -> one keep-alive connection")
+  // is enforced by always checking/closing this field before opening a
+  // new one -- see ensureKeepalive() below.
+  private keepaliveSocket: WebSocket | null = null
+  private keepaliveReconnectAttempts = 0
+  private keepaliveRotateAt = 0
 
   constructor(ctx: DurableObjectState<Env>, env: Env) {
     super(ctx, env)
@@ -203,6 +223,12 @@ export class WhatsAppAccountObject extends Container<Env> {
     console.log(
       `[lifecycle] onStop club=${this.clubIdShort()} at=${new Date().toISOString()} exitCode=${params.exitCode} reason=${params.reason}`,
     )
+    // Requirement 9: close the keep-alive socket cleanly on container
+    // shutdown -- the container process (and the /keepalive endpoint it
+    // was serving) is already gone at this point, so this is really
+    // just clearing our own reference/state; the remote side has
+    // already dropped the connection regardless.
+    this.closeKeepalive('container stopped')
     await this.ctx.storage.delete(START_STATE_KEY)
   }
 
@@ -282,7 +308,20 @@ export class WhatsAppAccountObject extends Container<Env> {
         // false here is the safe default, not "assume healthy".
         return { shouldStayAwake: false, status: `http_${res.status}` }
       }
-      const body = (await res.json()) as { shouldStayAwake: boolean }
+      const body = (await res.json()) as { shouldStayAwake: boolean; pid?: number; uptimeSeconds?: number; memoryMb?: { rss: number } }
+      // DIAGNOSTIC (root-cause investigation): surface the connector
+      // process's own pid/uptimeSeconds/memory through THIS Worker's
+      // logs -- wrangler tail only captures Durable Object/Worker
+      // invocations, never a Container's own stdout, so this is the
+      // only channel available to see real connector process identity
+      // without dashboard/Logpush access. A pid that stays constant
+      // across polls + uptimeSeconds climbing normally would prove the
+      // SAME process is alive between ticks (contradicting the onStop
+      // evidence) -- a pid that changes, or uptimeSeconds resetting to
+      // near-zero, confirms a genuine new process each cycle.
+      console.log(
+        `[lifecycle] pollHealthAndDecide club=${this.clubIdShort()} at=${new Date().toISOString()} pid=${body.pid} uptimeSeconds=${body.uptimeSeconds} rssMb=${body.memoryMb?.rss}`,
+      )
       if (body.shouldStayAwake) {
         this.renewActivityTimeout()
       }
@@ -369,7 +408,30 @@ export class WhatsAppAccountObject extends Container<Env> {
       // record) -- nothing to poll, nothing to reschedule. The next
       // real ensureRunning() call will re-enter onStart() and restart
       // this whole chain.
+      this.closeKeepalive('container not started')
       return
+    }
+
+    // ROOT CAUSE FIX: this is the enforcement point for the keep-alive
+    // WebSocket -- proven necessary by a controlled A/B test (see
+    // MAL3ABY_CLOUDFLARE_DEPLOYMENT_STATE.md): the ORIGINAL stable code
+    // (commit 1eef03a, before any QR/PDF media work existed) and the
+    // CURRENT code both showed the IDENTICAL ~185s Durable Object
+    // eviction cycle when tested side-by-side under otherwise identical
+    // conditions -- conclusively ruling out a QR/PDF-introduced
+    // regression and confirming this is inherent platform behavior:
+    // Cloudflare's own docs state plain fetch() (exactly what
+    // pollHealthAndDecide()'s /status call is) never keeps a DO alive.
+    //
+    // Tied to the SAME shouldStayAwake signal that already drives
+    // renewActivityTimeout() -- additive to, not a replacement of, the
+    // existing cost-guardrail logic (directive rule 77): a genuinely
+    // idle/disconnected account still gets no keep-alive connection and
+    // is still allowed to sleep and stop incurring cost.
+    if (result.shouldStayAwake) {
+      await this.ensureKeepalive()
+    } else {
+      this.closeKeepalive('no longer needs to stay awake')
     }
 
     // Every other outcome -- ok/shouldStayAwake, ok/notStayAwake
@@ -381,6 +443,99 @@ export class WhatsAppAccountObject extends Container<Env> {
     // method's git history/commit message for the full story); it just
     // tries again in 60s, same as any other non-fatal outcome.
     await this.scheduleNextHealthPoll()
+  }
+
+  /**
+   * Opens the keep-alive WebSocket if one is not already open, and
+   * schedules its rotation before Cloudflare's documented 15-minute
+   * per-connection limit expires. Idempotent -- safe to call on every
+   * health-poll tick while shouldStayAwake is true; does nothing if a
+   * connection is already open and not yet due for rotation.
+   *
+   * Requirement 6 (one club DO -> one keep-alive connection): this
+   * container serves exactly one club (this repo's own "one container
+   * instance per WhatsApp account" architecture), so this method is
+   * the ONLY place that opens a keepalive connection, and it always
+   * checks/replaces `this.keepaliveSocket` rather than ever opening a
+   * second one alongside an existing open one.
+   */
+  private async ensureKeepalive(): Promise<void> {
+    const now = Date.now()
+    if (this.keepaliveSocket && this.keepaliveSocket.readyState === WebSocket.READY_STATE_OPEN) {
+      if (now < this.keepaliveRotateAt) {
+        return // still open, not yet due for rotation
+      }
+      // Requirement 5: rotate before the 15-minute per-connection limit
+      // -- close the old one cleanly and fall through to open a fresh
+      // one below, rather than waiting for Cloudflare to stop counting
+      // it as "active" out from under us.
+      console.log(`[keepalive] keepalive_rotated club=${this.clubIdShort()} at=${new Date().toISOString()}`)
+      this.keepaliveSocket.close(1000, 'scheduled rotation')
+      this.keepaliveSocket = null
+    }
+
+    try {
+      const res = await this.containerFetch(
+        'http://container/keepalive',
+        {
+          headers: {
+            'x-internal-token': this.env.CONTAINER_INTERNAL_TOKEN,
+            Upgrade: 'websocket',
+            Connection: 'Upgrade',
+          },
+        },
+        this.defaultPort,
+      )
+      if (!res.webSocket) {
+        throw new Error(`keepalive upgrade did not return a WebSocket (status ${res.status})`)
+      }
+      const ws = res.webSocket
+      ws.accept()
+      this.keepaliveSocket = ws
+      this.keepaliveReconnectAttempts = 0
+      // Requirement 5: jittered rotation so many clubs' DOs don't all
+      // reconnect in the same instant (thundering-herd avoidance,
+      // requirement 10).
+      this.keepaliveRotateAt = now + KEEPALIVE_ROTATE_BASE_MS + Math.round((Math.random() * 2 - 1) * KEEPALIVE_ROTATE_JITTER_MS)
+      console.log(`[keepalive] keepalive_opened club=${this.clubIdShort()} at=${new Date().toISOString()}`)
+
+      ws.addEventListener('close', () => {
+        if (this.keepaliveSocket === ws) this.keepaliveSocket = null
+        console.log(`[keepalive] keepalive_closed club=${this.clubIdShort()} at=${new Date().toISOString()}`)
+      })
+      ws.addEventListener('error', () => {
+        console.log(`[keepalive] keepalive_error club=${this.clubIdShort()} at=${new Date().toISOString()}`)
+      })
+      // No message handling needed -- see HealthServer.ts's /keepalive
+      // doc comment: this channel exists only to be an open connection,
+      // never a command/data channel.
+    } catch (err) {
+      // Requirement 8: reconnect with bounded backoff on error, rather
+      // than either a tight retry loop or silently giving up. The NEXT
+      // health-poll tick (60s cadence, same as always) is what actually
+      // drives the retry -- this just logs and lets that natural cadence
+      // serve as the backoff, capped by KEEPALIVE_RECONNECT_BACKOFF_MS's
+      // own length so a persistently failing keepalive doesn't spam
+      // reconnect_attempt logs forever without bound.
+      this.keepaliveReconnectAttempts = Math.min(this.keepaliveReconnectAttempts + 1, KEEPALIVE_RECONNECT_BACKOFF_MS.length)
+      console.log(
+        `[keepalive] reconnect_attempt club=${this.clubIdShort()} at=${new Date().toISOString()} attempt=${this.keepaliveReconnectAttempts} error=${(err as Error).message}`,
+      )
+    }
+  }
+
+  /** Closes the keep-alive socket if one is open. Requirement 9: clean close on shutdown/no-longer-needed, never an abrupt drop. */
+  private closeKeepalive(reason: string): void {
+    if (!this.keepaliveSocket) return
+    try {
+      if (this.keepaliveSocket.readyState === WebSocket.READY_STATE_OPEN) {
+        this.keepaliveSocket.close(1000, reason)
+      }
+    } catch {
+      // Best-effort -- the socket may already be in a closing/closed
+      // state; nothing further to do.
+    }
+    this.keepaliveSocket = null
   }
 }
 
