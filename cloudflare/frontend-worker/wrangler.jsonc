@@ -53,6 +53,14 @@
   // origin, without hardcoding it in source.
   "vars": {
     "SUPABASE_URL": "https://gxkrtlvpjwxhcqdisyob.supabase.co"
+  },
+
+  // Workers Logs -- free-tier eligible, no plan upgrade required.
+  // Ingests invocation logs, errors, and uncaught exceptions for up to
+  // 7 days, queryable from the Cloudflare dashboard. Confirmed enabled
+  // live post-deploy.
+  "observability": {
+    "enabled": true
   }
 
   // Custom domain: bound via the Cloudflare dashboard (Workers &
