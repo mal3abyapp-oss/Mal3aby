@@ -6,6 +6,65 @@ Last updated: 2026-08-18
 
 ---
 
+## FINAL PRODUCTION ACCEPTANCE — 2026-08-18
+
+Full production hardening pass: Supabase security/performance audit, real Auth flow testing on `https://mal3aby.app`, live multi-layer tenant-isolation attack testing, real payment-idempotency attack testing, and a genuine end-to-end WhatsApp business-flow test using the approved real test number (`+971502061209`) — booking → confirmation → QR → cancellation → invalidation → payment → invoice, all through the actual RPCs, not direct SQL shortcuts.
+
+### Two real P1 bugs found live and fixed
+
+**Bug 1 — cancellation notice self-suppression (layer 1).** `cancel_booking()` called `cancel_pending_whatsapp_for_booking(p_booking_id)` immediately after queuing its own new `booking.cancelled` notification, with no way to exclude that just-created row from the sweep. Since a freshly-queued notification is always `status='pending'`, the cancellation notice matched its own suppression filter and was marked `cancelled` before the connector could ever claim it — **every WhatsApp cancellation notification since this mechanism shipped was silently never sent.** Confirmed live: booking `093e89a7-...` was cancelled via the real RPC; its cancellation notice (`c25d5189-...`) read `status='cancelled'` with zero attempts immediately after. Fixed in `20260818171000_fix_cancellation_notice_self_suppression.sql`: `cancel_pending_whatsapp_for_booking()` gained a `p_exclude_event_id` parameter, and `cancel_booking()` now passes its own event ID.
+
+**Bug 2 — cancellation notice self-suppression (layer 2, independent).** Even after fixing Bug 1, a fresh cancellation notice was STILL wiped — a second, separate code path. `whatsapp_connector_claim_next_batch()`'s own general validity sweep calls `notification_source_still_valid('booking', booking_id)`, which returns `false` whenever the booking's *current* status is `'cancelled'` — with no exception for the `booking.cancelled` event itself, whose entire purpose is reporting that exact transition. Confirmed live: booking `76bd6177-...`'s cancellation notice (`87f28f80-...`) was wiped again by this separate check, proving it wasn't a leftover of Bug 1. Fixed in `20260818172000_fix_cancellation_event_source_validity.sql`: `notification_source_still_valid()` gained a `p_event_type` parameter — a `booking.cancelled` event is now always valid regardless of the booking's status. **Re-tested after both fixes** (booking `98cd5be9-...`, cancellation queue row `7838afac-...`): genuinely claimed and delivered via real WhatsApp, `provider_reference: 3EB07963E3E9BCD28C1399`. Both stale function overloads (the versions without the new parameters) were dropped so nothing can accidentally call the old self-suppressing form again.
+
+### Performance fix
+
+**`auth_rls_initplan` on `invoices`, `payment_method_configs`, `manual_payment_claims` (×2 policies).** Four RLS policies used a bare `auth.uid()` inside their expression, re-evaluated per row instead of once per query — the classic quadratic-cost RLS trap, missed by an earlier sweep (`gate12_rls_auth_uid_initplan_fix`) because these 4 policies were added by later customer-self-service migrations after that sweep ran. Fixed in `20260818170000_fix_remaining_rls_initplan.sql`: all 4 wrapped as `(select auth.uid())`. Same authorization logic, verified live — tenant isolation re-tested post-fix (0 rows visible to an unaffiliated user), unchanged.
+
+### Live multi-tenant security testing (real attacks, not just SELECT checks)
+
+- **Cross-tenant SELECT**: an unaffiliated `auth.uid()` sees 0 rows across `bookings`, `payments`, `customers`, `invoices`, `whatsapp_accounts` — confirmed live.
+- **Cross-tenant SELECT, properly scoped non-platform-owner user**: discovered mid-test that the first test account was actually the platform owner (legitimately sees all clubs) — re-ran with a genuinely single-club-scoped Receptionist account, confirmed 0 rows visible into a different club's `bookings`/`payments`/`customers`.
+- **Cross-tenant UPDATE (real attack, not just a SELECT probe)**: the same correctly-scoped Receptionist attempted `UPDATE bookings SET status='cancelled' WHERE club_id=<other club>` — 0 real rows were affected, confirmed by checking the other club's booking statuses were unchanged afterward.
+- **Payment idempotency attack**: `record_payment()` called 2–3 times with the identical idempotency key against a real invoice — exactly one payment row was created every time, confirmed by row count, not by trusting the return value alone.
+- **Public verification token design review**: `verify_invoice_public()`/`verify_booking_qr_public()` look up by SHA-256 token hash only (never plaintext), correctly gate on `status='active'`, and expose no `club_id`/cross-tenant enumeration surface.
+
+### Real end-to-end WhatsApp business flow (approved test number only: +971502061209)
+
+All of the following used the real `create_booking`/`cancel_booking`/`record_payment` RPCs — no direct queue-table shortcuts — and were confirmed via real `provider_reference` message IDs, not just `status='sent'` alone:
+
+| Step | Result | Evidence |
+|---|---|---|
+| Booking created → confirmation WhatsApp | PASS | `provider_reference: 3EB0D2321898458125F102` |
+| QR link on `https://mal3aby.app/qr/<token>` | PASS | Real page load: correct booking ref, field, sport, Cairo-timezone-converted time |
+| Booking cancelled → QR re-checked | PASS | Same URL now shows "الحجز ملغي" (cancelled), no stale cache |
+| Cancellation WhatsApp notice | PASS (after 2 real bug fixes) | `provider_reference: 3EB07963E3E9BCD28C1399` |
+| Payment recorded → payment WhatsApp | PASS | `provider_reference: 3EB0DA7B0BFB6723B6CC02` |
+| Invoice link on `https://mal3aby.app/verify/<token>` | PASS | Real page load: correct invoice number, amounts, "مدفوعة بالكامل" status |
+| Core independence (booking created while WhatsApp queue was rate-limited) | PASS | Booking `f025d078-...` created instantly despite 2 pending rate-limited sends for the same recipient |
+| Real per-recipient rate limiting | Observed working correctly | 5-minute `min_minutes_between_recipient_sends` correctly delayed (not dropped) sends to the same test number |
+
+**Total real WhatsApp messages sent this session: 6**, all to the single approved test number, all with unique `provider_reference` IDs, no duplicates, all legitimate test/business-flow validations (no bulk/spam pattern). One earlier session (a prior task) also sent one unintended real message to a QA-seed phone number mistakenly assumed synthetic — documented in that task's own record; not repeated this session, since this session used only the approved number throughout.
+
+### Auth testing on the real production domain
+
+- Unauthenticated direct navigation to `/app/bookings` and `/portal/bookings` both correctly redirect to `/login` — tested via real HTTPS requests to `mal3aby.app`, not localhost.
+- Password-reset request flow: submitted for the real platform-owner account via the live `/forgot-password` form on `mal3aby.app` — correct non-enumerating success message returned, confirming the real `resetPasswordForEmail({ redirectTo: '${origin}/reset-password' })` call round-trips successfully against production Supabase. Whether the resulting email link ultimately resolves depends on the Auth Site URL setting, which remains an external blocker (below).
+- Login/session-persistence/logout could not be fully tested end-to-end because no test account's real password is available to this session — protected-route gating and the reset-request round-trip are the achievable proof without a credential.
+
+### Backup — confirmed precisely, not assumed
+
+Free plan: **zero automated backups, no PITR, no downloadable backups** (Supabase's own current documentation, re-verified this session). A manual `supabase db dump` was attempted as a genuine mitigation — blocked by the same missing local Docker daemon (`db dump` requires Docker even with `--project-ref`), and no `pg_dump` binary or database password (only the API-layer service-role key, not a Postgres connection string) is available in this environment to use the Docker-free `--db-url` path. This is a real, precise tool/credential gap, not a workaround-able one.
+
+### External blockers, unchanged and re-confirmed this session
+
+- **Supabase Auth Site URL / Redirect URLs → `https://mal3aby.app`**: still genuinely blocked. No Auth-config write capability exists in the Supabase MCP server (re-confirmed), and no Supabase dashboard session/credential is available to this environment.
+- **Leaked password protection (Auth setting)**: same category of blocker as Site URL — a project-level Auth toggle with no SQL or MCP-tool path to change it.
+- **Manual database backup/dump**: blocked by the Docker+pg_dump+password gap described above.
+
+None of these blocked the rest of this session's work.
+
+---
+
 ## WHATSAPP CONTAINER — LIVE, ACCEPTANCE TESTED
 
 **The WhatsApp Container is deployed and running in production.** Image built and pushed via `.github/workflows/whatsapp-container-build.yml` on a GitHub-hosted runner (tag `v1`, digest `sha256:6a229c291d2580fc235d9fecd0f7d1d9eda6f9a14d00d80a1b12f2b4863ec08c`, run `32111047189`, commit `17c6440`), deployed to Cloudflare via `wrangler deploy` referencing the pushed `registry.cloudflare.com/...` image.
