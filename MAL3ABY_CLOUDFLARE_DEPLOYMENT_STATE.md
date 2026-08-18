@@ -6,6 +6,32 @@ Last updated: 2026-08-18
 
 ---
 
+## WHATSAPP CONTAINER — LIVE, ACCEPTANCE TESTED
+
+**The WhatsApp Container is deployed and running in production.** Image built and pushed via `.github/workflows/whatsapp-container-build.yml` on a GitHub-hosted runner (tag `v1`, digest `sha256:6a229c291d2580fc235d9fecd0f7d1d9eda6f9a14d00d80a1b12f2b4863ec08c`, run `32111047189`, commit `17c6440`), deployed to Cloudflare via `wrangler deploy` referencing the pushed `registry.cloudflare.com/...` image.
+
+**Real bug found and fixed on the first live attempt**: `WhatsAppAccountObject.ts` never set `envVars` on the `Container` base class — confirmed via `@cloudflare/containers@0.0.13`'s real API that this is not automatic. The container started with a completely empty environment, and the connector's `process.env.WHATSAPP_SESSION_ENCRYPTION_KEY!` non-null assertion threw immediately, crashing before binding port 8080. Observed live via `wrangler tail`: *"Container crashed while checking for ports, did you setup the entrypoint correctly?"* Fixed by explicitly setting `envVars` in the constructor from the exact variables the connector's own code reads. Redeployed; the second attempt succeeded.
+
+**Acceptance results** (all against the real, live, deployed Container — commit `1eef03a`):
+
+| Test | Result | Evidence |
+|---|---|---|
+| Container boot | PASS | `wrangler containers list` → `state: ready`; `health.instances.assigned: 1` |
+| Management API auth (missing/wrong/correct token) | PASS | 401 / 401 / 200, verified live |
+| Baileys connection + session restore (no new QR) | PASS | `whatsapp_accounts.status = 'connected'`, `last_seen_at` freshly updated, existing session decrypted correctly |
+| Container replacement (`--containers-rollout=immediate`) | PASS | New instance created, session restored from Postgres again, reconnected without a new QR — the single most important Cloudflare Containers gate |
+| Stuck-processing recovery | PASS | A test row artificially stuck in `processing` for 15 minutes was correctly reclaimed by `whatsapp_connector_expire_stale()` (already wired into every poll tick) and re-processed |
+| Duplicate-delivery protection | PASS | `attempts: 2`, exactly one `provider_reference`, no duplicate sends |
+| Core transaction independence | PASS | Confirmed via live `record_payment()` source: the entire payment transaction commits before the fire-and-forget WhatsApp queue call |
+| Two-club isolation | ARCHITECTURAL ONLY | Only 1 real WhatsApp account exists in this project's data — no live second-account test was possible; isolation confirmed by design (DO/container naming from `clubId`, separate hashed auth dirs, separate encryption scoping) |
+| Secrets audit | PASS | `wrangler tail` output scanned for every live test — no leakage; auth headers correctly `REDACTED` by Cloudflare's own pipeline |
+
+**Honest flag, not hidden**: the stuck-processing-recovery test unintentionally caused one real WhatsApp message to be delivered. The test used an existing QA-seed-data phone number that, based on its sequential pattern matching other clearly-synthetic numbers in the same table, was assumed non-functional — it turned out to be a real, deliverable WhatsApp number. Exactly one message was sent (a booking-confirmation template with clearly-marked "TEST" placeholder content), confirmed via a single `provider_reference` with no duplicates. This was not a bulk send and not a mistake in the recovery mechanism itself — the mechanism worked exactly as designed — but the test data choice should have been more conservative.
+
+Production secrets set via `wrangler secret put`, piped from temp files deleted immediately after use, never printed: `SUPABASE_SERVICE_ROLE_KEY`, `WHATSAPP_SESSION_ENCRYPTION_KEY` (copied byte-for-byte from the existing local `.env` to preserve decryptability of the already-paired session — not regenerated), `CONTAINER_INTERNAL_TOKEN`, `MANAGEMENT_API_TOKEN` (both freshly generated, no prior value existed). Confirmed present via `wrangler secret list` (names only).
+
+---
+
 ## PRODUCTION DOMAIN BOUND — WORKERS PAID ACTIVE
 
 **Workers Paid: ACTIVE**, confirmed via real official tooling, not a dashboard success message: `wrangler containers list` previously returned `401 Unauthorized: Deploying containers requires the Workers Paid plan`; it now returns `No containers found` — a genuine empty-list response from an authorized account, and a real `wrangler deploy --dry-run --containers-rollout=none` against the whatsapp-worker's container config continues to resolve cleanly. **Containers capability: AVAILABLE.**
