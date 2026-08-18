@@ -4,10 +4,8 @@
     {
       "name": "mala3by-dev",
       "runtimeExecutable": "npm",
-      "runtimeArgs": ["run", "dev", "--", "--host", "192.168.1.6"],
-      "port": 5173,
-      "autoPort": true,
-      "url": "http://192.168.1.6:5173"
+      "runtimeArgs": ["run", "dev"],
+      "port": 5173
     }
   ]
 }
