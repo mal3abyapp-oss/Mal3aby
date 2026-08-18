@@ -1,0 +1,37 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "mala3by-frontend",
+  "compatibility_date": "2026-08-18",
+
+  // Mal3aby's frontend is a pure client-side SPA (Vite + React Router,
+  // no server-side rendering, no Worker-side business logic of its own
+  // -- all real authorization is Supabase RLS/RPCs, confirmed
+  // throughout this project's own architecture). Workers Static Assets
+  // is the current Cloudflare-recommended approach for this shape of
+  // project (confirmed via current Cloudflare documentation research,
+  // Aug 2026: "Now that Workers supports serving static assets... you
+  // should start with Workers" for new projects) -- no separate Worker
+  // script/main entrypoint is needed since there is no dynamic
+  // request-time logic to run.
+  "assets": {
+    // Relative to this wrangler.jsonc -- the root frontend's own Vite
+    // build output (../../dist, i.e. the existing `npm run build` at
+    // the repo root, completely unchanged by this Cloudflare work).
+    "directory": "../../dist",
+
+    // SPA fallback: any request that doesn't match a real built file
+    // (e.g. /qr/<token>, /verify/<token>, /app/bookings, /portal/...)
+    // serves index.html with a 200 status so React Router's own
+    // client-side routing takes over -- this is what makes deep-link
+    // reload (directive rule 42) work in production the same way Vite
+    // dev server's own historyApiFallback already does locally.
+    "not_found_handling": "single-page-application"
+  }
+
+  // Custom domain: bound via the Cloudflare dashboard (Workers &
+  // Pages -> mala3by-frontend -> Settings -> Domains & Routes) or
+  // `wrangler deploy --routes <domain>/*`, once a real production
+  // domain exists -- see MAL3ABY_CLOUDFLARE_PRODUCTION_ARCHITECTURE.md
+  // for the exact steps and why this repo does not invent a domain
+  // name (directive rule 39).
+}

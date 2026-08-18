@@ -1,0 +1,12 @@
+{
+  "name": "mala3by-frontend-deploy",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Cloudflare Workers Static Assets deployment config for the Mal3aby frontend SPA. Deploys the repo root's own `npm run build` output (../../dist) -- no separate build step, no duplicated frontend code.",
+  "scripts": {
+    "deploy": "wrangler deploy"
+  },
+  "devDependencies": {
+    "wrangler": "^4.0.0"
+  }
+}
