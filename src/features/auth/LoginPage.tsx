@@ -78,19 +78,40 @@ export function LoginPage() {
       return
     }
 
-    const from = (location.state as { from?: Location })?.from?.pathname
-    if (from) {
-      // Came from a specific protected route (RequireAuth's redirect state)
-      // -- honor it as-is, same as before.
-      navigate(from, { replace: true })
-      return
-    }
-
+    // P1 production bug (real account report, 2026-08-19): a platform_owner
+    // who is ALSO a club_owner (a real, supported multi-role account --
+    // see AuthProvider's own dedupe comment) landed on /app instead of
+    // /platform after login. Root cause: this `from` location-state check
+    // ran BEFORE the platform-owner check below and honored it
+    // unconditionally. `from` gets populated by RequireAuth/RequirePortalAuth
+    // whenever an unauthenticated (or session-expired) visit to a protected
+    // route bounces through /login -- e.g. a stale /app bookmark, or a
+    // browser tab left open on /app whose session had expired. For a
+    // platform_owner, that stale `from=/app` silently overrode the correct
+    // role-based redirect on every subsequent login, since it was checked
+    // first and returned immediately.
+    //
+    // Fix: platform-owner status is checked FIRST, unconditionally -- a
+    // platform_owner always lands on /platform by default, regardless of
+    // any stale `from` state. `from` is still honored for every other
+    // account (customers/club owners/staff bouncing back to the specific
+    // page they were trying to reach), and a platform_owner can still
+    // navigate to /app manually at any time -- this only changes the
+    // POST-LOGIN DEFAULT LANDING, not route access.
     const isOwner = await isPlatformOwner()
     if (isOwner) {
       navigate('/platform', { replace: true })
       return
     }
+
+    const from = (location.state as { from?: Location })?.from?.pathname
+    if (from) {
+      // Came from a specific protected route (RequireAuth's redirect state)
+      // -- honor it as-is, same as before, for every non-platform-owner account.
+      navigate(from, { replace: true })
+      return
+    }
+
     const hasClub = await hasAnyActiveMembership()
     if (hasClub) {
       navigate('/app', { replace: true })
