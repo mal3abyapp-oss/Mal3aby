@@ -6,6 +6,24 @@ Last updated: 2026-08-19
 
 ---
 
+## 2026-08-19 — Product/UX/Booking/Payment directive (brand, booking policy, payment hold, contact separation, payment methods+receipts)
+
+Full implementation of the MAL3ABY PRODUCT, UX, BOOKING, PAYMENT & DESIGN DEVELOPMENT directive: brand identity fix (Mala3by -> Mal3aby across all user-facing copy), platform-contact/club-contact separation, configurable booking-window policy enforced server-side, real server-backed 60-minute payment hold with a pg_cron reaper, extensible per-club payment methods, in-app + WhatsApp payment receipt workflow with an idempotent staff approval queue, and the Booking Success/Secure Booking payment panel.
+
+**Database**: 7 new migrations applied directly via Supabase MCP and committed as `.sql` files (`20260819160000` through `20260819220000`) — platform contact + club booking policy schema/RPCs, booking payment-hold-expiry + pg_cron reaper, public booking policy enforcement inside `create_public_booking()`, public payment-methods/receipt-contact RPCs (anon-safe, scoped by `booking_id`), payment-proof upload/review schema + private storage bucket, and two security-hardening migrations revoking anon EXECUTE from staff-only write RPCs (`set_club_booking_policy`, `approve_payment_proof`, `reject_payment_proof`) and the cron-only `expire_stale_booking_holds()` reaper (found via Supabase security advisor, fixed and re-verified live — cron kept succeeding every minute throughout).
+
+**Frontend**: `mala3by-frontend` redeployed via `wrangler deploy` from a fresh `npm run build` (commit `bf68eea`). Version `9302c90d-ce55-4abd-aeb2-7988bd3ba396`.
+
+**Full regression + live production E2E verification performed**:
+- Real booking created through `https://mal3aby.app/c/fayed`'s actual UI (not SQL shortcut) for tomorrow — booking `MB-B7EB6177`, correct total, exactly 1 `notification_queue` row (`booking-created`, no duplicates), live server-backed countdown confirmed ticking down from a real `hold_expires_at`.
+- Today branch verified live: real-time availability list, race-condition warning copy, Call/WhatsApp CTAs correctly using the **club's own** number (never platform contact) — confirmed via `read_page` href inspection (`tel:+201234567890`, `wa.me/201234567890...`).
+- Adversarial SQL: same-day online booking blocked server-side; tomorrow/day-after-tomorrow allowed with correct `hold_expires_at`; day+3 (an otherwise-open day) rejected specifically by window policy; **live double-booking attempt against an actively-held slot correctly rejected** by the EXCLUDE constraint with a real user-facing error, proving the payment hold is a genuine atomic reservation, not just a UI countdown.
+- Settings UI (`ClubContactCard`, `BookingPolicyCard`) and Finance `PendingPaymentsPage` all confirmed rendering live in production, in both Arabic and English, with a real already-configured club (distinct general vs. payment-receipt WhatsApp numbers both present and correctly separated).
+- WhatsApp 1-message-per-booking-event behavior re-confirmed: `_create_booking_internal()` (staff-side) queues exactly one template depending on paid/unpaid at creation, never both; live `notification_queue` counts for every booking checked this session were exactly 1.
+- Cross-tenant enumeration re-confirmed closed by design: all 4 new anon-safe RPCs are scoped through a real `booking_id` join to `bookings.club_id`, with no code path accepting a raw `club_id` parameter.
+
+**One test booking (`MB-B7EB6177`) was left in `pending_payment`** deliberately, to observe its own `hold_expires_at` (~07:44 UTC) expire naturally via the live pg_cron reaper as a final real-world proof point, rather than manually cancelling it.
+
 ## 2026-08-19 — Final hardening redeploy (Tasks #2-#7)
 
 Full redeploy of everything accumulated locally since the 2026-08-18 report above (status-write-race fencing, duplicate-message fix, Secure Booking Link as primary UX, real Arabic invoice PDF shaping fix, full English localization sweep, public club booking URL/QR system).
