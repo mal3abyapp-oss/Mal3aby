@@ -4792,6 +4792,11 @@ export type Database = {
         Args: { p_branch_id: string; p_club_id: string }
         Returns: string
       }
+      log_own_password_changed: { Args: never; Returns: undefined }
+      log_password_reset_event: {
+        Args: { p_kind: string; p_target_user_id?: string }
+        Returns: undefined
+      }
       mark_attendance: {
         Args: { p_player_id: string; p_session_id: string; p_status: string }
         Returns: string

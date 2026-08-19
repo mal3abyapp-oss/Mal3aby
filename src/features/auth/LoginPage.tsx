@@ -24,6 +24,23 @@ async function hasAnyActiveMembership(): Promise<boolean> {
   return (count ?? 0) > 0
 }
 
+// Platform Owner routing fix: a platform_owner previously landed on
+// /app (same as any club_owner) and had to manually type /platform --
+// reuses the exact same is_platform_owner() RPC RequirePlatformOwner
+// itself checks (see RequireAuth.tsx), so this is never a second,
+// possibly-drifting definition of "who is a platform owner". Checked
+// FIRST, ahead of the club-membership check: a platform_owner who also
+// happens to hold a club membership (a real, supported multi-role
+// scenario -- see AuthProvider's own dedupe comment) still lands on
+// /platform by default. They are never locked out of /app -- the route
+// itself has no platform-owner exclusion, so manual navigation to /app
+// continues to work exactly as before this change.
+async function isPlatformOwner(): Promise<boolean> {
+  const { data, error } = await supabase.rpc('is_platform_owner')
+  if (error) return false
+  return data === true
+}
+
 // Gate 3 (Unified Accounts): a login with no staff membership is not
 // necessarily a prospective club owner who hasn't onboarded yet -- it
 // may be a customer/guardian who has claimed (or can claim) a
@@ -69,6 +86,11 @@ export function LoginPage() {
       return
     }
 
+    const isOwner = await isPlatformOwner()
+    if (isOwner) {
+      navigate('/platform', { replace: true })
+      return
+    }
     const hasClub = await hasAnyActiveMembership()
     if (hasClub) {
       navigate('/app', { replace: true })

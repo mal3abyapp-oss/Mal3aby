@@ -20,6 +20,20 @@ export function ForgotPasswordPage() {
     await supabase.auth.resetPasswordForEmail(email, {
       redirectTo: `${window.location.origin}/reset-password`,
     })
+    // Platform Owner & Password Security directive: best-effort audit
+    // event. Deliberately NOT awaited into the success/failure branch --
+    // this request is anonymous by design (no session exists yet, and
+    // must never differ in timing/behavior based on whether the email
+    // is registered), and log_password_reset_event('self_requested')
+    // requires auth.uid(), which is null here -- it will simply no-op
+    // server-side for an unauthenticated caller. This call exists only
+    // to cover the case where a signed-in user reaches this same page
+    // deliberately (e.g. to rotate credentials); it never blocks or
+    // alters the response shown to the visitor.
+    await supabase.rpc('log_password_reset_event', { p_kind: 'self_requested' }).then(
+      () => undefined,
+      () => undefined,
+    )
     setSubmitting(false)
     // Always show the same success state regardless of whether the email
     // exists — never reveal account existence via response differences.

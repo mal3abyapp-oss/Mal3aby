@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { useQuery } from '@tanstack/react-query'
+import { useMutation, useQuery } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
 import { supabase } from '@/lib/supabase/client'
 import { useDirection } from '@/app/providers/DirectionProvider'
@@ -9,6 +9,7 @@ import { StatCard } from '@/components/ui/stat-card'
 import { DataTable, type DataTableColumn } from '@/components/ui/data-table'
 import { StatusBadge } from '@/components/ui/status-badge'
 import { Input } from '@/components/ui/input'
+import { Button } from '@/components/ui/button'
 import { CLUB_STATUS_LABELS } from '@/features/platform/labels'
 
 // Gate 13 task #55: the platform owner console had no way to see WHO
@@ -43,7 +44,46 @@ export function PlatformOwnersPage() {
   const { t } = useTranslation()
   const { locale } = useDirection()
   const [search, setSearch] = useState('')
+  const [resetSentFor, setResetSentFor] = useState<string | null>(null)
+  const [resetError, setResetError] = useState<string | null>(null)
   const { data: owners = [], isLoading } = useQuery({ queryKey: ['platform-owners'], queryFn: fetchOwners })
+
+  // Platform Owner & Password Security directive item 17/18: the
+  // preferred admin action is "send a reset email", never viewing or
+  // setting a user's password directly. resetPasswordForEmail() is
+  // Supabase Auth's own public, rate-limited mechanism (no service_role
+  // key, no custom token system) -- the same call ForgotPasswordPage
+  // already uses, just triggered by the platform owner on someone
+  // else's behalf instead of by the user themselves. Real server-side
+  // authorization for the AUDIT record (not the email-send itself,
+  // which needs no elevated privilege by design) is enforced inside
+  // log_password_reset_event('platform_owner_initiated') via
+  // is_platform_owner() -- a non-owner calling this RPC gets a real
+  // "not authorized" rejection, not just a hidden button.
+  const sendResetMutation = useMutation({
+    mutationFn: async (owner: OwnerRow) => {
+      if (!owner.email) throw new Error('NO_EMAIL')
+      const { error: sendError } = await supabase.auth.resetPasswordForEmail(owner.email, {
+        redirectTo: `${window.location.origin}/reset-password`,
+      })
+      if (sendError) throw sendError
+      const { error: auditError } = await supabase.rpc('log_password_reset_event', {
+        p_kind: 'platform_owner_initiated',
+        p_target_user_id: owner.user_id,
+      })
+      if (auditError) throw auditError
+      return owner.membership_id
+    },
+    onSuccess: (membershipId) => {
+      setResetError(null)
+      setResetSentFor(membershipId)
+      setTimeout(() => setResetSentFor((cur) => (cur === membershipId ? null : cur)), 4000)
+    },
+    onError: (err: unknown) => {
+      const message = err instanceof Error ? err.message : ''
+      setResetError(message === 'NO_EMAIL' ? t('platform.ownersPage.resetNoEmail') : t('platform.ownersPage.resetError'))
+    },
+  })
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase()
@@ -138,6 +178,30 @@ export function PlatformOwnersPage() {
       ),
     },
     { key: 'since', header: t('platform.ownersPage.columns.since'), render: (o) => new Date(o.owner_since).toLocaleDateString(locale === 'en' ? 'en-US' : 'ar-EG') },
+    {
+      key: 'security',
+      header: t('platform.ownersPage.columns.security'),
+      render: (o, index, rows) => {
+        const isFirstOfOwner = index === 0 || rows[index - 1]?.user_id !== o.user_id
+        if (!isFirstOfOwner) return null
+        const justSent = resetSentFor === o.membership_id
+        const isSending = sendResetMutation.isPending && sendResetMutation.variables?.membership_id === o.membership_id
+        return (
+          <Button
+            size="sm"
+            variant="outline"
+            disabled={isSending || !o.email}
+            onClick={() => sendResetMutation.mutate(o)}
+          >
+            {justSent
+              ? t('platform.ownersPage.resetSent')
+              : isSending
+                ? t('platform.ownersPage.resetSending')
+                : t('platform.ownersPage.sendPasswordReset')}
+          </Button>
+        )
+      },
+    },
   ]
 
   return (
@@ -155,6 +219,7 @@ export function PlatformOwnersPage() {
           onChange={(e) => setSearch(e.target.value)}
         />
       </div>
+      {resetError && <p role="alert" className="mb-3 text-sm text-status-danger">{resetError}</p>}
       <DataTable
         columns={columns}
         rows={sortedFiltered}

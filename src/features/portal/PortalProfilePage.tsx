@@ -2,11 +2,13 @@ import { useState, type FormEvent } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
 import { supabase } from '@/lib/supabase/client'
+import { useAuth } from '@/app/providers/AuthProvider'
 import { PageHeader } from '@/components/ui/page-header'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { translateSupabaseError } from '@/lib/errors'
+import { ChangePasswordCard } from '@/features/account/ChangePasswordCard'
 
 // Gate 3 — "My Account": contact-preference self-service edit (the
 // columns protect_customer_identity_columns() explicitly allows a
@@ -44,6 +46,7 @@ async function fetchMyCustomerRecords(): Promise<MyCustomerRecord[]> {
 
 export function PortalProfilePage() {
   const { t } = useTranslation()
+  const { session } = useAuth()
   const queryClient = useQueryClient()
   const { data: records = [], isLoading } = useQuery({ queryKey: ['portal', 'my-customer-records'], queryFn: fetchMyCustomerRecords })
   const [selectedClubId, setSelectedClubId] = useState<string | null>(null)
@@ -152,6 +155,16 @@ export function PortalProfilePage() {
             {saveMutation.isPending ? t('portal.profilePage.saving') : t('portal.profilePage.saveChanges')}
           </Button>
         </form>
+      )}
+
+      {/* Platform Owner & Password Security directive: same shared
+          ChangePasswordCard staff use via Settings -- customers get
+          the identical self-service flow, not a second implementation. */}
+      {session?.user.email && (
+        <div className="flex flex-col gap-4">
+          <h2 className="text-sm font-semibold text-text-secondary">{t('account.securitySection')}</h2>
+          <ChangePasswordCard userEmail={session.user.email} />
+        </div>
       )}
     </div>
   )

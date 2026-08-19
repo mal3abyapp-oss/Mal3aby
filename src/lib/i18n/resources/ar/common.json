@@ -362,7 +362,8 @@
         "code": "الكود",
         "clubStatus": "حالة النادي",
         "membershipStatus": "حالة العضوية",
-        "since": "مالك منذ"
+        "since": "مالك منذ",
+        "security": "الأمان"
       },
       "membershipStatusLabels": {
         "active": "نشطة",
@@ -383,6 +384,11 @@
         "trial": "تجربة مجانية",
         "paid": "مدفوع"
       },
+      "sendPasswordReset": "إرسال إعادة تعيين كلمة المرور",
+      "resetSending": "جارٍ الإرسال...",
+      "resetSent": "تم إرسال رسالة إعادة التعيين",
+      "resetNoEmail": "لا يوجد بريد إلكتروني مسجّل لهذا المستخدم.",
+      "resetError": "تعذّر إرسال رسالة إعادة تعيين كلمة المرور.",
       "emptyTitle": "لا توجد نتائج مطابقة",
       "emptyTitleNoOwners": "لا يوجد أصحاب أندية بعد"
     },
@@ -700,6 +706,27 @@
       "updateError": "تعذّر تحديث كلمة المرور. جرّب طلب رابط إعادة تعيين جديد.",
       "saving": "جارٍ الحفظ...",
       "savePassword": "حفظ كلمة المرور"
+    }
+  },
+  "account": {
+    "securitySection": "الأمان",
+    "changePassword": {
+      "title": "تغيير كلمة المرور",
+      "currentPasswordLabel": "كلمة المرور الحالية",
+      "newPasswordLabel": "كلمة المرور الجديدة",
+      "confirmPasswordLabel": "تأكيد كلمة المرور الجديدة",
+      "showPassword": "إظهار كلمة المرور",
+      "hidePassword": "إخفاء كلمة المرور",
+      "requirementsHint": "{{min}} أحرف على الأقل.",
+      "allFieldsRequired": "املأ الحقول الثلاثة كلها.",
+      "tooShort": "يجب أن تتكون كلمة المرور الجديدة من {{min}} أحرف على الأقل.",
+      "mismatch": "كلمة المرور الجديدة والتأكيد غير متطابقين.",
+      "sameAsCurrent": "يجب أن تكون كلمة المرور الجديدة مختلفة عن الحالية.",
+      "wrongCurrentPassword": "كلمة المرور الحالية غير صحيحة.",
+      "genericError": "تعذّر تغيير كلمة المرور. حاول مرة أخرى.",
+      "success": "تم تغيير كلمة المرور بنجاح",
+      "saving": "جارٍ الحفظ...",
+      "save": "تغيير كلمة المرور"
     }
   },
   "whatsapp": {

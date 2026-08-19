@@ -362,7 +362,8 @@
         "code": "Code",
         "clubStatus": "Club status",
         "membershipStatus": "Membership status",
-        "since": "Owner since"
+        "since": "Owner since",
+        "security": "Security"
       },
       "membershipStatusLabels": {
         "active": "Active",
@@ -383,6 +384,11 @@
         "trial": "Free trial",
         "paid": "Paid"
       },
+      "sendPasswordReset": "Send password reset",
+      "resetSending": "Sending...",
+      "resetSent": "Reset email sent",
+      "resetNoEmail": "This user has no email on file.",
+      "resetError": "Couldn't send the password reset email.",
       "emptyTitle": "No matching results",
       "emptyTitleNoOwners": "No club owners yet"
     },
@@ -700,6 +706,27 @@
       "updateError": "Couldn't update the password. Try requesting a new reset link.",
       "saving": "Saving...",
       "savePassword": "Save password"
+    }
+  },
+  "account": {
+    "securitySection": "Security",
+    "changePassword": {
+      "title": "Change password",
+      "currentPasswordLabel": "Current password",
+      "newPasswordLabel": "New password",
+      "confirmPasswordLabel": "Confirm new password",
+      "showPassword": "Show password",
+      "hidePassword": "Hide password",
+      "requirementsHint": "At least {{min}} characters.",
+      "allFieldsRequired": "Fill in all three fields.",
+      "tooShort": "New password must be at least {{min}} characters.",
+      "mismatch": "New password and confirmation don't match.",
+      "sameAsCurrent": "New password must be different from your current password.",
+      "wrongCurrentPassword": "Current password is incorrect.",
+      "genericError": "Couldn't change the password. Please try again.",
+      "success": "Password changed successfully",
+      "saving": "Saving...",
+      "save": "Change password"
     }
   },
   "whatsapp": {
