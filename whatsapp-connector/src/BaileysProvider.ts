@@ -391,6 +391,56 @@ export class BaileysProvider implements WhatsAppProvider {
     await mkdir(authDir, { recursive: true, mode: 0o700 })
 
     const { state, saveCreds } = await useMultiFileAuthState(authDir)
+
+    // ROOT CAUSE FIX (2026-08-19) -- "Waiting for this message" stuck
+    // on the recipient's device despite Baileys reporting a successful
+    // send with a real message id. Confirmed live: a real test message
+    // sent through a freshly-redeployed container (session restored
+    // from Postgres, no new QR) was accepted by WhatsApp's relay
+    // (provider_reference present) but never decrypted on the
+    // recipient's phone.
+    //
+    // Root cause, confirmed by reading Baileys' own
+    // useMultiFileAuthState source (not assumed): `saveCreds()` only
+    // persists `creds.json` (top-level identity/registration state) and
+    // is only invoked on the `creds.update` event. Per-CONTACT Signal
+    // session state -- session-<jid>.json, prekeys, sender keys -- is
+    // written by `state.keys.set()`, a COMPLETELY SEPARATE code path
+    // with no event and no hook back into this connector at all. This
+    // connector's only persistence-to-Postgres trigger was
+    // `creds.update`, so every per-contact session-key write was
+    // landing on the container's own ephemeral local disk only, NEVER
+    // pushed to Postgres. On the next container restart (Cloudflare
+    // Containers' disk does not survive a restart, by design -- see
+    // this file's other ephemeral-disk comments), the restored session
+    // has the OLD/missing per-contact keys; Baileys silently
+    // renegotiates a new session with the recipient's device, but the
+    // recipient's own device still holds the OLD session and cannot
+    // decrypt anything encrypted under a session it doesn't recognize
+    // -- exactly WhatsApp's own "Waiting for this message" UI text.
+    //
+    // Fix: wrap `state.keys.set` so every per-contact session-key write
+    // ALSO triggers the exact same onCredsUpdate hook creds.update
+    // already uses (which re-reads and persists the WHOLE auth
+    // directory via encryptAuthDirForClub -- already correct, it just
+    // was never being called for this class of write). Debounced
+    // (500ms) since active messaging can trigger many key writes in
+    // quick succession and each Postgres round-trip is real network
+    // I/O; a short coalescing window is safe because the underlying
+    // files are already durably written to local disk synchronously by
+    // Baileys' own keys.set before this callback fires -- the debounce
+    // only delays the Postgres push, never risks losing a write.
+    let keysPersistTimer: ReturnType<typeof setTimeout> | undefined
+    const originalKeysSet = state.keys.set.bind(state.keys)
+    state.keys.set = async (data) => {
+      await originalKeysSet(data)
+      if (myGeneration !== this.generation) return
+      if (keysPersistTimer) clearTimeout(keysPersistTimer)
+      keysPersistTimer = setTimeout(() => {
+        if (myGeneration !== this.generation) return
+        this.hooks.onCredsUpdate?.()
+      }, 500)
+    }
     // fetchLatestBaileysVersion() itself has a try/catch that falls
     // back to a bundled default version on failure -- but its
     // underlying axios call has no timeout, so a network stall to
