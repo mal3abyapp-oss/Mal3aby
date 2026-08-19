@@ -117,6 +117,14 @@ export function PlatformClubDetailPage() {
   const [reasonDialogAction, setReasonDialogAction] = useState<null | 'cancel' | 'reverse' | 'suspend'>(null)
   const [reasonTarget, setReasonTarget] = useState<string | null>(null)
   const [reasonText, setReasonText] = useState('')
+  // Phase A directive (A2): create_platform_subscription now enforces a
+  // real per-owner trial-abuse guard (checked against
+  // automatic_trial_entitlements, not just the per-club uniqueness that
+  // existed before). When it rejects, the platform owner can still force
+  // an override, but only with a typed reason -- never silently, and
+  // always audit-logged as a distinct "override" action server-side.
+  const [trialBlockedReason, setTrialBlockedReason] = useState<string | null>(null)
+  const [trialOverrideReason, setTrialOverrideReason] = useState('')
   const [selectedPlanId, setSelectedPlanId] = useState<string>('')
   const [actionError, setActionError] = useState<string | null>(null)
   const [editingLimits, setEditingLimits] = useState(false)
@@ -195,16 +203,32 @@ export function PlatformClubDetailPage() {
   }
 
   const startTrialMutation = useMutation({
-    mutationFn: async () => {
+    mutationFn: async (override?: { reason: string }) => {
       const { error } = await supabase.rpc('create_platform_subscription', {
         p_club_id: clubId!,
         p_subscription_kind: 'trial',
         p_trial_origin: 'manual',
+        p_force_override: !!override,
+        p_override_reason: override?.reason,
       })
       if (error) throw error
     },
-    onSuccess: invalidateAll,
-    onError: () => setActionError(t('platform.clubDetailPage.errors.startTrial')),
+    onSuccess: () => {
+      setTrialBlockedReason(null)
+      setTrialOverrideReason('')
+      invalidateAll()
+    },
+    onError: (err: unknown) => {
+      // "trial not eligible" is a real, expected rejection (A2 guard) --
+      // surface it distinctly so the platform owner can choose to
+      // override with a reason, instead of a generic failure message.
+      const message = err instanceof Error ? err.message : ''
+      if (message.includes('trial not eligible')) {
+        setTrialBlockedReason(message)
+      } else {
+        setActionError(t('platform.clubDetailPage.errors.startTrial'))
+      }
+    },
   })
 
   const activateMutation = useMutation({
@@ -476,9 +500,33 @@ export function PlatformClubDetailPage() {
           <CardContent className="flex flex-wrap gap-2">
             {!currentSub && (
               <>
-                <Button size="sm" onClick={() => startTrialMutation.mutate()} disabled={startTrialMutation.isPending}>
-                  {t('platform.clubDetailPage.actionsCard.startTrial')}
-                </Button>
+                <div className="flex flex-col gap-2">
+                  <Button size="sm" onClick={() => startTrialMutation.mutate(undefined)} disabled={startTrialMutation.isPending}>
+                    {t('platform.clubDetailPage.actionsCard.startTrial')}
+                  </Button>
+                  {/* Phase A directive (A2): create_platform_subscription
+                      now enforces a real per-owner trial-eligibility check.
+                      If it rejects, show why and require a typed reason to
+                      override -- never a silent bypass. */}
+                  {trialBlockedReason && (
+                    <div className="flex max-w-sm flex-col gap-2 rounded-md border border-warning/40 bg-warning/5 p-3">
+                      <p className="text-xs text-text-secondary">{trialBlockedReason}</p>
+                      <Input
+                        placeholder={t('platform.clubDetailPage.actionsCard.trialOverrideReasonPlaceholder')}
+                        value={trialOverrideReason}
+                        onChange={(e) => setTrialOverrideReason(e.target.value)}
+                      />
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        disabled={!trialOverrideReason.trim() || startTrialMutation.isPending}
+                        onClick={() => startTrialMutation.mutate({ reason: trialOverrideReason.trim() })}
+                      >
+                        {t('platform.clubDetailPage.actionsCard.forceTrialOverride')}
+                      </Button>
+                    </div>
+                  )}
+                </div>
                 <div className="flex items-center gap-2">
                   <Select value={selectedPlanId} onValueChange={setSelectedPlanId}>
                     <SelectTrigger className="w-40"><SelectValue placeholder={t('platform.clubDetailPage.actionsCard.choosePlanPlaceholder')} /></SelectTrigger>

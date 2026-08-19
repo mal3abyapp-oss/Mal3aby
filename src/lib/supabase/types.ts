@@ -2926,7 +2926,6 @@ export type Database = {
       }
       platform_settings: {
         Row: {
-          default_grace_period_days: number
           default_trial_days: number
           id: boolean
           platform_email: string | null
@@ -2934,7 +2933,6 @@ export type Database = {
           updated_at: string | null
         }
         Insert: {
-          default_grace_period_days?: number
           default_trial_days?: number
           id?: boolean
           platform_email?: string | null
@@ -2942,7 +2940,6 @@ export type Database = {
           updated_at?: string | null
         }
         Update: {
-          default_grace_period_days?: number
           default_trial_days?: number
           id?: boolean
           platform_email?: string | null
@@ -4327,6 +4324,17 @@ export type Database = {
         }
         Returns: string
       }
+      check_trial_eligibility: {
+        Args: {
+          p_email: string
+          p_normalized_mobile: string
+          p_user_id: string
+        }
+        Returns: {
+          blocking_reason: string
+          eligible: boolean
+        }[]
+      }
       claim_customer_self_service: {
         Args: { p_club_id: string; p_customer_id: string }
         Returns: string
@@ -4423,6 +4431,8 @@ export type Database = {
       create_platform_subscription: {
         Args: {
           p_club_id: string
+          p_force_override?: boolean
+          p_override_reason?: string
           p_plan_id?: string
           p_subscription_kind: string
           p_trial_origin?: string
@@ -4605,6 +4615,33 @@ export type Database = {
         }
         Returns: Json
       }
+      get_platform_audit_log: {
+        Args: {
+          p_action?: string
+          p_actor_id?: string
+          p_club_id?: string
+          p_entity_type?: string
+          p_from?: string
+          p_limit?: number
+          p_offset?: number
+          p_to?: string
+        }
+        Returns: {
+          action: string
+          actor_email: string
+          actor_id: string
+          actor_name: string
+          after: Json
+          before: Json
+          club_id: string
+          club_name: string
+          created_at: string
+          entity_id: string
+          entity_type: string
+          id: string
+          reason: string
+        }[]
+      }
       get_platform_club_owners: {
         Args: never
         Returns: {
@@ -4619,6 +4656,14 @@ export type Database = {
           owner_since: string
           phone: string
           user_id: string
+        }[]
+      }
+      get_platform_clubs_access: {
+        Args: { p_club_ids: string[] }
+        Returns: {
+          access: string
+          club_id: string
+          reason: string
         }[]
       }
       get_platform_contact: {
@@ -4993,6 +5038,10 @@ export type Database = {
       }
       unfreeze_subscription: {
         Args: { p_reason?: string; p_subscription_id: string }
+        Returns: undefined
+      }
+      update_platform_settings: {
+        Args: { p_default_trial_days: number }
         Returns: undefined
       }
       user_club_ids: { Args: never; Returns: string[] }

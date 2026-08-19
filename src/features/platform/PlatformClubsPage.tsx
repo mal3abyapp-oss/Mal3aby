@@ -37,12 +37,18 @@ async function fetchClubs(offset: number): Promise<{ rows: ClubRow[]; hasMore: b
   if (error) throw error
   if (!clubs) return { rows: [], hasMore: false }
 
-  const withAccess = await Promise.all(
-    clubs.map(async (c) => {
-      const { data: access } = await supabase.rpc('get_club_platform_access', { p_club_id: c.id })
-      return { ...c, access: access ?? 'blocked' }
-    }),
-  )
+  // Phase A directive (A3): this used to call get_club_platform_access()
+  // once PER CLUB via Promise.all, re-run in full on every "load more"
+  // click -- cost grew with total pages loaded, not just the newest page.
+  // Batched into a single RPC call per page instead.
+  const clubIds = clubs.map((c) => c.id)
+  const { data: accessRows, error: accessError } =
+    clubIds.length > 0
+      ? await supabase.rpc('get_platform_clubs_access', { p_club_ids: clubIds })
+      : { data: [] as { club_id: string; access: string; reason: string }[], error: null }
+  if (accessError) throw accessError
+  const accessByClub = new Map((accessRows ?? []).map((r) => [r.club_id, r.access]))
+  const withAccess = clubs.map((c) => ({ ...c, access: accessByClub.get(c.id) ?? 'blocked' }))
 
   return { rows: withAccess, hasMore: clubs.length === PAGE_SIZE }
 }

@@ -161,12 +161,21 @@
       "title": "سجل التدقيق",
       "description": "سجل غير قابل للتعديل لكل إجراء حساس على مستوى المنصة",
       "time": "الوقت",
+      "actor": "من قام بالإجراء",
+      "systemActor": "النظام",
       "club": "النادي",
       "platformLevel": "مستوى المنصة",
       "clubFallback": "نادٍ",
       "action": "الإجراء",
       "entity": "الكيان",
+      "whatChanged": "ماذا تغيّر",
+      "noFieldChanges": "لا تغييرات في الحقول",
+      "moreFields": "حقول إضافية",
+      "showTechnicalDetails": "عرض التفاصيل التقنية",
+      "hideTechnicalDetails": "إخفاء التفاصيل التقنية",
       "reason": "السبب",
+      "filterAction": "تصفية حسب الإجراء",
+      "filterEntity": "تصفية حسب الكيان",
       "emptyTitle": "لا يوجد سجل تدقيق بعد",
       "loadingMore": "جارٍ التحميل...",
       "loadMore": "تحميل المزيد"
@@ -221,6 +230,8 @@
       "actionsCard": {
         "title": "إجراءات",
         "startTrial": "بدء تجربة مجانية",
+        "trialOverrideReasonPlaceholder": "سبب تجاوز شرط الأهلية (إلزامي)",
+        "forceTrialOverride": "منح التجربة رغم ذلك",
         "choosePlanPlaceholder": "اختر خطة",
         "activate": "تفعيل",
         "renew": "تجديد",
@@ -334,6 +345,10 @@
         "trialCount": "تجارب مجانية نشطة",
         "expiringSoonCount": "اشتراكات تنتهي قريبًا",
         "newClubsThisMonth": "أندية جديدة هذا الشهر"
+      },
+      "noSubscriptionClubs": {
+        "title": "أندية بدون اشتراك على الإطلاق",
+        "description": "لا يوجد سجل اشتراك من أي نوع لهذا النادي — يحتاج مراجعة يدوية"
       },
       "pendingUpgradeRequests": {
         "title": "طلبات ترقية بانتظار المراجعة",
@@ -474,8 +489,7 @@
       "loading": "جارٍ التحميل...",
       "trialDaysLabel": "مدة التجربة المجانية الافتراضية (أيام)",
       "trialDaysHint": "تُستخدم عند بدء أي نادٍ جديد لتجربة مجانية تلقائية أو يدوية، ما لم تُحدَّد مدة مختلفة صراحةً.",
-      "graceDaysLabel": "فترة السماح الافتراضية (أيام)",
-      "graceDaysHint": "المدة الافتراضية عند بدء اشتراك جديد. يمكن تمديدها لاشتراك محدد لاحقًا من صفحة تفاصيل النادي.",
+      "graceMovedHint": "فترة السماح تُدار الآن لكل باقة على حدة من صفحة الباقات، وليست إعدادًا عامًا للمنصة.",
       "saving": "جارٍ الحفظ...",
       "save": "حفظ",
       "saved": "تم الحفظ",

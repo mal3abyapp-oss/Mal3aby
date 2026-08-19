@@ -18,6 +18,7 @@ interface OverviewData {
   activeClubs: number
   adminSuspendedClubs: number
   blockedAccessClubs: number
+  noSubscriptionClubs: number
   trialCount: number
   expiringSoonCount: number
   revenueThisMonth: number
@@ -90,16 +91,26 @@ async function fetchOverview(): Promise<OverviewData> {
       ?.filter((p) => new Date(p.recorded_at) >= monthStart)
       .reduce((sum, p) => sum + Number(p.amount), 0) ?? 0
 
-  const accessResults = await Promise.all(
-    (clubs ?? []).map((c) => supabase.rpc('get_club_platform_access', { p_club_id: c.id })),
-  )
-  const blockedAccessClubs = accessResults.filter((r) => r.data === 'blocked').length
+  // Phase A directive (A3): this used to call get_club_platform_access()
+  // once PER CLUB via Promise.all -- N sequential RPC round-trips on every
+  // Overview load, unbounded by the (also unpaginated here) clubs query.
+  // Replaced with a single batched RPC that resolves access for every club
+  // ID in one round-trip. See PlatformClubsPage.tsx for the same fix.
+  const clubIds = (clubs ?? []).map((c) => c.id)
+  const { data: accessRows, error: accessError } =
+    clubIds.length > 0
+      ? await supabase.rpc('get_platform_clubs_access', { p_club_ids: clubIds })
+      : { data: [] as { club_id: string; access: string; reason: string }[], error: null }
+  if (accessError) throw accessError
+  const blockedAccessClubs = (accessRows ?? []).filter((r) => r.access === 'blocked').length
+  const noSubscriptionClubs = (accessRows ?? []).filter((r) => r.reason === 'no_subscription').length
 
   return {
     totalClubs,
     activeClubs,
     adminSuspendedClubs,
     blockedAccessClubs,
+    noSubscriptionClubs,
     trialCount,
     expiringSoonCount,
     revenueThisMonth,
@@ -156,8 +167,31 @@ export function PlatformOverviewPage() {
           detail page, and new leads only by opening the Leads page. Both
           need a single glance from the landing dashboard, so they're
           shown here as actionable links, not duplicated lists. */}
-      {!isLoading && ((data?.pendingUpgradeRequests ?? 0) > 0 || (data?.newLeads ?? 0) > 0) && (
+      {!isLoading &&
+        ((data?.pendingUpgradeRequests ?? 0) > 0 ||
+          (data?.newLeads ?? 0) > 0 ||
+          (data?.noSubscriptionClubs ?? 0) > 0) && (
         <div className="mt-4 grid grid-cols-1 gap-4 md:grid-cols-2">
+          {/* Phase A/B directive: the audit found a real club with zero
+              platform_subscriptions rows -- get_club_platform_access()
+              correctly failed closed to 'blocked', but that state was
+              indistinguishable from any other blocked club (grace expired,
+              cancelled, etc). get_platform_clubs_access() now returns a
+              machine-readable `reason`, so this real data-integrity gap is
+              a distinct, actionable exception instead of an invisible one. */}
+          {(data?.noSubscriptionClubs ?? 0) > 0 && (
+            <Link to="/platform/clubs" className="block">
+              <Card className="border-danger/40 bg-danger/5 transition-colors hover:bg-danger/10">
+                <CardContent className="flex items-center justify-between p-4">
+                  <div>
+                    <p className="font-medium text-text-primary">{t('platform.overviewPage.noSubscriptionClubs.title')}</p>
+                    <p className="text-sm text-text-secondary">{t('platform.overviewPage.noSubscriptionClubs.description')}</p>
+                  </div>
+                  <span className="text-2xl font-semibold text-danger">{data?.noSubscriptionClubs}</span>
+                </CardContent>
+              </Card>
+            </Link>
+          )}
           {(data?.pendingUpgradeRequests ?? 0) > 0 && (
             <Link to="/platform/clubs" className="block">
               <Card className="border-warning/40 bg-warning/5 transition-colors hover:bg-warning/10">

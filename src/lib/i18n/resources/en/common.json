@@ -161,12 +161,21 @@
       "title": "Audit Log",
       "description": "An immutable record of every sensitive platform-level action",
       "time": "Time",
+      "actor": "Actor",
+      "systemActor": "System",
       "club": "Club",
       "platformLevel": "Platform level",
       "clubFallback": "Club",
       "action": "Action",
       "entity": "Entity",
+      "whatChanged": "What changed",
+      "noFieldChanges": "No field changes",
+      "moreFields": "more fields",
+      "showTechnicalDetails": "Show technical details",
+      "hideTechnicalDetails": "Hide technical details",
       "reason": "Reason",
+      "filterAction": "Filter by action",
+      "filterEntity": "Filter by entity",
       "emptyTitle": "No audit log yet",
       "loadingMore": "Loading...",
       "loadMore": "Load more"
@@ -221,6 +230,8 @@
       "actionsCard": {
         "title": "Actions",
         "startTrial": "Start free trial",
+        "trialOverrideReasonPlaceholder": "Reason to override eligibility (required)",
+        "forceTrialOverride": "Grant trial anyway",
         "choosePlanPlaceholder": "Choose a plan",
         "activate": "Activate",
         "renew": "Renew",
@@ -334,6 +345,10 @@
         "trialCount": "Active free trials",
         "expiringSoonCount": "Subscriptions expiring soon",
         "newClubsThisMonth": "New clubs this month"
+      },
+      "noSubscriptionClubs": {
+        "title": "Clubs with no subscription at all",
+        "description": "No subscription record exists for this club — needs manual review"
       },
       "pendingUpgradeRequests": {
         "title": "Upgrade requests awaiting review",
@@ -474,8 +489,7 @@
       "loading": "Loading...",
       "trialDaysLabel": "Default free trial length (days)",
       "trialDaysHint": "Used when any new club starts an automatic or manual free trial, unless a different length is set explicitly.",
-      "graceDaysLabel": "Default grace period (days)",
-      "graceDaysHint": "The default length when a new subscription starts. It can be extended for a specific subscription later from the club detail page.",
+      "graceMovedHint": "Grace period is now managed per plan from the Plans page, not as a platform-wide default.",
       "saving": "Saving...",
       "save": "Save",
       "saved": "Saved",
