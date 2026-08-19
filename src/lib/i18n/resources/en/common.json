@@ -250,7 +250,17 @@
       },
       "whatsappCard": {
         "title": "WhatsApp health",
-        "comingInPhaseE": "A WhatsApp status summary for this club will appear here."
+        "status": "Status",
+        "number": "Connected number",
+        "failures7d": "Failures (7d)",
+        "pending": "Pending",
+        "statusLabels": {
+          "connected": "Connected",
+          "not_connected": "Not connected",
+          "logged_out": "Logged out",
+          "qr_pending": "Awaiting QR scan",
+          "connecting": "Connecting"
+        }
       },
       "actionsCard": {
         "title": "Actions",
@@ -402,6 +412,14 @@
       "noSubscriptionClubs": {
         "title": "Clubs with no subscription at all",
         "description": "No subscription record exists for this club — needs manual review"
+      },
+      "whatsappDisconnected": {
+        "title": "Clubs with WhatsApp disconnected",
+        "description": "Previously connected, now disconnected — needs review"
+      },
+      "whatsappFailures": {
+        "title": "Failed WhatsApp messages (7d)",
+        "description": "Total failed send attempts across all clubs"
       },
       "pendingUpgradeRequests": {
         "title": "Upgrade requests awaiting review",

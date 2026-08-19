@@ -4692,6 +4692,19 @@ export type Database = {
           platform_phone: string
         }[]
       }
+      get_platform_whatsapp_health: {
+        Args: never
+        Returns: {
+          circuit_breaker_open: boolean
+          club_id: string
+          club_name: string
+          connected_phone_masked: string
+          connection_status: string
+          failed_count_7d: number
+          last_seen_at: string
+          pending_count: number
+        }[]
+      }
       get_public_booking_receipt_contact: {
         Args: { p_booking_id: string }
         Returns: {

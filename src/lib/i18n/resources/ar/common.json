@@ -250,7 +250,17 @@
       },
       "whatsappCard": {
         "title": "صحة واتساب",
-        "comingInPhaseE": "سيتم إضافة ملخص حالة واتساب لهذا النادي هنا."
+        "status": "الحالة",
+        "number": "الرقم المتصل",
+        "failures7d": "فشل آخر 7 أيام",
+        "pending": "قيد الانتظار",
+        "statusLabels": {
+          "connected": "متصل",
+          "not_connected": "غير متصل",
+          "logged_out": "تم تسجيل الخروج",
+          "qr_pending": "بانتظار مسح رمز QR",
+          "connecting": "جارٍ الاتصال"
+        }
       },
       "actionsCard": {
         "title": "إجراءات",
@@ -402,6 +412,14 @@
       "noSubscriptionClubs": {
         "title": "أندية بدون اشتراك على الإطلاق",
         "description": "لا يوجد سجل اشتراك من أي نوع لهذا النادي — يحتاج مراجعة يدوية"
+      },
+      "whatsappDisconnected": {
+        "title": "أندية واتساب غير متصلة",
+        "description": "كان متصلًا سابقًا والآن غير متصل — يحتاج مراجعة"
+      },
+      "whatsappFailures": {
+        "title": "رسائل واتساب فاشلة (7 أيام)",
+        "description": "إجمالي محاولات الإرسال الفاشلة عبر كل الأندية"
       },
       "pendingUpgradeRequests": {
         "title": "طلبات ترقية بانتظار المراجعة",

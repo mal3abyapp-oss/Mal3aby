@@ -160,6 +160,20 @@ export function PlatformClubDetailPage() {
     },
     enabled: !!clubId,
   })
+  // Phase E directive (C8/E4): fills the WhatsApp health placeholder
+  // card added in Phase C. Reuses the same batched, platform-wide RPC
+  // Overview uses (no new N+1 surface) and filters to this one club --
+  // cheap at current scale, and keeps a single source of truth for
+  // WhatsApp health logic instead of a second per-club RPC.
+  const { data: whatsappHealthRow } = useQuery({
+    queryKey: ['platform-whatsapp-health', clubId],
+    queryFn: async () => {
+      const { data, error } = await supabase.rpc('get_platform_whatsapp_health')
+      if (error) throw error
+      return (data ?? []).find((w) => w.club_id === clubId) ?? null
+    },
+    enabled: !!clubId,
+  })
   const { data: access } = useQuery({
     queryKey: ['platform-club-access', clubId],
     queryFn: async () => {
@@ -594,17 +608,35 @@ export function PlatformClubDetailPage() {
         </Card>
       </div>
 
-      {/* Phase C directive (C8): a placeholder section for WhatsApp
-          platform health, to be filled by Phase E's batched health RPC --
-          intentionally not built here to avoid a second N+1 surface;
-          this just reserves the visual slot so Phase E only needs to
-          fill it in, not restructure the page. */}
+      {/* Phase E directive (C8/E4): operational health only -- connection
+          state, masked phone (last 4 digits), failure/queue counts.
+          Never message content, per the directive's explicit privacy
+          requirement (respect tenant privacy -- no customer conversation
+          content). */}
       <Card className="mb-4">
         <CardHeader>
           <CardTitle className="text-base">{t('platform.clubDetailPage.whatsappCard.title')}</CardTitle>
         </CardHeader>
-        <CardContent>
-          <p className="text-sm text-text-secondary">{t('platform.clubDetailPage.whatsappCard.comingInPhaseE')}</p>
+        <CardContent className="grid grid-cols-2 gap-3 text-sm md:grid-cols-4">
+          <div>
+            <p className="text-text-secondary">{t('platform.clubDetailPage.whatsappCard.status')}</p>
+            <StatusBadge
+              tone={whatsappHealthRow?.connection_status === 'connected' ? 'success' : whatsappHealthRow?.connection_status === 'not_connected' ? 'neutral' : 'danger'}
+              label={t(`platform.clubDetailPage.whatsappCard.statusLabels.${whatsappHealthRow?.connection_status ?? 'not_connected'}`, { defaultValue: whatsappHealthRow?.connection_status ?? '—' })}
+            />
+          </div>
+          <div>
+            <p className="text-text-secondary">{t('platform.clubDetailPage.whatsappCard.number')}</p>
+            <bdi>{whatsappHealthRow?.connected_phone_masked ?? '—'}</bdi>
+          </div>
+          <div>
+            <p className="text-text-secondary">{t('platform.clubDetailPage.whatsappCard.failures7d')}</p>
+            <p className="font-medium tabular-nums">{whatsappHealthRow?.failed_count_7d ?? 0}</p>
+          </div>
+          <div>
+            <p className="text-text-secondary">{t('platform.clubDetailPage.whatsappCard.pending')}</p>
+            <p className="font-medium tabular-nums">{whatsappHealthRow?.pending_count ?? 0}</p>
+          </div>
         </CardContent>
       </Card>
 

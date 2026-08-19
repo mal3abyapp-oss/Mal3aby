@@ -25,6 +25,8 @@ interface OverviewData {
   newClubsThisMonth: number
   pendingUpgradeRequests: number
   newLeads: number
+  whatsappDisconnectedCount: number
+  whatsappFailuresCount: number
 }
 
 async function fetchOverview(): Promise<OverviewData> {
@@ -34,6 +36,7 @@ async function fetchOverview(): Promise<OverviewData> {
     { data: payments, error: paymentsError },
     { count: pendingUpgradeRequests, error: upgradeError },
     { count: newLeads, error: leadsError },
+    { data: whatsappHealth, error: whatsappError },
   ] = await Promise.all([
     supabase.from('clubs').select('id, status, created_at'),
     supabase
@@ -46,6 +49,10 @@ async function fetchOverview(): Promise<OverviewData> {
       .is('reversed_at', null),
     supabase.from('commercial_upgrade_requests').select('id', { count: 'exact', head: true }).eq('status', 'pending'),
     supabase.from('contact_requests').select('id', { count: 'exact', head: true }).eq('status', 'new'),
+    // Phase E directive: the single largest operational gap the audit
+    // found -- zero WhatsApp visibility anywhere in the platform console.
+    // One batched RPC (not per-club), consistent with Phase A/C.
+    supabase.rpc('get_platform_whatsapp_health'),
   ])
 
   if (clubsError) throw clubsError
@@ -53,6 +60,7 @@ async function fetchOverview(): Promise<OverviewData> {
   if (paymentsError) throw paymentsError
   if (upgradeError) throw upgradeError
   if (leadsError) throw leadsError
+  if (whatsappError) throw whatsappError
 
   const now = new Date()
   const monthStart = new Date(now.getFullYear(), now.getMonth(), 1)
@@ -105,6 +113,14 @@ async function fetchOverview(): Promise<OverviewData> {
   const blockedAccessClubs = (accessRows ?? []).filter((r) => r.access === 'blocked').length
   const noSubscriptionClubs = (accessRows ?? []).filter((r) => r.reason === 'no_subscription').length
 
+  // Only count clubs that ever actually connected (had a whatsapp_accounts
+  // row) and are now not connected -- a club that simply never set up
+  // WhatsApp yet isn't a "disconnected" exception, it's just unconfigured.
+  const whatsappDisconnectedCount = (whatsappHealth ?? []).filter(
+    (w) => w.connection_status !== 'not_connected' && w.connection_status !== 'connected',
+  ).length
+  const whatsappFailuresCount = (whatsappHealth ?? []).reduce((sum, w) => sum + (w.failed_count_7d ?? 0), 0)
+
   return {
     totalClubs,
     activeClubs,
@@ -117,6 +133,8 @@ async function fetchOverview(): Promise<OverviewData> {
     newClubsThisMonth,
     pendingUpgradeRequests: pendingUpgradeRequests ?? 0,
     newLeads: newLeads ?? 0,
+    whatsappDisconnectedCount,
+    whatsappFailuresCount,
   }
 }
 
@@ -167,8 +185,41 @@ export function PlatformOverviewPage() {
       {!isLoading &&
         ((data?.pendingUpgradeRequests ?? 0) > 0 ||
           (data?.newLeads ?? 0) > 0 ||
-          (data?.noSubscriptionClubs ?? 0) > 0) && (
+          (data?.noSubscriptionClubs ?? 0) > 0 ||
+          (data?.whatsappDisconnectedCount ?? 0) > 0 ||
+          (data?.whatsappFailuresCount ?? 0) > 0) && (
         <div className="mt-4 grid grid-cols-1 gap-4 md:grid-cols-2">
+          {/* Phase E directive: the single largest operational gap the
+              audit found -- zero WhatsApp visibility platform-wide.
+              Only surfaces when there's a real issue (per the exception-
+              first principle already established for the other cards
+              here), not as a permanent dashboard fixture. */}
+          {(data?.whatsappDisconnectedCount ?? 0) > 0 && (
+            <Link to="/platform/clubs" className="block">
+              <Card className="border-danger/40 bg-danger/5 transition-colors hover:bg-danger/10">
+                <CardContent className="flex items-center justify-between p-4">
+                  <div>
+                    <p className="font-medium text-text-primary">{t('platform.overviewPage.whatsappDisconnected.title')}</p>
+                    <p className="text-sm text-text-secondary">{t('platform.overviewPage.whatsappDisconnected.description')}</p>
+                  </div>
+                  <span className="text-2xl font-semibold text-danger">{data?.whatsappDisconnectedCount}</span>
+                </CardContent>
+              </Card>
+            </Link>
+          )}
+          {(data?.whatsappFailuresCount ?? 0) > 0 && (
+            <Link to="/platform/clubs" className="block">
+              <Card className="border-warning/40 bg-warning/5 transition-colors hover:bg-warning/10">
+                <CardContent className="flex items-center justify-between p-4">
+                  <div>
+                    <p className="font-medium text-text-primary">{t('platform.overviewPage.whatsappFailures.title')}</p>
+                    <p className="text-sm text-text-secondary">{t('platform.overviewPage.whatsappFailures.description')}</p>
+                  </div>
+                  <span className="text-2xl font-semibold text-warning">{data?.whatsappFailuresCount}</span>
+                </CardContent>
+              </Card>
+            </Link>
+          )}
           {/* Phase A/B directive: the audit found a real club with zero
               platform_subscriptions rows -- get_club_platform_access()
               correctly failed closed to 'blocked', but that state was
