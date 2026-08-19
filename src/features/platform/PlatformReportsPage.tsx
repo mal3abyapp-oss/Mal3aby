@@ -2,6 +2,7 @@ import { useQuery } from '@tanstack/react-query'
 import { Link } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { supabase } from '@/lib/supabase/client'
+import { useDirection } from '@/app/providers/DirectionProvider'
 import { PageHeader } from '@/components/ui/page-header'
 import { DataTable, type DataTableColumn } from '@/components/ui/data-table'
 import { MoneyDisplay } from '@/components/ui/money-display'
@@ -59,7 +60,7 @@ interface RevenueRow {
   amount: number
 }
 
-async function fetchRevenueReport(): Promise<RevenueRow[]> {
+async function fetchRevenueReport(locale: 'ar' | 'en'): Promise<RevenueRow[]> {
   const { data, error } = await supabase
     .from('platform_payments')
     .select('amount, method, recorded_at')
@@ -67,7 +68,7 @@ async function fetchRevenueReport(): Promise<RevenueRow[]> {
     .order('recorded_at', { ascending: false })
   if (error) throw error
   return (data ?? []).map((r) => ({
-    month: new Date(r.recorded_at).toLocaleDateString('ar-EG', { year: 'numeric', month: 'long' }),
+    month: new Date(r.recorded_at).toLocaleDateString(locale === 'en' ? 'en-US' : 'ar-EG', { year: 'numeric', month: 'long' }),
     method: r.method,
     amount: Number(r.amount),
   }))
@@ -127,8 +128,9 @@ async function fetchUsageReport() {
 
 export function PlatformReportsPage() {
   const { t } = useTranslation()
+  const { locale } = useDirection()
   const { data: subReport = [] } = useQuery({ queryKey: ['report-subscriptions'], queryFn: fetchSubscriptionReport })
-  const { data: revenueReport = [] } = useQuery({ queryKey: ['report-revenue'], queryFn: fetchRevenueReport })
+  const { data: revenueReport = [] } = useQuery({ queryKey: ['report-revenue', locale], queryFn: () => fetchRevenueReport(locale) })
   const { data: renewalReport = [] } = useQuery({ queryKey: ['report-renewals'], queryFn: fetchRenewalReport })
   const { data: growthReport = [] } = useQuery({ queryKey: ['report-growth'], queryFn: fetchGrowthReport })
   const { data: usageReport = [] } = useQuery({ queryKey: ['report-usage'], queryFn: fetchUsageReport })
@@ -152,14 +154,14 @@ export function PlatformReportsPage() {
           defaultValue: LIFECYCLE_STATUS_LABELS[r.lifecycle_status] ?? r.lifecycle_status,
         }),
     },
-    { key: 'start', header: t('platform.reportsPage.subscriptionColumns.start'), render: (r) => new Date(r.start_at).toLocaleDateString('ar-EG') },
-    { key: 'end', header: t('platform.reportsPage.subscriptionColumns.end'), render: (r) => new Date(r.end_at).toLocaleDateString('ar-EG') },
+    { key: 'start', header: t('platform.reportsPage.subscriptionColumns.start'), render: (r) => new Date(r.start_at).toLocaleDateString(locale === 'en' ? 'en-US' : 'ar-EG') },
+    { key: 'end', header: t('platform.reportsPage.subscriptionColumns.end'), render: (r) => new Date(r.end_at).toLocaleDateString(locale === 'en' ? 'en-US' : 'ar-EG') },
     { key: 'price', header: t('platform.reportsPage.subscriptionColumns.price'), render: (r) => <MoneyDisplay amount={r.price_snapshot} size="sm" /> },
   ]
 
   const revenueColumns: DataTableColumn<RevenueRow>[] = [
     { key: 'month', header: t('platform.reportsPage.revenueColumns.month'), render: (r) => r.month },
-    { key: 'method', header: t('platform.reportsPage.revenueColumns.method'), render: (r) => r.method },
+    { key: 'method', header: t('platform.reportsPage.revenueColumns.method'), render: (r) => t(`common.paymentMethodLabels.${r.method}`, { defaultValue: r.method }) },
     { key: 'amount', header: t('platform.reportsPage.revenueColumns.amount'), render: (r) => <MoneyDisplay amount={r.amount} size="sm" /> },
   ]
 
@@ -173,7 +175,7 @@ export function PlatformReportsPage() {
         </Link>
       ),
     },
-    { key: 'end', header: t('platform.reportsPage.renewalColumns.end'), render: (r) => new Date(r.end_at).toLocaleDateString('ar-EG') },
+    { key: 'end', header: t('platform.reportsPage.renewalColumns.end'), render: (r) => new Date(r.end_at).toLocaleDateString(locale === 'en' ? 'en-US' : 'ar-EG') },
     {
       key: 'status',
       header: t('platform.reportsPage.renewalColumns.status'),
@@ -204,7 +206,7 @@ export function PlatformReportsPage() {
       render: (r) =>
         t(`platform.ownersPage.clubStatusLabels.${r.status}`, { defaultValue: CLUB_STATUS_LABELS[r.status] ?? r.status }),
     },
-    { key: 'created', header: t('platform.reportsPage.growthColumns.created'), render: (r) => new Date(r.created_at).toLocaleDateString('ar-EG') },
+    { key: 'created', header: t('platform.reportsPage.growthColumns.created'), render: (r) => new Date(r.created_at).toLocaleDateString(locale === 'en' ? 'en-US' : 'ar-EG') },
   ]
 
   const usageColumns: DataTableColumn<(typeof usageReport)[number]>[] = [

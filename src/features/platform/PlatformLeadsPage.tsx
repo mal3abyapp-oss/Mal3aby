@@ -1,6 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
 import { supabase } from '@/lib/supabase/client'
+import { useDirection } from '@/app/providers/DirectionProvider'
 import { PageHeader } from '@/components/ui/page-header'
 import { DataTable, type DataTableColumn } from '@/components/ui/data-table'
 import { StatusBadge } from '@/components/ui/status-badge'
@@ -38,6 +39,7 @@ const STATUS_TONE: Record<string, 'info' | 'warning' | 'success' | 'neutral'> = 
 
 export function PlatformLeadsPage() {
   const { t } = useTranslation()
+  const { locale } = useDirection()
   const queryClient = useQueryClient()
   const { data: leads = [], isLoading } = useQuery({ queryKey: ['platform-leads'], queryFn: fetchLeads })
 
@@ -80,7 +82,7 @@ export function PlatformLeadsPage() {
           '—'
         ),
     },
-    { key: 'date', header: t('platform.leadsPage.columns.date'), render: (l) => new Date(l.created_at).toLocaleDateString('ar-EG') },
+    { key: 'date', header: t('platform.leadsPage.columns.date'), render: (l) => new Date(l.created_at).toLocaleDateString(locale === 'en' ? 'en-US' : 'ar-EG') },
     {
       key: 'status',
       header: t('platform.leadsPage.columns.status'),

@@ -2,6 +2,7 @@ import { useQuery } from '@tanstack/react-query'
 import { Link } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { supabase } from '@/lib/supabase/client'
+import { useDirection } from '@/app/providers/DirectionProvider'
 import { PageHeader } from '@/components/ui/page-header'
 import { StatCard } from '@/components/ui/stat-card'
 import { DataTable, type DataTableColumn } from '@/components/ui/data-table'
@@ -38,6 +39,7 @@ async function fetchTrials(): Promise<TrialRow[]> {
 
 export function PlatformTrialsPage() {
   const { t } = useTranslation()
+  const { locale } = useDirection()
   const { data: trials = [], isLoading } = useQuery({ queryKey: ['platform-trials'], queryFn: fetchTrials })
 
   const now = new Date()
@@ -64,8 +66,8 @@ export function PlatformTrialsPage() {
       header: t('platform.trialsPage.columns.origin'),
       render: (row) => (row.trial_origin === 'automatic' ? t('platform.trialsPage.originAutomatic') : t('platform.trialsPage.originManual')),
     },
-    { key: 'start', header: t('platform.trialsPage.columns.start'), render: (row) => new Date(row.start_at).toLocaleDateString('ar-EG') },
-    { key: 'end', header: t('platform.trialsPage.columns.end'), render: (row) => new Date(row.end_at).toLocaleDateString('ar-EG') },
+    { key: 'start', header: t('platform.trialsPage.columns.start'), render: (row) => new Date(row.start_at).toLocaleDateString(locale === 'en' ? 'en-US' : 'ar-EG') },
+    { key: 'end', header: t('platform.trialsPage.columns.end'), render: (row) => new Date(row.end_at).toLocaleDateString(locale === 'en' ? 'en-US' : 'ar-EG') },
     {
       key: 'status',
       header: t('platform.trialsPage.columns.status'),

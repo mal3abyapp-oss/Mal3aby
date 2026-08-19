@@ -373,6 +373,15 @@
         "suspended": "موقوف",
         "closed": "مغلق"
       },
+      "accessLabels": {
+        "full": "كامل",
+        "grace": "فترة سماح",
+        "blocked": "موقوف"
+      },
+      "subscriptionKindLabels": {
+        "trial": "تجربة مجانية",
+        "paid": "مدفوع"
+      },
       "emptyTitle": "لا توجد نتائج مطابقة",
       "emptyTitleNoOwners": "لا يوجد أصحاب أندية بعد"
     },
@@ -522,7 +531,14 @@
     "time": "الوقت",
     "price": "السعر",
     "total": "الإجمالي",
-    "currency": "ج.م"
+    "currency": "ج.م",
+    "paymentMethodLabels": {
+      "cash": "نقدًا",
+      "card": "بطاقة",
+      "bank_transfer": "تحويل بنكي",
+      "wallet": "محفظة إلكترونية",
+      "other": "أخرى"
+    }
   },
   "bookings": {
     "statusLabels": {

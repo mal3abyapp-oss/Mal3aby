@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next'
 import { useQuery } from '@tanstack/react-query'
 import { supabase } from '@/lib/supabase/client'
 import { useAuth } from '@/app/providers/AuthProvider'
+import { useDirection } from '@/app/providers/DirectionProvider'
 import { PageHeader } from '@/components/ui/page-header'
 import { DataTable, type DataTableColumn } from '@/components/ui/data-table'
 import { MoneyDisplay } from '@/components/ui/money-display'
@@ -73,6 +74,7 @@ function toCsv(rows: InvoiceRow[], header: string[]): string {
 export function OutstandingPage() {
   const { currentClubId } = useAuth()
   const { t } = useTranslation()
+  const { locale } = useDirection()
   const [filter, setFilter] = useState<FilterKey>('all')
 
   const { data: invoices = [], isLoading } = useQuery({
@@ -113,7 +115,7 @@ export function OutstandingPage() {
     { key: 'customer', header: t('billing.outstandingPage.table.customer'), render: (r) => r.customerName },
     { key: 'total', header: t('billing.outstandingPage.table.total'), render: (r) => <MoneyDisplay amount={r.total} size="sm" /> },
     { key: 'outstanding', header: t('billing.outstandingPage.table.outstanding'), render: (r) => <MoneyDisplay amount={r.outstanding ?? 0} size="sm" tone="danger" /> },
-    { key: 'due', header: t('billing.outstandingPage.table.due'), render: (r) => (r.dueDate ? new Date(r.dueDate).toLocaleDateString('ar-EG') : '—') },
+    { key: 'due', header: t('billing.outstandingPage.table.due'), render: (r) => (r.dueDate ? new Date(r.dueDate).toLocaleDateString(locale === 'en' ? 'en-US' : 'ar-EG') : '—') },
     {
       key: 'status',
       header: t('billing.outstandingPage.table.status'),

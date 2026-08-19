@@ -341,7 +341,7 @@ export function BookingDetailSheet({
                   </div>
                   <div className="flex justify-between text-xs text-text-secondary">
                     <span>{t('bookings.detail.paymentStatus')}</span>
-                    <span>{PAYMENT_STATUS_LABELS[invoiceSummary.paymentStatus]}</span>
+                    <span>{t(`secureBooking.paymentStatusLabels.${invoiceSummary.paymentStatus}`, { defaultValue: PAYMENT_STATUS_LABELS[invoiceSummary.paymentStatus] })}</span>
                   </div>
                 </>
               )}
@@ -366,7 +366,7 @@ export function BookingDetailSheet({
                       <SelectTrigger><SelectValue /></SelectTrigger>
                       <SelectContent>
                         {Object.entries(PAYMENT_METHOD_LABELS).map(([value, label]) => (
-                          <SelectItem key={value} value={value}>{label}</SelectItem>
+                          <SelectItem key={value} value={value}>{t(`common.paymentMethodLabels.${value}`, { defaultValue: label })}</SelectItem>
                         ))}
                       </SelectContent>
                     </Select>

@@ -126,7 +126,7 @@ export function ReportPaymentMethodsPage() {
                     `payment-method-reconciliation-${startDate}-${endDate}.csv`,
                     rowsToCsv(
                       data.by_method.map((m) => ({
-                        method: PAYMENT_METHOD_LABELS[m.method] ?? m.method,
+                        method: t(`common.paymentMethodLabels.${m.method}`, { defaultValue: PAYMENT_METHOD_LABELS[m.method] ?? m.method }),
                         collected: m.collected,
                         collected_count: m.collected_count,
                         refunded: m.refunded,
@@ -168,7 +168,7 @@ export function ReportPaymentMethodsPage() {
                 <tbody>
                   {data.by_method.map((m) => (
                     <tr key={m.method} className="border-b border-border">
-                      <td className="p-2 font-medium">{PAYMENT_METHOD_LABELS[m.method] ?? m.method}</td>
+                      <td className="p-2 font-medium">{t(`common.paymentMethodLabels.${m.method}`, { defaultValue: PAYMENT_METHOD_LABELS[m.method] ?? m.method })}</td>
                       <td className="p-2">{formatMoney(m.collected, 'EGP', locale)} — {t('reports.paymentMethods.collectedCountSuffix', { count: m.collected_count })}</td>
                       <td className="p-2 text-status-danger">
                         {m.refunded > 0 ? t('reports.paymentMethods.refundedCountSuffix', { amount: formatMoney(m.refunded, 'EGP', locale), count: m.refunded_count }) : '—'}
@@ -201,7 +201,7 @@ export function ReportPaymentMethodsPage() {
                 {reconciliations.map((r) => (
                   <li key={r.id} className="flex items-center justify-between rounded-md border border-border p-2 text-sm">
                     <span>
-                      {PAYMENT_METHOD_LABELS[r.method] ?? r.method} — {formatMoney(r.reconciled_total, 'EGP', locale)}
+                      {t(`common.paymentMethodLabels.${r.method}`, { defaultValue: PAYMENT_METHOD_LABELS[r.method] ?? r.method })} — {formatMoney(r.reconciled_total, 'EGP', locale)}
                       {r.note && <span className="text-text-secondary"> — {r.note}</span>}
                     </span>
                     <span className="text-xs text-text-secondary">

@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
 import { supabase } from '@/lib/supabase/client'
+import { useDirection } from '@/app/providers/DirectionProvider'
 import { PageHeader } from '@/components/ui/page-header'
 import { StatCard } from '@/components/ui/stat-card'
 import { DataTable, type DataTableColumn } from '@/components/ui/data-table'
@@ -40,6 +41,7 @@ const MEMBERSHIP_STATUS_LABELS: Record<string, string> = { active: 'نشطة', s
 
 export function PlatformOwnersPage() {
   const { t } = useTranslation()
+  const { locale } = useDirection()
   const [search, setSearch] = useState('')
   const { data: owners = [], isLoading } = useQuery({ queryKey: ['platform-owners'], queryFn: fetchOwners })
 
@@ -73,8 +75,8 @@ export function PlatformOwnersPage() {
   // name/email cell only renders once per owner (with a club-count
   // badge), not once per row.
   const sortedFiltered = useMemo(
-    () => [...filtered].sort((a, b) => (a.user_id === b.user_id ? 0 : (a.full_name ?? '').localeCompare(b.full_name ?? '', 'ar'))),
-    [filtered],
+    () => [...filtered].sort((a, b) => (a.user_id === b.user_id ? 0 : (a.full_name ?? '').localeCompare(b.full_name ?? '', locale))),
+    [filtered, locale],
   )
 
   const columns: DataTableColumn<OwnerRow>[] = [
@@ -135,7 +137,7 @@ export function PlatformOwnersPage() {
         />
       ),
     },
-    { key: 'since', header: t('platform.ownersPage.columns.since'), render: (o) => new Date(o.owner_since).toLocaleDateString('ar-EG') },
+    { key: 'since', header: t('platform.ownersPage.columns.since'), render: (o) => new Date(o.owner_since).toLocaleDateString(locale === 'en' ? 'en-US' : 'ar-EG') },
   ]
 
   return (

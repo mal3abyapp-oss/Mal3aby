@@ -76,7 +76,7 @@ export function ReportRevenuePage() {
                 <ul className="flex flex-col gap-1">
                   {data.by_method.map((m) => (
                     <li key={m.method} className="flex justify-between rounded-md border border-border p-2 text-sm">
-                      <span>{PAYMENT_METHOD_LABELS[m.method] ?? m.method}</span>
+                      <span>{t(`common.paymentMethodLabels.${m.method}`, { defaultValue: PAYMENT_METHOD_LABELS[m.method] ?? m.method })}</span>
                       <span>{formatMoney(m.revenue, 'EGP', locale)}</span>
                     </li>
                   ))}

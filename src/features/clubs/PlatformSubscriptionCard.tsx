@@ -2,6 +2,7 @@ import { useQuery } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
 import { supabase } from '@/lib/supabase/client'
 import { useAuth } from '@/app/providers/AuthProvider'
+import { useDirection } from '@/app/providers/DirectionProvider'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { StatusBadge } from '@/components/ui/status-badge'
 import { Skeleton } from '@/components/ui/skeleton'
@@ -31,6 +32,7 @@ async function fetchSubscriptionSummary(clubId: string) {
 export function PlatformSubscriptionCard() {
   const { t } = useTranslation()
   const { currentClubId } = useAuth()
+  const { locale } = useDirection()
 
   const { data, isLoading } = useQuery({
     queryKey: ['platform-subscription-summary', currentClubId],
@@ -93,7 +95,7 @@ export function PlatformSubscriptionCard() {
             )}
             <div>
               <span className="text-text-secondary">{t('clubs.platformSubscriptionCard.endDateLabel')}</span>
-              {data.end_at ? new Date(data.end_at).toLocaleDateString('ar-EG') : '—'}
+              {data.end_at ? new Date(data.end_at).toLocaleDateString(locale === 'en' ? 'en-US' : 'ar-EG') : '—'}
             </div>
           </div>
         )}

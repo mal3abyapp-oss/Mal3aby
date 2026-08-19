@@ -535,7 +535,7 @@ export function BillingPage() {
                     {paymentSummary && (
                       <StatusBadge
                         tone={PAYMENT_STATUS_TONE[paymentSummary.paymentStatus]}
-                        label={PAYMENT_STATUS_LABELS[paymentSummary.paymentStatus]}
+                        label={t(`secureBooking.paymentStatusLabels.${paymentSummary.paymentStatus}`, { defaultValue: PAYMENT_STATUS_LABELS[paymentSummary.paymentStatus] })}
                       />
                     )}
                   </div>
@@ -610,7 +610,7 @@ export function BillingPage() {
                     {payments.map((p) => (
                       <li key={p.id} className="flex items-center justify-between rounded-md border border-border p-2 text-sm">
                         <span>
-                          <MoneyDisplay amount={p.amount} size="sm" /> — {PAYMENT_METHOD_LABELS[p.method] ?? p.method}
+                          <MoneyDisplay amount={p.amount} size="sm" /> — {t(`common.paymentMethodLabels.${p.method}`, { defaultValue: PAYMENT_METHOD_LABELS[p.method] ?? p.method })}
                           {p.receivedByName && (
                             <span className="text-text-secondary"> — {t('billing.detail.collectedBy', { name: p.receivedByName })}</span>
                           )}
@@ -657,7 +657,7 @@ export function BillingPage() {
                           <SelectTrigger className="w-40"><SelectValue /></SelectTrigger>
                           <SelectContent>
                             {Object.entries(PAYMENT_METHOD_LABELS).map(([key, label]) => (
-                              <SelectItem key={key} value={key}>{label}</SelectItem>
+                              <SelectItem key={key} value={key}>{t(`common.paymentMethodLabels.${key}`, { defaultValue: label })}</SelectItem>
                             ))}
                           </SelectContent>
                         </Select>
@@ -753,7 +753,7 @@ export function BillingPage() {
                 <div className="flex flex-col gap-1">
                   <p>{t('billing.refund.receiptInvoicePrefix')} <bdi>{refundReceipt.invoiceNumber}</bdi></p>
                   <p>{t('billing.refund.receiptCustomer', { name: refundReceipt.customerName })}</p>
-                  <p>{t('billing.refund.receiptOriginalMethod', { method: PAYMENT_METHOD_LABELS[refundReceipt.method] ?? refundReceipt.method })}</p>
+                  <p>{t('billing.refund.receiptOriginalMethod', { method: t(`common.paymentMethodLabels.${refundReceipt.method}`, { defaultValue: PAYMENT_METHOD_LABELS[refundReceipt.method] ?? refundReceipt.method }) })}</p>
                   <p>{t('billing.refund.receiptReason', { reason: refundReceipt.reason })}</p>
                   <p>{t('billing.refund.receiptDate', { date: new Date(refundReceipt.refundedAt).toLocaleString(locale === 'en' ? 'en-US' : 'ar-EG') })}</p>
                 </div>

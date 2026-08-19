@@ -187,8 +187,8 @@ export function CashShiftPage() {
   const historyColumns: DataTableColumn<ShiftHistoryRow>[] = [
     { key: 'branch', header: t('billing.cashShift.historyCard.table.branch'), render: (s) => s.branch_name },
     { key: 'opened_by', header: t('billing.cashShift.historyCard.table.openedBy'), render: (s) => s.opened_by_name ?? '—' },
-    { key: 'opened_at', header: t('billing.cashShift.historyCard.table.openedAt'), render: (s) => new Date(s.opened_at).toLocaleString('ar-EG') },
-    { key: 'closed_at', header: t('billing.cashShift.historyCard.table.closedAt'), render: (s) => (s.closed_at ? new Date(s.closed_at).toLocaleString('ar-EG') : '—') },
+    { key: 'opened_at', header: t('billing.cashShift.historyCard.table.openedAt'), render: (s) => new Date(s.opened_at).toLocaleString(locale === 'en' ? 'en-US' : 'ar-EG') },
+    { key: 'closed_at', header: t('billing.cashShift.historyCard.table.closedAt'), render: (s) => (s.closed_at ? new Date(s.closed_at).toLocaleString(locale === 'en' ? 'en-US' : 'ar-EG') : '—') },
     { key: 'opening_float', header: t('billing.cashShift.historyCard.table.openingFloat'), render: (s) => formatMoney(s.opening_float, 'EGP', locale) },
     { key: 'expected', header: t('billing.cashShift.historyCard.table.expected'), render: (s) => (s.expected_cash === null ? '—' : formatMoney(s.expected_cash, 'EGP', locale)) },
     { key: 'counted', header: t('billing.cashShift.historyCard.table.counted'), render: (s) => (s.closing_count === null ? '—' : formatMoney(s.closing_count, 'EGP', locale)) },
@@ -228,7 +228,7 @@ export function CashShiftPage() {
               </CardHeader>
               <CardContent className="flex flex-col gap-3">
                 <p className="text-sm text-text-secondary">
-                  {t('billing.cashShift.openShiftCard.openedBy', { name: shift.opened_by_name ?? '—', date: new Date(shift.opened_at).toLocaleString('ar-EG') })}
+                  {t('billing.cashShift.openShiftCard.openedBy', { name: shift.opened_by_name ?? '—', date: new Date(shift.opened_at).toLocaleString(locale === 'en' ? 'en-US' : 'ar-EG') })}
                 </p>
                 {closingShiftId === shift.id && liveStatus ? (
                   <>

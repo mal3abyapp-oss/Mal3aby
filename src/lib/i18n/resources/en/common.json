@@ -373,6 +373,15 @@
         "suspended": "Suspended",
         "closed": "Closed"
       },
+      "accessLabels": {
+        "full": "Full",
+        "grace": "Grace period",
+        "blocked": "Blocked"
+      },
+      "subscriptionKindLabels": {
+        "trial": "Free trial",
+        "paid": "Paid"
+      },
       "emptyTitle": "No matching results",
       "emptyTitleNoOwners": "No club owners yet"
     },
@@ -522,7 +531,14 @@
     "time": "Time",
     "price": "Price",
     "total": "Total",
-    "currency": "EGP"
+    "currency": "EGP",
+    "paymentMethodLabels": {
+      "cash": "Cash",
+      "card": "Card",
+      "bank_transfer": "Bank transfer",
+      "wallet": "E-wallet",
+      "other": "Other"
+    }
   },
   "bookings": {
     "statusLabels": {

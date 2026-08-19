@@ -59,7 +59,7 @@ export function ReportBookingsPage() {
                       downloadCsv(
                         `bookings-by-status-${startDate}-${endDate}.csv`,
                         rowsToCsv(
-                          data.by_status.map((s) => ({ status: BOOKING_STATUS_LABELS[s.status] ?? s.status, count: s.count })),
+                          data.by_status.map((s) => ({ status: t(`secureBooking.bookingStatusLabels.${s.status}`, { defaultValue: BOOKING_STATUS_LABELS[s.status] ?? s.status }), count: s.count })),
                           { status: t('reports.bookings.csvHeader.status'), count: t('reports.bookings.csvHeader.count') },
                         ),
                       )
@@ -76,7 +76,7 @@ export function ReportBookingsPage() {
                 <ul className="flex flex-col gap-1">
                   {data.by_status.map((s) => (
                     <li key={s.status} className="flex items-center justify-between rounded-md border border-border p-2 text-sm">
-                      <span>{BOOKING_STATUS_LABELS[s.status] ?? s.status}</span>
+                      <span>{t(`secureBooking.bookingStatusLabels.${s.status}`, { defaultValue: BOOKING_STATUS_LABELS[s.status] ?? s.status })}</span>
                       <span className="flex items-center gap-2">
                         <span className="tabular-nums">{s.count}</span>
                         {/* Master IA/UX audit: Reports must not be a

@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next'
 import type { TFunction } from 'i18next'
 import { supabase } from '@/lib/supabase/client'
 import { useAuth } from '@/app/providers/AuthProvider'
+import { useDirection } from '@/app/providers/DirectionProvider'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { StatusBadge } from '@/components/ui/status-badge'
 import { fetchInvoicePaymentSummaries } from '@/lib/domain/billing'
@@ -31,7 +32,7 @@ interface AttentionItem {
   to: string
 }
 
-async function fetchAttentionItems(clubId: string, t: TFunction): Promise<AttentionItem[]> {
+async function fetchAttentionItems(clubId: string, t: TFunction, locale: 'ar' | 'en'): Promise<AttentionItem[]> {
   const today = new Date().toISOString().slice(0, 10)
   const now = new Date()
   const soonCutoff = new Date(now.getTime() + 60 * 60 * 1000).toISOString() // next 60 min
@@ -92,7 +93,7 @@ async function fetchAttentionItems(clubId: string, t: TFunction): Promise<Attent
       id: `soon-${b.id}`,
       kind: 'starting-soon',
       label: t('dashboard.attentionNeeded.startingSoon', { name }),
-      detail: new Date(b.start_at).toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit' }),
+      detail: new Date(b.start_at).toLocaleTimeString(locale === 'en' ? 'en-US' : 'ar-EG', { hour: '2-digit', minute: '2-digit' }),
       to: '/app/bookings',
     })
   }
@@ -121,6 +122,7 @@ export function AttentionNeeded() {
   const { t } = useTranslation()
   const { currentClubId } = useAuth()
   const navigate = useNavigate()
+  const { locale } = useDirection()
 
   const KIND_CHIP_LABEL: Record<AttentionItem['kind'], string> = {
     unpaid: t('dashboard.attentionNeeded.chipLabels.unpaid'),
@@ -129,8 +131,8 @@ export function AttentionNeeded() {
   }
 
   const { data: items = [], isLoading } = useQuery({
-    queryKey: ['attention-needed', currentClubId],
-    queryFn: () => fetchAttentionItems(currentClubId!, t),
+    queryKey: ['attention-needed', currentClubId, locale],
+    queryFn: () => fetchAttentionItems(currentClubId!, t, locale),
     enabled: !!currentClubId,
     refetchInterval: 60_000,
   })

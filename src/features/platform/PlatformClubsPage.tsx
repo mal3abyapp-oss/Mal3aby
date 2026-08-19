@@ -74,12 +74,22 @@ export function PlatformClubsPage() {
     {
       key: 'status',
       header: t('platform.clubsPage.columns.adminStatus'),
-      render: (c) => <StatusBadge tone={c.status === 'active' ? 'success' : 'danger'} label={CLUB_STATUS_LABELS[c.status] ?? c.status} />,
+      render: (c) => (
+        <StatusBadge
+          tone={c.status === 'active' ? 'success' : 'danger'}
+          label={t(`platform.ownersPage.clubStatusLabels.${c.status}`, { defaultValue: CLUB_STATUS_LABELS[c.status] ?? c.status })}
+        />
+      ),
     },
     {
       key: 'access',
       header: t('platform.clubsPage.columns.subscriptionStatus'),
-      render: (c) => <StatusBadge tone={ACCESS_TONE[c.access] ?? 'neutral'} label={ACCESS_LABEL[c.access] ?? c.access} />,
+      render: (c) => (
+        <StatusBadge
+          tone={ACCESS_TONE[c.access] ?? 'neutral'}
+          label={t(`platform.ownersPage.accessLabels.${c.access}`, { defaultValue: ACCESS_LABEL[c.access] ?? c.access })}
+        />
+      ),
     },
   ]
 
