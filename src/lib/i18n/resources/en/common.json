@@ -310,6 +310,14 @@
         "adminStatus": "Administrative status",
         "subscriptionStatus": "Subscription status"
       },
+      "searchPlaceholder": "Search by name or code",
+      "filters": {
+        "status": "Administrative status",
+        "allStatuses": "All statuses",
+        "access": "Subscription status",
+        "allAccess": "All subscription states",
+        "clear": "Clear filters"
+      },
       "emptyTitle": "No clubs yet",
       "loadingMore": "Loading...",
       "loadMore": "Load more"

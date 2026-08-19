@@ -310,6 +310,14 @@
         "adminStatus": "الحالة الإدارية",
         "subscriptionStatus": "حالة الاشتراك"
       },
+      "searchPlaceholder": "بحث بالاسم أو الكود",
+      "filters": {
+        "status": "الحالة الإدارية",
+        "allStatuses": "كل الحالات",
+        "access": "حالة الاشتراك",
+        "allAccess": "كل حالات الاشتراك",
+        "clear": "إزالة الفلاتر"
+      },
       "emptyTitle": "لا توجد أندية بعد",
       "loadingMore": "جارٍ التحميل...",
       "loadMore": "تحميل المزيد"

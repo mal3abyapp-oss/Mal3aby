@@ -127,30 +127,27 @@ export function PlatformOverviewPage() {
   return (
     <div>
       <PageHeader title={t('platform.overviewPage.title')} description={t('platform.overviewPage.description')} />
-      {/* Master IA/UX audit (Platform Owner phase, Audit 5): all 7 cards
-          here were dead-ends -- no way to reach the underlying club list
-          from the summary number, unlike Reports Overview's cards (fixed
-          earlier this pass) which all drill into matching operational
-          data. PlatformClubsPage/PlatformAlertsPage don't yet support
-          status-filter query params -- adding that filtering UI is a new
-          feature, out of scope here -- so each card links to the page
-          that already shows the underlying rows, same page for several
-          cards where no finer-grained screen exists yet. Real filtering
-          is a legitimate follow-up, logged, not built here. */}
+      {/* Master IA/UX audit (Platform Owner phase, Audit 5) confirmed all 7
+          cards here were dead-ends -- every card linked to the same
+          unfiltered /platform/clubs list regardless of which was clicked.
+          Phase B directive (B1): PlatformClubsPage now reads status/access/
+          created query params (see its own header comment for the
+          contract) -- each card below links to a genuinely filtered view
+          instead of the same undifferentiated list. */}
       <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
         <StatCard label={t('platform.overviewPage.cards.totalClubs')} value={isLoading ? '—' : String(data?.totalClubs ?? 0)} to="/platform/clubs" />
-        <StatCard label={t('platform.overviewPage.cards.activeClubs')} value={isLoading ? '—' : String(data?.activeClubs ?? 0)} to="/platform/clubs" />
+        <StatCard label={t('platform.overviewPage.cards.activeClubs')} value={isLoading ? '—' : String(data?.activeClubs ?? 0)} to="/platform/clubs?status=active" />
         {/* Renamed from "أندية موقوفة" -- that label was ambiguous with
             "حالة الاشتراك: موقوف" on PlatformClubsPage, a different
             concept (subscription/billing access, not admin status).
             See blockedAccessClubs card below for that other signal. */}
-        <StatCard label={t('platform.overviewPage.cards.adminSuspendedClubs')} value={isLoading ? '—' : String(data?.adminSuspendedClubs ?? 0)} to="/platform/clubs" />
+        <StatCard label={t('platform.overviewPage.cards.adminSuspendedClubs')} value={isLoading ? '—' : String(data?.adminSuspendedClubs ?? 0)} to="/platform/clubs?status=suspended" />
         <StatCard
           label={t('platform.overviewPage.cards.blockedAccessClubs')}
           value={isLoading ? '—' : String(data?.blockedAccessClubs ?? 0)}
-          to="/platform/alerts"
+          to="/platform/clubs?access=blocked"
         />
-        <StatCard label={t('platform.overviewPage.cards.trialCount')} value={isLoading ? '—' : String(data?.trialCount ?? 0)} to="/platform/clubs" />
+        <StatCard label={t('platform.overviewPage.cards.trialCount')} value={isLoading ? '—' : String(data?.trialCount ?? 0)} to="/platform/trials" />
         {/* Label no longer says "(7 أيام)" -- the underlying threshold is
             now isSubscriptionExpiringSoon() (3d trial / 7d paid), not a
             flat 7 days; see labels.ts. */}
@@ -159,7 +156,7 @@ export function PlatformOverviewPage() {
           value={isLoading ? '—' : String(data?.expiringSoonCount ?? 0)}
           to="/platform/alerts"
         />
-        <StatCard label={t('platform.overviewPage.cards.newClubsThisMonth')} value={isLoading ? '—' : String(data?.newClubsThisMonth ?? 0)} to="/platform/clubs" />
+        <StatCard label={t('platform.overviewPage.cards.newClubsThisMonth')} value={isLoading ? '—' : String(data?.newClubsThisMonth ?? 0)} to="/platform/clubs?created=this_month" />
       </div>
 
       {/* Gate 13 #56: pending action items were invisible platform-wide --
@@ -180,7 +177,7 @@ export function PlatformOverviewPage() {
               machine-readable `reason`, so this real data-integrity gap is
               a distinct, actionable exception instead of an invisible one. */}
           {(data?.noSubscriptionClubs ?? 0) > 0 && (
-            <Link to="/platform/clubs" className="block">
+            <Link to="/platform/clubs?reason=no_subscription" className="block">
               <Card className="border-danger/40 bg-danger/5 transition-colors hover:bg-danger/10">
                 <CardContent className="flex items-center justify-between p-4">
                   <div>
