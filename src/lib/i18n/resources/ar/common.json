@@ -1069,7 +1069,61 @@
       "full_payment": "عند السداد الكامل"
     }
   },
+  "publicBooking": {
+    "loading": "جارٍ التحميل...",
+    "notFoundTitle": "الرابط غير متاح",
+    "notFoundMessage": "لم يتم العثور على صفحة حجز لهذا الرابط. تأكد من صحة الرابط أو تواصل مع النادي مباشرة.",
+    "bookNow": "احجز الآن",
+    "back": "رجوع",
+    "chooseField": "اختر الملعب",
+    "noFields": "لا توجد ملاعب متاحة للحجز حاليًا.",
+    "chooseDate": "اختر التاريخ",
+    "chooseTime": "اختر الوقت",
+    "noSlotsAvailable": "لا توجد أوقات متاحة في هذا اليوم. جرّب يومًا آخر.",
+    "yourDetails": "بياناتك",
+    "field": "الملعب",
+    "date": "التاريخ",
+    "time": "الوقت",
+    "total": "الإجمالي",
+    "nameLabel": "الاسم",
+    "namePlaceholder": "اسمك الكامل",
+    "mobileLabel": "رقم الجوال",
+    "mobilePlaceholder": "01xxxxxxxxx",
+    "booking": "جارٍ الحجز...",
+    "confirmBooking": "تأكيد الحجز",
+    "genericError": "تعذّر إتمام الحجز. حاول مرة أخرى.",
+    "confirmedTitle": "تم الحجز بنجاح!",
+    "confirmedMessage": "سنرسل لك تفاصيل الحجز ورمز الحضور عبر واتساب.",
+    "bookingRef": "رقم الحجز",
+    "whatsappHint": "تحقق من واتساب للحصول على رابط تفاصيل الحجز الآمن ورمز الحضور.",
+    "sportLabels": {
+      "football": "كرة قدم",
+      "padel": "بادل",
+      "basketball": "كرة سلة",
+      "volleyball": "كرة طائرة",
+      "tennis": "تنس"
+    }
+  },
   "clubs": {
+    "publicBookingLink": {
+      "title": "رابط الحجز العام لناديك",
+      "noSlugHint": "لم يتم إنشاء رابط عام لهذا النادي بعد. أنشئ رابطًا ليتمكن العملاء من الحجز مباشرة دون الحاجة لتسجيل الدخول.",
+      "generateLink": "إنشاء رابط الحجز",
+      "generating": "جارٍ الإنشاء...",
+      "generateError": "تعذّر إنشاء الرابط.",
+      "share": "مشاركة",
+      "viewQr": "عرض رمز QR",
+      "downloadQr": "تحميل رمز QR",
+      "printQr": "طباعة رمز QR",
+      "printTagline": "امسح الرمز لحجز ملعبك الآن",
+      "enable": "تفعيل الرابط العام",
+      "disable": "إيقاف الرابط العام",
+      "disabledHint": "الرابط العام متوقف حاليًا — لن يتمكن الزوار من الحجز عبره حتى تُفعّله.",
+      "changeSlugLabel": "تغيير الرابط",
+      "customSlugError": "هذا الرابط غير متاح أو غير صالح.",
+      "saving": "جارٍ الحفظ...",
+      "save": "حفظ"
+    },
     "branchesFieldsPage": {
       "title": "الفروع والملاعب",
       "description": "فروع النادي، الملاعب، مواعيد العمل، والأسعار",
@@ -1776,7 +1830,8 @@
     "whatsappManagedNote": "اتصال واتساب، ضوابط الإرسال، وسجل الرسائل تُدار من صفحة واتساب المخصصة.",
     "openWhatsappPage": "فتح صفحة واتساب",
     "platformSubscriptionSection": "اشتراك المنصة",
-    "viewFullDetails": "عرض التفاصيل الكاملة"
+    "viewFullDetails": "عرض التفاصيل الكاملة",
+    "publicBookingSection": "رابط الحجز العام"
   },
   "auditLog": {
     "title": "سجل التدقيق",

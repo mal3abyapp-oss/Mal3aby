@@ -19,6 +19,7 @@ import { ResetPasswordPage } from '@/features/auth/ResetPasswordPage'
 import { OnboardingPage } from '@/features/onboarding/OnboardingPage'
 import { VerifyInvoicePage } from '@/features/verify/VerifyInvoicePage'
 import { SecureBookingPage } from '@/features/verify/SecureBookingPage'
+import { PublicClubBookingPage } from '@/features/public-booking/PublicClubBookingPage'
 
 import { TodayPage } from '@/features/dashboard/TodayPage'
 import { MorePage } from '@/features/dashboard/MorePage'
@@ -107,6 +108,14 @@ export const router = createBrowserRouter([
     // though both are opaque hex strings.
     path: '/qr/:token',
     element: <SecureBookingPage />,
+  },
+  {
+    // Public Club Booking System (directive Sections 42-53): every
+    // club's public, shareable booking page -- no auth guard, mobile-
+    // first, reachable by anyone holding the link/QR/printed poster.
+    // Standalone, same pattern as /qr/:token and /verify/:token.
+    path: '/c/:slug',
+    element: <PublicClubBookingPage />,
   },
   {
     element: <RequireAuth />,

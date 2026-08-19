@@ -1069,7 +1069,61 @@
       "full_payment": "On full payment"
     }
   },
+  "publicBooking": {
+    "loading": "Loading...",
+    "notFoundTitle": "Link unavailable",
+    "notFoundMessage": "No booking page was found for this link. Make sure the link is correct, or contact the club directly.",
+    "bookNow": "Book now",
+    "back": "Back",
+    "chooseField": "Choose a field",
+    "noFields": "No fields are available for booking right now.",
+    "chooseDate": "Choose a date",
+    "chooseTime": "Choose a time",
+    "noSlotsAvailable": "No time slots are available on this day. Try another day.",
+    "yourDetails": "Your details",
+    "field": "Field",
+    "date": "Date",
+    "time": "Time",
+    "total": "Total",
+    "nameLabel": "Name",
+    "namePlaceholder": "Your full name",
+    "mobileLabel": "Mobile number",
+    "mobilePlaceholder": "01xxxxxxxxx",
+    "booking": "Booking...",
+    "confirmBooking": "Confirm booking",
+    "genericError": "Couldn't complete the booking. Please try again.",
+    "confirmedTitle": "Booking confirmed!",
+    "confirmedMessage": "We'll send your booking details and entry code via WhatsApp.",
+    "bookingRef": "Booking #",
+    "whatsappHint": "Check WhatsApp for your secure booking details link and entry code.",
+    "sportLabels": {
+      "football": "Football",
+      "padel": "Padel",
+      "basketball": "Basketball",
+      "volleyball": "Volleyball",
+      "tennis": "Tennis"
+    }
+  },
   "clubs": {
+    "publicBookingLink": {
+      "title": "Your club's public booking link",
+      "noSlugHint": "No public link has been generated for this club yet. Generate one so customers can book directly, without logging in.",
+      "generateLink": "Generate booking link",
+      "generating": "Generating...",
+      "generateError": "Couldn't generate the link.",
+      "share": "Share",
+      "viewQr": "View QR",
+      "downloadQr": "Download QR",
+      "printQr": "Print QR",
+      "printTagline": "Scan to book your field now",
+      "enable": "Enable public link",
+      "disable": "Disable public link",
+      "disabledHint": "The public link is currently disabled -- visitors won't be able to book through it until you re-enable it.",
+      "changeSlugLabel": "Change link",
+      "customSlugError": "This link is unavailable or invalid.",
+      "saving": "Saving...",
+      "save": "Save"
+    },
     "branchesFieldsPage": {
       "title": "Branches & Fields",
       "description": "Club branches, fields, operating hours, and pricing",
@@ -1776,7 +1830,8 @@
     "whatsappManagedNote": "WhatsApp connection, sending controls, and message log are managed from the dedicated WhatsApp page.",
     "openWhatsappPage": "Open WhatsApp page",
     "platformSubscriptionSection": "Platform subscription",
-    "viewFullDetails": "View full details"
+    "viewFullDetails": "View full details",
+    "publicBookingSection": "Public booking link"
   },
   "auditLog": {
     "title": "Audit Log",
