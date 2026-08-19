@@ -416,6 +416,35 @@ export class WhatsAppAccountObject extends Container<Env> {
   }
 
   /**
+   * Proxies a single-contact session repair into the container's
+   * internal /repair-session endpoint. See BaileysProvider.
+   * repairContactSession's own doc comment for what this does and why
+   * -- added 2026-08-19 after a real live incident where messages were
+   * accepted by WhatsApp's relay (real provider_reference) but stuck
+   * undecryptable on the recipient's device.
+   */
+  async repairContactSession(clubId: string, phone: string): Promise<{ ok: boolean; sessionFilesRemoved?: number; error?: string }> {
+    try {
+      const res = await this.containerFetch(
+        'http://container/repair-session',
+        {
+          method: 'POST',
+          headers: { 'x-internal-token': this.env.CONTAINER_INTERNAL_TOKEN, 'content-type': 'application/json' },
+          body: JSON.stringify({ clubId, phone }),
+        },
+        this.defaultPort,
+      )
+      const body = (await res.json()) as { ok?: boolean; sessionFilesRemoved?: number; error?: string }
+      if (!res.ok) {
+        return { ok: false, error: body.error ?? `http_${res.status}` }
+      }
+      return { ok: true, sessionFilesRemoved: body.sessionFilesRemoved }
+    } catch (err) {
+      return { ok: false, error: (err as Error).message }
+    }
+  }
+
+  /**
    * REAL BUG found live (a THIRD, independent bug in this same class --
    * found by adding temporary diagnostic logging after the first two
    * fixes above did not stop the reconnect cycle): calling

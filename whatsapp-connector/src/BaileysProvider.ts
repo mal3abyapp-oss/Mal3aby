@@ -7,7 +7,7 @@ import makeWASocket, {
 import { Boom } from '@hapi/boom'
 import pino from 'pino'
 import path from 'node:path'
-import { mkdir, rm } from 'node:fs/promises'
+import { mkdir, rm, readdir } from 'node:fs/promises'
 import { createHash, randomInt } from 'node:crypto'
 import type { ConnectionState, MediaAttachment, SendMessageResult, WhatsAppProvider } from './WhatsAppProvider.js'
 import { recordSendStart, recordSendStage, recordSendOutcome, recordConnectionOpen } from './SendDiagnostics.js'
@@ -756,6 +756,54 @@ export class BaileysProvider implements WhatsAppProvider {
     this.generation += 1 // invalidate any in-flight event handlers immediately
     await this.teardownCurrentSocket()
     this.setState('disconnected')
+  }
+
+  /**
+   * Deletes the local Signal session file(s) for one specific contact,
+   * forcing Baileys to negotiate a brand-new session with that
+   * recipient on the next send -- the standard, safe WhatsApp/Signal
+   * recovery for a session that has desynced from the recipient's
+   * device (recipient shows "Waiting for this message" indefinitely
+   * despite Baileys reporting a successful send). Added 2026-08-19
+   * after a real live incident: per-contact session-key writes
+   * (state.keys.set) were never persisted to Postgres before this
+   * session's own fix (see initializeConnection()'s doc comment on the
+   * keys.set wrap) -- any session negotiated before that fix shipped
+   * can still be stale even after the persistence fix, since the fix
+   * only prevents FUTURE corruption, it cannot repair a session that
+   * already desynced. This targets only the named contact; every other
+   * contact's session is untouched, and re-negotiation with WhatsApp's
+   * own protocol is automatic and invisible to the recipient (their
+   * device accepts the new PreKey-based session message transparently
+   * -- this is the same mechanism used when a user reinstalls WhatsApp
+   * or gets a new phone).
+   *
+   * Returns the list of session files actually removed, purely for
+   * caller-side confirmation/logging -- an empty array is not an error,
+   * it just means no matching session existed locally (already clean,
+   * or never negotiated).
+   */
+  async repairContactSession(toPhoneDigitsOnly: string): Promise<string[]> {
+    const digits = toPhoneDigitsOnly.replace(/\D/g, '')
+    const dir = tenantAuthDir(this.clubId)
+    const entries = await readdir(dir).catch(() => [] as string[])
+    // useMultiFileAuthState's file naming: `session-${id}.json` where id
+    // is `<phoneDigits>.<deviceId>` (ProtocolAddress.toString(), see
+    // libsignal's protocol_address.js) -- match every device id for
+    // this contact, not just device 0.
+    const matches = entries.filter((name) => name.startsWith(`session-${digits}.`) && name.endsWith('.json'))
+    for (const name of matches) {
+      await rm(path.join(dir, name), { force: true })
+    }
+    if (matches.length > 0) {
+      // Push the now-corrected (session file absent) state to Postgres
+      // immediately, same hook the keys.set wrap uses -- otherwise a
+      // restart before the next unrelated key write would silently
+      // restore the just-deleted stale session from the last Postgres
+      // snapshot, undoing this repair.
+      this.hooks.onCredsUpdate?.()
+    }
+    return matches
   }
 
   async logout(): Promise<void> {

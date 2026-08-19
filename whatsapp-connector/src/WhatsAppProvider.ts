@@ -135,6 +135,17 @@ export interface WhatsAppProvider {
   /** Explicit disconnect + session credential wipe (both in-memory and on the encrypted store). */
   logout(): Promise<void>
 
+  /**
+   * Deletes the local Signal session for one specific contact only,
+   * forcing a fresh renegotiation on the next send -- the standard
+   * recovery for a per-contact session that desynced from the
+   * recipient's device (recipient stuck on "Waiting for this message"
+   * despite a reported-successful send). Every other contact's session
+   * is untouched. Returns the session file names actually removed (an
+   * empty array means nothing matched -- not an error).
+   */
+  repairContactSession(toPhoneDigitsOnly: string): Promise<string[]>
+
   /** Observability snapshot for a future admin health panel (review directive rule 17). */
   getDiagnostics(): {
     generation: number

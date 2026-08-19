@@ -71,6 +71,13 @@ export class TenantConnectionManager {
     this.providers.delete(clubId)
   }
 
+  /** See WhatsAppProvider.repairContactSession's own doc comment. Returns null (not an empty array) if this club has no active provider at all -- distinct from "provider exists but no stale session found". */
+  async repairContactSession(clubId: string, toPhoneDigitsOnly: string): Promise<string[] | null> {
+    const provider = this.providers.get(clubId)
+    if (!provider) return null
+    return provider.repairContactSession(toPhoneDigitsOnly)
+  }
+
   async send(clubId: string, toPhoneDigitsOnly: string, body: string, media?: MediaAttachment, templateKey?: string) {
     const provider = this.providers.get(clubId)
     if (!provider) {

@@ -97,6 +97,47 @@ export function startHealthServer(sync: SupabaseSync, connections: TenantConnect
       return
     }
 
+    if (url.pathname === '/repair-session' && req.method === 'POST') {
+      // Same internal-only gate as /status -- never public. See
+      // BaileysProvider.repairContactSession's own doc comment for
+      // what this does and why it exists (2026-08-19 live incident:
+      // per-contact Signal sessions negotiated before this session's
+      // persistence fix can still be stale even after that fix ships,
+      // since the fix only prevents FUTURE corruption).
+      const provided = req.headers['x-internal-token']
+      if (!internalToken || Array.isArray(provided) || !safeTokenEquals(provided, internalToken)) {
+        res.writeHead(403, { 'content-type': 'text/plain' })
+        res.end('forbidden')
+        return
+      }
+      let body = ''
+      req.on('data', (chunk) => { body += chunk })
+      req.on('end', () => {
+        void (async () => {
+          try {
+            const { clubId, phone } = JSON.parse(body) as { clubId?: string; phone?: string }
+            if (!clubId || !phone) {
+              res.writeHead(400, { 'content-type': 'application/json' })
+              res.end(JSON.stringify({ error: 'clubId and phone are required' }))
+              return
+            }
+            const removed = await connections.repairContactSession(clubId, phone)
+            if (removed === null) {
+              res.writeHead(404, { 'content-type': 'application/json' })
+              res.end(JSON.stringify({ error: 'no active connection for this club' }))
+              return
+            }
+            res.writeHead(200, { 'content-type': 'application/json' })
+            res.end(JSON.stringify({ ok: true, sessionFilesRemoved: removed.length }))
+          } catch (err) {
+            res.writeHead(500, { 'content-type': 'application/json' })
+            res.end(JSON.stringify({ error: (err as Error).message }))
+          }
+        })()
+      })
+      return
+    }
+
     if (url.pathname === '/status') {
       // Internal-only: requires the shared token the owning Durable
       // Object was provisioned with (Container class' envVars), not a

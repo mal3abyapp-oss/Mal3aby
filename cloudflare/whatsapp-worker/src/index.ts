@@ -78,6 +78,24 @@ async function handleManage(request: Request, env: Env): Promise<Response> {
     return Response.json({ clubId, ...result })
   }
 
+  if (action === 'repair-session') {
+    // POST /manage/:clubId/repair-session { "phone": "971502061209" }
+    // Same auth gate as every other /manage/* action. See
+    // WhatsAppAccountObject.repairContactSession's own doc comment.
+    let phone: string | undefined
+    try {
+      const body = (await request.json()) as { phone?: string }
+      phone = body.phone
+    } catch {
+      return new Response('invalid JSON body, expected {"phone": "..."}', { status: 400 })
+    }
+    if (!phone) {
+      return new Response('phone is required', { status: 400 })
+    }
+    const result = await stub.repairContactSession(clubId, phone)
+    return Response.json({ clubId, action: 'repair-session', ...result })
+  }
+
   if (action === 'restart') {
     // ADVERSARIAL PROOF SEQUENCE addition (2026-08-18): a legitimate,
     // controlled restart capability was missing entirely -- this Worker
