@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
+import { useQuery } from '@tanstack/react-query'
 import { PageHeader } from '@/components/ui/page-header'
 import { StatCard } from '@/components/ui/stat-card'
 import { StatusBadge } from '@/components/ui/status-badge'
@@ -8,7 +9,9 @@ import { Button } from '@/components/ui/button'
 import { formatMoney } from '@/lib/domain/billing'
 import { rowsToCsv, downloadCsv } from '@/lib/csv'
 import { useDirection } from '@/app/providers/DirectionProvider'
-import { ShieldCheck, Download } from 'lucide-react'
+import { useAuth } from '@/app/providers/AuthProvider'
+import { supabase } from '@/lib/supabase/client'
+import { ShieldCheck, Download, AlertTriangle } from 'lucide-react'
 import { useDateRange, useDateRangeReport } from './hooks/useDateRangeReport'
 import { DateRangeFilter } from './components/DateRangeFilter'
 import { ReportsNav } from './components/ReportsNav'
@@ -48,6 +51,7 @@ interface ReceiptsReport {
 export function ReportOfficialReceiptsPage() {
   const { t } = useTranslation()
   const { locale } = useDirection()
+  const { currentClubId } = useAuth()
   const { startDate, setStartDate, endDate, setEndDate } = useDateRange()
   const [serialSearch, setSerialSearch] = useState('')
 
@@ -57,6 +61,21 @@ export function ReportOfficialReceiptsPage() {
     endDate,
     { p_receipt_serial: serialSearch.trim() || undefined },
   )
+
+  // Directive section 29/43: surface compliance exceptions (missing
+  // receipt, reversal awaiting review) to authorized users -- reuses
+  // the report's own RLS/permission boundary via the RPC.
+  const { data: exceptions } = useQuery({
+    queryKey: ['government-compliance-exceptions', currentClubId],
+    queryFn: async () => {
+      const { data, error } = await supabase.rpc('get_government_compliance_exceptions', {
+        p_club_id: currentClubId as string,
+      })
+      if (error) throw error
+      return data?.[0] ?? null
+    },
+    enabled: !!currentClubId,
+  })
 
   return (
     <div>
@@ -73,6 +92,25 @@ export function ReportOfficialReceiptsPage() {
       </div>
 
       {isLoading && <p className="text-sm text-text-secondary">{t('reports.loading')}</p>}
+
+      {exceptions && (exceptions.missing_receipt_payment_count > 0 || exceptions.reversed_awaiting_review_count > 0) && (
+        <div className="mb-6 flex flex-col gap-2 rounded-lg border border-status-warning/40 bg-status-warning/10 p-4">
+          <div className="flex items-center gap-2 font-medium">
+            <AlertTriangle className="size-4 text-status-warning" />
+            {t('reports.officialReceipts.exceptions.title')}
+          </div>
+          {exceptions.missing_receipt_payment_count > 0 && (
+            <p className="text-sm">
+              {t('reports.officialReceipts.exceptions.missingReceipt')}: <span className="font-medium tabular-nums">{exceptions.missing_receipt_payment_count}</span>
+            </p>
+          )}
+          {exceptions.reversed_awaiting_review_count > 0 && (
+            <p className="text-sm">
+              {t('reports.officialReceipts.exceptions.reversedAwaitingReview')}: <span className="font-medium tabular-nums">{exceptions.reversed_awaiting_review_count}</span>
+            </p>
+          )}
+        </div>
+      )}
 
       {data && (
         <>

@@ -4890,6 +4890,13 @@ export type Database = {
         Args: { p_club_id: string; p_end_date: string; p_start_date: string }
         Returns: Json
       }
+      get_government_compliance_exceptions: {
+        Args: { p_club_id: string }
+        Returns: {
+          missing_receipt_payment_count: number
+          reversed_awaiting_review_count: number
+        }[]
+      }
       get_invoice_payment_summary: {
         Args: { p_invoice_ids: string[] }
         Returns: {

@@ -1956,6 +1956,13 @@
         "status": "Status",
         "customer": "Customer",
         "enteredBy": "Entered by"
+      },
+      "exceptions": {
+        "title": "Compliance exceptions",
+        "missingReceipt": "Payments missing a required receipt",
+        "missingReceiptZero": "No payments are missing a required receipt",
+        "reversedAwaitingReview": "Reversed receipts (review recommended)",
+        "reversedAwaitingReviewZero": "No reversed receipts to review"
       }
     },
     "overview": {

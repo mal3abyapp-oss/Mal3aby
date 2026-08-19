@@ -1955,6 +1955,13 @@
         "status": "الحالة",
         "customer": "العميل",
         "enteredBy": "أدخله"
+      },
+      "exceptions": {
+        "title": "استثناءات الامتثال",
+        "missingReceipt": "مدفوعات ينقصها إيصال مطلوب",
+        "missingReceiptZero": "لا توجد مدفوعات ينقصها إيصال مطلوب",
+        "reversedAwaitingReview": "إيصالات معكوسة (يُنصح بالمراجعة)",
+        "reversedAwaitingReviewZero": "لا توجد إيصالات معكوسة للمراجعة"
       }
     },
     "overview": {
