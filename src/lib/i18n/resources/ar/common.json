@@ -247,7 +247,8 @@
         "customers": "العملاء",
         "bookingsToday": "حجوزات اليوم",
         "bookingsMonth": "حجوزات الشهر",
-        "bookingsPending": "حجوزات معلقة"
+        "bookingsPending": "حجوزات معلقة",
+        "staff": "الفريق"
       },
       "whatsappCard": {
         "title": "صحة واتساب",
@@ -435,6 +436,8 @@
     "ownersPage": {
       "title": "أصحاب الأندية",
       "description": "جميع أصحاب الأندية المسجّلين على المنصة، وربط كل مالك بناديه",
+      "platformOwnersHeading": "أصحاب صلاحية المنصة (Platform Owner)",
+      "alsoClubOwnerOf": "يملك أيضًا {{count}} نادٍ",
       "cards": {
         "uniqueOwners": "إجمالي أصحاب الأندية",
         "totalMemberships": "إجمالي عضويات الملكية",

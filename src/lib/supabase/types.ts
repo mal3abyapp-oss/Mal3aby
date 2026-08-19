@@ -4677,6 +4677,14 @@ export type Database = {
           user_id: string
         }[]
       }
+      get_platform_club_staff_summary: {
+        Args: { p_club_id: string }
+        Returns: {
+          member_count: number
+          role_key: string
+          role_name: string
+        }[]
+      }
       get_platform_clubs_access: {
         Args: { p_club_ids: string[] }
         Returns: {
@@ -4690,6 +4698,17 @@ export type Database = {
         Returns: {
           platform_email: string
           platform_phone: string
+        }[]
+      }
+      get_platform_owner_accounts: {
+        Args: never
+        Returns: {
+          club_count: number
+          created_at: string
+          email: string
+          full_name: string
+          phone: string
+          user_id: string
         }[]
       }
       get_platform_whatsapp_health: {

@@ -40,6 +40,24 @@ interface OwnerRow {
 // happened to already be fetched.
 const PAGE_SIZE = 100
 
+// Cross-phase directive (U1): Platform Owner accounts had zero
+// visibility anywhere on the console -- only discoverable via a direct
+// DB query. Loaded via the same safe pattern as club owners (no direct
+// auth.users exposure to the client).
+interface PlatformOwnerAccount {
+  user_id: string
+  full_name: string | null
+  email: string | null
+  phone: string | null
+  club_count: number
+}
+
+async function fetchPlatformOwnerAccounts(): Promise<PlatformOwnerAccount[]> {
+  const { data, error } = await supabase.rpc('get_platform_owner_accounts')
+  if (error) throw error
+  return (data ?? []) as PlatformOwnerAccount[]
+}
+
 async function fetchOwners(search: string, offset: number): Promise<{ rows: OwnerRow[]; hasMore: boolean }> {
   const { data, error } = await supabase.rpc('get_platform_club_owners', {
     p_search: search.trim() || undefined,
@@ -69,6 +87,10 @@ export function PlatformOwnersPage() {
     },
   })
   const owners = data?.rows ?? []
+  const { data: platformOwnerAccounts = [] } = useQuery({
+    queryKey: ['platform-owner-accounts'],
+    queryFn: fetchPlatformOwnerAccounts,
+  })
 
   function updateSearch(value: string) {
     setSearch(value)
@@ -221,6 +243,34 @@ export function PlatformOwnersPage() {
   return (
     <div>
       <PageHeader title={t('platform.ownersPage.title')} description={t('platform.ownersPage.description')} />
+
+      {/* Cross-phase directive (U1): Platform Owner accounts, previously
+          invisible anywhere on the console -- only discoverable via a
+          direct DB query. A distinct section, not merged into the
+          club-owner table below, since these are a genuinely different
+          user category (platform-wide authority, not tied to any one
+          club's billing/entitlements). */}
+      {platformOwnerAccounts.length > 0 && (
+        <div className="mb-6 rounded-lg border border-border p-4">
+          <p className="mb-2 text-sm font-medium text-text-primary">{t('platform.ownersPage.platformOwnersHeading')}</p>
+          <div className="flex flex-col gap-2">
+            {platformOwnerAccounts.map((acc) => (
+              <div key={acc.user_id} className="flex flex-wrap items-center justify-between gap-2 text-sm">
+                <div>
+                  <span className="font-medium">{acc.full_name ?? '—'}</span>
+                  {acc.email && <span className="text-text-secondary"> · {acc.email}</span>}
+                </div>
+                {acc.club_count > 0 && (
+                  <span className="text-xs text-text-secondary">
+                    {t('platform.ownersPage.alsoClubOwnerOf', { count: acc.club_count })}
+                  </span>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* Phase I directive (I1): these 3 cards are computed from the
           currently LOADED page(s), not the true platform-wide total, now
           that this screen is genuinely paginated. Rather than silently

@@ -174,6 +174,20 @@ export function PlatformClubDetailPage() {
     },
     enabled: !!clubId,
   })
+  // Cross-phase directive (U2): staff visibility beyond club_owner
+  // (managers, coaches, scanners, etc.) had no platform-level summary --
+  // a platform owner had to open each club's own Staff page to see it.
+  // Counts only, no permission editing -- full staff management stays
+  // exactly where it already is.
+  const { data: staffSummary = [] } = useQuery({
+    queryKey: ['platform-club-staff-summary', clubId],
+    queryFn: async () => {
+      const { data, error } = await supabase.rpc('get_platform_club_staff_summary', { p_club_id: clubId! })
+      if (error) throw error
+      return data ?? []
+    },
+    enabled: !!clubId,
+  })
   const { data: access } = useQuery({
     queryKey: ['platform-club-access', clubId],
     queryFn: async () => {
@@ -633,6 +647,14 @@ export function PlatformClubDetailPage() {
             <div><span className="text-text-secondary">{t('platform.clubDetailPage.summaryCard.bookingsToday')}</span> <span className="font-medium">{club360?.bookings_today ?? '—'}</span></div>
             <div><span className="text-text-secondary">{t('platform.clubDetailPage.summaryCard.bookingsMonth')}</span> <span className="font-medium">{club360?.bookings_this_month ?? '—'}</span></div>
             <div><span className="text-text-secondary">{t('platform.clubDetailPage.summaryCard.bookingsPending')}</span> <span className="font-medium">{club360?.bookings_pending ?? '—'}</span></div>
+            {staffSummary.length > 0 && (
+              <div className="col-span-2 border-t border-border pt-2">
+                <span className="text-text-secondary">{t('platform.clubDetailPage.summaryCard.staff')}</span>{' '}
+                <span className="font-medium">
+                  {staffSummary.map((s) => `${s.role_name} (${s.member_count})`).join(' · ')}
+                </span>
+              </div>
+            )}
           </CardContent>
         </Card>
       </div>

@@ -247,7 +247,8 @@
         "customers": "Customers",
         "bookingsToday": "Bookings today",
         "bookingsMonth": "Bookings this month",
-        "bookingsPending": "Pending bookings"
+        "bookingsPending": "Pending bookings",
+        "staff": "Staff"
       },
       "whatsappCard": {
         "title": "WhatsApp health",
@@ -435,6 +436,9 @@
     "ownersPage": {
       "title": "Club Owners",
       "description": "All club owners registered on the platform, and each owner's linked clubs",
+      "platformOwnersHeading": "Platform Owner accounts",
+      "alsoClubOwnerOf": "Also owns {{count}} club",
+      "alsoClubOwnerOf_plural": "Also owns {{count}} clubs",
       "cards": {
         "uniqueOwners": "Total club owners",
         "totalMemberships": "Total ownership memberships",
