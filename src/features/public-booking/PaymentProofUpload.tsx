@@ -80,10 +80,21 @@ export function PaymentProofUpload({
   })
 
   if (proofStatus?.status === 'pending_review') {
+    // HIGH-ROI UX PASS 01, item 12 (payment/hold state clarity): the
+    // copy now explicitly says the booking is still held pending
+    // review -- not just "under review" in isolation, which left a
+    // real gap between "I uploaded a receipt" and "am I actually
+    // confirmed?". This is copy only; the real state machine (proof
+    // status + hold_expires_at) is unchanged -- HoldCountdown right
+    // above this component is still the single source of truth for
+    // whether the hold itself is still active.
     return (
-      <div className="flex items-center gap-2 rounded-lg border border-status-warning/40 bg-status-warning/5 p-3 text-sm text-status-warning">
-        <Clock className="size-4 shrink-0" />
-        {t('publicBooking.proofUpload.pendingReview')}
+      <div className="flex items-start gap-2 rounded-lg border border-status-warning/40 bg-status-warning/5 p-3 text-sm text-status-warning">
+        <Clock className="mt-0.5 size-4 shrink-0" />
+        <div>
+          <p className="font-medium">{t('publicBooking.proofUpload.pendingReview')}</p>
+          <p className="mt-0.5 text-xs">{t('publicBooking.proofUpload.pendingReviewHoldNote')}</p>
+        </div>
       </div>
     )
   }
@@ -129,6 +140,11 @@ export function PaymentProofUpload({
         <Upload className="me-1 size-4" />
         {uploadMutation.isPending ? t('publicBooking.proofUpload.uploading') : t('publicBooking.proofUpload.uploadButton')}
       </Button>
+      {/* Design audit finding: file guidance previously only appeared
+          after a rejected attempt. Shown upfront now so a customer on a
+          slow connection, or with a large phone-camera photo, isn't
+          surprised by a rejection they could have avoided. */}
+      <p className="text-xs text-text-secondary">{t('publicBooking.proofUpload.fileHint')}</p>
       {error && <p role="alert" className="text-xs text-status-danger">{error}</p>}
     </div>
   )

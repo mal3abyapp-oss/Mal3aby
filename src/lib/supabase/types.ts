@@ -4727,6 +4727,23 @@ export type Database = {
         Returns: string
       }
       get_today_dashboard: { Args: { p_club_id: string }; Returns: Json }
+      get_whatsapp_failed_messages: {
+        Args: { p_club_id: string }
+        Returns: {
+          attempts: number
+          created_at: string
+          id: string
+          last_attempt_at: string
+          last_error: string
+          recipient_customer_id: string
+          recipient_name: string
+          recipient_phone: string
+          reference_id: string
+          reference_type: string
+          status: string
+          template_key: string
+        }[]
+      }
       get_whatsapp_qr: {
         Args: { p_club_id: string }
         Returns: {
@@ -4924,6 +4941,10 @@ export type Database = {
           p_start_time: string
         }
         Returns: number
+      }
+      retry_failed_whatsapp_message: {
+        Args: { p_queue_id: string }
+        Returns: undefined
       }
       reverse_platform_payment: {
         Args: { p_payment_id: string; p_reason: string }

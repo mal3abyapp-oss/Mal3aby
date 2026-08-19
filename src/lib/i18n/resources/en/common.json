@@ -795,6 +795,7 @@
         "connectionLabel": "Connection:",
         "pending": "Pending",
         "failedFinal": "Failed permanently",
+        "failedFinalCta": "Review failures",
         "footerHint": "For a per-message log, see the \"Activity\" tab; to manage the connection or sending controls, see \"Connection\"/\"Settings\"."
       },
       "activityTab": {
@@ -818,12 +819,31 @@
         },
         "loading": "Loading...",
         "emptyTitle": "No WhatsApp messages in this range yet.",
+        "emptyFailed": "No permanently failed messages -- everything is sending normally.",
         "columns": {
           "message": "Message",
           "recipient": "Recipient",
           "status": "Status",
           "timing": "Timing",
           "lastAttempt": "Last attempt"
+        },
+        "noPhone": "No phone on file",
+        "unknownCustomer": "Unknown customer",
+        "attemptsLabel": "{{count}} attempt",
+        "attemptsLabel_other": "{{count}} attempts",
+        "failureReason": {
+          "timeout": "The message send timed out -- likely a temporary connection issue with WhatsApp.",
+          "unknownTemplate": "Internal template configuration issue -- this has been logged.",
+          "generic": "Reason: {{reason}}"
+        },
+        "actions": {
+          "retry": "Retry",
+          "retrying": "Retrying...",
+          "retrySuccess": "Queued for retry",
+          "retryError": "Couldn't retry this message",
+          "retryInvalidSource": "This message's booking or payment is no longer valid, so it can't be retried.",
+          "viewBooking": "View bookings",
+          "viewCustomer": "View customer"
         }
       }
     }
@@ -1106,9 +1126,12 @@
     "namePlaceholder": "Your full name",
     "mobileLabel": "Mobile number",
     "mobilePlaceholder": "01xxxxxxxxx",
+    "mobileInvalid": "Enter a valid mobile number so the club can reach you on WhatsApp.",
     "booking": "Booking...",
     "confirmBooking": "Confirm booking",
     "genericError": "Couldn't complete the booking. Please try again.",
+    "slotConflictMessage": "That time was just booked by someone else. Please choose another time.",
+    "addToCalendar": "Add to calendar",
     "confirmedTitle": "Booking confirmed!",
     "confirmedMessage": "We'll send your booking details and entry code via WhatsApp.",
     "bookingRef": "Booking #",
@@ -1121,6 +1144,8 @@
     "todayContactTitle": "Contact the club to book today",
     "todayRaceWarning": "Availability shown here is live but may change until the club confirms your booking.",
     "callClub": "Call club",
+    "copyPhoneNumber": "Copy phone number",
+    "copyDetail": "Copy {{label}}",
     "whatsappClub": "WhatsApp club",
     "todayWaMessage": "Hello,\nI'd like to book a field today.\n\nClub: {{club}}\nField: {{field}}\nDate: {{date}}\n\nIs this time still available?",
     "contactClubTitle": "Contact the club",
@@ -1138,12 +1163,14 @@
       "uploadButton": "Upload receipt",
       "uploading": "Uploading...",
       "pendingReview": "Receipt uploaded -- awaiting review by the club.",
+      "pendingReviewHoldNote": "Your booking is still held for you while the club reviews it.",
       "approved": "Payment confirmed. Thank you!",
       "rejected": "This receipt was not accepted.",
       "rejectedRetry": "You can upload a new receipt below.",
       "invalidType": "Please upload a JPG, PNG, or PDF file.",
       "tooLarge": "The file is too large (max 10MB).",
-      "uploadError": "Couldn't upload the receipt. Please try again."
+      "uploadError": "Couldn't upload the receipt. Please try again.",
+      "fileHint": "JPG, PNG, or PDF, up to 10MB."
     },
     "sportLabels": {
       "football": "Football",
@@ -1722,10 +1749,16 @@
       "amountEgp": "EGP {{amount}}",
       "startingSoon": "Upcoming booking not checked in yet — {{name}}",
       "expiringSubscription": "Academy subscription about to expire — {{name}}",
+      "pendingPaymentProof": "Payment receipt awaiting review — {{name}}",
+      "holdMinutesLeft": "{{minutes}} min left on hold",
+      "whatsappFailed": "{{count}} WhatsApp message permanently failed",
+      "whatsappFailed_other": "{{count}} WhatsApp messages permanently failed",
       "chipLabels": {
         "unpaid": "Payment",
         "startingSoon": "Urgent",
-        "expiringSubscription": "Renewal"
+        "expiringSubscription": "Renewal",
+        "pendingPaymentProof": "Review",
+        "whatsappFailed": "WhatsApp"
       }
     },
     "quickActionsPalette": {

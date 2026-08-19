@@ -23,10 +23,21 @@ import { fetchInvoicePaymentSummaries } from '@/lib/domain/billing'
 // in AUTONOMOUS_DECISION_LOG.md D-015. Now filters through
 // get_invoice_payment_summary() so only bookings with a genuinely
 // nonzero outstanding balance appear.
+//
+// HIGH-ROI UX PASS 01, Priority 4 (Today exception-first): the design
+// audit found Today had no signal at all for two genuinely
+// time-sensitive exceptions -- customer-uploaded payment proofs
+// awaiting review (a real customer's payment-hold countdown is running
+// while it sits unreviewed) and WhatsApp messages that failed
+// permanently. Rather than build a second, competing "exceptions"
+// panel on Today (which the directive explicitly warns against as
+// dashboard noise), both are added as two more AttentionItem kinds
+// here -- this component already IS Today's single actionable-exception
+// surface, so extending it is the correct, non-duplicative fix.
 
 interface AttentionItem {
   id: string
-  kind: 'unpaid' | 'starting-soon' | 'expiring-subscription'
+  kind: 'unpaid' | 'starting-soon' | 'expiring-subscription' | 'pending-payment-proof' | 'whatsapp-failed'
   label: string
   detail: string
   to: string
@@ -37,7 +48,7 @@ async function fetchAttentionItems(clubId: string, t: TFunction, locale: 'ar' | 
   const now = new Date()
   const soonCutoff = new Date(now.getTime() + 60 * 60 * 1000).toISOString() // next 60 min
 
-  const [unpaidRes, soonRes, expiringRes] = await Promise.all([
+  const [unpaidRes, soonRes, expiringRes, pendingProofsRes, whatsappDiagRes] = await Promise.all([
     supabase
       .from('bookings')
       .select('id, start_at, total_price, invoice_id, customers(full_name)')
@@ -62,6 +73,18 @@ async function fetchAttentionItems(clubId: string, t: TFunction, locale: 'ar' | 
       .gte('end_date', today)
       .lte('end_date', new Date(now.getTime() + 3 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10))
       .limit(10),
+    supabase
+      .from('payment_proofs')
+      .select('id, amount, uploaded_at, bookings(hold_expires_at, customer_id, customers(full_name))')
+      .eq('club_id', clubId)
+      .eq('status', 'pending_review')
+      .order('uploaded_at', { ascending: true })
+      .limit(10),
+    supabase
+      .from('whatsapp_queue_diagnostics')
+      .select('failed_count')
+      .eq('club_id', clubId)
+      .maybeSingle(),
   ])
 
   const items: AttentionItem[] = []
@@ -109,6 +132,46 @@ async function fetchAttentionItems(clubId: string, t: TFunction, locale: 'ar' | 
     })
   }
 
+  // HIGH-ROI UX PASS 01, Priority 4: pending payment proofs, ordered
+  // oldest-first (the ones closest to their booking's hold_expires_at
+  // deserve attention first). detail shows minutes remaining when the
+  // linked booking is still holding a slot -- matches the directive's
+  // explicit "don't rely on color alone" instruction by putting the
+  // urgency as text, not just a badge tone.
+  for (const p of pendingProofsRes.data ?? []) {
+    const booking = p.bookings as unknown as { hold_expires_at: string | null; customers: { full_name: string } | null } | null
+    const name = booking?.customers?.full_name ?? '—'
+    let detail = t('dashboard.attentionNeeded.amountEgp', { amount: Number(p.amount).toFixed(0) })
+    if (booking?.hold_expires_at) {
+      const minutesLeft = Math.round((new Date(booking.hold_expires_at).getTime() - now.getTime()) / 60000)
+      if (minutesLeft > 0) {
+        detail = t('dashboard.attentionNeeded.holdMinutesLeft', { minutes: minutesLeft })
+      }
+    }
+    items.push({
+      id: `proof-${p.id}`,
+      kind: 'pending-payment-proof',
+      label: t('dashboard.attentionNeeded.pendingPaymentProof', { name }),
+      detail,
+      to: '/app/pending-payments',
+    })
+  }
+
+  // HIGH-ROI UX PASS 01, Priority 4: a single summary row (not one row
+  // per failed message -- that level of detail belongs on the WhatsApp
+  // Activity tab, which this row links to) when any WhatsApp message
+  // has permanently failed for this club.
+  const failedWhatsappCount = whatsappDiagRes.data?.failed_count ?? 0
+  if (failedWhatsappCount > 0) {
+    items.push({
+      id: 'whatsapp-failed-summary',
+      kind: 'whatsapp-failed',
+      label: t('dashboard.attentionNeeded.whatsappFailed', { count: failedWhatsappCount }),
+      detail: '',
+      to: '/app/whatsapp',
+    })
+  }
+
   return items
 }
 
@@ -116,6 +179,8 @@ const KIND_TONE = {
   unpaid: 'warning',
   'starting-soon': 'danger',
   'expiring-subscription': 'warning',
+  'pending-payment-proof': 'warning',
+  'whatsapp-failed': 'danger',
 } as const
 
 export function AttentionNeeded() {
@@ -128,6 +193,8 @@ export function AttentionNeeded() {
     unpaid: t('dashboard.attentionNeeded.chipLabels.unpaid'),
     'starting-soon': t('dashboard.attentionNeeded.chipLabels.startingSoon'),
     'expiring-subscription': t('dashboard.attentionNeeded.chipLabels.expiringSubscription'),
+    'pending-payment-proof': t('dashboard.attentionNeeded.chipLabels.pendingPaymentProof'),
+    'whatsapp-failed': t('dashboard.attentionNeeded.chipLabels.whatsappFailed'),
   }
 
   const { data: items = [], isLoading } = useQuery({
@@ -160,7 +227,7 @@ export function AttentionNeeded() {
           >
             <span>{item.label}</span>
             <div className="flex shrink-0 items-center gap-2">
-              <span className="text-xs text-text-secondary tabular-nums">{item.detail}</span>
+              {item.detail && <span className="text-xs text-text-secondary tabular-nums">{item.detail}</span>}
               <StatusBadge tone={KIND_TONE[item.kind]} label={KIND_CHIP_LABEL[item.kind]} />
             </div>
           </button>

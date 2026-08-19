@@ -1,13 +1,14 @@
 import { useEffect, useMemo, useState } from 'react'
-import { useParams } from 'react-router-dom'
-import { useMutation, useQuery } from '@tanstack/react-query'
+import { useParams, useSearchParams } from 'react-router-dom'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
 import { supabase } from '@/lib/supabase/client'
 import { useDirection } from '@/app/providers/DirectionProvider'
 import { formatCurrency, formatDate, type SupportedLocale } from '@/lib/i18n/config'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { CheckCircle2, MapPin, ChevronLeft, ChevronRight, Phone, MessageCircle, Copy, Check } from 'lucide-react'
+import { LanguageSwitcher } from '@/components/ui/language-switcher'
+import { CheckCircle2, MapPin, ChevronLeft, ChevronRight, Phone, MessageCircle, Copy, Check, CalendarPlus } from 'lucide-react'
 import { PaymentMethodsPanel } from './PaymentMethodsPanel'
 import { HoldCountdown } from './HoldCountdown'
 
@@ -127,10 +128,62 @@ function toWaDigits(phone: string): string {
   return phone.replace(/\D/g, '')
 }
 
+// HIGH-ROI UX PASS 01, supplementary item 7 (customer phone
+// validation): mirrors create_public_booking()'s own server-side
+// normalize_mobile()/is_phone_plausible() exactly (strip non-digits,
+// strip leading zeros, require 8-15 remaining digits) -- not a
+// separate, looser client rule, and not an Egypt-only regex. This
+// gives instant feedback but is NOT the real validation boundary; the
+// server re-validates independently on submit regardless of what the
+// client thinks, exactly as it already did before this change.
+function normalizeMobileClient(raw: string): string {
+  return raw.replace(/\D/g, '').replace(/^0+/, '')
+}
+function isPhonePlausibleClient(raw: string): boolean {
+  const normalized = normalizeMobileClient(raw)
+  return normalized.length >= 8 && normalized.length <= 15
+}
+
+// HIGH-ROI UX PASS 01, item 19 (Add to Calendar): builds a plain .ics
+// data URI from already-known booking fields -- no payment
+// secrets/tokens in the description, per the directive's explicit
+// instruction.
+function buildIcsDataUri(opts: {
+  clubName: string
+  fieldName: string
+  address: string | null
+  startAt: Date
+  endAt: Date
+  bookingRef: string | null
+}): string {
+  const pad = (n: number) => String(n).padStart(2, '0')
+  const toIcsUtc = (d: Date) =>
+    `${d.getUTCFullYear()}${pad(d.getUTCMonth() + 1)}${pad(d.getUTCDate())}T${pad(d.getUTCHours())}${pad(d.getUTCMinutes())}${pad(d.getUTCSeconds())}Z`
+  const escapeIcs = (s: string) => s.replace(/[\\;,]/g, (c) => `\\${c}`).replace(/\n/g, '\\n')
+  const lines = [
+    'BEGIN:VCALENDAR',
+    'VERSION:2.0',
+    'PRODID:-//Mal3aby//Booking//EN',
+    'BEGIN:VEVENT',
+    `UID:${opts.bookingRef ?? crypto.randomUUID()}@mal3aby.app`,
+    `DTSTAMP:${toIcsUtc(new Date())}`,
+    `DTSTART:${toIcsUtc(opts.startAt)}`,
+    `DTEND:${toIcsUtc(opts.endAt)}`,
+    `SUMMARY:${escapeIcs(`${opts.clubName} — ${opts.fieldName}`)}`,
+    opts.address ? `LOCATION:${escapeIcs(opts.address)}` : null,
+    opts.bookingRef ? `DESCRIPTION:${escapeIcs(opts.bookingRef)}` : null,
+    'END:VEVENT',
+    'END:VCALENDAR',
+  ].filter((l): l is string => l !== null)
+  return `data:text/calendar;charset=utf-8,${encodeURIComponent(lines.join('\r\n'))}`
+}
+
 export function PublicClubBookingPage() {
   const { slug } = useParams<{ slug: string }>()
+  const [searchParams] = useSearchParams()
   const { t } = useTranslation()
-  const { direction, locale } = useDirection()
+  const { direction, locale, setLocale } = useDirection()
+  const queryClient = useQueryClient()
 
   const [step, setStep] = useState<Step>('field')
   const [selectedFieldId, setSelectedFieldId] = useState<string | null>(null)
@@ -138,12 +191,29 @@ export function PublicClubBookingPage() {
   const [selectedTime, setSelectedTime] = useState<string | null>(null)
   const [customerName, setCustomerName] = useState('')
   const [customerMobile, setCustomerMobile] = useState('')
+  const [mobileTouched, setMobileTouched] = useState(false)
   const [formError, setFormError] = useState<string | null>(null)
+  const [conflictSlot, setConflictSlot] = useState<string | null>(null)
   const [confirmedRef, setConfirmedRef] = useState<string | null>(null)
   const [confirmedBookingId, setConfirmedBookingId] = useState<string | null>(null)
   const [confirmedHoldExpiresAt, setConfirmedHoldExpiresAt] = useState<string | null>(null)
   const [confirmedTotal, setConfirmedTotal] = useState<number | null>(null)
   const [copiedField, setCopiedField] = useState<string | null>(null)
+
+  // HIGH-ROI UX PASS 01, supplementary item 6 (Public Booking language
+  // switcher): seed from a one-time ?lang= param on first mount only,
+  // same pattern already proven in SecureBookingPage.tsx -- never
+  // fights the in-page LanguageSwitcher afterward, never overrides a
+  // returning visitor's stored preference beyond this first read. This
+  // controls the SYSTEM UI language only; club/user-generated data
+  // (club name, address) is never machine-translated.
+  useEffect(() => {
+    const langParam = searchParams.get('lang')
+    if (langParam === 'ar' || langParam === 'en') {
+      if (langParam !== locale) setLocale(langParam)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   const { data: club, isLoading: clubLoading, isError: clubError } = useQuery({
     queryKey: ['public-club', slug],
@@ -224,12 +294,18 @@ export function PublicClubBookingPage() {
       // per remaining slot (contact, not online booking), handled at
       // render time via isTodaySelected, not here.
       if (!isPast) {
-        slots.push({ time: `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`, isAvailable: !isBusy })
+        const time = `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`
+        // HIGH-ROI UX PASS 01, supplementary item 8: force this exact
+        // slot unavailable in the UI the instant a real booking-conflict
+        // error names it, even if the availability refetch triggered
+        // alongside it hasn't resolved yet -- avoids a flash where the
+        // just-taken slot briefly still renders as bookable.
+        slots.push({ time, isAvailable: !isBusy && time !== conflictSlot })
       }
       cursor += DURATION_MINUTES
     }
     return slots
-  }, [availability, dateKey])
+  }, [availability, dateKey, conflictSlot])
 
   const bookMutation = useMutation({
     mutationFn: async () => {
@@ -261,7 +337,27 @@ export function PublicClubBookingPage() {
       setStep('confirmed')
     },
     onError: (error: { message?: string }) => {
-      setFormError(error?.message ?? t('publicBooking.genericError'))
+      const message = error?.message ?? ''
+      // HIGH-ROI UX PASS 01, supplementary item 8 (booking conflict
+      // recovery): create_public_booking() raises this exact,
+      // human-readable string when the EXCLUDE constraint on bookings
+      // catches a real race (the slot was booked by someone else
+      // between selection and submit) -- matched by substring since the
+      // RPC error is the real, single source of truth for this
+      // condition, not a guessed error code. On this specific failure,
+      // route the customer back to a refreshed time step with the
+      // now-taken slot remembered so it renders visibly unavailable,
+      // instead of leaving them stuck on the details step reading a
+      // flat error string with no guided next step.
+      if (message.includes('just booked by someone else')) {
+        setConflictSlot(selectedTime)
+        setSelectedTime(null)
+        setFormError(null)
+        setStep('time')
+        void queryClient.invalidateQueries({ queryKey: ['public-field-availability', selectedFieldId, dateKey] })
+        return
+      }
+      setFormError(message || t('publicBooking.genericError'))
     },
   })
 
@@ -301,12 +397,21 @@ export function PublicClubBookingPage() {
   return (
     <div dir={direction} className="min-h-screen bg-page-bg pb-24">
       <header className="border-b border-border bg-surface px-4 py-4">
-        <div className="mx-auto flex max-w-lg items-center gap-3">
-          {club.logoUrl && <img src={club.logoUrl} alt={club.clubName} className="size-10 rounded-full object-cover" />}
-          <div>
-            <p className="font-semibold">{club.clubName}</p>
-            {selectedBranch && <p className="text-xs text-text-secondary">{selectedBranch.name}</p>}
+        <div className="mx-auto flex max-w-lg items-center justify-between gap-3">
+          <div className="flex items-center gap-3">
+            {club.logoUrl && <img src={club.logoUrl} alt={club.clubName} className="size-10 rounded-full object-cover" />}
+            <div>
+              <p className="font-semibold">{club.clubName}</p>
+              {selectedBranch && <p className="text-xs text-text-secondary">{selectedBranch.name}</p>}
+            </div>
           </div>
+          {/* HIGH-ROI UX PASS 01, supplementary item 6: the highest-
+              traffic anonymous screen in the product previously had no
+              way to change language at all -- stuck on whatever the
+              browser/localStorage default was. Only the system UI
+              switches; club-owned data (name, address) is never
+              machine-translated. */}
+          <LanguageSwitcher />
         </div>
       </header>
 
@@ -391,9 +496,50 @@ export function PublicClubBookingPage() {
             <h1 className="text-lg font-semibold">{t('publicBooking.chooseTime')}</h1>
             {selectedDate && <p className="text-sm text-text-secondary">{formatDate(selectedDate, locale as SupportedLocale, club.timezone, { day: 'numeric', month: 'long', year: 'numeric' })}</p>}
 
+            {conflictSlot && (
+              <div role="alert" className="rounded-lg border border-status-warning/40 bg-status-warning/5 p-3 text-sm text-status-warning">
+                {t('publicBooking.slotConflictMessage')}
+              </div>
+            )}
+
             {isTodaySelected && (
               <div className="rounded-lg border border-info/30 bg-info/5 p-3 text-sm text-info">
                 {t('publicBooking.todayContactExplainer')}
+              </div>
+            )}
+
+            {/* HIGH-ROI UX PASS 01, supplementary item 18: the same-day
+                contact card moved above the (possibly long) slot list --
+                a customer in a hurry to reach the club right now no
+                longer has to scroll past every remaining slot first.
+                Not duplicated: this is the ONLY render of this card,
+                just repositioned. */}
+            {isTodaySelected && clubWaNumber && (
+              <div className="flex flex-col gap-2 rounded-lg border border-border bg-surface p-4">
+                <p className="text-sm font-medium">{t('publicBooking.todayContactTitle')}</p>
+                <p className="text-xs text-text-secondary">{t('publicBooking.todayRaceWarning')}</p>
+                <div className="flex flex-wrap gap-2">
+                  <Button asChild size="sm" variant="outline">
+                    <a href={`tel:${clubWaNumber}`}>
+                      <Phone className="me-1 size-4" /> {t('publicBooking.callClub')}
+                    </a>
+                  </Button>
+                  <Button asChild size="sm">
+                    <a
+                      href={`https://wa.me/${toWaDigits(clubWaNumber)}?text=${encodeURIComponent(
+                        t('publicBooking.todayWaMessage', {
+                          club: club.clubName,
+                          field: selectedField?.name ?? '',
+                          date: selectedDate ? formatDate(selectedDate, locale as SupportedLocale, club.timezone, { day: 'numeric', month: 'long' }) : '',
+                        }),
+                      )}`}
+                      target="_blank"
+                      rel="noreferrer"
+                    >
+                      <MessageCircle className="me-1 size-4" /> {t('publicBooking.whatsappClub')}
+                    </a>
+                  </Button>
+                </div>
               </div>
             )}
 
@@ -402,17 +548,20 @@ export function PublicClubBookingPage() {
 
             {!isTodaySelected && (
               <div className="grid grid-cols-3 gap-2">
-                {timeSlots.filter((s) => s.isAvailable).map((s) => (
+                {timeSlots.map((s) => (
                   <button
                     key={s.time}
                     type="button"
-                    className="rounded-lg border border-border bg-surface p-3 text-center text-sm font-medium tabular-nums shadow-sm transition hover:border-accent"
+                    disabled={!s.isAvailable}
+                    className="rounded-lg border border-border bg-surface p-3 text-center text-sm font-medium tabular-nums shadow-sm transition hover:border-accent disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:border-border"
                     onClick={() => {
+                      setConflictSlot(null)
                       setSelectedTime(s.time)
                       setStep('details')
                     }}
                   >
                     <bdi>{s.time}</bdi>
+                    {!s.isAvailable && <span className="mt-0.5 block text-[10px] text-text-secondary">{t('publicBooking.unavailable')}</span>}
                   </button>
                 ))}
               </div>
@@ -433,34 +582,6 @@ export function PublicClubBookingPage() {
                     )}
                   </div>
                 ))}
-                {clubWaNumber && (
-                  <div className="mt-2 flex flex-col gap-2 rounded-lg border border-border bg-surface p-4">
-                    <p className="text-sm font-medium">{t('publicBooking.todayContactTitle')}</p>
-                    <p className="text-xs text-text-secondary">{t('publicBooking.todayRaceWarning')}</p>
-                    <div className="flex flex-wrap gap-2">
-                      <Button asChild size="sm" variant="outline">
-                        <a href={`tel:${clubWaNumber}`}>
-                          <Phone className="me-1 size-4" /> {t('publicBooking.callClub')}
-                        </a>
-                      </Button>
-                      <Button asChild size="sm">
-                        <a
-                          href={`https://wa.me/${toWaDigits(clubWaNumber)}?text=${encodeURIComponent(
-                            t('publicBooking.todayWaMessage', {
-                              club: club.clubName,
-                              field: selectedField?.name ?? '',
-                              date: selectedDate ? formatDate(selectedDate, locale as SupportedLocale, club.timezone, { day: 'numeric', month: 'long' }) : '',
-                            }),
-                          )}`}
-                          target="_blank"
-                          rel="noreferrer"
-                        >
-                          <MessageCircle className="me-1 size-4" /> {t('publicBooking.whatsappClub')}
-                        </a>
-                      </Button>
-                    </div>
-                  </div>
-                )}
               </div>
             )}
           </div>
@@ -499,14 +620,40 @@ export function PublicClubBookingPage() {
             </div>
             <div className="flex flex-col gap-1.5">
               <label className="text-sm font-medium text-text-secondary">{t('publicBooking.mobileLabel')}</label>
-              <Input value={customerMobile} onChange={(e) => setCustomerMobile(e.target.value)} placeholder={t('publicBooking.mobilePlaceholder')} dir="ltr" />
+              {/* HIGH-ROI UX PASS 01, supplementary item 7: mirrors
+                  create_public_booking()'s own normalize_mobile()/
+                  is_phone_plausible() so client feedback and the real
+                  server-side gate agree -- this is instant feedback
+                  only, never the actual validation boundary (the RPC
+                  re-checks independently regardless of what the client
+                  believes). type="tel" + inputMode="tel" improve the
+                  on-screen keyboard on mobile without being the
+                  validation mechanism themselves. */}
+              <Input
+                type="tel"
+                inputMode="tel"
+                value={customerMobile}
+                onChange={(e) => setCustomerMobile(e.target.value)}
+                onBlur={() => setMobileTouched(true)}
+                placeholder={t('publicBooking.mobilePlaceholder')}
+                dir="ltr"
+                aria-invalid={mobileTouched && customerMobile.trim().length > 0 && !isPhonePlausibleClient(customerMobile)}
+              />
+              {mobileTouched && customerMobile.trim().length > 0 && !isPhonePlausibleClient(customerMobile) && (
+                <p role="alert" className="text-xs text-status-danger">{t('publicBooking.mobileInvalid')}</p>
+              )}
             </div>
 
             {formError && <p role="alert" className="text-sm text-status-danger">{formError}</p>}
 
             <Button
               className="w-full"
-              disabled={!customerName.trim() || !customerMobile.trim() || bookMutation.isPending}
+              disabled={
+                !customerName.trim() ||
+                !customerMobile.trim() ||
+                !isPhonePlausibleClient(customerMobile) ||
+                bookMutation.isPending
+              }
               onClick={() => bookMutation.mutate()}
             >
               {bookMutation.isPending ? t('publicBooking.booking') : t('publicBooking.confirmBooking')}
@@ -534,6 +681,30 @@ export function PublicClubBookingPage() {
               <HoldCountdown holdExpiresAt={confirmedHoldExpiresAt} />
             )}
 
+            {/* HIGH-ROI UX PASS 01, item 19: a plain .ics download for
+                the just-created booking -- low cost, reduces no-shows.
+                No payment secrets/tokens in the description, per the
+                directive. dateKey/selectedTime are still the values
+                that were just submitted (this step only renders right
+                after a successful mutation, before either could change). */}
+            {selectedField && dateKey && selectedTime && (
+              <Button asChild size="sm" variant="outline" className="w-fit self-center">
+                <a
+                  href={buildIcsDataUri({
+                    clubName: club.clubName,
+                    fieldName: selectedField.name,
+                    address: club.address,
+                    startAt: new Date(`${dateKey}T${selectedTime}:00`),
+                    endAt: new Date(new Date(`${dateKey}T${selectedTime}:00`).getTime() + DURATION_MINUTES * 60000),
+                    bookingRef: confirmedRef,
+                  })}
+                  download={`${confirmedRef ?? 'booking'}.ics`}
+                >
+                  <CalendarPlus className="me-1 size-4" /> {t('publicBooking.addToCalendar')}
+                </a>
+              </Button>
+            )}
+
             {confirmedBookingId && (
               <PaymentMethodsPanel
                 bookingId={confirmedBookingId}
@@ -554,9 +725,14 @@ export function PublicClubBookingPage() {
                     <span dir="ltr" className="tabular-nums">{club.primaryPhone}</span>
                     <div className="flex gap-1">
                       <Button asChild size="sm" variant="ghost">
-                        <a href={`tel:${club.primaryPhone}`}><Phone className="size-4" /></a>
+                        <a href={`tel:${club.primaryPhone}`} aria-label={t('publicBooking.callClub')}><Phone className="size-4" /></a>
                       </Button>
-                      <Button size="sm" variant="ghost" onClick={() => copyToClipboard(club.primaryPhone!, 'club-phone')}>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => copyToClipboard(club.primaryPhone!, 'club-phone')}
+                        aria-label={t('publicBooking.copyPhoneNumber')}
+                      >
                         {copiedField === 'club-phone' ? <Check className="size-4" /> : <Copy className="size-4" />}
                       </Button>
                     </div>

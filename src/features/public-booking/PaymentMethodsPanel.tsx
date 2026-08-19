@@ -138,17 +138,25 @@ export function PaymentMethodsPanel({
               </button>
               {isOpen && (
                 <div className="flex flex-col gap-2 border-t border-border p-3 text-sm">
-                  {Object.entries(m.details).filter(([, v]) => v).map(([key, value]) => (
-                    <div key={key} className="flex items-center justify-between gap-2">
-                      <span className="text-xs text-text-secondary">{DETAIL_KEY_LABELS[key] ? DETAIL_KEY_LABELS[key][isEn ? 'en' : 'ar'] : key}</span>
-                      <div className="flex items-center gap-1">
-                        <span dir="ltr" className="font-medium tabular-nums">{value}</span>
-                        <Button size="sm" variant="ghost" onClick={() => copy(value, `${m.id}-${key}`)}>
-                          {copiedKey === `${m.id}-${key}` ? <Check className="size-3.5" /> : <Copy className="size-3.5" />}
-                        </Button>
+                  {Object.entries(m.details).filter(([, v]) => v).map(([key, value]) => {
+                    const detailLabel = DETAIL_KEY_LABELS[key] ? DETAIL_KEY_LABELS[key][isEn ? 'en' : 'ar'] : key
+                    return (
+                      <div key={key} className="flex items-center justify-between gap-2">
+                        <span className="text-xs text-text-secondary">{detailLabel}</span>
+                        <div className="flex items-center gap-1">
+                          <span dir="ltr" className="font-medium tabular-nums">{value}</span>
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            onClick={() => copy(value, `${m.id}-${key}`)}
+                            aria-label={t('publicBooking.copyDetail', { label: detailLabel })}
+                          >
+                            {copiedKey === `${m.id}-${key}` ? <Check className="size-3.5" /> : <Copy className="size-3.5" />}
+                          </Button>
+                        </div>
                       </div>
-                    </div>
-                  ))}
+                    )
+                  })}
                   {instructions && <p className="text-xs text-text-secondary">{instructions}</p>}
                   {total != null && (
                     <p className="text-xs font-medium">{t('publicBooking.amountToPay')}: {formatCurrency(total, locale, currency)}</p>

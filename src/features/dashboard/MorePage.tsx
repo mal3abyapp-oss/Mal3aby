@@ -6,6 +6,7 @@ import { Users, Receipt, Wallet, BarChart3, UserCog, Settings, ChevronRight, Cir
 import type { LucideIcon } from 'lucide-react'
 import { useAuth } from '@/app/providers/AuthProvider'
 import { canSeeNavDomain, type NavDomain } from '@/lib/domain/navigation'
+import { usePendingPaymentsCount } from '@/features/billing/usePendingPaymentsCount'
 
 // Section M: mobile bottom nav stays minimal (اليوم/الحجوزات/مسح/
 // الأكاديمية) -- lower-frequency screens live behind "المزيد" instead
@@ -68,6 +69,12 @@ export function MorePage() {
   const { t } = useTranslation()
   const { currentMembership } = useAuth()
   const visibleItems = ITEMS.filter((item) => canSeeNavDomain(currentMembership?.roleKey, item.domain))
+  // HIGH-ROI UX PASS 01, Priority 3: a live, tenant-scoped count next to
+  // "Pending Payments" -- previously a plain list row indistinguishable
+  // from a low-urgency item like Cash Shift despite being a
+  // time-sensitive queue (a real customer's payment-hold countdown is
+  // running while a proof sits unreviewed).
+  const { data: pendingPaymentsCount = 0 } = usePendingPaymentsCount()
 
   return (
     <div>
@@ -82,6 +89,11 @@ export function MorePage() {
                   <p className="font-medium">{t(item.labelKey)}</p>
                   <p className="truncate text-sm text-text-secondary">{t(item.descriptionKey)}</p>
                 </div>
+                {item.to === '/app/pending-payments' && pendingPaymentsCount > 0 && (
+                  <span className="flex size-6 shrink-0 items-center justify-center rounded-full bg-status-warning text-xs font-semibold text-white">
+                    {pendingPaymentsCount}
+                  </span>
+                )}
                 {/* Master IA/UX audit (RTL phase): base icon is the
                     LTR-correct "forward" direction (right), rtl:
                     rotate-180 flips it for RTL. Verified live in both

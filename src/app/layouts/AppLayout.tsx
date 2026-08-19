@@ -8,6 +8,7 @@ import { GlobalSearch } from '@/features/search/GlobalSearch'
 import { QuickActionsPalette } from '@/features/dashboard/QuickActionsPalette'
 import { LanguageSwitcher } from '@/components/ui/language-switcher'
 import { canSeeNavDomain, type NavDomain } from '@/lib/domain/navigation'
+import { usePendingPaymentsCount } from '@/features/billing/usePendingPaymentsCount'
 import {
   CalendarDays,
   GraduationCap,
@@ -129,13 +130,20 @@ async function fetchSubscriptionSummary(clubId: string) {
 }
 
 export function AppLayout() {
-  const { t } = useTranslation()
+  const { t, i18n } = useTranslation()
   const { memberships, currentMembership, currentClubId, setCurrentClubId, signOut } = useAuth()
+  const isEnglish = i18n.language === 'en'
   const { data: subSummary } = useQuery({
     queryKey: ['app-subscription-summary', currentClubId],
     queryFn: () => fetchSubscriptionSummary(currentClubId!),
     enabled: !!currentClubId,
   })
+  // HIGH-ROI UX PASS 01, supplementary item 3 (Pending Payments live
+  // badge) + item 9 (English club switcher, design audit finding: the
+  // switcher always showed clubNameAr/roleNameAr even in English mode
+  // despite clubName/roleName -- the real English values -- already
+  // being fetched by AuthProvider and simply never used here).
+  const { data: pendingPaymentsCount = 0 } = usePendingPaymentsCount()
 
   const daysRemaining = subSummary?.end_at
     ? Math.ceil((new Date(subSummary.end_at).getTime() - Date.now()) / (24 * 60 * 60 * 1000))
@@ -164,12 +172,14 @@ export function AppLayout() {
             >
               {memberships.map((m) => (
                 <option key={m.clubId} value={m.clubId} className="text-black">
-                  {m.clubNameAr}
+                  {isEnglish ? (m.clubName || m.clubNameAr) : m.clubNameAr}
                 </option>
               ))}
             </select>
             {currentMembership && (
-              <p className="mt-1 px-1 text-xs text-white/50">{currentMembership.roleNameAr}</p>
+              <p className="mt-1 px-1 text-xs text-white/50">
+                {isEnglish ? (currentMembership.roleName || currentMembership.roleNameAr) : currentMembership.roleNameAr}
+              </p>
             )}
           </div>
         )}
@@ -193,7 +203,12 @@ export function AppLayout() {
                   }
                 >
                   <item.icon className="size-4" />
-                  {t(item.labelKey)}
+                  <span className="flex-1">{t(item.labelKey)}</span>
+                  {item.to === '/app/pending-payments' && pendingPaymentsCount > 0 && (
+                    <span className="flex size-5 shrink-0 items-center justify-center rounded-full bg-status-warning text-[11px] font-semibold text-white">
+                      {pendingPaymentsCount}
+                    </span>
+                  )}
                 </NavLink>
               ))}
             </div>
@@ -272,7 +287,12 @@ export function AppLayout() {
                 )
               }
             >
-              <item.icon className={cn('size-5', item.to === '/scan' && 'size-6 text-status-success')} />
+              <span className="relative">
+                <item.icon className={cn('size-5', item.to === '/scan' && 'size-6 text-status-success')} />
+                {item.to === '/app/more' && pendingPaymentsCount > 0 && (
+                  <span className="absolute -end-1.5 -top-1 flex size-2.5 items-center justify-center rounded-full bg-status-warning" />
+                )}
+              </span>
               {t(item.labelKey)}
             </NavLink>
           ))}

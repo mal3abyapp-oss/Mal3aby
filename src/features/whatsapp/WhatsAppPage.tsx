@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
 import { supabase } from '@/lib/supabase/client'
@@ -6,7 +7,8 @@ import { PageHeader } from '@/components/ui/page-header'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { StatusBadge, type StatusTone } from '@/components/ui/status-badge'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { LayoutDashboard, Activity, Wifi, Settings as SettingsIcon } from 'lucide-react'
+import { LayoutDashboard, Activity, Wifi, Settings as SettingsIcon, ArrowLeft, ArrowRight } from 'lucide-react'
+import { useDirection } from '@/app/providers/DirectionProvider'
 import { WhatsAppConnectionCard } from './WhatsAppConnectionCard'
 import { MessagingSafetyCard } from './MessagingSafetyCard'
 import { WhatsAppActivityTab } from './WhatsAppActivityTab'
@@ -28,6 +30,14 @@ import { WhatsAppActivityTab } from './WhatsAppActivityTab'
 // contextual "sent ✓ / view activity" summaries instead of duplicating
 // this module's controls -- WhatsApp reacts to booking/payment events
 // as a connected channel, not a silo.
+//
+// HIGH-ROI UX PASS 01, Priority 1 (design audit finding: "Failed
+// permanently: N" was a passive, unexplained number with zero path to
+// investigate or act). Tabs state is now lifted here (was an
+// uncontrolled Radix Tabs with defaultValue) so the Overview tab's
+// failed-count card can jump straight to Activity pre-filtered to
+// 'failed' -- turning a dead-end number into a real operational
+// exception with a one-click path to the actual messages.
 
 interface QuickHealth {
   status: string
@@ -66,8 +76,9 @@ async function fetchQuickHealth(clubId: string): Promise<QuickHealth> {
   }
 }
 
-function OverviewTab() {
+function OverviewTab({ onReviewFailures }: { onReviewFailures: () => void }) {
   const { t } = useTranslation()
+  const { direction } = useDirection()
   const STATUS_LABELS: Record<string, string> = {
     disconnected: t('whatsapp.statusLabels.disconnected'),
     qr_required: t('whatsapp.statusLabels.qr_required'),
@@ -87,6 +98,9 @@ function OverviewTab() {
     enabled: !!currentClubId,
     refetchInterval: 15000,
   })
+
+  const ArrowIcon = direction === 'rtl' ? ArrowLeft : ArrowRight
+  const failedCount = data?.failedCount ?? 0
 
   return (
     <Card>
@@ -110,10 +124,25 @@ function OverviewTab() {
                 <p className="text-xs text-text-secondary">{t('whatsapp.page.overviewTab.pending')}</p>
                 <p className="font-medium">{data?.pendingCount ?? 0}</p>
               </div>
-              <div className="rounded-md border border-border p-3">
-                <p className="text-xs text-text-secondary">{t('whatsapp.page.overviewTab.failedFinal')}</p>
-                <p className={`font-medium ${(data?.failedCount ?? 0) > 0 ? 'text-status-danger' : ''}`}>{data?.failedCount ?? 0}</p>
-              </div>
+              {failedCount > 0 ? (
+                <button
+                  type="button"
+                  onClick={onReviewFailures}
+                  className="flex flex-col items-start gap-1 rounded-md border border-status-danger/40 bg-status-danger/5 p-3 text-start transition hover:bg-status-danger/10"
+                >
+                  <p className="text-xs text-text-secondary">{t('whatsapp.page.overviewTab.failedFinal')}</p>
+                  <p className="font-medium text-status-danger">{failedCount}</p>
+                  <span className="flex items-center gap-1 text-xs font-medium text-status-danger">
+                    {t('whatsapp.page.overviewTab.failedFinalCta')}
+                    <ArrowIcon className="size-3" />
+                  </span>
+                </button>
+              ) : (
+                <div className="rounded-md border border-border p-3">
+                  <p className="text-xs text-text-secondary">{t('whatsapp.page.overviewTab.failedFinal')}</p>
+                  <p className="font-medium">0</p>
+                </div>
+              )}
             </div>
             <p className="text-xs text-text-secondary">
               {t('whatsapp.page.overviewTab.footerHint')}
@@ -127,10 +156,18 @@ function OverviewTab() {
 
 export function WhatsAppPage() {
   const { t } = useTranslation()
+  const [tab, setTab] = useState('overview')
+  const [activityStatusFilter, setActivityStatusFilter] = useState<string | null>(null)
+
+  function reviewFailures() {
+    setActivityStatusFilter('failed')
+    setTab('activity')
+  }
+
   return (
     <div>
       <PageHeader title={t('whatsapp.page.title')} description={t('whatsapp.page.description')} />
-      <Tabs defaultValue="overview">
+      <Tabs value={tab} onValueChange={setTab}>
         <TabsList>
           <TabsTrigger value="overview">
             <LayoutDashboard className="me-1 size-4" />
@@ -149,8 +186,10 @@ export function WhatsAppPage() {
             {t('whatsapp.page.tabs.settings')}
           </TabsTrigger>
         </TabsList>
-        <TabsContent value="overview"><OverviewTab /></TabsContent>
-        <TabsContent value="activity"><WhatsAppActivityTab /></TabsContent>
+        <TabsContent value="overview"><OverviewTab onReviewFailures={reviewFailures} /></TabsContent>
+        <TabsContent value="activity">
+          <WhatsAppActivityTab initialStatusFilter={activityStatusFilter} onStatusFilterConsumed={() => setActivityStatusFilter(null)} />
+        </TabsContent>
         <TabsContent value="connection"><WhatsAppConnectionCard /></TabsContent>
         <TabsContent value="settings"><MessagingSafetyCard /></TabsContent>
       </Tabs>

@@ -795,6 +795,7 @@
         "connectionLabel": "الاتصال:",
         "pending": "قيد الانتظار",
         "failedFinal": "فشلت نهائيًا",
+        "failedFinalCta": "مراجعة الرسائل الفاشلة",
         "footerHint": "للاطلاع على كل رسالة على حدة راجع تبويب \"النشاط\"، ولإدارة الاتصال أو ضوابط الإرسال راجع \"الاتصال\"/\"الإعدادات\"."
       },
       "activityTab": {
@@ -818,12 +819,31 @@
         },
         "loading": "جارٍ التحميل...",
         "emptyTitle": "لا توجد رسائل واتساب في هذا النطاق بعد.",
+        "emptyFailed": "لا توجد رسائل فشلت نهائيًا -- كل شيء يُرسل بشكل طبيعي.",
         "columns": {
           "message": "الرسالة",
           "recipient": "المستلم",
           "status": "الحالة",
           "timing": "التوقيت",
           "lastAttempt": "آخر محاولة"
+        },
+        "noPhone": "لا يوجد رقم هاتف مسجّل",
+        "unknownCustomer": "عميل غير معروف",
+        "attemptsLabel": "{{count}} محاولة",
+        "attemptsLabel_other": "{{count}} محاولات",
+        "failureReason": {
+          "timeout": "انتهت مهلة إرسال الرسالة -- على الأرجح مشكلة اتصال مؤقتة مع واتساب.",
+          "unknownTemplate": "مشكلة إعداد داخلية في قالب الرسالة -- تم تسجيلها.",
+          "generic": "السبب: {{reason}}"
+        },
+        "actions": {
+          "retry": "إعادة المحاولة",
+          "retrying": "جارٍ إعادة المحاولة...",
+          "retrySuccess": "تمت إضافتها لقائمة إعادة المحاولة",
+          "retryError": "تعذّرت إعادة محاولة هذه الرسالة",
+          "retryInvalidSource": "الحجز أو الدفعة المرتبطة بهذه الرسالة لم تعد صالحة، لذا لا يمكن إعادة المحاولة.",
+          "viewBooking": "عرض الحجوزات",
+          "viewCustomer": "عرض العميل"
         }
       }
     }
@@ -1106,9 +1126,12 @@
     "namePlaceholder": "اسمك الكامل",
     "mobileLabel": "رقم الجوال",
     "mobilePlaceholder": "01xxxxxxxxx",
+    "mobileInvalid": "أدخل رقم جوال صحيح ليتمكن النادي من التواصل معك عبر واتساب.",
     "booking": "جارٍ الحجز...",
     "confirmBooking": "تأكيد الحجز",
     "genericError": "تعذّر إتمام الحجز. حاول مرة أخرى.",
+    "slotConflictMessage": "تم حجز هذا الموعد للتو من شخص آخر. اختر موعدًا آخر.",
+    "addToCalendar": "أضف إلى التقويم",
     "confirmedTitle": "تم الحجز بنجاح!",
     "confirmedMessage": "سنرسل لك تفاصيل الحجز ورمز الحضور عبر واتساب.",
     "bookingRef": "رقم الحجز",
@@ -1121,6 +1144,8 @@
     "todayContactTitle": "تواصل مع النادي للحجز اليوم",
     "todayRaceWarning": "التوفر الظاهر لحظي وقد يتغير حتى يؤكد النادي الحجز.",
     "callClub": "اتصل بالنادي",
+    "copyPhoneNumber": "نسخ رقم الهاتف",
+    "copyDetail": "نسخ {{label}}",
     "whatsappClub": "واتساب النادي",
     "todayWaMessage": "مرحبًا،\nأرغب في حجز الملعب اليوم.\n\nالنادي: {{club}}\nالملعب: {{field}}\nالتاريخ: {{date}}\n\nهل الموعد ما زال متاحًا؟",
     "contactClubTitle": "التواصل مع النادي",
@@ -1138,12 +1163,14 @@
       "uploadButton": "رفع الإيصال",
       "uploading": "جارٍ الرفع...",
       "pendingReview": "تم رفع الإيصال — بانتظار مراجعة النادي.",
+      "pendingReviewHoldNote": "حجزك لا يزال محجوزًا لك أثناء مراجعة النادي.",
       "approved": "تم تأكيد الدفع. شكرًا لك!",
       "rejected": "لم يتم قبول هذا الإيصال.",
       "rejectedRetry": "يمكنك رفع إيصال جديد أدناه.",
       "invalidType": "يرجى رفع ملف بصيغة JPG أو PNG أو PDF.",
       "tooLarge": "الملف كبير جدًا (الحد الأقصى 10 ميجابايت).",
-      "uploadError": "تعذّر رفع الإيصال. حاول مرة أخرى."
+      "uploadError": "تعذّر رفع الإيصال. حاول مرة أخرى.",
+      "fileHint": "JPG أو PNG أو PDF، بحد أقصى 10 ميجابايت."
     },
     "sportLabels": {
       "football": "كرة قدم",
@@ -1722,10 +1749,16 @@
       "amountEgp": "{{amount}} ج.م",
       "startingSoon": "موعد قريب لم يتم تسجيل الحضور — {{name}}",
       "expiringSubscription": "اشتراك أكاديمية على وشك الانتهاء — {{name}}",
+      "pendingPaymentProof": "إيصال دفع بانتظار المراجعة — {{name}}",
+      "holdMinutesLeft": "متبقٍ {{minutes}} دقيقة على انتهاء المهلة",
+      "whatsappFailed": "رسالة واتساب واحدة فشلت نهائيًا",
+      "whatsappFailed_other": "{{count}} رسائل واتساب فشلت نهائيًا",
       "chipLabels": {
         "unpaid": "دفع",
         "startingSoon": "عاجل",
-        "expiringSubscription": "تجديد"
+        "expiringSubscription": "تجديد",
+        "pendingPaymentProof": "مراجعة",
+        "whatsappFailed": "واتساب"
       }
     },
     "quickActionsPalette": {
