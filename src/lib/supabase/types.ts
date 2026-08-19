@@ -319,6 +319,7 @@ export type Database = {
           marked_at: string | null
           marked_by: string | null
           notes: string | null
+          source: string
           start_at: string
           status: string
           total_price: number
@@ -343,6 +344,7 @@ export type Database = {
           marked_at?: string | null
           marked_by?: string | null
           notes?: string | null
+          source?: string
           start_at: string
           status?: string
           total_price: number
@@ -367,6 +369,7 @@ export type Database = {
           marked_at?: string | null
           marked_by?: string | null
           notes?: string | null
+          source?: string
           start_at?: string
           status?: string
           total_price?: number
@@ -624,6 +627,8 @@ export type Database = {
           name: string
           name_ar: string
           name_en: string | null
+          public_booking_enabled: boolean
+          public_slug: string | null
           status: string
           subscription_activation_policy: string
           tax_info: Json | null
@@ -643,6 +648,8 @@ export type Database = {
           name: string
           name_ar: string
           name_en?: string | null
+          public_booking_enabled?: boolean
+          public_slug?: string | null
           status?: string
           subscription_activation_policy?: string
           tax_info?: Json | null
@@ -662,6 +669,8 @@ export type Database = {
           name?: string
           name_ar?: string
           name_en?: string | null
+          public_booking_enabled?: boolean
+          public_slug?: string | null
           status?: string
           subscription_activation_policy?: string
           tax_info?: Json | null
@@ -4221,6 +4230,22 @@ export type Database = {
         }
         Returns: string
       }
+      create_public_booking: {
+        Args: {
+          p_club_slug: string
+          p_customer_mobile: string
+          p_customer_name: string
+          p_end_at: string
+          p_field_id: string
+          p_notes?: string
+          p_source?: string
+          p_start_at: string
+        }
+        Returns: {
+          booking_id: string
+          booking_ref: string
+        }[]
+      }
       create_recurring_booking: {
         Args: {
           p_customer_id: string
@@ -4298,6 +4323,10 @@ export type Database = {
           p_start_date: string
           p_subscription_id: string
         }
+        Returns: string
+      }
+      generate_club_slug: {
+        Args: { p_club_id: string; p_preferred_base?: string }
         Returns: string
       }
       generate_training_sessions: {
@@ -4387,6 +4416,41 @@ export type Database = {
           phone: string
           user_id: string
         }[]
+      }
+      get_public_club: {
+        Args: { p_slug: string }
+        Returns: {
+          branches: Json
+          club_id: string
+          club_name: string
+          club_name_en: string
+          currency: string
+          fields: Json
+          logo_url: string
+          timezone: string
+        }[]
+      }
+      get_public_club_subscription_access: {
+        Args: { p_club_id: string }
+        Returns: string
+      }
+      get_public_field_availability: {
+        Args: { p_date: string; p_field_id: string }
+        Returns: {
+          busy_ranges: Json
+          close_time: string
+          has_any_config: boolean
+          open_time: string
+        }[]
+      }
+      get_public_field_price: {
+        Args: {
+          p_date: string
+          p_end_time: string
+          p_field_id: string
+          p_start_time: string
+        }
+        Returns: number
       }
       get_revenue_report: {
         Args: {
@@ -4594,10 +4658,19 @@ export type Database = {
         Args: { p_approve: boolean; p_reason?: string; p_request_id: string }
         Returns: undefined
       }
+      set_club_public_booking_enabled: {
+        Args: { p_club_id: string; p_enabled: boolean }
+        Returns: undefined
+      }
+      set_club_public_slug: {
+        Args: { p_club_id: string; p_desired_slug?: string }
+        Returns: string
+      }
       set_plan_publish_status: {
         Args: { p_is_public: boolean; p_plan_id: string }
         Returns: undefined
       }
+      slugify: { Args: { p_text: string }; Returns: string }
       start_gateway_checkout: {
         Args: { p_amount: number; p_gateway: string; p_invoice_id: string }
         Returns: string
