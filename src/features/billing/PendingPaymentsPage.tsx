@@ -92,7 +92,14 @@ export function PendingPaymentsPage() {
 
   const approveMutation = useMutation({
     mutationFn: async (proofId: string) => {
-      const { error } = await supabase.rpc('approve_payment_proof', { p_proof_id: proofId, p_payment_method: 'bank_transfer' })
+      // Design/UX audit fix (2026-08-19): previously hardcoded
+      // p_payment_method: 'bank_transfer' on every approval regardless of
+      // the method the customer actually used -- corrupted real financial
+      // records. approve_payment_proof() now resolves the real method
+      // itself from the proof's own linked payment_method_config_id when
+      // no explicit override is passed, so this call correctly leaves it
+      // unset rather than forcing a specific value.
+      const { error } = await supabase.rpc('approve_payment_proof', { p_proof_id: proofId })
       if (error) throw error
     },
     onSuccess: () => {
