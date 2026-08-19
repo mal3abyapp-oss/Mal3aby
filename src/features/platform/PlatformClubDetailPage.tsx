@@ -555,7 +555,14 @@ export function PlatformClubDetailPage() {
           </CardHeader>
           <CardContent className="flex flex-col gap-1.5 text-sm">
             <div className="flex justify-between"><span className="text-text-secondary">{t('platform.clubDetailPage.identityCard.createdAt')}</span><bdi>{club ? new Date(club.created_at).toLocaleDateString(locale === 'en' ? 'en-US' : 'ar-EG') : '—'}</bdi></div>
-            <div className="flex justify-between"><span className="text-text-secondary">{t('platform.clubDetailPage.identityCard.phone')}</span><bdi>{club?.primary_phone ?? '—'}</bdi></div>
+            <div className="flex justify-between">
+              <span className="text-text-secondary">{t('platform.clubDetailPage.identityCard.phone')}</span>
+              {club?.primary_phone ? (
+                <a href={`tel:${club.primary_phone}`} className="text-accent-foreground hover:underline"><bdi>{club.primary_phone}</bdi></a>
+              ) : (
+                <span>—</span>
+              )}
+            </div>
             <div className="flex justify-between"><span className="text-text-secondary">{t('platform.clubDetailPage.identityCard.email')}</span><span>{club?.contact_email ?? '—'}</span></div>
             {club?.public_slug && (
               <div className="flex justify-between">
@@ -577,9 +584,31 @@ export function PlatformClubDetailPage() {
               <>
                 <p className="font-medium text-text-primary">{club360.owner_name}</p>
                 {club360.owner_email && (
-                  <a href={`mailto:${club360.owner_email}`} className="text-accent-foreground hover:underline">{club360.owner_email}</a>
+                  <div className="flex items-center gap-2">
+                    <a href={`mailto:${club360.owner_email}`} className="text-accent-foreground hover:underline">{club360.owner_email}</a>
+                    <button
+                      type="button"
+                      className="text-xs text-text-secondary hover:text-text-primary"
+                      onClick={() => void navigator.clipboard?.writeText(club360.owner_email!)}
+                      title={t('platform.clubDetailPage.ownerCard.copy')}
+                    >
+                      {t('platform.clubDetailPage.ownerCard.copy')}
+                    </button>
+                  </div>
                 )}
-                {club360.owner_phone && <bdi className="text-text-secondary">{club360.owner_phone}</bdi>}
+                {club360.owner_phone && (
+                  <div className="flex items-center gap-2">
+                    <a href={`tel:${club360.owner_phone}`} className="text-accent-foreground hover:underline"><bdi>{club360.owner_phone}</bdi></a>
+                    <button
+                      type="button"
+                      className="text-xs text-text-secondary hover:text-text-primary"
+                      onClick={() => void navigator.clipboard?.writeText(club360.owner_phone!)}
+                      title={t('platform.clubDetailPage.ownerCard.copy')}
+                    >
+                      {t('platform.clubDetailPage.ownerCard.copy')}
+                    </button>
+                  </div>
+                )}
                 <Link
                   to="/platform/owners"
                   className="mt-1 text-xs text-accent-foreground hover:underline"

@@ -237,7 +237,8 @@
       "ownerCard": {
         "title": "صاحب النادي",
         "noOwner": "لا يوجد صاحب نادٍ نشط",
-        "openOwners": "فتح صفحة الأصحاب"
+        "openOwners": "فتح صفحة الأصحاب",
+        "copy": "نسخ"
       },
       "summaryCard": {
         "title": "ملخص التشغيل",

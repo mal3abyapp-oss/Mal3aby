@@ -237,7 +237,8 @@
       "ownerCard": {
         "title": "Club owner",
         "noOwner": "No active club owner",
-        "openOwners": "Open Owners page"
+        "openOwners": "Open Owners page",
+        "copy": "Copy"
       },
       "summaryCard": {
         "title": "Operational summary",
