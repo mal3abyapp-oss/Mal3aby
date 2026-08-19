@@ -114,9 +114,20 @@ export function PlatformClubDetailPage() {
   const { locale } = useDirection()
   const { clubId } = useParams<{ clubId: string }>()
   const queryClient = useQueryClient()
-  const [reasonDialogAction, setReasonDialogAction] = useState<null | 'cancel' | 'reverse' | 'suspend'>(null)
+  const [reasonDialogAction, setReasonDialogAction] = useState<null | 'cancel' | 'reverse' | 'suspend' | 'changePlan'>(null)
   const [reasonTarget, setReasonTarget] = useState<string | null>(null)
   const [reasonText, setReasonText] = useState('')
+  // Phase D directive (D2): "Extend grace" used to be a literal 14-day
+  // hardcode with no input at all. Real input + preview of the resulting
+  // date, plus a reason (consistent with every other subscription-
+  // affecting action on this page).
+  const [graceDaysInput, setGraceDaysInput] = useState('14')
+  const [graceReasonText, setGraceReasonText] = useState('')
+  const [showGraceDialog, setShowGraceDialog] = useState(false)
+  const [showPaymentDialog, setShowPaymentDialog] = useState(false)
+  const [paymentInvoiceId, setPaymentInvoiceId] = useState<string | null>(null)
+  const [paymentMethod, setPaymentMethod] = useState('bank_transfer')
+  const [paymentReference, setPaymentReference] = useState('')
   // Phase A directive (A2): create_platform_subscription now enforces a
   // real per-owner trial-abuse guard (checked against
   // automatic_trial_entitlements, not just the per-club uniqueness that
@@ -273,30 +284,48 @@ export function PlatformClubDetailPage() {
     onError: () => setActionError(t('platform.clubDetailPage.errors.renew')),
   })
 
+  // Phase D directive (D1): p_reason used to be a hardcoded literal
+  // ('plan change via platform console') -- no actual operator input.
+  // The RPC itself already accepted a real reason string; this now
+  // collects one via the existing reason-dialog pattern.
   const changePlanMutation = useMutation({
-    mutationFn: async () => {
+    mutationFn: async (reason: string) => {
       if (!currentSub || !selectedPlanId) throw new Error('missing input')
       const { error } = await supabase.rpc('change_platform_plan', {
         p_current_subscription_id: currentSub.id,
         p_new_plan_id: selectedPlanId,
-        p_reason: 'plan change via platform console',
+        p_reason: reason,
       })
       if (error) throw error
     },
-    onSuccess: invalidateAll,
+    onSuccess: () => {
+      invalidateAll()
+      setReasonDialogAction(null)
+      setReasonText('')
+    },
     onError: () => setActionError(t('platform.clubDetailPage.errors.changePlan')),
   })
 
+  // Phase D directive (D2): was a literal 14 with no input field and no
+  // reason -- extend_grace_period() itself now requires a reason (see
+  // migration 20260819120000). p_grace_period_days SETS the snapshot
+  // (not additive), so the dialog shows the resulting end-of-grace date
+  // computed from the current subscription's end_at, not just a day count.
   const extendGraceMutation = useMutation({
-    mutationFn: async (days: number) => {
+    mutationFn: async ({ days, reason }: { days: number; reason: string }) => {
       if (!currentSub) throw new Error('no current subscription')
       const { error } = await supabase.rpc('extend_grace_period', {
         p_subscription_id: currentSub.id,
         p_grace_period_days: days,
+        p_reason: reason,
       })
       if (error) throw error
     },
-    onSuccess: invalidateAll,
+    onSuccess: () => {
+      invalidateAll()
+      setShowGraceDialog(false)
+      setGraceReasonText('')
+    },
     onError: () => setActionError(t('platform.clubDetailPage.errors.extendGrace')),
   })
 
@@ -339,18 +368,29 @@ export function PlatformClubDetailPage() {
     onError: () => setActionError(t('platform.clubDetailPage.errors.cancel')),
   })
 
+  // Phase D directive (D4/D5): p_method was hardcoded to 'bank_transfer'
+  // regardless of how the club actually paid -- record_platform_payment
+  // already accepted 'bank_transfer' | 'cash' | 'other', only the caller
+  // never let the operator choose. Now collected via a dialog with a
+  // real method Select plus an optional reference/note field.
   const recordPaymentMutation = useMutation({
-    mutationFn: async (invoiceId: string) => {
+    mutationFn: async ({ invoiceId, method, reference }: { invoiceId: string; method: string; reference: string }) => {
       const invoice = invoices.find((i) => i.id === invoiceId)
       if (!invoice) throw new Error('invoice not found')
       const { error } = await supabase.rpc('record_platform_payment', {
         p_invoice_id: invoiceId,
         p_amount: invoice.amount,
-        p_method: 'bank_transfer',
+        p_method: method,
+        p_reference: reference.trim() || undefined,
       })
       if (error) throw error
     },
-    onSuccess: invalidateAll,
+    onSuccess: () => {
+      invalidateAll()
+      setShowPaymentDialog(false)
+      setPaymentMethod('bank_transfer')
+      setPaymentReference('')
+    },
     onError: () => setActionError(t('platform.clubDetailPage.errors.recordPayment')),
   })
 
@@ -435,7 +475,16 @@ export function PlatformClubDetailPage() {
         const activePayment = payments.find((p) => !p.reversed_at)
         if (i.status === 'pending') {
           return (
-            <Button size="sm" variant="outline" onClick={() => recordPaymentMutation.mutate(i.id)}>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => {
+                setPaymentInvoiceId(i.id)
+                setPaymentMethod('bank_transfer')
+                setPaymentReference('')
+                setShowPaymentDialog(true)
+              }}
+            >
               {t('platform.clubDetailPage.recordPayment')}
             </Button>
           )
@@ -651,11 +700,27 @@ export function PlatformClubDetailPage() {
                       ))}
                     </SelectContent>
                   </Select>
-                  <Button size="sm" variant="outline" onClick={() => changePlanMutation.mutate()} disabled={changePlanMutation.isPending}>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    disabled={!selectedPlanId || changePlanMutation.isPending}
+                    onClick={() => {
+                      setReasonDialogAction('changePlan')
+                      setReasonTarget(currentSub.id)
+                    }}
+                  >
                     {t('platform.clubDetailPage.actionsCard.changePlan')}
                   </Button>
                 </div>
-                <Button size="sm" variant="outline" onClick={() => extendGraceMutation.mutate(14)} disabled={extendGraceMutation.isPending}>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => {
+                    setGraceDaysInput(String(currentSub.grace_period_days_snapshot ?? 0))
+                    setGraceReasonText('')
+                    setShowGraceDialog(true)
+                  }}
+                >
                   {t('platform.clubDetailPage.actionsCard.extendGrace')}
                 </Button>
                 <Button
@@ -858,7 +923,9 @@ export function PlatformClubDetailPage() {
                 ? t('platform.clubDetailPage.reasonDialog.cancelTitle')
                 : reasonDialogAction === 'suspend'
                   ? t('platform.clubDetailPage.reasonDialog.suspendTitle')
-                  : t('platform.clubDetailPage.reasonDialog.reverseTitle')}
+                  : reasonDialogAction === 'changePlan'
+                    ? t('platform.clubDetailPage.reasonDialog.changePlanTitle')
+                    : t('platform.clubDetailPage.reasonDialog.reverseTitle')}
             </DialogTitle>
           </DialogHeader>
           <div className="flex flex-col gap-3">
@@ -867,18 +934,97 @@ export function PlatformClubDetailPage() {
                 {t('platform.clubDetailPage.reasonDialog.suspendWarning')}
               </p>
             )}
+            {reasonDialogAction === 'changePlan' && currentSub && (
+              <p className="text-sm text-text-secondary">
+                {t('platform.clubDetailPage.reasonDialog.changePlanSummary', {
+                  from: currentSub.plan_name_snapshot ?? '—',
+                  to: plans.find((p) => p.id === selectedPlanId)?.name_ar ?? '—',
+                })}
+              </p>
+            )}
             <Input value={reasonText} onChange={(e) => setReasonText(e.target.value)} placeholder={t('platform.clubDetailPage.reasonDialog.reasonPlaceholder')} />
             <Button
               variant={reasonDialogAction === 'suspend' ? 'destructive' : 'default'}
-              disabled={!reasonText.trim() || cancelMutation.isPending || reverseMutation.isPending || suspendMutation.isPending}
+              disabled={!reasonText.trim() || cancelMutation.isPending || reverseMutation.isPending || suspendMutation.isPending || changePlanMutation.isPending}
               onClick={() => {
                 if (!reasonTarget) return
                 if (reasonDialogAction === 'cancel') cancelMutation.mutate(reasonText)
                 else if (reasonDialogAction === 'suspend') suspendMutation.mutate(reasonText)
+                else if (reasonDialogAction === 'changePlan') changePlanMutation.mutate(reasonText)
                 else reverseMutation.mutate({ paymentId: reasonTarget, reason: reasonText })
               }}
             >
               {reasonDialogAction === 'suspend' ? t('platform.clubDetailPage.reasonDialog.confirmSuspend') : t('platform.clubDetailPage.reasonDialog.confirm')}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Phase D directive (D2): extend_grace_period sets the grace
+          snapshot (not additive) and now requires a reason -- this
+          dialog shows the resulting grace-end date computed from the
+          current subscription so the operator sees the actual effect,
+          not just a day count. */}
+      <Dialog open={showGraceDialog} onOpenChange={setShowGraceDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>{t('platform.clubDetailPage.graceDialog.title')}</DialogTitle>
+          </DialogHeader>
+          <div className="flex flex-col gap-3">
+            <div className="flex flex-col gap-1.5">
+              <label className="text-sm font-medium text-text-secondary">{t('platform.clubDetailPage.graceDialog.daysLabel')}</label>
+              <Input type="number" min="0" value={graceDaysInput} onChange={(e) => setGraceDaysInput(e.target.value)} />
+            </div>
+            {currentSub && graceDaysInput.trim() !== '' && !Number.isNaN(Number(graceDaysInput)) && (
+              <p className="text-sm text-text-secondary">
+                {t('platform.clubDetailPage.graceDialog.resultingDate', {
+                  date: new Date(new Date(currentSub.end_at).getTime() + Number(graceDaysInput) * 86400000).toLocaleDateString(locale === 'en' ? 'en-US' : 'ar-EG'),
+                })}
+              </p>
+            )}
+            <Input value={graceReasonText} onChange={(e) => setGraceReasonText(e.target.value)} placeholder={t('platform.clubDetailPage.reasonDialog.reasonPlaceholder')} />
+            <Button
+              disabled={!graceReasonText.trim() || graceDaysInput.trim() === '' || Number.isNaN(Number(graceDaysInput)) || Number(graceDaysInput) < 0 || extendGraceMutation.isPending}
+              onClick={() => extendGraceMutation.mutate({ days: Number(graceDaysInput), reason: graceReasonText.trim() })}
+            >
+              {t('platform.clubDetailPage.graceDialog.confirm')}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Phase D directive (D4/D5): payment method used to be hardcoded
+          to bank_transfer regardless of how the club actually paid --
+          real method selection plus an optional reference/note field. */}
+      <Dialog open={showPaymentDialog} onOpenChange={setShowPaymentDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>{t('platform.clubDetailPage.paymentDialog.title')}</DialogTitle>
+          </DialogHeader>
+          <div className="flex flex-col gap-3">
+            <div className="flex flex-col gap-1.5">
+              <label className="text-sm font-medium text-text-secondary">{t('platform.clubDetailPage.paymentDialog.methodLabel')}</label>
+              <Select value={paymentMethod} onValueChange={setPaymentMethod}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="bank_transfer">{t('platform.clubDetailPage.paymentDialog.methods.bank_transfer')}</SelectItem>
+                  <SelectItem value="cash">{t('platform.clubDetailPage.paymentDialog.methods.cash')}</SelectItem>
+                  <SelectItem value="other">{t('platform.clubDetailPage.paymentDialog.methods.other')}</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="flex flex-col gap-1.5">
+              <label className="text-sm font-medium text-text-secondary">{t('platform.clubDetailPage.paymentDialog.referenceLabel')}</label>
+              <Input value={paymentReference} onChange={(e) => setPaymentReference(e.target.value)} placeholder={t('platform.clubDetailPage.paymentDialog.referencePlaceholder')} />
+            </div>
+            <Button
+              disabled={!paymentInvoiceId || recordPaymentMutation.isPending}
+              onClick={() => {
+                if (!paymentInvoiceId) return
+                recordPaymentMutation.mutate({ invoiceId: paymentInvoiceId, method: paymentMethod, reference: paymentReference })
+              }}
+            >
+              {t('platform.clubDetailPage.paymentDialog.confirm')}
             </Button>
           </div>
         </DialogContent>

@@ -320,10 +320,30 @@
         "cancelTitle": "سبب الإلغاء",
         "suspendTitle": "سبب إيقاف النادي",
         "reverseTitle": "سبب عكس الدفعة",
+        "changePlanTitle": "سبب تغيير الخطة",
+        "changePlanSummary": "من {{from}} إلى {{to}}",
         "suspendWarning": "سيتم إيقاف النادي بالكامل عن العمل على المنصة فورًا. هذا إجراء حساس يُسجَّل في سجل التدقيق.",
         "reasonPlaceholder": "السبب مطلوب",
         "confirmSuspend": "تأكيد الإيقاف",
         "confirm": "تأكيد"
+      },
+      "graceDialog": {
+        "title": "تعديل فترة السماح",
+        "daysLabel": "عدد أيام فترة السماح",
+        "resultingDate": "ستنتهي فترة السماح في: {{date}}",
+        "confirm": "تأكيد التعديل"
+      },
+      "paymentDialog": {
+        "title": "تسجيل دفعة",
+        "methodLabel": "طريقة الدفع",
+        "methods": {
+          "bank_transfer": "حوالة بنكية",
+          "cash": "نقدًا",
+          "other": "أخرى"
+        },
+        "referenceLabel": "المرجع / ملاحظة (اختياري)",
+        "referencePlaceholder": "رقم الحوالة أو أي ملاحظة",
+        "confirm": "تأكيد الدفعة"
       }
     },
     "clubsPage": {

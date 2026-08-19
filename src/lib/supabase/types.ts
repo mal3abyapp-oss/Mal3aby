@@ -4517,7 +4517,11 @@ export type Database = {
       ensure_player_qr: { Args: { p_player_id: string }; Returns: string }
       expire_stale_booking_holds: { Args: never; Returns: number }
       extend_grace_period: {
-        Args: { p_grace_period_days: number; p_subscription_id: string }
+        Args: {
+          p_grace_period_days: number
+          p_reason: string
+          p_subscription_id: string
+        }
         Returns: undefined
       }
       find_claimable_customer: {

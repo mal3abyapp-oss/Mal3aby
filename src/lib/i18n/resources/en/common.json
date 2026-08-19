@@ -320,10 +320,30 @@
         "cancelTitle": "Reason for cancellation",
         "suspendTitle": "Reason for suspending the club",
         "reverseTitle": "Reason for reversing the payment",
+        "changePlanTitle": "Reason for changing the plan",
+        "changePlanSummary": "From {{from}} to {{to}}",
         "suspendWarning": "The club will be immediately suspended from operating on the platform. This is a sensitive action and is recorded in the audit log.",
         "reasonPlaceholder": "Reason is required",
         "confirmSuspend": "Confirm suspension",
         "confirm": "Confirm"
+      },
+      "graceDialog": {
+        "title": "Edit grace period",
+        "daysLabel": "Grace period days",
+        "resultingDate": "Grace will end on: {{date}}",
+        "confirm": "Confirm change"
+      },
+      "paymentDialog": {
+        "title": "Record payment",
+        "methodLabel": "Payment method",
+        "methods": {
+          "bank_transfer": "Bank transfer",
+          "cash": "Cash",
+          "other": "Other"
+        },
+        "referenceLabel": "Reference / note (optional)",
+        "referencePlaceholder": "Transfer number or any note",
+        "confirm": "Confirm payment"
       }
     },
     "clubsPage": {
