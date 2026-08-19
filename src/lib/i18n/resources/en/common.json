@@ -4,6 +4,12 @@
     "updateAvailable": "A new version is available.",
     "reload": "Reload"
   },
+  "whatsappConsent": {
+    "question": "Did the customer agree to receive service messages via WhatsApp?",
+    "hint": "Booking confirmations, payment receipts, and similar service notifications only -- never marketing.",
+    "yes": "Yes",
+    "no": "No"
+  },
   "phoneInput": {
     "invalidError": "Invalid phone number. Check the country and phone number.",
     "duplicateCustomer": "A customer with this phone number already exists.",

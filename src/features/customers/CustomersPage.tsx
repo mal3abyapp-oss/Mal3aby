@@ -10,6 +10,7 @@ import { DataTable, type DataTableColumn } from '@/components/ui/data-table'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { PhoneInput } from '@/components/ui/phone-input'
+import { WhatsappConsentQuestion, type WhatsappConsentAnswer } from '@/components/ui/whatsapp-consent-question'
 import {
   Dialog,
   DialogContent,
@@ -107,6 +108,11 @@ export function CustomersPage() {
   const [email, setEmail] = useState('')
   const [formError, setFormError] = useState<string | null>(null)
   const [duplicateCustomer, setDuplicateCustomer] = useState<{ id: string; fullName: string } | null>(null)
+  // Correction: creating a customer record is never itself consent.
+  // Staff must explicitly ask the customer and record the real
+  // answer -- no pre-selected default, same pattern as the government-
+  // affiliation question at onboarding.
+  const [whatsappConsent, setWhatsappConsent] = useState<WhatsappConsentAnswer>(null)
 
   const { data: clubCountry } = useQuery({
     queryKey: ['club-country', currentClubId],
@@ -151,6 +157,7 @@ export function CustomersPage() {
     setEmail('')
     setFormError(null)
     setDuplicateCustomer(null)
+    setWhatsappConsent(null)
     setDialogOpen(true)
   }
 
@@ -159,6 +166,7 @@ export function CustomersPage() {
     setFullName(c.fullName)
     setMobile(c.mobileDisplay ?? '')
     setMobileCountry((clubCountry as CountryCode) ?? 'EG')
+    setWhatsappConsent(null)
     setEmail(c.email ?? '')
     setFormError(null)
     setDuplicateCustomer(null)
@@ -202,9 +210,11 @@ export function CustomersPage() {
         phone_e164: phoneE164,
         email: email || null,
       }
+      let customerId: string
       if (editingCustomer) {
         const { error } = await supabase.from('customers').update(payload).eq('id', editingCustomer.id)
         if (error) throw error
+        customerId = editingCustomer.id
       } else {
         const { data: created, error } = await supabase
           .from('customers')
@@ -212,26 +222,24 @@ export function CustomersPage() {
           .select('id')
           .single()
         if (error) throw error
+        customerId = created.id
+      }
 
-        // P0 Phone Identity directive gap fix: enqueue_notification()
-        // requires an explicit, enabled notification_consent row --
-        // only the public-booking self-signup path ever created one,
-        // so a staff-created customer's WhatsApp messages (booking
-        // confirmations, payment receipts) were silently never sent
-        // regardless of how correctly the phone was normalized.
-        // Mirrors the same default-consent pattern create_public_booking()
-        // already uses for a new self-signup customer.
-        if (phoneE164 && created) {
-          await supabase.from('notification_consent').insert({
-            club_id: currentClubId as string,
-            customer_id: created.id,
-            channel: 'whatsapp',
-            enabled: true,
-            consent_source: 'staff_created',
-            phone_display: mobile,
-            normalized_phone: normalizeMobile(mobile),
-          })
-        }
+      // Correction: creating/editing a customer record is never
+      // itself consent to receive WhatsApp messages. This RPC only
+      // writes a decision when staff have actually asked the customer
+      // and recorded a real yes/no answer -- never a silent default.
+      // Centralized in one RPC so every staff-side customer-creation
+      // surface behaves identically (directive requirement).
+      if (phoneE164 && whatsappConsent !== null) {
+        const { error: consentError } = await supabase.rpc('record_staff_whatsapp_consent', {
+          p_club_id: currentClubId as string,
+          p_customer_id: customerId,
+          p_consented: whatsappConsent,
+          p_phone_display: mobile,
+          p_normalized_phone: normalizeMobile(mobile),
+        })
+        if (consentError) throw consentError
       }
     },
     onSuccess: () => {
@@ -242,6 +250,7 @@ export function CustomersPage() {
       setEmail('')
       setFormError(null)
       setDuplicateCustomer(null)
+      setWhatsappConsent(null)
       void queryClient.invalidateQueries({ queryKey: ['customers', currentClubId] })
     },
     onError: (error: unknown) => {
@@ -339,6 +348,9 @@ export function CustomersPage() {
                   }}
                   onValidChange={(r) => setPhoneValid(r.valid)}
                 />
+                {mobile.trim() && phoneValid && (
+                  <WhatsappConsentQuestion value={whatsappConsent} onChange={setWhatsappConsent} />
+                )}
                 <div className="flex flex-col gap-1.5">
                   <label className="text-sm font-medium text-text-secondary">{t('customers.emailOptional')}</label>
                   <Input type="email" value={email} onChange={(e) => setEmail(e.target.value)} />
@@ -364,7 +376,14 @@ export function CustomersPage() {
                     {formError}
                   </p>
                 )}
-                <Button type="submit" disabled={saveMutation.isPending || (mobile.trim().length > 0 && !phoneValid)}>
+                <Button
+                  type="submit"
+                  disabled={
+                    saveMutation.isPending ||
+                    (mobile.trim().length > 0 && !phoneValid) ||
+                    (mobile.trim().length > 0 && phoneValid && whatsappConsent === null)
+                  }
+                >
                   {saveMutation.isPending ? t('common.saving') : editingCustomer ? t('customers.saveChanges') : t('common.add')}
                 </Button>
               </form>

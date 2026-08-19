@@ -15,6 +15,7 @@ import {
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { PhoneInput } from '@/components/ui/phone-input'
+import { WhatsappConsentQuestion, type WhatsappConsentAnswer } from '@/components/ui/whatsapp-consent-question'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { useResolvedFieldPrice, useClubTimezone } from './useFieldPricing'
 import { toInstant } from '@/lib/domain/time'
@@ -88,6 +89,9 @@ export function QuickBookingSheet({
   const [newCustomerMobileCountry, setNewCustomerMobileCountry] = useState<CountryCode>('EG')
   const [newCustomerPhoneValid, setNewCustomerPhoneValid] = useState(false)
   const [duplicateCustomer, setDuplicateCustomer] = useState<{ id: string; full_name: string } | null>(null)
+  // Correction: creating a customer record is never itself consent --
+  // staff must explicitly ask and record the real answer.
+  const [newCustomerWhatsappConsent, setNewCustomerWhatsappConsent] = useState<WhatsappConsentAnswer>(null)
 
   const { data: clubCountry } = useQuery({
     queryKey: ['club-country', clubId],
@@ -115,6 +119,7 @@ export function QuickBookingSheet({
       setNewCustomerMobile('')
       setNewCustomerMobileCountry((clubCountry as CountryCode) ?? 'EG')
       setDuplicateCustomer(null)
+      setNewCustomerWhatsappConsent(null)
       setIsRecurring(false)
       setOccurrenceCount('8')
       setRecurringResult(null)
@@ -187,22 +192,18 @@ export function QuickBookingSheet({
         .single()
       if (error) throw error
 
-      // P0 Phone Identity directive gap fix: enqueue_notification()
-      // requires an explicit, enabled notification_consent row --
-      // without one, a staff-created customer's WhatsApp booking
-      // confirmation is silently never queued regardless of how
-      // correctly the phone was normalized. Mirrors the same
-      // default-consent pattern create_public_booking() already uses.
-      if (phoneE164 && data) {
-        await supabase.from('notification_consent').insert({
-          club_id: clubId,
-          customer_id: data.id,
-          channel: 'whatsapp',
-          enabled: true,
-          consent_source: 'staff_created',
-          phone_display: newCustomerMobile,
-          normalized_phone: legacyNormalize(newCustomerMobile),
+      // Correction: creating a customer record is never itself
+      // consent. This RPC only writes a decision when staff have
+      // actually asked the customer and recorded a real yes/no answer.
+      if (phoneE164 && data && newCustomerWhatsappConsent !== null) {
+        const { error: consentError } = await supabase.rpc('record_staff_whatsapp_consent', {
+          p_club_id: clubId,
+          p_customer_id: data.id,
+          p_consented: newCustomerWhatsappConsent,
+          p_phone_display: newCustomerMobile,
+          p_normalized_phone: legacyNormalize(newCustomerMobile),
         })
+        if (consentError) throw consentError
       }
 
       return data
@@ -211,6 +212,7 @@ export function QuickBookingSheet({
       setCustomerId(data.id)
       setShowNewCustomer(false)
       setDuplicateCustomer(null)
+      setNewCustomerWhatsappConsent(null)
       void queryClient.invalidateQueries({ queryKey: ['customers-search', clubId] })
     },
     onError: (error: unknown) => {
@@ -347,6 +349,9 @@ export function QuickBookingSheet({
                     }}
                     onValidChange={(r) => setNewCustomerPhoneValid(r.valid)}
                   />
+                  {newCustomerMobile.trim() && newCustomerPhoneValid && (
+                    <WhatsappConsentQuestion value={newCustomerWhatsappConsent} onChange={setNewCustomerWhatsappConsent} />
+                  )}
                   {duplicateCustomer && (
                     <div className="flex flex-col gap-2 rounded-md border border-status-warning/40 bg-status-warning/10 p-2 text-xs">
                       <p>{t('phoneInput.duplicateCustomer')} ({duplicateCustomer.full_name})</p>
@@ -366,7 +371,12 @@ export function QuickBookingSheet({
                   )}
                   <Button
                     size="sm"
-                    disabled={!newCustomerName.trim() || (newCustomerMobile.trim().length > 0 && !newCustomerPhoneValid) || createCustomerMutation.isPending}
+                    disabled={
+                      !newCustomerName.trim() ||
+                      (newCustomerMobile.trim().length > 0 && !newCustomerPhoneValid) ||
+                      (newCustomerMobile.trim().length > 0 && newCustomerPhoneValid && newCustomerWhatsappConsent === null) ||
+                      createCustomerMutation.isPending
+                    }
                     onClick={() => createCustomerMutation.mutate()}
                   >
                     {createCustomerMutation.isPending ? t('bookings.quick.adding') : t('bookings.quick.addCustomer')}

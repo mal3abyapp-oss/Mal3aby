@@ -5398,6 +5398,16 @@ export type Database = {
         }
         Returns: string
       }
+      record_staff_whatsapp_consent: {
+        Args: {
+          p_club_id: string
+          p_consented: boolean
+          p_customer_id: string
+          p_normalized_phone: string
+          p_phone_display: string
+        }
+        Returns: undefined
+      }
       reject_payment_proof: {
         Args: { p_proof_id: string; p_reason: string }
         Returns: undefined
