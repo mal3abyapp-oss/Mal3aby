@@ -186,6 +186,25 @@ export function QuickBookingSheet({
         .select('id, full_name, mobile_display')
         .single()
       if (error) throw error
+
+      // P0 Phone Identity directive gap fix: enqueue_notification()
+      // requires an explicit, enabled notification_consent row --
+      // without one, a staff-created customer's WhatsApp booking
+      // confirmation is silently never queued regardless of how
+      // correctly the phone was normalized. Mirrors the same
+      // default-consent pattern create_public_booking() already uses.
+      if (phoneE164 && data) {
+        await supabase.from('notification_consent').insert({
+          club_id: clubId,
+          customer_id: data.id,
+          channel: 'whatsapp',
+          enabled: true,
+          consent_source: 'staff_created',
+          phone_display: newCustomerMobile,
+          normalized_phone: legacyNormalize(newCustomerMobile),
+        })
+      }
+
       return data
     },
     onSuccess: (data) => {

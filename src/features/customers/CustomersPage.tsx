@@ -206,8 +206,32 @@ export function CustomersPage() {
         const { error } = await supabase.from('customers').update(payload).eq('id', editingCustomer.id)
         if (error) throw error
       } else {
-        const { error } = await supabase.from('customers').insert({ club_id: currentClubId as string, ...payload })
+        const { data: created, error } = await supabase
+          .from('customers')
+          .insert({ club_id: currentClubId as string, ...payload })
+          .select('id')
+          .single()
         if (error) throw error
+
+        // P0 Phone Identity directive gap fix: enqueue_notification()
+        // requires an explicit, enabled notification_consent row --
+        // only the public-booking self-signup path ever created one,
+        // so a staff-created customer's WhatsApp messages (booking
+        // confirmations, payment receipts) were silently never sent
+        // regardless of how correctly the phone was normalized.
+        // Mirrors the same default-consent pattern create_public_booking()
+        // already uses for a new self-signup customer.
+        if (phoneE164 && created) {
+          await supabase.from('notification_consent').insert({
+            club_id: currentClubId as string,
+            customer_id: created.id,
+            channel: 'whatsapp',
+            enabled: true,
+            consent_source: 'staff_created',
+            phone_display: mobile,
+            normalized_phone: normalizeMobile(mobile),
+          })
+        }
       }
     },
     onSuccess: () => {
