@@ -4662,7 +4662,7 @@ export type Database = {
         }[]
       }
       get_platform_club_owners: {
-        Args: never
+        Args: { p_limit?: number; p_offset?: number; p_search?: string }
         Returns: {
           club_code: string
           club_id: string

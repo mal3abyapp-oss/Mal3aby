@@ -438,7 +438,8 @@
       "cards": {
         "uniqueOwners": "إجمالي أصحاب الأندية",
         "totalMemberships": "إجمالي عضويات الملكية",
-        "multiClubOwners": "أصحاب يملكون أكثر من نادٍ"
+        "multiClubOwners": "أصحاب يملكون أكثر من نادٍ",
+        "atLeastValue": "+{{count}}"
       },
       "searchPlaceholder": "ابحث بالاسم، البريد الإلكتروني، الهاتف، أو اسم النادي",
       "clubCountSuffix": "{{count}} أندية",

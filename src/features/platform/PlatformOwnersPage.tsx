@@ -32,10 +32,23 @@ interface OwnerRow {
   owner_since: string
 }
 
-async function fetchOwners(): Promise<OwnerRow[]> {
-  const { data, error } = await supabase.rpc('get_platform_club_owners')
+// Phase I directive (I1): get_platform_club_owners() used to pull every
+// club-owner membership row in one shot with no pagination at all --
+// a real, confirmed scaling gap even though invisible at the current
+// real club count. Search is now server-side (p_search), so pagination
+// and search interact correctly instead of only filtering whatever
+// happened to already be fetched.
+const PAGE_SIZE = 100
+
+async function fetchOwners(search: string, offset: number): Promise<{ rows: OwnerRow[]; hasMore: boolean }> {
+  const { data, error } = await supabase.rpc('get_platform_club_owners', {
+    p_search: search.trim() || undefined,
+    p_limit: PAGE_SIZE,
+    p_offset: offset,
+  })
   if (error) throw error
-  return (data ?? []) as OwnerRow[]
+  const rows = (data ?? []) as OwnerRow[]
+  return { rows, hasMore: rows.length === PAGE_SIZE }
 }
 
 const MEMBERSHIP_STATUS_LABELS: Record<string, string> = { active: 'نشطة', suspended: 'موقوفة', removed: 'ملغاة' }
@@ -44,9 +57,23 @@ export function PlatformOwnersPage() {
   const { t } = useTranslation()
   const { locale } = useDirection()
   const [search, setSearch] = useState('')
+  const [pages, setPages] = useState(1)
   const [resetSentFor, setResetSentFor] = useState<string | null>(null)
   const [resetError, setResetError] = useState<string | null>(null)
-  const { data: owners = [], isLoading } = useQuery({ queryKey: ['platform-owners'], queryFn: fetchOwners })
+  const { data, isLoading, isFetching } = useQuery({
+    queryKey: ['platform-owners', search, pages],
+    queryFn: async () => {
+      const results = await Promise.all(Array.from({ length: pages }, (_, i) => fetchOwners(search, i * PAGE_SIZE)))
+      const lastPage = results.at(-1)
+      return { rows: results.flatMap((r) => r.rows), hasMore: lastPage?.hasMore ?? false }
+    },
+  })
+  const owners = data?.rows ?? []
+
+  function updateSearch(value: string) {
+    setSearch(value)
+    setPages(1)
+  }
 
   // Platform Owner & Password Security directive item 17/18: the
   // preferred admin action is "send a reset email", never viewing or
@@ -85,19 +112,6 @@ export function PlatformOwnersPage() {
     },
   })
 
-  const filtered = useMemo(() => {
-    const q = search.trim().toLowerCase()
-    if (!q) return owners
-    return owners.filter(
-      (o) =>
-        (o.full_name ?? '').toLowerCase().includes(q) ||
-        (o.email ?? '').toLowerCase().includes(q) ||
-        (o.phone ?? '').toLowerCase().includes(q) ||
-        o.club_name.toLowerCase().includes(q) ||
-        o.club_code.toLowerCase().includes(q),
-    )
-  }, [owners, search])
-
   const ownerClubCounts = new Map<string, number>()
   for (const o of owners) ownerClubCounts.set(o.user_id, (ownerClubCounts.get(o.user_id) ?? 0) + 1)
   const uniqueOwners = ownerClubCounts.size
@@ -115,8 +129,8 @@ export function PlatformOwnersPage() {
   // name/email cell only renders once per owner (with a club-count
   // badge), not once per row.
   const sortedFiltered = useMemo(
-    () => [...filtered].sort((a, b) => (a.user_id === b.user_id ? 0 : (a.full_name ?? '').localeCompare(b.full_name ?? '', locale))),
-    [filtered, locale],
+    () => [...owners].sort((a, b) => (a.user_id === b.user_id ? 0 : (a.full_name ?? '').localeCompare(b.full_name ?? '', locale))),
+    [owners, locale],
   )
 
   const columns: DataTableColumn<OwnerRow>[] = [
@@ -207,16 +221,32 @@ export function PlatformOwnersPage() {
   return (
     <div>
       <PageHeader title={t('platform.ownersPage.title')} description={t('platform.ownersPage.description')} />
+      {/* Phase I directive (I1): these 3 cards are computed from the
+          currently LOADED page(s), not the true platform-wide total, now
+          that this screen is genuinely paginated. Rather than silently
+          understate once there's more than one page (the exact "no
+          silent caps" failure mode the audit warns against), each card
+          shows a "+ more" qualifier whenever more data exists beyond
+          what's loaded. */}
       <div className="mb-4 grid grid-cols-2 gap-4 md:grid-cols-3">
-        <StatCard label={t('platform.ownersPage.cards.uniqueOwners')} value={String(uniqueOwners)} />
-        <StatCard label={t('platform.ownersPage.cards.totalMemberships')} value={String(owners.length)} />
-        <StatCard label={t('platform.ownersPage.cards.multiClubOwners')} value={String(multiClubOwners)} />
+        <StatCard
+          label={t('platform.ownersPage.cards.uniqueOwners')}
+          value={data?.hasMore ? t('platform.ownersPage.cards.atLeastValue', { count: uniqueOwners }) : String(uniqueOwners)}
+        />
+        <StatCard
+          label={t('platform.ownersPage.cards.totalMemberships')}
+          value={data?.hasMore ? t('platform.ownersPage.cards.atLeastValue', { count: owners.length }) : String(owners.length)}
+        />
+        <StatCard
+          label={t('platform.ownersPage.cards.multiClubOwners')}
+          value={data?.hasMore ? t('platform.ownersPage.cards.atLeastValue', { count: multiClubOwners }) : String(multiClubOwners)}
+        />
       </div>
       <div className="mb-4 max-w-sm">
         <Input
           placeholder={t('platform.ownersPage.searchPlaceholder')}
           value={search}
-          onChange={(e) => setSearch(e.target.value)}
+          onChange={(e) => updateSearch(e.target.value)}
         />
       </div>
       {resetError && <p role="alert" className="mb-3 text-sm text-status-danger">{resetError}</p>}
@@ -227,6 +257,13 @@ export function PlatformOwnersPage() {
         isLoading={isLoading}
         emptyTitle={search ? t('platform.ownersPage.emptyTitle') : t('platform.ownersPage.emptyTitleNoOwners')}
       />
+      {data?.hasMore && (
+        <div className="mt-4 flex justify-center">
+          <Button variant="outline" onClick={() => setPages((p) => p + 1)} disabled={isFetching}>
+            {isFetching ? t('platform.clubsPage.loadingMore') : t('platform.clubsPage.loadMore')}
+          </Button>
+        </div>
+      )}
     </div>
   )
 }

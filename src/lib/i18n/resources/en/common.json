@@ -438,7 +438,8 @@
       "cards": {
         "uniqueOwners": "Total club owners",
         "totalMemberships": "Total ownership memberships",
-        "multiClubOwners": "Owners with more than one club"
+        "multiClubOwners": "Owners with more than one club",
+        "atLeastValue": "+{{count}}"
       },
       "searchPlaceholder": "Search by name, email, phone, or club name",
       "clubCountSuffix": "{{count}} clubs",
