@@ -539,6 +539,8 @@
         "status": "Status",
         "created": "Created on"
       },
+      "newClubsCount": "{{count}} new club",
+      "newClubsCount_plural": "{{count}} new clubs",
       "usageColumns": {
         "club": "Club",
         "branches": "Branches",

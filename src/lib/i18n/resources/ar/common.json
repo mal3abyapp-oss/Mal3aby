@@ -539,6 +539,8 @@
         "status": "الحالة",
         "created": "تاريخ الإنشاء"
       },
+      "newClubsCount": "{{count}} نادٍ جديد",
+      "newClubsCount_plural": "{{count}} أندية جديدة",
       "usageColumns": {
         "club": "النادي",
         "branches": "الفروع",

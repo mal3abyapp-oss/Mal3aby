@@ -60,18 +60,47 @@ interface RevenueRow {
   amount: number
 }
 
-async function fetchRevenueReport(locale: 'ar' | 'en'): Promise<RevenueRow[]> {
+interface RevenueMonthTotal {
+  monthKey: string
+  monthLabel: string
+  total: number
+}
+
+async function fetchRevenueReport(locale: 'ar' | 'en'): Promise<{ rows: RevenueRow[]; monthlyTotals: RevenueMonthTotal[] }> {
   const { data, error } = await supabase
     .from('platform_payments')
     .select('amount, method, recorded_at')
     .is('reversed_at', null)
     .order('recorded_at', { ascending: false })
   if (error) throw error
-  return (data ?? []).map((r) => ({
+
+  const rows = (data ?? []).map((r) => ({
     month: new Date(r.recorded_at).toLocaleDateString(locale === 'en' ? 'en-US' : 'ar-EG', { year: 'numeric', month: 'long' }),
     method: r.method,
     amount: Number(r.amount),
   }))
+
+  // Phase G directive (G1): the Revenue tab showed raw per-payment rows
+  // with no actual monthly aggregate, despite implying one -- a real gap
+  // confirmed by the live audit. Definition: sum of non-reversed
+  // platform_payments.amount, grouped by calendar month of recorded_at
+  // (the same non-reversed filter Overview's revenueThisMonth already
+  // uses, just bucketed across all months instead of only the current
+  // one). No fake/derived metric invented -- this is exactly the same
+  // underlying rows, just grouped.
+  const totalsByKey = new Map<string, { label: string; total: number; sortKey: string }>()
+  for (const r of data ?? []) {
+    const d = new Date(r.recorded_at)
+    const sortKey = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
+    const label = d.toLocaleDateString(locale === 'en' ? 'en-US' : 'ar-EG', { year: 'numeric', month: 'long' })
+    const existing = totalsByKey.get(sortKey)
+    totalsByKey.set(sortKey, { label, sortKey, total: (existing?.total ?? 0) + Number(r.amount) })
+  }
+  const monthlyTotals = Array.from(totalsByKey.values())
+    .sort((a, b) => b.sortKey.localeCompare(a.sortKey))
+    .map((v) => ({ monthKey: v.sortKey, monthLabel: v.label, total: v.total }))
+
+  return { rows, monthlyTotals }
 }
 
 async function fetchRenewalReport() {
@@ -101,10 +130,27 @@ async function fetchRenewalReport() {
   })
 }
 
-async function fetchGrowthReport() {
+async function fetchGrowthReport(locale: 'ar' | 'en') {
   const { data, error } = await supabase.from('clubs').select('id, name_ar, status, created_at').order('created_at', { ascending: false })
   if (error) throw error
-  return data ?? []
+  const rows = data ?? []
+
+  // Phase G directive (G3): Growth tab was just a raw club list with no
+  // actual growth/trend metric -- add real time-grouping (new clubs per
+  // calendar month of created_at) above the existing raw list.
+  const countsByKey = new Map<string, { label: string; count: number; sortKey: string }>()
+  for (const c of rows) {
+    const d = new Date(c.created_at)
+    const sortKey = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
+    const label = d.toLocaleDateString(locale === 'en' ? 'en-US' : 'ar-EG', { year: 'numeric', month: 'long' })
+    const existing = countsByKey.get(sortKey)
+    countsByKey.set(sortKey, { label, sortKey, count: (existing?.count ?? 0) + 1 })
+  }
+  const monthlyNewClubs = Array.from(countsByKey.values())
+    .sort((a, b) => b.sortKey.localeCompare(a.sortKey))
+    .map((v) => ({ monthKey: v.sortKey, monthLabel: v.label, count: v.count }))
+
+  return { rows, monthlyNewClubs }
 }
 
 async function fetchUsageReport() {
@@ -130,9 +176,13 @@ export function PlatformReportsPage() {
   const { t } = useTranslation()
   const { locale } = useDirection()
   const { data: subReport = [] } = useQuery({ queryKey: ['report-subscriptions'], queryFn: fetchSubscriptionReport })
-  const { data: revenueReport = [] } = useQuery({ queryKey: ['report-revenue', locale], queryFn: () => fetchRevenueReport(locale) })
+  const { data: revenueReport } = useQuery({ queryKey: ['report-revenue', locale], queryFn: () => fetchRevenueReport(locale) })
+  const revenueRows = revenueReport?.rows ?? []
+  const monthlyTotals = revenueReport?.monthlyTotals ?? []
   const { data: renewalReport = [] } = useQuery({ queryKey: ['report-renewals'], queryFn: fetchRenewalReport })
-  const { data: growthReport = [] } = useQuery({ queryKey: ['report-growth'], queryFn: fetchGrowthReport })
+  const { data: growthReport } = useQuery({ queryKey: ['report-growth', locale], queryFn: () => fetchGrowthReport(locale) })
+  const growthRows = growthReport?.rows ?? []
+  const monthlyNewClubs = growthReport?.monthlyNewClubs ?? []
   const { data: usageReport = [] } = useQuery({ queryKey: ['report-usage'], queryFn: fetchUsageReport })
 
   const subColumns: DataTableColumn<SubRow>[] = [
@@ -190,7 +240,7 @@ export function PlatformReportsPage() {
     },
   ]
 
-  const growthColumns: DataTableColumn<(typeof growthReport)[number]>[] = [
+  const growthColumns: DataTableColumn<(typeof growthRows)[number]>[] = [
     {
       key: 'club',
       header: t('platform.reportsPage.growthColumns.club'),
@@ -238,9 +288,22 @@ export function PlatformReportsPage() {
           <DataTable columns={subColumns} rows={subReport} rowKey={(r) => `${r.club_id}-${r.start_at}`} emptyTitle={t('platform.reportsPage.emptyTitle')} />
         </TabsContent>
         <TabsContent value="revenue">
+          {/* Phase G directive (G1): real monthly aggregation, added
+              above the existing raw-payment table (kept for
+              transaction-level detail/audit) rather than replacing it. */}
+          {monthlyTotals.length > 0 && (
+            <div className="mb-4 grid gap-3 sm:grid-cols-2 md:grid-cols-3">
+              {monthlyTotals.map((m) => (
+                <div key={m.monthKey} className="rounded-lg border border-border p-3">
+                  <p className="text-sm text-text-secondary">{m.monthLabel}</p>
+                  <MoneyDisplay amount={m.total} size="md" />
+                </div>
+              ))}
+            </div>
+          )}
           <DataTable
             columns={revenueColumns}
-            rows={revenueReport}
+            rows={revenueRows}
             rowKey={(r) => `${r.month}-${r.method}-${r.amount}`}
             emptyTitle={t('platform.reportsPage.emptyTitle')}
           />
@@ -249,7 +312,17 @@ export function PlatformReportsPage() {
           <DataTable columns={renewalColumns} rows={renewalReport} rowKey={(r) => `${r.club_id}-${r.end_at}`} emptyTitle={t('platform.reportsPage.emptyTitle')} />
         </TabsContent>
         <TabsContent value="growth">
-          <DataTable columns={growthColumns} rows={growthReport} rowKey={(r) => r.id} emptyTitle={t('platform.reportsPage.emptyTitle')} />
+          {monthlyNewClubs.length > 0 && (
+            <div className="mb-4 grid gap-3 sm:grid-cols-2 md:grid-cols-3">
+              {monthlyNewClubs.map((m) => (
+                <div key={m.monthKey} className="rounded-lg border border-border p-3">
+                  <p className="text-sm text-text-secondary">{m.monthLabel}</p>
+                  <p className="text-lg font-semibold tabular-nums">{t('platform.reportsPage.newClubsCount', { count: m.count })}</p>
+                </div>
+              ))}
+            </div>
+          )}
+          <DataTable columns={growthColumns} rows={growthRows} rowKey={(r) => r.id} emptyTitle={t('platform.reportsPage.emptyTitle')} />
         </TabsContent>
         <TabsContent value="usage">
           <DataTable columns={usageColumns} rows={usageReport} rowKey={(r) => r.club_id} emptyTitle={t('platform.reportsPage.emptyTitle')} />
