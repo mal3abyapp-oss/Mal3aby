@@ -20,6 +20,20 @@ Full redeploy of everything accumulated locally since the 2026-08-18 report abov
 
 **Full failure matrix (12 adversarial scenarios) re-verified against the redeployed live schema**: disabled-club rejection, wrong slug, cross-tenant field, invalid time order, past-time booking, day-span/operating-hours violations, malformed phone, empty name, spoofed `source`, double-booking exclusion, and field-block conflicts — all correctly rejected, all rolled back cleanly, zero test data persisted.
 
+### CRITICAL bug found and fixed: messages accepted by WhatsApp's relay but never delivered (undecryptable)
+
+Real production incident, found live during Task #8 delivery verification: 7 real messages sent to the approved test number all showed **"Waiting for this message"** stuck on the recipient's device, despite `notification_queue.status='sent'` with a real `provider_reference` for every one of them. `status='sent'` was never proof of actual delivery — only proof the message left the connector and was accepted by WhatsApp's relay.
+
+**Root cause** (confirmed by reading Baileys' `useMultiFileAuthState` source directly, not assumed): `saveCreds()` only persists `creds.json` (top-level identity) and only fires on `creds.update`. Per-CONTACT Signal session state (`session-<jid>.json`, prekeys, sender keys) is written by `state.keys.set()` — a completely separate code path with no event and no hook into the connector at all. Every per-contact session-key write landed on the container's own ephemeral disk only, never pushed to Postgres. Each container restart (this session redeployed 3 times) silently lost per-recipient session state — Baileys renegotiated a new session transparently, but the recipient's device still held the OLD session and couldn't decrypt anything under it.
+
+**Fix, two parts** (commits `f2b82a9`, `235e37c`):
+1. Wrap `state.keys.set` so every per-contact session-key write also triggers the same Postgres-persistence hook `creds.update` already uses — stops **future** corruption.
+2. New `POST /manage/:clubId/repair-session {"phone": "..."}` — deletes one contact's local Signal session file(s), forcing a fresh renegotiation on the next send (the standard WhatsApp/Signal recovery, transparent to the recipient, same mechanism as a reinstall/new-phone re-sync). Needed because part 1 alone cannot repair a session that was **already** stale before the fix shipped.
+
+**Verified end-to-end, real device confirmation (not just DB status) from the platform owner directly**: repaired the test contact's session (3 stale session files removed) → sent a fresh message → user confirmed real content arrived, not stuck. Repeated for a second and third message (a payment/cancellation-style message and a final cancellation) — both delivered correctly. Message-count/dedup correctness re-confirmed across the whole test run: every `dedup_key` this session ever produced has exactly one `provider_reference`, zero duplicates.
+
+Image `v11` (commit `235e37c`, digest `sha256:2d56d1f6d1c1c1f413bc6b8021b83035ad41318cad2b0110ec30ec684fd97875`) is the currently deployed connector.
+
 ## FINAL PRODUCTION ACCEPTANCE — 2026-08-18
 
 Full production hardening pass: Supabase security/performance audit, real Auth flow testing on `https://mal3aby.app`, live multi-layer tenant-isolation attack testing, real payment-idempotency attack testing, and a genuine end-to-end WhatsApp business-flow test using the approved real test number (`+971502061209`) — booking → confirmation → QR → cancellation → invalidation → payment → invoice, all through the actual RPCs, not direct SQL shortcuts.
