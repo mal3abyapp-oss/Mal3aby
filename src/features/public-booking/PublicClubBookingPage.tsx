@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
+import type { CountryCode } from 'libphonenumber-js'
 import { useParams, useSearchParams } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
@@ -7,10 +8,12 @@ import { useDirection } from '@/app/providers/DirectionProvider'
 import { formatCurrency, formatDate, type SupportedLocale } from '@/lib/i18n/config'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { PhoneInput } from '@/components/ui/phone-input'
 import { LanguageSwitcher } from '@/components/ui/language-switcher'
 import { CheckCircle2, MapPin, ChevronLeft, ChevronRight, Phone, MessageCircle, Copy, Check, CalendarPlus } from 'lucide-react'
 import { PaymentMethodsPanel } from './PaymentMethodsPanel'
 import { HoldCountdown } from './HoldCountdown'
+import { normalizePhone } from '@/lib/domain/phone'
 
 /**
  * PublicClubBookingPage -- the Public Club Booking Page.
@@ -53,6 +56,7 @@ interface PublicClub {
   logoUrl: string | null
   currency: string
   timezone: string
+  country: string | null
   primaryPhone: string | null
   whatsappNumber: string | null
   contactEmail: string | null
@@ -78,6 +82,7 @@ async function fetchPublicClub(slug: string): Promise<PublicClub | null> {
     logoUrl: row.logo_url,
     currency: row.currency,
     timezone: row.timezone,
+    country: row.country ?? null,
     primaryPhone: row.primary_phone,
     whatsappNumber: row.whatsapp_number,
     contactEmail: row.contact_email,
@@ -128,21 +133,10 @@ function toWaDigits(phone: string): string {
   return phone.replace(/\D/g, '')
 }
 
-// HIGH-ROI UX PASS 01, supplementary item 7 (customer phone
-// validation): mirrors create_public_booking()'s own server-side
-// normalize_mobile()/is_phone_plausible() exactly (strip non-digits,
-// strip leading zeros, require 8-15 remaining digits) -- not a
-// separate, looser client rule, and not an Egypt-only regex. This
-// gives instant feedback but is NOT the real validation boundary; the
-// server re-validates independently on submit regardless of what the
-// client thinks, exactly as it already did before this change.
-function normalizeMobileClient(raw: string): string {
-  return raw.replace(/\D/g, '').replace(/^0+/, '')
-}
-function isPhonePlausibleClient(raw: string): boolean {
-  const normalized = normalizeMobileClient(raw)
-  return normalized.length >= 8 && normalized.length <= 15
-}
+// Phone validation is now handled by the shared normalizePhone()
+// pipeline (src/lib/domain/phone.ts) via <PhoneInput> below -- see the
+// P0 Phone Identity directive. The old hand-rolled digit-strip regex
+// (no country-code awareness) is retired from this file.
 
 // HIGH-ROI UX PASS 01, item 19 (Add to Calendar): builds a plain .ics
 // data URI from already-known booking fields -- no payment
@@ -191,7 +185,8 @@ export function PublicClubBookingPage() {
   const [selectedTime, setSelectedTime] = useState<string | null>(null)
   const [customerName, setCustomerName] = useState('')
   const [customerMobile, setCustomerMobile] = useState('')
-  const [mobileTouched, setMobileTouched] = useState(false)
+  const [customerPhoneCountry, setCustomerPhoneCountry] = useState<CountryCode>('EG')
+  const [phoneValid, setPhoneValid] = useState(false)
   const [formError, setFormError] = useState<string | null>(null)
   const [conflictSlot, setConflictSlot] = useState<string | null>(null)
   const [confirmedRef, setConfirmedRef] = useState<string | null>(null)
@@ -221,6 +216,13 @@ export function PublicClubBookingPage() {
     enabled: !!slug,
     retry: false,
   })
+
+  // Directive section 5: default the phone country to the club's own
+  // default country once known -- never a hardcoded EG assumption, and
+  // the customer can still explicitly override it (section 6).
+  useEffect(() => {
+    if (club?.country) setCustomerPhoneCountry(club.country as CountryCode)
+  }, [club?.country])
 
   const selectedField = useMemo(() => club?.fields.find((f) => f.id === selectedFieldId) ?? null, [club, selectedFieldId])
   const selectedBranch = useMemo(() => club?.branches.find((b) => b.id === selectedField?.branch_id) ?? null, [club, selectedField])
@@ -316,6 +318,11 @@ export function PublicClubBookingPage() {
       const startAt = new Date(`${dateKey}T${selectedTime}:00`).toISOString()
       const endAt = new Date(`${dateKey}T${endTime}:00`).toISOString()
 
+      const phoneResult = normalizePhone(customerMobile, customerPhoneCountry)
+      if (!phoneResult.valid || !phoneResult.e164) {
+        throw new Error(t('publicBooking.mobileInvalid'))
+      }
+
       const { data, error } = await supabase.rpc('create_public_booking', {
         p_club_slug: slug,
         p_field_id: selectedFieldId,
@@ -323,6 +330,7 @@ export function PublicClubBookingPage() {
         p_end_at: endAt,
         p_customer_name: customerName.trim(),
         p_customer_mobile: customerMobile.trim(),
+        p_customer_phone_e164: phoneResult.e164,
         p_source: 'club_public_link',
       })
       if (error) throw error
@@ -618,31 +626,23 @@ export function PublicClubBookingPage() {
               <label className="text-sm font-medium text-text-secondary">{t('publicBooking.nameLabel')}</label>
               <Input value={customerName} onChange={(e) => setCustomerName(e.target.value)} placeholder={t('publicBooking.namePlaceholder')} />
             </div>
-            <div className="flex flex-col gap-1.5">
-              <label className="text-sm font-medium text-text-secondary">{t('publicBooking.mobileLabel')}</label>
-              {/* HIGH-ROI UX PASS 01, supplementary item 7: mirrors
-                  create_public_booking()'s own normalize_mobile()/
-                  is_phone_plausible() so client feedback and the real
-                  server-side gate agree -- this is instant feedback
-                  only, never the actual validation boundary (the RPC
-                  re-checks independently regardless of what the client
-                  believes). type="tel" + inputMode="tel" improve the
-                  on-screen keyboard on mobile without being the
-                  validation mechanism themselves. */}
-              <Input
-                type="tel"
-                inputMode="tel"
-                value={customerMobile}
-                onChange={(e) => setCustomerMobile(e.target.value)}
-                onBlur={() => setMobileTouched(true)}
-                placeholder={t('publicBooking.mobilePlaceholder')}
-                dir="ltr"
-                aria-invalid={mobileTouched && customerMobile.trim().length > 0 && !isPhonePlausibleClient(customerMobile)}
-              />
-              {mobileTouched && customerMobile.trim().length > 0 && !isPhonePlausibleClient(customerMobile) && (
-                <p role="alert" className="text-xs text-status-danger">{t('publicBooking.mobileInvalid')}</p>
-              )}
-            </div>
+            {/* P0 phone identity directive: canonical E.164
+                normalization via the shared PhoneInput/normalizePhone
+                pipeline, defaulting to the club's own country
+                (section 21), explicitly overridable per customer
+                (section 6/39). This is client-side feedback only --
+                create_public_booking() re-validates the E.164 value
+                server-side regardless. */}
+            <PhoneInput
+              label={t('publicBooking.mobileLabel')}
+              required
+              value={{ raw: customerMobile, country: customerPhoneCountry }}
+              onChange={(v) => {
+                setCustomerMobile(v.raw)
+                setCustomerPhoneCountry(v.country)
+              }}
+              onValidChange={(r) => setPhoneValid(r.valid)}
+            />
 
             {formError && <p role="alert" className="text-sm text-status-danger">{formError}</p>}
 
@@ -651,7 +651,7 @@ export function PublicClubBookingPage() {
               disabled={
                 !customerName.trim() ||
                 !customerMobile.trim() ||
-                !isPhonePlausibleClient(customerMobile) ||
+                !phoneValid ||
                 bookMutation.isPending
               }
               onClick={() => bookMutation.mutate()}

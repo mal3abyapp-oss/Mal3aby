@@ -1,4 +1,5 @@
 import { useState, type FormEvent } from 'react'
+import type { CountryCode } from 'libphonenumber-js'
 import { useTranslation } from 'react-i18next'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '@/lib/supabase/client'
@@ -6,6 +7,7 @@ import { useAuth } from '@/app/providers/AuthProvider'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { PhoneInput } from '@/components/ui/phone-input'
 import { StatusBadge } from '@/components/ui/status-badge'
 import {
   Dialog,
@@ -15,6 +17,7 @@ import {
   DialogTrigger,
 } from '@/components/ui/dialog'
 import { translateSupabaseError } from '@/lib/errors'
+import { normalizePhone } from '@/lib/domain/phone'
 
 // P1-7 (critical usability fix pass, 2026-08-16): Settings previously
 // only exposed the FIRST branch's fields for editing, with no branch
@@ -50,6 +53,12 @@ async function fetchBranches(clubId: string): Promise<BranchRow[]> {
   }))
 }
 
+async function fetchClubCountry(clubId: string): Promise<CountryCode | null> {
+  const { data, error } = await supabase.from('clubs').select('country').eq('id', clubId).single()
+  if (error) return null
+  return (data?.country as CountryCode | null) ?? null
+}
+
 export function BranchesCard() {
   const { t } = useTranslation()
   const { currentClubId } = useAuth()
@@ -62,10 +71,17 @@ export function BranchesCard() {
   const [branchCode, setBranchCode] = useState('')
   const [address, setAddress] = useState('')
   const [phone, setPhone] = useState('')
+  const [phoneCountry, setPhoneCountry] = useState<CountryCode>('EG')
 
   const { data: branches = [], isLoading } = useQuery({
     queryKey: ['branches-settings', currentClubId],
     queryFn: () => fetchBranches(currentClubId!),
+    enabled: !!currentClubId,
+  })
+
+  const { data: clubCountry } = useQuery({
+    queryKey: ['club-country', currentClubId],
+    queryFn: () => fetchClubCountry(currentClubId!),
     enabled: !!currentClubId,
   })
 
@@ -75,6 +91,7 @@ export function BranchesCard() {
     setBranchCode(b.branchCode)
     setAddress(b.address ?? '')
     setPhone(b.phone ?? '')
+    setPhoneCountry((clubCountry as CountryCode) ?? 'EG')
     setFormError(null)
   }
 
@@ -84,15 +101,25 @@ export function BranchesCard() {
     setBranchCode('')
     setAddress('')
     setPhone('')
+    setPhoneCountry((clubCountry as CountryCode) ?? 'EG')
     setFormError(null)
   }
 
   const saveMutation = useMutation({
     mutationFn: async () => {
+      let phoneE164: string | null = null
+      if (phone.trim()) {
+        const result = normalizePhone(phone, phoneCountry)
+        if (!result.valid || !result.e164) {
+          throw new Error(t('phoneInput.invalidError'))
+        }
+        phoneE164 = result.e164
+      }
+
       if (editingBranch) {
         const { error } = await supabase
           .from('branches')
-          .update({ name, branch_code: branchCode, address: address || null, phone: phone || null })
+          .update({ name, branch_code: branchCode, address: address || null, phone: phone || null, phone_e164: phoneE164 })
           .eq('id', editingBranch.id)
         if (error) throw error
       } else {
@@ -102,6 +129,7 @@ export function BranchesCard() {
           branch_code: branchCode,
           address: address || null,
           phone: phone || null,
+          phone_e164: phoneE164,
         })
         if (error) throw error
       }
@@ -136,10 +164,14 @@ export function BranchesCard() {
         <label className="text-sm font-medium text-text-secondary">{t('clubs.branchesCard.addressLabel')}</label>
         <Input value={address} onChange={(e) => setAddress(e.target.value)} />
       </div>
-      <div className="flex flex-col gap-1.5">
-        <label className="text-sm font-medium text-text-secondary">{t('clubs.branchesCard.phoneLabel')}</label>
-        <Input value={phone} onChange={(e) => setPhone(e.target.value)} />
-      </div>
+      <PhoneInput
+        label={t('clubs.branchesCard.phoneLabel')}
+        value={{ raw: phone, country: phoneCountry }}
+        onChange={(v) => {
+          setPhone(v.raw)
+          setPhoneCountry(v.country)
+        }}
+      />
       {formError && <p role="alert" className="text-sm text-status-danger">{formError}</p>}
       <Button type="submit" disabled={!name.trim() || !branchCode.trim() || saveMutation.isPending}>
         {saveMutation.isPending ? t('clubs.branchesCard.saving') : t('clubs.branchesCard.save')}

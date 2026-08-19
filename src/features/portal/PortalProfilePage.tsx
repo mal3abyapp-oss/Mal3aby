@@ -1,4 +1,5 @@
 import { useState, type FormEvent } from 'react'
+import type { CountryCode } from 'libphonenumber-js'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
 import { supabase } from '@/lib/supabase/client'
@@ -6,9 +7,11 @@ import { useAuth } from '@/app/providers/AuthProvider'
 import { PageHeader } from '@/components/ui/page-header'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { PhoneInput } from '@/components/ui/phone-input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { translateSupabaseError } from '@/lib/errors'
 import { ChangePasswordCard } from '@/features/account/ChangePasswordCard'
+import { normalizePhone } from '@/lib/domain/phone'
 
 // Gate 3 — "My Account": contact-preference self-service edit (the
 // columns protect_customer_identity_columns() explicitly allows a
@@ -44,6 +47,12 @@ async function fetchMyCustomerRecords(): Promise<MyCustomerRecord[]> {
   return (data ?? []) as unknown as MyCustomerRecord[]
 }
 
+async function fetchClubCountry(clubId: string): Promise<CountryCode | null> {
+  const { data, error } = await supabase.from('clubs').select('country').eq('id', clubId).single()
+  if (error) return null
+  return (data?.country as CountryCode | null) ?? null
+}
+
 export function PortalProfilePage() {
   const { t } = useTranslation()
   const { session } = useAuth()
@@ -53,11 +62,19 @@ export function PortalProfilePage() {
   const record = records.find((r) => r.club_id === selectedClubId) ?? records[0]
 
   const [mobile, setMobile] = useState(record?.mobile_display ?? '')
+  const [mobileCountry, setMobileCountry] = useState<CountryCode>('EG')
+  const [phoneValid, setPhoneValid] = useState(true) // existing saved value is presumed valid until edited
   const [email, setEmail] = useState(record?.email ?? '')
   const [whatsapp, setWhatsapp] = useState(record?.whatsapp ?? '')
   const [initializedForId, setInitializedForId] = useState<string | null>(null)
   const [formError, setFormError] = useState<string | null>(null)
   const [saved, setSaved] = useState(false)
+
+  const { data: clubCountry } = useQuery({
+    queryKey: ['club-country', record?.club_id],
+    queryFn: () => fetchClubCountry(record!.club_id),
+    enabled: !!record?.club_id,
+  })
 
   // Re-initialize the form fields whenever the effective record changes
   // (first load, or the guardian switches clubs via the selector) --
@@ -66,6 +83,8 @@ export function PortalProfilePage() {
   // edited-but-unsaved field values.
   if (record && initializedForId !== record.id) {
     setMobile(record.mobile_display ?? '')
+    setMobileCountry((clubCountry as CountryCode) ?? 'EG')
+    setPhoneValid(true)
     setEmail(record.email ?? '')
     setWhatsapp(record.whatsapp ?? '')
     setInitializedForId(record.id)
@@ -74,11 +93,20 @@ export function PortalProfilePage() {
   const saveMutation = useMutation({
     mutationFn: async () => {
       if (!record) return
+      let phoneE164: string | null = null
+      if (mobile.trim()) {
+        const result = normalizePhone(mobile, mobileCountry)
+        if (!result.valid || !result.e164) {
+          throw new Error(t('phoneInput.invalidError'))
+        }
+        phoneE164 = result.e164
+      }
       const { error } = await supabase
         .from('customers')
         .update({
           mobile_display: mobile || null,
           normalized_mobile: mobile ? mobile.replace(/\D/g, '').replace(/^0+/, '') : null,
+          phone_e164: phoneE164,
           email: email || null,
           whatsapp: whatsapp || null,
         })
@@ -135,10 +163,15 @@ export function PortalProfilePage() {
             <p className="mt-1 text-xs text-text-secondary">{t('portal.profilePage.nameEditHint')}</p>
           </div>
 
-          <div className="flex flex-col gap-1.5">
-            <label className="text-sm font-medium text-text-secondary">{t('portal.profilePage.phoneLabel')}</label>
-            <Input value={mobile} onChange={(e) => setMobile(e.target.value)} />
-          </div>
+          <PhoneInput
+            label={t('portal.profilePage.phoneLabel')}
+            value={{ raw: mobile, country: mobileCountry }}
+            onChange={(v) => {
+              setMobile(v.raw)
+              setMobileCountry(v.country)
+            }}
+            onValidChange={(r) => setPhoneValid(r.valid)}
+          />
           <div className="flex flex-col gap-1.5">
             <label className="text-sm font-medium text-text-secondary">{t('portal.profilePage.whatsappLabel')}</label>
             <Input value={whatsapp} onChange={(e) => setWhatsapp(e.target.value)} />
@@ -151,7 +184,7 @@ export function PortalProfilePage() {
           {formError && <p className="text-sm text-status-danger">{formError}</p>}
           {saved && <p className="text-sm text-status-success">{t('portal.profilePage.saved')}</p>}
 
-          <Button type="submit" disabled={saveMutation.isPending}>
+          <Button type="submit" disabled={saveMutation.isPending || (mobile.trim().length > 0 && !phoneValid)}>
             {saveMutation.isPending ? t('portal.profilePage.saving') : t('portal.profilePage.saveChanges')}
           </Button>
         </form>

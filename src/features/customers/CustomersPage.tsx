@@ -1,4 +1,5 @@
 import { useState, type FormEvent } from 'react'
+import type { CountryCode } from 'libphonenumber-js'
 import { useSearchParams } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
@@ -8,6 +9,7 @@ import { PageHeader } from '@/components/ui/page-header'
 import { DataTable, type DataTableColumn } from '@/components/ui/data-table'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { PhoneInput } from '@/components/ui/phone-input'
 import {
   Dialog,
   DialogContent,
@@ -18,6 +20,7 @@ import {
 import type { CustomerRow } from '@/lib/domain/people'
 import { CustomerDetailDialog } from './CustomerDetailDialog'
 import { translateSupabaseError } from '@/lib/errors'
+import { normalizePhone } from '@/lib/domain/phone'
 
 // Phase 4: search, create, edit customers. Guardian linking (from the
 // player side) lives in AcademyPage's Player Profile per SCREEN_MAP.md
@@ -71,8 +74,19 @@ async function fetchCustomers(clubId: string, search: string) {
   }))
 }
 
+// Legacy digit-strip normalization is retained ONLY for populating the
+// legacy normalized_mobile column (display/search back-compat) --
+// phone_e164 (the canonical identity/WhatsApp value) is always
+// produced by the real normalizePhone() pipeline in
+// src/lib/domain/phone.ts. See the P0 Phone Identity directive.
 function normalizeMobile(input: string): string {
   return input.replace(/\D/g, '').replace(/^0+/, '')
+}
+
+async function fetchClubCountry(clubId: string): Promise<CountryCode | null> {
+  const { data, error } = await supabase.from('clubs').select('country').eq('id', clubId).single()
+  if (error) return null
+  return (data?.country as CountryCode | null) ?? null
 }
 
 export function CustomersPage() {
@@ -88,8 +102,31 @@ export function CustomersPage() {
   const [dialogOpen, setDialogOpen] = useState(false)
   const [fullName, setFullName] = useState('')
   const [mobile, setMobile] = useState('')
+  const [mobileCountry, setMobileCountry] = useState<CountryCode>('EG')
+  const [phoneValid, setPhoneValid] = useState(false)
   const [email, setEmail] = useState('')
   const [formError, setFormError] = useState<string | null>(null)
+  const [duplicateCustomer, setDuplicateCustomer] = useState<{ id: string; fullName: string } | null>(null)
+
+  const { data: clubCountry } = useQuery({
+    queryKey: ['club-country', currentClubId],
+    queryFn: () => fetchClubCountry(currentClubId!),
+    enabled: !!currentClubId,
+  })
+
+  // Directive section 76: minimal actionable view of customers whose
+  // phone couldn't be safely normalized -- never guessed, surfaced for
+  // a human to fix via the normal edit flow (which now runs through
+  // the real parser).
+  const { data: phoneIssues = [] } = useQuery({
+    queryKey: ['phone-data-issues', currentClubId],
+    queryFn: async () => {
+      const { data, error } = await supabase.rpc('get_phone_data_issues', { p_club_id: currentClubId as string })
+      if (error) throw error
+      return data ?? []
+    },
+    enabled: !!currentClubId,
+  })
 
   // V1 Implementation Gap Audit (2026-08-16): this file's own original
   // comment said "Phase 4: search, create, edit customers" but edit was
@@ -110,8 +147,10 @@ export function CustomersPage() {
     setEditingCustomer(null)
     setFullName('')
     setMobile('')
+    setMobileCountry((clubCountry as CountryCode) ?? 'EG')
     setEmail('')
     setFormError(null)
+    setDuplicateCustomer(null)
     setDialogOpen(true)
   }
 
@@ -119,17 +158,48 @@ export function CustomersPage() {
     setEditingCustomer(c)
     setFullName(c.fullName)
     setMobile(c.mobileDisplay ?? '')
+    setMobileCountry((clubCountry as CountryCode) ?? 'EG')
     setEmail(c.email ?? '')
     setFormError(null)
+    setDuplicateCustomer(null)
     setDialogOpen(true)
   }
 
   const saveMutation = useMutation({
     mutationFn: async () => {
+      let phoneE164: string | null = null
+      if (mobile.trim()) {
+        // Directive section 16/23: an invalid phone is never saved --
+        // the previous value (if editing) stays untouched.
+        const result = normalizePhone(mobile, mobileCountry)
+        if (!result.valid || !result.e164) {
+          throw new Error(t('phoneInput.invalidError'))
+        }
+        phoneE164 = result.e164
+
+        // Directive section 31: tenant-scoped duplicate check before
+        // silently creating a second customer record with the same
+        // canonical phone.
+        if (!editingCustomer || editingCustomer.mobileDisplay !== mobile) {
+          const { data: existing } = await supabase
+            .from('customers')
+            .select('id, full_name')
+            .eq('club_id', currentClubId as string)
+            .eq('phone_e164', phoneE164)
+            .neq('id', editingCustomer?.id ?? '00000000-0000-0000-0000-000000000000')
+            .limit(1)
+            .maybeSingle()
+          if (existing) {
+            throw { isDuplicate: true, customer: existing }
+          }
+        }
+      }
+
       const payload = {
         full_name: fullName,
         mobile_display: mobile || null,
         normalized_mobile: mobile ? normalizeMobile(mobile) : null,
+        phone_e164: phoneE164,
         email: email || null,
       }
       if (editingCustomer) {
@@ -147,15 +217,24 @@ export function CustomersPage() {
       setMobile('')
       setEmail('')
       setFormError(null)
+      setDuplicateCustomer(null)
       void queryClient.invalidateQueries({ queryKey: ['customers', currentClubId] })
     },
-    onError: (error) =>
-      setFormError(translateSupabaseError(error, editingCustomer ? t('customers.saveEditError') : t('customers.addError'))),
+    onError: (error: unknown) => {
+      if (error && typeof error === 'object' && 'isDuplicate' in error) {
+        const dup = (error as unknown as { customer: { id: string; full_name: string } }).customer
+        setDuplicateCustomer({ id: dup.id, fullName: dup.full_name })
+        setFormError(null)
+        return
+      }
+      setFormError(translateSupabaseError(error, editingCustomer ? t('customers.saveEditError') : t('customers.addError')))
+    },
   })
 
   function handleSubmit(e: FormEvent) {
     e.preventDefault()
     setFormError(null)
+    setDuplicateCustomer(null)
     saveMutation.mutate()
   }
 
@@ -189,6 +268,26 @@ export function CustomersPage() {
 
   return (
     <div>
+      {phoneIssues.length > 0 && (
+        <div className="mb-4 flex flex-col gap-2 rounded-lg border border-status-warning/40 bg-status-warning/10 p-3 text-sm">
+          <p className="font-medium">{t('customers.phoneIssues.title', { count: phoneIssues.length })}</p>
+          <div className="flex flex-col gap-1">
+            {phoneIssues.slice(0, 5).map((issue) => (
+              <button
+                key={issue.customer_id}
+                className="flex items-center justify-between rounded border border-transparent px-2 py-1 text-start hover:border-border hover:bg-muted/40"
+                onClick={() => {
+                  const c = customers.find((row) => row.id === issue.customer_id)
+                  if (c) openEditDialog(c)
+                }}
+              >
+                <span>{issue.full_name}</span>
+                <span dir="ltr" className="text-xs tabular-nums text-text-secondary">{issue.mobile_display}</span>
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
       <PageHeader
         title={t('customers.page.title')}
         description={t('customers.page.description')}
@@ -206,20 +305,42 @@ export function CustomersPage() {
                   <label className="text-sm font-medium text-text-secondary">{t('customers.fullName')}</label>
                   <Input required value={fullName} onChange={(e) => setFullName(e.target.value)} />
                 </div>
-                <div className="flex flex-col gap-1.5">
-                  <label className="text-sm font-medium text-text-secondary">{t('common.phone')}</label>
-                  <Input value={mobile} onChange={(e) => setMobile(e.target.value)} />
-                </div>
+                <PhoneInput
+                  label={t('common.phone')}
+                  value={{ raw: mobile, country: mobileCountry }}
+                  onChange={(v) => {
+                    setMobile(v.raw)
+                    setMobileCountry(v.country)
+                    setDuplicateCustomer(null)
+                  }}
+                  onValidChange={(r) => setPhoneValid(r.valid)}
+                />
                 <div className="flex flex-col gap-1.5">
                   <label className="text-sm font-medium text-text-secondary">{t('customers.emailOptional')}</label>
                   <Input type="email" value={email} onChange={(e) => setEmail(e.target.value)} />
                 </div>
+                {duplicateCustomer && (
+                  <div className="flex flex-col gap-2 rounded-md border border-status-warning/40 bg-status-warning/10 p-3 text-sm">
+                    <p>{t('phoneInput.duplicateCustomer')} ({duplicateCustomer.fullName})</p>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      onClick={() => {
+                        setDialogOpen(false)
+                        setViewingCustomer({ id: duplicateCustomer.id, fullName: duplicateCustomer.fullName, mobileDisplay: null, email: null, whatsapp: null, outstanding: 0 })
+                      }}
+                    >
+                      {t('phoneInput.openCustomer')}
+                    </Button>
+                  </div>
+                )}
                 {formError && (
                   <p role="alert" className="text-sm text-status-danger">
                     {formError}
                   </p>
                 )}
-                <Button type="submit" disabled={saveMutation.isPending}>
+                <Button type="submit" disabled={saveMutation.isPending || (mobile.trim().length > 0 && !phoneValid)}>
                   {saveMutation.isPending ? t('common.saving') : editingCustomer ? t('customers.saveChanges') : t('common.add')}
                 </Button>
               </form>

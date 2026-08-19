@@ -2,6 +2,24 @@
   "app": {
     "name": "Mal3aby"
   },
+  "phoneInput": {
+    "invalidError": "Invalid phone number. Check the country and phone number.",
+    "duplicateCustomer": "A customer with this phone number already exists.",
+    "useExisting": "Use existing customer",
+    "openCustomer": "Open customer",
+    "countries": {
+      "EG": "Egypt",
+      "AE": "United Arab Emirates",
+      "SA": "Saudi Arabia",
+      "KW": "Kuwait",
+      "QA": "Qatar",
+      "JO": "Jordan"
+    },
+    "countryLabel": "Country",
+    "clubCountryMissing": "Set this club's default country in Settings before entering a local phone number.",
+    "invalidRecipient": "Invalid recipient phone",
+    "fixCustomerPhone": "Fix customer phone"
+  },
   "nav": {
     "today": "Today",
     "bookings": "Bookings",
@@ -946,7 +964,8 @@
           "sent": "Sent",
           "failed": "Failed permanently",
           "expired": "Expired",
-          "cancelled": "Cancelled"
+          "cancelled": "Cancelled",
+          "suppressed_invalid_recipient": "Invalid recipient phone"
         },
         "loading": "Loading...",
         "emptyTitle": "No WhatsApp messages in this range yet.",
@@ -1810,6 +1829,9 @@
     "outstanding": "Outstanding",
     "saveEditError": "Couldn't save the changes, try again.",
     "addError": "Couldn't add the customer, try again.",
+    "phoneIssues": {
+      "title": "{{count}} customer phone number(s) need review"
+    },
     "relationshipLabels": {
       "father": "Father",
       "mother": "Mother",

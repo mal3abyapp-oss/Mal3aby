@@ -19,6 +19,7 @@
     "@whiskeysockets/baileys": "^6.7.9",
     "bidi-shaper": "^0.1.2",
     "fontkit": "^2.0.4",
+    "libphonenumber-js": "^1.13.11",
     "pdfkit": "^0.19.1",
     "pino": "^9.4.0",
     "qrcode": "^1.5.4",

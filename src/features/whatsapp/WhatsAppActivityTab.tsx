@@ -70,7 +70,7 @@ const TEMPLATE_LABEL_KEYS = [
   'invoice-created',
 ] as const
 
-const STATUS_LABEL_KEYS = ['pending', 'retrying', 'sent', 'failed', 'expired', 'cancelled'] as const
+const STATUS_LABEL_KEYS = ['pending', 'retrying', 'sent', 'failed', 'expired', 'cancelled', 'suppressed_invalid_recipient'] as const
 
 const STATUS_LABEL_KEYS_WITH_ALL = ['all', ...STATUS_LABEL_KEYS] as const
 
@@ -81,6 +81,10 @@ const STATUS_TONE: Record<string, StatusTone> = {
   failed: 'danger',
   expired: 'danger',
   cancelled: 'neutral',
+  // P0 Phone Identity directive: a suppressed-invalid-recipient row is
+  // NOT a provider failure (directive section 44) -- distinct tone/
+  // label so it never gets misread as "WhatsApp/provider is broken".
+  suppressed_invalid_recipient: 'warning',
 }
 
 async function fetchActivity(clubId: string, status: string): Promise<ActivityRow[]> {
@@ -265,6 +269,9 @@ export function WhatsAppActivityTab({
                       <StatusBadge tone={STATUS_TONE[r.status] ?? 'neutral'} label={statusLabel} />
                       {r.status === 'failed' && r.lastError && (
                         <p className="mt-1 max-w-xs text-xs text-status-danger">{describeFailure(r.lastError, t)}</p>
+                      )}
+                      {r.status === 'suppressed_invalid_recipient' && (
+                        <p className="mt-1 max-w-xs text-xs text-status-warning">{t('phoneInput.invalidRecipient')}</p>
                       )}
                     </td>
                     <td className="p-2 text-xs text-text-secondary">{formatDateTime(r.scheduledAt, i18n.language)}</td>

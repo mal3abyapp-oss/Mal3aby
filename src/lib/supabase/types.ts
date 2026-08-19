@@ -448,6 +448,7 @@ export type Database = {
           name: string
           opening_hours: Json | null
           phone: string | null
+          phone_e164: string | null
           status: string
           updated_at: string | null
         }
@@ -461,6 +462,7 @@ export type Database = {
           name: string
           opening_hours?: Json | null
           phone?: string | null
+          phone_e164?: string | null
           status?: string
           updated_at?: string | null
         }
@@ -474,6 +476,7 @@ export type Database = {
           name?: string
           opening_hours?: Json | null
           phone?: string | null
+          phone_e164?: string | null
           status?: string
           updated_at?: string | null
         }
@@ -669,6 +672,7 @@ export type Database = {
           address: string | null
           club_code: string
           contact_email: string | null
+          country: string | null
           created_at: string
           created_by: string | null
           currency: string
@@ -682,7 +686,9 @@ export type Database = {
           name_ar: string
           name_en: string | null
           payment_receipt_whatsapp_number: string | null
+          payment_receipt_whatsapp_number_e164: string | null
           primary_phone: string | null
+          primary_phone_e164: string | null
           public_booking_enabled: boolean
           public_slug: string | null
           secondary_phone: string | null
@@ -692,11 +698,13 @@ export type Database = {
           timezone: string
           updated_at: string | null
           whatsapp_number: string | null
+          whatsapp_number_e164: string | null
         }
         Insert: {
           address?: string | null
           club_code: string
           contact_email?: string | null
+          country?: string | null
           created_at?: string
           created_by?: string | null
           currency?: string
@@ -710,7 +718,9 @@ export type Database = {
           name_ar: string
           name_en?: string | null
           payment_receipt_whatsapp_number?: string | null
+          payment_receipt_whatsapp_number_e164?: string | null
           primary_phone?: string | null
+          primary_phone_e164?: string | null
           public_booking_enabled?: boolean
           public_slug?: string | null
           secondary_phone?: string | null
@@ -720,11 +730,13 @@ export type Database = {
           timezone?: string
           updated_at?: string | null
           whatsapp_number?: string | null
+          whatsapp_number_e164?: string | null
         }
         Update: {
           address?: string | null
           club_code?: string
           contact_email?: string | null
+          country?: string | null
           created_at?: string
           created_by?: string | null
           currency?: string
@@ -738,7 +750,9 @@ export type Database = {
           name_ar?: string
           name_en?: string | null
           payment_receipt_whatsapp_number?: string | null
+          payment_receipt_whatsapp_number_e164?: string | null
           primary_phone?: string | null
+          primary_phone_e164?: string | null
           public_booking_enabled?: boolean
           public_slug?: string | null
           secondary_phone?: string | null
@@ -748,6 +762,7 @@ export type Database = {
           timezone?: string
           updated_at?: string | null
           whatsapp_number?: string | null
+          whatsapp_number_e164?: string | null
         }
         Relationships: []
       }
@@ -986,6 +1001,7 @@ export type Database = {
           national_id: string | null
           normalized_mobile: string | null
           notes: string | null
+          phone_e164: string | null
           photo_url: string | null
           updated_at: string | null
           user_id: string | null
@@ -1006,6 +1022,7 @@ export type Database = {
           national_id?: string | null
           normalized_mobile?: string | null
           notes?: string | null
+          phone_e164?: string | null
           photo_url?: string | null
           updated_at?: string | null
           user_id?: string | null
@@ -1026,6 +1043,7 @@ export type Database = {
           national_id?: string | null
           normalized_mobile?: string | null
           notes?: string | null
+          phone_e164?: string | null
           photo_url?: string | null
           updated_at?: string | null
           user_id?: string | null
@@ -3183,6 +3201,7 @@ export type Database = {
           id: boolean
           platform_email: string | null
           platform_phone: string | null
+          platform_phone_e164: string | null
           updated_at: string | null
         }
         Insert: {
@@ -3190,6 +3209,7 @@ export type Database = {
           id?: boolean
           platform_email?: string | null
           platform_phone?: string | null
+          platform_phone_e164?: string | null
           updated_at?: string | null
         }
         Update: {
@@ -3197,6 +3217,7 @@ export type Database = {
           id?: boolean
           platform_email?: string | null
           platform_phone?: string | null
+          platform_phone_e164?: string | null
           updated_at?: string | null
         }
         Relationships: []
@@ -4617,10 +4638,12 @@ export type Database = {
           p_city: string
           p_club_name: string
           p_club_name_ar: string
+          p_country?: string
           p_government_affiliated?: boolean
           p_owner_email: string
           p_owner_mobile: string
           p_phone: string
+          p_phone_e164?: string
         }
         Returns: {
           club_id: string
@@ -4710,6 +4733,7 @@ export type Database = {
           p_club_slug: string
           p_customer_mobile: string
           p_customer_name: string
+          p_customer_phone_e164: string
           p_end_at: string
           p_field_id: string
           p_notes?: string
@@ -4943,6 +4967,15 @@ export type Database = {
         }
         Returns: Json
       }
+      get_phone_data_issues: {
+        Args: { p_club_id: string }
+        Returns: {
+          customer_id: string
+          full_name: string
+          issue: string
+          mobile_display: string
+        }[]
+      }
       get_platform_audit_log: {
         Args: {
           p_action?: string
@@ -5079,6 +5112,7 @@ export type Database = {
           club_name: string
           club_name_en: string
           contact_email: string
+          country: string
           currency: string
           fields: Json
           logo_url: string
@@ -5472,7 +5506,11 @@ export type Database = {
         Returns: string
       }
       update_platform_contact: {
-        Args: { p_platform_email: string; p_platform_phone: string }
+        Args: {
+          p_platform_email: string
+          p_platform_phone: string
+          p_platform_phone_e164?: string
+        }
         Returns: undefined
       }
       update_platform_settings: {

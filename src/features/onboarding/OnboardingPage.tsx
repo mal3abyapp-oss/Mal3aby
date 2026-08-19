@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import type { CountryCode } from 'libphonenumber-js'
 import { useNavigate } from 'react-router-dom'
 import { useMutation } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
@@ -6,6 +7,7 @@ import { supabase } from '@/lib/supabase/client'
 import { useAuth } from '@/app/providers/AuthProvider'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { PhoneInput } from '@/components/ui/phone-input'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import {
   Select,
@@ -15,6 +17,7 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { CheckCircle2 } from 'lucide-react'
+import { normalizePhone } from '@/lib/domain/phone'
 
 // 4-step wizard: Business Type -> Basic Details -> First Branch -> Trial
 // Activation confirmation. Requires only an authenticated session — never
@@ -42,6 +45,8 @@ export function OnboardingPage() {
   const [branchName, setBranchName] = useState(t('onboarding.defaultBranchName'))
   const [city, setCity] = useState('')
   const [phone, setPhone] = useState('')
+  const [phoneCountry, setPhoneCountry] = useState<CountryCode>('EG')
+  const [phoneValid, setPhoneValid] = useState(false)
   // Government / Ministry Collection Compliance directive, section 3/47:
   // asked at onboarding, defaults unanswered (no pre-selected YES/NO) so
   // an ordinary commercial club isn't nudged toward a compliance
@@ -53,6 +58,15 @@ export function OnboardingPage() {
 
   const onboardMutation = useMutation({
     mutationFn: async () => {
+      // P0 Phone Identity directive: the club's default country
+      // (section 3/4) and the branch phone's canonical E.164 form are
+      // both established at the same moment -- no club can exist with
+      // country unset while accepting local phone numbers elsewhere.
+      const phoneResult = normalizePhone(phone, phoneCountry)
+      if (!phoneResult.valid || !phoneResult.e164) {
+        throw new Error(t('phoneInput.invalidError'))
+      }
+
       const { data, error } = await supabase.rpc('complete_new_club_onboarding', {
         p_business_type: businessType,
         p_club_name: clubNameEn || clubNameAr,
@@ -63,6 +77,8 @@ export function OnboardingPage() {
         p_owner_email: session?.user.email ?? '',
         p_owner_mobile: phone,
         p_government_affiliated: governmentAffiliated === true,
+        p_country: phoneCountry,
+        p_phone_e164: phoneResult.e164,
       })
       if (error) throw error
       const row = data?.[0]
@@ -75,7 +91,8 @@ export function OnboardingPage() {
       setCurrentClubId(r.clubId)
       setStep(4)
     },
-    onError: () => setSubmitError(t('onboarding.createError')),
+    onError: (error: unknown) =>
+      setSubmitError(error instanceof Error && error.message === t('phoneInput.invalidError') ? error.message : t('onboarding.createError')),
   })
 
   if (!session) {
@@ -163,8 +180,16 @@ export function OnboardingPage() {
               <Input required value={branchName} onChange={(e) => setBranchName(e.target.value)} />
               <label className="text-sm font-medium text-text-secondary">{t('onboarding.wizard.step3.cityLabel')}</label>
               <Input required value={city} onChange={(e) => setCity(e.target.value)} />
-              <label className="text-sm font-medium text-text-secondary">{t('onboarding.wizard.step3.phoneLabel')}</label>
-              <Input required value={phone} onChange={(e) => setPhone(e.target.value)} />
+              <PhoneInput
+                label={t('onboarding.wizard.step3.phoneLabel')}
+                required
+                value={{ raw: phone, country: phoneCountry }}
+                onChange={(v) => {
+                  setPhone(v.raw)
+                  setPhoneCountry(v.country)
+                }}
+                onValidChange={(r) => setPhoneValid(r.valid)}
+              />
 
               {/* Government / Ministry Collection Compliance directive,
                   section 3: asked at every club creation, but never
@@ -202,7 +227,7 @@ export function OnboardingPage() {
                 <Button variant="outline" onClick={() => setStep(2)}>{t('onboarding.wizard.step3.back')}</Button>
                 <Button
                   onClick={() => onboardMutation.mutate()}
-                  disabled={onboardMutation.isPending || !branchName.trim() || !city.trim() || !phone.trim() || governmentAffiliated === null}
+                  disabled={onboardMutation.isPending || !branchName.trim() || !city.trim() || !phone.trim() || !phoneValid || governmentAffiliated === null}
                 >
                   {onboardMutation.isPending ? t('onboarding.wizard.step3.submitting') : t('onboarding.wizard.step3.submit')}
                 </Button>

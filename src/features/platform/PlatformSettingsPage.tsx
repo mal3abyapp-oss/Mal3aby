@@ -6,6 +6,8 @@ import { PageHeader } from '@/components/ui/page-header'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
+import { PhoneInput } from '@/components/ui/phone-input'
+import { normalizePhone } from '@/lib/domain/phone'
 
 // IA restructuring (Phase 4): this was a permanent placeholder
 // ("لا توجد إعدادات على مستوى المنصة... غير مُتاحة كشاشة مستقلة في هذا
@@ -59,10 +61,11 @@ async function updateSettings(values: { default_trial_days: number }) {
 // console to CHANGE them -- only a direct database edit could. This
 // closes that gap with the same is_platform_owner()-gated + audited RPC
 // pattern as the trial-days setting above.
-async function updateContact(values: { platform_phone: string; platform_email: string }) {
+async function updateContact(values: { platform_phone: string; platform_email: string; platform_phone_e164: string | null }) {
   const { error } = await supabase.rpc('update_platform_contact', {
     p_platform_phone: values.platform_phone,
     p_platform_email: values.platform_email,
+    p_platform_phone_e164: values.platform_phone_e164 ?? undefined,
   })
   if (error) throw error
 }
@@ -94,7 +97,20 @@ export function PlatformSettingsPage() {
   })
 
   const contactMutation = useMutation({
-    mutationFn: () => updateContact({ platform_phone: effectiveContactPhone, platform_email: effectiveContactEmail }),
+    mutationFn: () => {
+      // Platform contact is a single, known operator number (never a
+      // multi-tenant club) -- Egypt by convention, still validated
+      // through the real parser rather than assumed blindly.
+      const phoneResult = normalizePhone(effectiveContactPhone, 'EG')
+      if (effectiveContactPhone.trim() && !phoneResult.valid) {
+        throw new Error(t('phoneInput.invalidError'))
+      }
+      return updateContact({
+        platform_phone: effectiveContactPhone,
+        platform_email: effectiveContactEmail,
+        platform_phone_e164: phoneResult.e164,
+      })
+    },
     onSuccess: () => {
       setContactSaved(true)
       setTimeout(() => setContactSaved(false), 3000)
@@ -161,10 +177,11 @@ export function PlatformSettingsPage() {
             <p className="text-sm text-text-secondary">{t('platform.settingsPage.loading')}</p>
           ) : (
             <>
-              <div className="flex flex-col gap-1.5">
-                <label htmlFor="platform-phone" className="text-sm font-medium text-text-secondary">{t('platform.settingsPage.phoneLabel')}</label>
-                <Input id="platform-phone" value={effectiveContactPhone} onChange={(e) => setContactPhone(e.target.value)} />
-              </div>
+              <PhoneInput
+                label={t('platform.settingsPage.phoneLabel')}
+                value={{ raw: effectiveContactPhone, country: 'EG' }}
+                onChange={(v) => setContactPhone(v.raw)}
+              />
               <div className="flex flex-col gap-1.5">
                 <label htmlFor="platform-email" className="text-sm font-medium text-text-secondary">{t('platform.settingsPage.emailLabel')}</label>
                 <Input id="platform-email" type="email" value={effectiveContactEmail} onChange={(e) => setContactEmail(e.target.value)} />

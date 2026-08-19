@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
+import type { CountryCode } from 'libphonenumber-js'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
 import { supabase } from '@/lib/supabase/client'
@@ -13,10 +14,12 @@ import {
 } from '@/components/ui/sheet'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { PhoneInput } from '@/components/ui/phone-input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { useResolvedFieldPrice, useClubTimezone } from './useFieldPricing'
 import { toInstant } from '@/lib/domain/time'
 import { useDirection } from '@/app/providers/DirectionProvider'
+import { normalizePhone } from '@/lib/domain/phone'
 
 // Section E3 — Quick Booking: a right-side drawer opened from an empty
 // calendar slot. Price is ALWAYS server-resolved (resolve_field_price)
@@ -39,11 +42,21 @@ interface Customer {
 async function fetchCustomers(clubId: string, search: string) {
   let query = supabase.from('customers').select('id, full_name, mobile_display').eq('club_id', clubId).order('full_name').limit(50)
   if (search.trim()) {
-    query = query.or(`full_name.ilike.%${search}%,normalized_mobile.ilike.%${search}%`)
+    query = query.or(`full_name.ilike.%${search}%,normalized_mobile.ilike.%${search}%,mobile_display.ilike.%${search}%`)
   }
   const { data, error } = await query
   if (error) throw error
   return (data ?? []) as Customer[]
+}
+
+async function fetchClubCountry(clubId: string): Promise<CountryCode | null> {
+  const { data, error } = await supabase.from('clubs').select('country').eq('id', clubId).single()
+  if (error) return null
+  return (data?.country as CountryCode | null) ?? null
+}
+
+function legacyNormalize(input: string): string {
+  return input.replace(/\D/g, '').replace(/^0+/, '')
 }
 
 const DURATION_VALUES = ['0.5', '1', '1.5', '2', '3'] as const
@@ -72,6 +85,15 @@ export function QuickBookingSheet({
   const [showNewCustomer, setShowNewCustomer] = useState(false)
   const [newCustomerName, setNewCustomerName] = useState('')
   const [newCustomerMobile, setNewCustomerMobile] = useState('')
+  const [newCustomerMobileCountry, setNewCustomerMobileCountry] = useState<CountryCode>('EG')
+  const [newCustomerPhoneValid, setNewCustomerPhoneValid] = useState(false)
+  const [duplicateCustomer, setDuplicateCustomer] = useState<{ id: string; full_name: string } | null>(null)
+
+  const { data: clubCountry } = useQuery({
+    queryKey: ['club-country', clubId],
+    queryFn: () => fetchClubCountry(clubId),
+    enabled: !!clubId,
+  })
   // Gate 5 — recurring bookings: create_recurring_booking() already
   // existed server-side (delegates to the same, already-fixed
   // _create_booking_internal per occurrence) but had no frontend caller
@@ -91,6 +113,8 @@ export function QuickBookingSheet({
       setShowNewCustomer(false)
       setNewCustomerName('')
       setNewCustomerMobile('')
+      setNewCustomerMobileCountry((clubCountry as CountryCode) ?? 'EG')
+      setDuplicateCustomer(null)
       setIsRecurring(false)
       setOccurrenceCount('8')
       setRecurringResult(null)
@@ -123,9 +147,42 @@ export function QuickBookingSheet({
 
   const createCustomerMutation = useMutation({
     mutationFn: async () => {
+      // P0 Phone Identity directive fix: this previously wrote
+      // newCustomerMobile completely raw into BOTH mobile_display and
+      // normalized_mobile -- the weakest phone-write path in the
+      // codebase (not even the old digit-strip cleanup). Now runs
+      // through the same normalizePhone() pipeline as every other
+      // customer-creation surface, and checks for a tenant-scoped
+      // duplicate before creating (directive section 24/29/31).
+      let phoneE164: string | null = null
+      if (newCustomerMobile.trim()) {
+        const result = normalizePhone(newCustomerMobile, newCustomerMobileCountry)
+        if (!result.valid || !result.e164) {
+          throw new Error(t('phoneInput.invalidError'))
+        }
+        phoneE164 = result.e164
+
+        const { data: existing } = await supabase
+          .from('customers')
+          .select('id, full_name')
+          .eq('club_id', clubId)
+          .eq('phone_e164', phoneE164)
+          .limit(1)
+          .maybeSingle()
+        if (existing) {
+          throw { isDuplicate: true, customer: existing }
+        }
+      }
+
       const { data, error } = await supabase
         .from('customers')
-        .insert({ club_id: clubId, full_name: newCustomerName, mobile_display: newCustomerMobile || null, normalized_mobile: newCustomerMobile || null })
+        .insert({
+          club_id: clubId,
+          full_name: newCustomerName,
+          mobile_display: newCustomerMobile || null,
+          normalized_mobile: newCustomerMobile ? legacyNormalize(newCustomerMobile) : null,
+          phone_e164: phoneE164,
+        })
         .select('id, full_name, mobile_display')
         .single()
       if (error) throw error
@@ -134,9 +191,16 @@ export function QuickBookingSheet({
     onSuccess: (data) => {
       setCustomerId(data.id)
       setShowNewCustomer(false)
+      setDuplicateCustomer(null)
       void queryClient.invalidateQueries({ queryKey: ['customers-search', clubId] })
     },
-    onError: () => setFormError(t('bookings.quick.addCustomerError')),
+    onError: (error: unknown) => {
+      if (error && typeof error === 'object' && 'isDuplicate' in error) {
+        setDuplicateCustomer((error as unknown as { customer: { id: string; full_name: string } }).customer)
+        return
+      }
+      setFormError(error instanceof Error && error.message ? error.message : t('bookings.quick.addCustomerError'))
+    },
   })
 
   const bookMutation = useMutation({
@@ -254,8 +318,38 @@ export function QuickBookingSheet({
               {showNewCustomer ? (
                 <div className="flex flex-col gap-2 rounded-md border border-border p-2">
                   <Input placeholder={t('bookings.quick.namePlaceholder')} value={newCustomerName} onChange={(e) => setNewCustomerName(e.target.value)} />
-                  <Input placeholder={t('bookings.quick.mobilePlaceholder')} value={newCustomerMobile} onChange={(e) => setNewCustomerMobile(e.target.value)} />
-                  <Button size="sm" disabled={!newCustomerName.trim() || createCustomerMutation.isPending} onClick={() => createCustomerMutation.mutate()}>
+                  <PhoneInput
+                    label={t('bookings.quick.mobilePlaceholder')}
+                    value={{ raw: newCustomerMobile, country: newCustomerMobileCountry }}
+                    onChange={(v) => {
+                      setNewCustomerMobile(v.raw)
+                      setNewCustomerMobileCountry(v.country)
+                      setDuplicateCustomer(null)
+                    }}
+                    onValidChange={(r) => setNewCustomerPhoneValid(r.valid)}
+                  />
+                  {duplicateCustomer && (
+                    <div className="flex flex-col gap-2 rounded-md border border-status-warning/40 bg-status-warning/10 p-2 text-xs">
+                      <p>{t('phoneInput.duplicateCustomer')} ({duplicateCustomer.full_name})</p>
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="outline"
+                        onClick={() => {
+                          setCustomerId(duplicateCustomer.id)
+                          setShowNewCustomer(false)
+                          setDuplicateCustomer(null)
+                        }}
+                      >
+                        {t('phoneInput.useExisting')}
+                      </Button>
+                    </div>
+                  )}
+                  <Button
+                    size="sm"
+                    disabled={!newCustomerName.trim() || (newCustomerMobile.trim().length > 0 && !newCustomerPhoneValid) || createCustomerMutation.isPending}
+                    onClick={() => createCustomerMutation.mutate()}
+                  >
                     {createCustomerMutation.isPending ? t('bookings.quick.adding') : t('bookings.quick.addCustomer')}
                   </Button>
                 </div>
