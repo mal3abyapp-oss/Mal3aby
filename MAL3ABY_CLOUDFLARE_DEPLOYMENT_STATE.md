@@ -2,7 +2,27 @@
 
 Live tracker of what has been built, validated, and what remains pending external input, for the MAL3ABY CLOUDFLARE-ONLY PRODUCTION ARCHITECTURE & DEPLOYMENT task. Updated after each phase.
 
-Last updated: 2026-08-19
+Last updated: 2026-08-20
+
+## 2026-08-20 — WhatsApp "Waiting for this message" re-incident: re-repair + fresh real send
+
+A second live report came in after the 2026-08-19 fix/repair (below): a real message sent later that same day (22:14:44 UTC, `booking-confirmed-paid`, `provider_reference: 3EB0F0DB6E593557CB9CB3`) again rendered as "Waiting for this message" on the recipient's device, despite `status='sent'`. This message was sent from the same connected session, but its timestamp is **after** the 04:00-06:00 UTC repair-and-verify window documented below -- so it was never actually covered by that verification, even though the doc's wording could be misread as a durable fix. Corrected here so the record doesn't overstate what was actually re-tested.
+
+**Investigation**: confirmed via DB that the deployed image (`v11`, `235e37c`) already includes both the persistence fix (`state.keys.set` wrap) and the repair endpoint (`POST /manage/:clubId/repair-session`) from the 2026-08-19 fix -- no code regression. The per-contact Signal session for `+971502061209` on club `b9178c0f-...` (connected number `201116505553`) had simply gone stale again since the last repair (expected: the persistence fix only prevents *future* corruption of sessions negotiated after it shipped; a session already stale before a repair needs the repair re-run whenever it desyncs again, same as WhatsApp's own reinstall/re-link recovery).
+
+**Action taken**:
+1. `MANAGEMENT_API_TOKEN` rotated (previous value's plaintext had been deliberately discarded after single use on 2026-08-19, per this project's standing secret-handling rule) -- done with the platform owner's explicit in-chat approval. New value used once, never written to any file/log/report, discarded after use.
+2. `POST /manage/b9178c0f.../repair-session {"phone":"971502061209"}` -- `sessionFilesRemoved: 3` (matches the same 3-file pattern as the 2026-08-19 repair).
+3. Fresh real booking created through the actual staff UI (`https://mal3aby.app`, Quick Booking, existing "QA Media Test" customer, real field/slot, real `create_booking`-equivalent flow) -- booking `MB-7B08ED8B` (`7b08ed8b-be40-4326-984a-d65c0e1aeb07`), `status='confirmed'`.
+4. Resulting real WhatsApp send: `notification_queue` row `8a25bcb4-a312-4efb-8f4a-d0f6a4b0977b`, `template_key='booking-confirmed-paid'`, `status='sent'`, `provider_reference: 3EB04F0C5618632C36AE28`, `attempts=1`, `last_error=null`. `whatsapp_accounts.last_successful_send_at` updated to `23:03:13.96282+00`, ~5s after queue creation -- consistent with a real successful provider round-trip, not a stuck/retrying state.
+
+**What this evidence does and does not prove**: `status='sent'` + `provider_reference` proves the message was accepted by WhatsApp's relay after a fresh Signal session repair -- the same class of evidence that was wrongly treated as sufficient before. It does **not** by itself prove the recipient's device rendered the plaintext. Marked below as `USER CONFIRMATION REQUIRED` -- the platform owner is the only one who can open the device and confirm the actual message text appeared normally (not "Waiting for this message"). The user indicated they are stepping away for the night immediately after sending the re-repair/re-test directive, so this confirmation is deferred, not skipped -- it is the one item this task cannot close autonomously per the user's own stated rule that a message needing their own device observation is the one legitimate reason to stop and ask.
+
+**Standing lesson recorded for the delivery-status model** (Phase 6 of the investigation directive): `notification_queue.status='sent'` means "the connector's `sendMessage()` call returned a provider message ID without throwing." It does not mean, and must never be presented in UI/reports as meaning, "delivered to and readable by the recipient." WhatsApp/Baileys does not expose a reliable device-level read receipt to this connector, so no `delivered`/`read` state is invented -- the queue's status model stays exactly `queued/processing/sent/failed/suppressed_invalid_recipient`, with `sent` now documented precisely instead of implied to be stronger than it is.
+
+**Consent regression check**: `record_staff_whatsapp_consent()` RPC call site confirmed unchanged and present in both `CustomersPage.tsx:235` and `QuickBookingSheet.tsx:199` (same centralized path, no drift). Working tree clean at commit `2314648` (the consent-fix commit) for the entire duration of this re-investigation -- no code changes were needed, only the operational repair-endpoint call and a token rotation.
+
+WhatsApp task status: **NOT CLOSED** -- everything autonomously verifiable has passed; the single remaining item is the platform owner's own on-device confirmation of booking `MB-7B08ED8B`'s WhatsApp message, to be given whenever they are next available.
 
 ---
 
