@@ -4,6 +4,7 @@ import { DirectionProvider } from '@/app/providers/DirectionProvider'
 import { AuthProvider } from '@/app/providers/AuthProvider'
 import { router } from '@/app/routing/router'
 import { ErrorBoundary } from '@/components/ui/error-boundary'
+import { PwaUpdatePrompt } from '@/app/PwaUpdatePrompt'
 
 export function App() {
   return (
@@ -12,6 +13,7 @@ export function App() {
         <DirectionProvider>
           <AuthProvider>
             <RouterProvider router={router} />
+            <PwaUpdatePrompt />
           </AuthProvider>
         </DirectionProvider>
       </QueryProvider>

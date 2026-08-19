@@ -1,6 +1,8 @@
 {
   "app": {
-    "name": "Mal3aby"
+    "name": "Mal3aby",
+    "updateAvailable": "A new version is available.",
+    "reload": "Reload"
   },
   "phoneInput": {
     "invalidError": "Invalid phone number. Check the country and phone number.",
