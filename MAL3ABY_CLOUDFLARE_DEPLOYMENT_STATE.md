@@ -2,9 +2,23 @@
 
 Live tracker of what has been built, validated, and what remains pending external input, for the MAL3ABY CLOUDFLARE-ONLY PRODUCTION ARCHITECTURE & DEPLOYMENT task. Updated after each phase.
 
-Last updated: 2026-08-18
+Last updated: 2026-08-19
 
 ---
+
+## 2026-08-19 — Final hardening redeploy (Tasks #2-#7)
+
+Full redeploy of everything accumulated locally since the 2026-08-18 report above (status-write-race fencing, duplicate-message fix, Secure Booking Link as primary UX, real Arabic invoice PDF shaping fix, full English localization sweep, public club booking URL/QR system).
+
+**Frontend**: `mala3by-frontend` redeployed via `wrangler deploy` from a fresh `npm run build` (commit `59dc5de`). Version `e42d3d82-1378-4240-a3e7-bb86d0b13242`. Verified live at `https://mal3aby.app/c/fayed` (new public booking page renders correctly).
+
+**WhatsApp connector container**: new image built via `.github/workflows/whatsapp-container-build.yml` (GitHub Actions run `32200344075`, tag `59dc5de`, digest `sha256:8ffb88460a3b65610f3a4e80e45a1a97f15823c227433c364ef6a4f71767974e`). Deployed via `wrangler deploy --containers-rollout=immediate`. Confirmed live: the new container instance reconnected the existing Baileys session with **no new QR pairing needed** (`whatsapp_accounts.status='connected'`, fresh `last_seen_at` immediately after rollout) — the same critical Cloudflare Containers session-persistence gate from the original acceptance test, re-passed on the new image.
+
+**`MANAGEMENT_API_TOKEN` was rotated** (with explicit user approval — the prior value was not retrievable by any tool, Cloudflare never exposes secret values once set) to wake the container via `/manage/:clubId/start` after its `sleepAfter=3m` idle timeout. New value set via `wrangler secret put`, used once, the plaintext temp file deleted immediately after. No other secret was touched.
+
+**Real production E2E via the new public booking page**: booking `MB-F158CC76` created end-to-end through `https://mal3aby.app/c/fayed` (real field/date/time selection against real operating hours, real server-resolved price, real guest-customer creation, `source='club_public_link'`). Its `booking-created` WhatsApp notification was queued correctly and is scheduled for `2026-08-19 05:00:00+00` (`08:00 Africa/Cairo`) — correctly deferred by the club's own `quiet_hours_enabled` setting (`23:59`–`08:00` Cairo), since the booking was created at `02:18` Cairo, inside the quiet window. This is the messaging-safety feature working as designed, not a defect. `record_payment()` also queues at `'transactional'` priority (not `critical_operational`), so it does not offer a quiet-hours bypass either — a real send proof for the newly deployed image requires waiting for the natural end of the quiet window or a legitimately-eligible send window, not a workaround.
+
+**Full failure matrix (12 adversarial scenarios) re-verified against the redeployed live schema**: disabled-club rejection, wrong slug, cross-tenant field, invalid time order, past-time booking, day-span/operating-hours violations, malformed phone, empty name, spoofed `source`, double-booking exclusion, and field-block conflicts — all correctly rejected, all rolled back cleanly, zero test data persisted.
 
 ## FINAL PRODUCTION ACCEPTANCE — 2026-08-18
 

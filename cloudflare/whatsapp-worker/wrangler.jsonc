@@ -100,12 +100,17 @@
       // Traceable to: git commit 82aedbf, GitHub Actions run
       // 32172921915, tag v8-jid-fix-real, digest
       // sha256:6fbf385358dbc4ca9c515deb16ccc2db6a7a97a3d125f078b656d8f6063037b0.
+      // v9, commit 59dc5de (status-write-race fencing, duplicate-message
+      // fix, Secure Booking Link as primary UX, real Arabic invoice PDF
+      // shaping fix, full English localization, public club booking
+      // system), GitHub Actions run 32200344075, digest
+      // sha256:8ffb88460a3b65610f3a4e80e45a1a97f15823c227433c364ef6a4f71767974e.
       // To ship a new connector version: bump the tag in a new
       // workflow_dispatch run, then update this image reference to
       // match -- never silently reuse the same tag for different code
       // (the digest above is the actual content-addressed proof of
       // what's running, keep it in sync with the tag).
-      "image": "registry.cloudflare.com/35ac10727701095866b16c276b4a33d1/mala3by-whatsapp-connector:v8-jid-fix-real",
+      "image": "registry.cloudflare.com/35ac10727701095866b16c276b4a33d1/mala3by-whatsapp-connector:59dc5de",
       // One container instance per WhatsApp account (one Durable
       // Object = one container, directive rule 21's chosen model --
       // NOT a shared container serving multiple clubs, which would
