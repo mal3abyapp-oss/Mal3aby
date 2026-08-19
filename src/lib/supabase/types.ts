@@ -4642,6 +4642,21 @@ export type Database = {
           reason: string
         }[]
       }
+      get_platform_club_360: {
+        Args: { p_club_id: string }
+        Returns: {
+          bookings_pending: number
+          bookings_this_month: number
+          bookings_today: number
+          branch_count: number
+          customer_count: number
+          field_count: number
+          owner_email: string
+          owner_name: string
+          owner_phone: string
+          owner_user_id: string
+        }[]
+      }
       get_platform_club_owners: {
         Args: never
         Returns: {

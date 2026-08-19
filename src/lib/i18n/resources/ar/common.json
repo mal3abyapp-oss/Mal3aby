@@ -227,6 +227,31 @@
         "type": "النوع: {{type}}",
         "endsAtPrefix": "ينتهي:"
       },
+      "identityCard": {
+        "title": "بيانات النادي",
+        "createdAt": "تاريخ الإنشاء",
+        "phone": "الهاتف",
+        "email": "البريد الإلكتروني",
+        "publicBooking": "صفحة الحجز العامة"
+      },
+      "ownerCard": {
+        "title": "صاحب النادي",
+        "noOwner": "لا يوجد صاحب نادٍ نشط",
+        "openOwners": "فتح صفحة الأصحاب"
+      },
+      "summaryCard": {
+        "title": "ملخص التشغيل",
+        "branches": "الفروع",
+        "fields": "الملاعب",
+        "customers": "العملاء",
+        "bookingsToday": "حجوزات اليوم",
+        "bookingsMonth": "حجوزات الشهر",
+        "bookingsPending": "حجوزات معلقة"
+      },
+      "whatsappCard": {
+        "title": "صحة واتساب",
+        "comingInPhaseE": "سيتم إضافة ملخص حالة واتساب لهذا النادي هنا."
+      },
       "actionsCard": {
         "title": "إجراءات",
         "startTrial": "بدء تجربة مجانية",

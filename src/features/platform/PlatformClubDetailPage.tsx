@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { useParams } from 'react-router-dom'
+import { Link, useParams } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
 import { supabase } from '@/lib/supabase/client'
@@ -133,6 +133,22 @@ export function PlatformClubDetailPage() {
   const [academyLimitInput, setAcademyLimitInput] = useState('')
 
   const { data: club } = useQuery({ queryKey: ['platform-club', clubId], queryFn: () => fetchClub(clubId!), enabled: !!clubId })
+  // Phase C directive (Club 360): the audit's core test -- "if a club
+  // owner calls support right now, can the platform owner understand
+  // that club's full state within under a minute?" -- was a confirmed
+  // NO: this page showed subscription/payment/audit data but zero owner
+  // contact, facilities, or booking/customer volume. One batched RPC
+  // (not per-section queries, consistent with the Phase A N+1 fix)
+  // covers all of it in a single round trip.
+  const { data: club360 } = useQuery({
+    queryKey: ['platform-club-360', clubId],
+    queryFn: async () => {
+      const { data, error } = await supabase.rpc('get_platform_club_360', { p_club_id: clubId! })
+      if (error) throw error
+      return data?.[0] ?? null
+    },
+    enabled: !!clubId,
+  })
   const { data: access } = useQuery({
     queryKey: ['platform-club-access', clubId],
     queryFn: async () => {
@@ -463,6 +479,85 @@ export function PlatformClubDetailPage() {
           {actionError}
         </p>
       )}
+
+      {/* Phase C directive (C1/C2/C6/C7): Club Identity + Owner Contact +
+          a facilities/booking/customer summary -- the specific data the
+          audit found completely absent from this page despite fetching
+          (but never rendering) most of the club row already. Summary
+          only, deliberately -- not a platform booking-operations system. */}
+      <div className="mb-4 grid gap-4 md:grid-cols-3">
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">{t('platform.clubDetailPage.identityCard.title')}</CardTitle>
+          </CardHeader>
+          <CardContent className="flex flex-col gap-1.5 text-sm">
+            <div className="flex justify-between"><span className="text-text-secondary">{t('platform.clubDetailPage.identityCard.createdAt')}</span><bdi>{club ? new Date(club.created_at).toLocaleDateString(locale === 'en' ? 'en-US' : 'ar-EG') : '—'}</bdi></div>
+            <div className="flex justify-between"><span className="text-text-secondary">{t('platform.clubDetailPage.identityCard.phone')}</span><bdi>{club?.primary_phone ?? '—'}</bdi></div>
+            <div className="flex justify-between"><span className="text-text-secondary">{t('platform.clubDetailPage.identityCard.email')}</span><span>{club?.contact_email ?? '—'}</span></div>
+            {club?.public_slug && (
+              <div className="flex justify-between">
+                <span className="text-text-secondary">{t('platform.clubDetailPage.identityCard.publicBooking')}</span>
+                <a href={`/c/${club.public_slug}`} target="_blank" rel="noreferrer" className="text-accent-foreground hover:underline">
+                  /c/{club.public_slug}
+                </a>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">{t('platform.clubDetailPage.ownerCard.title')}</CardTitle>
+          </CardHeader>
+          <CardContent className="flex flex-col gap-1.5 text-sm">
+            {club360?.owner_name ? (
+              <>
+                <p className="font-medium text-text-primary">{club360.owner_name}</p>
+                {club360.owner_email && (
+                  <a href={`mailto:${club360.owner_email}`} className="text-accent-foreground hover:underline">{club360.owner_email}</a>
+                )}
+                {club360.owner_phone && <bdi className="text-text-secondary">{club360.owner_phone}</bdi>}
+                <Link
+                  to="/platform/owners"
+                  className="mt-1 text-xs text-accent-foreground hover:underline"
+                >
+                  {t('platform.clubDetailPage.ownerCard.openOwners')}
+                </Link>
+              </>
+            ) : (
+              <p className="text-text-secondary">{t('platform.clubDetailPage.ownerCard.noOwner')}</p>
+            )}
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">{t('platform.clubDetailPage.summaryCard.title')}</CardTitle>
+          </CardHeader>
+          <CardContent className="grid grid-cols-2 gap-2 text-sm tabular-nums">
+            <div><span className="text-text-secondary">{t('platform.clubDetailPage.summaryCard.branches')}</span> <span className="font-medium">{club360?.branch_count ?? '—'}</span></div>
+            <div><span className="text-text-secondary">{t('platform.clubDetailPage.summaryCard.fields')}</span> <span className="font-medium">{club360?.field_count ?? '—'}</span></div>
+            <div><span className="text-text-secondary">{t('platform.clubDetailPage.summaryCard.customers')}</span> <span className="font-medium">{club360?.customer_count ?? '—'}</span></div>
+            <div><span className="text-text-secondary">{t('platform.clubDetailPage.summaryCard.bookingsToday')}</span> <span className="font-medium">{club360?.bookings_today ?? '—'}</span></div>
+            <div><span className="text-text-secondary">{t('platform.clubDetailPage.summaryCard.bookingsMonth')}</span> <span className="font-medium">{club360?.bookings_this_month ?? '—'}</span></div>
+            <div><span className="text-text-secondary">{t('platform.clubDetailPage.summaryCard.bookingsPending')}</span> <span className="font-medium">{club360?.bookings_pending ?? '—'}</span></div>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Phase C directive (C8): a placeholder section for WhatsApp
+          platform health, to be filled by Phase E's batched health RPC --
+          intentionally not built here to avoid a second N+1 surface;
+          this just reserves the visual slot so Phase E only needs to
+          fill it in, not restructure the page. */}
+      <Card className="mb-4">
+        <CardHeader>
+          <CardTitle className="text-base">{t('platform.clubDetailPage.whatsappCard.title')}</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <p className="text-sm text-text-secondary">{t('platform.clubDetailPage.whatsappCard.comingInPhaseE')}</p>
+        </CardContent>
+      </Card>
 
       <div className="mb-4 grid gap-4 md:grid-cols-3">
         <Card>

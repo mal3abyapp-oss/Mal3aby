@@ -227,6 +227,31 @@
         "type": "Type: {{type}}",
         "endsAtPrefix": "Ends:"
       },
+      "identityCard": {
+        "title": "Club identity",
+        "createdAt": "Created",
+        "phone": "Phone",
+        "email": "Email",
+        "publicBooking": "Public booking page"
+      },
+      "ownerCard": {
+        "title": "Club owner",
+        "noOwner": "No active club owner",
+        "openOwners": "Open Owners page"
+      },
+      "summaryCard": {
+        "title": "Operational summary",
+        "branches": "Branches",
+        "fields": "Fields",
+        "customers": "Customers",
+        "bookingsToday": "Bookings today",
+        "bookingsMonth": "Bookings this month",
+        "bookingsPending": "Pending bookings"
+      },
+      "whatsappCard": {
+        "title": "WhatsApp health",
+        "comingInPhaseE": "A WhatsApp status summary for this club will appear here."
+      },
       "actionsCard": {
         "title": "Actions",
         "startTrial": "Start free trial",
