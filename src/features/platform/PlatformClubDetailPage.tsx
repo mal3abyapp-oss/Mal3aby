@@ -179,6 +179,18 @@ export function PlatformClubDetailPage() {
   // a platform owner had to open each club's own Staff page to see it.
   // Counts only, no permission editing -- full staff management stays
   // exactly where it already is.
+  // Government / Ministry Collection Compliance directive, section 46:
+  // Club 360 shows affiliation status, effective policy, receipt
+  // counts, and collected total -- no receipt images (section 45).
+  const { data: govCompliance } = useQuery({
+    queryKey: ['platform-club-gov-compliance', clubId],
+    queryFn: async () => {
+      const { data, error } = await supabase.rpc('get_platform_government_compliance_summary')
+      if (error) throw error
+      return (data ?? []).find((row) => row.club_id === clubId) ?? null
+    },
+    enabled: !!clubId,
+  })
   const { data: staffSummary = [] } = useQuery({
     queryKey: ['platform-club-staff-summary', clubId],
     queryFn: async () => {
@@ -690,6 +702,41 @@ export function PlatformClubDetailPage() {
           </div>
         </CardContent>
       </Card>
+
+      {/* Government / Ministry Collection Compliance directive, section
+          46: affiliation status, effective policy, receipt counts,
+          collected total. No receipt images shown (section 45). Only
+          rendered when the club is actually affiliated -- an ordinary
+          commercial club's Club 360 stays unchanged. */}
+      {govCompliance?.enabled && (
+        <Card className="mb-4">
+          <CardHeader>
+            <CardTitle className="text-base">{t('platform.clubDetailPage.govComplianceCard.title')}</CardTitle>
+          </CardHeader>
+          <CardContent className="grid grid-cols-2 gap-3 text-sm md:grid-cols-4">
+            <div>
+              <p className="text-text-secondary">{t('platform.clubDetailPage.govComplianceCard.authorityType')}</p>
+              <p className="font-medium">
+                {govCompliance.authority_type ? t(`governmentCompliance.authorityTypes.${govCompliance.authority_type}`) : '—'}
+              </p>
+            </div>
+            <div>
+              <p className="text-text-secondary">{t('platform.clubDetailPage.govComplianceCard.receiptRequired')}</p>
+              <p className="font-medium">{govCompliance.official_receipt_required ? t('governmentCompliance.yes') : t('governmentCompliance.no')}</p>
+            </div>
+            <div>
+              <p className="text-text-secondary">{t('platform.clubDetailPage.govComplianceCard.receiptCounts')}</p>
+              <p className="font-medium tabular-nums">
+                {govCompliance.active_receipt_count} / {govCompliance.reversed_receipt_count}
+              </p>
+            </div>
+            <div>
+              <p className="text-text-secondary">{t('platform.clubDetailPage.govComplianceCard.totalCollected')}</p>
+              <MoneyDisplay amount={Number(govCompliance.total_collected)} size="sm" />
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       <div className="mb-4 grid gap-4 md:grid-cols-3">
         <Card>

@@ -42,6 +42,12 @@ export function OnboardingPage() {
   const [branchName, setBranchName] = useState(t('onboarding.defaultBranchName'))
   const [city, setCity] = useState('')
   const [phone, setPhone] = useState('')
+  // Government / Ministry Collection Compliance directive, section 3/47:
+  // asked at onboarding, defaults unanswered (no pre-selected YES/NO) so
+  // an ordinary commercial club isn't nudged toward a compliance
+  // workflow it doesn't need -- "NO" behaves identically to never
+  // asking, per section 48 (zero regression for non-government clubs).
+  const [governmentAffiliated, setGovernmentAffiliated] = useState<boolean | null>(null)
   const [result, setResult] = useState<{ clubId: string; trialGranted: boolean } | null>(null)
   const [submitError, setSubmitError] = useState<string | null>(null)
 
@@ -56,6 +62,7 @@ export function OnboardingPage() {
         p_phone: phone,
         p_owner_email: session?.user.email ?? '',
         p_owner_mobile: phone,
+        p_government_affiliated: governmentAffiliated === true,
       })
       if (error) throw error
       const row = data?.[0]
@@ -158,6 +165,34 @@ export function OnboardingPage() {
               <Input required value={city} onChange={(e) => setCity(e.target.value)} />
               <label className="text-sm font-medium text-text-secondary">{t('onboarding.wizard.step3.phoneLabel')}</label>
               <Input required value={phone} onChange={(e) => setPhone(e.target.value)} />
+
+              {/* Government / Ministry Collection Compliance directive,
+                  section 3: asked at every club creation, but never
+                  blocks or complicates onboarding for a "no" answer. */}
+              <div className="flex flex-col gap-1.5 rounded-lg border border-border p-3">
+                <label className="text-sm font-medium text-text-secondary">
+                  {t('onboarding.wizard.step3.governmentAffiliatedLabel')}
+                </label>
+                <div className="flex gap-2">
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant={governmentAffiliated === true ? 'default' : 'outline'}
+                    onClick={() => setGovernmentAffiliated(true)}
+                  >
+                    {t('onboarding.wizard.step3.yes')}
+                  </Button>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant={governmentAffiliated === false ? 'default' : 'outline'}
+                    onClick={() => setGovernmentAffiliated(false)}
+                  >
+                    {t('onboarding.wizard.step3.no')}
+                  </Button>
+                </div>
+              </div>
+
               {submitError && (
                 <p role="alert" className="text-sm text-status-danger">
                   {submitError}
@@ -167,7 +202,7 @@ export function OnboardingPage() {
                 <Button variant="outline" onClick={() => setStep(2)}>{t('onboarding.wizard.step3.back')}</Button>
                 <Button
                   onClick={() => onboardMutation.mutate()}
-                  disabled={onboardMutation.isPending || !branchName.trim() || !city.trim() || !phone.trim()}
+                  disabled={onboardMutation.isPending || !branchName.trim() || !city.trim() || !phone.trim() || governmentAffiliated === null}
                 >
                   {onboardMutation.isPending ? t('onboarding.wizard.step3.submitting') : t('onboarding.wizard.step3.submit')}
                 </Button>

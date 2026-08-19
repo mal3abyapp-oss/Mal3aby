@@ -250,6 +250,13 @@
         "bookingsPending": "Pending bookings",
         "staff": "Staff"
       },
+      "govComplianceCard": {
+        "title": "Government Compliance",
+        "authorityType": "Authority type",
+        "receiptRequired": "Official receipt required",
+        "receiptCounts": "Active / reversed receipts",
+        "totalCollected": "Total collected"
+      },
       "whatsappCard": {
         "title": "WhatsApp health",
         "status": "Status",
@@ -1916,6 +1923,7 @@
       "collections": "Collections",
       "paymentMethods": "Payment method reconciliation",
       "exceptions": "Financial exceptions",
+      "officialReceipts": "Official Collection Receipts",
       "sectionAcademyCustomers": "Academy & Customers",
       "academy": "Academy",
       "customers": "Customers"
@@ -1924,6 +1932,32 @@
     "loading": "Loading...",
     "noData": "No data",
     "exportCsv": "Export CSV",
+    "officialReceipts": {
+      "description": "Official collection receipt log -- reconciliation, search, and collected totals",
+      "searchSerialPlaceholder": "Search by receipt serial",
+      "totalCount": "Total receipts",
+      "activeCount": "Active receipts",
+      "reversedCount": "Reversed receipts",
+      "totalCollected": "Total actually collected",
+      "listTitle": "Receipt log",
+      "enteredByPrefix": "by",
+      "reversalReasonPrefix": "Reversal reason:",
+      "statusLabels": {
+        "active": "Active",
+        "reversed": "Reversed"
+      },
+      "csvHeader": {
+        "serial": "Receipt serial",
+        "book": "Book",
+        "series": "Series",
+        "date": "Date",
+        "amount": "Amount",
+        "method": "Payment method",
+        "status": "Status",
+        "customer": "Customer",
+        "enteredBy": "Entered by"
+      }
+    },
     "overview": {
       "description": "Club performance overview -- every number drills down to its source",
       "cards": {
@@ -2107,7 +2141,53 @@
     "viewFullDetails": "View full details",
     "publicBookingSection": "Public booking link",
     "contactSection": "Contact information",
-    "bookingPolicySection": "Booking policy"
+    "bookingPolicySection": "Booking policy",
+    "financeComplianceSection": "Finance & Compliance"
+  },
+  "governmentCompliance": {
+    "title": "Official Collection Receipt",
+    "activeBadge": "Active",
+    "loading": "Loading...",
+    "affiliationStatus": "Status",
+    "affiliated": "Affiliated with a government authority",
+    "notAffiliated": "Not affiliated",
+    "receiptRequired": "Official receipt required",
+    "requiredMethods": "Covered payment methods",
+    "yes": "Yes",
+    "no": "No",
+    "edit": "Edit",
+    "ownerOnlyHint": "Only the club owner can change this policy.",
+    "enabledLabel": "This organization is affiliated with the Ministry of Youth and Sports or subject to an official collection receipt system",
+    "authorityTypeLabel": "Authority type",
+    "authorityTypes": {
+      "MINISTRY_YOUTH_AND_SPORTS": "Ministry of Youth and Sports",
+      "YOUTH_CENTER": "Youth center",
+      "GOVERNMENT_CLUB": "Government club",
+      "GOVERNMENT_FACILITY": "Government facility",
+      "OTHER": "Other"
+    },
+    "receiptRequiredLabel": "Require staff to enter an official receipt serial before a payment can be confirmed",
+    "methodsLabel": "Payment methods that require an official receipt",
+    "imageRequiredLabel": "Require a receipt image upload",
+    "bookEnabledLabel": "Enable receipt book field",
+    "seriesEnabledLabel": "Enable series field",
+    "saveError": "Couldn't save the policy, try again",
+    "saving": "Saving...",
+    "save": "Save",
+    "cancel": "Cancel",
+    "disableReasonTitle": "Reason for disabling government compliance",
+    "disableWarning": "Disabling this policy means collection staff will no longer be required to enter an official receipt serial. This is a sensitive action and is recorded in the audit log.",
+    "reasonPlaceholder": "Reason is required",
+    "confirmDisable": "Confirm disable",
+    "receiptSectionTitle": "Official collection receipt details",
+    "receiptSerialLabel": "Receipt serial *",
+    "receiptDateLabel": "Receipt date *",
+    "receiptBookLabel": "Receipt book",
+    "receiptSeriesLabel": "Series",
+    "receiptNotesLabel": "Notes",
+    "receiptSerialRequired": "Receipt serial is required",
+    "receiptDateRequired": "Receipt date is required",
+    "duplicateReceiptError": "This receipt number is already registered. It cannot be used again."
   },
   "auditLog": {
     "title": "Audit Log",
@@ -2344,6 +2424,9 @@
         "branchNameLabel": "First branch name",
         "cityLabel": "City",
         "phoneLabel": "Phone number",
+        "governmentAffiliatedLabel": "Is this organization affiliated with the Ministry of Youth and Sports or subject to an official collection receipt system?",
+        "yes": "Yes",
+        "no": "No",
         "back": "Back",
         "submitting": "Creating...",
         "submit": "Create club and start free trial"

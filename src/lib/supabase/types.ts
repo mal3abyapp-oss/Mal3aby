@@ -1320,6 +1320,98 @@ export type Database = {
           },
         ]
       }
+      government_collection_policies: {
+        Row: {
+          authority_type: string | null
+          branch_id: string | null
+          club_id: string
+          created_at: string
+          created_by: string | null
+          effective_from: string
+          enabled: boolean
+          field_id: string | null
+          id: string
+          is_override: boolean
+          official_receipt_required: boolean
+          override_reason: string | null
+          receipt_book_enabled: boolean
+          receipt_date_required: boolean
+          receipt_image_required: boolean
+          receipt_series_enabled: boolean
+          required_payment_methods: string[]
+          updated_at: string
+        }
+        Insert: {
+          authority_type?: string | null
+          branch_id?: string | null
+          club_id: string
+          created_at?: string
+          created_by?: string | null
+          effective_from?: string
+          enabled?: boolean
+          field_id?: string | null
+          id?: string
+          is_override?: boolean
+          official_receipt_required?: boolean
+          override_reason?: string | null
+          receipt_book_enabled?: boolean
+          receipt_date_required?: boolean
+          receipt_image_required?: boolean
+          receipt_series_enabled?: boolean
+          required_payment_methods?: string[]
+          updated_at?: string
+        }
+        Update: {
+          authority_type?: string | null
+          branch_id?: string | null
+          club_id?: string
+          created_at?: string
+          created_by?: string | null
+          effective_from?: string
+          enabled?: boolean
+          field_id?: string | null
+          id?: string
+          is_override?: boolean
+          official_receipt_required?: boolean
+          override_reason?: string | null
+          receipt_book_enabled?: boolean
+          receipt_date_required?: boolean
+          receipt_image_required?: boolean
+          receipt_series_enabled?: boolean
+          required_payment_methods?: string[]
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "government_collection_policies_branch_id_fkey"
+            columns: ["branch_id"]
+            isOneToOne: false
+            referencedRelation: "branches"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "government_collection_policies_club_id_fkey"
+            columns: ["club_id"]
+            isOneToOne: false
+            referencedRelation: "clubs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "government_collection_policies_club_id_fkey"
+            columns: ["club_id"]
+            isOneToOne: false
+            referencedRelation: "commercial_entitlements_usage"
+            referencedColumns: ["club_id"]
+          },
+          {
+            foreignKeyName: "government_collection_policies_field_id_fkey"
+            columns: ["field_id"]
+            isOneToOne: false
+            referencedRelation: "fields"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       group_schedule_slots: {
         Row: {
           created_at: string
@@ -2247,6 +2339,167 @@ export type Database = {
             columns: ["customer_id"]
             isOneToOne: false
             referencedRelation: "customers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      official_collection_receipts: {
+        Row: {
+          authority_type: string | null
+          booking_id: string | null
+          branch_id: string | null
+          club_id: string
+          corrected_from_receipt_id: string | null
+          created_at: string
+          customer_id: string | null
+          entered_at: string
+          entered_by: string
+          field_id: string | null
+          id: string
+          invoice_id: string | null
+          normalized_receipt_serial: string | null
+          notes: string | null
+          payment_id: string | null
+          payment_method: string
+          receipt_amount: number
+          receipt_book: string | null
+          receipt_date: string
+          receipt_image_path: string | null
+          receipt_serial: string
+          receipt_series: string | null
+          reversal_reason: string | null
+          reversed_at: string | null
+          reversed_by: string | null
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          authority_type?: string | null
+          booking_id?: string | null
+          branch_id?: string | null
+          club_id: string
+          corrected_from_receipt_id?: string | null
+          created_at?: string
+          customer_id?: string | null
+          entered_at?: string
+          entered_by: string
+          field_id?: string | null
+          id?: string
+          invoice_id?: string | null
+          normalized_receipt_serial?: string | null
+          notes?: string | null
+          payment_id?: string | null
+          payment_method: string
+          receipt_amount: number
+          receipt_book?: string | null
+          receipt_date: string
+          receipt_image_path?: string | null
+          receipt_serial: string
+          receipt_series?: string | null
+          reversal_reason?: string | null
+          reversed_at?: string | null
+          reversed_by?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          authority_type?: string | null
+          booking_id?: string | null
+          branch_id?: string | null
+          club_id?: string
+          corrected_from_receipt_id?: string | null
+          created_at?: string
+          customer_id?: string | null
+          entered_at?: string
+          entered_by?: string
+          field_id?: string | null
+          id?: string
+          invoice_id?: string | null
+          normalized_receipt_serial?: string | null
+          notes?: string | null
+          payment_id?: string | null
+          payment_method?: string
+          receipt_amount?: number
+          receipt_book?: string | null
+          receipt_date?: string
+          receipt_image_path?: string | null
+          receipt_serial?: string
+          receipt_series?: string | null
+          reversal_reason?: string | null
+          reversed_at?: string | null
+          reversed_by?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "official_collection_receipts_booking_id_fkey"
+            columns: ["booking_id"]
+            isOneToOne: false
+            referencedRelation: "bookings"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "official_collection_receipts_branch_id_fkey"
+            columns: ["branch_id"]
+            isOneToOne: false
+            referencedRelation: "branches"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "official_collection_receipts_club_id_fkey"
+            columns: ["club_id"]
+            isOneToOne: false
+            referencedRelation: "clubs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "official_collection_receipts_club_id_fkey"
+            columns: ["club_id"]
+            isOneToOne: false
+            referencedRelation: "commercial_entitlements_usage"
+            referencedColumns: ["club_id"]
+          },
+          {
+            foreignKeyName: "official_collection_receipts_corrected_from_receipt_id_fkey"
+            columns: ["corrected_from_receipt_id"]
+            isOneToOne: false
+            referencedRelation: "official_collection_receipts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "official_collection_receipts_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "customers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "official_collection_receipts_field_id_fkey"
+            columns: ["field_id"]
+            isOneToOne: false
+            referencedRelation: "fields"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "official_collection_receipts_invoice_id_fkey"
+            columns: ["invoice_id"]
+            isOneToOne: false
+            referencedRelation: "invoices"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "official_collection_receipts_invoice_id_fkey"
+            columns: ["invoice_id"]
+            isOneToOne: false
+            referencedRelation: "outstanding_invoices"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "official_collection_receipts_payment_id_fkey"
+            columns: ["payment_id"]
+            isOneToOne: false
+            referencedRelation: "payments"
             referencedColumns: ["id"]
           },
         ]
@@ -4364,6 +4617,7 @@ export type Database = {
           p_city: string
           p_club_name: string
           p_club_name_ar: string
+          p_government_affiliated?: boolean
           p_owner_email: string
           p_owner_mobile: string
           p_phone: string
@@ -4381,6 +4635,18 @@ export type Database = {
           p_note?: string
           p_period_end: string
           p_period_start: string
+        }
+        Returns: string
+      }
+      correct_official_receipt: {
+        Args: {
+          p_new_receipt_book?: string
+          p_new_receipt_date: string
+          p_new_receipt_image_path?: string
+          p_new_receipt_serial: string
+          p_new_receipt_series?: string
+          p_original_receipt_id: string
+          p_reason?: string
         }
         Returns: string
       }
@@ -4578,6 +4844,35 @@ export type Database = {
         Args: { p_club_id: string; p_end_date: string; p_start_date: string }
         Returns: Json
       }
+      get_effective_government_policy: {
+        Args: { p_branch_id?: string; p_club_id: string; p_field_id?: string }
+        Returns: {
+          authority_type: string | null
+          branch_id: string | null
+          club_id: string
+          created_at: string
+          created_by: string | null
+          effective_from: string
+          enabled: boolean
+          field_id: string | null
+          id: string
+          is_override: boolean
+          official_receipt_required: boolean
+          override_reason: string | null
+          receipt_book_enabled: boolean
+          receipt_date_required: boolean
+          receipt_image_required: boolean
+          receipt_series_enabled: boolean
+          required_payment_methods: string[]
+          updated_at: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "government_collection_policies"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
       get_executive_dashboard: {
         Args: { p_club_id: string; p_end_date: string; p_start_date: string }
         Returns: Json
@@ -4604,6 +4899,28 @@ export type Database = {
           payment_status: string
           refunded: number
           total: number
+        }[]
+      }
+      get_official_receipts_report: {
+        Args: {
+          p_branch_id?: string
+          p_club_id: string
+          p_end_date: string
+          p_entered_by?: string
+          p_field_id?: string
+          p_payment_method?: string
+          p_receipt_book?: string
+          p_receipt_serial?: string
+          p_receipt_series?: string
+          p_start_date: string
+          p_status?: string
+        }
+        Returns: {
+          active_count: number
+          receipts: Json
+          reversed_count: number
+          total_collected_amount: number
+          total_count: number
         }[]
       }
       get_open_cash_shift_status: {
@@ -4698,6 +5015,21 @@ export type Database = {
         Returns: {
           platform_email: string
           platform_phone: string
+        }[]
+      }
+      get_platform_government_compliance_summary: {
+        Args: never
+        Returns: {
+          active_receipt_count: number
+          authority_type: string
+          club_id: string
+          club_name: string
+          enabled: boolean
+          latest_receipt_date: string
+          official_receipt_required: boolean
+          receipt_count: number
+          reversed_receipt_count: number
+          total_collected: number
         }[]
       }
       get_platform_owner_accounts: {
@@ -4981,6 +5313,7 @@ export type Database = {
           p_idempotency_key?: string
           p_invoice_id: string
           p_method: string
+          p_official_receipt_id?: string
           p_reference?: string
         }
         Returns: string
@@ -4995,6 +5328,25 @@ export type Database = {
           p_storage_path: string
         }
         Returns: string
+      }
+      record_payment_with_official_receipt: {
+        Args: {
+          p_amount: number
+          p_idempotency_key?: string
+          p_invoice_id: string
+          p_method: string
+          p_notes?: string
+          p_receipt_book?: string
+          p_receipt_date: string
+          p_receipt_image_path?: string
+          p_receipt_serial: string
+          p_receipt_series?: string
+          p_reference?: string
+        }
+        Returns: {
+          official_receipt_id: string
+          payment_id: string
+        }[]
       }
       record_platform_payment: {
         Args: {
@@ -5047,6 +5399,10 @@ export type Database = {
         Args: { p_queue_id: string }
         Returns: undefined
       }
+      reverse_official_receipt: {
+        Args: { p_reason: string; p_receipt_id: string }
+        Returns: undefined
+      }
       reverse_platform_payment: {
         Args: { p_payment_id: string; p_reason: string }
         Returns: undefined
@@ -5090,6 +5446,23 @@ export type Database = {
       unfreeze_subscription: {
         Args: { p_reason?: string; p_subscription_id: string }
         Returns: undefined
+      }
+      update_government_compliance_policy: {
+        Args: {
+          p_authority_type: string
+          p_branch_id: string
+          p_club_id: string
+          p_enabled: boolean
+          p_field_id: string
+          p_official_receipt_required: boolean
+          p_reason?: string
+          p_receipt_book_enabled: boolean
+          p_receipt_date_required: boolean
+          p_receipt_image_required: boolean
+          p_receipt_series_enabled: boolean
+          p_required_payment_methods: string[]
+        }
+        Returns: string
       }
       update_platform_contact: {
         Args: { p_platform_email: string; p_platform_phone: string }

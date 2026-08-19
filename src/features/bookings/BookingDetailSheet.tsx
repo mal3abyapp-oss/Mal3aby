@@ -19,6 +19,7 @@ import { formatInstant } from '@/lib/domain/time'
 import { fetchInvoicePaymentSummaries, PAYMENT_METHOD_LABELS, PAYMENT_STATUS_LABELS, type InvoicePaymentSummary } from '@/lib/domain/billing'
 import { translateSupabaseError } from '@/lib/errors'
 import { useDirection } from '@/app/providers/DirectionProvider'
+import { useAuth } from '@/app/providers/AuthProvider'
 import {
   Select,
   SelectContent,
@@ -114,6 +115,7 @@ export function BookingDetailSheet({
 }) {
   const { t } = useTranslation()
   const { locale } = useDirection()
+  const { currentClubId } = useAuth()
   const [cancelReason, setCancelReason] = useState('')
   const [showCancelForm, setShowCancelForm] = useState(false)
   // Owner-level review finding (P1, confirmed live): "تسجيل عدم حضور"
@@ -166,6 +168,34 @@ export function BookingDetailSheet({
     queryFn: () => fetchBookingWhatsAppSummary(booking!.id),
     enabled: !!booking?.id,
   })
+
+  // Government / Ministry Collection Compliance directive, section 25:
+  // "بيانات إيصال التحصيل الرسمي" -- a prominent, dedicated section
+  // shown only when this booking's field/branch/club actually requires
+  // it. get_effective_government_policy() applies the same field ->
+  // branch -> club inheritance the server-side hard block uses, so the
+  // UI and the enforcement never disagree about whether a receipt is
+  // needed.
+  const { data: govPolicy } = useQuery({
+    queryKey: ['government-policy', currentClubId, booking?.branchId, booking?.fieldId],
+    queryFn: async () => {
+      const { data, error } = await supabase.rpc('get_effective_government_policy', {
+        p_club_id: currentClubId!,
+        p_branch_id: booking?.branchId ?? undefined,
+        p_field_id: booking?.fieldId ?? undefined,
+      })
+      if (error) throw error
+      return data
+    },
+    enabled: !!currentClubId && !!booking,
+  })
+  const receiptRequiredForMethod = !!govPolicy?.enabled && !!govPolicy.official_receipt_required
+    && (govPolicy.required_payment_methods ?? []).includes(collectMethod)
+  const [receiptSerial, setReceiptSerial] = useState('')
+  const [receiptDate, setReceiptDate] = useState(() => new Date().toISOString().slice(0, 10))
+  const [receiptBook, setReceiptBook] = useState('')
+  const [receiptSeries, setReceiptSeries] = useState('')
+  const [receiptNotes, setReceiptNotes] = useState('')
 
   const qrMutation = useMutation({
     mutationFn: async () => {
@@ -221,6 +251,30 @@ export function BookingDetailSheet({
       if (!collectIdempotencyKeyRef.current) {
         collectIdempotencyKeyRef.current = crypto.randomUUID()
       }
+
+      // Government / Ministry Collection Compliance directive, section
+      // 15/26: the button stays enabled here but the SERVER is what
+      // actually enforces the block -- record_payment() itself raises
+      // if a receipt is required and none is supplied, even if this
+      // client-side branch were somehow bypassed.
+      if (receiptRequiredForMethod) {
+        if (!receiptSerial.trim()) throw new Error(t('governmentCompliance.receiptSerialRequired'))
+        if (!receiptDate) throw new Error(t('governmentCompliance.receiptDateRequired'))
+        const { error } = await supabase.rpc('record_payment_with_official_receipt', {
+          p_invoice_id: booking.invoiceId,
+          p_amount: amount,
+          p_method: collectMethod,
+          p_receipt_serial: receiptSerial.trim(),
+          p_receipt_date: receiptDate,
+          p_receipt_book: receiptBook.trim() || undefined,
+          p_receipt_series: receiptSeries.trim() || undefined,
+          p_notes: receiptNotes.trim() || undefined,
+          p_idempotency_key: collectIdempotencyKeyRef.current,
+        })
+        if (error) throw error
+        return
+      }
+
       const { error } = await supabase.rpc('record_payment', {
         p_invoice_id: booking.invoiceId,
         p_amount: amount,
@@ -233,11 +287,24 @@ export function BookingDetailSheet({
       collectIdempotencyKeyRef.current = null
       setShowCollectForm(false)
       setCollectAmount('')
+      setReceiptSerial('')
+      setReceiptBook('')
+      setReceiptSeries('')
+      setReceiptNotes('')
       setActionError(null)
       void queryClient.invalidateQueries({ queryKey: ['booking-invoice-summary', booking?.invoiceId] })
       onChanged()
     },
-    onError: (error) => setActionError(error instanceof Error && !('code' in error) ? error.message : translateSupabaseError(error, t('bookings.detail.collectError'))),
+    onError: (error) => {
+      const message = error instanceof Error && !('code' in error) ? error.message : translateSupabaseError(error, t('bookings.detail.collectError'))
+      // Directive section 14: a duplicate receipt must be rejected
+      // clearly, not surfaced as a generic failure.
+      setActionError(
+        message.includes('unique constraint') || message.includes('duplicate key')
+          ? t('governmentCompliance.duplicateReceiptError')
+          : message,
+      )
+    },
   })
 
   return (
@@ -371,15 +438,64 @@ export function BookingDetailSheet({
                       </SelectContent>
                     </Select>
                   </div>
+                  {/* Government / Ministry Collection Compliance
+                      directive, section 25: a prominent, dedicated
+                      section -- only rendered when this booking's
+                      field/branch/club policy actually requires an
+                      official receipt for the currently-selected
+                      payment method. */}
+                  {receiptRequiredForMethod && (
+                    <div className="flex flex-col gap-2 rounded-lg border border-warning/40 bg-warning/5 p-3">
+                      <p className="text-xs font-medium text-warning">{t('governmentCompliance.receiptSectionTitle')}</p>
+                      <div className="grid grid-cols-2 gap-2">
+                        <Input
+                          required
+                          placeholder={t('governmentCompliance.receiptSerialLabel')}
+                          value={receiptSerial}
+                          onChange={(e) => setReceiptSerial(e.target.value)}
+                        />
+                        <Input
+                          required
+                          type="date"
+                          value={receiptDate}
+                          onChange={(e) => setReceiptDate(e.target.value)}
+                        />
+                        {govPolicy?.receipt_book_enabled && (
+                          <Input
+                            placeholder={t('governmentCompliance.receiptBookLabel')}
+                            value={receiptBook}
+                            onChange={(e) => setReceiptBook(e.target.value)}
+                          />
+                        )}
+                        {govPolicy?.receipt_series_enabled && (
+                          <Input
+                            placeholder={t('governmentCompliance.receiptSeriesLabel')}
+                            value={receiptSeries}
+                            onChange={(e) => setReceiptSeries(e.target.value)}
+                          />
+                        )}
+                      </div>
+                      <Input
+                        placeholder={t('governmentCompliance.receiptNotesLabel')}
+                        value={receiptNotes}
+                        onChange={(e) => setReceiptNotes(e.target.value)}
+                      />
+                    </div>
+                  )}
+
                   <div className="flex gap-2">
                     <Button
                       size="sm"
-                      disabled={!collectAmount || collectPaymentMutation.isPending}
+                      disabled={
+                        !collectAmount
+                        || collectPaymentMutation.isPending
+                        || (receiptRequiredForMethod && (!receiptSerial.trim() || !receiptDate))
+                      }
                       onClick={() => collectPaymentMutation.mutate()}
                     >
                       {collectPaymentMutation.isPending ? t('bookings.detail.recording') : t('bookings.detail.confirmCollect')}
                     </Button>
-                    <Button variant="ghost" size="sm" onClick={() => { setShowCollectForm(false); setCollectAmount(''); collectIdempotencyKeyRef.current = null }}>{t('bookings.detail.undo')}</Button>
+                    <Button variant="ghost" size="sm" onClick={() => { setShowCollectForm(false); setCollectAmount(''); setReceiptSerial(''); setReceiptBook(''); setReceiptSeries(''); setReceiptNotes(''); collectIdempotencyKeyRef.current = null }}>{t('bookings.detail.undo')}</Button>
                   </div>
                 </div>
               ) : (

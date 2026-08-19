@@ -14,6 +14,7 @@ import { ActivationPolicySetting } from '@/features/academy/EnrollmentSection'
 import { PaymentMethodsCard } from '@/features/billing/PaymentMethodsCard'
 import { PaymentGatewaysCard } from '@/features/billing/PaymentGatewaysCard'
 import { ChangePasswordCard } from '@/features/account/ChangePasswordCard'
+import { GovernmentComplianceCard } from '@/features/clubs/GovernmentComplianceCard'
 
 // P1-7 (critical usability fix pass, 2026-08-16): Settings was a
 // dumping ground -- /app/settings rendered only the Audit Log Viewer,
@@ -91,6 +92,16 @@ export function SettingsPage() {
           <PaymentMethodsCard />
           <PaymentGatewaysCard />
         </div>
+      </section>
+
+      {/* Government / Ministry Collection Compliance directive, section
+          8: a real, always-visible settings surface -- never hidden
+          after onboarding. Shown to every club (not just ones that
+          answered YES at onboarding) since a club can become
+          government-affiliated later without re-onboarding. */}
+      <section className="flex flex-col gap-4">
+        <h2 className="text-sm font-semibold text-text-secondary">{t('settings.financeComplianceSection')}</h2>
+        <GovernmentComplianceCard />
       </section>
 
       <section className="flex flex-col gap-4">

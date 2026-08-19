@@ -250,6 +250,13 @@
         "bookingsPending": "حجوزات معلقة",
         "staff": "الفريق"
       },
+      "govComplianceCard": {
+        "title": "الامتثال الحكومي",
+        "authorityType": "نوع الجهة",
+        "receiptRequired": "إيصال رسمي مطلوب",
+        "receiptCounts": "إيصالات فعالة / معكوسة",
+        "totalCollected": "إجمالي التحصيل"
+      },
       "whatsappCard": {
         "title": "صحة واتساب",
         "status": "الحالة",
@@ -1915,6 +1922,7 @@
       "collections": "التحصيلات",
       "paymentMethods": "تسوية طرق الدفع",
       "exceptions": "الاستثناءات المالية",
+      "officialReceipts": "إيصالات التحصيل الرسمية",
       "sectionAcademyCustomers": "الأكاديمية والعملاء",
       "academy": "الأكاديمية",
       "customers": "العملاء"
@@ -1923,6 +1931,32 @@
     "loading": "جارٍ التحميل...",
     "noData": "لا توجد بيانات",
     "exportCsv": "تصدير CSV",
+    "officialReceipts": {
+      "description": "سجل إيصالات التحصيل الرسمية -- المطابقة، البحث، وإجماليات التحصيل",
+      "searchSerialPlaceholder": "بحث برقم الإيصال",
+      "totalCount": "إجمالي الإيصالات",
+      "activeCount": "إيصالات فعالة",
+      "reversedCount": "إيصالات معكوسة",
+      "totalCollected": "إجمالي التحصيل الفعلي",
+      "listTitle": "سجل الإيصالات",
+      "enteredByPrefix": "بواسطة",
+      "reversalReasonPrefix": "سبب العكس:",
+      "statusLabels": {
+        "active": "فعّال",
+        "reversed": "معكوس"
+      },
+      "csvHeader": {
+        "serial": "رقم الإيصال",
+        "book": "الدفتر",
+        "series": "السلسلة",
+        "date": "التاريخ",
+        "amount": "المبلغ",
+        "method": "طريقة الدفع",
+        "status": "الحالة",
+        "customer": "العميل",
+        "enteredBy": "أدخله"
+      }
+    },
     "overview": {
       "description": "نظرة عامة على أداء النادي -- كل رقم يؤدي إلى مصدره",
       "cards": {
@@ -2106,7 +2140,53 @@
     "openWhatsappPage": "فتح صفحة واتساب",
     "platformSubscriptionSection": "اشتراك المنصة",
     "viewFullDetails": "عرض التفاصيل الكاملة",
-    "publicBookingSection": "رابط الحجز العام"
+    "publicBookingSection": "رابط الحجز العام",
+    "financeComplianceSection": "المالية والامتثال"
+  },
+  "governmentCompliance": {
+    "title": "إيصال التحصيل الرسمي",
+    "activeBadge": "مفعّل",
+    "loading": "جارٍ التحميل...",
+    "affiliationStatus": "الحالة",
+    "affiliated": "تابع لجهة حكومية",
+    "notAffiliated": "غير تابع",
+    "receiptRequired": "إيصال رسمي مطلوب",
+    "requiredMethods": "طرق الدفع المشمولة",
+    "yes": "نعم",
+    "no": "لا",
+    "edit": "تعديل",
+    "ownerOnlyHint": "يمكن لصاحب النادي فقط تعديل هذه السياسة.",
+    "enabledLabel": "المنشأة تابعة لوزارة الشباب والرياضة أو تخضع لنظام إيصالات تحصيل رسمية",
+    "authorityTypeLabel": "نوع الجهة",
+    "authorityTypes": {
+      "MINISTRY_YOUTH_AND_SPORTS": "وزارة الشباب والرياضة",
+      "YOUTH_CENTER": "مركز شباب",
+      "GOVERNMENT_CLUB": "نادٍ حكومي",
+      "GOVERNMENT_FACILITY": "منشأة حكومية",
+      "OTHER": "أخرى"
+    },
+    "receiptRequiredLabel": "إلزام موظف التحصيل بإدخال رقم إيصال رسمي قبل اعتماد الدفعة",
+    "methodsLabel": "طرق الدفع التي تتطلب إيصالًا رسميًا",
+    "imageRequiredLabel": "إلزام رفع صورة الإيصال",
+    "bookEnabledLabel": "تفعيل حقل دفتر الإيصالات",
+    "seriesEnabledLabel": "تفعيل حقل السلسلة",
+    "saveError": "تعذّر حفظ السياسة، حاول مرة أخرى",
+    "saving": "جارٍ الحفظ...",
+    "save": "حفظ",
+    "cancel": "إلغاء",
+    "disableReasonTitle": "سبب تعطيل الامتثال الحكومي",
+    "disableWarning": "تعطيل هذه السياسة يعني أن موظفي التحصيل لن يُطالَبوا بإدخال رقم الإيصال الرسمي بعد الآن. هذا إجراء حساس يُسجَّل في سجل التدقيق.",
+    "reasonPlaceholder": "السبب مطلوب",
+    "confirmDisable": "تأكيد التعطيل",
+    "receiptSectionTitle": "بيانات إيصال التحصيل الرسمي",
+    "receiptSerialLabel": "رقم الإيصال *",
+    "receiptDateLabel": "تاريخ الإيصال *",
+    "receiptBookLabel": "رقم الدفتر",
+    "receiptSeriesLabel": "السلسلة",
+    "receiptNotesLabel": "ملاحظات",
+    "receiptSerialRequired": "رقم الإيصال مطلوب",
+    "receiptDateRequired": "تاريخ الإيصال مطلوب",
+    "duplicateReceiptError": "هذا رقم إيصال مسجل بالفعل. لا يمكن استخدامه مرة أخرى."
   },
   "auditLog": {
     "title": "سجل التدقيق",
@@ -2343,6 +2423,9 @@
         "branchNameLabel": "اسم الفرع الأول",
         "cityLabel": "المدينة",
         "phoneLabel": "رقم الهاتف",
+        "governmentAffiliatedLabel": "هل المنشأة تابعة لوزارة الشباب والرياضة أو تخضع لنظام إيصالات تحصيل رسمية؟",
+        "yes": "نعم",
+        "no": "لا",
         "back": "السابق",
         "submitting": "جارٍ الإنشاء...",
         "submit": "إنشاء النادي وبدء التجربة المجانية"

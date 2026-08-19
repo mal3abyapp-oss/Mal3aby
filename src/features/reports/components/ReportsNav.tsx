@@ -11,6 +11,7 @@ import {
   Landmark,
   GraduationCap,
   Users,
+  ShieldCheck,
 } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 
@@ -50,6 +51,7 @@ const REPORT_NAV: ReportNavGroup[] = [
       { to: '/app/reports/collections', labelKey: 'reports.nav.collections', icon: HandCoins },
       { to: '/app/reports/payment-methods', labelKey: 'reports.nav.paymentMethods', icon: Banknote },
       { to: '/app/reports/exceptions', labelKey: 'reports.nav.exceptions', icon: ReceiptText },
+      { to: '/app/reports/official-receipts', labelKey: 'reports.nav.officialReceipts', icon: ShieldCheck },
     ],
   },
   {
