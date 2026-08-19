@@ -5072,6 +5072,10 @@ export type Database = {
         Args: { p_reason?: string; p_subscription_id: string }
         Returns: undefined
       }
+      update_platform_contact: {
+        Args: { p_platform_email: string; p_platform_phone: string }
+        Returns: undefined
+      }
       update_platform_settings: {
         Args: { p_default_trial_days: number }
         Returns: undefined

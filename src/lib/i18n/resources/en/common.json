@@ -567,7 +567,11 @@
       "saving": "Saving...",
       "save": "Save",
       "saved": "Saved",
-      "saveError": "Couldn't save, try again"
+      "saveError": "Couldn't save, try again",
+      "contactCardTitle": "Platform contact information",
+      "phoneLabel": "Phone number",
+      "emailLabel": "Email address",
+      "contactHint": "This information appears in the public site footer. This is its single source of truth."
     },
     "trialsPage": {
       "title": "Free Trials",

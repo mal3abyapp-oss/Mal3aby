@@ -26,18 +26,20 @@ import { Button } from '@/components/ui/button'
 // correct and already in use everywhere else.
 interface PlatformSettingsRow {
   default_trial_days: number
+  platform_phone: string | null
+  platform_email: string | null
 }
 
 async function fetchSettings(): Promise<PlatformSettingsRow> {
   const { data, error } = await supabase
     .from('platform_settings')
-    .select('default_trial_days')
+    .select('default_trial_days, platform_phone, platform_email')
     .single()
   if (error) throw error
   return data
 }
 
-async function updateSettings(values: PlatformSettingsRow) {
+async function updateSettings(values: { default_trial_days: number }) {
   // Phase A directive (A5/H5): platform setting changes must be audited.
   // This used to be a bare table .update() with zero trace of who changed
   // the trial-days default or from what to what -- now routed through a
@@ -50,14 +52,34 @@ async function updateSettings(values: PlatformSettingsRow) {
   if (error) throw error
 }
 
+// Phase H directive (H2/H3): platform_phone/platform_email were already
+// confirmed (earlier audit pass) as the correct single source of truth --
+// read via the public get_platform_contact() RPC and shown on the public
+// marketing footer. But there was no UI anywhere on the Platform Owner
+// console to CHANGE them -- only a direct database edit could. This
+// closes that gap with the same is_platform_owner()-gated + audited RPC
+// pattern as the trial-days setting above.
+async function updateContact(values: { platform_phone: string; platform_email: string }) {
+  const { error } = await supabase.rpc('update_platform_contact', {
+    p_platform_phone: values.platform_phone,
+    p_platform_email: values.platform_email,
+  })
+  if (error) throw error
+}
+
 export function PlatformSettingsPage() {
   const { t } = useTranslation()
   const queryClient = useQueryClient()
   const { data, isLoading } = useQuery({ queryKey: ['platform-settings'], queryFn: fetchSettings })
   const [trialDays, setTrialDays] = useState<string>('')
   const [saved, setSaved] = useState(false)
+  const [contactPhone, setContactPhone] = useState<string>('')
+  const [contactEmail, setContactEmail] = useState<string>('')
+  const [contactSaved, setContactSaved] = useState(false)
 
   const effectiveTrialDays = trialDays || String(data?.default_trial_days ?? '')
+  const effectiveContactPhone = contactPhone || (data?.platform_phone ?? '')
+  const effectiveContactEmail = contactEmail || (data?.platform_email ?? '')
 
   const mutation = useMutation({
     mutationFn: () =>
@@ -67,6 +89,15 @@ export function PlatformSettingsPage() {
     onSuccess: () => {
       setSaved(true)
       setTimeout(() => setSaved(false), 3000)
+      void queryClient.invalidateQueries({ queryKey: ['platform-settings'] })
+    },
+  })
+
+  const contactMutation = useMutation({
+    mutationFn: () => updateContact({ platform_phone: effectiveContactPhone, platform_email: effectiveContactEmail }),
+    onSuccess: () => {
+      setContactSaved(true)
+      setTimeout(() => setContactSaved(false), 3000)
       void queryClient.invalidateQueries({ queryKey: ['platform-settings'] })
     },
   })
@@ -112,6 +143,43 @@ export function PlatformSettingsPage() {
                 </Button>
                 {saved && <span className="text-sm text-status-success">{t('platform.settingsPage.saved')}</span>}
                 {mutation.isError && <span className="text-sm text-status-danger">{t('platform.settingsPage.saveError')}</span>}
+              </div>
+            </>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Phase H directive (H2/H3): Platform Identity/Contact -- single
+          source of truth, previously readable everywhere (public footer)
+          but editable nowhere except a direct database edit. */}
+      <Card className="mt-4 max-w-lg">
+        <CardHeader>
+          <CardTitle className="text-base">{t('platform.settingsPage.contactCardTitle')}</CardTitle>
+        </CardHeader>
+        <CardContent className="flex flex-col gap-4">
+          {isLoading ? (
+            <p className="text-sm text-text-secondary">{t('platform.settingsPage.loading')}</p>
+          ) : (
+            <>
+              <div className="flex flex-col gap-1.5">
+                <label htmlFor="platform-phone" className="text-sm font-medium text-text-secondary">{t('platform.settingsPage.phoneLabel')}</label>
+                <Input id="platform-phone" value={effectiveContactPhone} onChange={(e) => setContactPhone(e.target.value)} />
+              </div>
+              <div className="flex flex-col gap-1.5">
+                <label htmlFor="platform-email" className="text-sm font-medium text-text-secondary">{t('platform.settingsPage.emailLabel')}</label>
+                <Input id="platform-email" type="email" value={effectiveContactEmail} onChange={(e) => setContactEmail(e.target.value)} />
+              </div>
+              <p className="text-xs text-text-secondary">{t('platform.settingsPage.contactHint')}</p>
+              <div className="flex items-center gap-3">
+                <Button
+                  size="sm"
+                  disabled={contactMutation.isPending || (!contactPhone && !contactEmail)}
+                  onClick={() => contactMutation.mutate()}
+                >
+                  {contactMutation.isPending ? t('platform.settingsPage.saving') : t('platform.settingsPage.save')}
+                </Button>
+                {contactSaved && <span className="text-sm text-status-success">{t('platform.settingsPage.saved')}</span>}
+                {contactMutation.isError && <span className="text-sm text-status-danger">{t('platform.settingsPage.saveError')}</span>}
               </div>
             </>
           )}
