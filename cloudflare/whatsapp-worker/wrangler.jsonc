@@ -114,12 +114,18 @@
       // recipient's device, undecryptable. GitHub Actions run
       // 32215525522, digest
       // sha256:f3ad7b0e5e64c9982f5b8f25f151ce73a5bc4b5d3180bcdb5dd3a83b9260008c.
+      // v11, commit 235e37c -- adds POST /manage/:clubId/repair-session,
+      // a single-contact Signal session repair (v10's persistence fix
+      // only prevents FUTURE corruption; a session already stale before
+      // v10 shipped needed an explicit repair). GitHub Actions run
+      // 32216765843, digest
+      // sha256:2d56d1f6d1c1c1f413bc6b8021b83035ad41318cad2b0110ec30ec684fd97875.
       // To ship a new connector version: bump the tag in a new
       // workflow_dispatch run, then update this image reference to
       // match -- never silently reuse the same tag for different code
       // (the digest above is the actual content-addressed proof of
       // what's running, keep it in sync with the tag).
-      "image": "registry.cloudflare.com/35ac10727701095866b16c276b4a33d1/mala3by-whatsapp-connector:f2b82a9",
+      "image": "registry.cloudflare.com/35ac10727701095866b16c276b4a33d1/mala3by-whatsapp-connector:235e37c",
       // One container instance per WhatsApp account (one Durable
       // Object = one container, directive rule 21's chosen model --
       // NOT a shared container serving multiple clubs, which would
