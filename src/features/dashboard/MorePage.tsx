@@ -54,6 +54,7 @@ const ITEMS: MoreItem[] = [
   { to: '/app/customers', labelKey: 'nav.customers', descriptionKey: 'dashboard.more.customersDesc', icon: Users, domain: 'customers' },
   { to: '/app/billing', labelKey: 'nav.billing', descriptionKey: 'dashboard.more.billingDesc', icon: Receipt, domain: 'finance' },
   { to: '/app/outstanding', labelKey: 'nav.outstanding', descriptionKey: 'dashboard.more.outstandingDesc', icon: CircleDollarSign, domain: 'finance' },
+  { to: '/app/pending-payments', labelKey: 'nav.pendingPayments', descriptionKey: 'dashboard.more.pendingPaymentsDesc', icon: Receipt, domain: 'finance' },
   { to: '/app/cash-shift', labelKey: 'nav.cashShift', descriptionKey: 'dashboard.more.cashShiftDesc', icon: Wallet, domain: 'finance' },
   { to: '/app/reports', labelKey: 'nav.reports', descriptionKey: 'dashboard.more.reportsDesc', icon: BarChart3, domain: 'reports' },
   { to: '/app/fields', labelKey: 'nav.fields', descriptionKey: 'dashboard.more.fieldsDesc', icon: Building2, domain: 'settings' },

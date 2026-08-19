@@ -1,8 +1,8 @@
-# Mala3by WhatsApp Connector
+# Mal3aby WhatsApp Connector
 
 A standalone Node/TypeScript service that performs the real WhatsApp
 Multi-Device (Baileys) handshake and message delivery on behalf of the
-Mala3by app. It exists as a separate service because Mala3by itself is
+Mal3aby app. It exists as a separate service because Mal3aby itself is
 a Vite + React SPA with **no Node backend** -- all its server logic
 lives in Supabase (Postgres RPCs, RLS, Deno Edge Functions). Baileys
 needs a long-lived Node process holding a real WebSocket connection to
@@ -44,7 +44,7 @@ QueueConsumer  ->  TenantConnectionManager  ->  WhatsAppProvider (interface)
 boundary. Only `BaileysProvider.ts` imports `@whiskeysockets/baileys`.
 If Baileys is ever replaced, only a new class implementing this
 interface is needed -- nothing else in this service, and nothing in the
-main Mala3by app (which never imports anything from this directory),
+main Mal3aby app (which never imports anything from this directory),
 changes.
 
 **No inbound HTTP API.** The admin app never talks to this process

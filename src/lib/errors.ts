@@ -41,7 +41,7 @@ const MESSAGE_RULES: Array<[RegExp, string, string]> = [
   [/no billing guardian/i, 'يجب اختيار ولي أمر لإتمام الفوترة، أو ربط ولي أمر أساسي باللاعب أولاً.', 'You need to select a guardian to bill, or link a primary guardian to the player first.'],
   [/end date must be after start date/i, 'تاريخ الانتهاء يجب أن يكون بعد تاريخ البداية.', 'The end date must be after the start date.'],
   [/club subscription does not allow new commitments/i, 'اشتراك النادي في المنصة لا يسمح حاليًا بإنشاء التزامات جديدة — راجع حالة الاشتراك.', "The club's platform subscription doesn't currently allow new commitments — check the subscription status."],
-  [/no account found for that email/i, 'لا يوجد حساب مسجّل بهذا البريد الإلكتروني في ملعبي — يجب أن ينشئ الموظف حسابًا أولاً.', 'No account is registered with that email in Mala3by — a staff member needs to create an account first.'],
+  [/no account found for that email/i, 'لا يوجد حساب مسجّل بهذا البريد الإلكتروني في ملعبي — يجب أن ينشئ الموظف حسابًا أولاً.', 'No account is registered with that email in Mal3aby — a staff member needs to create an account first.'],
   [/unknown role/i, 'الدور المحدد غير معروف.', 'The selected role is not recognized.'],
   [/no such field|field not found/i, 'الملعب غير موجود.', 'Field not found.'],
   [/no price configured|no approved price/i, 'لا يوجد سعر معتمد لهذا التوقيت.', 'No approved price is configured for this time.'],

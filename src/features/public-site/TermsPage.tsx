@@ -1,6 +1,6 @@
 import { useTranslation } from 'react-i18next'
 
-// Initial usable V1 legal content -- accurate to what Mala3by actually is
+// Initial usable V1 legal content -- accurate to what Mal3aby actually is
 // and does today, deliberately not over-engineered (no clause-by-clause
 // legal drafting, no jurisdiction-specific boilerplate). Replaces the
 // placeholder found during the Final Release Gate (2026-08-15). Should be

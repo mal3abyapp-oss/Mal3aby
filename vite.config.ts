@@ -11,8 +11,8 @@ export default defineConfig({
       registerType: 'autoUpdate',
       includeAssets: ['favicon.svg', 'icons.svg'],
       manifest: {
-        name: 'ملعبي | Mala3by',
-        short_name: 'Mala3by',
+        name: 'ملعبي | Mal3aby',
+        short_name: 'Mal3aby',
         description: 'Club & Academy Operations Platform',
         theme_color: '#0B1220',
         background_color: '#0B1220',

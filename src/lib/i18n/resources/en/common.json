@@ -1,6 +1,6 @@
 {
   "app": {
-    "name": "Mala3by"
+    "name": "Mal3aby"
   },
   "nav": {
     "today": "Today",
@@ -9,6 +9,7 @@
     "customers": "Customers",
     "billing": "Billing & Payments",
     "outstanding": "Outstanding",
+    "pendingPayments": "Pending Payments",
     "cashShift": "Cash Shift",
     "subscription": "Platform Subscription",
     "sectionFinance": "Finance",
@@ -304,7 +305,7 @@
     },
     "leadsPage": {
       "title": "Leads",
-      "description": "Prospective customers from the Mala3by public site",
+      "description": "Prospective customers from the Mal3aby public site",
       "columns": {
         "name": "Name",
         "phone": "Phone",
@@ -1112,6 +1113,38 @@
     "confirmedMessage": "We'll send your booking details and entry code via WhatsApp.",
     "bookingRef": "Booking #",
     "whatsappHint": "Check WhatsApp for your secure booking details link and entry code.",
+    "today": "Today",
+    "todayContactBadge": "Contact to book",
+    "todayContactExplainer": "Same-day booking isn't available online for this club -- pick an available time below and contact the club directly to book it.",
+    "availableNow": "Available",
+    "unavailable": "Unavailable",
+    "todayContactTitle": "Contact the club to book today",
+    "todayRaceWarning": "Availability shown here is live but may change until the club confirms your booking.",
+    "callClub": "Call club",
+    "whatsappClub": "WhatsApp club",
+    "todayWaMessage": "Hello,\nI'd like to book a field today.\n\nClub: {{club}}\nField: {{field}}\nDate: {{date}}\n\nIs this time still available?",
+    "contactClubTitle": "Contact the club",
+    "directions": "Get directions",
+    "choosePaymentMethod": "Choose a payment method",
+    "amountToPay": "Amount to pay",
+    "sendReceiptWhatsapp": "Send receipt via WhatsApp",
+    "receiptWaMessage": "Hello,\nI'm sending the payment receipt for my booking.\n\nBooking #: {{bookingRef}}\nClub: {{club}}\nAmount: {{amount}}\n\nI'll attach the receipt photo in this chat.",
+    "holdActiveTitle": "Your slot is held",
+    "holdActiveMessage": "Complete payment before the timer runs out or the booking will be released automatically.",
+    "holdExpiredTitle": "Payment window expired",
+    "holdExpiredMessage": "This booking's payment hold has expired and the slot has been released. Please book again.",
+    "proofUpload": {
+      "title": "Or upload your receipt",
+      "uploadButton": "Upload receipt",
+      "uploading": "Uploading...",
+      "pendingReview": "Receipt uploaded -- awaiting review by the club.",
+      "approved": "Payment confirmed. Thank you!",
+      "rejected": "This receipt was not accepted.",
+      "rejectedRetry": "You can upload a new receipt below.",
+      "invalidType": "Please upload a JPG, PNG, or PDF file.",
+      "tooLarge": "The file is too large (max 10MB).",
+      "uploadError": "Couldn't upload the receipt. Please try again."
+    },
     "sportLabels": {
       "football": "Football",
       "padel": "Padel",
@@ -1121,6 +1154,42 @@
     }
   },
   "clubs": {
+    "contactCard": {
+      "title": "Contact information",
+      "hint": "This is your club's own contact information, shown to your customers -- never Mal3aby's platform contact.",
+      "loading": "Loading...",
+      "primaryPhone": "Primary phone",
+      "secondaryPhone": "Secondary phone (optional)",
+      "whatsappNumber": "WhatsApp number",
+      "whatsappNumberHint": "Used for same-day booking requests from customers.",
+      "paymentReceiptWhatsapp": "Payment receipt WhatsApp",
+      "paymentReceiptWhatsappHint": "Where customers send payment receipts. Leave blank to use the WhatsApp number above.",
+      "email": "Email (optional)",
+      "address": "Address",
+      "mapsUrl": "Google Maps link (optional)",
+      "save": "Save",
+      "saving": "Saving...",
+      "saved": "Saved",
+      "saveError": "Couldn't save the contact information."
+    },
+    "bookingPolicyCard": {
+      "title": "Booking policy",
+      "loading": "Loading...",
+      "sameDayLabel": "Same-day online booking",
+      "sameDayHint": "When off, customers can't complete an online booking for today -- they'll see live availability and a call/WhatsApp option instead.",
+      "enable": "Enable",
+      "disable": "Disable",
+      "startOffsetLabel": "Booking opens (days from today)",
+      "startOffsetHint": "1 = booking opens tomorrow",
+      "windowLabel": "Booking window (days)",
+      "windowHint": "How many days customers can book ahead",
+      "holdMinutesLabel": "Payment hold (minutes)",
+      "holdMinutesHint": "How long an unpaid booking is held before it's released",
+      "save": "Save",
+      "saving": "Saving...",
+      "saved": "Saved",
+      "saveError": "Couldn't save the booking policy."
+    },
     "publicBookingLink": {
       "title": "Your club's public booking link",
       "noSlugHint": "No public link has been generated for this club yet. Generate one so customers can book directly, without logging in.",
@@ -1155,7 +1224,7 @@
       "upgradePending": "Upgrade request under review",
       "requestUpgrade": "Request increase",
       "requestUpgradeTitle": "Request {{label}} limit increase",
-      "requestUpgradeDescription": "This request will reach the Mala3by platform team for review. The current limit and usage are attached automatically.",
+      "requestUpgradeDescription": "This request will reach the Mal3aby platform team for review. The current limit and usage are attached automatically.",
       "notePlaceholder": "Any extra details you'd like to add (optional)",
       "cancel": "Cancel",
       "sending": "Sending...",
@@ -1438,6 +1507,18 @@
       "nameArLabel": "Name (Arabic)",
       "nameArPlaceholder": "e.g. Vodafone Cash",
       "nameEnLabel": "Name (English)",
+      "providerLabel": "Wallet provider",
+      "providerPlaceholder": "Choose a provider",
+      "providerLabels": {
+        "instapay": "InstaPay",
+        "vodafone_cash": "Vodafone Cash",
+        "etisalat_cash": "Etisalat / e& Cash",
+        "orange_cash": "Orange Cash",
+        "we_pay": "WE Pay",
+        "other": "Other wallet"
+      },
+      "instructionsArLabel": "Instructions for customer (Arabic, optional)",
+      "instructionsEnLabel": "Instructions for customer (English, optional)",
       "instructionsLabel": "Instructions for customer (optional)",
       "instructionsPlaceholder": "e.g. Mention the invoice number when transferring",
       "customerVisibleCheckbox": "Show this method to customers at checkout",
@@ -1455,9 +1536,28 @@
       "nameRequiredError": "Enter the name in both Arabic and English",
       "addError": "Couldn't add the payment method"
     },
+    "pendingPayments": {
+      "title": "Pending Payments",
+      "description": "Review customer-uploaded payment receipts and approve or reject them",
+      "loading": "Loading...",
+      "empty": "No receipts waiting for review.",
+      "viewReceipt": "View receipt",
+      "approve": "Approve",
+      "reject": "Reject",
+      "approved": "Approved",
+      "rejected": "Rejected",
+      "reviewedHeading": "Recently reviewed",
+      "receiptTitle": "Payment receipt",
+      "openPdf": "Open PDF",
+      "rejectDialogTitle": "Reject this receipt",
+      "rejectReasonPlaceholder": "Reason for rejection",
+      "confirmReject": "Confirm rejection",
+      "approveError": "Couldn't approve this payment.",
+      "rejectError": "Couldn't reject this payment."
+    },
     "subscriptionPage": {
       "title": "Club subscription",
-      "description": "Your subscription status on the Mala3by platform",
+      "description": "Your subscription status on the Mal3aby platform",
       "accessLabels": {
         "full": "Active",
         "grace": "Grace period",
@@ -1588,6 +1688,7 @@
       "customersDesc": "Search for customers and manage their data",
       "billingDesc": "Invoice, payment, and outstanding records",
       "outstandingDesc": "Invoices not yet fully paid",
+      "pendingPaymentsDesc": "Review and approve customer-uploaded payment receipts",
       "cashShiftDesc": "Open and close the cash register shift",
       "reportsDesc": "Revenue, occupancy, and academy reports",
       "fieldsDesc": "Club branches, fields, working hours, and pricing",
@@ -1847,7 +1948,9 @@
     "openWhatsappPage": "Open WhatsApp page",
     "platformSubscriptionSection": "Platform subscription",
     "viewFullDetails": "View full details",
-    "publicBookingSection": "Public booking link"
+    "publicBookingSection": "Public booking link",
+    "contactSection": "Contact information",
+    "bookingPolicySection": "Booking policy"
   },
   "auditLog": {
     "title": "Audit Log",
@@ -1880,7 +1983,7 @@
     "emailLabel": "Email (for an existing account)",
     "roleLabel": "Role",
     "adding": "Adding...",
-    "inviteError": "Couldn't add the staff member — make sure the email belongs to an account already registered on Mala3by.",
+    "inviteError": "Couldn't add the staff member — make sure the email belongs to an account already registered on Mal3aby.",
     "columns": {
       "name": "Name",
       "role": "Role",
@@ -2025,11 +2128,11 @@
       "lastUpdated": "Last updated: August 15, 2026",
       "section1": {
         "title": "1. About the Service",
-        "body": "Mala3by is an operations management platform for sports clubs and academies — bookings, invoices and payments, players and subscriptions, QR-based attendance, and reports. By using the service, you agree to these terms."
+        "body": "Mal3aby is an operations management platform for sports clubs and academies — bookings, invoices and payments, players and subscriptions, QR-based attendance, and reports. By using the service, you agree to these terms."
       },
       "section2": {
         "title": "2. Account and Subscription",
-        "body": "Every new club starts with a 7-day free trial that requires no credit card, granted once per user. After the trial ends, continuing to use the platform requires a paid subscription activated by contacting the Mala3by team. You are responsible for the accuracy of your club's data and for keeping your account's login credentials confidential."
+        "body": "Every new club starts with a 7-day free trial that requires no credit card, granted once per user. After the trial ends, continuing to use the platform requires a paid subscription activated by contacting the Mal3aby team. You are responsible for the accuracy of your club's data and for keeping your account's login credentials confidential."
       },
       "section3": {
         "title": "3. Data You Enter",
@@ -2037,7 +2140,7 @@
       },
       "section4": {
         "title": "4. Payments and Invoices",
-        "body": "Platform subscription fees are charged according to the plan the club selects, and do not include the club's own payments from its customers (those are managed within your own system and do not pass through Mala3by). No amount is ever deducted automatically without your explicit confirmation."
+        "body": "Platform subscription fees are charged according to the plan the club selects, and do not include the club's own payments from its customers (those are managed within your own system and do not pass through Mal3aby). No amount is ever deducted automatically without your explicit confirmation."
       },
       "section5": {
         "title": "5. Termination of Service",
@@ -2064,7 +2167,7 @@
       "titleWithTrial": "Your club was created successfully!",
       "trialActivated": "Your 7-day free trial has been activated.",
       "titleNoTrial": "Club created",
-      "noTrialMessage": "This is your additional club, so it wasn't automatically activated with a free trial — additional clubs need approval from the Mala3by platform team first. We'll be in touch once it's reviewed, and you can track the subscription status from the settings page.",
+      "noTrialMessage": "This is your additional club, so it wasn't automatically activated with a free trial — additional clubs need approval from the Mal3aby platform team first. We'll be in touch once it's reviewed, and you can track the subscription status from the settings page.",
       "goToDashboard": "Go to dashboard"
     },
     "wizard": {

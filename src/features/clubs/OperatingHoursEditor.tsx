@@ -19,7 +19,7 @@ interface DaySchedule {
   closeTime: string
 }
 
-const WEEK_START_SATURDAY = 6 // day_of_week: 0=Sunday..6=Saturday. Display Saturday-first (Mala3by's week).
+const WEEK_START_SATURDAY = 6 // day_of_week: 0=Sunday..6=Saturday. Display Saturday-first (Mal3aby's week).
 const DISPLAY_ORDER = [6, 0, 1, 2, 3, 4, 5]
 
 type Schedule = [DaySchedule, DaySchedule, DaySchedule, DaySchedule, DaySchedule, DaySchedule, DaySchedule]

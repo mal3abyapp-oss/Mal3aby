@@ -28,7 +28,7 @@ import type { StaffRow } from '@/lib/domain/staff'
 // "Invite" only attaches an EXISTING auth.users account to this club (via
 // invite_staff_member RPC) — there is no invitation-token/signup-by-email
 // mechanism in the approved schema (club_memberships.user_id is a hard FK
-// to auth.users). The person must already have a Mala3by account.
+// to auth.users). The person must already have a Mal3aby account.
 const ASSIGNABLE_ROLES = [
   { key: 'club_manager', labelKey: 'staff.roles.club_manager' },
   { key: 'branch_manager', labelKey: 'staff.roles.branch_manager' },

@@ -9,7 +9,7 @@
  *
  * If Baileys is ever replaced, only a new class implementing this same
  * interface is needed -- SessionStore, TenantConnectionManager, the
- * Supabase RPC calls, and everything in the main Mala3by app (which
+ * Supabase RPC calls, and everything in the main Mal3aby app (which
  * never imports anything from this directory at all) are untouched.
  */
 

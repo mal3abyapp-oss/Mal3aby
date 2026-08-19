@@ -7,26 +7,24 @@ import { useDirection } from '@/app/providers/DirectionProvider'
 import { formatCurrency, formatDate, type SupportedLocale } from '@/lib/i18n/config'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { CheckCircle2, MapPin, ChevronLeft, ChevronRight } from 'lucide-react'
+import { CheckCircle2, MapPin, ChevronLeft, ChevronRight, Phone, MessageCircle, Copy, Check } from 'lucide-react'
+import { PaymentMethodsPanel } from './PaymentMethodsPanel'
+import { HoldCountdown } from './HoldCountdown'
 
 /**
- * PublicClubBookingPage -- the Public Club Booking Page (directive
- * Sections 42-53). Reached via https://mal3aby.app/c/<club-slug>,
- * fully public (no auth guard, standalone route like /qr/:token),
- * mobile-first (directive Section 46: most traffic originates from
- * WhatsApp/Instagram/QR/social/direct link on a phone).
+ * PublicClubBookingPage -- the Public Club Booking Page.
  *
- * Flow: club overview -> choose field -> choose date -> choose time
- * -> customer details -> booking -> confirmation (directive Section
- * 54's full new-customer journey). No login required at any step
- * (directive Section 45) -- the RPC layer (create_public_booking())
- * handles guest-customer creation/matching entirely server-side.
- *
- * All data comes from the three anon-safe RPCs added alongside this
- * page (get_public_club, get_public_field_availability,
- * get_public_field_price, create_public_booking) -- this page never
- * queries clubs/fields/bookings tables directly, matching the
- * directive's explicit tenant-isolation requirement.
+ * MAL3ABY PRODUCT/UX/BOOKING/PAYMENT DIRECTIVE: the booking-window
+ * policy (same-day online booking off by default, booking opens
+ * tomorrow, 2-day window) is enforced SERVER-SIDE by
+ * create_public_booking() itself (never trust the frontend alone --
+ * this page's date picker only ever offers dates the server would
+ * actually accept, but the server re-validates independently so
+ * editing the request directly still gets rejected). TODAY is
+ * deliberately still selectable here -- it shows real availability and
+ * a "contact the club" CTA (call/WhatsApp using the CLUB's own number,
+ * never Mal3aby's), not a disabled/hidden day and not an online-booking
+ * form that fails at the last step.
  */
 
 type Step = 'field' | 'date' | 'time' | 'details' | 'confirmed'
@@ -54,6 +52,15 @@ interface PublicClub {
   logoUrl: string | null
   currency: string
   timezone: string
+  primaryPhone: string | null
+  whatsappNumber: string | null
+  contactEmail: string | null
+  address: string | null
+  mapsUrl: string | null
+  sameDayOnlineBookingEnabled: boolean
+  onlineBookingStartOffsetDays: number
+  onlineBookingWindowDays: number
+  paymentHoldMinutes: number
   branches: PublicBranch[]
   fields: PublicField[]
 }
@@ -70,6 +77,15 @@ async function fetchPublicClub(slug: string): Promise<PublicClub | null> {
     logoUrl: row.logo_url,
     currency: row.currency,
     timezone: row.timezone,
+    primaryPhone: row.primary_phone,
+    whatsappNumber: row.whatsapp_number,
+    contactEmail: row.contact_email,
+    address: row.address,
+    mapsUrl: row.maps_url,
+    sameDayOnlineBookingEnabled: row.same_day_online_booking_enabled ?? false,
+    onlineBookingStartOffsetDays: row.online_booking_start_offset_days ?? 1,
+    onlineBookingWindowDays: row.online_booking_window_days ?? 2,
+    paymentHoldMinutes: row.payment_hold_minutes ?? 60,
     branches: (row.branches ?? []) as unknown as PublicBranch[],
     fields: (row.fields ?? []) as unknown as PublicField[],
   }
@@ -96,20 +112,19 @@ async function fetchAvailability(fieldId: string, date: string): Promise<Availab
 
 const DURATION_MINUTES = 60
 
-function nextNDays(n: number): Date[] {
-  const days: Date[] = []
-  const today = new Date()
-  today.setHours(0, 0, 0, 0)
-  for (let i = 0; i < n; i++) {
-    const d = new Date(today)
-    d.setDate(d.getDate() + i)
-    days.push(d)
-  }
-  return days
-}
-
 function toDateKey(d: Date): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+}
+
+function addDays(base: Date, n: number): Date {
+  const d = new Date(base)
+  d.setDate(d.getDate() + n)
+  return d
+}
+
+/** Formats a phone for wa.me (digits only, no leading +). */
+function toWaDigits(phone: string): string {
+  return phone.replace(/\D/g, '')
 }
 
 export function PublicClubBookingPage() {
@@ -125,6 +140,10 @@ export function PublicClubBookingPage() {
   const [customerMobile, setCustomerMobile] = useState('')
   const [formError, setFormError] = useState<string | null>(null)
   const [confirmedRef, setConfirmedRef] = useState<string | null>(null)
+  const [confirmedBookingId, setConfirmedBookingId] = useState<string | null>(null)
+  const [confirmedHoldExpiresAt, setConfirmedHoldExpiresAt] = useState<string | null>(null)
+  const [confirmedTotal, setConfirmedTotal] = useState<number | null>(null)
+  const [copiedField, setCopiedField] = useState<string | null>(null)
 
   const { data: club, isLoading: clubLoading, isError: clubError } = useQuery({
     queryKey: ['public-club', slug],
@@ -137,10 +156,34 @@ export function PublicClubBookingPage() {
   const selectedBranch = useMemo(() => club?.branches.find((b) => b.id === selectedField?.branch_id) ?? null, [club, selectedField])
   const dateKey = selectedDate ? toDateKey(selectedDate) : null
 
+  // The exact 3 dates this page ever offers: Today, Tomorrow, Day after
+  // tomorrow -- Today is always shown (contact experience), Tomorrow/
+  // day-after are only shown if inside the club's configured window
+  // (directive: "do not show dates beyond the allowed window").
+  const dateOptions = useMemo(() => {
+    if (!club) return []
+    const today = new Date()
+    today.setHours(0, 0, 0, 0)
+    const options: Array<{ date: Date; daysOut: number; isToday: boolean; isOnlineBookable: boolean }> = [
+      { date: today, daysOut: 0, isToday: true, isOnlineBookable: club.sameDayOnlineBookingEnabled },
+    ]
+    const lastWindowDay = club.onlineBookingStartOffsetDays + club.onlineBookingWindowDays - 1
+    for (let d = club.onlineBookingStartOffsetDays; d <= lastWindowDay; d++) {
+      options.push({ date: addDays(today, d), daysOut: d, isToday: false, isOnlineBookable: true })
+    }
+    return options
+  }, [club])
+
+  const selectedDateOption = useMemo(
+    () => dateOptions.find((o) => dateKey && toDateKey(o.date) === dateKey) ?? null,
+    [dateOptions, dateKey],
+  )
+  const isTodaySelected = selectedDateOption?.isToday ?? false
+
   const { data: availability, isLoading: availabilityLoading } = useQuery({
     queryKey: ['public-field-availability', selectedFieldId, dateKey],
     queryFn: () => fetchAvailability(selectedFieldId!, dateKey!),
-    enabled: !!selectedFieldId && !!dateKey && step === 'time',
+    enabled: !!selectedFieldId && !!dateKey && (step === 'time' || step === 'date'),
   })
 
   const { data: price } = useQuery({
@@ -158,12 +201,12 @@ export function PublicClubBookingPage() {
       if (error) throw error
       return data as number
     },
-    enabled: !!selectedFieldId && !!dateKey && !!selectedTime && step === 'details',
+    enabled: !!selectedFieldId && !!dateKey && !!selectedTime && step === 'details' && !isTodaySelected,
   })
 
   const timeSlots = useMemo(() => {
     if (!availability?.hasAnyConfig || !availability.openTime || !availability.closeTime || !dateKey) return []
-    const slots: string[] = []
+    const slots: Array<{ time: string; isAvailable: boolean }> = []
     const [openH, openM] = availability.openTime.split(':').map(Number)
     const [closeH, closeM] = availability.closeTime.split(':').map(Number)
     let cursor = (openH ?? 0) * 60 + (openM ?? 0)
@@ -176,8 +219,12 @@ export function PublicClubBookingPage() {
       const slotEnd = new Date(slotStart.getTime() + DURATION_MINUTES * 60000)
       const isPast = slotStart <= now
       const isBusy = availability.busyRanges.some((r) => new Date(r.start_at) < slotEnd && new Date(r.end_at) > slotStart)
-      if (!isPast && !isBusy) {
-        slots.push(`${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`)
+      // TODAY slots that are past or busy are simply omitted (matches
+      // future-day behavior) -- what differs for today is the CTA shown
+      // per remaining slot (contact, not online booking), handled at
+      // render time via isTodaySelected, not here.
+      if (!isPast) {
+        slots.push({ time: `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`, isAvailable: !isBusy })
       }
       cursor += DURATION_MINUTES
     }
@@ -208,6 +255,9 @@ export function PublicClubBookingPage() {
     onSuccess: (row) => {
       setFormError(null)
       setConfirmedRef(row?.booking_ref ?? null)
+      setConfirmedBookingId(row?.booking_id ?? null)
+      setConfirmedHoldExpiresAt(row?.hold_expires_at ?? null)
+      setConfirmedTotal(row?.total_price != null ? Number(row.total_price) : null)
       setStep('confirmed')
     },
     onError: (error: { message?: string }) => {
@@ -216,8 +266,14 @@ export function PublicClubBookingPage() {
   })
 
   useEffect(() => {
-    document.title = club ? `${club.clubName} — ${t('publicBooking.bookNow')}` : 'Mala3by'
+    document.title = club ? `${club.clubName} — ${t('publicBooking.bookNow')}` : 'Mal3aby'
   }, [club, t])
+
+  async function copyToClipboard(value: string, fieldKey: string) {
+    await navigator.clipboard.writeText(value)
+    setCopiedField(fieldKey)
+    setTimeout(() => setCopiedField((cur) => (cur === fieldKey ? null : cur)), 2000)
+  }
 
   const BackIcon = direction === 'rtl' ? ChevronRight : ChevronLeft
 
@@ -239,6 +295,8 @@ export function PublicClubBookingPage() {
       </div>
     )
   }
+
+  const clubWaNumber = club.whatsappNumber || club.primaryPhone
 
   return (
     <div dir={direction} className="min-h-screen bg-page-bg pb-24">
@@ -303,18 +361,25 @@ export function PublicClubBookingPage() {
           <div className="flex flex-col gap-3">
             <h1 className="text-lg font-semibold">{t('publicBooking.chooseDate')}</h1>
             <div className="grid grid-cols-3 gap-2">
-              {nextNDays(14).map((d) => (
+              {dateOptions.map((opt) => (
                 <button
-                  key={toDateKey(d)}
+                  key={toDateKey(opt.date)}
                   type="button"
-                  className="rounded-lg border border-border bg-surface p-3 text-center text-sm shadow-sm transition hover:border-accent"
+                  className="flex flex-col items-center gap-1 rounded-lg border border-border bg-surface p-3 text-center text-sm shadow-sm transition hover:border-accent"
                   onClick={() => {
-                    setSelectedDate(d)
+                    setSelectedDate(opt.date)
                     setStep('time')
                   }}
                 >
-                  <p className="font-medium">{formatDate(d, locale as SupportedLocale, club.timezone, { weekday: 'short' })}</p>
-                  <p className="text-text-secondary">{formatDate(d, locale as SupportedLocale, club.timezone, { day: 'numeric', month: 'short' })}</p>
+                  <p className="font-medium">
+                    {opt.isToday ? t('publicBooking.today') : formatDate(opt.date, locale as SupportedLocale, club.timezone, { weekday: 'short' })}
+                  </p>
+                  <p className="text-text-secondary">{formatDate(opt.date, locale as SupportedLocale, club.timezone, { day: 'numeric', month: 'short' })}</p>
+                  {opt.isToday && (
+                    <span className="rounded-full bg-info/10 px-2 py-0.5 text-[11px] font-medium text-info">
+                      {t('publicBooking.todayContactBadge')}
+                    </span>
+                  )}
                 </button>
               ))}
             </div>
@@ -325,27 +390,83 @@ export function PublicClubBookingPage() {
           <div className="flex flex-col gap-3">
             <h1 className="text-lg font-semibold">{t('publicBooking.chooseTime')}</h1>
             {selectedDate && <p className="text-sm text-text-secondary">{formatDate(selectedDate, locale as SupportedLocale, club.timezone, { day: 'numeric', month: 'long', year: 'numeric' })}</p>}
+
+            {isTodaySelected && (
+              <div className="rounded-lg border border-info/30 bg-info/5 p-3 text-sm text-info">
+                {t('publicBooking.todayContactExplainer')}
+              </div>
+            )}
+
             {availabilityLoading && <p className="text-sm text-text-secondary">{t('publicBooking.loading')}</p>}
             {!availabilityLoading && timeSlots.length === 0 && <p className="text-sm text-text-secondary">{t('publicBooking.noSlotsAvailable')}</p>}
-            <div className="grid grid-cols-3 gap-2">
-              {timeSlots.map((time) => (
-                <button
-                  key={time}
-                  type="button"
-                  className="rounded-lg border border-border bg-surface p-3 text-center text-sm font-medium tabular-nums shadow-sm transition hover:border-accent"
-                  onClick={() => {
-                    setSelectedTime(time)
-                    setStep('details')
-                  }}
-                >
-                  <bdi>{time}</bdi>
-                </button>
-              ))}
-            </div>
+
+            {!isTodaySelected && (
+              <div className="grid grid-cols-3 gap-2">
+                {timeSlots.filter((s) => s.isAvailable).map((s) => (
+                  <button
+                    key={s.time}
+                    type="button"
+                    className="rounded-lg border border-border bg-surface p-3 text-center text-sm font-medium tabular-nums shadow-sm transition hover:border-accent"
+                    onClick={() => {
+                      setSelectedTime(s.time)
+                      setStep('details')
+                    }}
+                  >
+                    <bdi>{s.time}</bdi>
+                  </button>
+                ))}
+              </div>
+            )}
+
+            {isTodaySelected && (
+              <div className="flex flex-col gap-2">
+                {timeSlots.map((s) => (
+                  <div
+                    key={s.time}
+                    className={`flex items-center justify-between rounded-lg border p-3 text-sm ${s.isAvailable ? 'border-status-success/40 bg-status-success/5' : 'border-border bg-surface opacity-60'}`}
+                  >
+                    <span className="font-medium tabular-nums"><bdi>{s.time}</bdi></span>
+                    {s.isAvailable ? (
+                      <span className="text-xs font-medium text-status-success">{t('publicBooking.availableNow')}</span>
+                    ) : (
+                      <span className="text-xs text-text-secondary">{t('publicBooking.unavailable')}</span>
+                    )}
+                  </div>
+                ))}
+                {clubWaNumber && (
+                  <div className="mt-2 flex flex-col gap-2 rounded-lg border border-border bg-surface p-4">
+                    <p className="text-sm font-medium">{t('publicBooking.todayContactTitle')}</p>
+                    <p className="text-xs text-text-secondary">{t('publicBooking.todayRaceWarning')}</p>
+                    <div className="flex flex-wrap gap-2">
+                      <Button asChild size="sm" variant="outline">
+                        <a href={`tel:${clubWaNumber}`}>
+                          <Phone className="me-1 size-4" /> {t('publicBooking.callClub')}
+                        </a>
+                      </Button>
+                      <Button asChild size="sm">
+                        <a
+                          href={`https://wa.me/${toWaDigits(clubWaNumber)}?text=${encodeURIComponent(
+                            t('publicBooking.todayWaMessage', {
+                              club: club.clubName,
+                              field: selectedField?.name ?? '',
+                              date: selectedDate ? formatDate(selectedDate, locale as SupportedLocale, club.timezone, { day: 'numeric', month: 'long' }) : '',
+                            }),
+                          )}`}
+                          target="_blank"
+                          rel="noreferrer"
+                        >
+                          <MessageCircle className="me-1 size-4" /> {t('publicBooking.whatsappClub')}
+                        </a>
+                      </Button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         )}
 
-        {step === 'details' && (
+        {step === 'details' && !isTodaySelected && (
           <div className="flex flex-col gap-4">
             <h1 className="text-lg font-semibold">{t('publicBooking.yourDetails')}</h1>
 
@@ -394,22 +515,72 @@ export function PublicClubBookingPage() {
         )}
 
         {step === 'confirmed' && (
-          <div className="flex flex-col items-center gap-3 text-center">
-            <CheckCircle2 className="size-14 text-status-success" />
-            <h1 className="text-lg font-semibold">{t('publicBooking.confirmedTitle')}</h1>
-            <p className="text-sm text-text-secondary">{t('publicBooking.confirmedMessage')}</p>
-            {confirmedRef && (
-              <p className="text-sm">
-                {t('publicBooking.bookingRef')}: <bdi className="font-medium">{confirmedRef}</bdi>
-              </p>
+          <div className="flex flex-col gap-5">
+            <div className="flex flex-col items-center gap-2 text-center">
+              <CheckCircle2 className="size-14 text-status-success" />
+              <h1 className="text-lg font-semibold">{t('publicBooking.confirmedTitle')}</h1>
+              <p className="text-sm text-text-secondary">{t('publicBooking.confirmedMessage')}</p>
+              {confirmedRef && (
+                <p className="text-sm">
+                  {t('publicBooking.bookingRef')}: <bdi className="font-medium">{confirmedRef}</bdi>
+                </p>
+              )}
+              {confirmedTotal != null && (
+                <p className="text-sm font-semibold">{formatCurrency(confirmedTotal, locale as SupportedLocale, club.currency)}</p>
+              )}
+            </div>
+
+            {confirmedHoldExpiresAt && (
+              <HoldCountdown holdExpiresAt={confirmedHoldExpiresAt} />
             )}
-            {/* Directive Section 30: never link to the Secure Booking
-                Page using a raw booking id as if it were the opaque
-                token -- the real qr token is only ever delivered via
-                the WhatsApp message create_public_booking() already
-                queues, matching Section 28's "Secure Booking Link is
-                the primary UX, delivered via WhatsApp" design. */}
-            <p className="mt-2 text-xs text-text-secondary">{t('publicBooking.whatsappHint')}</p>
+
+            {confirmedBookingId && (
+              <PaymentMethodsPanel
+                bookingId={confirmedBookingId}
+                clubId={club.clubId}
+                bookingRef={confirmedRef}
+                clubName={club.clubName}
+                total={confirmedTotal}
+                currency={club.currency}
+                locale={locale as SupportedLocale}
+              />
+            )}
+
+            {(club.primaryPhone || clubWaNumber || club.address) && (
+              <div className="flex flex-col gap-2 rounded-lg border border-border bg-surface p-4">
+                <p className="text-sm font-medium">{t('publicBooking.contactClubTitle')}</p>
+                {club.primaryPhone && (
+                  <div className="flex items-center justify-between text-sm">
+                    <span dir="ltr" className="tabular-nums">{club.primaryPhone}</span>
+                    <div className="flex gap-1">
+                      <Button asChild size="sm" variant="ghost">
+                        <a href={`tel:${club.primaryPhone}`}><Phone className="size-4" /></a>
+                      </Button>
+                      <Button size="sm" variant="ghost" onClick={() => copyToClipboard(club.primaryPhone!, 'club-phone')}>
+                        {copiedField === 'club-phone' ? <Check className="size-4" /> : <Copy className="size-4" />}
+                      </Button>
+                    </div>
+                  </div>
+                )}
+                {clubWaNumber && (
+                  <Button asChild size="sm" variant="outline" className="w-fit">
+                    <a href={`https://wa.me/${toWaDigits(clubWaNumber)}`} target="_blank" rel="noreferrer">
+                      <MessageCircle className="me-1 size-4" /> {t('publicBooking.whatsappClub')}
+                    </a>
+                  </Button>
+                )}
+                {club.address && (
+                  <p className="text-xs text-text-secondary">{club.address}</p>
+                )}
+                {club.mapsUrl && (
+                  <a href={club.mapsUrl} target="_blank" rel="noreferrer" className="text-xs text-accent-foreground underline">
+                    {t('publicBooking.directions')}
+                  </a>
+                )}
+              </div>
+            )}
+
+            <p className="text-center text-xs text-text-secondary">{t('publicBooking.whatsappHint')}</p>
           </div>
         )}
       </main>

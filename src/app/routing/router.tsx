@@ -30,6 +30,7 @@ import { BillingPage } from '@/features/billing/BillingPage'
 import { CashShiftPage } from '@/features/billing/CashShiftPage'
 import { SubscriptionPage } from '@/features/billing/SubscriptionPage'
 import { OutstandingPage } from '@/features/billing/OutstandingPage'
+import { PendingPaymentsPage } from '@/features/billing/PendingPaymentsPage'
 import { ReportsOverviewPage } from '@/features/reports/ReportsOverviewPage'
 import { ReportBookingsPage } from '@/features/reports/ReportBookingsPage'
 import { ReportOccupancyPage } from '@/features/reports/ReportOccupancyPage'
@@ -136,6 +137,7 @@ export const router = createBrowserRouter([
           { path: 'cash-shift', element: <CashShiftPage /> },
           { path: 'subscription', element: <SubscriptionPage /> },
           { path: 'outstanding', element: <OutstandingPage /> },
+          { path: 'pending-payments', element: <PendingPaymentsPage /> },
           // Master IA/UX audit (Reports decomposition phase): the old
           // single /app/reports route rendered a 1127-line file with
           // 9 tabs sharing one Tabs.Root -- visual grouping (a prior

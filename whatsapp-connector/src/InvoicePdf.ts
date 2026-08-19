@@ -305,7 +305,7 @@ function renderEnglish(
     doc.moveDown(0.55)
   }
 
-  heading(data.clubName ?? 'Mala3by', { bold: true, size: 20 })
+  heading(data.clubName ?? 'Mal3aby', { bold: true, size: 20 })
   doc.moveDown(0.2)
   heading('Invoice', { size: 11, color: '#555555' })
   doc.moveDown(0.8)
@@ -342,5 +342,5 @@ function renderEnglish(
     { size: 9, color: '#777777' },
   )
   doc.moveDown(0.2)
-  heading('via Mala3by', { size: 9, color: '#777777' })
+  heading('via Mal3aby', { size: 9, color: '#777777' })
 }

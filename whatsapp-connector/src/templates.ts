@@ -238,12 +238,12 @@ function paymentMethodLabel(method: unknown, language: string): string | null {
   return table[String(method)] ?? null
 }
 
-/** "*{club_name} عبر ملعبي*" when a reliable club name is available, "*ملعبي*"/"*Mala3by*" otherwise -- directive rule 21. */
+/** "*{club_name} عبر ملعبي*" when a reliable club name is available, "*ملعبي*"/"*Mal3aby*" otherwise -- directive rule 21. */
 function brandLine(vars: Vars, language: string): string {
   if (isPresent(vars.club_name)) {
-    return language === 'en' ? `*${String(vars.club_name)} via Mala3by*` : `*${String(vars.club_name)} عبر ملعبي*`
+    return language === 'en' ? `*${String(vars.club_name)} via Mal3aby*` : `*${String(vars.club_name)} عبر ملعبي*`
   }
-  return language === 'en' ? '*Mala3by*' : '*ملعبي*'
+  return language === 'en' ? '*Mal3aby*' : '*ملعبي*'
 }
 
 function greeting(vars: Vars, language: string): string {
@@ -581,7 +581,7 @@ const EN: Record<TemplateKey, Renderer> = {
       line('🕐', 'Time', time),
       isPresent(v.reason) ? `\nReason: ${String(v.reason)}` : '',
       '',
-      'You can create a new booking any time through Mala3by.',
+      'You can create a new booking any time through Mal3aby.',
       '',
       brandLine(v, 'en'),
     )

@@ -1,8 +1,8 @@
-# ملعبي | Mala3by
+# ملعبي | Mal3aby
 
 **Club & Academy Operations Platform** — not just a court booking app.
 
-Mala3by is a multi-tenant operations system for sports clubs and football academies: booking desk, cashier, coach, and manager all work from one system, all day. Built to run a single pilot club first, architected so a second club or branch is a data row, not a rebuild.
+Mal3aby is a multi-tenant operations system for sports clubs and football academies: booking desk, cashier, coach, and manager all work from one system, all day. Built to run a single pilot club first, architected so a second club or branch is a data row, not a rebuild.
 
 ## What this is
 
@@ -12,7 +12,7 @@ Mala3by is a multi-tenant operations system for sports clubs and football academ
 - Real financial ledger: invoices, payments, allocations, refunds — no deletes, only void/reverse
 - Secure QR check-in for bookings and academy attendance
 - Arabic RTL first, English toggle, installable PWA, works on desktop/tablet/mobile
-- Platform billing: Mala3by charges clubs a real subscription (Monthly/Quarterly/Semi-Annual/Annual) to use the platform — period-based with full renewal history, structurally separate from a club's own customer billing, and fully independent of club account status (see [docs/DECISIONS.md ADR-027](docs/DECISIONS.md#adr-027--clubsstatus-and-platform-subscription-status-are-fully-independent-grace_period-is-never-a-club-status) through ADR-035)
+- Platform billing: Mal3aby charges clubs a real subscription (Monthly/Quarterly/Semi-Annual/Annual) to use the platform — period-based with full renewal history, structurally separate from a club's own customer billing, and fully independent of club account status (see [docs/DECISIONS.md ADR-027](docs/DECISIONS.md#adr-027--clubsstatus-and-platform-subscription-status-are-fully-independent-grace_period-is-never-a-club-status) through ADR-035)
 - Public marketing site + self-service signup + 7-day free trial (no card required) — a club can go from anonymous visitor to an operating trial club in one short flow, with trial modeled as a value on the same subscription system above, not a separate mechanism (see [docs/DECISIONS.md ADR-036](docs/DECISIONS.md#adr-036--free-trial-requires-no-payment-method-zero-financial-exposure-by-construction) through ADR-046)
 - Security-first by design: the frontend is never trusted for authorization or financial values — every mutation is re-verified server-side, with a documented Abuse Test Catalogue and a Security Gate on every implementation phase (see [docs/SECURITY_ANTI_FRAUD.md](docs/SECURITY_ANTI_FRAUD.md))
 - A real, documented visual identity (Modern Sports Operations SaaS, not an old-style ERP) — see [docs/DESIGN_SYSTEM.md](docs/DESIGN_SYSTEM.md)

@@ -15,7 +15,7 @@ export function PublicLayout() {
       <header className="sticky top-0 z-40 border-b border-border bg-surface/95 backdrop-blur">
         <div className="mx-auto flex max-w-6xl items-center justify-between px-4 py-3">
           <Link to="/" className="text-lg font-bold text-text-primary">
-            ملعبي <span className="text-text-secondary">| Mala3by</span>
+            ملعبي <span className="text-text-secondary">| Mal3aby</span>
           </Link>
           <nav className="hidden items-center gap-6 text-sm font-medium text-text-secondary md:flex">
             <Link to="/" className="hover:text-text-primary">{t('publicSite.nav.home')}</Link>
@@ -42,7 +42,7 @@ export function PublicLayout() {
       <footer className="border-t border-border bg-dark-base text-white">
         <div className="mx-auto grid max-w-6xl grid-cols-2 gap-8 px-4 py-10 md:grid-cols-4">
           <div>
-            <p className="font-bold">ملعبي | Mala3by</p>
+            <p className="font-bold">ملعبي | Mal3aby</p>
             <p className="mt-2 text-sm text-white/60">{t('publicSite.footer.tagline')}</p>
           </div>
           <div className="flex flex-col gap-2 text-sm text-white/70">

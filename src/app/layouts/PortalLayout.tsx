@@ -39,7 +39,7 @@ export function PortalLayout() {
   return (
     <div className="flex min-h-screen flex-col bg-page-bg">
       <header className="sticky top-0 z-30 flex items-center justify-between border-b border-border bg-surface px-4 py-3">
-        <span className="text-lg font-bold">ملعبي | Mala3by</span>
+        <span className="text-lg font-bold">ملعبي | Mal3aby</span>
         <div className="flex items-center gap-3">
           <LanguageSwitcher />
           <button

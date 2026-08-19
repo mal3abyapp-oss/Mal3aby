@@ -42,6 +42,7 @@ interface PaymentMethodRow {
   nameAr: string
   nameEn: string
   instructionsAr: string | null
+  instructionsEn: string | null
   details: Record<string, string>
   referenceRequired: boolean
   proofRequired: boolean
@@ -49,6 +50,21 @@ interface PaymentMethodRow {
   isActive: boolean
   displayOrder: number
 }
+
+// Directive: at least InstaPay + the major Egyptian mobile wallets need
+// to be selectable, not just a generic "wallet" bucket -- provider is
+// the existing free-text column (no schema change needed, matches the
+// architecture's own "no migration per provider" requirement), this
+// is just the curated picker for the common ones plus a free-text
+// escape hatch for anything else.
+const WALLET_PROVIDER_OPTIONS = [
+  { value: 'instapay', labelKey: 'billing.paymentMethods.providerLabels.instapay' },
+  { value: 'vodafone_cash', labelKey: 'billing.paymentMethods.providerLabels.vodafone_cash' },
+  { value: 'etisalat_cash', labelKey: 'billing.paymentMethods.providerLabels.etisalat_cash' },
+  { value: 'orange_cash', labelKey: 'billing.paymentMethods.providerLabels.orange_cash' },
+  { value: 'we_pay', labelKey: 'billing.paymentMethods.providerLabels.we_pay' },
+  { value: 'other', labelKey: 'billing.paymentMethods.providerLabels.other' },
+] as const
 
 const UNDERLYING_METHOD_LABEL_KEYS: Record<UnderlyingMethod, string> = {
   cash: 'billing.paymentMethods.underlyingMethodLabels.cash',
@@ -83,7 +99,7 @@ const DETAIL_FIELDS: Record<UnderlyingMethod, { key: string; labelKey: string }[
 async function fetchPaymentMethods(clubId: string): Promise<PaymentMethodRow[]> {
   const { data, error } = await supabase
     .from('payment_method_configs')
-    .select('id, underlying_method, provider, name_ar, name_en, instructions_ar, details, reference_required, proof_required, customer_visible, is_active, display_order')
+    .select('id, underlying_method, provider, name_ar, name_en, instructions_ar, instructions_en, details, reference_required, proof_required, customer_visible, is_active, display_order')
     .eq('club_id', clubId)
     .order('display_order')
   if (error) throw error
@@ -94,6 +110,7 @@ async function fetchPaymentMethods(clubId: string): Promise<PaymentMethodRow[]> 
     nameAr: r.name_ar,
     nameEn: r.name_en,
     instructionsAr: r.instructions_ar,
+    instructionsEn: r.instructions_en,
     details: (r.details as Record<string, string>) ?? {},
     referenceRequired: r.reference_required,
     proofRequired: r.proof_required,
@@ -109,9 +126,11 @@ export function PaymentMethodsCard() {
   const queryClient = useQueryClient()
   const [dialogOpen, setDialogOpen] = useState(false)
   const [underlyingMethod, setUnderlyingMethod] = useState<UnderlyingMethod>('bank_transfer')
+  const [provider, setProvider] = useState<string>('')
   const [nameAr, setNameAr] = useState('')
   const [nameEn, setNameEn] = useState('')
   const [instructionsAr, setInstructionsAr] = useState('')
+  const [instructionsEn, setInstructionsEn] = useState('')
   const [detailValues, setDetailValues] = useState<Record<string, string>>({})
   const [customerVisible, setCustomerVisible] = useState(true)
   const [formError, setFormError] = useState<string | null>(null)
@@ -124,9 +143,11 @@ export function PaymentMethodsCard() {
 
   const resetForm = () => {
     setUnderlyingMethod('bank_transfer')
+    setProvider('')
     setNameAr('')
     setNameEn('')
     setInstructionsAr('')
+    setInstructionsEn('')
     setDetailValues({})
     setCustomerVisible(true)
     setFormError(null)
@@ -138,9 +159,11 @@ export function PaymentMethodsCard() {
       const { error } = await supabase.from('payment_method_configs').insert({
         club_id: currentClubId!,
         underlying_method: underlyingMethod,
+        provider: provider.trim() || null,
         name_ar: nameAr.trim(),
         name_en: nameEn.trim(),
         instructions_ar: instructionsAr.trim() || null,
+        instructions_en: instructionsEn.trim() || null,
         details: detailValues,
         customer_visible: customerVisible,
         display_order: methods.length,
@@ -185,7 +208,7 @@ export function PaymentMethodsCard() {
               {formError && <p className="text-sm text-status-danger">{formError}</p>}
               <div className="flex flex-col gap-1">
                 <label className="text-sm font-medium">{t('billing.paymentMethods.methodTypeLabel')}</label>
-                <Select value={underlyingMethod} onValueChange={(v) => { setUnderlyingMethod(v as UnderlyingMethod); setDetailValues({}) }}>
+                <Select value={underlyingMethod} onValueChange={(v) => { setUnderlyingMethod(v as UnderlyingMethod); setDetailValues({}); setProvider('') }}>
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
                     {(Object.keys(UNDERLYING_METHOD_LABEL_KEYS) as UnderlyingMethod[]).map((m) => (
@@ -194,6 +217,19 @@ export function PaymentMethodsCard() {
                   </SelectContent>
                 </Select>
               </div>
+              {underlyingMethod === 'wallet' && (
+                <div className="flex flex-col gap-1">
+                  <label className="text-sm font-medium">{t('billing.paymentMethods.providerLabel')}</label>
+                  <Select value={provider} onValueChange={setProvider}>
+                    <SelectTrigger><SelectValue placeholder={t('billing.paymentMethods.providerPlaceholder')} /></SelectTrigger>
+                    <SelectContent>
+                      {WALLET_PROVIDER_OPTIONS.map((p) => (
+                        <SelectItem key={p.value} value={p.value}>{t(p.labelKey)}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
               <div className="grid gap-3 md:grid-cols-2">
                 <div className="flex flex-col gap-1">
                   <label className="text-sm font-medium">{t('billing.paymentMethods.nameArLabel')}</label>
@@ -213,9 +249,15 @@ export function PaymentMethodsCard() {
                   />
                 </div>
               ))}
-              <div className="flex flex-col gap-1">
-                <label className="text-sm font-medium">{t('billing.paymentMethods.instructionsLabel')}</label>
-                <Input value={instructionsAr} onChange={(e) => setInstructionsAr(e.target.value)} placeholder={t('billing.paymentMethods.instructionsPlaceholder')} />
+              <div className="grid gap-3 md:grid-cols-2">
+                <div className="flex flex-col gap-1">
+                  <label className="text-sm font-medium">{t('billing.paymentMethods.instructionsArLabel')}</label>
+                  <Input value={instructionsAr} onChange={(e) => setInstructionsAr(e.target.value)} placeholder={t('billing.paymentMethods.instructionsPlaceholder')} />
+                </div>
+                <div className="flex flex-col gap-1">
+                  <label className="text-sm font-medium">{t('billing.paymentMethods.instructionsEnLabel')}</label>
+                  <Input value={instructionsEn} onChange={(e) => setInstructionsEn(e.target.value)} placeholder={t('billing.paymentMethods.instructionsPlaceholder')} />
+                </div>
               </div>
               <label className="flex items-center gap-2 text-sm">
                 <input type="checkbox" checked={customerVisible} onChange={(e) => setCustomerVisible(e.target.checked)} className="size-4" />

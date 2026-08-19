@@ -5,6 +5,8 @@ import { PageHeader } from '@/components/ui/page-header'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { ClubSettingsCard } from '@/features/clubs/ClubSettingsCard'
+import { ClubContactCard } from '@/features/clubs/ClubContactCard'
+import { BookingPolicyCard } from '@/features/clubs/BookingPolicyCard'
 import { PublicBookingLinkCard } from '@/features/clubs/PublicBookingLinkCard'
 import { PlatformSubscriptionCard } from '@/features/clubs/PlatformSubscriptionCard'
 import { EntitlementsCard } from '@/features/clubs/EntitlementsCard'
@@ -53,6 +55,16 @@ export function SettingsPage() {
       <section className="flex flex-col gap-4">
         <h2 className="text-sm font-semibold text-text-secondary">{t('settings.clubSection')}</h2>
         <ClubSettingsCard />
+      </section>
+
+      <section className="flex flex-col gap-4">
+        <h2 className="text-sm font-semibold text-text-secondary">{t('settings.contactSection')}</h2>
+        <ClubContactCard />
+      </section>
+
+      <section className="flex flex-col gap-4">
+        <h2 className="text-sm font-semibold text-text-secondary">{t('settings.bookingPolicySection')}</h2>
+        <BookingPolicyCard />
       </section>
 
       <section className="flex flex-col gap-4">

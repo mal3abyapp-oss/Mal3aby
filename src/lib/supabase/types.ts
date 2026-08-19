@@ -314,6 +314,7 @@ export type Database = {
           during: unknown
           end_at: string
           field_id: string
+          hold_expires_at: string | null
           id: string
           invoice_id: string | null
           marked_at: string | null
@@ -339,6 +340,7 @@ export type Database = {
           during?: unknown
           end_at: string
           field_id: string
+          hold_expires_at?: string | null
           id?: string
           invoice_id?: string | null
           marked_at?: string | null
@@ -364,6 +366,7 @@ export type Database = {
           during?: unknown
           end_at?: string
           field_id?: string
+          hold_expires_at?: string | null
           id?: string
           invoice_id?: string | null
           marked_at?: string | null
@@ -561,6 +564,54 @@ export type Database = {
           },
         ]
       }
+      club_booking_policy: {
+        Row: {
+          cash_reservation_allowed: boolean
+          club_id: string
+          created_at: string
+          online_booking_start_offset_days: number
+          online_booking_window_days: number
+          payment_hold_minutes: number
+          same_day_online_booking_enabled: boolean
+          updated_at: string | null
+        }
+        Insert: {
+          cash_reservation_allowed?: boolean
+          club_id: string
+          created_at?: string
+          online_booking_start_offset_days?: number
+          online_booking_window_days?: number
+          payment_hold_minutes?: number
+          same_day_online_booking_enabled?: boolean
+          updated_at?: string | null
+        }
+        Update: {
+          cash_reservation_allowed?: boolean
+          club_id?: string
+          created_at?: string
+          online_booking_start_offset_days?: number
+          online_booking_window_days?: number
+          payment_hold_minutes?: number
+          same_day_online_booking_enabled?: boolean
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "club_booking_policy_club_id_fkey"
+            columns: ["club_id"]
+            isOneToOne: true
+            referencedRelation: "clubs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "club_booking_policy_club_id_fkey"
+            columns: ["club_id"]
+            isOneToOne: true
+            referencedRelation: "commercial_entitlements_usage"
+            referencedColumns: ["club_id"]
+          },
+        ]
+      }
       club_memberships: {
         Row: {
           club_id: string
@@ -615,7 +666,9 @@ export type Database = {
       }
       clubs: {
         Row: {
+          address: string | null
           club_code: string
+          contact_email: string | null
           created_at: string
           created_by: string | null
           currency: string
@@ -624,19 +677,26 @@ export type Database = {
           id: string
           invoice_settings: Json | null
           logo_url: string | null
+          maps_url: string | null
           name: string
           name_ar: string
           name_en: string | null
+          payment_receipt_whatsapp_number: string | null
+          primary_phone: string | null
           public_booking_enabled: boolean
           public_slug: string | null
+          secondary_phone: string | null
           status: string
           subscription_activation_policy: string
           tax_info: Json | null
           timezone: string
           updated_at: string | null
+          whatsapp_number: string | null
         }
         Insert: {
+          address?: string | null
           club_code: string
+          contact_email?: string | null
           created_at?: string
           created_by?: string | null
           currency?: string
@@ -645,19 +705,26 @@ export type Database = {
           id?: string
           invoice_settings?: Json | null
           logo_url?: string | null
+          maps_url?: string | null
           name: string
           name_ar: string
           name_en?: string | null
+          payment_receipt_whatsapp_number?: string | null
+          primary_phone?: string | null
           public_booking_enabled?: boolean
           public_slug?: string | null
+          secondary_phone?: string | null
           status?: string
           subscription_activation_policy?: string
           tax_info?: Json | null
           timezone?: string
           updated_at?: string | null
+          whatsapp_number?: string | null
         }
         Update: {
+          address?: string | null
           club_code?: string
+          contact_email?: string | null
           created_at?: string
           created_by?: string | null
           currency?: string
@@ -666,16 +733,21 @@ export type Database = {
           id?: string
           invoice_settings?: Json | null
           logo_url?: string | null
+          maps_url?: string | null
           name?: string
           name_ar?: string
           name_en?: string | null
+          payment_receipt_whatsapp_number?: string | null
+          primary_phone?: string | null
           public_booking_enabled?: boolean
           public_slug?: string | null
+          secondary_phone?: string | null
           status?: string
           subscription_activation_policy?: string
           tax_info?: Json | null
           timezone?: string
           updated_at?: string | null
+          whatsapp_number?: string | null
         }
         Relationships: []
       }
@@ -2423,6 +2495,123 @@ export type Database = {
           },
         ]
       }
+      payment_proofs: {
+        Row: {
+          amount: number
+          booking_id: string | null
+          club_id: string
+          created_by_customer: boolean
+          customer_id: string | null
+          file_size_bytes: number
+          id: string
+          invoice_id: string
+          mime_type: string
+          payment_method_config_id: string | null
+          rejection_reason: string | null
+          resulting_payment_id: string | null
+          reviewed_at: string | null
+          reviewed_by: string | null
+          status: string
+          storage_path: string
+          uploaded_at: string
+        }
+        Insert: {
+          amount: number
+          booking_id?: string | null
+          club_id: string
+          created_by_customer?: boolean
+          customer_id?: string | null
+          file_size_bytes: number
+          id?: string
+          invoice_id: string
+          mime_type: string
+          payment_method_config_id?: string | null
+          rejection_reason?: string | null
+          resulting_payment_id?: string | null
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          status?: string
+          storage_path: string
+          uploaded_at?: string
+        }
+        Update: {
+          amount?: number
+          booking_id?: string | null
+          club_id?: string
+          created_by_customer?: boolean
+          customer_id?: string | null
+          file_size_bytes?: number
+          id?: string
+          invoice_id?: string
+          mime_type?: string
+          payment_method_config_id?: string | null
+          rejection_reason?: string | null
+          resulting_payment_id?: string | null
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          status?: string
+          storage_path?: string
+          uploaded_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "payment_proofs_booking_id_fkey"
+            columns: ["booking_id"]
+            isOneToOne: false
+            referencedRelation: "bookings"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "payment_proofs_club_id_fkey"
+            columns: ["club_id"]
+            isOneToOne: false
+            referencedRelation: "clubs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "payment_proofs_club_id_fkey"
+            columns: ["club_id"]
+            isOneToOne: false
+            referencedRelation: "commercial_entitlements_usage"
+            referencedColumns: ["club_id"]
+          },
+          {
+            foreignKeyName: "payment_proofs_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "customers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "payment_proofs_invoice_id_fkey"
+            columns: ["invoice_id"]
+            isOneToOne: false
+            referencedRelation: "invoices"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "payment_proofs_invoice_id_fkey"
+            columns: ["invoice_id"]
+            isOneToOne: false
+            referencedRelation: "outstanding_invoices"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "payment_proofs_payment_method_config_id_fkey"
+            columns: ["payment_method_config_id"]
+            isOneToOne: false
+            referencedRelation: "payment_method_configs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "payment_proofs_resulting_payment_id_fkey"
+            columns: ["resulting_payment_id"]
+            isOneToOne: false
+            referencedRelation: "payments"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       payment_reconciliations: {
         Row: {
           branch_id: string | null
@@ -2740,18 +2929,24 @@ export type Database = {
           default_grace_period_days: number
           default_trial_days: number
           id: boolean
+          platform_email: string | null
+          platform_phone: string | null
           updated_at: string | null
         }
         Insert: {
           default_grace_period_days?: number
           default_trial_days?: number
           id?: boolean
+          platform_email?: string | null
+          platform_phone?: string | null
           updated_at?: string | null
         }
         Update: {
           default_grace_period_days?: number
           default_trial_days?: number
           id?: boolean
+          platform_email?: string | null
+          platform_phone?: string | null
           updated_at?: string | null
         }
         Relationships: []
@@ -4104,6 +4299,10 @@ export type Database = {
         Args: { p_subscription_id: string }
         Returns: boolean
       }
+      approve_payment_proof: {
+        Args: { p_payment_method?: string; p_proof_id: string }
+        Returns: string
+      }
       cancel_booking: {
         Args: { p_booking_id: string; p_reason: string }
         Returns: undefined
@@ -4244,6 +4443,10 @@ export type Database = {
         Returns: {
           booking_id: string
           booking_ref: string
+          hold_expires_at: string
+          invoice_id: string
+          invoice_number: string
+          total_price: number
         }[]
       }
       create_recurring_booking: {
@@ -4302,6 +4505,7 @@ export type Database = {
       ensure_booking_qr: { Args: { p_booking_id: string }; Returns: string }
       ensure_invoice_qr: { Args: { p_invoice_id: string }; Returns: string }
       ensure_player_qr: { Args: { p_player_id: string }; Returns: string }
+      expire_stale_booking_holds: { Args: never; Returns: number }
       extend_grace_period: {
         Args: { p_grace_period_days: number; p_subscription_id: string }
         Returns: undefined
@@ -4417,17 +4621,49 @@ export type Database = {
           user_id: string
         }[]
       }
+      get_platform_contact: {
+        Args: never
+        Returns: {
+          platform_email: string
+          platform_phone: string
+        }[]
+      }
+      get_public_booking_receipt_contact: {
+        Args: { p_booking_id: string }
+        Returns: {
+          payment_receipt_whatsapp_number: string
+          whatsapp_number: string
+        }[]
+      }
       get_public_club: {
         Args: { p_slug: string }
         Returns: {
+          address: string
           branches: Json
           club_id: string
           club_name: string
           club_name_en: string
+          contact_email: string
           currency: string
           fields: Json
           logo_url: string
+          maps_url: string
+          online_booking_start_offset_days: number
+          online_booking_window_days: number
+          payment_hold_minutes: number
+          primary_phone: string
+          same_day_online_booking_enabled: boolean
           timezone: string
+          whatsapp_number: string
+        }[]
+      }
+      get_public_club_booking_policy: {
+        Args: { p_club_id: string }
+        Returns: {
+          online_booking_start_offset_days: number
+          online_booking_window_days: number
+          payment_hold_minutes: number
+          same_day_online_booking_enabled: boolean
         }[]
       }
       get_public_club_subscription_access: {
@@ -4451,6 +4687,30 @@ export type Database = {
           p_start_time: string
         }
         Returns: number
+      }
+      get_public_payment_methods_for_booking: {
+        Args: { p_booking_id: string }
+        Returns: {
+          details: Json
+          display_order: number
+          id: string
+          instructions_ar: string
+          instructions_en: string
+          name_ar: string
+          name_en: string
+          proof_required: boolean
+          provider: string
+          reference_required: boolean
+          underlying_method: string
+        }[]
+      }
+      get_public_payment_proof_status: {
+        Args: { p_booking_id: string }
+        Returns: {
+          rejection_reason: string
+          status: string
+          uploaded_at: string
+        }[]
       }
       get_revenue_report: {
         Args: {
@@ -4607,6 +4867,17 @@ export type Database = {
         }
         Returns: string
       }
+      record_payment_proof_upload: {
+        Args: {
+          p_amount: number
+          p_booking_id: string
+          p_file_size_bytes: number
+          p_mime_type: string
+          p_payment_method_config_id?: string
+          p_storage_path: string
+        }
+        Returns: string
+      }
       record_platform_payment: {
         Args: {
           p_amount: number
@@ -4615,6 +4886,10 @@ export type Database = {
           p_reference?: string
         }
         Returns: string
+      }
+      reject_payment_proof: {
+        Args: { p_proof_id: string; p_reason: string }
+        Returns: undefined
       }
       renew_platform_subscription: {
         Args: { p_plan_id?: string; p_previous_subscription_id: string }
@@ -4656,6 +4931,17 @@ export type Database = {
       }
       review_customer_photo_request: {
         Args: { p_approve: boolean; p_reason?: string; p_request_id: string }
+        Returns: undefined
+      }
+      set_club_booking_policy: {
+        Args: {
+          p_cash_reservation_allowed?: boolean
+          p_club_id: string
+          p_online_booking_start_offset_days?: number
+          p_online_booking_window_days?: number
+          p_payment_hold_minutes?: number
+          p_same_day_online_booking_enabled?: boolean
+        }
         Returns: undefined
       }
       set_club_public_booking_enabled: {

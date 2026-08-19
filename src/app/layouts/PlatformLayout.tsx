@@ -129,7 +129,7 @@ export function PlatformLayout() {
     <div className="flex min-h-screen bg-page-bg">
       <aside className="hidden w-64 shrink-0 border-e border-border bg-dark-secondary text-white md:flex md:flex-col">
         <div className="px-4 py-5">
-          <p className="text-lg font-bold">Mala3by</p>
+          <p className="text-lg font-bold">Mal3aby</p>
           <p className="text-xs text-white/50">Platform Owner Console</p>
         </div>
         <PlatformNavList />
@@ -146,7 +146,7 @@ export function PlatformLayout() {
 
       <div className="flex flex-1 flex-col">
         <header className="flex h-14 items-center justify-between border-b border-border bg-surface px-4 md:hidden">
-          <span className="font-bold text-text-primary">Mala3by — Platform</span>
+          <span className="font-bold text-text-primary">Mal3aby — Platform</span>
           <div className="flex items-center gap-2">
             <LanguageSwitcher />
             <Button
@@ -171,7 +171,7 @@ export function PlatformLayout() {
             the sidebar's own `border-e` direction-awareness, so this
             stays correct if a user toggles to English. */}
         <SheetContent side="right" className="flex w-64 flex-col bg-dark-secondary p-0 text-white">
-          <SheetTitle className="px-4 py-5 text-lg font-bold text-white">Mala3by — Platform</SheetTitle>
+          <SheetTitle className="px-4 py-5 text-lg font-bold text-white">Mal3aby — Platform</SheetTitle>
           <PlatformNavList onNavigate={() => setMobileNavOpen(false)} />
         </SheetContent>
       </Sheet>

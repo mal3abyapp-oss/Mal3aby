@@ -81,6 +81,7 @@ const navSections: NavSection[] = [
     items: [
       { to: '/app/billing', labelKey: 'nav.billing', icon: Receipt, domain: 'finance' },
       { to: '/app/outstanding', labelKey: 'nav.outstanding', icon: Wallet, domain: 'finance' },
+      { to: '/app/pending-payments', labelKey: 'nav.pendingPayments', icon: Receipt, domain: 'finance' },
       { to: '/app/cash-shift', labelKey: 'nav.cashShift', icon: Wallet, domain: 'finance' },
       { to: '/app/subscription', labelKey: 'nav.subscription', icon: CreditCard, domain: 'finance' },
     ],
@@ -152,7 +153,7 @@ export function AppLayout() {
     <div className="flex min-h-screen bg-page-bg">
       {/* Desktop sidebar */}
       <aside className="hidden w-60 shrink-0 border-e border-border bg-dark-base text-white md:flex md:flex-col">
-        <div className="px-4 py-5 text-lg font-bold">ملعبي | Mala3by</div>
+        <div className="px-4 py-5 text-lg font-bold">ملعبي | Mal3aby</div>
 
         {memberships.length > 0 && (
           <div className="px-2 pb-3">
@@ -214,7 +215,7 @@ export function AppLayout() {
       <div className="flex flex-1 flex-col">
         {/* Top bar: mobile shows brand, desktop shows Global Search */}
         <header className="flex h-14 items-center justify-between border-b border-border bg-surface px-4 md:hidden">
-          <span className="font-bold text-text-primary">ملعبي | Mala3by</span>
+          <span className="font-bold text-text-primary">ملعبي | Mal3aby</span>
           <LanguageSwitcher />
         </header>
         <header className="hidden h-14 items-center gap-4 border-b border-border bg-surface px-4 md:flex">

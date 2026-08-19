@@ -1,6 +1,6 @@
 import { useTranslation } from 'react-i18next'
 
-// Initial usable V1 legal content -- accurate to what Mala3by actually
+// Initial usable V1 legal content -- accurate to what Mal3aby actually
 // stores and how (Supabase-hosted, RLS-isolated multi-tenant data), not
 // over-engineered. Replaces the placeholder found during the Final
 // Release Gate (2026-08-15). Should be reviewed by qualified legal
