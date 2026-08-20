@@ -227,7 +227,19 @@ export function AppLayout() {
         </button>
       </aside>
 
-      <div className="flex flex-1 flex-col">
+      {/* min-w-0 fix (real mobile bug found via live QA browser E2E, MASTER
+          OPERATIONAL SIMPLIFICATION DIRECTIVE section 38): a flex child
+          with no explicit min-width defaults to min-width:auto, which
+          means it refuses to shrink below its content's intrinsic width.
+          Any wide content deep inside main (a data table with many
+          columns, in this case Cash Shift's history table) was pushing
+          this whole column -- and with it the entire page body -- to
+          ~1100px wide on a 375px viewport, causing horizontal overflow
+          site-wide on mobile. The table's own overflow-x-auto wrapper
+          was correct and did its job; the bug was one level up, this
+          flex container never letting the page shrink to the viewport
+          in the first place. */}
+      <div className="flex min-w-0 flex-1 flex-col">
         {/* Top bar: mobile shows brand, desktop shows Global Search */}
         <header className="flex h-14 items-center justify-between border-b border-border bg-surface px-4 md:hidden">
           <span className="font-bold text-text-primary">ملعبي | Mal3aby</span>
