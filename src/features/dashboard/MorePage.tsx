@@ -2,7 +2,7 @@ import { Link } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { PageHeader } from '@/components/ui/page-header'
 import { Card, CardContent } from '@/components/ui/card'
-import { Users, Receipt, BarChart3, UserCog, Settings, ChevronRight, Building2, ShieldCheck, MessageCircle } from 'lucide-react'
+import { Users, Receipt, BarChart3, UserCog, Settings, ChevronRight, Building2, ShieldCheck, MessageCircle, LogOut } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 import { useAuth } from '@/app/providers/AuthProvider'
 import { canSeeNavDomain, type NavDomain } from '@/lib/domain/navigation'
@@ -64,7 +64,7 @@ const ITEMS: MoreItem[] = [
 
 export function MorePage() {
   const { t } = useTranslation()
-  const { currentMembership } = useAuth()
+  const { currentMembership, signOut } = useAuth()
   const visibleItems = ITEMS.filter((item) => canSeeNavDomain(currentMembership?.roleKey, item.domain))
   // HIGH-ROI UX PASS 01, Priority 3: a live, tenant-scoped count next to
   // "Pending Payments" -- previously a plain list row indistinguishable
@@ -102,6 +102,14 @@ export function MorePage() {
             </Card>
           </Link>
         ))}
+        <button
+          type="button"
+          onClick={() => void signOut()}
+          className="mt-2 flex w-full items-center gap-3 rounded-lg border border-border bg-card p-4 text-start font-medium text-status-danger transition hover:bg-muted/40"
+        >
+          <LogOut className="size-5 shrink-0" />
+          {t('nav.logout')}
+        </button>
       </div>
     </div>
   )
