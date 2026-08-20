@@ -435,7 +435,11 @@ export function BookingDetailSheet({
               )}
             </div>
 
-            {booking.invoiceId && outstanding > 0.01 && (
+            {/* Phase H (H2): a cancelled/no-show booking's outstanding
+                balance is real accounting information (still shown
+                above), but staff should never be invited to collect
+                MORE money for a booking that isn't happening. */}
+            {booking.invoiceId && outstanding > 0.01 && booking.status !== 'cancelled' && booking.status !== 'no_show' && (
               showCollectForm ? (
                 <div className="flex flex-col gap-2 rounded-lg border border-border p-3">
                   <div className="grid grid-cols-2 gap-2">
