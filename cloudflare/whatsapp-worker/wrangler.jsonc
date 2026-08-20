@@ -125,7 +125,17 @@
       // match -- never silently reuse the same tag for different code
       // (the digest above is the actual content-addressed proof of
       // what's running, keep it in sync with the tag).
-      "image": "registry.cloudflare.com/35ac10727701095866b16c276b4a33d1/mala3by-whatsapp-connector:235e37c",
+      // v12, commit fa49505 -- MASTER OPERATIONAL SIMPLIFICATION
+      // DIRECTIVE night-execution batch: government receipt fields
+      // wired into WhatsApp message payloads (booking-confirmed-paid,
+      // payment-received templates), payment method added to
+      // invoice-PDF/message payload, real Arabic-tofu-box bug fixed on
+      // the English-language invoice PDF layout (mixed-script values
+      // now render through the correct vector renderer), booking
+      // date/time + official receipt block added to the PDF. GitHub
+      // Actions run 32355894455, digest
+      // sha256:f37397cef615f5b49bc4247e4847d6a711df2f3ccc63c2a08f47f1122403619c.
+      "image": "registry.cloudflare.com/35ac10727701095866b16c276b4a33d1/mala3by-whatsapp-connector:fa49505",
       // One container instance per WhatsApp account (one Durable
       // Object = one container, directive rule 21's chosen model --
       // NOT a shared container serving multiple clubs, which would
