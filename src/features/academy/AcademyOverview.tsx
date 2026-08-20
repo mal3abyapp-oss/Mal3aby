@@ -1,5 +1,4 @@
 import { useQuery } from '@tanstack/react-query'
-import { useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { supabase } from '@/lib/supabase/client'
 import { useAuth } from '@/app/providers/AuthProvider'
@@ -93,10 +92,9 @@ async function fetchOverview(clubId: string): Promise<OverviewData> {
   }
 }
 
-export function AcademyOverview({ onNavigateTab }: { onNavigateTab: (tab: 'players' | 'structure' | 'enrollments') => void }) {
+export function AcademyOverview({ onNavigateTab }: { onNavigateTab: (tab: 'players' | 'memberships' | 'attendance') => void }) {
   const { t } = useTranslation()
   const { currentClubId } = useAuth()
-  const navigate = useNavigate()
 
   const { data, isLoading } = useQuery({
     queryKey: ['academy-overview', currentClubId],
@@ -112,10 +110,10 @@ export function AcademyOverview({ onNavigateTab }: { onNavigateTab: (tab: 'playe
         <Button size="sm" onClick={() => onNavigateTab('players')}>
           <UserPlus className="size-4" /> {t('academy.overview.addPlayer')}
         </Button>
-        <Button size="sm" variant="outline" onClick={() => onNavigateTab('enrollments')}>
+        <Button size="sm" variant="outline" onClick={() => onNavigateTab('memberships')}>
           <ClipboardList className="size-4" /> {t('academy.overview.enrollInGroup')}
         </Button>
-        <Button size="sm" variant="outline" onClick={() => navigate('/app')}>
+        <Button size="sm" variant="outline" onClick={() => onNavigateTab('attendance')}>
           <CheckSquare className="size-4" /> {t('academy.overview.markAttendance')}
         </Button>
       </div>
@@ -136,7 +134,7 @@ export function AcademyOverview({ onNavigateTab }: { onNavigateTab: (tab: 'playe
             {data.groupsNearCapacity.map((g) => (
               <button
                 key={g.id}
-                onClick={() => onNavigateTab('structure')}
+                onClick={() => onNavigateTab('memberships')}
                 className="flex items-center justify-between rounded-md border border-border p-2.5 text-start text-sm hover:bg-muted/40"
               >
                 <span>{g.name}</span>

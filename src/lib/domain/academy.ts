@@ -1,5 +1,20 @@
 // Shared domain types for Phase 10 — Academy Structure.
 
+/**
+ * Academy radical simplification directive section 10: "the employee
+ * should never calculate the end date manually." Given a start date and
+ * a whole-month duration, returns the ISO end date exactly one calendar
+ * month later -- the single implementation both the create-membership
+ * wizard and the renewal flow use (previously duplicated inline in
+ * EnrollmentSection.tsx's two onChange handlers, one for enrollment and
+ * one for renewal, with identical logic hand-copied twice).
+ */
+export function addMonthsToDate(startDateIso: string, months: number): string {
+  const d = new Date(startDateIso)
+  d.setMonth(d.getMonth() + months)
+  return d.toISOString().slice(0, 10)
+}
+
 export interface ProgramRow {
   id: string
   name: string

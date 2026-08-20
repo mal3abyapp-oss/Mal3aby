@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { getAcademySubscriptionDisplayStatus } from './academy'
+import { getAcademySubscriptionDisplayStatus, addMonthsToDate } from './academy'
 
 // Dedicated automated test for academy expiry/DUE derivation (directive's
 // explicit "academy enrollment expiry calculation" test requirement).
@@ -61,5 +61,30 @@ describe('getAcademySubscriptionDisplayStatus', () => {
     // the real clock, so only structural correctness is asserted here).
     const result = getAcademySubscriptionDisplayStatus('active', '2099-01-01')
     expect(result).toBe('active')
+  })
+})
+
+// Academy radical simplification directive section 10: "the system
+// calculates the end date automatically" -- dedicated coverage for the
+// one shared date-math helper the create-membership and renewal flows
+// both now use (previously two hand-copied inline implementations).
+describe('addMonthsToDate', () => {
+  it('adds exactly one month for the default academy subscription duration', () => {
+    expect(addMonthsToDate('2026-08-20', 1)).toBe('2026-09-20')
+  })
+
+  it('rolls over the year boundary correctly', () => {
+    expect(addMonthsToDate('2026-12-15', 1)).toBe('2027-01-15')
+  })
+
+  it('handles a start date on the 31st rolling into a shorter month', () => {
+    // JS Date.setMonth() rolls Jan 31 + 1 month into March 3 (Feb has no
+    // 31st) -- documenting the real, current behavior so a future change
+    // to this helper is caught by a test, not discovered live.
+    expect(addMonthsToDate('2026-01-31', 1)).toBe('2026-03-03')
+  })
+
+  it('supports multi-month durations', () => {
+    expect(addMonthsToDate('2026-08-20', 3)).toBe('2026-11-20')
   })
 })
