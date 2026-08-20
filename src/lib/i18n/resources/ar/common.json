@@ -39,6 +39,7 @@
     "cashShift": "وردية النقدية",
     "subscription": "اشتراك المنصة",
     "sectionFinance": "المالية",
+    "finance": "المالية",
     "reports": "التقارير",
     "whatsapp": "واتساب",
     "staff": "الموظفون",
@@ -1916,6 +1917,7 @@
       "outstandingDesc": "الفواتير غير المسددة بالكامل",
       "pendingPaymentsDesc": "مراجعة واعتماد إيصالات الدفع المرفوعة من العملاء",
       "cashShiftDesc": "فتح وإغلاق وردية الصندوق النقدي",
+      "financeDesc": "المدفوعات، الفواتير، الورديات النقدية، والتقارير المالية",
       "reportsDesc": "تقارير الإيرادات والإشغال والأكاديمية",
       "fieldsDesc": "فروع النادي، الملاعب، مواعيد العمل، والأسعار",
       "whatsappDesc": "الاتصال، النشاط، وضوابط الإرسال",
@@ -1994,6 +1996,7 @@
       "officialReceipts": "إيصالات التحصيل الرسمية",
       "reconciliation": "المطابقة المالية",
       "employeeLiability": "مديونية الموظفين",
+      "financialReports": "التقارير المالية",
       "sectionAcademyCustomers": "الأكاديمية والعملاء",
       "academy": "الأكاديمية",
       "customers": "العملاء"
@@ -2569,5 +2572,61 @@
   "errorState": {
     "defaultMessage": "حدث خطأ، حاول مرة أخرى",
     "retry": "إعادة المحاولة"
+  },
+  "finance": {
+    "title": "المالية",
+    "description": "كل ما يخص الأموال في مكان واحد — المدفوعات، الفواتير، الورديات النقدية، والتقارير.",
+    "nav": {
+      "overview": "نظرة عامة",
+      "payments": "التحصيل والمدفوعات",
+      "invoices": "الفواتير والإيصالات",
+      "cash": "الورديات والخزينة",
+      "expenses": "المصروفات",
+      "reports": "التقارير"
+    },
+    "overview": {
+      "revenue": "الإيرادات",
+      "cashCollected": "النقد المحصل",
+      "bankTransfers": "التحويلات البنكية",
+      "electronicPayments": "المدفوعات الإلكترونية",
+      "outstanding": "المستحقات",
+      "unpaidInvoices": "فواتير غير مدفوعة",
+      "partiallyPaidInvoices": "فواتير مدفوعة جزئيًا",
+      "refunds": "المرتجعات",
+      "netMovement": "صافي الحركة المالية",
+      "openShifts": "الورديات المفتوحة",
+      "expectedCashDrawer": "المتوقع بالدرج (إجمالي الرصيد الافتتاحي)",
+      "pendingProofs": "إثباتات دفع بانتظار المراجعة",
+      "officialReceipts": "الإيصالات الرسمية",
+      "expenses": "المصروفات",
+      "notApplicable": "غير متاح"
+    },
+    "payments": {
+      "tabAll": "كل المدفوعات",
+      "tabOutstanding": "المستحقات",
+      "tabPendingProofs": "إثباتات بانتظار المراجعة"
+    },
+    "invoices": {
+      "tabInvoices": "الفواتير",
+      "tabOfficialReceipts": "الإيصالات الرسمية"
+    },
+    "cash": {
+      "tabShifts": "الورديات",
+      "tabReconciliation": "المطابقة المالية",
+      "tabLiability": "مديونية الموظفين"
+    },
+    "expenses": {
+      "notBuiltTitle": "تتبع المصروفات غير متاح بعد",
+      "notBuiltDescription": "لا يوجد لهذا النادي سجل مصروفات تشغيلية داخل ملعبي حتى الآن. لا توجد بيانات مخفية — هذه الميزة ببساطة غير موجودة في النظام بعد."
+    },
+    "reportsPage": {
+      "revenue": "الإيرادات",
+      "collections": "التحصيلات",
+      "paymentMethods": "طرق الدفع",
+      "exceptions": "الاستثناءات",
+      "officialReceipts": "الإيصالات الرسمية",
+      "reconciliation": "المطابقة المالية",
+      "employeeLiability": "مديونية الموظفين"
+    }
   }
 }

@@ -4,6 +4,7 @@ import { AppLayout } from '@/app/layouts/AppLayout'
 import { PlatformLayout } from '@/app/layouts/PlatformLayout'
 import { PortalLayout } from '@/app/layouts/PortalLayout'
 import { RequireAuth, RequirePlatformOwner, RequirePortalAuth } from '@/app/routing/RequireAuth'
+import { RedirectWithSearch } from '@/app/routing/RedirectWithSearch'
 
 import { HomePage } from '@/features/public-site/HomePage'
 import { PricingPage } from '@/features/public-site/PricingPage'
@@ -26,11 +27,14 @@ import { MorePage } from '@/features/dashboard/MorePage'
 import { BookingsPage } from '@/features/bookings/BookingsPage'
 import { AcademyPage } from '@/features/academy/AcademyPage'
 import { CustomersPage } from '@/features/customers/CustomersPage'
-import { BillingPage } from '@/features/billing/BillingPage'
-import { CashShiftPage } from '@/features/billing/CashShiftPage'
 import { SubscriptionPage } from '@/features/billing/SubscriptionPage'
-import { OutstandingPage } from '@/features/billing/OutstandingPage'
-import { PendingPaymentsPage } from '@/features/billing/PendingPaymentsPage'
+import { FinanceLayout } from '@/features/finance/FinanceLayout'
+import { FinanceOverviewPage } from '@/features/finance/FinanceOverviewPage'
+import { FinancePaymentsPage } from '@/features/finance/FinancePaymentsPage'
+import { FinanceInvoicesPage } from '@/features/finance/FinanceInvoicesPage'
+import { FinanceCashPage } from '@/features/finance/FinanceCashPage'
+import { FinanceExpensesPage } from '@/features/finance/FinanceExpensesPage'
+import { FinanceReportsPage } from '@/features/finance/FinanceReportsPage'
 import { ReportsOverviewPage } from '@/features/reports/ReportsOverviewPage'
 import { ReportBookingsPage } from '@/features/reports/ReportBookingsPage'
 import { ReportOccupancyPage } from '@/features/reports/ReportOccupancyPage'
@@ -136,11 +140,40 @@ export const router = createBrowserRouter([
           { path: 'bookings', element: <BookingsPage /> },
           { path: 'academy', element: <AcademyPage /> },
           { path: 'customers', element: <CustomersPage /> },
-          { path: 'billing', element: <BillingPage /> },
-          { path: 'cash-shift', element: <CashShiftPage /> },
+          // Finance IA consolidation directive: every money-related
+          // screen now lives under /app/finance as one coherent module
+          // (sections 1-84) -- FinanceLayout renders the shared sub-nav,
+          // each child is a tab. /app/finance itself is the Overview
+          // landing tab (matches the pre-existing /app/reports pattern:
+          // ReportsOverviewPage is the index, not a tab among equals).
+          {
+            path: 'finance',
+            element: <FinanceLayout />,
+            children: [
+              { index: true, element: <FinanceOverviewPage /> },
+              { path: 'payments', element: <FinancePaymentsPage /> },
+              { path: 'invoices', element: <FinanceInvoicesPage /> },
+              { path: 'cash', element: <FinanceCashPage /> },
+              { path: 'expenses', element: <FinanceExpensesPage /> },
+              { path: 'reports', element: <FinanceReportsPage /> },
+            ],
+          },
+          // Directive section 31/32: old flat finance routes redirect
+          // into the new Finance module -- query params (e.g.
+          // ?invoice=<id> from Academy's "Collect Payment Now" link,
+          // BookingDetailSheet/CustomerDetailDialog deep links) are
+          // preserved via RedirectWithSearch so no existing bookmark or
+          // in-app link breaks (directive section 32: "test invoice
+          // deep link, booking payment link, customer payment link").
+          { path: 'billing', element: <RedirectWithSearch to="/app/finance/payments" /> },
+          { path: 'cash-shift', element: <RedirectWithSearch to="/app/finance/cash" /> },
+          { path: 'outstanding', element: <RedirectWithSearch to="/app/finance/payments" /> },
+          { path: 'pending-payments', element: <RedirectWithSearch to="/app/finance/payments" /> },
+          // Club's own platform-SaaS-subscription status -- unrelated to
+          // customer money, kept as its own route (directive doesn't
+          // fold platform billing into the customer-money Finance
+          // module); linked from Finance Overview and Settings.
           { path: 'subscription', element: <SubscriptionPage /> },
-          { path: 'outstanding', element: <OutstandingPage /> },
-          { path: 'pending-payments', element: <PendingPaymentsPage /> },
           // Master IA/UX audit (Reports decomposition phase): the old
           // single /app/reports route rendered a 1127-line file with
           // 9 tabs sharing one Tabs.Root -- visual grouping (a prior

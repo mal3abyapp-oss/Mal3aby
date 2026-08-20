@@ -2,7 +2,7 @@ import { Link } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { PageHeader } from '@/components/ui/page-header'
 import { Card, CardContent } from '@/components/ui/card'
-import { Users, Receipt, Wallet, BarChart3, UserCog, Settings, ChevronRight, CircleDollarSign, Building2, ShieldCheck, MessageCircle } from 'lucide-react'
+import { Users, Receipt, BarChart3, UserCog, Settings, ChevronRight, Building2, ShieldCheck, MessageCircle } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 import { useAuth } from '@/app/providers/AuthProvider'
 import { canSeeNavDomain, type NavDomain } from '@/lib/domain/navigation'
@@ -53,10 +53,7 @@ interface MoreItem {
 
 const ITEMS: MoreItem[] = [
   { to: '/app/customers', labelKey: 'nav.customers', descriptionKey: 'dashboard.more.customersDesc', icon: Users, domain: 'customers' },
-  { to: '/app/billing', labelKey: 'nav.billing', descriptionKey: 'dashboard.more.billingDesc', icon: Receipt, domain: 'finance' },
-  { to: '/app/outstanding', labelKey: 'nav.outstanding', descriptionKey: 'dashboard.more.outstandingDesc', icon: CircleDollarSign, domain: 'finance' },
-  { to: '/app/pending-payments', labelKey: 'nav.pendingPayments', descriptionKey: 'dashboard.more.pendingPaymentsDesc', icon: Receipt, domain: 'finance' },
-  { to: '/app/cash-shift', labelKey: 'nav.cashShift', descriptionKey: 'dashboard.more.cashShiftDesc', icon: Wallet, domain: 'finance' },
+  { to: '/app/finance', labelKey: 'nav.finance', descriptionKey: 'dashboard.more.financeDesc', icon: Receipt, domain: 'finance' },
   { to: '/app/reports', labelKey: 'nav.reports', descriptionKey: 'dashboard.more.reportsDesc', icon: BarChart3, domain: 'reports' },
   { to: '/app/fields', labelKey: 'nav.fields', descriptionKey: 'dashboard.more.fieldsDesc', icon: Building2, domain: 'settings' },
   { to: '/app/whatsapp', labelKey: 'nav.whatsapp', descriptionKey: 'dashboard.more.whatsappDesc', icon: MessageCircle, domain: 'whatsapp' },
@@ -89,7 +86,7 @@ export function MorePage() {
                   <p className="font-medium">{t(item.labelKey)}</p>
                   <p className="truncate text-sm text-text-secondary">{t(item.descriptionKey)}</p>
                 </div>
-                {item.to === '/app/pending-payments' && pendingPaymentsCount > 0 && (
+                {item.to === '/app/finance' && pendingPaymentsCount > 0 && (
                   <span className="flex size-6 shrink-0 items-center justify-center rounded-full bg-status-warning text-xs font-semibold text-white">
                     {pendingPaymentsCount}
                   </span>

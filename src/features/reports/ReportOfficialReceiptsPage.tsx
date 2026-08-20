@@ -48,7 +48,13 @@ interface ReceiptsReport {
   total_collected_amount: number
 }
 
-export function ReportOfficialReceiptsPage() {
+// Finance IA consolidation directive: split into a header/nav-free
+// content component (reused verbatim by /app/finance/invoices'
+// "Official Receipts" sub-tab) plus the original standalone routed page
+// (kept for old bookmarks/deep links, directive section 32) which just
+// wraps the content with this module's own PageHeader/ReportsNav. No
+// duplicated fetch/render logic between the two entry points.
+export function ReportOfficialReceiptsContent() {
   const { t } = useTranslation()
   const { locale } = useDirection()
   const { currentClubId } = useAuth()
@@ -79,8 +85,6 @@ export function ReportOfficialReceiptsPage() {
 
   return (
     <div>
-      <PageHeader title={t('reports.title')} description={t('reports.officialReceipts.description')} />
-      <ReportsNav />
       <div className="mb-4 flex flex-wrap gap-3">
         <DateRangeFilter startDate={startDate} endDate={endDate} onStart={setStartDate} onEnd={setEndDate} />
         <Input
@@ -191,6 +195,17 @@ export function ReportOfficialReceiptsPage() {
           )}
         </>
       )}
+    </div>
+  )
+}
+
+export function ReportOfficialReceiptsPage() {
+  const { t } = useTranslation()
+  return (
+    <div>
+      <PageHeader title={t('reports.title')} description={t('reports.officialReceipts.description')} />
+      <ReportsNav />
+      <ReportOfficialReceiptsContent />
     </div>
   )
 }

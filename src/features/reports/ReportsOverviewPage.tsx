@@ -51,9 +51,9 @@ export function ReportsOverviewPage() {
               report pre-scoped conceptually to cancellations (exact
               status-filter wiring lives on that screen). */}
           <div className="mb-6 grid grid-cols-2 gap-3 md:grid-cols-4">
-            <StatCard label={t('reports.overview.cards.totalRevenue')} value={formatMoney(data.total_revenue, 'EGP', locale)} icon={Wallet} to="/app/reports/revenue" />
-            <StatCard label={t('reports.overview.cards.currentOutstanding')} value={formatMoney(data.outstanding_total, 'EGP', locale)} tone={data.outstanding_total > 0 ? 'warning' : undefined} to="/app/outstanding" />
-            <StatCard label={t('reports.overview.cards.refunds')} value={formatMoney(data.refunds_total, 'EGP', locale)} tone="danger" to="/app/reports/exceptions" />
+            <StatCard label={t('reports.overview.cards.totalRevenue')} value={formatMoney(data.total_revenue, 'EGP', locale)} icon={Wallet} to="/app/finance" />
+            <StatCard label={t('reports.overview.cards.currentOutstanding')} value={formatMoney(data.outstanding_total, 'EGP', locale)} tone={data.outstanding_total > 0 ? 'warning' : undefined} to="/app/finance/payments?status=outstanding" />
+            <StatCard label={t('reports.overview.cards.refunds')} value={formatMoney(data.refunds_total, 'EGP', locale)} tone="danger" to="/app/finance/reports" />
             <StatCard label={t('reports.overview.cards.confirmedBookings')} value={data.bookings_count} icon={CalendarCheck2} to="/app/reports/bookings" />
             <StatCard label={t('reports.overview.cards.cancelledBookings')} value={data.bookings_cancelled_count} to="/app/reports/bookings" />
             <StatCard label={t('reports.overview.cards.bookedHours')} value={data.total_booked_hours} to="/app/reports/occupancy" />

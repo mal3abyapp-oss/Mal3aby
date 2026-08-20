@@ -40,7 +40,7 @@ interface FinancialExceptionsReport {
   }[]
 }
 
-export function ReportExceptionsPage() {
+export function ReportExceptionsContent() {
   const { t } = useTranslation()
   const { locale } = useDirection()
   const { startDate, setStartDate, endDate, setEndDate } = useDateRange()
@@ -49,8 +49,6 @@ export function ReportExceptionsPage() {
 
   return (
     <div>
-      <PageHeader title={t('reports.title')} description={t('reports.exceptions.description')} />
-      <ReportsNav />
       <DateRangeFilter startDate={startDate} endDate={endDate} onStart={setStartDate} onEnd={setEndDate} />
       {isLoading && <p className="text-sm text-text-secondary">{t('reports.loading')}</p>}
       {data && (
@@ -170,6 +168,17 @@ export function ReportExceptionsPage() {
           </div>
         </>
       )}
+    </div>
+  )
+}
+
+export function ReportExceptionsPage() {
+  const { t } = useTranslation()
+  return (
+    <div>
+      <PageHeader title={t('reports.title')} description={t('reports.exceptions.description')} />
+      <ReportsNav />
+      <ReportExceptionsContent />
     </div>
   )
 }

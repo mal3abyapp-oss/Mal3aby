@@ -3,17 +3,11 @@ import { useTranslation } from 'react-i18next'
 import { cn } from '@/lib/utils'
 import {
   LayoutDashboard,
-  Wallet,
-  HandCoins,
-  Banknote,
-  ReceiptText,
   CalendarCheck2,
   Landmark,
   GraduationCap,
   Users,
-  ShieldCheck,
-  Scale,
-  UserX,
+  BarChart3,
 } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 
@@ -25,6 +19,16 @@ import type { LucideIcon } from 'lucide-react'
 // Each report is now its own screen/route with its own bundle, own
 // state, no shared active-tab coupling -- "one primary responsibility
 // per screen" applied for real, not just visually.
+//
+// Finance IA consolidation directive section 27/30: the 7 financial
+// reports (Revenue, Collections, Payment Methods, Exceptions, Official
+// Receipts, Reconciliation, Employee Liability) moved their nav home to
+// /app/finance/reports -- this was the "third parallel Finance grouping"
+// the pre-consolidation audit flagged as confusing (three different
+// screens all called themselves "Finance"). Their routes still exist
+// unchanged for old bookmarks (redirect not needed -- the content itself
+// didn't move, just this nav's listing of it), reachable here via one
+// link into the real Finance Reports tab instead of 7 separate entries.
 interface ReportNavItem {
   to: string
   labelKey: string
@@ -47,15 +51,9 @@ const REPORT_NAV: ReportNavGroup[] = [
     ],
   },
   {
-    titleKey: 'reports.nav.sectionFinance',
+    titleKey: null,
     items: [
-      { to: '/app/reports/revenue', labelKey: 'reports.nav.revenue', icon: Wallet },
-      { to: '/app/reports/collections', labelKey: 'reports.nav.collections', icon: HandCoins },
-      { to: '/app/reports/payment-methods', labelKey: 'reports.nav.paymentMethods', icon: Banknote },
-      { to: '/app/reports/exceptions', labelKey: 'reports.nav.exceptions', icon: ReceiptText },
-      { to: '/app/reports/official-receipts', labelKey: 'reports.nav.officialReceipts', icon: ShieldCheck },
-      { to: '/app/reports/reconciliation', labelKey: 'reports.nav.reconciliation', icon: Scale },
-      { to: '/app/reports/employee-liability', labelKey: 'reports.nav.employeeLiability', icon: UserX },
+      { to: '/app/finance/reports', labelKey: 'reports.nav.financialReports', icon: BarChart3 },
     ],
   },
   {

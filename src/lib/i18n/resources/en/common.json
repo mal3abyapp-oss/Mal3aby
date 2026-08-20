@@ -39,6 +39,7 @@
     "cashShift": "Cash Shift",
     "subscription": "Platform Subscription",
     "sectionFinance": "Finance",
+    "finance": "Finance",
     "reports": "Reports",
     "whatsapp": "WhatsApp",
     "staff": "Staff",
@@ -1917,6 +1918,7 @@
       "outstandingDesc": "Invoices not yet fully paid",
       "pendingPaymentsDesc": "Review and approve customer-uploaded payment receipts",
       "cashShiftDesc": "Open and close the cash register shift",
+      "financeDesc": "Payments, invoices, cash shifts, and financial reports",
       "reportsDesc": "Revenue, occupancy, and academy reports",
       "fieldsDesc": "Club branches, fields, working hours, and pricing",
       "whatsappDesc": "Connection, activity, and sending controls",
@@ -1995,6 +1997,7 @@
       "officialReceipts": "Official Collection Receipts",
       "reconciliation": "Financial reconciliation",
       "employeeLiability": "Employee liability",
+      "financialReports": "Financial reports",
       "sectionAcademyCustomers": "Academy & Customers",
       "academy": "Academy",
       "customers": "Customers"
@@ -2570,5 +2573,61 @@
   "errorState": {
     "defaultMessage": "An error occurred, please try again",
     "retry": "Retry"
+  },
+  "finance": {
+    "title": "Finance",
+    "description": "Everything money-related in one place — payments, invoices, cash shifts, and reports.",
+    "nav": {
+      "overview": "Overview",
+      "payments": "Payments & Collections",
+      "invoices": "Invoices & Receipts",
+      "cash": "Cash Shifts & Treasury",
+      "expenses": "Expenses",
+      "reports": "Reports"
+    },
+    "overview": {
+      "revenue": "Revenue",
+      "cashCollected": "Cash collected",
+      "bankTransfers": "Bank transfers",
+      "electronicPayments": "Electronic payments",
+      "outstanding": "Outstanding",
+      "unpaidInvoices": "Unpaid invoices",
+      "partiallyPaidInvoices": "Partially paid invoices",
+      "refunds": "Refunds",
+      "netMovement": "Net movement",
+      "openShifts": "Open shifts",
+      "expectedCashDrawer": "Expected in drawer (opening total)",
+      "pendingProofs": "Pending payment proofs",
+      "officialReceipts": "Official receipts",
+      "expenses": "Expenses",
+      "notApplicable": "N/A"
+    },
+    "payments": {
+      "tabAll": "All payments",
+      "tabOutstanding": "Outstanding",
+      "tabPendingProofs": "Pending proofs"
+    },
+    "invoices": {
+      "tabInvoices": "Invoices",
+      "tabOfficialReceipts": "Official receipts"
+    },
+    "cash": {
+      "tabShifts": "Shifts",
+      "tabReconciliation": "Reconciliation",
+      "tabLiability": "Employee liability"
+    },
+    "expenses": {
+      "notBuiltTitle": "Expenses tracking is not built yet",
+      "notBuiltDescription": "This club doesn't have an operating-expenses ledger in Mal3aby yet. Nothing has been recorded or hidden — this feature simply doesn't exist in the system yet."
+    },
+    "reportsPage": {
+      "revenue": "Revenue",
+      "collections": "Collections",
+      "paymentMethods": "Payment methods",
+      "exceptions": "Exceptions",
+      "officialReceipts": "Official receipts",
+      "reconciliation": "Reconciliation",
+      "employeeLiability": "Employee liability"
+    }
   }
 }

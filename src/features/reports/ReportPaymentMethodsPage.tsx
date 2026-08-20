@@ -67,7 +67,7 @@ async function fetchReconciliations(clubId: string, startDate: string, endDate: 
   }))
 }
 
-export function ReportPaymentMethodsPage() {
+export function ReportPaymentMethodsContent() {
   const { t } = useTranslation()
   const { currentClubId } = useAuth()
   const { locale } = useDirection()
@@ -104,8 +104,6 @@ export function ReportPaymentMethodsPage() {
 
   return (
     <div>
-      <PageHeader title={t('reports.title')} description={t('reports.paymentMethods.description')} />
-      <ReportsNav />
       <DateRangeFilter startDate={startDate} endDate={endDate} onStart={setStartDate} onEnd={setEndDate} />
       {isLoading && <p className="text-sm text-text-secondary">{t('reports.loading')}</p>}
       {data && (
@@ -214,6 +212,17 @@ export function ReportPaymentMethodsPage() {
           )}
         </>
       )}
+    </div>
+  )
+}
+
+export function ReportPaymentMethodsPage() {
+  const { t } = useTranslation()
+  return (
+    <div>
+      <PageHeader title={t('reports.title')} description={t('reports.paymentMethods.description')} />
+      <ReportsNav />
+      <ReportPaymentMethodsContent />
     </div>
   )
 }

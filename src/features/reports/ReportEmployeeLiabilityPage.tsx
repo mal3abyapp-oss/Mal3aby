@@ -26,7 +26,7 @@ interface LiabilityRow {
   created_at: string
 }
 
-export function ReportEmployeeLiabilityPage() {
+export function ReportEmployeeLiabilityContent() {
   const { t } = useTranslation()
   const { locale } = useDirection()
   const { startDate, setStartDate, endDate, setEndDate } = useDateRange()
@@ -54,8 +54,6 @@ export function ReportEmployeeLiabilityPage() {
 
   return (
     <div>
-      <PageHeader title={t('reports.title')} description={t('reports.employeeLiability.description')} />
-      <ReportsNav />
       <DateRangeFilter startDate={startDate} endDate={endDate} onStart={setStartDate} onEnd={setEndDate} />
       {isLoading && <p className="text-sm text-text-secondary">{t('reports.loading')}</p>}
       {!isLoading && (
@@ -73,6 +71,17 @@ export function ReportEmployeeLiabilityPage() {
           />
         </>
       )}
+    </div>
+  )
+}
+
+export function ReportEmployeeLiabilityPage() {
+  const { t } = useTranslation()
+  return (
+    <div>
+      <PageHeader title={t('reports.title')} description={t('reports.employeeLiability.description')} />
+      <ReportsNav />
+      <ReportEmployeeLiabilityContent />
     </div>
   )
 }

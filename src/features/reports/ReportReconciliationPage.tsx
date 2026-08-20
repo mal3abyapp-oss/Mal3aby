@@ -25,7 +25,7 @@ interface ReconciliationReport {
   unreceipted_required_payments: { payment_id: string; amount: number; method: string; received_at: string }[]
 }
 
-export function ReportReconciliationPage() {
+export function ReportReconciliationContent() {
   const { t } = useTranslation()
   const { locale } = useDirection()
   const { startDate, setStartDate, endDate, setEndDate } = useDateRange()
@@ -35,8 +35,6 @@ export function ReportReconciliationPage() {
 
   return (
     <div>
-      <PageHeader title={t('reports.title')} description={t('reports.reconciliation.description')} />
-      <ReportsNav />
       <DateRangeFilter startDate={startDate} endDate={endDate} onStart={setStartDate} onEnd={setEndDate} />
       {isLoading && <p className="text-sm text-text-secondary">{t('reports.loading')}</p>}
       {data && (
@@ -94,6 +92,17 @@ export function ReportReconciliationPage() {
           </div>
         </>
       )}
+    </div>
+  )
+}
+
+export function ReportReconciliationPage() {
+  const { t } = useTranslation()
+  return (
+    <div>
+      <PageHeader title={t('reports.title')} description={t('reports.reconciliation.description')} />
+      <ReportsNav />
+      <ReportReconciliationContent />
     </div>
   )
 }

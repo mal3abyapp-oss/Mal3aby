@@ -21,7 +21,7 @@ interface CollectionsReport {
   by_branch: { branch_id: string; branch_name: string; amount: number; payment_count: number }[]
 }
 
-export function ReportCollectionsPage() {
+export function ReportCollectionsContent() {
   const { t } = useTranslation()
   const { locale } = useDirection()
   const { startDate, setStartDate, endDate, setEndDate } = useDateRange()
@@ -29,8 +29,6 @@ export function ReportCollectionsPage() {
 
   return (
     <div>
-      <PageHeader title={t('reports.title')} description={t('reports.collections.description')} />
-      <ReportsNav />
       <DateRangeFilter startDate={startDate} endDate={endDate} onStart={setStartDate} onEnd={setEndDate} />
       {isLoading && <p className="text-sm text-text-secondary">{t('reports.loading')}</p>}
       {data && (
@@ -112,6 +110,17 @@ export function ReportCollectionsPage() {
           </div>
         </>
       )}
+    </div>
+  )
+}
+
+export function ReportCollectionsPage() {
+  const { t } = useTranslation()
+  return (
+    <div>
+      <PageHeader title={t('reports.title')} description={t('reports.collections.description')} />
+      <ReportsNav />
+      <ReportCollectionsContent />
     </div>
   )
 }

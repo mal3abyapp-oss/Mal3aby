@@ -14,8 +14,6 @@ import {
   GraduationCap,
   Users,
   Receipt,
-  Wallet,
-  CreditCard,
   BarChart3,
   UserCog,
   Settings,
@@ -56,17 +54,17 @@ interface NavSection {
 // the component -- these arrays stay static (no re-render cost from
 // recreating them), only the label lookup is locale-aware.
 //
-// IA restructuring (Phase 6): Billing/Outstanding/Cash Shift/Subscription
-// were 4 separate flat items with no visual indication they're all the
-// same "money" domain -- confirmed in the audit as one of the crowding
-// symptoms (nav-visibility was already grouped under the 'finance'
-// NavDomain since Phase 3, but the sidebar never reflected that
-// grouping visually). Grouped under a "المالية" section header, same
-// pattern as PlatformLayout's sidebar sections (Phase 4). Subscription
-// added here too -- per target IA it "gets a real nav presence... as a
-// Settings sub-link", but a persistent sidebar entry inside the Finance
-// group is the more honest home for an always-relevant financial
-// concern than a link buried at the bottom of Settings.
+// Finance IA consolidation directive (sections 1-84): the 5 flat
+// "Finance" items (Billing, Outstanding, Pending Payments, Cash Shift,
+// Subscription) collapse into ONE nav entry -- /app/finance, a real
+// tabbed module (Overview/Payments & Collections/Invoices & Receipts/
+// Cash Shifts & Treasury/Expenses/Reports) rather than a sidebar
+// section grouping 5 competing top-level pages (directive section 84:
+// "Do not leave Billing/Outstanding/Cash Shift/Pending Payments/
+// Official Receipts as separate competing primary navigation items").
+// Club's own platform-subscription status is a different concern
+// (SaaS billing, not customer money) and keeps its own link, moved next
+// to Settings where account-status concerns live.
 const navSections: NavSection[] = [
   {
     titleKey: null,
@@ -75,16 +73,7 @@ const navSections: NavSection[] = [
       { to: '/app/bookings', labelKey: 'nav.bookings', icon: CalendarDays, domain: 'bookings' },
       { to: '/app/academy', labelKey: 'nav.academy', icon: GraduationCap, domain: 'academy' },
       { to: '/app/customers', labelKey: 'nav.customers', icon: Users, domain: 'customers' },
-    ],
-  },
-  {
-    titleKey: 'nav.sectionFinance',
-    items: [
-      { to: '/app/billing', labelKey: 'nav.billing', icon: Receipt, domain: 'finance' },
-      { to: '/app/outstanding', labelKey: 'nav.outstanding', icon: Wallet, domain: 'finance' },
-      { to: '/app/pending-payments', labelKey: 'nav.pendingPayments', icon: Receipt, domain: 'finance' },
-      { to: '/app/cash-shift', labelKey: 'nav.cashShift', icon: Wallet, domain: 'finance' },
-      { to: '/app/subscription', labelKey: 'nav.subscription', icon: CreditCard, domain: 'finance' },
+      { to: '/app/finance', labelKey: 'nav.finance', icon: Receipt, domain: 'finance' },
     ],
   },
   {
@@ -204,7 +193,7 @@ export function AppLayout() {
                 >
                   <item.icon className="size-4" />
                   <span className="flex-1">{t(item.labelKey)}</span>
-                  {item.to === '/app/pending-payments' && pendingPaymentsCount > 0 && (
+                  {item.to === '/app/finance' && pendingPaymentsCount > 0 && (
                     <span className="flex size-5 shrink-0 items-center justify-center rounded-full bg-status-warning text-[11px] font-semibold text-white">
                       {pendingPaymentsCount}
                     </span>

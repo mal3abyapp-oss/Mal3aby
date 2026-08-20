@@ -30,7 +30,11 @@ interface RevenueReport {
   refunds_total: number
 }
 
-export function ReportRevenuePage() {
+// Finance IA consolidation directive: content split out so
+// /app/finance/reports can embed it without dragging in the Reports
+// module's own PageHeader/ReportsNav (directive section 43). Original
+// routed page kept below for old bookmarks (section 32).
+export function ReportRevenueContent() {
   const { t } = useTranslation()
   const { locale } = useDirection()
   const { startDate, setStartDate, endDate, setEndDate } = useDateRange()
@@ -44,8 +48,6 @@ export function ReportRevenuePage() {
 
   return (
     <div>
-      <PageHeader title={t('reports.title')} description={t('reports.revenue.description')} />
-      <ReportsNav />
       <DateRangeFilter startDate={startDate} endDate={endDate} onStart={setStartDate} onEnd={setEndDate} />
       <div className="mb-4 w-48">
         <Select value={method} onValueChange={setMethod}>
@@ -118,6 +120,17 @@ export function ReportRevenuePage() {
           </div>
         </>
       )}
+    </div>
+  )
+}
+
+export function ReportRevenuePage() {
+  const { t } = useTranslation()
+  return (
+    <div>
+      <PageHeader title={t('reports.title')} description={t('reports.revenue.description')} />
+      <ReportsNav />
+      <ReportRevenueContent />
     </div>
   )
 }
