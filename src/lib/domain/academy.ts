@@ -23,6 +23,33 @@ export interface AgeGroupRow {
   maxAge: number | null
 }
 
+/**
+ * Client-side mirror of get_academy_subscription_display_status() (see
+ * supabase/migrations/20260820082000_academy_renewal_and_expiry_rpcs.sql
+ * and its search_path fix in 20260820100000). Pure derivation, no cron
+ * dependency: an active/pending subscription within 7 days of end_date
+ * reads as DUE, past end_date reads as EXPIRED, even before the daily
+ * pg_cron sweep has actually transitioned the stored status. Never
+ * overrides a terminal status (frozen/expired/cancelled display exactly
+ * as stored) -- extracted out of EnrollmentSection.tsx's render body so
+ * this exact rule has real test coverage instead of only being
+ * exercised implicitly through a rendered component.
+ *
+ * `today` is an injectable ISO date string (YYYY-MM-DD) so callers/
+ * tests can pin a fixed "now" instead of depending on the real clock.
+ */
+export function getAcademySubscriptionDisplayStatus(
+  status: string,
+  endDate: string,
+  today: string = new Date().toISOString().slice(0, 10),
+): string {
+  if (['expired', 'cancelled', 'frozen'].includes(status)) return status
+  if (endDate < today) return 'expired'
+  const sevenDaysFromToday = new Date(new Date(today).getTime() + 7 * 86400000).toISOString().slice(0, 10)
+  if (endDate <= sevenDaysFromToday) return 'due'
+  return status
+}
+
 export interface GroupRow {
   id: string
   branchId: string

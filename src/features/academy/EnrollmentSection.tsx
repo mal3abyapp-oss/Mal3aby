@@ -27,6 +27,7 @@ import {
 import {
   type EnrollmentRow,
   type SubscriptionRow,
+  getAcademySubscriptionDisplayStatus,
 } from '@/lib/domain/academy'
 
 // Enrollment Wizard (guardian -> player -> group -> subscription ->
@@ -471,14 +472,7 @@ export function EnrollmentSection() {
                 // actually transitioned the stored status. Never
                 // overrides a terminal status (frozen/expired/cancelled
                 // display exactly as stored).
-                const today = new Date().toISOString().slice(0, 10)
-                const displayStatus = ['expired', 'cancelled', 'frozen'].includes(subscription.status)
-                  ? subscription.status
-                  : subscription.endDate < today
-                    ? 'expired'
-                    : subscription.endDate <= new Date(Date.now() + 7 * 86400000).toISOString().slice(0, 10)
-                      ? 'due'
-                      : subscription.status
+                const displayStatus = getAcademySubscriptionDisplayStatus(subscription.status, subscription.endDate)
                 return (
                   <StatusBadge
                     tone={displayStatus === 'active' ? 'success' : displayStatus === 'due' || displayStatus === 'frozen' ? 'warning' : displayStatus === 'expired' ? 'danger' : 'neutral'}
