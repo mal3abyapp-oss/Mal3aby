@@ -112,6 +112,12 @@ export function EnrollmentSection() {
     frozen: t('academy.subscriptionStatusLabels.frozen'),
     expired: t('academy.subscriptionStatusLabels.expired'),
     cancelled: t('academy.subscriptionStatusLabels.cancelled'),
+    // Phase E (E5): DUE is a display-only derivation (an active
+    // subscription within 7 days of end_date) computed client-side from
+    // the same rule get_academy_subscription_display_status() uses --
+    // never a real stored status, since it's a moving target that
+    // changes without any write happening.
+    due: t('academy.subscriptionStatusLabels.due'),
   }
   const queryClient = useQueryClient()
 
@@ -256,6 +262,47 @@ export function EnrollmentSection() {
     },
   })
 
+  // Phase E (E4): renewal creates a NEW subscription row for the same
+  // enrollment -- never overwrites the expired/cancelled one, which
+  // stays as history. Only reachable once the current subscription is
+  // in a terminal status, matching renew_academy_subscription()'s own
+  // server-side guard.
+  const [renewStart, setRenewStart] = useState('')
+  const [renewEnd, setRenewEnd] = useState('')
+  const [renewError, setRenewError] = useState<string | null>(null)
+
+  // Reset renewal fields whenever a different enrollment is selected (or
+  // the dialog closes) so a stale date range/error from one player's
+  // renewal can never leak into another's.
+  useEffect(() => {
+    setRenewStart('')
+    setRenewEnd('')
+    setRenewError(null)
+  }, [selectedEnrollment])
+
+  const renewMutation = useMutation({
+    mutationFn: async () => {
+      if (!selectedEnrollment) throw new Error('no enrollment selected')
+      const group = groups.find((g) => g.id === selectedEnrollment.groupId)
+      const price = group?.subscription_price
+      if (price == null) throw new Error(t('academy.enrollments.noApprovedPrice'))
+      const { error } = await supabase.rpc('renew_academy_subscription', {
+        p_enrollment_id: selectedEnrollment.id,
+        p_start_date: renewStart,
+        p_end_date: renewEnd,
+        p_price: price,
+      })
+      if (error) throw error
+    },
+    onSuccess: () => {
+      setRenewStart('')
+      setRenewEnd('')
+      setRenewError(null)
+      void queryClient.invalidateQueries({ queryKey: ['subscription-for-enrollment', selectedEnrollment?.id] })
+    },
+    onError: (error) => setRenewError(translateSupabaseError(error, t('academy.enrollments.renewError'))),
+  })
+
   const columns: DataTableColumn<EnrollmentRow>[] = [
     {
       key: 'player',
@@ -295,17 +342,32 @@ export function EnrollmentSection() {
                 <SelectTrigger><SelectValue placeholder={t('academy.enrollments.group')} /></SelectTrigger>
                 <SelectContent>{groups.map((g) => <SelectItem key={g.id} value={g.id}>{g.name}</SelectItem>)}</SelectContent>
               </Select>
-              <Select value={wizardPlanType} onValueChange={setWizardPlanType}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  {Object.entries(SUBSCRIPTION_PLAN_LABELS).map(([key, label]) => (
-                    <SelectItem key={key} value={key}>{label}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              {/* Phase E simplification: every subscription in production
+                  has always been 'monthly' (0 rows ever used quarterly/
+                  season/package) -- the plan-type choice was UI
+                  complexity the data never actually used. Removed the
+                  Select; wizardPlanType stays fixed at 'monthly' and the
+                  end date is now auto-computed one month out instead of
+                  asking staff to pick both ends of a period whose length
+                  is no longer a real choice. */}
               <div className="flex gap-2">
-                <Input required type="date" value={wizardStart} onChange={(e) => setWizardStart(e.target.value)} />
-                <Input required type="date" value={wizardEnd} onChange={(e) => setWizardEnd(e.target.value)} />
+                <label className="sr-only" htmlFor="wizard-start">{t('academy.enrollments.startDate')}</label>
+                <Input
+                  id="wizard-start"
+                  required
+                  type="date"
+                  value={wizardStart}
+                  onChange={(e) => {
+                    setWizardStart(e.target.value)
+                    if (e.target.value) {
+                      const d = new Date(e.target.value)
+                      d.setMonth(d.getMonth() + 1)
+                      setWizardEnd(d.toISOString().slice(0, 10))
+                    }
+                  }}
+                />
+                <label className="sr-only" htmlFor="wizard-end">{t('academy.enrollments.endDate')}</label>
+                <Input id="wizard-end" required type="date" value={wizardEnd} onChange={(e) => setWizardEnd(e.target.value)} />
               </div>
 
               {/* Locked pricing rule: price is resolved from the group's
@@ -374,10 +436,29 @@ export function EnrollmentSection() {
                 <p className="text-status-warning">{t('academy.enrollments.effectiveEndDate', { date: effectiveEndQuery.data })}</p>
               )}
               <MoneyDisplay amount={subscription.price - subscription.discount} size="lg" />
-              <StatusBadge
-                tone={subscription.status === 'active' ? 'success' : subscription.status === 'frozen' ? 'warning' : 'neutral'}
-                label={SUBSCRIPTION_STATUS_LABELS[subscription.status] ?? subscription.status}
-              />
+              {(() => {
+                // Phase E (E5): mirrors get_academy_subscription_display_status()'s
+                // rule client-side -- an active/pending subscription
+                // within 7 days of end_date reads as DUE, past end_date
+                // reads as EXPIRED, even before the daily cron sweep has
+                // actually transitioned the stored status. Never
+                // overrides a terminal status (frozen/expired/cancelled
+                // display exactly as stored).
+                const today = new Date().toISOString().slice(0, 10)
+                const displayStatus = ['expired', 'cancelled', 'frozen'].includes(subscription.status)
+                  ? subscription.status
+                  : subscription.endDate < today
+                    ? 'expired'
+                    : subscription.endDate <= new Date(Date.now() + 7 * 86400000).toISOString().slice(0, 10)
+                      ? 'due'
+                      : subscription.status
+                return (
+                  <StatusBadge
+                    tone={displayStatus === 'active' ? 'success' : displayStatus === 'due' || displayStatus === 'frozen' ? 'warning' : displayStatus === 'expired' ? 'danger' : 'neutral'}
+                    label={SUBSCRIPTION_STATUS_LABELS[displayStatus] ?? displayStatus}
+                  />
+                )
+              })()}
 
               {subscription.status === 'pending' && currentMembership?.roleKey && ['club_manager', 'academy_manager'].includes(currentMembership.roleKey) && (
                 <Button size="sm" variant="outline" disabled={activateMutation.isPending} onClick={() => activateMutation.mutate()}>
@@ -395,6 +476,36 @@ export function EnrollmentSection() {
                   <Input placeholder={t('academy.enrollments.reason')} value={freezeReason} onChange={(e) => setFreezeReason(e.target.value)} />
                   <Button size="sm" disabled={!freezeStart || !freezeEnd || freezeMutation.isPending} onClick={() => freezeMutation.mutate()}>
                     {t('academy.enrollments.freeze')}
+                  </Button>
+                </div>
+              )}
+
+              {/* Phase E (E4): renewal only reachable once the current
+                  subscription has reached a terminal status -- matches
+                  renew_academy_subscription()'s own server-side guard,
+                  so the button is never shown in a state the server
+                  would reject anyway. */}
+              {(subscription.status === 'expired' || subscription.status === 'cancelled') && (
+                <div className="flex flex-col gap-2 border-t border-border pt-3">
+                  <p className="font-medium">{t('academy.enrollments.renewSubscription')}</p>
+                  <div className="flex gap-2">
+                    <Input
+                      type="date"
+                      value={renewStart}
+                      onChange={(e) => {
+                        setRenewStart(e.target.value)
+                        if (e.target.value) {
+                          const d = new Date(e.target.value)
+                          d.setMonth(d.getMonth() + 1)
+                          setRenewEnd(d.toISOString().slice(0, 10))
+                        }
+                      }}
+                    />
+                    <Input type="date" value={renewEnd} onChange={(e) => setRenewEnd(e.target.value)} />
+                  </div>
+                  {renewError && <p className="text-status-danger text-xs">{renewError}</p>}
+                  <Button size="sm" disabled={!renewStart || !renewEnd || renewMutation.isPending} onClick={() => renewMutation.mutate()}>
+                    {renewMutation.isPending ? t('academy.enrollments.renewing') : t('academy.enrollments.renew')}
                   </Button>
                 </div>
               )}

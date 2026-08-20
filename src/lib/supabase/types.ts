@@ -4041,7 +4041,7 @@ export type Database = {
           {
             foreignKeyName: "subscriptions_enrollment_id_fkey"
             columns: ["enrollment_id"]
-            isOneToOne: true
+            isOneToOne: false
             referencedRelation: "enrollments"
             referencedColumns: ["id"]
           },
@@ -5015,6 +5015,7 @@ export type Database = {
       ensure_booking_qr: { Args: { p_booking_id: string }; Returns: string }
       ensure_invoice_qr: { Args: { p_invoice_id: string }; Returns: string }
       ensure_player_qr: { Args: { p_player_id: string }; Returns: string }
+      expire_due_academy_subscriptions: { Args: never; Returns: number }
       expire_stale_booking_holds: { Args: never; Returns: number }
       extend_grace_period: {
         Args: {
@@ -5054,6 +5055,10 @@ export type Database = {
       get_academy_report: {
         Args: { p_club_id: string; p_end_date: string; p_start_date: string }
         Returns: Json
+      }
+      get_academy_subscription_display_status: {
+        Args: { p_end_date: string; p_status: string }
+        Returns: string
       }
       get_booking_report: {
         Args: {
@@ -5626,6 +5631,19 @@ export type Database = {
       reject_payment_proof: {
         Args: { p_proof_id: string; p_reason: string }
         Returns: undefined
+      }
+      renew_academy_subscription: {
+        Args: {
+          p_discount?: number
+          p_end_date: string
+          p_enrollment_id: string
+          p_price: number
+          p_start_date: string
+        }
+        Returns: {
+          invoice_id: string
+          subscription_id: string
+        }[]
       }
       renew_platform_subscription: {
         Args: { p_plan_id?: string; p_previous_subscription_id: string }

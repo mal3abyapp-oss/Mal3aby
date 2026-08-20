@@ -1145,6 +1145,12 @@
       "freezeSubscription": "Freeze subscription",
       "reason": "Reason",
       "freeze": "Freeze",
+      "renewSubscription": "Renew subscription",
+      "renew": "Renew",
+      "renewing": "Renewing...",
+      "renewError": "Couldn't renew the subscription",
+      "startDate": "Start date",
+      "endDate": "End date",
       "noSubscription": "No linked subscription.",
       "activationPolicy": "Subscription activation policy",
       "activationPolicyManagedFrom": "The subscription activation policy is managed from the",
@@ -1256,7 +1262,8 @@
       "active": "Active",
       "frozen": "Frozen",
       "expired": "Expired",
-      "cancelled": "Cancelled"
+      "cancelled": "Cancelled",
+      "due": "Due soon"
     },
     "activationPolicyLabels": {
       "manual": "Manual activation",

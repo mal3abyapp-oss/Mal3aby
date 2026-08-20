@@ -1144,6 +1144,12 @@
       "freezeSubscription": "تجميد الاشتراك",
       "reason": "السبب",
       "freeze": "تجميد",
+      "renewSubscription": "تجديد الاشتراك",
+      "renew": "تجديد",
+      "renewing": "جارٍ التجديد...",
+      "renewError": "تعذّر تجديد الاشتراك",
+      "startDate": "تاريخ البداية",
+      "endDate": "تاريخ النهاية",
       "noSubscription": "لا يوجد اشتراك مرتبط.",
       "activationPolicy": "سياسة تفعيل الاشتراك",
       "activationPolicyManagedFrom": "سياسة تفعيل الاشتراك تُدار من",
@@ -1255,7 +1261,8 @@
       "active": "نشط",
       "frozen": "مجمّد",
       "expired": "منتهي",
-      "cancelled": "ملغى"
+      "cancelled": "ملغى",
+      "due": "يستحق قريبًا"
     },
     "activationPolicyLabels": {
       "manual": "تفعيل يدوي",
