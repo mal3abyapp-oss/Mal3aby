@@ -44,6 +44,7 @@ interface ActivityRow {
   status: string
   recipientPhone: string | null
   recipientName: string | null
+  recipientCustomerId: string | null
   createdAt: string
   scheduledAt: string
   lastAttemptAt: string | null
@@ -94,7 +95,7 @@ const STATUS_TONE: Record<string, StatusTone> = {
 async function fetchActivity(clubId: string, status: string, templateKey: string): Promise<ActivityRow[]> {
   let query = supabase
     .from('notification_queue')
-    .select('id, template_key, status, recipient_phone, created_at, scheduled_at, last_attempt_at, last_error, attempts')
+    .select('id, template_key, status, recipient_phone, recipient_customer_id, customers(full_name), created_at, scheduled_at, last_attempt_at, last_error, attempts')
     .eq('club_id', clubId)
     .eq('channel', 'whatsapp')
     .order('created_at', { ascending: false })
@@ -112,7 +113,8 @@ async function fetchActivity(clubId: string, status: string, templateKey: string
     templateKey: r.template_key,
     status: r.status,
     recipientPhone: r.recipient_phone,
-    recipientName: null,
+    recipientName: (r.customers as unknown as { full_name: string } | null)?.full_name ?? null,
+    recipientCustomerId: r.recipient_customer_id,
     createdAt: r.created_at,
     scheduledAt: r.scheduled_at,
     lastAttemptAt: r.last_attempt_at,
@@ -131,6 +133,7 @@ async function fetchFailedActivity(clubId: string): Promise<ActivityRow[]> {
     status: r.status,
     recipientPhone: r.recipient_phone,
     recipientName: r.recipient_name,
+    recipientCustomerId: r.recipient_customer_id,
     createdAt: r.created_at,
     scheduledAt: r.created_at,
     lastAttemptAt: r.last_attempt_at,
@@ -322,9 +325,9 @@ export function WhatsAppActivityTab({
                               <Link to="/app/bookings">{t('whatsapp.page.activityTab.actions.viewBooking')}</Link>
                             </Button>
                           )}
-                          {r.recipientName && (
+                          {r.recipientCustomerId && (
                             <Button size="sm" variant="ghost" asChild>
-                              <Link to="/app/customers">{t('whatsapp.page.activityTab.actions.viewCustomer')}</Link>
+                              <Link to={`/app/customers/${r.recipientCustomerId}`}>{t('whatsapp.page.activityTab.actions.viewCustomer')}</Link>
                             </Button>
                           )}
                         </div>

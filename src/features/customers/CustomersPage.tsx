@@ -1,6 +1,6 @@
 import { useState, type FormEvent } from 'react'
 import type { CountryCode } from 'libphonenumber-js'
-import { useSearchParams } from 'react-router-dom'
+import { useSearchParams, useNavigate } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
 import { supabase } from '@/lib/supabase/client'
@@ -19,7 +19,6 @@ import {
   DialogTrigger,
 } from '@/components/ui/dialog'
 import type { CustomerRow } from '@/lib/domain/people'
-import { CustomerDetailDialog } from './CustomerDetailDialog'
 import { translateSupabaseError } from '@/lib/errors'
 import { normalizePhone } from '@/lib/domain/phone'
 
@@ -92,6 +91,7 @@ async function fetchClubCountry(clubId: string): Promise<CountryCode | null> {
 
 export function CustomersPage() {
   const { t } = useTranslation()
+  const navigate = useNavigate()
   const { currentClubId } = useAuth()
   const queryClient = useQueryClient()
   // Master IA/UX audit (Reports decomposition phase): reports must not
@@ -141,7 +141,6 @@ export function CustomersPage() {
   // the same dialog/form as create, pre-filled, submitting an update
   // instead of an insert.
   const [editingCustomer, setEditingCustomer] = useState<CustomerRow | null>(null)
-  const [viewingCustomer, setViewingCustomer] = useState<CustomerRow | null>(null)
 
   const { data: customers = [], isLoading } = useQuery({
     queryKey: ['customers', currentClubId, search],
@@ -284,7 +283,7 @@ export function CustomersPage() {
       key: 'name',
       header: t('common.name'),
       render: (c) => (
-        <button className="text-accent-foreground hover:underline" onClick={() => setViewingCustomer(c)}>
+        <button className="text-accent-foreground hover:underline" onClick={() => navigate(`/app/customers/${c.id}`)}>
           {c.fullName}
         </button>
       ),
@@ -333,10 +332,14 @@ export function CustomersPage() {
         title={t('customers.page.title')}
         description={t('customers.page.description')}
         actions={
-          <Dialog open={dialogOpen} onOpenChange={(open) => { setDialogOpen(open); if (!open) setEditingCustomer(null) }}>
-            <DialogTrigger asChild>
-              <Button onClick={openCreateDialog}>{t('customers.addCustomer')}</Button>
-            </DialogTrigger>
+          <div className="flex items-center gap-2">
+            <Button variant="outline" onClick={() => navigate('/app/customers/duplicates')}>
+              {t('customers.duplicates.reviewLink', { defaultValue: 'Review duplicates' })}
+            </Button>
+            <Dialog open={dialogOpen} onOpenChange={(open) => { setDialogOpen(open); if (!open) setEditingCustomer(null) }}>
+              <DialogTrigger asChild>
+                <Button onClick={openCreateDialog}>{t('customers.addCustomer')}</Button>
+              </DialogTrigger>
             <DialogContent>
               <DialogHeader>
                 <DialogTitle>{editingCustomer ? t('customers.editCustomer') : t('customers.addCustomer')}</DialogTitle>
@@ -372,7 +375,7 @@ export function CustomersPage() {
                       variant="outline"
                       onClick={() => {
                         setDialogOpen(false)
-                        setViewingCustomer({ id: duplicateCustomer.id, fullName: duplicateCustomer.fullName, mobileDisplay: null, email: null, whatsapp: null, outstanding: 0 })
+                        navigate(`/app/customers/${duplicateCustomer.id}`)
                       }}
                     >
                       {t('phoneInput.openCustomer')}
@@ -396,7 +399,8 @@ export function CustomersPage() {
                 </Button>
               </form>
             </DialogContent>
-          </Dialog>
+            </Dialog>
+          </div>
         }
       />
 
@@ -420,12 +424,6 @@ export function CustomersPage() {
         isLoading={isLoading}
         emptyTitle={t('customers.emptyTitle')}
         emptyDescription={t('customers.emptyDescription')}
-      />
-
-      <CustomerDetailDialog
-        customerId={viewingCustomer?.id ?? null}
-        customerName={viewingCustomer?.fullName ?? ''}
-        onOpenChange={(open) => !open && setViewingCustomer(null)}
       />
     </div>
   )

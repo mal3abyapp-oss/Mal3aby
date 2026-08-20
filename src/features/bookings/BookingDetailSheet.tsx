@@ -339,7 +339,7 @@ export function BookingDetailSheet({
 
             <div className="rounded-lg border border-border p-3">
               <p className="text-xs text-text-secondary">{t('bookings.detail.customer')}</p>
-              <Link to={`/app/customers?q=${encodeURIComponent(booking.customerName)}`} className="font-semibold text-accent-foreground hover:underline">
+              <Link to={`/app/customers/${booking.customerId}`} className="font-semibold text-accent-foreground hover:underline">
                 {booking.customerName}
               </Link>
               {booking.customerMobile && <p className="text-text-secondary tabular-nums"><bdi>{booking.customerMobile}</bdi></p>}

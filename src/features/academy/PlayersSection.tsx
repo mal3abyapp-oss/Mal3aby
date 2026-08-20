@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import type { CountryCode } from 'libphonenumber-js'
+import { Link } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import QRCode from 'qrcode'
@@ -528,7 +529,14 @@ function PlayerDetailDialog({
           </div>
 
           {player.guardianName && (
-            <p className="text-sm text-text-secondary">{t('academy.players.guardianColumn')}: <span className="font-medium text-text-primary">{player.guardianName}</span></p>
+            <p className="text-sm text-text-secondary">
+              {t('academy.players.guardianColumn')}:{' '}
+              {player.guardianId ? (
+                <Link to={`/app/customers/${player.guardianId}`} className="font-medium text-accent-foreground hover:underline">{player.guardianName}</Link>
+              ) : (
+                <span className="font-medium text-text-primary">{player.guardianName}</span>
+              )}
+            </p>
           )}
 
           <PlayerStatusPanel playerId={player.id} />

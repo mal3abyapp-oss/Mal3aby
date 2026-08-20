@@ -69,11 +69,18 @@ export function QuickBookingSheet({
   clubId,
   onOpenChange,
   onCreated,
+  preselectedCustomer,
 }: {
   slot: QuickBookingSlot | null
   clubId: string
   onOpenChange: (open: boolean) => void
   onCreated: () => void
+  // Customer 360 directive section 13: "New Booking" from a customer's
+  // profile must land here with the customer already selected -- staff
+  // must never re-search/re-select. Only the identity is passed in
+  // (not trusted display data) so the sheet still fetches its own
+  // customer row and can't be tricked by a stale/forged URL param.
+  preselectedCustomer?: { id: string; name: string } | null
 }) {
   const { t } = useTranslation()
   const { locale } = useDirection()
@@ -123,10 +130,13 @@ export function QuickBookingSheet({
     enabled: !!slot && payNow,
   })
 
+  const [customerLocked, setCustomerLocked] = useState(false)
+
   useEffect(() => {
     if (!slot) {
       setCustomerId('')
       setCustomerSearch('')
+      setCustomerLocked(false)
       setDuration('1')
       setPayNow(true)
       setPaymentMethod('cash')
@@ -141,6 +151,9 @@ export function QuickBookingSheet({
       setOccurrenceCount('8')
       setRecurringResult(null)
       receipt.reset()
+    } else if (preselectedCustomer) {
+      setCustomerId(preselectedCustomer.id)
+      setCustomerLocked(true)
     }
   }, [slot])
 
@@ -365,11 +378,20 @@ export function QuickBookingSheet({
             <div className="flex flex-col gap-1.5">
               <div className="flex items-center justify-between">
                 <label className="text-sm font-medium text-text-secondary">{t('bookings.quick.customer')}</label>
-                <button type="button" className="text-xs text-accent hover:underline" onClick={() => setShowNewCustomer((v) => !v)}>
-                  {showNewCustomer ? t('bookings.quick.chooseExistingCustomer') : t('bookings.quick.newCustomer')}
-                </button>
+                {!customerLocked && (
+                  <button type="button" className="text-xs text-accent hover:underline" onClick={() => setShowNewCustomer((v) => !v)}>
+                    {showNewCustomer ? t('bookings.quick.chooseExistingCustomer') : t('bookings.quick.newCustomer')}
+                  </button>
+                )}
               </div>
-              {showNewCustomer ? (
+              {customerLocked && preselectedCustomer ? (
+                <div className="flex items-center justify-between rounded-md border border-accent/30 bg-accent/5 p-2 text-sm">
+                  <span className="font-medium">{preselectedCustomer.name}</span>
+                  <button type="button" className="text-xs text-accent hover:underline" onClick={() => { setCustomerLocked(false); setCustomerId('') }}>
+                    {t('bookings.quick.changeCustomer', { defaultValue: 'Change' })}
+                  </button>
+                </div>
+              ) : showNewCustomer ? (
                 <div className="flex flex-col gap-2 rounded-md border border-border p-2">
                   <Input placeholder={t('bookings.quick.namePlaceholder')} value={newCustomerName} onChange={(e) => setNewCustomerName(e.target.value)} />
                   <PhoneInput

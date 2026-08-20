@@ -27,6 +27,8 @@ import { MorePage } from '@/features/dashboard/MorePage'
 import { BookingsPage } from '@/features/bookings/BookingsPage'
 import { AcademyPage } from '@/features/academy/AcademyPage'
 import { CustomersPage } from '@/features/customers/CustomersPage'
+import { Customer360Page } from '@/features/customers/Customer360Page'
+import { CustomerDuplicatesPage } from '@/features/customers/CustomerDuplicatesPage'
 import { SubscriptionPage } from '@/features/billing/SubscriptionPage'
 import { FinanceLayout } from '@/features/finance/FinanceLayout'
 import { FinanceOverviewPage } from '@/features/finance/FinanceOverviewPage'
@@ -140,6 +142,16 @@ export const router = createBrowserRouter([
           { path: 'bookings', element: <BookingsPage /> },
           { path: 'academy', element: <AcademyPage /> },
           { path: 'customers', element: <CustomersPage /> },
+          // Static route must come before the :customerId dynamic
+          // route below, or "duplicates" would itself be matched and
+          // passed to Customer360Page as a (nonexistent) customer id.
+          { path: 'customers/duplicates', element: <CustomerDuplicatesPage /> },
+          // Customer 360 directive: "ONE CUSTOMER, ONE SOURCE OF
+          // TRUTH" -- the single identity page every cross-module
+          // "open customer" link (booking, academy, finance, whatsapp)
+          // now points at, replacing CustomerDetailDialog's scattered
+          // read-only summary.
+          { path: 'customers/:customerId', element: <Customer360Page /> },
           // Finance IA consolidation directive: every money-related
           // screen now lives under /app/finance as one coherent module
           // (sections 1-84) -- FinanceLayout renders the shared sub-nav,

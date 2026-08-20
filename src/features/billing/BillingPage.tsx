@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { useSearchParams } from 'react-router-dom'
+import { useSearchParams, Link } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import QRCode from 'qrcode'
 import { supabase } from '@/lib/supabase/client'
@@ -42,6 +42,7 @@ import { useDirection } from '@/app/providers/DirectionProvider'
 interface InvoiceListRow {
   id: string
   invoiceNumber: string
+  customerId: string | null
   customerName: string
   status: string
   total: number
@@ -67,7 +68,7 @@ const SOURCE_KEYS = new Set(['booking', 'subscription'])
 async function fetchInvoices(clubId: string, startDate?: string, endDate?: string, status?: string) {
   let query = supabase
     .from('invoices')
-    .select('id, invoice_number, status, total, issued_at, customers(full_name), invoice_items(reference_type)')
+    .select('id, invoice_number, status, total, issued_at, customer_id, customers(full_name), invoice_items(reference_type)')
     .eq('club_id', clubId)
     .order('created_at', { ascending: false })
     .limit(50)
@@ -87,6 +88,7 @@ async function fetchInvoices(clubId: string, startDate?: string, endDate?: strin
     return {
       id: row.id,
       invoiceNumber: row.invoice_number,
+      customerId: row.customer_id,
       customerName: (row.customers as unknown as { full_name: string } | null)?.full_name ?? '—',
       status: row.status,
       total,
@@ -567,7 +569,11 @@ export function BillingPage() {
         </button>
       ),
     },
-    { key: 'customer', header: t('billing.table.customer'), render: (r) => r.customerName },
+    {
+      key: 'customer', header: t('billing.table.customer'), render: (r) => r.customerId ? (
+        <Link to={`/app/customers/${r.customerId}`} className="text-accent-foreground hover:underline" onClick={(e) => e.stopPropagation()}>{r.customerName}</Link>
+      ) : r.customerName,
+    },
     { key: 'source', header: t('billing.table.source'), render: (r) => t(`billing.sourceLabels.${r.source}`) },
     { key: 'date', header: t('billing.table.date'), render: (r) => (r.issuedAt ? new Date(r.issuedAt).toLocaleDateString(locale === 'en' ? 'en-US' : 'ar-EG') : '—') },
     { key: 'total', header: t('billing.table.total'), render: (r) => <MoneyDisplay amount={r.total} size="sm" /> },

@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
+import { useSearchParams } from 'react-router-dom'
 import { supabase } from '@/lib/supabase/client'
 import { useAuth } from '@/app/providers/AuthProvider'
 import { PageHeader } from '@/components/ui/page-header'
@@ -72,6 +73,17 @@ async function fetchBranches(clubId: string) {
   const { data, error } = await supabase.from('branches').select('id, name').eq('club_id', clubId).eq('status', 'active').order('name')
   if (error) throw error
   return data ?? []
+}
+
+// Customer 360 directive section 13: "New booking" from a customer's
+// profile arrives here as ?newBookingCustomer=<id>. Re-fetches the
+// name from the DB (never trusts a display name carried in the URL)
+// so a stale/forged id just fails to resolve instead of mislabeling
+// the wrong customer.
+async function fetchCustomerName(clubId: string, customerId: string) {
+  const { data, error } = await supabase.from('customers').select('id, full_name').eq('club_id', clubId).eq('id', customerId).maybeSingle()
+  if (error) throw error
+  return data as { id: string; full_name: string } | null
 }
 
 async function fetchBookingsForDay(clubId: string, date: string, timezone: string) {
@@ -165,10 +177,19 @@ export function BookingsPage() {
   const { currentClubId } = useAuth()
   const queryClient = useQueryClient()
   const isMobile = useIsMobile()
+  const [searchParams, setSearchParams] = useSearchParams()
   const [date, setDate] = useState(() => new Date().toISOString().slice(0, 10))
   const [branchId, setBranchId] = useState<string | null>(null)
   const [slotSelection, setSlotSelection] = useState<QuickBookingSlot | null>(null)
   const [selectedBooking, setSelectedBooking] = useState<BookingRow | null>(null)
+
+  const newBookingCustomerId = searchParams.get('newBookingCustomer')
+  const { data: preselectedCustomerRow } = useQuery({
+    queryKey: ['new-booking-preselected-customer', currentClubId, newBookingCustomerId],
+    queryFn: () => fetchCustomerName(currentClubId!, newBookingCustomerId!),
+    enabled: !!currentClubId && !!newBookingCustomerId,
+  })
+  const preselectedCustomer = preselectedCustomerRow ? { id: preselectedCustomerRow.id, name: preselectedCustomerRow.full_name } : null
 
   const { data: clubTimezone } = useClubTimezone(currentClubId)
   const { data: branches = [] } = useQuery({ queryKey: ['branches-for-bookings', currentClubId], queryFn: () => fetchBranches(currentClubId!), enabled: !!currentClubId })
@@ -187,6 +208,13 @@ export function BookingsPage() {
   function invalidateGrid() {
     void queryClient.invalidateQueries({ queryKey: ['bookings', currentClubId] })
     void queryClient.invalidateQueries({ queryKey: ['field-blocks', currentClubId] })
+  }
+
+  function clearPreselectedCustomer() {
+    if (!searchParams.has('newBookingCustomer')) return
+    const next = new URLSearchParams(searchParams)
+    next.delete('newBookingCustomer')
+    setSearchParams(next, { replace: true })
   }
 
   const bookingsByField = useMemo(() => {
@@ -258,6 +286,11 @@ export function BookingsPage() {
     return (
       <div className="flex flex-col gap-3">
         <PageHeader title={t('bookings.page.title')} description="" className="pb-0" />
+        {preselectedCustomer && (
+          <div className="rounded-md border border-accent/30 bg-accent/5 p-3 text-sm">
+            {t('bookings.page.pickSlotForCustomer', { defaultValue: 'Pick an empty slot to book for {{name}}.', name: preselectedCustomer.name })}
+          </div>
+        )}
         {fields.length === 0 ? (
           <p className="text-sm text-text-secondary">{t('bookings.page.noFieldsSettings')}</p>
         ) : !clubTimezone ? (
@@ -280,7 +313,8 @@ export function BookingsPage() {
           slot={slotSelection}
           clubId={currentClubId!}
           onOpenChange={(open) => !open && setSlotSelection(null)}
-          onCreated={invalidateGrid}
+          onCreated={() => { invalidateGrid(); clearPreselectedCustomer() }}
+          preselectedCustomer={preselectedCustomer}
         />
         <BookingDetailSheet
           booking={selectedBooking}
@@ -331,6 +365,12 @@ export function BookingsPage() {
           </div>
         }
       />
+
+      {preselectedCustomer && (
+        <div className="rounded-md border border-accent/30 bg-accent/5 p-3 text-sm">
+          {t('bookings.page.pickSlotForCustomer', { defaultValue: 'Pick an empty slot to book for {{name}}.', name: preselectedCustomer.name })}
+        </div>
+      )}
 
       {fields.length === 0 ? (
         <p className="text-sm text-text-secondary">{t('bookings.page.noFields')}</p>
@@ -431,7 +471,8 @@ export function BookingsPage() {
         slot={slotSelection}
         clubId={currentClubId!}
         onOpenChange={(open) => !open && setSlotSelection(null)}
-        onCreated={invalidateGrid}
+        onCreated={() => { invalidateGrid(); clearPreselectedCustomer() }}
+        preselectedCustomer={preselectedCustomer}
       />
 
       <BookingDetailSheet

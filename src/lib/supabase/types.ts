@@ -995,11 +995,13 @@ export type Database = {
           created_at: string
           created_by: string | null
           date_of_birth: string | null
+          duplicate_review_status: string
           email: string | null
           emergency_contact: Json | null
           full_name: string
           gender: string | null
           id: string
+          merged_into_customer_id: string | null
           mobile_display: string | null
           national_id: string | null
           normalized_mobile: string | null
@@ -1016,11 +1018,13 @@ export type Database = {
           created_at?: string
           created_by?: string | null
           date_of_birth?: string | null
+          duplicate_review_status?: string
           email?: string | null
           emergency_contact?: Json | null
           full_name: string
           gender?: string | null
           id?: string
+          merged_into_customer_id?: string | null
           mobile_display?: string | null
           national_id?: string | null
           normalized_mobile?: string | null
@@ -1037,11 +1041,13 @@ export type Database = {
           created_at?: string
           created_by?: string | null
           date_of_birth?: string | null
+          duplicate_review_status?: string
           email?: string | null
           emergency_contact?: Json | null
           full_name?: string
           gender?: string | null
           id?: string
+          merged_into_customer_id?: string | null
           mobile_display?: string | null
           national_id?: string | null
           normalized_mobile?: string | null
@@ -1066,6 +1072,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "commercial_entitlements_usage"
             referencedColumns: ["club_id"]
+          },
+          {
+            foreignKeyName: "customers_merged_into_customer_id_fkey"
+            columns: ["merged_into_customer_id"]
+            isOneToOne: false
+            referencedRelation: "customers"
+            referencedColumns: ["id"]
           },
         ]
       }
@@ -2207,6 +2220,7 @@ export type Database = {
           id: string
           normalized_phone: string | null
           phone_display: string | null
+          phone_e164: string | null
           preferred_language: string
           revoked_at: string | null
           updated_at: string
@@ -2221,6 +2235,7 @@ export type Database = {
           id?: string
           normalized_phone?: string | null
           phone_display?: string | null
+          phone_e164?: string | null
           preferred_language?: string
           revoked_at?: string | null
           updated_at?: string
@@ -2235,6 +2250,7 @@ export type Database = {
           id?: string
           normalized_phone?: string | null
           phone_display?: string | null
+          phone_e164?: string | null
           preferred_language?: string
           revoked_at?: string | null
           updated_at?: string
@@ -4670,59 +4686,27 @@ export type Database = {
         Args: { p_explicit?: boolean; p_subscription_id: string }
         Returns: boolean
       }
-      _create_booking_internal:
-        | {
-            Args: {
-              p_booking_series_id: string
-              p_customer_id: string
-              p_discount_amount: number
-              p_end_at: string
-              p_field_id: string
-              p_notes: string
-              p_payment_amount: number
-              p_payment_method: string
-              p_record_payment: boolean
-              p_start_at: string
-            }
-            Returns: string
-          }
-        | {
-            Args: {
-              p_booking_series_id: string
-              p_customer_id: string
-              p_discount_amount: number
-              p_end_at: string
-              p_field_id: string
-              p_notes: string
-              p_official_receipt_id?: string
-              p_payment_amount: number
-              p_payment_method: string
-              p_record_payment: boolean
-              p_start_at: string
-            }
-            Returns: string
-          }
-        | {
-            Args: {
-              p_booking_series_id: string
-              p_customer_id: string
-              p_discount_amount: number
-              p_end_at: string
-              p_field_id: string
-              p_notes: string
-              p_payment_amount: number
-              p_payment_method: string
-              p_receipt_book?: string
-              p_receipt_date?: string
-              p_receipt_image_path?: string
-              p_receipt_notes?: string
-              p_receipt_serial?: string
-              p_receipt_series?: string
-              p_record_payment: boolean
-              p_start_at: string
-            }
-            Returns: string
-          }
+      _create_booking_internal: {
+        Args: {
+          p_booking_series_id: string
+          p_customer_id: string
+          p_discount_amount: number
+          p_end_at: string
+          p_field_id: string
+          p_notes: string
+          p_payment_amount: number
+          p_payment_method: string
+          p_receipt_book?: string
+          p_receipt_date?: string
+          p_receipt_image_path?: string
+          p_receipt_notes?: string
+          p_receipt_serial?: string
+          p_receipt_series?: string
+          p_record_payment: boolean
+          p_start_at: string
+        }
+        Returns: string
+      }
       _mint_booking_qr_token_internal: {
         Args: {
           p_booking_id: string
@@ -4847,56 +4831,26 @@ export type Database = {
         }
         Returns: string
       }
-      create_booking:
-        | {
-            Args: {
-              p_customer_id: string
-              p_discount_amount?: number
-              p_end_at: string
-              p_field_id: string
-              p_notes?: string
-              p_payment_amount?: number
-              p_payment_method?: string
-              p_record_payment?: boolean
-              p_start_at: string
-            }
-            Returns: string
-          }
-        | {
-            Args: {
-              p_customer_id: string
-              p_discount_amount?: number
-              p_end_at: string
-              p_field_id: string
-              p_notes?: string
-              p_official_receipt_id?: string
-              p_payment_amount?: number
-              p_payment_method?: string
-              p_record_payment?: boolean
-              p_start_at: string
-            }
-            Returns: string
-          }
-        | {
-            Args: {
-              p_customer_id: string
-              p_discount_amount?: number
-              p_end_at: string
-              p_field_id: string
-              p_notes?: string
-              p_payment_amount?: number
-              p_payment_method?: string
-              p_receipt_book?: string
-              p_receipt_date?: string
-              p_receipt_image_path?: string
-              p_receipt_notes?: string
-              p_receipt_serial?: string
-              p_receipt_series?: string
-              p_record_payment?: boolean
-              p_start_at: string
-            }
-            Returns: string
-          }
+      create_booking: {
+        Args: {
+          p_customer_id: string
+          p_discount_amount?: number
+          p_end_at: string
+          p_field_id: string
+          p_notes?: string
+          p_payment_amount?: number
+          p_payment_method?: string
+          p_receipt_book?: string
+          p_receipt_date?: string
+          p_receipt_image_path?: string
+          p_receipt_notes?: string
+          p_receipt_serial?: string
+          p_receipt_series?: string
+          p_record_payment?: boolean
+          p_start_at: string
+        }
+        Returns: string
+      }
       create_enrollment_with_subscription: {
         Args: {
           p_discount?: number
@@ -5012,6 +4966,10 @@ export type Database = {
         }
         Returns: string
       }
+      ensure_adhoc_attendance_session: {
+        Args: { p_group_id: string; p_session_date: string }
+        Returns: string
+      }
       ensure_booking_qr: { Args: { p_booking_id: string }; Returns: string }
       ensure_invoice_qr: { Args: { p_invoice_id: string }; Returns: string }
       ensure_player_qr: { Args: { p_player_id: string }; Returns: string }
@@ -5048,10 +5006,6 @@ export type Database = {
         Args: { p_club_id: string; p_preferred_base?: string }
         Returns: string
       }
-      ensure_adhoc_attendance_session: {
-        Args: { p_group_id: string; p_session_date: string }
-        Returns: string
-      }
       generate_training_sessions: {
         Args: { p_group_id: string; p_through_date: string }
         Returns: number
@@ -5083,8 +5037,56 @@ export type Database = {
         }
         Returns: Json
       }
+      get_customer_360_summary: {
+        Args: { p_club_id: string; p_customer_id: string }
+        Returns: Json
+      }
+      get_customer_academy_players: {
+        Args: { p_club_id: string; p_customer_id: string }
+        Returns: Json
+      }
+      get_customer_activity: {
+        Args: {
+          p_club_id: string
+          p_customer_id: string
+          p_limit?: number
+          p_offset?: number
+        }
+        Returns: Json
+      }
       get_customer_activity_report: {
         Args: { p_club_id: string; p_end_date: string; p_start_date: string }
+        Returns: Json
+      }
+      get_customer_bookings: {
+        Args: {
+          p_club_id: string
+          p_customer_id: string
+          p_limit?: number
+          p_offset?: number
+        }
+        Returns: Json
+      }
+      get_customer_communications: {
+        Args: {
+          p_club_id: string
+          p_customer_id: string
+          p_limit?: number
+          p_offset?: number
+        }
+        Returns: Json
+      }
+      get_customer_duplicate_groups: {
+        Args: { p_club_id: string }
+        Returns: Json
+      }
+      get_customer_financial_account: {
+        Args: {
+          p_club_id: string
+          p_customer_id: string
+          p_limit?: number
+          p_offset?: number
+        }
         Returns: Json
       }
       get_effective_government_policy: {
@@ -5564,6 +5566,10 @@ export type Database = {
           subscription_status: string
         }[]
       }
+      quarantine_duplicate_customer: {
+        Args: { p_club_id: string; p_customer_id: string; p_reason?: string }
+        Returns: undefined
+      }
       queue_whatsapp_notification: {
         Args: {
           p_category: string
@@ -5629,16 +5635,28 @@ export type Database = {
         }
         Returns: string
       }
-      record_staff_whatsapp_consent: {
-        Args: {
-          p_club_id: string
-          p_consented: boolean
-          p_customer_id: string
-          p_normalized_phone: string
-          p_phone_display: string
-        }
-        Returns: undefined
-      }
+      record_staff_whatsapp_consent:
+        | {
+            Args: {
+              p_club_id: string
+              p_consented: boolean
+              p_customer_id: string
+              p_normalized_phone: string
+              p_phone_display: string
+            }
+            Returns: undefined
+          }
+        | {
+            Args: {
+              p_club_id: string
+              p_consented: boolean
+              p_customer_id: string
+              p_normalized_phone: string
+              p_phone_display: string
+              p_phone_e164?: string
+            }
+            Returns: undefined
+          }
       reject_payment_proof: {
         Args: { p_proof_id: string; p_reason: string }
         Returns: undefined
@@ -5725,6 +5743,10 @@ export type Database = {
         Args: { p_club_id: string; p_desired_slug?: string }
         Returns: string
       }
+      set_customer_whatsapp_consent: {
+        Args: { p_club_id: string; p_consented: boolean; p_customer_id: string }
+        Returns: undefined
+      }
       set_plan_publish_status: {
         Args: { p_is_public: boolean; p_plan_id: string }
         Returns: undefined
@@ -5748,6 +5770,10 @@ export type Database = {
       }
       unfreeze_subscription: {
         Args: { p_reason?: string; p_subscription_id: string }
+        Returns: undefined
+      }
+      unquarantine_customer: {
+        Args: { p_club_id: string; p_customer_id: string }
         Returns: undefined
       }
       update_government_compliance_policy: {
@@ -5778,6 +5804,22 @@ export type Database = {
       update_platform_settings: {
         Args: { p_default_trial_days: number }
         Returns: undefined
+      }
+      upsert_customer: {
+        Args: {
+          p_club_id: string
+          p_customer_id?: string
+          p_email?: string
+          p_full_name: string
+          p_mobile_display?: string
+          p_phone_e164: string
+          p_whatsapp_consent?: boolean
+        }
+        Returns: {
+          customer_id: string
+          duplicate_of_customer_id: string
+          was_existing: boolean
+        }[]
       }
       user_club_ids: { Args: never; Returns: string[] }
       verify_booking_qr_public: {
