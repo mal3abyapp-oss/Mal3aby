@@ -1815,9 +1815,21 @@
           "expected": "Expected",
           "counted": "Counted",
           "variance": "Variance",
-          "status": "Status"
+          "status": "Status",
+          "liability": "Shortage/Overage"
         },
         "emptyTitle": "No shifts yet"
+      },
+      "openShiftWarning": "{{name}}'s shift has been open for {{hours}}h",
+      "liability": {
+        "outstanding": "Owed: {{amount}}",
+        "settled": "Settled",
+        "overageRecorded": "Overage recorded",
+        "settle": "Settle",
+        "settleAmountLabel": "Amount being settled",
+        "settleReasonLabel": "Reason (optional)",
+        "settleReasonPlaceholder": "e.g. payroll deduction, cash payment",
+        "confirmSettle": "Confirm settlement"
       }
     }
   },
@@ -2275,13 +2287,16 @@
       "name": "Name",
       "role": "Role",
       "branchScope": "Branch scope",
-      "status": "Status"
+      "status": "Status",
+      "cashCustody": "Cash custody"
     },
     "notLoggedInYet": "Hasn't logged in yet",
     "allBranches": "All branches",
     "branchListSeparator": ", ",
     "statusActive": "Active",
     "statusInactive": "Inactive",
+    "custodyEnabled": "Handles cash",
+    "custodyDisabled": "No cash access",
     "deactivate": "Deactivate",
     "emptyTitle": "No staff yet",
     "emptyDescription": "Add your first staff member to start managing club permissions",

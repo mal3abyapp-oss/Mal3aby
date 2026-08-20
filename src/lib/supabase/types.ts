@@ -619,6 +619,7 @@ export type Database = {
         Row: {
           club_id: string
           created_at: string
+          has_cash_custody: boolean
           id: string
           role_id: string
           status: string
@@ -628,6 +629,7 @@ export type Database = {
         Insert: {
           club_id: string
           created_at?: string
+          has_cash_custody?: boolean
           id?: string
           role_id: string
           status?: string
@@ -637,6 +639,7 @@ export type Database = {
         Update: {
           club_id?: string
           created_at?: string
+          has_cash_custody?: boolean
           id?: string
           role_id?: string
           status?: string
@@ -1063,6 +1066,115 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "commercial_entitlements_usage"
             referencedColumns: ["club_id"]
+          },
+        ]
+      }
+      employee_cash_liabilities: {
+        Row: {
+          branch_id: string
+          cash_shift_id: string
+          club_id: string
+          created_at: string
+          employee_id: string
+          id: string
+          kind: string
+          original_amount: number
+          outstanding: number
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          branch_id: string
+          cash_shift_id: string
+          club_id: string
+          created_at?: string
+          employee_id: string
+          id?: string
+          kind: string
+          original_amount: number
+          outstanding: number
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          branch_id?: string
+          cash_shift_id?: string
+          club_id?: string
+          created_at?: string
+          employee_id?: string
+          id?: string
+          kind?: string
+          original_amount?: number
+          outstanding?: number
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "employee_cash_liabilities_branch_id_fkey"
+            columns: ["branch_id"]
+            isOneToOne: false
+            referencedRelation: "branches"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "employee_cash_liabilities_cash_shift_id_fkey"
+            columns: ["cash_shift_id"]
+            isOneToOne: false
+            referencedRelation: "cash_shifts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "employee_cash_liabilities_club_id_fkey"
+            columns: ["club_id"]
+            isOneToOne: false
+            referencedRelation: "clubs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "employee_cash_liabilities_club_id_fkey"
+            columns: ["club_id"]
+            isOneToOne: false
+            referencedRelation: "commercial_entitlements_usage"
+            referencedColumns: ["club_id"]
+          },
+        ]
+      }
+      employee_cash_liability_ledger: {
+        Row: {
+          actor_id: string
+          amount: number
+          created_at: string
+          entry_type: string
+          id: string
+          liability_id: string
+          reason: string | null
+        }
+        Insert: {
+          actor_id: string
+          amount: number
+          created_at?: string
+          entry_type: string
+          id?: string
+          liability_id: string
+          reason?: string | null
+        }
+        Update: {
+          actor_id?: string
+          amount?: number
+          created_at?: string
+          entry_type?: string
+          id?: string
+          liability_id?: string
+          reason?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "employee_cash_liability_ledger_liability_id_fkey"
+            columns: ["liability_id"]
+            isOneToOne: false
+            referencedRelation: "employee_cash_liabilities"
+            referencedColumns: ["id"]
           },
         ]
       }
@@ -2948,6 +3060,7 @@ export type Database = {
         Row: {
           amount: number
           branch_id: string
+          cash_shift_id: string | null
           club_id: string
           customer_id: string
           id: string
@@ -2961,6 +3074,7 @@ export type Database = {
         Insert: {
           amount: number
           branch_id: string
+          cash_shift_id?: string | null
           club_id: string
           customer_id: string
           id?: string
@@ -2974,6 +3088,7 @@ export type Database = {
         Update: {
           amount?: number
           branch_id?: string
+          cash_shift_id?: string | null
           club_id?: string
           customer_id?: string
           id?: string
@@ -2990,6 +3105,13 @@ export type Database = {
             columns: ["branch_id"]
             isOneToOne: false
             referencedRelation: "branches"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "payments_cash_shift_id_fkey"
+            columns: ["cash_shift_id"]
+            isOneToOne: false
+            referencedRelation: "cash_shifts"
             referencedColumns: ["id"]
           },
           {
@@ -3649,6 +3771,7 @@ export type Database = {
       refunds: {
         Row: {
           amount: number
+          cash_shift_id: string | null
           id: string
           payment_id: string
           reason: string
@@ -3658,6 +3781,7 @@ export type Database = {
         }
         Insert: {
           amount: number
+          cash_shift_id?: string | null
           id?: string
           payment_id: string
           reason: string
@@ -3667,6 +3791,7 @@ export type Database = {
         }
         Update: {
           amount?: number
+          cash_shift_id?: string | null
           id?: string
           payment_id?: string
           reason?: string
@@ -3675,6 +3800,13 @@ export type Database = {
           status?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "refunds_cash_shift_id_fkey"
+            columns: ["cash_shift_id"]
+            isOneToOne: false
+            referencedRelation: "cash_shifts"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "refunds_payment_id_fkey"
             columns: ["payment_id"]
@@ -4538,21 +4670,59 @@ export type Database = {
         Args: { p_explicit?: boolean; p_subscription_id: string }
         Returns: boolean
       }
-      _create_booking_internal: {
-        Args: {
-          p_booking_series_id: string
-          p_customer_id: string
-          p_discount_amount: number
-          p_end_at: string
-          p_field_id: string
-          p_notes: string
-          p_payment_amount: number
-          p_payment_method: string
-          p_record_payment: boolean
-          p_start_at: string
-        }
-        Returns: string
-      }
+      _create_booking_internal:
+        | {
+            Args: {
+              p_booking_series_id: string
+              p_customer_id: string
+              p_discount_amount: number
+              p_end_at: string
+              p_field_id: string
+              p_notes: string
+              p_payment_amount: number
+              p_payment_method: string
+              p_record_payment: boolean
+              p_start_at: string
+            }
+            Returns: string
+          }
+        | {
+            Args: {
+              p_booking_series_id: string
+              p_customer_id: string
+              p_discount_amount: number
+              p_end_at: string
+              p_field_id: string
+              p_notes: string
+              p_official_receipt_id?: string
+              p_payment_amount: number
+              p_payment_method: string
+              p_record_payment: boolean
+              p_start_at: string
+            }
+            Returns: string
+          }
+        | {
+            Args: {
+              p_booking_series_id: string
+              p_customer_id: string
+              p_discount_amount: number
+              p_end_at: string
+              p_field_id: string
+              p_notes: string
+              p_payment_amount: number
+              p_payment_method: string
+              p_receipt_book?: string
+              p_receipt_date?: string
+              p_receipt_image_path?: string
+              p_receipt_notes?: string
+              p_receipt_serial?: string
+              p_receipt_series?: string
+              p_record_payment: boolean
+              p_start_at: string
+            }
+            Returns: string
+          }
       _mint_booking_qr_token_internal: {
         Args: {
           p_booking_id: string
@@ -4569,6 +4739,10 @@ export type Database = {
       activate_subscription_if_due: {
         Args: { p_subscription_id: string }
         Returns: boolean
+      }
+      adjust_employee_cash_liability: {
+        Args: { p_amount: number; p_liability_id: string; p_reason: string }
+        Returns: Json
       }
       approve_payment_proof: {
         Args: { p_payment_method?: string; p_proof_id: string }
@@ -4673,20 +4847,56 @@ export type Database = {
         }
         Returns: string
       }
-      create_booking: {
-        Args: {
-          p_customer_id: string
-          p_discount_amount?: number
-          p_end_at: string
-          p_field_id: string
-          p_notes?: string
-          p_payment_amount?: number
-          p_payment_method?: string
-          p_record_payment?: boolean
-          p_start_at: string
-        }
-        Returns: string
-      }
+      create_booking:
+        | {
+            Args: {
+              p_customer_id: string
+              p_discount_amount?: number
+              p_end_at: string
+              p_field_id: string
+              p_notes?: string
+              p_payment_amount?: number
+              p_payment_method?: string
+              p_record_payment?: boolean
+              p_start_at: string
+            }
+            Returns: string
+          }
+        | {
+            Args: {
+              p_customer_id: string
+              p_discount_amount?: number
+              p_end_at: string
+              p_field_id: string
+              p_notes?: string
+              p_official_receipt_id?: string
+              p_payment_amount?: number
+              p_payment_method?: string
+              p_record_payment?: boolean
+              p_start_at: string
+            }
+            Returns: string
+          }
+        | {
+            Args: {
+              p_customer_id: string
+              p_discount_amount?: number
+              p_end_at: string
+              p_field_id: string
+              p_notes?: string
+              p_payment_amount?: number
+              p_payment_method?: string
+              p_receipt_book?: string
+              p_receipt_date?: string
+              p_receipt_image_path?: string
+              p_receipt_notes?: string
+              p_receipt_serial?: string
+              p_receipt_series?: string
+              p_record_payment?: boolean
+              p_start_at: string
+            }
+            Returns: string
+          }
       create_enrollment_with_subscription: {
         Args: {
           p_discount?: number
@@ -4958,6 +5168,7 @@ export type Database = {
         Args: { p_shift_id: string }
         Returns: Json
       }
+      get_open_cash_shifts: { Args: { p_club_id: string }; Returns: Json }
       get_payment_method_report: {
         Args: {
           p_branch_id?: string
@@ -5189,6 +5400,10 @@ export type Database = {
           p_method?: string
           p_start_date: string
         }
+        Returns: Json
+      }
+      get_staff_cash_profile: {
+        Args: { p_membership_id: string }
         Returns: Json
       }
       get_subscription_effective_end_date: {
@@ -5484,6 +5699,14 @@ export type Database = {
       set_plan_publish_status: {
         Args: { p_is_public: boolean; p_plan_id: string }
         Returns: undefined
+      }
+      set_staff_cash_custody: {
+        Args: { p_has_custody: boolean; p_membership_id: string }
+        Returns: undefined
+      }
+      settle_employee_cash_liability: {
+        Args: { p_amount: number; p_liability_id: string; p_reason?: string }
+        Returns: Json
       }
       slugify: { Args: { p_text: string }; Returns: string }
       start_gateway_checkout: {

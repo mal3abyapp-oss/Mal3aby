@@ -1814,9 +1814,21 @@
           "expected": "المتوقع",
           "counted": "المعدود فعليًا",
           "variance": "الفرق",
-          "status": "الحالة"
+          "status": "الحالة",
+          "liability": "عجز/زيادة"
         },
         "emptyTitle": "لا توجد ورديات بعد"
+      },
+      "openShiftWarning": "وردية {{name}} مفتوحة منذ {{hours}} ساعة",
+      "liability": {
+        "outstanding": "المستحق: {{amount}}",
+        "settled": "تمت التسوية",
+        "overageRecorded": "تم تسجيل زيادة",
+        "settle": "تسوية",
+        "settleAmountLabel": "المبلغ المسدد",
+        "settleReasonLabel": "السبب (اختياري)",
+        "settleReasonPlaceholder": "مثال: خصم من الراتب، دفعة نقدية",
+        "confirmSettle": "تأكيد التسوية"
       }
     }
   },
@@ -2274,13 +2286,16 @@
       "name": "الاسم",
       "role": "الدور",
       "branchScope": "نطاق الفروع",
-      "status": "الحالة"
+      "status": "الحالة",
+      "cashCustody": "عهدة نقدية"
     },
     "notLoggedInYet": "لم يسجّل الدخول بعد",
     "allBranches": "كل الفروع",
     "branchListSeparator": "، ",
     "statusActive": "نشط",
     "statusInactive": "غير نشط",
+    "custodyEnabled": "يتعامل مع النقدية",
+    "custodyDisabled": "لا صلاحية نقدية",
     "deactivate": "إلغاء التفعيل",
     "emptyTitle": "لا يوجد موظفون بعد",
     "emptyDescription": "أضف أول موظف لبدء إدارة صلاحيات النادي",

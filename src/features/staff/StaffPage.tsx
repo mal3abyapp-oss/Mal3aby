@@ -54,7 +54,7 @@ async function fetchStaff(clubId: string): Promise<StaffRow[]> {
   const { data, error } = await supabase
     .from('club_memberships')
     .select(
-      'id, user_id, status, roles(key, name_ar), membership_branches(branches(name))',
+      'id, user_id, status, has_cash_custody, roles(key, name_ar), membership_branches(branches(name))',
     )
     .eq('club_id', clubId)
     .order('created_at', { ascending: false })
@@ -85,6 +85,7 @@ async function fetchStaff(clubId: string): Promise<StaffRow[]> {
       roleNameAr: roles?.name_ar ?? '',
       status: row.status,
       branchNames: branchRows.map((b) => b.branches?.name).filter((n): n is string => !!n),
+      hasCashCustody: row.has_cash_custody,
     }
   })
 }
@@ -138,6 +139,21 @@ export function StaffPage() {
     },
   })
 
+  // Phase D (D1): explicit per-person cash-handling authorization,
+  // independent of role -- owner/manager-only server-side (staff.update).
+  const setCustodyMutation = useMutation({
+    mutationFn: async ({ membershipId, hasCustody }: { membershipId: string; hasCustody: boolean }) => {
+      const { error } = await supabase.rpc('set_staff_cash_custody', {
+        p_membership_id: membershipId,
+        p_has_custody: hasCustody,
+      })
+      if (error) throw error
+    },
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ['staff', currentClubId] })
+    },
+  })
+
   function handleInviteSubmit(e: FormEvent) {
     e.preventDefault()
     setFormError(null)
@@ -166,6 +182,20 @@ export function StaffPage() {
         ) : (
           <StatusBadge tone="neutral" label={t('staff.statusInactive')} />
         ),
+    },
+    {
+      key: 'cashCustody',
+      header: t('staff.columns.cashCustody'),
+      render: (r) => (
+        <Button
+          variant={r.hasCashCustody ? 'default' : 'outline'}
+          size="sm"
+          onClick={() => setCustodyMutation.mutate({ membershipId: r.membershipId, hasCustody: !r.hasCashCustody })}
+          disabled={setCustodyMutation.isPending}
+        >
+          {r.hasCashCustody ? t('staff.custodyEnabled') : t('staff.custodyDisabled')}
+        </Button>
+      ),
     },
     {
       key: 'actions',

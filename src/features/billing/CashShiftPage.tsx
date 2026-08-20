@@ -103,6 +103,56 @@ async function fetchOpenShiftStatus(shiftId: string) {
   return data as unknown as { opening_float: number; cash_collected: number; cash_refunded: number; expected_cash: number }
 }
 
+// Phase D (D17): informational only -- never auto-closes a stale open
+// shift, just surfaces its age so staff/management can act on it.
+interface OpenShiftAgeRow {
+  id: string
+  branch_id: string
+  opened_by: string
+  opened_by_name: string | null
+  opened_at: string
+  opening_float: number
+  age_hours: number
+}
+
+async function fetchOpenShiftAges(clubId: string): Promise<OpenShiftAgeRow[]> {
+  const { data, error } = await supabase.rpc('get_open_cash_shifts', { p_club_id: clubId })
+  if (error) throw error
+  return (data ?? []) as unknown as OpenShiftAgeRow[]
+}
+
+// Phase D (D10-D13): a shift closed with a shortage creates a liability
+// row -- shown here so staff don't need to leave Cash Shift to see it.
+interface ShiftLiabilityRow {
+  id: string
+  cash_shift_id: string
+  kind: 'shortage' | 'overage'
+  original_amount: number
+  outstanding: number
+  status: 'outstanding' | 'settled'
+}
+
+async function fetchLiabilitiesByShift(shiftIds: string[]): Promise<Map<string, ShiftLiabilityRow>> {
+  if (shiftIds.length === 0) return new Map()
+  const { data, error } = await supabase
+    .from('employee_cash_liabilities')
+    .select('id, cash_shift_id, kind, original_amount, outstanding, status')
+    .in('cash_shift_id', shiftIds)
+  if (error) throw error
+  const map = new Map<string, ShiftLiabilityRow>()
+  for (const row of data ?? []) {
+    map.set(row.cash_shift_id, {
+      id: row.id,
+      cash_shift_id: row.cash_shift_id,
+      kind: row.kind as 'shortage' | 'overage',
+      original_amount: Number(row.original_amount),
+      outstanding: Number(row.outstanding),
+      status: row.status as 'outstanding' | 'settled',
+    })
+  }
+  return map
+}
+
 export function CashShiftPage() {
   const { t } = useTranslation()
   const { currentClubId } = useAuth()
@@ -132,6 +182,47 @@ export function CashShiftPage() {
     queryFn: () => fetchOpenShiftStatus(closingShiftId!),
     enabled: !!closingShiftId,
     refetchInterval: 15_000,
+  })
+
+  // Phase D (D17): open-shift age warnings.
+  const { data: openShiftAges = [] } = useQuery({
+    queryKey: ['cash-shift-ages', currentClubId],
+    queryFn: () => fetchOpenShiftAges(currentClubId!),
+    enabled: !!currentClubId,
+    refetchInterval: 60_000,
+  })
+
+  // Phase D (D10-D13): shortage/overage per shift + settlement dialog.
+  const shiftIdsForLiabilityLookup = (data?.history ?? []).map((s) => s.id)
+  const { data: liabilitiesByShift = new Map<string, ShiftLiabilityRow>() } = useQuery({
+    queryKey: ['cash-shift-liabilities', currentClubId, shiftIdsForLiabilityLookup.join(',')],
+    queryFn: () => fetchLiabilitiesByShift(shiftIdsForLiabilityLookup),
+    enabled: shiftIdsForLiabilityLookup.length > 0,
+  })
+  const [settlingLiabilityId, setSettlingLiabilityId] = useState<string | null>(null)
+  const [settleAmount, setSettleAmount] = useState('')
+  const [settleReason, setSettleReason] = useState('')
+
+  const settleMutation = useMutation({
+    mutationFn: async () => {
+      const amount = Number(settleAmount)
+      if (!settlingLiabilityId) throw new Error(t('billing.cashShift.errors.noShiftSelected'))
+      if (!amount || amount <= 0) throw new Error(t('bookings.detail.invalidAmountError'))
+      const { error } = await supabase.rpc('settle_employee_cash_liability', {
+        p_liability_id: settlingLiabilityId,
+        p_amount: amount,
+        p_reason: settleReason.trim() || undefined,
+      })
+      if (error) throw error
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['cash-shift-liabilities', currentClubId] })
+      setSettlingLiabilityId(null)
+      setSettleAmount('')
+      setSettleReason('')
+      setFormError(null)
+    },
+    onError: (err) => setFormError(err instanceof Error ? err.message : translateSupabaseError(err, t('billing.cashShift.errors.genericError'))),
   })
 
   const openMutation = useMutation({
@@ -168,6 +259,8 @@ export function CashShiftPage() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['cash-shifts', currentClubId] })
+      queryClient.invalidateQueries({ queryKey: ['cash-shift-liabilities', currentClubId] })
+      queryClient.invalidateQueries({ queryKey: ['cash-shift-ages', currentClubId] })
       setClosingShiftId(null)
       setClosingCount('')
       setClosingNotes('')
@@ -206,6 +299,38 @@ export function CashShiftPage() {
       header: t('billing.cashShift.historyCard.table.status'),
       render: (s) => <StatusBadge tone={s.status === 'open' ? 'warning' : 'neutral'} label={statusLabels[s.status] ?? s.status} />,
     },
+    // Phase D (D10-D13): a closed shift's shortage/overage, with a
+    // one-click settle action while it's still outstanding -- no need
+    // to leave Cash Shift to record a payroll deduction against it.
+    {
+      key: 'liability',
+      header: t('billing.cashShift.historyCard.table.liability'),
+      render: (s) => {
+        const liability = liabilitiesByShift.get(s.id)
+        if (!liability) return '—'
+        if (liability.kind === 'overage') {
+          return <span className="text-status-info text-xs">{t('billing.cashShift.liability.overageRecorded')}</span>
+        }
+        if (liability.status === 'settled') {
+          return <StatusBadge tone="success" label={t('billing.cashShift.liability.settled')} />
+        }
+        return (
+          <div className="flex items-center gap-2">
+            <span className="text-status-danger text-xs tabular-nums">
+              {t('billing.cashShift.liability.outstanding', { amount: formatMoney(liability.outstanding, 'EGP', locale) })}
+            </span>
+            <Button
+              size="sm"
+              variant="outline"
+              className="h-6 px-2 text-xs"
+              onClick={() => { setSettlingLiabilityId(liability.id); setSettleAmount(liability.outstanding.toFixed(2)) }}
+            >
+              {t('billing.cashShift.liability.settle')}
+            </Button>
+          </div>
+        )
+      },
+    },
   ]
 
   return (
@@ -214,6 +339,42 @@ export function CashShiftPage() {
 
       {formError && (
         <div className="mb-4 rounded-md border border-status-danger/40 bg-status-danger/5 p-3 text-sm text-status-danger">{formError}</div>
+      )}
+
+      {/* Phase D (D17): open-shift age warning -- purely informational,
+          never auto-closes anything. Threshold of 12h is a reasonable
+          "this has probably been left open" signal for a single-day
+          operating pattern without inventing a specific policy number
+          the directive never gave. */}
+      {openShiftAges.some((s) => s.age_hours >= 12) && (
+        <div className="mb-4 rounded-md border border-status-warning/40 bg-status-warning/5 p-3 text-sm text-status-warning">
+          {openShiftAges.filter((s) => s.age_hours >= 12).map((s) => (
+            <p key={s.id}>
+              {t('billing.cashShift.openShiftWarning', { name: s.opened_by_name ?? '—', hours: Math.round(s.age_hours) })}
+            </p>
+          ))}
+        </div>
+      )}
+
+      {settlingLiabilityId && (
+        <div className="mb-4 flex flex-col gap-2 rounded-lg border border-border p-3 md:flex-row md:items-end">
+          <div className="flex flex-col gap-1">
+            <label className="text-sm font-medium">{t('billing.cashShift.liability.settleAmountLabel')}</label>
+            <Input type="number" min={0} step="0.01" value={settleAmount} onChange={(e) => setSettleAmount(e.target.value)} className="w-40" />
+          </div>
+          <div className="flex flex-col gap-1">
+            <label className="text-sm font-medium">{t('billing.cashShift.liability.settleReasonLabel')}</label>
+            <Input value={settleReason} onChange={(e) => setSettleReason(e.target.value)} placeholder={t('billing.cashShift.liability.settleReasonPlaceholder')} className="w-56" />
+          </div>
+          <div className="flex gap-2">
+            <Button size="sm" onClick={() => settleMutation.mutate()} disabled={settleMutation.isPending}>
+              {t('billing.cashShift.liability.confirmSettle')}
+            </Button>
+            <Button size="sm" variant="outline" onClick={() => { setSettlingLiabilityId(null); setSettleAmount(''); setSettleReason('') }}>
+              {t('billing.cashShift.openShiftCard.cancel')}
+            </Button>
+          </div>
+        </div>
       )}
 
       {(data?.open?.length ?? 0) > 0 && (

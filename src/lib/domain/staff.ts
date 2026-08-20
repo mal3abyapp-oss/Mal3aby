@@ -8,4 +8,7 @@ export interface StaffRow {
   roleNameAr: string
   status: string
   branchNames: string[] // empty = all branches (zero rows in membership_branches)
+  // Phase D (D1): explicit per-person cash-handling authorization,
+  // independent of role.
+  hasCashCustody: boolean
 }
