@@ -127,6 +127,9 @@ async function main() {
     customerName: 'أحمد محمد',
     bookingRef: 'MB-ABCDEF12',
     fieldName: 'ملعب 1 - كرة قدم',
+    bookingStartAt: new Date().toISOString(),
+    bookingEndAt: new Date(Date.now() + 3600_000).toISOString(),
+    clubTimezone: 'Africa/Cairo',
     issuedAt: new Date().toISOString(),
     total: 350,
     paid: 100,
@@ -134,6 +137,11 @@ async function main() {
     outstanding: 250,
     paymentStatus: 'partially_paid',
     currency: 'EGP',
+    paymentMethod: 'cash',
+    receiptSerial: null,
+    receiptBook: null,
+    receiptSeries: null,
+    receiptDate: null,
   })
   check('Invoice PDF generation produces a non-empty PDF buffer', pdf.length > 0)
   check('Invoice PDF starts with the %PDF magic bytes', pdf.subarray(0, 5).toString('ascii') === '%PDF-')
@@ -153,6 +161,9 @@ async function main() {
     customerName: 'سارة علي',
     bookingRef: 'MB-11223344',
     fieldName: 'ملعب 3',
+    bookingStartAt: new Date().toISOString(),
+    bookingEndAt: new Date(Date.now() + 3600_000).toISOString(),
+    clubTimezone: 'Africa/Cairo',
     issuedAt: new Date().toISOString(),
     total: 500,
     paid: 500,
@@ -160,6 +171,11 @@ async function main() {
     outstanding: 0,
     paymentStatus: 'partially_refunded',
     currency: 'EGP',
+    paymentMethod: 'cash',
+    receiptSerial: null,
+    receiptBook: null,
+    receiptSeries: null,
+    receiptDate: null,
   })
   const refundPdfText = await extractPdfText(refundPdf)
   check('Invoice PDF with a real refund embeds the refunded amount as real extractable text', refundPdfText.includes('50.00 EGP'))
@@ -184,6 +200,9 @@ async function main() {
     customerName: 'محمد سعيد',
     bookingRef: 'MB-55667788',
     fieldName: 'ملعب 2',
+    bookingStartAt: new Date().toISOString(),
+    bookingEndAt: new Date(Date.now() + 3600_000).toISOString(),
+    clubTimezone: 'Africa/Cairo',
     issuedAt: new Date().toISOString(),
     total: 200,
     paid: 200,
@@ -191,8 +210,92 @@ async function main() {
     outstanding: 0,
     paymentStatus: 'paid',
     currency: 'EGP',
+    paymentMethod: 'cash',
+    receiptSerial: null,
+    receiptBook: null,
+    receiptSeries: null,
+    receiptDate: null,
   })
   check('Invoice PDF generation succeeds with no refund present', noRefundPdf.length > 0)
+
+  // Directive Sections 4/7/9: government-club invoice with an official
+  // collection receipt -- the receipt block must actually appear as
+  // real extractable text with the correct serial/book/series.
+  const govPdf = await buildInvoicePdfBuffer({
+    invoiceId: 'test-invoice-id-4',
+    invoiceNumber: 'INV-2026-0200',
+    clubName: 'ملعب الحكومي',
+    customerName: 'خالد إبراهيم',
+    bookingRef: 'MB-99887766',
+    fieldName: 'ملعب 4',
+    bookingStartAt: new Date().toISOString(),
+    bookingEndAt: new Date(Date.now() + 3600_000).toISOString(),
+    clubTimezone: 'Africa/Cairo',
+    issuedAt: new Date().toISOString(),
+    total: 300,
+    paid: 300,
+    refunded: 0,
+    outstanding: 0,
+    paymentStatus: 'paid',
+    currency: 'EGP',
+    paymentMethod: 'cash',
+    receiptSerial: 'GOV-2026-004521',
+    receiptBook: 'B12',
+    receiptSeries: 'S3',
+    receiptDate: '2026-08-20',
+  })
+  const govPdfText = await extractPdfText(govPdf)
+  check('Invoice PDF with an official receipt embeds the receipt serial as real extractable text', govPdfText.includes('GOV-2026-004521'), govPdfText)
+  check('Invoice PDF with an official receipt embeds the receipt book as real extractable text', govPdfText.includes('B12'))
+  check('Invoice PDF omits the receipt block entirely when no receipt is linked (non-government payment)', !pdfTextContainsArabic(pdfText, 'إيصال التحصيل'))
+
+  // Regression test for a real bug found via rasterized visual QA
+  // (directive Section 10 -- "actually generate real QA PDFs and
+  // inspect them visually, do not declare PASS from code alone"):
+  // an ENGLISH-language invoice with Arabic-language data values
+  // (very common -- bilingual clubs/customers, e.g. an Arabic club
+  // name shown to an English-speaking customer) rendered those values
+  // as tofu boxes, because renderEnglish() only ever registered/used
+  // the Latin font. Fixed by routing any Arabic-range value through
+  // the same vector Arabic renderer renderArabic() uses. Text
+  // extraction alone cannot catch a tofu-box bug (the invisible
+  // search layer still embeds the correct Unicode text even when the
+  // visible glyph is missing) -- this was only caught by rasterizing
+  // and looking at the actual pixels, so this test asserts on the
+  // *govPdfText* still containing the Arabic booking/receipt values
+  // as evidence the mixed-script path is exercised in the standard
+  // test flow, and is deliberately paired with the visual QA note in
+  // documentation-handoff for the one check code alone cannot fully
+  // replace.
+  const bilingualEnPdf = await buildInvoicePdfBuffer(
+    {
+      invoiceId: 'qa-bilingual',
+      invoiceNumber: 'INV-2026-0300',
+      clubName: 'نادي ملعبي التجريبي',
+      customerName: 'محمد أحمد علي',
+      bookingRef: 'MB-1A2B3C4D',
+      fieldName: 'ملعب 1 - كرة قدم (رئيسي)',
+      bookingStartAt: new Date().toISOString(),
+      bookingEndAt: new Date(Date.now() + 3600_000).toISOString(),
+      clubTimezone: 'Africa/Cairo',
+      issuedAt: new Date().toISOString(),
+      total: 350,
+      paid: 350,
+      refunded: 0,
+      outstanding: 0,
+      paymentStatus: 'paid',
+      currency: 'EGP',
+      paymentMethod: 'cash',
+      receiptSerial: null,
+      receiptBook: null,
+      receiptSeries: null,
+      receiptDate: null,
+    },
+    { language: 'en', compress: false },
+  )
+  const bilingualEnText = await extractPdfText(bilingualEnPdf)
+  check('English-layout PDF with Arabic data values still embeds those Arabic values as real extractable text (mixed-script fix)', pdfTextContainsArabic(bilingualEnText, 'محمد') && pdfTextContainsArabic(bilingualEnText, 'ملعب'), bilingualEnText)
+  check('English-layout PDF with Arabic data values keeps its English labels/headings in English', bilingualEnText.includes('Customer') && bilingualEnText.includes('Financial summary'))
 
   // ---- Media queue metadata pairing (mirrors the DB check constraint, at the app layer) ----
   const validPairs: Array<['image' | 'document' | null, 'booking_qr' | 'invoice_pdf' | null]> = [

@@ -132,6 +132,9 @@ export class SupabaseSync {
     customerName: string | null
     bookingRef: string | null
     fieldName: string | null
+    bookingStartAt: string | null
+    bookingEndAt: string | null
+    clubTimezone: string | null
     issuedAt: string
     total: number
     paid: number
@@ -139,6 +142,11 @@ export class SupabaseSync {
     outstanding: number
     paymentStatus: string
     currency: string
+    paymentMethod: string | null
+    receiptSerial: string | null
+    receiptBook: string | null
+    receiptSeries: string | null
+    receiptDate: string | null
   } | null> {
     const { data, error } = await this.client.rpc('whatsapp_connector_get_invoice_document_data', { p_invoice_id: invoiceId })
     if (error) throw new Error(`whatsapp_connector_get_invoice_document_data failed: ${error.message}`)
@@ -150,6 +158,9 @@ export class SupabaseSync {
           customer_name: string | null
           booking_ref: string | null
           field_name: string | null
+          booking_start_at: string | null
+          booking_end_at: string | null
+          club_timezone: string | null
           issued_at: string
           total: number
           paid: number
@@ -157,6 +168,11 @@ export class SupabaseSync {
           outstanding: number
           payment_status: string
           currency: string
+          payment_method: string | null
+          receipt_serial: string | null
+          receipt_book: string | null
+          receipt_series: string | null
+          receipt_date: string | null
         }
       | undefined
     if (!row) return null
@@ -167,6 +183,9 @@ export class SupabaseSync {
       customerName: row.customer_name,
       bookingRef: row.booking_ref,
       fieldName: row.field_name,
+      bookingStartAt: row.booking_start_at,
+      bookingEndAt: row.booking_end_at,
+      clubTimezone: row.club_timezone,
       issuedAt: row.issued_at,
       total: row.total,
       paid: row.paid,
@@ -174,6 +193,11 @@ export class SupabaseSync {
       outstanding: row.outstanding,
       paymentStatus: row.payment_status,
       currency: row.currency,
+      paymentMethod: row.payment_method,
+      receiptSerial: row.receipt_serial,
+      receiptBook: row.receipt_book,
+      receiptSeries: row.receipt_series,
+      receiptDate: row.receipt_date,
     }
   }
 

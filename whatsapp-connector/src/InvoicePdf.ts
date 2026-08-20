@@ -99,6 +99,9 @@ export interface InvoiceDocumentData {
   customerName: string | null
   bookingRef: string | null
   fieldName: string | null
+  bookingStartAt: string | null
+  bookingEndAt: string | null
+  clubTimezone: string | null
   issuedAt: string
   total: number
   paid: number
@@ -106,6 +109,27 @@ export interface InvoiceDocumentData {
   outstanding: number
   paymentStatus: string
   currency: string
+  paymentMethod: string | null
+  receiptSerial: string | null
+  receiptBook: string | null
+  receiptSeries: string | null
+  receiptDate: string | null
+}
+
+const PAYMENT_METHOD_LABELS_AR: Record<string, string> = {
+  cash: 'نقدي',
+  card: 'بطاقة',
+  bank_transfer: 'تحويل بنكي',
+  wallet: 'محفظة إلكترونية',
+  other: 'أخرى',
+}
+
+const PAYMENT_METHOD_LABELS_EN: Record<string, string> = {
+  cash: 'Cash',
+  card: 'Card',
+  bank_transfer: 'Bank transfer',
+  wallet: 'Wallet',
+  other: 'Other',
 }
 
 const PAYMENT_STATUS_LABELS_AR: Record<string, string> = {
@@ -146,6 +170,27 @@ function formatIssuedAt(iso: string, language: 'ar' | 'en'): string {
     minute: '2-digit',
     hour12: true,
   }).format(d)
+}
+
+/** Directive Section 9: the booking's own date/time (distinct from the
+ * invoice issue date/time above), rendered in the club's own venue
+ * timezone -- never the server/UTC offset, matching the WhatsApp
+ * message templates' own formatDate/formatTime pattern in
+ * templates.ts. Falls back to Africa/Cairo only if the club row
+ * genuinely has no timezone set (should not happen in practice, every
+ * club is required to set one at onboarding). */
+function formatBookingDateTime(startIso: string, endIso: string | null, timezone: string | null, language: 'ar' | 'en'): string {
+  const tz = timezone ?? 'Africa/Cairo'
+  const start = new Date(startIso)
+  if (Number.isNaN(start.getTime())) return startIso
+  const locale = language === 'en' ? 'en-GB' : 'en-GB'
+  const datePart = new Intl.DateTimeFormat(locale, { timeZone: tz, day: '2-digit', month: '2-digit', year: 'numeric' }).format(start)
+  const startTime = new Intl.DateTimeFormat(locale, { timeZone: tz, hour: 'numeric', minute: '2-digit', hour12: true }).format(start)
+  if (!endIso) return `${datePart} ${startTime}`
+  const end = new Date(endIso)
+  if (Number.isNaN(end.getTime())) return `${datePart} ${startTime}`
+  const endTime = new Intl.DateTimeFormat(locale, { timeZone: tz, hour: 'numeric', minute: '2-digit', hour12: true }).format(end)
+  return `${datePart}, ${startTime} - ${endTime}`
 }
 
 /**
@@ -193,7 +238,7 @@ export async function buildInvoicePdfBuffer(
       }
 
       if (language === 'en') {
-        renderEnglish(doc, data, left, rightEdge, divider)
+        renderEnglish(doc, data, fonts, left, rightEdge, divider)
       } else {
         renderArabic(doc, data, fonts, left, rightEdge, divider)
       }
@@ -245,6 +290,7 @@ function renderArabic(
   doc.moveDown(0.2)
   if (data.customerName) row('العميل', data.customerName)
   if (data.fieldName) row('الملعب', data.fieldName)
+  if (data.bookingStartAt) row('موعد الحجز', formatBookingDateTime(data.bookingStartAt, data.bookingEndAt, data.clubTimezone, 'ar'))
   doc.moveDown(0.2)
   divider()
 
@@ -257,6 +303,22 @@ function renderArabic(
   }
   row('المتبقي', money(data.outstanding, data.currency), { bold: true })
   row('حالة الدفع', PAYMENT_STATUS_LABELS_AR[data.paymentStatus] ?? data.paymentStatus, { bold: true })
+  if (data.paymentMethod) row('طريقة الدفع', PAYMENT_METHOD_LABELS_AR[data.paymentMethod] ?? data.paymentMethod)
+
+  // Directive Sections 4/7/9: official government collection receipt
+  // -- only shown when this invoice actually has an active one linked
+  // (government-required clubs/methods only). Serial/book/series/date
+  // only, exactly the fields the directive lists.
+  if (data.receiptSerial) {
+    doc.moveDown(0.2)
+    divider()
+    line('إيصال التحصيل الرسمي', { bold: true, size: 12 })
+    doc.moveDown(0.2)
+    row('رقم الإيصال', data.receiptSerial, { bold: true })
+    if (data.receiptBook) row('رقم الدفتر', data.receiptBook)
+    if (data.receiptSeries) row('السلسلة', data.receiptSeries)
+    if (data.receiptDate) row('تاريخ الإيصال', data.receiptDate)
+  }
 
   doc.moveDown(0.6)
   divider()
@@ -280,9 +342,13 @@ function renderArabic(
   }
 }
 
+/** Any Arabic-range codepoint (main block + presentation forms) -- used only to decide whether an English-layout VALUE needs the vector Arabic renderer instead of pdfkit's plain Latin .text(), never to alter shaping/reordering logic itself. */
+const ARABIC_RANGE = /[؀-ۿݐ-ݿﭐ-﷿ﹰ-﻿]/
+
 function renderEnglish(
   doc: PDFKit.PDFDocument,
   data: InvoiceDocumentData,
+  fonts: RenderFonts,
   left: number,
   rightEdge: number,
   divider: () => void,
@@ -290,19 +356,47 @@ function renderEnglish(
   const width = rightEdge - left
 
   const heading = (text: string, opts: { size?: number; bold?: boolean; color?: string } = {}) => {
+    // Directive Section 37 real bug (found via rasterized visual QA,
+    // not code review): customer/field/club names are staff-entered
+    // free text and are very often Arabic even on an English-language
+    // invoice (bilingual clubs/customers) -- rendering them through
+    // pdfkit's plain Latin font silently produced tofu boxes (no
+    // glyphs for Arabic codepoints exist in the Latin font). Route any
+    // value containing Arabic-range characters through the same
+    // correct vector renderer renderArabic() uses, right-aligned at
+    // the page's right edge like any other heading-width text; plain
+    // English strings keep the cheap/simple pdfkit path unchanged.
+    if (ARABIC_RANGE.test(text)) {
+      const size = opts.size ?? 11
+      drawArabicText(doc, text, rightEdge, doc.y + size * 0.8, size, fonts, { bold: opts.bold, color: opts.color })
+      doc.y += size * 1.4
+      return
+    }
     doc.font(opts.bold ? 'LatinBold' : 'Latin').fontSize(opts.size ?? 11).fillColor(opts.color ?? '#000000')
     doc.text(text, left, doc.y, { width, align: 'left' })
     doc.fillColor('#000000')
   }
 
   const row = (label: string, value: string, opts: { bold?: boolean; valueColor?: string } = {}) => {
+    // Fixed line height (not moveDown-from-wherever-text()-left-us) --
+    // both the label and value draws use an explicit y independent of
+    // any pdfkit internal cursor movement, and the row always advances
+    // by exactly one line height afterward, regardless of which branch
+    // drew the value (plain pdfkit .text() vs the vector Arabic
+    // renderer, which never touches doc.y itself).
     const y = doc.y
+    const lineHeight = 11 * 1.4
     doc.font(opts.bold ? 'LatinBold' : 'Latin').fontSize(11).fillColor('#000000')
-    doc.text(label, left, y, { width: width * 0.55, align: 'left' })
-    doc.font(opts.bold ? 'LatinBold' : 'Latin').fontSize(11).fillColor(opts.valueColor ?? '#000000')
-    doc.text(value, left, y, { width, align: 'right' })
-    doc.fillColor('#000000')
-    doc.moveDown(0.55)
+    doc.text(label, left, y, { width: width * 0.55, align: 'left', lineBreak: false })
+    if (ARABIC_RANGE.test(value)) {
+      // Same fix as heading() above, applied to the value column.
+      drawArabicText(doc, value, rightEdge, y + 11 * 0.8, 11, fonts, { bold: opts.bold, color: opts.valueColor })
+    } else {
+      doc.font(opts.bold ? 'LatinBold' : 'Latin').fontSize(11).fillColor(opts.valueColor ?? '#000000')
+      doc.text(value, left, y, { width, align: 'right', lineBreak: false })
+      doc.fillColor('#000000')
+    }
+    doc.y = y + lineHeight
   }
 
   heading(data.clubName ?? 'Mal3aby', { bold: true, size: 20 })
@@ -321,6 +415,7 @@ function renderEnglish(
   doc.moveDown(0.3)
   if (data.customerName) row('Customer', data.customerName)
   if (data.fieldName) row('Field', data.fieldName)
+  if (data.bookingStartAt) row('Booking time', formatBookingDateTime(data.bookingStartAt, data.bookingEndAt, data.clubTimezone, 'en'))
   doc.moveDown(0.3)
   divider()
 
@@ -333,6 +428,18 @@ function renderEnglish(
   }
   row('Outstanding', money(data.outstanding, data.currency), { bold: true })
   row('Payment status', PAYMENT_STATUS_LABELS_EN[data.paymentStatus] ?? data.paymentStatus, { bold: true })
+  if (data.paymentMethod) row('Payment method', PAYMENT_METHOD_LABELS_EN[data.paymentMethod] ?? data.paymentMethod)
+
+  if (data.receiptSerial) {
+    doc.moveDown(0.3)
+    divider()
+    heading('Official Collection Receipt', { bold: true, size: 12 })
+    doc.moveDown(0.3)
+    row('Receipt #', data.receiptSerial, { bold: true })
+    if (data.receiptBook) row('Book', data.receiptBook)
+    if (data.receiptSeries) row('Series', data.receiptSeries)
+    if (data.receiptDate) row('Receipt date', data.receiptDate)
+  }
 
   doc.moveDown(0.8)
   divider()
