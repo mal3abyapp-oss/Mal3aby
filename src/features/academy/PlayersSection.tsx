@@ -1,5 +1,4 @@
-import { useEffect, useState } from 'react'
-import type { CountryCode } from 'libphonenumber-js'
+import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
@@ -7,11 +6,9 @@ import QRCode from 'qrcode'
 import { supabase } from '@/lib/supabase/client'
 import { useAuth } from '@/app/providers/AuthProvider'
 import { translateSupabaseError } from '@/lib/errors'
-import { normalizePhone } from '@/lib/domain/phone'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { PhoneInput } from '@/components/ui/phone-input'
-import { WhatsappConsentQuestion, type WhatsappConsentAnswer } from '@/components/ui/whatsapp-consent-question'
+import { CustomerSelector, type SelectedCustomer } from '@/components/ui/customer-selector'
 import { StatusBadge } from '@/components/ui/status-badge'
 import { MoneyDisplay } from '@/components/ui/money-display'
 import { DataTable, type DataTableColumn } from '@/components/ui/data-table'
@@ -54,12 +51,6 @@ interface PlayerListRow {
   displayStatus: string
   outstanding: number
   attendanceRate: number | null
-}
-
-interface CustomerCandidate {
-  id: string
-  fullName: string
-  mobileDisplay: string | null
 }
 
 type PlayerFilter = 'all' | 'active' | 'due' | 'expired' | 'none'
@@ -161,31 +152,6 @@ async function fetchPlayersWithContext(clubId: string, search: string): Promise<
       attendanceRate: att && att.total > 0 ? Math.round((att.present / att.total) * 100) : null,
     }
   })
-}
-
-async function searchCustomers(clubId: string, search: string): Promise<CustomerCandidate[]> {
-  if (!search.trim()) return []
-  const { data, error } = await supabase
-    .from('customers')
-    .select('id, full_name, mobile_display')
-    .eq('club_id', clubId)
-    .ilike('full_name', `%${search}%`)
-    .limit(10)
-  if (error) throw error
-  return (data ?? []).map((c) => ({ id: c.id, fullName: c.full_name, mobileDisplay: c.mobile_display }))
-}
-
-async function fetchClubCountry(clubId: string) {
-  const { data } = await supabase.from('clubs').select('country').eq('id', clubId).maybeSingle()
-  return (data?.country as CountryCode | null) ?? null
-}
-
-// Kept as a display/search-back-compat helper for the legacy
-// normalized_mobile column, matching CustomersPage.tsx's own
-// (non-exported) helper exactly -- phone_e164 from normalizePhone()
-// remains the canonical identity value written alongside it.
-function normalizeMobile(input: string): string {
-  return input.replace(/\D/g, '').replace(/^0+/, '')
 }
 
 export function PlayersSection() {
@@ -326,70 +292,21 @@ function AddPlayerDialog({ onAdded }: { onAdded: () => void }) {
   const { t } = useTranslation()
   const { currentClubId } = useAuth()
 
-  const [mode, setMode] = useState<'existing' | 'new'>('existing')
-  const [guardianSearch, setGuardianSearch] = useState('')
-  const [selectedGuardianId, setSelectedGuardianId] = useState('')
+  const [guardian, setGuardian] = useState<SelectedCustomer | null>(null)
   const [playerName, setPlayerName] = useState('')
   const [error, setError] = useState<string | null>(null)
 
-  const [newName, setNewName] = useState('')
-  const [newMobile, setNewMobile] = useState('')
-  const [newMobileCountry, setNewMobileCountry] = useState<CountryCode>('EG')
-  const [newPhoneValid, setNewPhoneValid] = useState(false)
-  const [whatsappConsent, setWhatsappConsent] = useState<WhatsappConsentAnswer>(null)
-
-  const { data: clubCountry } = useQuery({ queryKey: ['club-country', currentClubId], queryFn: () => fetchClubCountry(currentClubId!), enabled: !!currentClubId })
-  useEffect(() => { if (clubCountry) setNewMobileCountry(clubCountry) }, [clubCountry])
-
-  const { data: candidates = [] } = useQuery({
-    queryKey: ['guardian-candidates-add-player', currentClubId, guardianSearch],
-    queryFn: () => searchCustomers(currentClubId!, guardianSearch),
-    enabled: !!currentClubId && mode === 'existing' && guardianSearch.trim().length > 0,
-  })
-
+  // Customer 360 closure gap: this dialog previously ran its own
+  // check-then-insert against `customers` (not upsert_customer's
+  // concurrency-safe path) and wrote consent through legacy
+  // normalizeMobile() digit-stripping instead of the real E.164
+  // pipeline -- the exact drift the shared CustomerSelector exists to
+  // eliminate. The guardian is never re-created here: CustomerSelector
+  // already returns either an existing customer's real id or a
+  // freshly upsert_customer-created one.
   const addMutation = useMutation({
     mutationFn: async () => {
-      let guardianId = selectedGuardianId
-      if (mode === 'new') {
-        if (!newName.trim()) throw new Error(t('customers.fullName'))
-        let phoneE164: string | null = null
-        if (newMobile.trim()) {
-          const result = normalizePhone(newMobile, newMobileCountry)
-          if (!result.valid || !result.e164) throw new Error(t('phoneInput.invalidError'))
-          phoneE164 = result.e164
-          const { data: existing } = await supabase
-            .from('customers')
-            .select('id')
-            .eq('club_id', currentClubId as string)
-            .eq('phone_e164', phoneE164)
-            .limit(1)
-            .maybeSingle()
-          if (existing) throw new Error(t('phoneInput.duplicateCustomer'))
-        }
-        const { data: created, error: custError } = await supabase
-          .from('customers')
-          .insert({
-            club_id: currentClubId as string,
-            full_name: newName,
-            mobile_display: newMobile || null,
-            normalized_mobile: newMobile ? normalizeMobile(newMobile) : null,
-            phone_e164: phoneE164,
-          })
-          .select('id')
-          .single()
-        if (custError) throw custError
-        guardianId = created.id
-        if (phoneE164 && whatsappConsent !== null) {
-          await supabase.rpc('record_staff_whatsapp_consent', {
-            p_club_id: currentClubId as string,
-            p_customer_id: created.id,
-            p_consented: whatsappConsent,
-            p_phone_display: newMobile,
-            p_normalized_phone: normalizeMobile(newMobile),
-          })
-        }
-      }
-      if (!guardianId) throw new Error(t('academy.players.chooseCustomer'))
+      if (!guardian) throw new Error(t('academy.players.chooseCustomer'))
 
       const { data: player, error: playerError } = await supabase
         .from('players')
@@ -399,7 +316,7 @@ function AddPlayerDialog({ onAdded }: { onAdded: () => void }) {
       if (playerError) throw playerError
 
       const { error: linkError } = await supabase.from('guardian_links').insert({
-        customer_id: guardianId,
+        customer_id: guardian.id,
         player_id: player.id,
         relationship: 'guardian',
         is_primary: true,
@@ -410,53 +327,16 @@ function AddPlayerDialog({ onAdded }: { onAdded: () => void }) {
     onError: (err) => setError(translateSupabaseError(err, t('academy.players.addError'))),
   })
 
-  const canSubmit = !!playerName.trim() && (mode === 'existing' ? !!selectedGuardianId : !!newName.trim())
+  const canSubmit = !!playerName.trim() && !!guardian
 
   return (
     <DialogContent>
       <DialogHeader><DialogTitle>{t('academy.players.addPlayer')}</DialogTitle></DialogHeader>
       <div className="flex flex-col gap-3">
-        <div className="flex gap-2">
-          <Button type="button" size="sm" variant={mode === 'existing' ? 'default' : 'outline'} className="flex-1" onClick={() => setMode('existing')}>
-            {t('academy.players.existingCustomer')}
-          </Button>
-          <Button type="button" size="sm" variant={mode === 'new' ? 'default' : 'outline'} className="flex-1" onClick={() => setMode('new')}>
-            {t('academy.players.newCustomer')}
-          </Button>
+        <div className="flex flex-col gap-1.5">
+          <label className="text-sm font-medium text-text-secondary">{t('academy.players.guardianColumn')}</label>
+          <CustomerSelector clubId={currentClubId as string} value={guardian} onSelect={setGuardian} />
         </div>
-
-        {mode === 'existing' ? (
-          <div className="flex flex-col gap-1.5">
-            <label className="text-sm font-medium text-text-secondary">{t('academy.players.searchCustomerByName')}</label>
-            <Input value={guardianSearch} onChange={(e) => { setGuardianSearch(e.target.value); setSelectedGuardianId('') }} />
-            {candidates.length > 0 && (
-              <Select value={selectedGuardianId} onValueChange={setSelectedGuardianId}>
-                <SelectTrigger><SelectValue placeholder={t('academy.players.chooseCustomer')} /></SelectTrigger>
-                <SelectContent>
-                  {candidates.map((c) => (
-                    <SelectItem key={c.id} value={c.id}>{c.fullName}{c.mobileDisplay ? ` (${c.mobileDisplay})` : ''}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            )}
-          </div>
-        ) : (
-          <div className="flex flex-col gap-3 rounded-md border border-border p-3">
-            <div className="flex flex-col gap-1.5">
-              <label className="text-sm font-medium text-text-secondary">{t('academy.players.guardianColumn')}</label>
-              <Input required value={newName} onChange={(e) => setNewName(e.target.value)} placeholder={t('customers.fullName')} />
-            </div>
-            <PhoneInput
-              label={t('common.phone')}
-              value={{ raw: newMobile, country: newMobileCountry }}
-              onChange={(v) => { setNewMobile(v.raw); setNewMobileCountry(v.country) }}
-              onValidChange={(r) => setNewPhoneValid(r.valid)}
-            />
-            {newMobile.trim() && newPhoneValid && (
-              <WhatsappConsentQuestion value={whatsappConsent} onChange={setWhatsappConsent} />
-            )}
-          </div>
-        )}
 
         <div className="flex flex-col gap-1.5">
           <label className="text-sm font-medium text-text-secondary">{t('academy.players.fullName')}</label>

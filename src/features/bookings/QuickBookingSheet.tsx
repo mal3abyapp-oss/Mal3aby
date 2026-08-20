@@ -1,6 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import type { CountryCode } from 'libphonenumber-js'
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { useMutation } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
 import { supabase } from '@/lib/supabase/client'
 import { translateSupabaseError } from '@/lib/errors'
@@ -14,13 +13,11 @@ import {
 } from '@/components/ui/sheet'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { PhoneInput } from '@/components/ui/phone-input'
-import { WhatsappConsentQuestion, type WhatsappConsentAnswer } from '@/components/ui/whatsapp-consent-question'
+import { CustomerSelector, type SelectedCustomer } from '@/components/ui/customer-selector'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { useResolvedFieldPrice, useClubTimezone } from './useFieldPricing'
 import { toInstant } from '@/lib/domain/time'
 import { useDirection } from '@/app/providers/DirectionProvider'
-import { normalizePhone } from '@/lib/domain/phone'
 import { useOfficialReceipt, OfficialCollectionReceiptFields, translateReceiptError } from '@/components/ui/official-collection-receipt-fields'
 import { PAYMENT_METHOD_LABELS } from '@/lib/domain/billing'
 
@@ -34,32 +31,6 @@ export interface QuickBookingSlot {
   branchId: string
   date: string // YYYY-MM-DD
   startTime: string // HH:MM
-}
-
-interface Customer {
-  id: string
-  full_name: string
-  mobile_display: string | null
-}
-
-async function fetchCustomers(clubId: string, search: string) {
-  let query = supabase.from('customers').select('id, full_name, mobile_display').eq('club_id', clubId).order('full_name').limit(50)
-  if (search.trim()) {
-    query = query.or(`full_name.ilike.%${search}%,normalized_mobile.ilike.%${search}%,mobile_display.ilike.%${search}%`)
-  }
-  const { data, error } = await query
-  if (error) throw error
-  return (data ?? []) as Customer[]
-}
-
-async function fetchClubCountry(clubId: string): Promise<CountryCode | null> {
-  const { data, error } = await supabase.from('clubs').select('country').eq('id', clubId).single()
-  if (error) return null
-  return (data?.country as CountryCode | null) ?? null
-}
-
-function legacyNormalize(input: string): string {
-  return input.replace(/\D/g, '').replace(/^0+/, '')
 }
 
 const DURATION_VALUES = ['0.5', '1', '1.5', '2', '3'] as const
@@ -84,29 +55,13 @@ export function QuickBookingSheet({
 }) {
   const { t } = useTranslation()
   const { locale } = useDirection()
-  const queryClient = useQueryClient()
-  const { data: clubTimezone } = useClubTimezone(clubId)
-  const [customerId, setCustomerId] = useState('')
-  const [customerSearch, setCustomerSearch] = useState('')
+  const [selectedCustomer, setSelectedCustomer] = useState<SelectedCustomer | null>(null)
   const [duration, setDuration] = useState('1')
   const [payNow, setPayNow] = useState(true)
   const [paymentMethod, setPaymentMethod] = useState('cash')
   const [formError, setFormError] = useState<string | null>(null)
-  const [showNewCustomer, setShowNewCustomer] = useState(false)
-  const [newCustomerName, setNewCustomerName] = useState('')
-  const [newCustomerMobile, setNewCustomerMobile] = useState('')
-  const [newCustomerMobileCountry, setNewCustomerMobileCountry] = useState<CountryCode>('EG')
-  const [newCustomerPhoneValid, setNewCustomerPhoneValid] = useState(false)
-  const [duplicateCustomer, setDuplicateCustomer] = useState<{ id: string; full_name: string } | null>(null)
-  // Correction: creating a customer record is never itself consent --
-  // staff must explicitly ask and record the real answer.
-  const [newCustomerWhatsappConsent, setNewCustomerWhatsappConsent] = useState<WhatsappConsentAnswer>(null)
 
-  const { data: clubCountry } = useQuery({
-    queryKey: ['club-country', clubId],
-    queryFn: () => fetchClubCountry(clubId),
-    enabled: !!clubId,
-  })
+  const { data: clubTimezone } = useClubTimezone(clubId)
   // Gate 5 — recurring bookings: create_recurring_booking() already
   // existed server-side (delegates to the same, already-fixed
   // _create_booking_internal per occurrence) but had no frontend caller
@@ -130,40 +85,23 @@ export function QuickBookingSheet({
     enabled: !!slot && payNow,
   })
 
-  const [customerLocked, setCustomerLocked] = useState(false)
-
   useEffect(() => {
     if (!slot) {
-      setCustomerId('')
-      setCustomerSearch('')
-      setCustomerLocked(false)
+      setSelectedCustomer(null)
       setDuration('1')
       setPayNow(true)
       setPaymentMethod('cash')
       setFormError(null)
-      setShowNewCustomer(false)
-      setNewCustomerName('')
-      setNewCustomerMobile('')
-      setNewCustomerMobileCountry((clubCountry as CountryCode) ?? 'EG')
-      setDuplicateCustomer(null)
-      setNewCustomerWhatsappConsent(null)
       setIsRecurring(false)
       setOccurrenceCount('8')
       setRecurringResult(null)
       receipt.reset()
     } else if (preselectedCustomer) {
-      setCustomerId(preselectedCustomer.id)
-      setCustomerLocked(true)
+      setSelectedCustomer({ id: preselectedCustomer.id, fullName: preselectedCustomer.name, mobileDisplay: null })
     }
   }, [slot])
 
   const durations = DURATION_VALUES.map((value) => ({ value, label: t(`bookings.quick.durations.${value}`) }))
-
-  const { data: customers = [] } = useQuery({
-    queryKey: ['customers-search', clubId, customerSearch],
-    queryFn: () => fetchCustomers(clubId, customerSearch),
-    enabled: !!clubId && !!slot,
-  })
 
   const endTime = useMemo(() => {
     if (!slot) return null
@@ -181,83 +119,9 @@ export function QuickBookingSheet({
     endTime ? `${endTime}:00` : null,
   )
 
-  const createCustomerMutation = useMutation({
-    mutationFn: async () => {
-      // P0 Phone Identity directive fix: this previously wrote
-      // newCustomerMobile completely raw into BOTH mobile_display and
-      // normalized_mobile -- the weakest phone-write path in the
-      // codebase (not even the old digit-strip cleanup). Now runs
-      // through the same normalizePhone() pipeline as every other
-      // customer-creation surface, and checks for a tenant-scoped
-      // duplicate before creating (directive section 24/29/31).
-      let phoneE164: string | null = null
-      if (newCustomerMobile.trim()) {
-        const result = normalizePhone(newCustomerMobile, newCustomerMobileCountry)
-        if (!result.valid || !result.e164) {
-          throw new Error(t('phoneInput.invalidError'))
-        }
-        phoneE164 = result.e164
-
-        const { data: existing } = await supabase
-          .from('customers')
-          .select('id, full_name')
-          .eq('club_id', clubId)
-          .eq('phone_e164', phoneE164)
-          .limit(1)
-          .maybeSingle()
-        if (existing) {
-          throw { isDuplicate: true, customer: existing }
-        }
-      }
-
-      const { data, error } = await supabase
-        .from('customers')
-        .insert({
-          club_id: clubId,
-          full_name: newCustomerName,
-          mobile_display: newCustomerMobile || null,
-          normalized_mobile: newCustomerMobile ? legacyNormalize(newCustomerMobile) : null,
-          phone_e164: phoneE164,
-        })
-        .select('id, full_name, mobile_display')
-        .single()
-      if (error) throw error
-
-      // Correction: creating a customer record is never itself
-      // consent. This RPC only writes a decision when staff have
-      // actually asked the customer and recorded a real yes/no answer.
-      if (phoneE164 && data && newCustomerWhatsappConsent !== null) {
-        const { error: consentError } = await supabase.rpc('record_staff_whatsapp_consent', {
-          p_club_id: clubId,
-          p_customer_id: data.id,
-          p_consented: newCustomerWhatsappConsent,
-          p_phone_display: newCustomerMobile,
-          p_normalized_phone: legacyNormalize(newCustomerMobile),
-        })
-        if (consentError) throw consentError
-      }
-
-      return data
-    },
-    onSuccess: (data) => {
-      setCustomerId(data.id)
-      setShowNewCustomer(false)
-      setDuplicateCustomer(null)
-      setNewCustomerWhatsappConsent(null)
-      void queryClient.invalidateQueries({ queryKey: ['customers-search', clubId] })
-    },
-    onError: (error: unknown) => {
-      if (error && typeof error === 'object' && 'isDuplicate' in error) {
-        setDuplicateCustomer((error as unknown as { customer: { id: string; full_name: string } }).customer)
-        return
-      }
-      setFormError(error instanceof Error && error.message ? error.message : t('bookings.quick.addCustomerError'))
-    },
-  })
-
   const bookMutation = useMutation({
     mutationFn: async () => {
-      if (!slot || !customerId) throw new Error('missing input')
+      if (!slot || !selectedCustomer) throw new Error('missing input')
       if (!clubTimezone) throw new Error('club timezone not loaded')
       // Gate 1 fix: slot.date/slot.startTime/endTime are venue-local wall-
       // clock values as the user picked them on the calendar. They must
@@ -276,7 +140,7 @@ export function QuickBookingSheet({
         // 'pending_payment', same as any other new booking.
         const { data, error } = await supabase.rpc('create_recurring_booking', {
           p_field_id: slot.fieldId,
-          p_customer_id: customerId,
+          p_customer_id: selectedCustomer.id,
           p_first_start_at: startAt,
           p_first_end_at: endAt,
           p_occurrence_count: Number(occurrenceCount),
@@ -305,7 +169,7 @@ export function QuickBookingSheet({
 
       const { error } = await supabase.rpc('create_booking', {
         p_field_id: slot.fieldId,
-        p_customer_id: customerId,
+        p_customer_id: selectedCustomer.id,
         p_start_at: startAt,
         p_end_at: endAt,
         p_record_payment: payNow,
@@ -374,84 +238,15 @@ export function QuickBookingSheet({
               </Select>
             </div>
 
-            {/* Customer */}
+            {/* Customer -- the shared CustomerSelector (Customer 360
+                closure gap: every module's customer search/create must
+                use the same component/RPCs, not drifted per-module
+                logic). preselectedCustomer arrives pre-selected from
+                Customer 360's "New booking" action; the selector's own
+                "Change" affordance is how staff would override it. */}
             <div className="flex flex-col gap-1.5">
-              <div className="flex items-center justify-between">
-                <label className="text-sm font-medium text-text-secondary">{t('bookings.quick.customer')}</label>
-                {!customerLocked && (
-                  <button type="button" className="text-xs text-accent hover:underline" onClick={() => setShowNewCustomer((v) => !v)}>
-                    {showNewCustomer ? t('bookings.quick.chooseExistingCustomer') : t('bookings.quick.newCustomer')}
-                  </button>
-                )}
-              </div>
-              {customerLocked && preselectedCustomer ? (
-                <div className="flex items-center justify-between rounded-md border border-accent/30 bg-accent/5 p-2 text-sm">
-                  <span className="font-medium">{preselectedCustomer.name}</span>
-                  <button type="button" className="text-xs text-accent hover:underline" onClick={() => { setCustomerLocked(false); setCustomerId('') }}>
-                    {t('bookings.quick.changeCustomer', { defaultValue: 'Change' })}
-                  </button>
-                </div>
-              ) : showNewCustomer ? (
-                <div className="flex flex-col gap-2 rounded-md border border-border p-2">
-                  <Input placeholder={t('bookings.quick.namePlaceholder')} value={newCustomerName} onChange={(e) => setNewCustomerName(e.target.value)} />
-                  <PhoneInput
-                    label={t('bookings.quick.mobilePlaceholder')}
-                    value={{ raw: newCustomerMobile, country: newCustomerMobileCountry }}
-                    onChange={(v) => {
-                      setNewCustomerMobile(v.raw)
-                      setNewCustomerMobileCountry(v.country)
-                      setDuplicateCustomer(null)
-                    }}
-                    onValidChange={(r) => setNewCustomerPhoneValid(r.valid)}
-                  />
-                  {newCustomerMobile.trim() && newCustomerPhoneValid && (
-                    <WhatsappConsentQuestion value={newCustomerWhatsappConsent} onChange={setNewCustomerWhatsappConsent} />
-                  )}
-                  {duplicateCustomer && (
-                    <div className="flex flex-col gap-2 rounded-md border border-status-warning/40 bg-status-warning/10 p-2 text-xs">
-                      <p>{t('phoneInput.duplicateCustomer')} ({duplicateCustomer.full_name})</p>
-                      <Button
-                        type="button"
-                        size="sm"
-                        variant="outline"
-                        onClick={() => {
-                          setCustomerId(duplicateCustomer.id)
-                          setShowNewCustomer(false)
-                          setDuplicateCustomer(null)
-                        }}
-                      >
-                        {t('phoneInput.useExisting')}
-                      </Button>
-                    </div>
-                  )}
-                  <Button
-                    size="sm"
-                    disabled={
-                      !newCustomerName.trim() ||
-                      (newCustomerMobile.trim().length > 0 && !newCustomerPhoneValid) ||
-                      (newCustomerMobile.trim().length > 0 && newCustomerPhoneValid && newCustomerWhatsappConsent === null) ||
-                      createCustomerMutation.isPending
-                    }
-                    onClick={() => createCustomerMutation.mutate()}
-                  >
-                    {createCustomerMutation.isPending ? t('bookings.quick.adding') : t('bookings.quick.addCustomer')}
-                  </Button>
-                </div>
-              ) : (
-                <>
-                  <Input placeholder={t('bookings.quick.searchPlaceholder')} value={customerSearch} onChange={(e) => setCustomerSearch(e.target.value)} />
-                  <Select value={customerId} onValueChange={setCustomerId}>
-                    <SelectTrigger><SelectValue placeholder={t('bookings.quick.chooseCustomerPlaceholder')} /></SelectTrigger>
-                    <SelectContent>
-                      {customers.map((c) => (
-                        <SelectItem key={c.id} value={c.id}>
-                          {c.full_name}{c.mobile_display ? ` — ${c.mobile_display}` : ''}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </>
-              )}
+              <label className="text-sm font-medium text-text-secondary">{t('bookings.quick.customer')}</label>
+              <CustomerSelector clubId={clubId} value={selectedCustomer} onSelect={setSelectedCustomer} />
             </div>
 
             {/* Price -- server resolved, always visible before confirmation */}
@@ -568,7 +363,7 @@ export function QuickBookingSheet({
         <SheetFooter>
           <Button
             className="w-full"
-            disabled={!customerId || !resolvedPrice || !clubTimezone || bookMutation.isPending || !!recurringResult || (isRecurring && (!occurrenceCount || Number(occurrenceCount) < 1 || Number(occurrenceCount) > 52)) || (payNow && !isRecurring && !receipt.isValid)}
+            disabled={!selectedCustomer || !resolvedPrice || !clubTimezone || bookMutation.isPending || !!recurringResult || (isRecurring && (!occurrenceCount || Number(occurrenceCount) < 1 || Number(occurrenceCount) > 52)) || (payNow && !isRecurring && !receipt.isValid)}
             onClick={() => bookMutation.mutate()}
           >
             {bookMutation.isPending ? t('bookings.quick.booking') : isRecurring ? t('bookings.quick.confirmRecurring') : t('bookings.quick.confirmBooking')}

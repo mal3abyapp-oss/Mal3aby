@@ -74,15 +74,6 @@ async function fetchCustomers(clubId: string, search: string) {
   }))
 }
 
-// Legacy digit-strip normalization is retained ONLY for populating the
-// legacy normalized_mobile column (display/search back-compat) --
-// phone_e164 (the canonical identity/WhatsApp value) is always
-// produced by the real normalizePhone() pipeline in
-// src/lib/domain/phone.ts. See the P0 Phone Identity directive.
-function normalizeMobile(input: string): string {
-  return input.replace(/\D/g, '').replace(/^0+/, '')
-}
-
 async function fetchClubCountry(clubId: string): Promise<CountryCode | null> {
   const { data, error } = await supabase.from('clubs').select('country').eq('id', clubId).single()
   if (error) return null
@@ -107,7 +98,7 @@ export function CustomersPage() {
   const [phoneValid, setPhoneValid] = useState(false)
   const [email, setEmail] = useState('')
   const [formError, setFormError] = useState<string | null>(null)
-  const [duplicateCustomer, setDuplicateCustomer] = useState<{ id: string; fullName: string } | null>(null)
+  const [duplicateCustomerId, setDuplicateCustomerId] = useState<string | null>(null)
   // Correction: creating a customer record is never itself consent.
   // Staff must explicitly ask the customer and record the real
   // answer -- no pre-selected default, same pattern as the government-
@@ -163,7 +154,7 @@ export function CustomersPage() {
     setMobileCountry((clubCountry as CountryCode) ?? 'EG')
     setEmail('')
     setFormError(null)
-    setDuplicateCustomer(null)
+    setDuplicateCustomerId(null)
     setWhatsappConsent(null)
     setDialogOpen(true)
   }
@@ -176,13 +167,13 @@ export function CustomersPage() {
     setWhatsappConsent(null)
     setEmail(c.email ?? '')
     setFormError(null)
-    setDuplicateCustomer(null)
+    setDuplicateCustomerId(null)
     setDialogOpen(true)
   }
 
   const saveMutation = useMutation({
     mutationFn: async () => {
-      let phoneE164: string | null = null
+      let phoneE164: string | undefined
       if (mobile.trim()) {
         // Directive section 16/23: an invalid phone is never saved --
         // the previous value (if editing) stays untouched.
@@ -191,62 +182,27 @@ export function CustomersPage() {
           throw new Error(t('phoneInput.invalidError'))
         }
         phoneE164 = result.e164
-
-        // Directive section 31: tenant-scoped duplicate check before
-        // silently creating a second customer record with the same
-        // canonical phone.
-        if (!editingCustomer || editingCustomer.mobileDisplay !== mobile) {
-          const { data: existing } = await supabase
-            .from('customers')
-            .select('id, full_name')
-            .eq('club_id', currentClubId as string)
-            .eq('phone_e164', phoneE164)
-            .neq('id', editingCustomer?.id ?? '00000000-0000-0000-0000-000000000000')
-            .limit(1)
-            .maybeSingle()
-          if (existing) {
-            throw { isDuplicate: true, customer: existing }
-          }
-        }
       }
 
-      const payload = {
-        full_name: fullName,
-        mobile_display: mobile || null,
-        normalized_mobile: mobile ? normalizeMobile(mobile) : null,
-        phone_e164: phoneE164,
-        email: email || null,
-      }
-      let customerId: string
-      if (editingCustomer) {
-        const { error } = await supabase.from('customers').update(payload).eq('id', editingCustomer.id)
-        if (error) throw error
-        customerId = editingCustomer.id
-      } else {
-        const { data: created, error } = await supabase
-          .from('customers')
-          .insert({ club_id: currentClubId as string, ...payload })
-          .select('id')
-          .single()
-        if (error) throw error
-        customerId = created.id
-      }
-
-      // Correction: creating/editing a customer record is never
-      // itself consent to receive WhatsApp messages. This RPC only
-      // writes a decision when staff have actually asked the customer
-      // and recorded a real yes/no answer -- never a silent default.
-      // Centralized in one RPC so every staff-side customer-creation
-      // surface behaves identically (directive requirement).
-      if (phoneE164 && whatsappConsent !== null) {
-        const { error: consentError } = await supabase.rpc('record_staff_whatsapp_consent', {
-          p_club_id: currentClubId as string,
-          p_customer_id: customerId,
-          p_consented: whatsappConsent,
-          p_phone_display: mobile,
-          p_normalized_phone: normalizeMobile(mobile),
-        })
-        if (consentError) throw consentError
+      // Customer 360 closure gap: single write path shared with every
+      // other customer-creation surface -- upsert_customer's own
+      // concurrency-safe create (database unique_violation + retry)
+      // and duplicate-on-edit detection (directive section 31) replace
+      // what used to be a check-then-insert done independently here.
+      const { data, error: rpcError } = await supabase.rpc('upsert_customer', {
+        p_club_id: currentClubId as string,
+        p_full_name: fullName,
+        p_phone_e164: phoneE164 as string,
+        p_mobile_display: mobile || undefined,
+        p_email: email || undefined,
+        p_whatsapp_consent: phoneE164 && whatsappConsent !== null ? whatsappConsent : undefined,
+        p_customer_id: editingCustomer?.id,
+      })
+      if (rpcError) throw rpcError
+      const row = data?.[0]
+      if (!row) throw new Error('upsert_customer returned no row')
+      if (row.duplicate_of_customer_id) {
+        throw { isDuplicate: true, customerId: row.duplicate_of_customer_id }
       }
     },
     onSuccess: () => {
@@ -256,14 +212,14 @@ export function CustomersPage() {
       setMobile('')
       setEmail('')
       setFormError(null)
-      setDuplicateCustomer(null)
+      setDuplicateCustomerId(null)
       setWhatsappConsent(null)
       void queryClient.invalidateQueries({ queryKey: ['customers', currentClubId] })
     },
     onError: (error: unknown) => {
       if (error && typeof error === 'object' && 'isDuplicate' in error) {
-        const dup = (error as unknown as { customer: { id: string; full_name: string } }).customer
-        setDuplicateCustomer({ id: dup.id, fullName: dup.full_name })
+        const dup = (error as unknown as { customerId: string })
+        setDuplicateCustomerId(dup.customerId)
         setFormError(null)
         return
       }
@@ -274,7 +230,7 @@ export function CustomersPage() {
   function handleSubmit(e: FormEvent) {
     e.preventDefault()
     setFormError(null)
-    setDuplicateCustomer(null)
+    setDuplicateCustomerId(null)
     saveMutation.mutate()
   }
 
@@ -355,7 +311,7 @@ export function CustomersPage() {
                   onChange={(v) => {
                     setMobile(v.raw)
                     setMobileCountry(v.country)
-                    setDuplicateCustomer(null)
+                    setDuplicateCustomerId(null)
                   }}
                   onValidChange={(r) => setPhoneValid(r.valid)}
                 />
@@ -366,16 +322,16 @@ export function CustomersPage() {
                   <label className="text-sm font-medium text-text-secondary">{t('customers.emailOptional')}</label>
                   <Input type="email" value={email} onChange={(e) => setEmail(e.target.value)} />
                 </div>
-                {duplicateCustomer && (
+                {duplicateCustomerId && (
                   <div className="flex flex-col gap-2 rounded-md border border-status-warning/40 bg-status-warning/10 p-3 text-sm">
-                    <p>{t('phoneInput.duplicateCustomer')} ({duplicateCustomer.fullName})</p>
+                    <p>{t('phoneInput.duplicateCustomer')}</p>
                     <Button
                       type="button"
                       size="sm"
                       variant="outline"
                       onClick={() => {
                         setDialogOpen(false)
-                        navigate(`/app/customers/${duplicateCustomer.id}`)
+                        navigate(`/app/customers/${duplicateCustomerId}`)
                       }}
                     >
                       {t('phoneInput.openCustomer')}
