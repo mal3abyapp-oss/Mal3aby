@@ -1,5 +1,7 @@
 # Staff 360 — Final Production Acceptance Report
 
+> **2026-08-21 Codex audit addendum:** The two browser-authentication gaps described in the original report were subsequently closed using 11 isolated QA accounts. Authenticated localhost role/route testing, mobile inspection at 375/390px, production database tenant/branch tests, and production UI smoke testing were completed. Treat the earlier “NOT COMPLETED” statements as superseded by `EVIDENCE_LEDGER.md` and `TEST_COVERAGE_MATRIX.md`.
+
 **Date:** 2026-08-21
 **Scope:** MAL3ABY — STAFF 360 / EMPLOYEE MANAGEMENT MASTER DIRECTIVE
 **Deploy branch:** `main` (verified the correct/only deploy branch; local HEAD == origin/main throughout)
