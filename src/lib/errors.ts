@@ -54,6 +54,24 @@ const MESSAGE_RULES: Array<[RegExp, string, string]> = [
   [/already linked to a different account/i, 'هذا السجل مرتبط بالفعل بحساب آخر.', 'This record is already linked to a different account.'],
   [/already linked to a customer record in this club/i, 'حسابك مرتبط بالفعل ببيانات عميل في هذا النادي.', 'Your account is already linked to a customer record in this club.'],
   [/invalid mobile number/i, 'رقم الهاتف غير صحيح.', 'The phone number is not valid.'],
+  // Directive-driven fix: these RPC errors (Phase D cash-shift gate,
+  // Phase B government-receipt gate) were falling through to the
+  // generic "could not create the booking" fallback -- confirmed via
+  // live QA (a real cash-without-shift attempt through the actual
+  // Quick Booking UI showed the unrelated slot-conflict message
+  // instead of the real reason). Order matters: the more specific cash-
+  // shift message must be checked before the generic receipt-required
+  // one below, since both can appear in the same underlying exception
+  // text shape.
+  [/cash collection requires an active cash shift/i, 'التحصيل النقدي يتطلب وردية نقدية مفتوحة — يجب فتح وردية قبل التحصيل.', 'Cash collection requires an active cash shift — open one before collecting cash.'],
+  [/cash collection requires a branch-scoped booking/i, 'التحصيل النقدي يتطلب حجزًا مرتبطًا بفرع محدد.', 'Cash collection requires a branch-scoped booking.'],
+  [/official collection receipt required/i, 'هذا النادي/الملعب يتطلب إيصال تحصيل رسمي لهذه الطريقة.', 'This club/field requires an official government collection receipt for this payment method.'],
+  [/official collection receipt not found, not active/i, 'رقم الإيصال غير موجود أو غير نشط أو لا يخص هذا النادي.', 'The official receipt was not found, is not active, or does not belong to this club.'],
+  [/this official collection receipt is already linked/i, 'رقم الإيصال هذا مرتبط بالفعل بدفعة أخرى.', 'This official receipt is already linked to another payment.'],
+  [/official collection receipt amount .* does not match/i, 'قيمة الإيصال لا تطابق قيمة الدفعة.', "The receipt amount doesn't match the payment amount."],
+  [/receipt date cannot be in the future/i, 'تاريخ الإيصال لا يمكن أن يكون في المستقبل.', "The receipt date can't be in the future."],
+  [/a receipt image is required/i, 'صورة الإيصال مطلوبة وفق سياسة الالتزام لهذا النادي/الملعب.', "A receipt image is required by this club/field's compliance policy."],
+  [/booking time must be in the future/i, 'وقت الحجز يجب أن يكون في المستقبل.', 'The booking time must be in the future.'],
 ]
 
 const CODE_RULES: Record<string, [string, string]> = {
