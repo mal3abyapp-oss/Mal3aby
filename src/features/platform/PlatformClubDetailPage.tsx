@@ -308,7 +308,10 @@ export function PlatformClubDetailPage() {
       })
       if (error) throw error
     },
-    onSuccess: invalidateAll,
+    onSuccess: () => {
+      invalidateAll()
+      setSelectedPlanId('')
+    },
     onError: () => setActionError(t('platform.clubDetailPage.errors.activate')),
   })
 
@@ -342,6 +345,7 @@ export function PlatformClubDetailPage() {
       invalidateAll()
       setReasonDialogAction(null)
       setReasonText('')
+      setSelectedPlanId('')
     },
     onError: () => setActionError(t('platform.clubDetailPage.errors.changePlan')),
   })

@@ -116,6 +116,7 @@ export function StaffPage() {
     onSuccess: () => {
       setDialogOpen(false)
       setEmail('')
+      setRoleKey('receptionist')
       setFormError(null)
       void queryClient.invalidateQueries({ queryKey: ['staff', currentClubId] })
     },

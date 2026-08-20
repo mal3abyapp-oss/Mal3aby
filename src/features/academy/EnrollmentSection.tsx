@@ -126,6 +126,27 @@ export function EnrollmentSection() {
   const [wizardDiscount, setWizardDiscount] = useState('0')
   const [wizardError, setWizardError] = useState<string | null>(null)
 
+  // Phase A dropdown audit: onSuccess already cleared the wizard fields
+  // after a successful submit, but closing the dialog via Cancel (or the
+  // sheet's own dismiss) left every field -- including all four Selects
+  // -- holding the previous, unrelated selection. Reopening the wizard
+  // then silently pre-filled a new enrollment with a stale player/group/
+  // guardian/plan choice. Resetting on `wizardOpen` becoming false covers
+  // both the cancel path and the submit path uniformly.
+  useEffect(() => {
+    if (!wizardOpen) {
+      setWizardPlayerId('')
+      setWizardGroupId('')
+      setWizardGuardianId('')
+      setWizardPlanType('monthly')
+      setWizardStart('')
+      setWizardEnd('')
+      setWizardPrice('')
+      setWizardDiscount('0')
+      setWizardError(null)
+    }
+  }, [wizardOpen])
+
   const [selectedEnrollment, setSelectedEnrollment] = useState<EnrollmentRow | null>(null)
   const [freezeStart, setFreezeStart] = useState('')
   const [freezeEnd, setFreezeEnd] = useState('')
