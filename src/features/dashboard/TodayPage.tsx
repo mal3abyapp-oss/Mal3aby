@@ -189,7 +189,7 @@ export function TodayPage() {
             label={t('dashboard.today.fieldsOccupiedNow')}
             value={`${data.fields_occupied_now_count} / ${data.fields_active_count}`}
             icon={Landmark}
-            to="/app/fields"
+            to={isManager ? '/app/fields' : undefined}
           />
           {isManager && (
             <StatCard label={t('dashboard.today.revenueToday')} value={formatMoney(data.revenue_today, 'EGP', locale)} icon={Wallet} to="/app/billing" />
