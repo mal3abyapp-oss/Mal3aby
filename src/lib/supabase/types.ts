@@ -5048,6 +5048,10 @@ export type Database = {
         Args: { p_club_id: string; p_preferred_base?: string }
         Returns: string
       }
+      ensure_adhoc_attendance_session: {
+        Args: { p_group_id: string; p_session_date: string }
+        Returns: string
+      }
       generate_training_sessions: {
         Args: { p_group_id: string; p_through_date: string }
         Returns: number
@@ -5174,13 +5178,7 @@ export type Database = {
           p_start_date: string
           p_status?: string
         }
-        Returns: {
-          active_count: number
-          receipts: Json
-          reversed_count: number
-          total_collected_amount: number
-          total_count: number
-        }[]
+        Returns: Json
       }
       get_open_cash_shift_status: {
         Args: { p_shift_id: string }

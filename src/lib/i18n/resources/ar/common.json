@@ -212,7 +212,7 @@
       "limitTypeLabels": {
         "branch_limit": "الفروع",
         "field_limit": "الملاعب",
-        "academy_limit": "برامج الأكاديمية"
+        "academy_limit": "مجموعات الأكاديمية"
       },
       "requestStatusLabels": {
         "pending": "قيد المراجعة",
@@ -319,7 +319,7 @@
         "emptyFieldHint": "اترك الحقل فارغًا لجعل الحد بلا نهاية.",
         "branchLimitLabel": "حد الفروع",
         "fieldLimitLabel": "حد الملاعب",
-        "academyLimitLabel": "حد برامج الأكاديمية",
+        "academyLimitLabel": "حد مجموعات الأكاديمية",
         "unlimitedPlaceholder": "بلا حد",
         "saving": "جارٍ الحفظ...",
         "saveLimits": "حفظ الحدود",
@@ -1064,17 +1064,21 @@
   "academy": {
     "loading": "جارٍ التحميل...",
     "title": "الأكاديمية",
-    "description": "إدارة اللاعبين والبرامج والمجموعات",
+    "description": "اللاعبون والعضويات والحضور",
     "tabs": {
       "overview": "نظرة عامة",
       "players": "اللاعبون",
-      "structure": "البرامج والمجموعات",
-      "enrollments": "التسجيلات والاشتراكات"
+      "memberships": "العضويات والاشتراكات",
+      "attendance": "الحضور"
+    },
+    "attendance": {
+      "recordForMembership": "تسجيل الحضور لعضوية",
+      "open": "فتح"
     },
     "overview": {
       "addPlayer": "إضافة لاعب",
-      "enrollInGroup": "تسجيل لاعب في مجموعة",
-      "markAttendance": "تسجيل الحضور",
+      "enrollInGroup": "اشتراك لاعب",
+      "markAttendance": "الحضور",
       "sessionsToday": "حصص اليوم",
       "sessionsUnmarked": "حضور غير مسجّل",
       "activePlayers": "لاعبون نشطون",
@@ -1117,7 +1121,23 @@
       "linkNewGuardian": "ربط ولي أمر جديد",
       "searchCustomerByName": "بحث عن عميل بالاسم",
       "chooseCustomer": "اختر عميلاً",
-      "link": "ربط"
+      "link": "ربط",
+      "guardianColumn": "العميل/ولي الأمر",
+      "expiry": "تاريخ الانتهاء",
+      "paymentStatus": "حالة الدفع",
+      "noActiveSubscription": "لا يوجد اشتراك نشط",
+      "filters": {
+        "all": "الكل",
+        "active": "نشط",
+        "due": "قريب من الانتهاء",
+        "expired": "منتهي",
+        "none": "بدون اشتراك نشط"
+      },
+      "existingCustomer": "عميل حالي",
+      "newCustomer": "عميل جديد",
+      "renew": "تجديد",
+      "subscribe": "اشتراك",
+      "collectPayment": "تحصيل الدفع"
     },
     "enrollments": {
       "manageSubtitle": "تسجيل لاعب في مجموعة وإنشاء اشتراكه",
@@ -1159,6 +1179,37 @@
       "activationPolicy": "سياسة تفعيل الاشتراك",
       "activationPolicyManagedFrom": "سياسة تفعيل الاشتراك تُدار من",
       "settingsPage": "صفحة الإعدادات"
+    },
+    "memberships": {
+      "subtitle": "أنشئ العضويات، سجّل اللاعبين، وحصّل الدفعات — كل ذلك في مكان واحد.",
+      "newMembership": "عضوية جديدة",
+      "name": "اسم العضوية",
+      "namePlaceholder": "مثال: تدريب كرة قدم شهري",
+      "duration": "المدة",
+      "oneMonth": "شهر واحد",
+      "price": "السعر",
+      "creating": "جارٍ الإنشاء...",
+      "create": "إنشاء",
+      "createError": "تعذّر إنشاء العضوية، حاول مرة أخرى.",
+      "emptyTitle": "لا توجد عضويات بعد",
+      "emptyDescription": "أنشئ عضوية (الاسم، السعر) لبدء بيع الاشتراكات",
+      "activePlayers": "لاعبون نشطون",
+      "status": "الحالة",
+      "noPriceSet": "لا يوجد سعر محدد",
+      "statusLabels": {
+        "active": "نشطة",
+        "full": "مكتملة",
+        "closed": "مغلقة"
+      },
+      "advancedLegacyToggle": "خيارات متقدمة / قديمة (البرامج، المواسم، المدربون، الجداول)",
+      "advancedLegacyDescription": "هذه ميزات اختيارية موجودة بالفعل — غير مطلوبة لإنشاء أو بيع عضوية.",
+      "addPlayerToMembership": "تسجيل لاعب",
+      "noSubscribersYet": "لا يوجد لاعبون مسجّلون في هذه العضوية بعد.",
+      "subscribeTo": "تسجيل في {{name}}",
+      "collectNow": "تحصيل الآن",
+      "collectLater": "تحصيل لاحقًا",
+      "subscribeAndCollect": "تسجيل وتحصيل الدفعة",
+      "noGuardianForPlayer": "لا يوجد ولي أمر مرتبط بهذا اللاعب للفوترة — اربط واحدًا من تبويب اللاعبين أولاً."
     },
     "coachToday": {
       "title": "جلسات اليوم",
@@ -1432,7 +1483,7 @@
       "limitLabels": {
         "branch_limit": "الفروع",
         "field_limit": "الملاعب",
-        "academy_limit": "برامج الأكاديمية"
+        "academy_limit": "مجموعات الأكاديمية"
       }
     },
     "fieldsManagement": {

@@ -9,10 +9,20 @@ const TabsList = React.forwardRef<
   React.ElementRef<typeof TabsPrimitive.List>,
   React.ComponentPropsWithoutRef<typeof TabsPrimitive.List>
 >(({ className, ...props }, ref) => (
+  // Academy radical simplification directive (mobile-first requirement,
+  // "no body horizontal overflow"): TabsList previously used plain
+  // inline-flex with no overflow handling -- on a narrow viewport with
+  // enough tabs/label length to exceed the screen width, this silently
+  // pushed the whole page body wider instead of scrolling in place
+  // (confirmed live: 4 Academy tabs measured document.body.scrollWidth
+  // at 493px against a 375px viewport). max-w-full + overflow-x-auto
+  // keeps this list scrollable within itself, matching the pattern
+  // already used by FinanceNav/ReportsNav/MembershipsSection's own
+  // sub-tab bars.
   <TabsPrimitive.List
     ref={ref}
     className={cn(
-      "inline-flex h-9 items-center justify-center rounded-lg bg-muted p-1 text-muted-foreground",
+      "inline-flex h-9 max-w-full items-center justify-start gap-1 overflow-x-auto rounded-lg bg-muted p-1 text-muted-foreground",
       className
     )}
     {...props}

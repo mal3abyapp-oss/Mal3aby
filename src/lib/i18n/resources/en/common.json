@@ -212,7 +212,7 @@
       "limitTypeLabels": {
         "branch_limit": "Branches",
         "field_limit": "Fields",
-        "academy_limit": "Academy programs"
+        "academy_limit": "Academy groups"
       },
       "requestStatusLabels": {
         "pending": "Under review",
@@ -319,7 +319,7 @@
         "emptyFieldHint": "Leave a field empty to make the limit unlimited.",
         "branchLimitLabel": "Branch limit",
         "fieldLimitLabel": "Field limit",
-        "academyLimitLabel": "Academy program limit",
+        "academyLimitLabel": "Academy group limit",
         "unlimitedPlaceholder": "Unlimited",
         "saving": "Saving...",
         "saveLimits": "Save limits",
@@ -1065,17 +1065,21 @@
   "academy": {
     "loading": "Loading...",
     "title": "Academy",
-    "description": "Manage players, programs and groups",
+    "description": "Players, memberships, and attendance",
     "tabs": {
       "overview": "Overview",
       "players": "Players",
-      "structure": "Programs & Groups",
-      "enrollments": "Enrollments & Subscriptions"
+      "memberships": "Memberships & Subscriptions",
+      "attendance": "Attendance"
+    },
+    "attendance": {
+      "recordForMembership": "Record attendance for a membership",
+      "open": "Open"
     },
     "overview": {
       "addPlayer": "Add player",
-      "enrollInGroup": "Enroll player in group",
-      "markAttendance": "Mark attendance",
+      "enrollInGroup": "Subscribe player",
+      "markAttendance": "Attendance",
       "sessionsToday": "Sessions today",
       "sessionsUnmarked": "Unmarked attendance",
       "activePlayers": "Active players",
@@ -1118,7 +1122,23 @@
       "linkNewGuardian": "Link new guardian",
       "searchCustomerByName": "Search for a customer by name",
       "chooseCustomer": "Choose a customer",
-      "link": "Link"
+      "link": "Link",
+      "guardianColumn": "Customer/Guardian",
+      "expiry": "Expiry",
+      "paymentStatus": "Payment status",
+      "noActiveSubscription": "No active subscription",
+      "filters": {
+        "all": "All",
+        "active": "Active",
+        "due": "Expiring soon",
+        "expired": "Expired",
+        "none": "No active subscription"
+      },
+      "existingCustomer": "Existing customer",
+      "newCustomer": "New customer",
+      "renew": "Renew",
+      "subscribe": "Subscribe",
+      "collectPayment": "Collect payment"
     },
     "enrollments": {
       "manageSubtitle": "Enroll a player in a group and create their subscription",
@@ -1160,6 +1180,37 @@
       "activationPolicy": "Subscription activation policy",
       "activationPolicyManagedFrom": "The subscription activation policy is managed from the",
       "settingsPage": "Settings page"
+    },
+    "memberships": {
+      "subtitle": "Create memberships, subscribe players, and collect payment -- all in one place.",
+      "newMembership": "New membership",
+      "name": "Membership name",
+      "namePlaceholder": "e.g. Monthly Football Training",
+      "duration": "Duration",
+      "oneMonth": "1 month",
+      "price": "Price",
+      "creating": "Creating...",
+      "create": "Create",
+      "createError": "Couldn't create the membership, try again.",
+      "emptyTitle": "No memberships yet",
+      "emptyDescription": "Create a membership (name, price) to start selling subscriptions",
+      "activePlayers": "Active players",
+      "status": "Status",
+      "noPriceSet": "No price set",
+      "statusLabels": {
+        "active": "Active",
+        "full": "Full",
+        "closed": "Closed"
+      },
+      "advancedLegacyToggle": "Advanced / legacy options (Programs, Seasons, Coaches, Schedules)",
+      "advancedLegacyDescription": "These are optional, existing features -- not required to create or sell a membership.",
+      "addPlayerToMembership": "Subscribe a player",
+      "noSubscribersYet": "No players subscribed to this membership yet.",
+      "subscribeTo": "Subscribe to {{name}}",
+      "collectNow": "Collect now",
+      "collectLater": "Collect later",
+      "subscribeAndCollect": "Subscribe & collect payment",
+      "noGuardianForPlayer": "This player has no linked guardian for billing -- link one from the Players tab first."
     },
     "coachToday": {
       "title": "Today's sessions",
@@ -1433,7 +1484,7 @@
       "limitLabels": {
         "branch_limit": "Branches",
         "field_limit": "Fields",
-        "academy_limit": "Academy programs"
+        "academy_limit": "Academy groups"
       }
     },
     "fieldsManagement": {
