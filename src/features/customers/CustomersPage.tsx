@@ -149,6 +149,14 @@ export function CustomersPage() {
     enabled: !!currentClubId,
   })
 
+  // Phase G (G2/G7): "outstanding only" is the single highest-value
+  // filter beyond the existing name/phone search -- lets a
+  // collections-focused staff member instantly narrow to who actually
+  // owes money, client-side since outstanding is already computed per
+  // row (no new RPC needed).
+  const [outstandingOnly, setOutstandingOnly] = useState(false)
+  const visibleCustomers = outstandingOnly ? customers.filter((c) => (c.outstanding ?? 0) > 0) : customers
+
   function openCreateDialog() {
     setEditingCustomer(null)
     setFullName('')
@@ -392,18 +400,22 @@ export function CustomersPage() {
         }
       />
 
-      <div className="mb-4">
+      <div className="mb-4 flex flex-wrap items-center gap-3">
         <Input
           placeholder={t('customers.searchPlaceholder')}
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           className="max-w-sm"
         />
+        <label className="flex items-center gap-1.5 text-sm">
+          <input type="checkbox" checked={outstandingOnly} onChange={(e) => setOutstandingOnly(e.target.checked)} className="size-4" />
+          {t('customers.outstandingOnlyFilter')}
+        </label>
       </div>
 
       <DataTable
         columns={columns}
-        rows={customers}
+        rows={visibleCustomers}
         rowKey={(c) => c.id}
         isLoading={isLoading}
         emptyTitle={t('customers.emptyTitle')}

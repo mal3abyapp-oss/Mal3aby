@@ -43,6 +43,7 @@ interface OpenShiftRow {
 
 interface ShiftHistoryRow {
   id: string
+  branch_id: string
   branch_name: string
   opened_by_name: string | null
   closed_by_name: string | null
@@ -164,6 +165,13 @@ export function CashShiftPage() {
   const [closingNotes, setClosingNotes] = useState('')
   const [closingShiftId, setClosingShiftId] = useState<string | null>(null)
   const [formError, setFormError] = useState<string | null>(null)
+
+  // Phase G (G6/G7): branch + status(active/closed), the two
+  // highest-value filters for the shift history table -- client-side
+  // since fetchShifts already returns the full capped list (no new RPC
+  // param needed for a real, useful narrowing).
+  const [historyBranchFilter, setHistoryBranchFilter] = useState('')
+  const [historyStatusFilter, setHistoryStatusFilter] = useState('')
 
   const { data: branches = [] } = useQuery({
     queryKey: ['branches-for-cash-shift', currentClubId],
@@ -458,9 +466,40 @@ export function CashShiftPage() {
       <Card>
         <CardHeader><CardTitle className="text-base">{t('billing.cashShift.historyCard.heading')}</CardTitle></CardHeader>
         <CardContent>
+          <div className="mb-3 flex flex-wrap items-end gap-2">
+            <div className="flex flex-col gap-1">
+              <label className="text-xs text-text-secondary">{t('billing.cashShift.filters.branch')}</label>
+              <Select value={historyBranchFilter || 'all'} onValueChange={(v) => setHistoryBranchFilter(v === 'all' ? '' : v)}>
+                <SelectTrigger className="w-40"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">{t('billing.cashShift.filters.allBranches')}</SelectItem>
+                  {branches.map((b) => <SelectItem key={b.id} value={b.id}>{b.name}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="flex flex-col gap-1">
+              <label className="text-xs text-text-secondary">{t('billing.cashShift.filters.status')}</label>
+              <Select value={historyStatusFilter || 'all'} onValueChange={(v) => setHistoryStatusFilter(v === 'all' ? '' : v)}>
+                <SelectTrigger className="w-40"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">{t('billing.cashShift.filters.allStatuses')}</SelectItem>
+                  <SelectItem value="open">{t('billing.cashShift.statusLabels.open')}</SelectItem>
+                  <SelectItem value="closed">{t('billing.cashShift.statusLabels.closed')}</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            {(historyBranchFilter || historyStatusFilter) && (
+              <Button variant="ghost" size="sm" onClick={() => { setHistoryBranchFilter(''); setHistoryStatusFilter('') }}>
+                {t('billing.filters.clear')}
+              </Button>
+            )}
+          </div>
           <DataTable
             columns={historyColumns}
-            rows={data?.history ?? []}
+            rows={(data?.history ?? []).filter((s) =>
+              (!historyBranchFilter || s.branch_id === historyBranchFilter)
+              && (!historyStatusFilter || s.status === historyStatusFilter),
+            )}
             rowKey={(s) => s.id}
             isLoading={isLoading}
             emptyTitle={t('billing.cashShift.historyCard.emptyTitle')}

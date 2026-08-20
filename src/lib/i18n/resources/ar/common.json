@@ -955,6 +955,7 @@
         "footerHint": "للاطلاع على كل رسالة على حدة راجع تبويب \"النشاط\"، ولإدارة الاتصال أو ضوابط الإرسال راجع \"الاتصال\"/\"الإعدادات\"."
       },
       "activityTab": {
+        "allTemplates": "كل القوالب",
         "templateLabels": {
           "booking-created": "إنشاء حجز",
           "booking-confirmed": "تأكيد حجز",
@@ -1575,6 +1576,13 @@
       "title": "الفواتير والمدفوعات",
       "description": "سجل الفواتير والمدفوعات"
     },
+    "filters": {
+      "startDate": "من",
+      "endDate": "إلى",
+      "status": "الحالة",
+      "allStatuses": "كل الحالات",
+      "clear": "مسح الفلاتر"
+    },
     "table": {
       "invoiceNumber": "رقم الفاتورة",
       "customer": "العميل",
@@ -1826,6 +1834,12 @@
         },
         "emptyTitle": "لا توجد ورديات بعد"
       },
+      "filters": {
+        "branch": "الفرع",
+        "allBranches": "كل الفروع",
+        "status": "الحالة",
+        "allStatuses": "كل الحالات"
+      },
       "openShiftWarning": "وردية {{name}} مفتوحة منذ {{hours}} ساعة",
       "liability": {
         "outstanding": "المستحق: {{amount}}",
@@ -1850,6 +1864,7 @@
     "emailOptional": "البريد الإلكتروني (اختياري)",
     "saveChanges": "حفظ التعديلات",
     "searchPlaceholder": "بحث بالاسم أو رقم الهاتف",
+    "outstandingOnlyFilter": "أصحاب مستحقات فقط",
     "emptyTitle": "لا يوجد عملاء",
     "emptyDescription": "أضف أول عميل لبدء إدارة قاعدة عملاء النادي",
     "outstanding": "المستحق",

@@ -87,7 +87,11 @@ const STATUS_TONE: Record<string, StatusTone> = {
   suppressed_invalid_recipient: 'warning',
 }
 
-async function fetchActivity(clubId: string, status: string): Promise<ActivityRow[]> {
+// Phase G (G5): template is the second highest-value filter alongside
+// the existing status filter -- lets staff isolate "did our
+// booking-confirmed-paid messages go out" from the noise of every
+// other template, same real server-side .eq() pattern as status.
+async function fetchActivity(clubId: string, status: string, templateKey: string): Promise<ActivityRow[]> {
   let query = supabase
     .from('notification_queue')
     .select('id, template_key, status, recipient_phone, created_at, scheduled_at, last_attempt_at, last_error, attempts')
@@ -97,6 +101,9 @@ async function fetchActivity(clubId: string, status: string): Promise<ActivityRo
     .limit(100)
   if (status !== 'all') {
     query = query.eq('status', status)
+  }
+  if (templateKey !== 'all') {
+    query = query.eq('template_key', templateKey)
   }
   const { data, error } = await query
   if (error) throw error
@@ -162,6 +169,7 @@ export function WhatsAppActivityTab({
   const { currentClubId } = useAuth()
   const queryClient = useQueryClient()
   const [statusFilter, setStatusFilter] = useState(initialStatusFilter ?? 'all')
+  const [templateFilter, setTemplateFilter] = useState('all')
   const [retryError, setRetryError] = useState<string | null>(null)
 
   useEffect(() => {
@@ -179,8 +187,8 @@ export function WhatsAppActivityTab({
   const isFailedView = statusFilter === 'failed'
 
   const { data: rows = [], isLoading } = useQuery({
-    queryKey: ['whatsapp-activity', currentClubId, statusFilter],
-    queryFn: () => (isFailedView ? fetchFailedActivity(currentClubId!) : fetchActivity(currentClubId!, statusFilter)),
+    queryKey: ['whatsapp-activity', currentClubId, statusFilter, templateFilter],
+    queryFn: () => (isFailedView ? fetchFailedActivity(currentClubId!) : fetchActivity(currentClubId!, statusFilter, templateFilter)),
     enabled: !!currentClubId,
     refetchInterval: 15000,
   })
@@ -207,17 +215,35 @@ export function WhatsAppActivityTab({
 
   return (
     <div className="flex flex-col gap-4">
-      <div className="w-48">
-        <Select value={statusFilter} onValueChange={setStatusFilter}>
-          <SelectTrigger><SelectValue /></SelectTrigger>
-          <SelectContent>
-            {STATUS_LABEL_KEYS_WITH_ALL.map((key) => (
-              <SelectItem key={key} value={key}>
-                {t(`whatsapp.page.activityTab.statusLabels.${key}`)}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+      <div className="flex flex-wrap gap-2">
+        <div className="w-48">
+          <Select value={statusFilter} onValueChange={setStatusFilter}>
+            <SelectTrigger><SelectValue /></SelectTrigger>
+            <SelectContent>
+              {STATUS_LABEL_KEYS_WITH_ALL.map((key) => (
+                <SelectItem key={key} value={key}>
+                  {t(`whatsapp.page.activityTab.statusLabels.${key}`)}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+        {/* Phase G (G5): template, the second highest-value filter --
+            disabled in the failed-messages view since that RPC already
+            returns only failed rows regardless of template. */}
+        <div className="w-56">
+          <Select value={templateFilter} onValueChange={setTemplateFilter} disabled={isFailedView}>
+            <SelectTrigger><SelectValue /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">{t('whatsapp.page.activityTab.allTemplates')}</SelectItem>
+              {TEMPLATE_LABEL_KEYS.map((key) => (
+                <SelectItem key={key} value={key}>
+                  {t(`whatsapp.page.activityTab.templateLabels.${key}`)}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
       </div>
 
       {retryError && <p role="alert" className="text-sm text-status-danger">{retryError}</p>}

@@ -60,13 +60,21 @@ const SOURCE_KEYS = new Set(['booking', 'subscription'])
 // for any invoice paid then refunded. Now reads
 // get_invoice_payment_summary(), the single source of truth (see
 // AUTONOMOUS_DECISION_LOG.md D-015).
-async function fetchInvoices(clubId: string) {
-  const { data, error } = await supabase
+// Phase G (G3): date + status are the two highest-value filters for a
+// list that otherwise silently caps at the 50 most recent invoices --
+// without them, an older or already-settled invoice becomes
+// unreachable from this screen once enough newer ones accumulate.
+async function fetchInvoices(clubId: string, startDate?: string, endDate?: string, status?: string) {
+  let query = supabase
     .from('invoices')
     .select('id, invoice_number, status, total, issued_at, customers(full_name), invoice_items(reference_type)')
     .eq('club_id', clubId)
     .order('created_at', { ascending: false })
     .limit(50)
+  if (startDate) query = query.gte('issued_at', `${startDate}T00:00:00`)
+  if (endDate) query = query.lte('issued_at', `${endDate}T23:59:59`)
+  if (status) query = query.eq('status', status)
+  const { data, error } = await query
   if (error) throw error
 
   const invoiceIds = (data ?? []).map((row) => row.id)
@@ -267,9 +275,19 @@ export function BillingPage() {
   const [voidReason, setVoidReason] = useState('')
   const [formError, setFormError] = useState<string | null>(null)
 
+  // Phase G (G3/G7): default filters are date + status, the two
+  // highest-value narrowing fields for a capped-at-50 invoice list --
+  // everything else (method/employee/branch/field/government receipt)
+  // stays reachable through the dedicated reports instead of
+  // overloading this screen with every possible field per G7's own
+  // "date + 1-2 highest-value filters" guidance.
+  const [invoiceStartDate, setInvoiceStartDate] = useState('')
+  const [invoiceEndDate, setInvoiceEndDate] = useState('')
+  const [invoiceStatusFilter, setInvoiceStatusFilter] = useState('')
+
   const { data: invoices = [], isLoading } = useQuery({
-    queryKey: ['invoices', currentClubId],
-    queryFn: () => fetchInvoices(currentClubId!),
+    queryKey: ['invoices', currentClubId, invoiceStartDate, invoiceEndDate, invoiceStatusFilter],
+    queryFn: () => fetchInvoices(currentClubId!, invoiceStartDate || undefined, invoiceEndDate || undefined, invoiceStatusFilter || undefined),
     enabled: !!currentClubId,
   })
 
@@ -623,6 +641,35 @@ export function BillingPage() {
           <p className="text-xs text-text-secondary">{t('billing.stats.customersWithDues')}</p>
           <p className="text-2xl font-bold tabular-nums text-status-danger">{owingCustomersCount}</p>
         </div>
+      </div>
+
+      {/* Phase G (G3): date + status, the two highest-value filters for
+          this capped-at-50 list. */}
+      <div className="mb-3 flex flex-wrap items-end gap-2">
+        <div className="flex flex-col gap-1">
+          <label className="text-xs text-text-secondary">{t('billing.filters.startDate')}</label>
+          <Input type="date" value={invoiceStartDate} onChange={(e) => setInvoiceStartDate(e.target.value)} className="w-40" />
+        </div>
+        <div className="flex flex-col gap-1">
+          <label className="text-xs text-text-secondary">{t('billing.filters.endDate')}</label>
+          <Input type="date" value={invoiceEndDate} onChange={(e) => setInvoiceEndDate(e.target.value)} className="w-40" />
+        </div>
+        <div className="flex flex-col gap-1">
+          <label className="text-xs text-text-secondary">{t('billing.filters.status')}</label>
+          <Select value={invoiceStatusFilter || 'all'} onValueChange={(v) => setInvoiceStatusFilter(v === 'all' ? '' : v)}>
+            <SelectTrigger className="w-40"><SelectValue /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">{t('billing.filters.allStatuses')}</SelectItem>
+              <SelectItem value="issued">{t('billing.invoiceStatusLabels.issued')}</SelectItem>
+              <SelectItem value="void">{t('billing.invoiceStatusLabels.void')}</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+        {(invoiceStartDate || invoiceEndDate || invoiceStatusFilter) && (
+          <Button variant="ghost" size="sm" onClick={() => { setInvoiceStartDate(''); setInvoiceEndDate(''); setInvoiceStatusFilter('') }}>
+            {t('billing.filters.clear')}
+          </Button>
+        )}
       </div>
 
       <DataTable columns={columns} rows={invoices} rowKey={(r) => r.id} isLoading={isLoading} emptyTitle={t('billing.table.emptyTitle')} />

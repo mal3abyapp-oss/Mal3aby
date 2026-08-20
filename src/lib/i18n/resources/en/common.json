@@ -956,6 +956,7 @@
         "footerHint": "For a per-message log, see the \"Activity\" tab; to manage the connection or sending controls, see \"Connection\"/\"Settings\"."
       },
       "activityTab": {
+        "allTemplates": "All templates",
         "templateLabels": {
           "booking-created": "Booking created",
           "booking-confirmed": "Booking confirmed",
@@ -1576,6 +1577,13 @@
       "title": "Billing & Payments",
       "description": "Invoice and payment history"
     },
+    "filters": {
+      "startDate": "From",
+      "endDate": "To",
+      "status": "Status",
+      "allStatuses": "All statuses",
+      "clear": "Clear filters"
+    },
     "table": {
       "invoiceNumber": "Invoice #",
       "customer": "Customer",
@@ -1827,6 +1835,12 @@
         },
         "emptyTitle": "No shifts yet"
       },
+      "filters": {
+        "branch": "Branch",
+        "allBranches": "All branches",
+        "status": "Status",
+        "allStatuses": "All statuses"
+      },
       "openShiftWarning": "{{name}}'s shift has been open for {{hours}}h",
       "liability": {
         "outstanding": "Owed: {{amount}}",
@@ -1851,6 +1865,7 @@
     "emailOptional": "Email (optional)",
     "saveChanges": "Save changes",
     "searchPlaceholder": "Search by name or phone number",
+    "outstandingOnlyFilter": "Outstanding balance only",
     "emptyTitle": "No customers",
     "emptyDescription": "Add your first customer to start managing the club's customer base",
     "outstanding": "Outstanding",
