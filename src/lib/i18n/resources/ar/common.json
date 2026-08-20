@@ -2223,7 +2223,20 @@
     "receiptNotesLabel": "ملاحظات",
     "receiptSerialRequired": "رقم الإيصال مطلوب",
     "receiptDateRequired": "تاريخ الإيصال مطلوب",
-    "duplicateReceiptError": "هذا رقم إيصال مسجل بالفعل. لا يمكن استخدامه مرة أخرى."
+    "duplicateReceiptError": "هذا رقم إيصال مسجل بالفعل. لا يمكن استخدامه مرة أخرى.",
+    "receiptImageLabel": "صورة الإيصال",
+    "receiptImageRequired": "صورة الإيصال مطلوبة",
+    "receiptImageUpload": "رفع صورة",
+    "receiptImageUploading": "جارٍ الرفع...",
+    "receiptImageUploaded": "تم رفع الصورة",
+    "receiptImageChange": "تغيير الصورة",
+    "receiptImageInvalidType": "يُقبل فقط ملفات JPG أو PNG أو PDF",
+    "receiptImageTooLarge": "حجم الملف أكبر من 10 ميجابايت",
+    "receiptImageUploadError": "تعذّر رفع الصورة، حاول مرة أخرى",
+    "receiptAlreadyLinkedError": "هذا الإيصال مرتبط بالفعل بدفعة أخرى",
+    "receiptAmountMismatchError": "مبلغ الإيصال لا يطابق مبلغ الدفعة",
+    "receiptNotFoundError": "الإيصال غير موجود أو لا ينتمي لهذا النادي",
+    "receiptRequiredError": "يتطلب هذا النادي إيصال تحصيل رسمي لطريقة الدفع هذه"
   },
   "auditLog": {
     "title": "سجل التدقيق",

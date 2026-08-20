@@ -21,6 +21,8 @@ import { useResolvedFieldPrice, useClubTimezone } from './useFieldPricing'
 import { toInstant } from '@/lib/domain/time'
 import { useDirection } from '@/app/providers/DirectionProvider'
 import { normalizePhone } from '@/lib/domain/phone'
+import { useOfficialReceipt, OfficialCollectionReceiptFields, translateReceiptError } from '@/components/ui/official-collection-receipt-fields'
+import { PAYMENT_METHOD_LABELS } from '@/lib/domain/billing'
 
 // Section E3 — Quick Booking: a right-side drawer opened from an empty
 // calendar slot. Price is ALWAYS server-resolved (resolve_field_price)
@@ -107,12 +109,27 @@ export function QuickBookingSheet({
   const [occurrenceCount, setOccurrenceCount] = useState('8')
   const [recurringResult, setRecurringResult] = useState<{ created: number; requested: number; conflicted: string[] } | null>(null)
 
+  // Government / Ministry Collection Compliance -- Phase B: "pay now"
+  // is the create-time equivalent of BookingDetailSheet's collect-
+  // existing-balance form, so it uses the exact same shared hook.
+  // Recurring bookings never take an upfront payment (see
+  // create_recurring_booking's own signature below), so this only ever
+  // matters for the single-booking path.
+  const receipt = useOfficialReceipt({
+    clubId,
+    branchId: slot?.branchId,
+    fieldId: slot?.fieldId,
+    method: paymentMethod,
+    enabled: !!slot && payNow,
+  })
+
   useEffect(() => {
     if (!slot) {
       setCustomerId('')
       setCustomerSearch('')
       setDuration('1')
       setPayNow(true)
+      setPaymentMethod('cash')
       setFormError(null)
       setShowNewCustomer(false)
       setNewCustomerName('')
@@ -123,6 +140,7 @@ export function QuickBookingSheet({
       setIsRecurring(false)
       setOccurrenceCount('8')
       setRecurringResult(null)
+      receipt.reset()
     }
   }, [slot])
 
@@ -261,6 +279,17 @@ export function QuickBookingSheet({
         return
       }
 
+      // Government / Ministry Collection Compliance -- Phase B: the
+      // client-side receipt.isValid gate (see the confirm button below)
+      // is a convenience, not the enforcement boundary -- create_booking()
+      // itself raises if the effective policy requires a receipt for
+      // paymentMethod and none/an invalid one was supplied. create_booking()
+      // creates the invoice AND payment in the same transaction as the
+      // booking, so it takes the raw receipt fields directly and inserts
+      // the receipt row itself once the real payment amount is known --
+      // there's no pre-existing receipt id a client could supply here.
+      const receiptPayload = payNow ? receipt.getPayload() : null
+
       const { error } = await supabase.rpc('create_booking', {
         p_field_id: slot.fieldId,
         p_customer_id: customerId,
@@ -269,11 +298,13 @@ export function QuickBookingSheet({
         p_record_payment: payNow,
         p_payment_amount: payNow ? resolvedPrice ?? undefined : undefined,
         p_payment_method: payNow ? paymentMethod : undefined,
+        ...(receiptPayload ?? {}),
       })
       if (error) throw error
     },
     onSuccess: () => {
       onCreated()
+      receipt.reset()
       // A recurring booking shows its own result summary (created vs.
       // conflicted occurrences) instead of closing immediately -- the
       // outcome ("6 of 8 created, 2 conflicted") is exactly the kind of
@@ -283,8 +314,10 @@ export function QuickBookingSheet({
         onOpenChange(false)
       }
     },
-    onError: (error) =>
-      setFormError(translateSupabaseError(error, t('bookings.quick.createError'))),
+    onError: (error) => {
+      const message = error instanceof Error && !('code' in error) ? error.message : translateSupabaseError(error, t('bookings.quick.createError'))
+      setFormError(translateReceiptError(message, t, message))
+    },
   })
 
   return (
@@ -465,14 +498,29 @@ export function QuickBookingSheet({
                   </Button>
                 </div>
                 {payNow && (
-                  <Select value={paymentMethod} onValueChange={setPaymentMethod}>
-                    <SelectTrigger><SelectValue /></SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="cash">{t('bookings.quick.cash')}</SelectItem>
-                      <SelectItem value="card">{t('bookings.quick.card')}</SelectItem>
-                      <SelectItem value="transfer">{t('bookings.quick.bankTransfer')}</SelectItem>
-                    </SelectContent>
-                  </Select>
+                  <>
+                    {/* Phase B fix: this previously used 'transfer' as
+                        the bank-transfer value, but every other
+                        surface (record_payment's own check constraint,
+                        PAYMENT_METHOD_LABELS, government policy's
+                        required_payment_methods) uses 'bank_transfer'.
+                        A government-required-receipt policy covering
+                        bank transfers would have silently never matched
+                        here, and the value would have been semantically
+                        wrong even where no policy applied. Also adds
+                        the two methods this Select was missing
+                        entirely (wallet/other) so every method staff
+                        can select elsewhere is selectable here too. */}
+                    <Select value={paymentMethod} onValueChange={setPaymentMethod}>
+                      <SelectTrigger><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        {Object.entries(PAYMENT_METHOD_LABELS).map(([value, label]) => (
+                          <SelectItem key={value} value={value}>{t(`common.paymentMethodLabels.${value}`, { defaultValue: label })}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <OfficialCollectionReceiptFields state={receipt} />
+                  </>
                 )}
               </div>
             )}
@@ -498,7 +546,7 @@ export function QuickBookingSheet({
         <SheetFooter>
           <Button
             className="w-full"
-            disabled={!customerId || !resolvedPrice || !clubTimezone || bookMutation.isPending || !!recurringResult || (isRecurring && (!occurrenceCount || Number(occurrenceCount) < 1 || Number(occurrenceCount) > 52))}
+            disabled={!customerId || !resolvedPrice || !clubTimezone || bookMutation.isPending || !!recurringResult || (isRecurring && (!occurrenceCount || Number(occurrenceCount) < 1 || Number(occurrenceCount) > 52)) || (payNow && !isRecurring && !receipt.isValid)}
             onClick={() => bookMutation.mutate()}
           >
             {bookMutation.isPending ? t('bookings.quick.booking') : isRecurring ? t('bookings.quick.confirmRecurring') : t('bookings.quick.confirmBooking')}

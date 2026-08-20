@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useSearchParams } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
@@ -33,6 +33,7 @@ import {
   type PaymentStatus,
 } from '@/lib/domain/billing'
 import { Trash2 } from 'lucide-react'
+import { useOfficialReceipt, OfficialCollectionReceiptFields, translateReceiptError, type OfficialReceiptState } from '@/components/ui/official-collection-receipt-fields'
 import { translateSupabaseError } from '@/lib/errors'
 import { useDirection } from '@/app/providers/DirectionProvider'
 
@@ -138,6 +139,22 @@ async function fetchInvoiceDetail(invoiceId: string) {
   return data
 }
 
+// Government / Ministry Collection Compliance -- Phase B: the same
+// field -> branch -> club resolution record_payment()'s own guard uses
+// (it looks this up from the booking linked to the invoice, see that
+// RPC's SQL) -- fetched once per selected invoice so the split-payment
+// form's receipt fields apply the correct policy per line/method.
+async function fetchInvoiceBookingScope(invoiceId: string) {
+  const { data, error } = await supabase
+    .from('bookings')
+    .select('field_id, branch_id')
+    .eq('invoice_id', invoiceId)
+    .limit(1)
+    .maybeSingle()
+  if (error) throw error
+  return data ?? null
+}
+
 async function fetchInvoicePayments(invoiceId: string) {
   const { data, error } = await supabase
     .from('payment_allocations')
@@ -148,6 +165,22 @@ async function fetchInvoicePayments(invoiceId: string) {
   const rawPayments = (data ?? [])
     .map((row) => row.payments as unknown as { id: string; amount: number; method: string; received_at: string; reference: string | null; received_by: string | null } | null)
     .filter((p): p is NonNullable<typeof p> => !!p)
+
+  // Government / Ministry Collection Compliance -- Phase B: at most one
+  // active official_collection_receipts row per payment_id (record_payment's
+  // own guard rejects reusing an already-linked receipt), so a single
+  // lookup by payment_id is unambiguous.
+  const paymentIds = rawPayments.map((p) => p.id)
+  const receiptsByPaymentId = new Map<string, { serial: string; status: string }>()
+  if (paymentIds.length > 0) {
+    const { data: receipts } = await supabase
+      .from('official_collection_receipts')
+      .select('payment_id, receipt_serial, status')
+      .in('payment_id', paymentIds)
+    for (const r of receipts ?? []) {
+      if (r.payment_id) receiptsByPaymentId.set(r.payment_id, { serial: r.receipt_serial, status: r.status })
+    }
+  }
 
   // Gate 13 #57 (employee financial attribution audit): payments.received_by
   // was always correctly populated server-side (record_payment() hardcodes
@@ -169,6 +202,8 @@ async function fetchInvoicePayments(invoiceId: string) {
     receivedAt: p.received_at,
     reference: p.reference,
     receivedByName: p.received_by ? (namesById.get(p.received_by) ?? null) : null,
+    officialReceiptSerial: receiptsByPaymentId.get(p.id)?.serial ?? null,
+    officialReceiptStatus: receiptsByPaymentId.get(p.id)?.status ?? null,
   }))
 }
 
@@ -177,6 +212,40 @@ const INVOICE_STATUS_LABEL_KEYS: Record<string, string> = {
   draft: DEFAULT_INVOICE_STATUS_KEY,
   issued: 'billing.invoiceStatusLabels.issued',
   void: 'billing.invoiceStatusLabels.void',
+}
+
+// Government / Ministry Collection Compliance -- Phase B: a split-
+// payment line's method can differ line to line, so each line needs
+// its own independent policy check (a cash line might require a
+// receipt while a card line on the same invoice doesn't). React hooks
+// can't be called inside splitLines.map() directly, so this owns one
+// useOfficialReceipt() call per line and reports its live state up to
+// the parent via onStateChange -- the parent never re-implements any
+// receipt logic itself, only reads each line's current isValid/
+// getPayload() at submit time.
+function SplitLineReceipt({
+  clubId,
+  branchId,
+  fieldId,
+  method,
+  onStateChange,
+}: {
+  clubId: string | null | undefined
+  branchId?: string | null
+  fieldId?: string | null
+  method: string
+  onStateChange: (state: OfficialReceiptState) => void
+}) {
+  const state = useOfficialReceipt({ clubId, branchId, fieldId, method })
+  // Reported in an effect, not during render -- calling a parent's
+  // setState synchronously while this child renders is a React
+  // anti-pattern even when the parent bails out on an unchanged value.
+  useEffect(() => {
+    onStateChange(state)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [state.required, state.isValid, state.getPayload])
+  if (!state.required) return null
+  return <OfficialCollectionReceiptFields state={state} />
 }
 
 export function BillingPage() {
@@ -209,6 +278,23 @@ export function BillingPage() {
     queryFn: () => fetchPendingClaims(currentClubId!),
     enabled: !!currentClubId,
   })
+
+  // Government / Ministry Collection Compliance -- Phase B.
+  const { data: invoiceBookingScope } = useQuery({
+    queryKey: ['invoice-booking-scope', selectedInvoiceId],
+    queryFn: () => fetchInvoiceBookingScope(selectedInvoiceId!),
+    enabled: !!selectedInvoiceId,
+  })
+  // key -> live receipt state for that split line, reported by each
+  // SplitLineReceipt instance. Kept in a ref (not the map itself in
+  // state) so BillingPage doesn't re-render on every receipt-field
+  // keystroke inside a SplitLineReceipt -- but the submit button's
+  // disabled check DOES need to react when required/isValid actually
+  // changes (e.g. the serial field going from empty to filled), so
+  // onStateChange also bumps a tiny counter to force exactly the
+  // re-renders that matter, not one per character.
+  const splitLineReceiptsRef = useRef(new Map<string, OfficialReceiptState>())
+  const [, forceReceiptGateRecheck] = useState(0)
 
   const reviewClaimMutation = useMutation({
     mutationFn: async ({ claimId, approve }: { claimId: string; approve: boolean }) => {
@@ -307,6 +393,7 @@ export function BillingPage() {
 
   useEffect(() => {
     resetSplitForm()
+    splitLineReceiptsRef.current.clear()
     setFormError(null)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedInvoiceId])
@@ -318,6 +405,18 @@ export function BillingPage() {
       if (validLines.length === 0) throw new Error(t('billing.recordPayment.enterAtLeastOneAmount'))
       if (outstandingForSelected !== null && splitTotal - outstandingForSelected > 0.01) {
         throw new Error(t('billing.recordPayment.amountExceedsOutstanding', { total: splitTotal.toFixed(2), outstanding: outstandingForSelected.toFixed(2) }))
+      }
+      // Government / Ministry Collection Compliance -- Phase B: the
+      // client-side isValid gate on the submit button (below) is a
+      // convenience, not the enforcement boundary -- record_payment()
+      // itself raises per-line if that line's method requires a receipt
+      // and none/an invalid one was attached, even if this check were
+      // somehow bypassed.
+      for (const line of validLines) {
+        const lineReceipt = splitLineReceiptsRef.current.get(line.key)
+        if (lineReceipt?.required && !lineReceipt.isValid) {
+          throw new Error(t('governmentCompliance.receiptRequiredError'))
+        }
       }
       // Sequential, not parallel -- each record_payment() call re-checks
       // the outstanding balance server-side against the latest state, so
@@ -336,6 +435,21 @@ export function BillingPage() {
       // attempt and returns the existing payment rather than
       // recording it twice, while line 2 still gets its own fresh key.
       for (const line of validLines) {
+        const lineReceipt = splitLineReceiptsRef.current.get(line.key)
+        const receiptPayload = lineReceipt?.getPayload()
+        if (receiptPayload) {
+          const { p_receipt_notes, ...rest } = receiptPayload
+          const { error } = await supabase.rpc('record_payment_with_official_receipt', {
+            p_invoice_id: selectedInvoiceId,
+            p_amount: Number(line.amount),
+            p_method: line.method,
+            ...rest,
+            p_notes: p_receipt_notes,
+            p_idempotency_key: line.key,
+          })
+          if (error) throw error
+          continue
+        }
         const { error } = await supabase.rpc('record_payment', {
           p_invoice_id: selectedInvoiceId,
           p_amount: Number(line.amount),
@@ -347,10 +461,14 @@ export function BillingPage() {
     },
     onSuccess: () => {
       resetSplitForm()
+      splitLineReceiptsRef.current.clear()
       setFormError(null)
       invalidateDetail()
     },
-    onError: (error) => setFormError(error instanceof Error && !('code' in error) ? error.message : translateSupabaseError(error, t('billing.recordPayment.genericError'))),
+    onError: (error) => {
+      const message = error instanceof Error && !('code' in error) ? error.message : translateSupabaseError(error, t('billing.recordPayment.genericError'))
+      setFormError(translateReceiptError(message, t, message))
+    },
   })
 
   // task #85: create_refund() succeeds server-side but the UI never
@@ -614,6 +732,19 @@ export function BillingPage() {
                           {p.receivedByName && (
                             <span className="text-text-secondary"> — {t('billing.detail.collectedBy', { name: p.receivedByName })}</span>
                           )}
+                          {/* Government / Ministry Collection Compliance
+                              -- Phase B: shown only when this specific
+                              payment actually has a linked receipt, no
+                              placeholder clutter on the (common) case
+                              where none applies. */}
+                          {p.officialReceiptSerial && (
+                            <span className="block text-xs text-text-secondary">
+                              {t('governmentCompliance.title')}: <bdi className="tabular-nums">{p.officialReceiptSerial}</bdi>
+                              {p.officialReceiptStatus === 'reversed' && (
+                                <span className="text-status-danger"> ({t('billing.detail.refunded')})</span>
+                              )}
+                            </span>
+                          )}
                         </span>
                         <Button
                           size="sm"
@@ -682,6 +813,26 @@ export function BillingPage() {
                         )}
                       </div>
                     ))}
+                    {/* Government / Ministry Collection Compliance --
+                        Phase B: one independent policy check per line,
+                        since a split payment can legitimately mix a
+                        receipt-required method with one that isn't. */}
+                    {splitLines.map((line) => (
+                      <SplitLineReceipt
+                        key={line.key}
+                        clubId={currentClubId}
+                        branchId={invoiceBookingScope?.branch_id}
+                        fieldId={invoiceBookingScope?.field_id}
+                        method={line.method}
+                        onStateChange={(state) => {
+                          const prev = splitLineReceiptsRef.current.get(line.key)
+                          splitLineReceiptsRef.current.set(line.key, state)
+                          if (!prev || prev.required !== state.required || prev.isValid !== state.isValid) {
+                            forceReceiptGateRecheck((n) => n + 1)
+                          }
+                        }}
+                      />
+                    ))}
                   </div>
                   {splitLines.length > 1 && splitTotal > 0 && (
                     <p className="text-xs text-text-secondary">
@@ -693,7 +844,16 @@ export function BillingPage() {
                   )}
                   <Button
                     className="w-fit"
-                    disabled={splitTotal <= 0 || recordPaymentMutation.isPending || splitTotal - outstandingForSelected > 0.01}
+                    disabled={
+                      splitTotal <= 0
+                      || recordPaymentMutation.isPending
+                      || splitTotal - outstandingForSelected > 0.01
+                      || splitLines.some((l) => {
+                        if (!(Number(l.amount) > 0)) return false
+                        const r = splitLineReceiptsRef.current.get(l.key)
+                        return !!r?.required && !r.isValid
+                      })
+                    }
                     onClick={() => recordPaymentMutation.mutate()}
                   >
                     {recordPaymentMutation.isPending ? t('billing.recordPayment.submitting') : t('billing.recordPayment.submit')}

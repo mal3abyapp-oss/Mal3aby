@@ -2224,7 +2224,20 @@
     "receiptNotesLabel": "Notes",
     "receiptSerialRequired": "Receipt serial is required",
     "receiptDateRequired": "Receipt date is required",
-    "duplicateReceiptError": "This receipt number is already registered. It cannot be used again."
+    "duplicateReceiptError": "This receipt number is already registered. It cannot be used again.",
+    "receiptImageLabel": "Receipt image",
+    "receiptImageRequired": "A receipt image is required",
+    "receiptImageUpload": "Upload image",
+    "receiptImageUploading": "Uploading...",
+    "receiptImageUploaded": "Image uploaded",
+    "receiptImageChange": "Change image",
+    "receiptImageInvalidType": "Only JPG, PNG, or PDF files are accepted",
+    "receiptImageTooLarge": "File is larger than 10 MB",
+    "receiptImageUploadError": "Couldn't upload the image, try again",
+    "receiptAlreadyLinkedError": "This receipt is already linked to another payment",
+    "receiptAmountMismatchError": "The receipt amount does not match the payment amount",
+    "receiptNotFoundError": "Receipt not found or does not belong to this club",
+    "receiptRequiredError": "An official government collection receipt is required for this payment method"
   },
   "auditLog": {
     "title": "Audit Log",

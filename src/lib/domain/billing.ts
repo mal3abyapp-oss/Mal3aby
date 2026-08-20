@@ -20,6 +20,13 @@ export interface PaymentRow {
   receivedAt: string
   reference: string | null
   receivedByName: string | null
+  // Government / Ministry Collection Compliance -- Phase B: surfaced
+  // wherever payment details are shown, since a receipt-required
+  // payment with an invisible receipt reference is exactly the kind of
+  // gap that leaves staff unable to answer "which official receipt
+  // covers this payment?" without leaving the screen.
+  officialReceiptSerial: string | null
+  officialReceiptStatus: string | null
 }
 
 export const PAYMENT_METHOD_LABELS: Record<string, string> = {

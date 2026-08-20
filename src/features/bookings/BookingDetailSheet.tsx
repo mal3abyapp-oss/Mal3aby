@@ -28,6 +28,7 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { MessageCircle } from 'lucide-react'
+import { useOfficialReceipt, OfficialCollectionReceiptFields, translateReceiptError } from '@/components/ui/official-collection-receipt-fields'
 
 // IA restructuring (Phase 8): "independent but connected" -- WhatsApp
 // management lives entirely in its own module now (/app/whatsapp), but
@@ -83,6 +84,19 @@ async function fetchBookingWhatsAppSummary(bookingId: string): Promise<WhatsAppS
 async function fetchInvoiceSummary(invoiceId: string): Promise<InvoicePaymentSummary | null> {
   const summaries = await fetchInvoicePaymentSummaries([invoiceId])
   return summaries.get(invoiceId) ?? null
+}
+
+// Government / Ministry Collection Compliance -- Phase B: surfaces the
+// official receipt reference right where staff are already looking at
+// this booking's payment status, without requiring a trip to Billing.
+async function fetchBookingOfficialReceipts(bookingId: string) {
+  const { data, error } = await supabase
+    .from('official_collection_receipts')
+    .select('receipt_serial, status, receipt_date')
+    .eq('booking_id', bookingId)
+    .order('created_at', { ascending: false })
+  if (error) throw error
+  return data ?? []
 }
 
 // Master IA/UX audit (Club Side Booking 360 phase): confirmed real gaps
@@ -169,33 +183,25 @@ export function BookingDetailSheet({
     enabled: !!booking?.id,
   })
 
-  // Government / Ministry Collection Compliance directive, section 25:
-  // "بيانات إيصال التحصيل الرسمي" -- a prominent, dedicated section
-  // shown only when this booking's field/branch/club actually requires
-  // it. get_effective_government_policy() applies the same field ->
-  // branch -> club inheritance the server-side hard block uses, so the
-  // UI and the enforcement never disagree about whether a receipt is
-  // needed.
-  const { data: govPolicy } = useQuery({
-    queryKey: ['government-policy', currentClubId, booking?.branchId, booking?.fieldId],
-    queryFn: async () => {
-      const { data, error } = await supabase.rpc('get_effective_government_policy', {
-        p_club_id: currentClubId!,
-        p_branch_id: booking?.branchId ?? undefined,
-        p_field_id: booking?.fieldId ?? undefined,
-      })
-      if (error) throw error
-      return data
-    },
-    enabled: !!currentClubId && !!booking,
+  const { data: officialReceipts = [] } = useQuery({
+    queryKey: ['booking-official-receipts', booking?.id],
+    queryFn: () => fetchBookingOfficialReceipts(booking!.id),
+    enabled: !!booking?.id,
   })
-  const receiptRequiredForMethod = !!govPolicy?.enabled && !!govPolicy.official_receipt_required
-    && (govPolicy.required_payment_methods ?? []).includes(collectMethod)
-  const [receiptSerial, setReceiptSerial] = useState('')
-  const [receiptDate, setReceiptDate] = useState(() => new Date().toISOString().slice(0, 10))
-  const [receiptBook, setReceiptBook] = useState('')
-  const [receiptSeries, setReceiptSeries] = useState('')
-  const [receiptNotes, setReceiptNotes] = useState('')
+
+  // Government / Ministry Collection Compliance -- Phase B: the shared
+  // useOfficialReceipt() hook owns policy resolution (field -> branch ->
+  // club, identical to the server-side guard) and all receipt field
+  // state, so this surface can never drift from QuickBookingSheet's or
+  // BillingPage's behavior. Recomputes `required` whenever collectMethod
+  // changes -- requirement 9 ("تغيير طريقة الدفع بعد إدخال الإيصال").
+  const receipt = useOfficialReceipt({
+    clubId: currentClubId,
+    branchId: booking?.branchId,
+    fieldId: booking?.fieldId,
+    method: collectMethod,
+    enabled: !!booking,
+  })
 
   const qrMutation = useMutation({
     mutationFn: async () => {
@@ -252,23 +258,25 @@ export function BookingDetailSheet({
         collectIdempotencyKeyRef.current = crypto.randomUUID()
       }
 
-      // Government / Ministry Collection Compliance directive, section
-      // 15/26: the button stays enabled here but the SERVER is what
-      // actually enforces the block -- record_payment() itself raises
-      // if a receipt is required and none is supplied, even if this
-      // client-side branch were somehow bypassed.
-      if (receiptRequiredForMethod) {
-        if (!receiptSerial.trim()) throw new Error(t('governmentCompliance.receiptSerialRequired'))
-        if (!receiptDate) throw new Error(t('governmentCompliance.receiptDateRequired'))
+      // Government / Ministry Collection Compliance -- Phase B: the
+      // button stays enabled here but the SERVER is what actually
+      // enforces the block -- record_payment() itself raises if a
+      // receipt is required and none is supplied, even if this
+      // client-side check were somehow bypassed.
+      const receiptPayload = receipt.getPayload()
+      if (receiptPayload) {
+        // record_payment_with_official_receipt() names this parameter
+        // p_notes (its p_receipt_serial/p_receipt_date/etc. siblings
+        // match the shared hook's field names exactly, but there is no
+        // separate "booking notes" concept on this RPC to disambiguate
+        // from, unlike create_booking()'s p_receipt_notes).
+        const { p_receipt_notes, ...rest } = receiptPayload
         const { error } = await supabase.rpc('record_payment_with_official_receipt', {
           p_invoice_id: booking.invoiceId,
           p_amount: amount,
           p_method: collectMethod,
-          p_receipt_serial: receiptSerial.trim(),
-          p_receipt_date: receiptDate,
-          p_receipt_book: receiptBook.trim() || undefined,
-          p_receipt_series: receiptSeries.trim() || undefined,
-          p_notes: receiptNotes.trim() || undefined,
+          ...rest,
+          p_notes: p_receipt_notes,
           p_idempotency_key: collectIdempotencyKeyRef.current,
         })
         if (error) throw error
@@ -287,23 +295,15 @@ export function BookingDetailSheet({
       collectIdempotencyKeyRef.current = null
       setShowCollectForm(false)
       setCollectAmount('')
-      setReceiptSerial('')
-      setReceiptBook('')
-      setReceiptSeries('')
-      setReceiptNotes('')
+      receipt.reset()
       setActionError(null)
       void queryClient.invalidateQueries({ queryKey: ['booking-invoice-summary', booking?.invoiceId] })
+      void queryClient.invalidateQueries({ queryKey: ['booking-official-receipts', booking?.id] })
       onChanged()
     },
     onError: (error) => {
       const message = error instanceof Error && !('code' in error) ? error.message : translateSupabaseError(error, t('bookings.detail.collectError'))
-      // Directive section 14: a duplicate receipt must be rejected
-      // clearly, not surfaced as a generic failure.
-      setActionError(
-        message.includes('unique constraint') || message.includes('duplicate key')
-          ? t('governmentCompliance.duplicateReceiptError')
-          : message,
-      )
+      setActionError(translateReceiptError(message, t, message))
     },
   })
 
@@ -318,6 +318,7 @@ export function BookingDetailSheet({
           setActionError(null)
           setShowCollectForm(false)
           setCollectAmount('')
+          receipt.reset()
         }
         onOpenChange(open)
       }}
@@ -410,6 +411,23 @@ export function BookingDetailSheet({
                     <span>{t('bookings.detail.paymentStatus')}</span>
                     <span>{t(`secureBooking.paymentStatusLabels.${invoiceSummary.paymentStatus}`, { defaultValue: PAYMENT_STATUS_LABELS[invoiceSummary.paymentStatus] })}</span>
                   </div>
+                  {/* Government / Ministry Collection Compliance --
+                      Phase B: shown only when this booking's payment
+                      actually has a linked official receipt -- no
+                      placeholder clutter otherwise. */}
+                  {officialReceipts.length > 0 && (
+                    <div className="flex justify-between text-xs text-text-secondary">
+                      <span>{t('governmentCompliance.title')}</span>
+                      <span className="text-end">
+                        {officialReceipts.map((r, i) => (
+                          <span key={i} className="block tabular-nums">
+                            <bdi>{r.receipt_serial}</bdi>
+                            {r.status === 'reversed' && <span className="text-status-danger"> ({t('billing.detail.refunded')})</span>}
+                          </span>
+                        ))}
+                      </span>
+                    </div>
+                  )}
                 </>
               )}
               {!booking.invoiceId && (
@@ -438,64 +456,22 @@ export function BookingDetailSheet({
                       </SelectContent>
                     </Select>
                   </div>
-                  {/* Government / Ministry Collection Compliance
-                      directive, section 25: a prominent, dedicated
-                      section -- only rendered when this booking's
-                      field/branch/club policy actually requires an
-                      official receipt for the currently-selected
-                      payment method. */}
-                  {receiptRequiredForMethod && (
-                    <div className="flex flex-col gap-2 rounded-lg border border-warning/40 bg-warning/5 p-3">
-                      <p className="text-xs font-medium text-warning">{t('governmentCompliance.receiptSectionTitle')}</p>
-                      <div className="grid grid-cols-2 gap-2">
-                        <Input
-                          required
-                          placeholder={t('governmentCompliance.receiptSerialLabel')}
-                          value={receiptSerial}
-                          onChange={(e) => setReceiptSerial(e.target.value)}
-                        />
-                        <Input
-                          required
-                          type="date"
-                          value={receiptDate}
-                          onChange={(e) => setReceiptDate(e.target.value)}
-                        />
-                        {govPolicy?.receipt_book_enabled && (
-                          <Input
-                            placeholder={t('governmentCompliance.receiptBookLabel')}
-                            value={receiptBook}
-                            onChange={(e) => setReceiptBook(e.target.value)}
-                          />
-                        )}
-                        {govPolicy?.receipt_series_enabled && (
-                          <Input
-                            placeholder={t('governmentCompliance.receiptSeriesLabel')}
-                            value={receiptSeries}
-                            onChange={(e) => setReceiptSeries(e.target.value)}
-                          />
-                        )}
-                      </div>
-                      <Input
-                        placeholder={t('governmentCompliance.receiptNotesLabel')}
-                        value={receiptNotes}
-                        onChange={(e) => setReceiptNotes(e.target.value)}
-                      />
-                    </div>
-                  )}
+                  {/* Government / Ministry Collection Compliance --
+                      Phase B: the shared component renders nothing at
+                      all unless this booking's field/branch/club policy
+                      actually requires an official receipt for the
+                      currently-selected payment method. */}
+                  <OfficialCollectionReceiptFields state={receipt} />
 
                   <div className="flex gap-2">
                     <Button
                       size="sm"
-                      disabled={
-                        !collectAmount
-                        || collectPaymentMutation.isPending
-                        || (receiptRequiredForMethod && (!receiptSerial.trim() || !receiptDate))
-                      }
+                      disabled={!collectAmount || collectPaymentMutation.isPending || !receipt.isValid}
                       onClick={() => collectPaymentMutation.mutate()}
                     >
                       {collectPaymentMutation.isPending ? t('bookings.detail.recording') : t('bookings.detail.confirmCollect')}
                     </Button>
-                    <Button variant="ghost" size="sm" onClick={() => { setShowCollectForm(false); setCollectAmount(''); setReceiptSerial(''); setReceiptBook(''); setReceiptSeries(''); setReceiptNotes(''); collectIdempotencyKeyRef.current = null }}>{t('bookings.detail.undo')}</Button>
+                    <Button variant="ghost" size="sm" onClick={() => { setShowCollectForm(false); setCollectAmount(''); receipt.reset(); collectIdempotencyKeyRef.current = null }}>{t('bookings.detail.undo')}</Button>
                   </div>
                 </div>
               ) : (
