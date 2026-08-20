@@ -26,8 +26,8 @@ export interface AgeGroupRow {
 export interface GroupRow {
   id: string
   branchId: string
-  programId: string
-  seasonId: string
+  programId: string | null
+  seasonId: string | null
   ageGroupId: string | null
   coachId: string | null
   assistantCoachId: string | null

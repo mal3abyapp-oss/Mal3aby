@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
+import { Link } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '@/lib/supabase/client'
 import { translateSupabaseError } from '@/lib/errors'
@@ -131,6 +132,14 @@ export function EnrollmentSection() {
   const [wizardPrice, setWizardPrice] = useState('')
   const [wizardDiscount, setWizardDiscount] = useState('0')
   const [wizardError, setWizardError] = useState<string | null>(null)
+  // Directive Sections 19-24: the enrollment wizard previously created a
+  // pending invoice and left collecting payment entirely to a separate
+  // trip to Billing, with no link back to the invoice it just created --
+  // real friction found by audit. Not duplicating the payment form here
+  // (that would re-create the exact per-surface drift problem Phase B
+  // fixed for government receipts); instead this deep-links straight to
+  // the new invoice on Billing's existing collect-payment flow.
+  const [justEnrolledInvoiceId, setJustEnrolledInvoiceId] = useState<string | null>(null)
 
   // Phase A dropdown audit: onSuccess already cleared the wizard fields
   // after a successful submit, but closing the dialog via Cancel (or the
@@ -204,7 +213,7 @@ export function EnrollmentSection() {
 
   const enrollMutation = useMutation({
     mutationFn: async () => {
-      const { error } = await supabase.rpc('create_enrollment_with_subscription', {
+      const { data, error } = await supabase.rpc('create_enrollment_with_subscription', {
         p_player_id: wizardPlayerId,
         p_group_id: wizardGroupId,
         p_guardian_id: wizardGuardianId,
@@ -215,9 +224,11 @@ export function EnrollmentSection() {
         p_discount: Number(wizardDiscount || 0),
       })
       if (error) throw error
+      return data?.[0]?.invoice_id as string | undefined
     },
-    onSuccess: () => {
+    onSuccess: (invoiceId) => {
       setWizardOpen(false)
+      setJustEnrolledInvoiceId(invoiceId ?? null)
       setWizardPlayerId('')
       setWizardGroupId('')
       setWizardGuardianId('')
@@ -415,6 +426,22 @@ export function EnrollmentSection() {
           </DialogContent>
         </Dialog>
       </div>
+
+      {justEnrolledInvoiceId && (
+        <div className="flex items-center justify-between gap-3 rounded-lg border border-status-warning/40 bg-status-warning/5 p-3 text-sm">
+          <span>{t('academy.enrollments.enrolledPendingPayment')}</span>
+          <div className="flex items-center gap-2">
+            <Button asChild size="sm">
+              <Link to={`/app/billing?invoice=${justEnrolledInvoiceId}`} onClick={() => setJustEnrolledInvoiceId(null)}>
+                {t('academy.enrollments.collectPaymentNow')}
+              </Link>
+            </Button>
+            <Button size="sm" variant="ghost" onClick={() => setJustEnrolledInvoiceId(null)}>
+              {t('academy.enrollments.dismiss')}
+            </Button>
+          </div>
+        </div>
+      )}
 
       <DataTable
         columns={columns}

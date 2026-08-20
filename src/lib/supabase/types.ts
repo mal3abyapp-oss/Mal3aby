@@ -1590,8 +1590,8 @@ export type Database = {
           field_id: string | null
           id: string
           name: string
-          program_id: string
-          season_id: string
+          program_id: string | null
+          season_id: string | null
           status: string
           subscription_price: number | null
           updated_at: string
@@ -1608,8 +1608,8 @@ export type Database = {
           field_id?: string | null
           id?: string
           name: string
-          program_id: string
-          season_id: string
+          program_id?: string | null
+          season_id?: string | null
           status?: string
           subscription_price?: number | null
           updated_at?: string
@@ -1626,8 +1626,8 @@ export type Database = {
           field_id?: string | null
           id?: string
           name?: string
-          program_id?: string
-          season_id?: string
+          program_id?: string | null
+          season_id?: string | null
           status?: string
           subscription_price?: number | null
           updated_at?: string
@@ -5845,9 +5845,12 @@ export type Database = {
       whatsapp_connector_get_invoice_document_data: {
         Args: { p_invoice_id: string }
         Returns: {
+          booking_end_at: string
           booking_ref: string
+          booking_start_at: string
           club_id: string
           club_name: string
+          club_timezone: string
           currency: string
           customer_name: string
           field_name: string
@@ -5856,7 +5859,12 @@ export type Database = {
           issued_at: string
           outstanding: number
           paid: number
+          payment_method: string
           payment_status: string
+          receipt_book: string
+          receipt_date: string
+          receipt_serial: string
+          receipt_series: string
           refunded: number
           total: number
         }[]

@@ -259,8 +259,11 @@ export function ProgramsGroupsSection() {
       const { error } = await supabase.from('groups').insert({
         club_id: currentClubId as string,
         branch_id: groupBranchId,
-        program_id: groupProgramId,
-        season_id: groupSeasonId,
+        // Directive Sections 19-21: Program/Season are optional
+        // organizational metadata, not required to sell a membership --
+        // most clubs need neither.
+        program_id: groupProgramId || null,
+        season_id: groupSeasonId || null,
         age_group_id: groupAgeGroupId || null,
         coach_id: groupCoachId || null,
         field_id: groupFieldId || null,
@@ -476,32 +479,41 @@ export function ProgramsGroupsSection() {
                 <SelectTrigger><SelectValue placeholder={t('academy.structure.branch')} /></SelectTrigger>
                 <SelectContent>{branches.map((b) => <SelectItem key={b.id} value={b.id}>{b.name}</SelectItem>)}</SelectContent>
               </Select>
-              <Select value={groupProgramId} onValueChange={setGroupProgramId}>
-                <SelectTrigger><SelectValue placeholder={t('academy.structure.program')} /></SelectTrigger>
-                <SelectContent>{programs.map((p) => <SelectItem key={p.id} value={p.id}>{p.nameAr}</SelectItem>)}</SelectContent>
-              </Select>
-              <Select value={groupSeasonId} onValueChange={setGroupSeasonId}>
-                <SelectTrigger><SelectValue placeholder={t('academy.structure.season')} /></SelectTrigger>
-                <SelectContent>{seasons.map((s) => <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>)}</SelectContent>
-              </Select>
-              <Select value={groupAgeGroupId} onValueChange={setGroupAgeGroupId}>
-                <SelectTrigger><SelectValue placeholder={t('academy.structure.ageGroupOptional')} /></SelectTrigger>
-                <SelectContent>{ageGroups.map((a) => <SelectItem key={a.id} value={a.id}>{a.name}</SelectItem>)}</SelectContent>
-              </Select>
-              <Select value={groupCoachId} onValueChange={setGroupCoachId}>
-                <SelectTrigger><SelectValue placeholder={t('academy.structure.coachOptional')} /></SelectTrigger>
-                <SelectContent>{coaches.map((c) => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}</SelectContent>
-              </Select>
-              <Select value={groupFieldId} onValueChange={setGroupFieldId}>
-                <SelectTrigger><SelectValue placeholder={t('academy.structure.fieldOptional')} /></SelectTrigger>
-                <SelectContent>{fields.map((f) => <SelectItem key={f.id} value={f.id}>{f.name}</SelectItem>)}</SelectContent>
-              </Select>
               <Input required type="number" min={1} placeholder={t('academy.structure.capacityPlaceholder')} value={groupCapacity} onChange={(e) => setGroupCapacity(e.target.value)} />
               <div className="flex flex-col gap-1">
                 <label className="text-xs text-text-secondary">{t('academy.structure.monthlySubscriptionPrice')}</label>
                 <Input type="number" min={0} placeholder={t('academy.structure.subscriptionPricePlaceholder')} value={groupSubscriptionPrice} onChange={(e) => setGroupSubscriptionPrice(e.target.value)} />
               </div>
-              <Button type="submit" disabled={!groupBranchId || !groupProgramId || !groupSeasonId || createGroupMutation.isPending}>
+              {/* Directive Sections 19-21: Program/Season/Age Group/Coach/
+                  Field are all optional organizational metadata, tucked
+                  under an explicit "advanced" disclosure so the common
+                  case (Name, Capacity, Price) stays a 3-field form. */}
+              <details className="rounded-md border border-border">
+                <summary className="cursor-pointer select-none px-3 py-2 text-sm font-medium text-text-secondary">{t('academy.structure.advancedOptional')}</summary>
+                <div className="flex flex-col gap-3 border-t border-border p-3">
+                  <Select value={groupProgramId} onValueChange={setGroupProgramId}>
+                    <SelectTrigger><SelectValue placeholder={t('academy.structure.programOptional')} /></SelectTrigger>
+                    <SelectContent>{programs.map((p) => <SelectItem key={p.id} value={p.id}>{p.nameAr}</SelectItem>)}</SelectContent>
+                  </Select>
+                  <Select value={groupSeasonId} onValueChange={setGroupSeasonId}>
+                    <SelectTrigger><SelectValue placeholder={t('academy.structure.seasonOptional')} /></SelectTrigger>
+                    <SelectContent>{seasons.map((s) => <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>)}</SelectContent>
+                  </Select>
+                  <Select value={groupAgeGroupId} onValueChange={setGroupAgeGroupId}>
+                    <SelectTrigger><SelectValue placeholder={t('academy.structure.ageGroupOptional')} /></SelectTrigger>
+                    <SelectContent>{ageGroups.map((a) => <SelectItem key={a.id} value={a.id}>{a.name}</SelectItem>)}</SelectContent>
+                  </Select>
+                  <Select value={groupCoachId} onValueChange={setGroupCoachId}>
+                    <SelectTrigger><SelectValue placeholder={t('academy.structure.coachOptional')} /></SelectTrigger>
+                    <SelectContent>{coaches.map((c) => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}</SelectContent>
+                  </Select>
+                  <Select value={groupFieldId} onValueChange={setGroupFieldId}>
+                    <SelectTrigger><SelectValue placeholder={t('academy.structure.fieldOptional')} /></SelectTrigger>
+                    <SelectContent>{fields.map((f) => <SelectItem key={f.id} value={f.id}>{f.name}</SelectItem>)}</SelectContent>
+                  </Select>
+                </div>
+              </details>
+              <Button type="submit" disabled={!groupBranchId || createGroupMutation.isPending}>
                 {t('academy.structure.add')}
               </Button>
             </form>
