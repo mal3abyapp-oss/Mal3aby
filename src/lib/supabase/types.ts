@@ -1191,6 +1191,32 @@ export type Database = {
           },
         ]
       }
+      employee_cash_liability_settlement_keys: {
+        Row: {
+          created_at: string
+          idempotency_key: string
+          liability_id: string
+        }
+        Insert: {
+          created_at?: string
+          idempotency_key: string
+          liability_id: string
+        }
+        Update: {
+          created_at?: string
+          idempotency_key?: string
+          liability_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "employee_cash_liability_settlement_keys_liability_id_fkey"
+            columns: ["liability_id"]
+            isOneToOne: false
+            referencedRelation: "employee_cash_liabilities"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       enrollments: {
         Row: {
           club_id: string
@@ -5420,8 +5446,51 @@ export type Database = {
         }
         Returns: Json
       }
+      get_staff_360_summary: {
+        Args: { p_club_id: string; p_membership_id: string }
+        Returns: Json
+      }
+      get_staff_access_profile: {
+        Args: { p_club_id: string; p_membership_id: string }
+        Returns: Json
+      }
+      get_staff_activity: {
+        Args: {
+          p_club_id: string
+          p_limit?: number
+          p_membership_id: string
+          p_offset?: number
+        }
+        Returns: Json
+      }
       get_staff_cash_profile: {
         Args: { p_membership_id: string }
+        Returns: Json
+      }
+      get_staff_financial_account: {
+        Args: {
+          p_club_id: string
+          p_limit?: number
+          p_membership_id: string
+          p_offset?: number
+        }
+        Returns: Json
+      }
+      get_staff_liability_ledger: {
+        Args: { p_club_id: string; p_liability_id: string }
+        Returns: Json
+      }
+      get_staff_shift_detail: {
+        Args: { p_club_id: string; p_shift_id: string }
+        Returns: Json
+      }
+      get_staff_shift_history: {
+        Args: {
+          p_club_id: string
+          p_limit?: number
+          p_membership_id: string
+          p_offset?: number
+        }
         Returns: Json
       }
       get_subscription_effective_end_date: {
@@ -5585,6 +5654,10 @@ export type Database = {
         }
         Returns: string
       }
+      reactivate_staff_member: {
+        Args: { p_membership_id: string }
+        Returns: undefined
+      }
       record_payment: {
         Args: {
           p_amount: number
@@ -5712,6 +5785,10 @@ export type Database = {
         Args: { p_queue_id: string }
         Returns: undefined
       }
+      reverse_employee_cash_liability: {
+        Args: { p_liability_id: string; p_reason: string }
+        Returns: Json
+      }
       reverse_official_receipt: {
         Args: { p_reason: string; p_receipt_id: string }
         Returns: undefined
@@ -5751,12 +5828,29 @@ export type Database = {
         Args: { p_is_public: boolean; p_plan_id: string }
         Returns: undefined
       }
+      set_staff_branch_scope: {
+        Args: {
+          p_branch_ids: string[]
+          p_club_id: string
+          p_membership_id: string
+        }
+        Returns: undefined
+      }
       set_staff_cash_custody: {
         Args: { p_has_custody: boolean; p_membership_id: string }
         Returns: undefined
       }
+      set_staff_role: {
+        Args: { p_club_id: string; p_membership_id: string; p_role_key: string }
+        Returns: undefined
+      }
       settle_employee_cash_liability: {
-        Args: { p_amount: number; p_liability_id: string; p_reason?: string }
+        Args: {
+          p_amount: number
+          p_idempotency_key?: string
+          p_liability_id: string
+          p_reason?: string
+        }
         Returns: Json
       }
       slugify: { Args: { p_text: string }; Returns: string }

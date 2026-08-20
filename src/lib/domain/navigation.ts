@@ -50,23 +50,23 @@ export type NavDomain =
 // a domain granted with zero backing permissions.
 const ROLE_NAV_DOMAINS: Record<string, ReadonlySet<NavDomain>> = {
   club_owner: new Set<NavDomain>([
-    'today', 'bookings', 'customers', 'academy', 'finance', 'reports', 'whatsapp', 'staff', 'settings',
+    'today', 'bookings', 'customers', 'academy', 'finance', 'reports', 'whatsapp', 'staff', 'settings', 'scan',
   ]),
   club_manager: new Set<NavDomain>([
-    'today', 'bookings', 'customers', 'academy', 'finance', 'reports', 'whatsapp', 'staff', 'settings',
+    'today', 'bookings', 'customers', 'academy', 'finance', 'reports', 'whatsapp', 'staff', 'settings', 'scan',
   ]),
   // branch_manager holds branch.update + field.update/view (confirmed
   // live) -- exactly what the 'settings' domain gates (/app/fields,
   // /app/settings) -- but 'settings' was withheld entirely.
   branch_manager: new Set<NavDomain>([
-    'today', 'bookings', 'customers', 'academy', 'finance', 'reports', 'whatsapp', 'settings',
+    'today', 'bookings', 'customers', 'academy', 'finance', 'reports', 'whatsapp', 'settings', 'scan',
   ]),
   // receptionist holds enrollment.view + player.create/view +
   // subscription.view (confirmed live) -- three distinct academy-domain
   // permission families including a real create right -- but 'academy'
   // was withheld entirely.
   receptionist: new Set<NavDomain>([
-    'today', 'bookings', 'customers', 'finance', 'academy',
+    'today', 'bookings', 'customers', 'finance', 'academy', 'scan',
   ]),
   // accountant holds enrollment.view + player.view + subscription.view
   // (confirmed live) -- the full breadth of what 'academy' exposes,

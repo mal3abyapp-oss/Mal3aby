@@ -6,6 +6,7 @@ import { useAuth } from '@/app/providers/AuthProvider'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { CheckCircle2, Circle } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { canSeeNavDomain, type NavDomain } from '@/lib/domain/navigation'
 
 // Dismissible checklist, not a wizard continuation (ADR-043). Each item is
 // an independent existence check, not stored progress state.
@@ -43,7 +44,7 @@ async function fetchChecklistState(clubId: string) {
 
 export function FirstRunChecklist() {
   const { t } = useTranslation()
-  const { currentClubId } = useAuth()
+  const { currentClubId, currentMembership } = useAuth()
   const { data } = useQuery({
     queryKey: ['first-run-checklist', currentClubId],
     queryFn: () => fetchChecklistState(currentClubId!),
@@ -54,14 +55,17 @@ export function FirstRunChecklist() {
     return null
   }
 
-  const items = [
-    { label: t('dashboard.checklist.addStaff'), done: !!data?.hasStaff, to: '/app/staff' },
-    { label: t('dashboard.checklist.addFirstCustomer'), done: !!data?.hasCustomer, to: '/app/customers' },
+  const allItems: { label: string; done: boolean; to: string; domain: NavDomain }[] = [
+    { label: t('dashboard.checklist.addStaff'), done: !!data?.hasStaff, to: '/app/staff', domain: 'staff' as const },
+    { label: t('dashboard.checklist.addFirstCustomer'), done: !!data?.hasCustomer, to: '/app/customers', domain: 'customers' as const },
     // Fields live under Settings -> إعدادات الحجوزات (moved there in
     // the P1-7 usability pass) -- not a standalone /app/fields route.
-    { label: t('dashboard.checklist.addField'), done: !!data?.hasField, to: '/app/settings' },
-    { label: t('dashboard.checklist.createFirstBooking'), done: !!data?.hasBooking, to: '/app/bookings' },
+    { label: t('dashboard.checklist.addField'), done: !!data?.hasField, to: '/app/fields', domain: 'settings' as const },
+    { label: t('dashboard.checklist.createFirstBooking'), done: !!data?.hasBooking, to: '/app/bookings', domain: 'bookings' as const },
   ]
+  const items = allItems.filter((item) => canSeeNavDomain(currentMembership?.roleKey, item.domain))
+
+  if (items.length === 0) return null
 
   return (
     <Card className="mb-4">

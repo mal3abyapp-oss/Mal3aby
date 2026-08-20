@@ -83,9 +83,9 @@ export function PlatformTrialsPage() {
     <div>
       <PageHeader title={t('platform.trialsPage.title')} description={t('platform.trialsPage.description')} />
       <div className="mb-4 grid grid-cols-3 gap-4">
-        <StatCard label={t('platform.trialsPage.cards.active')} value={String(active.length)} />
-        <StatCard label={t('platform.trialsPage.cards.expired')} value={String(expired.length)} />
-        <StatCard label={t('platform.trialsPage.cards.cancelled')} value={String(cancelled.length)} />
+        <StatCard label={t('platform.trialsPage.cards.active')} value={isLoading ? '—' : String(active.length)} />
+        <StatCard label={t('platform.trialsPage.cards.expired')} value={isLoading ? '—' : String(expired.length)} />
+        <StatCard label={t('platform.trialsPage.cards.cancelled')} value={isLoading ? '—' : String(cancelled.length)} />
       </div>
       <DataTable columns={columns} rows={trials} rowKey={(row) => row.id} isLoading={isLoading} emptyTitle={t('platform.trialsPage.emptyTitle')} />
     </div>

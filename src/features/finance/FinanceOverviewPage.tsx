@@ -11,7 +11,7 @@ import { DateRangeFilter } from '@/features/reports/components/DateRangeFilter'
 import { classifyOutstandingInvoices } from '@/lib/domain/finance'
 import {
   Wallet, HandCoins, Banknote, CreditCard, CircleDollarSign, ReceiptText,
-  FileWarning, Undo2, ShieldCheck, Scale, Clock, Image as ImageIcon,
+  FileWarning, Undo2, ShieldCheck, Scale, Clock, Image as ImageIcon, UserX,
 } from 'lucide-react'
 
 // Finance IA consolidation directive section 5: a real operational
@@ -68,6 +68,20 @@ async function fetchExpectedCashNow(clubId: string) {
   return rows.reduce((sum, r) => sum + Number(r.opening_float ?? 0), 0)
 }
 
+// Directive section 62: "if there is employee outstanding, Finance
+// Overview can show Employee Liabilities Total." Reads the same
+// employee_cash_liabilities table Staff 360's Financial Account tab
+// reads -- one source, two views.
+async function fetchEmployeeLiabilitiesOutstanding(clubId: string) {
+  const { data, error } = await supabase
+    .from('employee_cash_liabilities')
+    .select('outstanding')
+    .eq('club_id', clubId)
+    .eq('status', 'outstanding')
+  if (error) throw error
+  return (data ?? []).reduce((sum, r) => sum + Number(r.outstanding ?? 0), 0)
+}
+
 async function fetchPendingProofsCount(clubId: string) {
   const { count, error } = await supabase
     .from('payment_proofs')
@@ -119,6 +133,11 @@ export function FinanceOverviewPage() {
   const { data: pendingProofsCount = 0 } = useQuery({
     queryKey: ['finance-overview-pending-proofs', currentClubId],
     queryFn: () => fetchPendingProofsCount(currentClubId!),
+    enabled: !!currentClubId,
+  })
+  const { data: employeeLiabilitiesOutstanding = 0 } = useQuery({
+    queryKey: ['finance-overview-employee-liabilities', currentClubId],
+    queryFn: () => fetchEmployeeLiabilitiesOutstanding(currentClubId!),
     enabled: !!currentClubId,
   })
   const { data: officialReceiptsCount = 0 } = useQuery({
@@ -232,6 +251,13 @@ export function FinanceOverviewPage() {
             value={t('finance.overview.notApplicable')}
             icon={Clock}
             to="/app/finance/expenses"
+          />
+          <StatCard
+            label={t('finance.overview.employeeLiabilities', { defaultValue: 'Employee Liabilities' })}
+            value={formatMoney(employeeLiabilitiesOutstanding, 'EGP', locale)}
+            tone={employeeLiabilitiesOutstanding > 0 ? 'danger' : undefined}
+            icon={UserX}
+            to="/app/reports/employee-liability"
           />
         </div>
       )}

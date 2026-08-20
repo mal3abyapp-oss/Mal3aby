@@ -1,5 +1,7 @@
 import { Navigate, Outlet, useLocation } from 'react-router-dom'
+import type { ReactNode } from 'react'
 import { useAuth } from '@/app/providers/AuthProvider'
+import { canSeeNavDomain, type NavDomain } from '@/lib/domain/navigation'
 
 // Guards /app and /platform. Client-side redirect only — the real security
 // boundary is always RLS on the server (docs/SECURITY_ANTI_FRAUD.md); this
@@ -15,6 +17,21 @@ export function RequireAuth() {
   }
 
   return <Outlet />
+}
+
+// Mirrors the role-aware navigation at the routing boundary. RLS remains the
+// data-security boundary, but a user must not bypass the product role matrix
+// merely by typing a hidden URL directly.
+export function RequireNavDomain({ domain, children }: { domain: NavDomain; children: ReactNode }) {
+  const { loading, currentMembership } = useAuth()
+
+  if (loading) return null
+
+  if (!currentMembership || !canSeeNavDomain(currentMembership.roleKey, domain)) {
+    return <Navigate to={canSeeNavDomain(currentMembership?.roleKey, 'today') ? '/app' : '/scan'} replace />
+  }
+
+  return children
 }
 
 // Guards /portal (the customer/guardian self-service area, Gate 3).

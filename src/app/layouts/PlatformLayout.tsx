@@ -5,6 +5,7 @@ import { cn } from '@/lib/utils'
 import { Sheet, SheetContent, SheetTitle } from '@/components/ui/sheet'
 import { Button } from '@/components/ui/button'
 import { LanguageSwitcher } from '@/components/ui/language-switcher'
+import { useAuth } from '@/app/providers/AuthProvider'
 import {
   LayoutDashboard,
   Building2,
@@ -17,6 +18,7 @@ import {
   ShieldCheck,
   Settings,
   Menu,
+  LogOut,
 } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 
@@ -123,6 +125,7 @@ export function PlatformLayout() {
   // the exact same navSections/NavLink markup as the desktop sidebar
   // (no navigation model duplicated, just presented in two containers).
   const { t } = useTranslation()
+  const { signOut } = useAuth()
   const [mobileNavOpen, setMobileNavOpen] = useState(false)
 
   return (
@@ -142,9 +145,16 @@ export function PlatformLayout() {
         <div className="flex items-center justify-between border-t border-white/10 px-5 py-3">
           <LanguageSwitcher className="text-white/60 hover:text-white" />
         </div>
+        <button
+          onClick={() => void signOut()}
+          className="flex items-center gap-3 px-5 py-4 text-sm font-medium text-white/60 hover:text-white"
+        >
+          <LogOut className="size-4" />
+          {t('nav.logout')}
+        </button>
       </aside>
 
-      <div className="flex flex-1 flex-col">
+      <div className="flex min-w-0 flex-1 flex-col">
         <header className="flex h-14 items-center justify-between border-b border-border bg-surface px-4 md:hidden">
           <span className="font-bold text-text-primary">Mal3aby — Platform</span>
           <div className="flex items-center gap-2">
@@ -159,7 +169,7 @@ export function PlatformLayout() {
             </Button>
           </div>
         </header>
-        <main className="flex-1 p-4">
+        <main className="min-w-0 flex-1 p-4">
           <Outlet />
         </main>
       </div>
@@ -173,6 +183,13 @@ export function PlatformLayout() {
         <SheetContent side="right" className="flex w-64 flex-col bg-dark-secondary p-0 text-white">
           <SheetTitle className="px-4 py-5 text-lg font-bold text-white">Mal3aby — Platform</SheetTitle>
           <PlatformNavList onNavigate={() => setMobileNavOpen(false)} />
+          <button
+            onClick={() => void signOut()}
+            className="flex items-center gap-3 border-t border-white/10 px-5 py-4 text-sm font-medium text-white/60 hover:text-white"
+          >
+            <LogOut className="size-4" />
+            {t('nav.logout')}
+          </button>
         </SheetContent>
       </Sheet>
     </div>

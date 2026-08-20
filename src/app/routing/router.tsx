@@ -3,7 +3,7 @@ import { PublicLayout } from '@/app/layouts/PublicLayout'
 import { AppLayout } from '@/app/layouts/AppLayout'
 import { PlatformLayout } from '@/app/layouts/PlatformLayout'
 import { PortalLayout } from '@/app/layouts/PortalLayout'
-import { RequireAuth, RequirePlatformOwner, RequirePortalAuth } from '@/app/routing/RequireAuth'
+import { RequireAuth, RequireNavDomain, RequirePlatformOwner, RequirePortalAuth } from '@/app/routing/RequireAuth'
 import { RedirectWithSearch } from '@/app/routing/RedirectWithSearch'
 
 import { HomePage } from '@/features/public-site/HomePage'
@@ -50,6 +50,7 @@ import { ReportEmployeeLiabilityPage } from '@/features/reports/ReportEmployeeLi
 import { ReportAcademyPage } from '@/features/reports/ReportAcademyPage'
 import { ReportCustomersPage } from '@/features/reports/ReportCustomersPage'
 import { StaffPage } from '@/features/staff/StaffPage'
+import { Employee360Page } from '@/features/staff/Employee360Page'
 import { SettingsPage } from '@/features/settings/SettingsPage'
 import { BranchesFieldsPage } from '@/features/clubs/BranchesFieldsPage'
 import { AuditLogPage } from '@/features/settings/AuditLogPage'
@@ -132,26 +133,26 @@ export const router = createBrowserRouter([
     children: [
       {
         path: '/scan',
-        element: <ScanPage />,
+        element: <RequireNavDomain domain="scan"><ScanPage /></RequireNavDomain>,
       },
       {
         path: '/app',
         element: <AppLayout />,
         children: [
-          { index: true, element: <TodayPage /> },
-          { path: 'bookings', element: <BookingsPage /> },
-          { path: 'academy', element: <AcademyPage /> },
-          { path: 'customers', element: <CustomersPage /> },
+          { index: true, element: <RequireNavDomain domain="today"><TodayPage /></RequireNavDomain> },
+          { path: 'bookings', element: <RequireNavDomain domain="bookings"><BookingsPage /></RequireNavDomain> },
+          { path: 'academy', element: <RequireNavDomain domain="academy"><AcademyPage /></RequireNavDomain> },
+          { path: 'customers', element: <RequireNavDomain domain="customers"><CustomersPage /></RequireNavDomain> },
           // Static route must come before the :customerId dynamic
           // route below, or "duplicates" would itself be matched and
           // passed to Customer360Page as a (nonexistent) customer id.
-          { path: 'customers/duplicates', element: <CustomerDuplicatesPage /> },
+          { path: 'customers/duplicates', element: <RequireNavDomain domain="customers"><CustomerDuplicatesPage /></RequireNavDomain> },
           // Customer 360 directive: "ONE CUSTOMER, ONE SOURCE OF
           // TRUTH" -- the single identity page every cross-module
           // "open customer" link (booking, academy, finance, whatsapp)
           // now points at, replacing CustomerDetailDialog's scattered
           // read-only summary.
-          { path: 'customers/:customerId', element: <Customer360Page /> },
+          { path: 'customers/:customerId', element: <RequireNavDomain domain="customers"><Customer360Page /></RequireNavDomain> },
           // Finance IA consolidation directive: every money-related
           // screen now lives under /app/finance as one coherent module
           // (sections 1-84) -- FinanceLayout renders the shared sub-nav,
@@ -160,7 +161,7 @@ export const router = createBrowserRouter([
           // ReportsOverviewPage is the index, not a tab among equals).
           {
             path: 'finance',
-            element: <FinanceLayout />,
+            element: <RequireNavDomain domain="finance"><FinanceLayout /></RequireNavDomain>,
             children: [
               { index: true, element: <FinanceOverviewPage /> },
               { path: 'payments', element: <FinancePaymentsPage /> },
@@ -185,7 +186,7 @@ export const router = createBrowserRouter([
           // customer money, kept as its own route (directive doesn't
           // fold platform billing into the customer-money Finance
           // module); linked from Finance Overview and Settings.
-          { path: 'subscription', element: <SubscriptionPage /> },
+          { path: 'subscription', element: <RequireNavDomain domain="settings"><SubscriptionPage /></RequireNavDomain> },
           // Master IA/UX audit (Reports decomposition phase): the old
           // single /app/reports route rendered a 1127-line file with
           // 9 tabs sharing one Tabs.Root -- visual grouping (a prior
@@ -194,40 +195,45 @@ export const router = createBrowserRouter([
           // report, each independently bundled/testable/linkable.
           // /app/reports itself is now the Overview/landing screen,
           // not a tab among equals.
-          { path: 'reports', element: <ReportsOverviewPage /> },
-          { path: 'reports/bookings', element: <ReportBookingsPage /> },
-          { path: 'reports/occupancy', element: <ReportOccupancyPage /> },
-          { path: 'reports/revenue', element: <ReportRevenuePage /> },
-          { path: 'reports/collections', element: <ReportCollectionsPage /> },
-          { path: 'reports/payment-methods', element: <ReportPaymentMethodsPage /> },
-          { path: 'reports/exceptions', element: <ReportExceptionsPage /> },
-          { path: 'reports/official-receipts', element: <ReportOfficialReceiptsPage /> },
-          { path: 'reports/reconciliation', element: <ReportReconciliationPage /> },
-          { path: 'reports/employee-liability', element: <ReportEmployeeLiabilityPage /> },
-          { path: 'reports/academy', element: <ReportAcademyPage /> },
-          { path: 'reports/customers', element: <ReportCustomersPage /> },
+          { path: 'reports', element: <RequireNavDomain domain="reports"><ReportsOverviewPage /></RequireNavDomain> },
+          { path: 'reports/bookings', element: <RequireNavDomain domain="reports"><ReportBookingsPage /></RequireNavDomain> },
+          { path: 'reports/occupancy', element: <RequireNavDomain domain="reports"><ReportOccupancyPage /></RequireNavDomain> },
+          { path: 'reports/revenue', element: <RequireNavDomain domain="reports"><ReportRevenuePage /></RequireNavDomain> },
+          { path: 'reports/collections', element: <RequireNavDomain domain="reports"><ReportCollectionsPage /></RequireNavDomain> },
+          { path: 'reports/payment-methods', element: <RequireNavDomain domain="reports"><ReportPaymentMethodsPage /></RequireNavDomain> },
+          { path: 'reports/exceptions', element: <RequireNavDomain domain="reports"><ReportExceptionsPage /></RequireNavDomain> },
+          { path: 'reports/official-receipts', element: <RequireNavDomain domain="reports"><ReportOfficialReceiptsPage /></RequireNavDomain> },
+          { path: 'reports/reconciliation', element: <RequireNavDomain domain="reports"><ReportReconciliationPage /></RequireNavDomain> },
+          { path: 'reports/employee-liability', element: <RequireNavDomain domain="reports"><ReportEmployeeLiabilityPage /></RequireNavDomain> },
+          { path: 'reports/academy', element: <RequireNavDomain domain="reports"><ReportAcademyPage /></RequireNavDomain> },
+          { path: 'reports/customers', element: <RequireNavDomain domain="reports"><ReportCustomersPage /></RequireNavDomain> },
           // P1-7: /app/club's content moved into the new Settings hub
           // originally, then further split in the IA restructuring
           // (Phase 5) -- kept as a redirect for any stale links/
           // bookmarks rather than a dead route.
           { path: 'club', element: <Navigate to="/app/settings" replace /> },
-          { path: 'staff', element: <StaffPage /> },
+          { path: 'staff', element: <RequireNavDomain domain="staff"><StaffPage /></RequireNavDomain> },
+          // Staff 360 directive: one Employee 360 profile route, same
+          // pattern as Customer 360 -- static "staff" list route above
+          // this, so the dynamic :membershipId route below never
+          // shadows it.
+          { path: 'staff/:membershipId', element: <RequireNavDomain domain="staff"><Employee360Page /></RequireNavDomain> },
           // IA restructuring (Phase 5): branches + fields/hours/pricing
           // extracted out of Settings into their own domain -- confirmed
           // in MAL3ABY_INFORMATION_ARCHITECTURE_AUDIT.md as real
           // operational infrastructure management, not settings.
-          { path: 'fields', element: <BranchesFieldsPage /> },
+          { path: 'fields', element: <RequireNavDomain domain="settings"><BranchesFieldsPage /></RequireNavDomain> },
           // IA restructuring (Phase 5): audit log extracted out of
           // Settings into its own route -- a monitoring/security
           // concern, not settings. AuditLogPage already existed as a
           // standalone wrapper but had no registered route (confirmed
           // dead code in the audit) -- this is that route.
-          { path: 'audit-log', element: <AuditLogPage /> },
+          { path: 'audit-log', element: <RequireNavDomain domain="settings"><AuditLogPage /></RequireNavDomain> },
           // IA restructuring (Phase 8): WhatsApp promoted to an
           // independent top-level module per the directive's explicit
           // instruction -- 4 tabs (Overview/Activity/Connection/
           // Settings), no longer buried inside Settings' "الإشعارات".
-          { path: 'whatsapp', element: <WhatsAppPage /> },
+          { path: 'whatsapp', element: <RequireNavDomain domain="whatsapp"><WhatsAppPage /></RequireNavDomain> },
           // P1-7 (critical usability fix pass, 2026-08-16), narrowed in
           // IA restructuring Phase 5: "الإعدادات" now covers only true
           // club-identity/configuration settings -- club identity,
@@ -236,8 +242,8 @@ export const router = createBrowserRouter([
           // management, WhatsApp, and the audit log all moved to their
           // own destinations (see MAL3ABY_INFORMATION_ARCHITECTURE.md
           // §2's Settings reallocation table).
-          { path: 'settings', element: <SettingsPage /> },
-          { path: 'more', element: <MorePage /> },
+          { path: 'settings', element: <RequireNavDomain domain="settings"><SettingsPage /></RequireNavDomain> },
+          { path: 'more', element: <RequireNavDomain domain="today"><MorePage /></RequireNavDomain> },
         ],
       },
     ],

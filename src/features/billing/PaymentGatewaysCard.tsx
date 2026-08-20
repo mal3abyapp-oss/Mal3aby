@@ -92,7 +92,7 @@ export function PaymentGatewaysCard() {
   })
 
   return (
-    <Card>
+    <Card className="min-w-0">
       <CardHeader>
         <CardTitle className="text-base">{t('billing.paymentGatewaysCard.title')}</CardTitle>
       </CardHeader>

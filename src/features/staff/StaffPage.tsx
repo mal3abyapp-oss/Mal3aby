@@ -1,4 +1,5 @@
 import { useState, type FormEvent } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '@/lib/supabase/client'
@@ -38,6 +39,22 @@ const ASSIGNABLE_ROLES = [
   { key: 'coach', labelKey: 'staff.roles.coach' },
   { key: 'scanner', labelKey: 'staff.roles.scanner' },
 ]
+
+interface BranchOption {
+  id: string
+  name: string
+}
+
+async function fetchBranches(clubId: string): Promise<BranchOption[]> {
+  const { data, error } = await supabase
+    .from('branches')
+    .select('id, name')
+    .eq('club_id', clubId)
+    .eq('status', 'active')
+    .order('created_at')
+  if (error) throw error
+  return data ?? []
+}
 
 // V1 Critical Fix Pass (2026-08-16): fetchStaff previously left-embedded
 // `profiles` on the same select() as `roles`/`membership_branches`. A
@@ -92,17 +109,25 @@ async function fetchStaff(clubId: string): Promise<StaffRow[]> {
 
 export function StaffPage() {
   const { t } = useTranslation()
+  const navigate = useNavigate()
   const { currentClubId } = useAuth()
   const queryClient = useQueryClient()
   const [dialogOpen, setDialogOpen] = useState(false)
   const [email, setEmail] = useState('')
   const [roleKey, setRoleKey] = useState('receptionist')
+  const [allBranches, setAllBranches] = useState(false)
+  const [selectedBranchIds, setSelectedBranchIds] = useState<string[]>([])
   const [formError, setFormError] = useState<string | null>(null)
 
   const { data: staff = [], isLoading } = useQuery({
     queryKey: ['staff', currentClubId],
     queryFn: () => fetchStaff(currentClubId!),
     enabled: !!currentClubId,
+  })
+  const { data: branches = [] } = useQuery({
+    queryKey: ['staff-assignable-branches', currentClubId],
+    queryFn: () => fetchBranches(currentClubId!),
+    enabled: !!currentClubId && dialogOpen,
   })
 
   const inviteMutation = useMutation({
@@ -111,6 +136,7 @@ export function StaffPage() {
         p_club_id: currentClubId as string,
         p_email: email,
         p_role_key: roleKey,
+        p_branch_ids: allBranches ? [] : selectedBranchIds,
       })
       if (error) throw error
     },
@@ -118,6 +144,8 @@ export function StaffPage() {
       setDialogOpen(false)
       setEmail('')
       setRoleKey('receptionist')
+      setAllBranches(false)
+      setSelectedBranchIds([])
       setFormError(null)
       void queryClient.invalidateQueries({ queryKey: ['staff', currentClubId] })
     },
@@ -157,6 +185,10 @@ export function StaffPage() {
   function handleInviteSubmit(e: FormEvent) {
     e.preventDefault()
     setFormError(null)
+    if (!allBranches && selectedBranchIds.length === 0) {
+      setFormError(t('staff.branchRequired'))
+      return
+    }
     inviteMutation.mutate()
   }
 
@@ -164,8 +196,11 @@ export function StaffPage() {
     {
       key: 'name',
       header: t('staff.columns.name'),
-      render: (r) =>
-        r.fullName ?? <span className="text-text-secondary">{t('staff.notLoggedInYet')}</span>,
+      render: (r) => (
+        <button className="text-accent-foreground hover:underline" onClick={() => navigate(`/app/staff/${r.membershipId}`)}>
+          {r.fullName ?? <span className="text-text-secondary">{t('staff.notLoggedInYet')}</span>}
+        </button>
+      ),
     },
     { key: 'role', header: t('staff.columns.role'), render: (r) => r.roleNameAr },
     {
@@ -256,6 +291,34 @@ export function StaffPage() {
                     </SelectContent>
                   </Select>
                 </div>
+                <fieldset className="flex flex-col gap-2 rounded-md border border-border p-3">
+                  <legend className="px-1 text-sm font-medium text-text-secondary">{t('staff.branchScopeLabel')}</legend>
+                  <label className="flex items-center gap-2 text-sm">
+                    <input
+                      type="checkbox"
+                      checked={allBranches}
+                      onChange={(e) => {
+                        setAllBranches(e.target.checked)
+                        if (e.target.checked) setSelectedBranchIds([])
+                      }}
+                    />
+                    {t('staff.allBranches')}
+                  </label>
+                  {!allBranches && branches.map((branch) => (
+                    <label key={branch.id} className="flex items-center gap-2 text-sm">
+                      <input
+                        type="checkbox"
+                        checked={selectedBranchIds.includes(branch.id)}
+                        onChange={(e) => setSelectedBranchIds((current) => (
+                          e.target.checked
+                            ? [...current, branch.id]
+                            : current.filter((id) => id !== branch.id)
+                        ))}
+                      />
+                      {branch.name}
+                    </label>
+                  ))}
+                </fieldset>
                 {formError && (
                   <p role="alert" className="text-sm text-status-danger">
                     {formError}

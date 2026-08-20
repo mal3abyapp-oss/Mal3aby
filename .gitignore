@@ -32,3 +32,6 @@ npm-debug.log*
 
 # Testing
 coverage/
+
+# Scratch/QA scripts and credential fixtures -- never committed
+.codex-temp/

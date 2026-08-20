@@ -175,15 +175,15 @@ async function fetchUsageReport() {
 export function PlatformReportsPage() {
   const { t } = useTranslation()
   const { locale } = useDirection()
-  const { data: subReport = [] } = useQuery({ queryKey: ['report-subscriptions'], queryFn: fetchSubscriptionReport })
-  const { data: revenueReport } = useQuery({ queryKey: ['report-revenue', locale], queryFn: () => fetchRevenueReport(locale) })
+  const { data: subReport = [], isLoading: subLoading } = useQuery({ queryKey: ['report-subscriptions'], queryFn: fetchSubscriptionReport })
+  const { data: revenueReport, isLoading: revenueLoading } = useQuery({ queryKey: ['report-revenue', locale], queryFn: () => fetchRevenueReport(locale) })
   const revenueRows = revenueReport?.rows ?? []
   const monthlyTotals = revenueReport?.monthlyTotals ?? []
-  const { data: renewalReport = [] } = useQuery({ queryKey: ['report-renewals'], queryFn: fetchRenewalReport })
-  const { data: growthReport } = useQuery({ queryKey: ['report-growth', locale], queryFn: () => fetchGrowthReport(locale) })
+  const { data: renewalReport = [], isLoading: renewalLoading } = useQuery({ queryKey: ['report-renewals'], queryFn: fetchRenewalReport })
+  const { data: growthReport, isLoading: growthLoading } = useQuery({ queryKey: ['report-growth', locale], queryFn: () => fetchGrowthReport(locale) })
   const growthRows = growthReport?.rows ?? []
   const monthlyNewClubs = growthReport?.monthlyNewClubs ?? []
-  const { data: usageReport = [] } = useQuery({ queryKey: ['report-usage'], queryFn: fetchUsageReport })
+  const { data: usageReport = [], isLoading: usageLoading } = useQuery({ queryKey: ['report-usage'], queryFn: fetchUsageReport })
 
   const subColumns: DataTableColumn<SubRow>[] = [
     {
@@ -285,7 +285,7 @@ export function PlatformReportsPage() {
           <TabsTrigger value="usage">{t('platform.reportsPage.tabs.usage')}</TabsTrigger>
         </TabsList>
         <TabsContent value="subscription">
-          <DataTable columns={subColumns} rows={subReport} rowKey={(r) => `${r.club_id}-${r.start_at}`} emptyTitle={t('platform.reportsPage.emptyTitle')} />
+          <DataTable columns={subColumns} rows={subReport} rowKey={(r) => `${r.club_id}-${r.start_at}`} isLoading={subLoading} emptyTitle={t('platform.reportsPage.emptyTitle')} />
         </TabsContent>
         <TabsContent value="revenue">
           {/* Phase G directive (G1): real monthly aggregation, added
@@ -305,11 +305,12 @@ export function PlatformReportsPage() {
             columns={revenueColumns}
             rows={revenueRows}
             rowKey={(r) => `${r.month}-${r.method}-${r.amount}`}
+            isLoading={revenueLoading}
             emptyTitle={t('platform.reportsPage.emptyTitle')}
           />
         </TabsContent>
         <TabsContent value="renewal">
-          <DataTable columns={renewalColumns} rows={renewalReport} rowKey={(r) => `${r.club_id}-${r.end_at}`} emptyTitle={t('platform.reportsPage.emptyTitle')} />
+          <DataTable columns={renewalColumns} rows={renewalReport} rowKey={(r) => `${r.club_id}-${r.end_at}`} isLoading={renewalLoading} emptyTitle={t('platform.reportsPage.emptyTitle')} />
         </TabsContent>
         <TabsContent value="growth">
           {monthlyNewClubs.length > 0 && (
@@ -322,10 +323,10 @@ export function PlatformReportsPage() {
               ))}
             </div>
           )}
-          <DataTable columns={growthColumns} rows={growthRows} rowKey={(r) => r.id} emptyTitle={t('platform.reportsPage.emptyTitle')} />
+          <DataTable columns={growthColumns} rows={growthRows} rowKey={(r) => r.id} isLoading={growthLoading} emptyTitle={t('platform.reportsPage.emptyTitle')} />
         </TabsContent>
         <TabsContent value="usage">
-          <DataTable columns={usageColumns} rows={usageReport} rowKey={(r) => r.club_id} emptyTitle={t('platform.reportsPage.emptyTitle')} />
+          <DataTable columns={usageColumns} rows={usageReport} rowKey={(r) => r.club_id} isLoading={usageLoading} emptyTitle={t('platform.reportsPage.emptyTitle')} />
         </TabsContent>
       </Tabs>
     </div>

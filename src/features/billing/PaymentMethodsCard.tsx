@@ -195,8 +195,8 @@ export function PaymentMethodsCard() {
   })
 
   return (
-    <Card>
-      <CardHeader className="flex flex-row items-center justify-between">
+    <Card className="min-w-0">
+      <CardHeader className="flex flex-col items-start gap-3 sm:flex-row sm:items-center sm:justify-between">
         <CardTitle className="text-base">{t('billing.paymentMethods.cardTitle')}</CardTitle>
         <Dialog open={dialogOpen} onOpenChange={(open) => { setDialogOpen(open); if (!open) resetForm() }}>
           <Button size="sm" variant="outline" onClick={() => setDialogOpen(true)}>
@@ -278,7 +278,7 @@ export function PaymentMethodsCard() {
         ) : (
           methods.map((m) => (
             <div key={m.id} className="flex flex-col gap-2 rounded-md border border-border p-3 text-sm md:flex-row md:items-center md:justify-between">
-              <div className="flex items-center gap-2">
+              <div className="flex min-w-0 flex-wrap items-center gap-2">
                 <CreditCard className="size-4 shrink-0 text-text-secondary" />
                 <div>
                   <p className="font-medium">{m.nameAr}</p>
@@ -288,7 +288,7 @@ export function PaymentMethodsCard() {
                   </p>
                 </div>
               </div>
-              <div className="flex items-center gap-2">
+              <div className="flex flex-wrap items-center gap-2">
                 <StatusBadge tone={m.customerVisible ? 'success' : 'neutral'} label={m.customerVisible ? t('billing.paymentMethods.visibleToCustomers') : t('billing.paymentMethods.hiddenFromCustomers')} />
                 <StatusBadge tone={m.isActive ? 'success' : 'danger'} label={m.isActive ? t('billing.paymentMethods.active') : t('billing.paymentMethods.suspended')} />
                 <Button size="sm" variant="outline" onClick={() => toggleVisibleMutation.mutate({ id: m.id, customerVisible: m.customerVisible })}>
