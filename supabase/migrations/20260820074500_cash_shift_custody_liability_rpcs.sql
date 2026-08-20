@@ -230,7 +230,15 @@ begin
       'payment_status', case when v_new_outstanding <= 0 then 'paid' else 'partially_paid' end,
       'remaining_outstanding', v_new_outstanding, 'method', p_method,
       'club_name', v_club_name, 'customer_name', v_customer_name, 'booking_ref', v_booking_ref,
-      'invoice_token', v_invoice_token, 'invoice_id', p_invoice_id
+      'invoice_token', v_invoice_token, 'invoice_id', p_invoice_id,
+      -- Directive Sections 4/7: include official receipt details in the
+      -- customer-facing message when this payment has one, same fields
+      -- as booking-confirmed-paid's own receipt block (serial/book/
+      -- series/date only, no internal metadata).
+      'receipt_serial', case when v_receipt_validated then v_receipt.receipt_serial else null end,
+      'receipt_book', case when v_receipt_validated then v_receipt.receipt_book else null end,
+      'receipt_series', case when v_receipt_validated then v_receipt.receipt_series else null end,
+      'receipt_date', case when v_receipt_validated then v_receipt.receipt_date else null end
     ),
     'transactional', 'payment.received:' || v_payment_id::text,
     'document', 'invoice_pdf'

@@ -331,7 +331,13 @@ begin
         'total_price', v_total_price, 'amount_paid', p_payment_amount, 'invoice_number', v_invoice_number,
         'payment_status', v_payment_status, 'method', coalesce(p_payment_method, 'cash'),
         'club_name', v_club_name, 'customer_name', v_customer_name, 'timezone', v_timezone, 'booking_ref', v_booking_ref,
-        'booking_qr_token', v_qr_token, 'invoice_token', v_invoice_token
+        'booking_qr_token', v_qr_token, 'invoice_token', v_invoice_token,
+        -- Directive Sections 4/7: official receipt fields in the
+        -- consolidated pay-now message when this payment has one.
+        'receipt_serial', case when v_receipt_required then p_receipt_serial else null end,
+        'receipt_book', case when v_receipt_required then p_receipt_book else null end,
+        'receipt_series', case when v_receipt_required then p_receipt_series else null end,
+        'receipt_date', case when v_receipt_required then p_receipt_date else null end
       ),
       'transactional', 'booking.confirmed_paid:' || v_booking_id::text,
       'image', 'booking_qr'

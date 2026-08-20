@@ -262,6 +262,43 @@ check('booking-confirmed-paid omits the invoice link when invoice_token is absen
   assert.ok(msg.includes('/qr/qrtok-paid-1'), 'the QR link should still be present')
 })
 
+// Master Operational Simplification directive Sections 4/7: official
+// collection receipt details must appear in the customer WhatsApp
+// message for government-club payments, but never for non-government
+// payments (no receipt fields supplied).
+const RECEIPT_VARS = {
+  ...PAID_VARS,
+  receipt_serial: 'GOV-2026-004521',
+  receipt_book: 'B12',
+  receipt_series: 'S3',
+  receipt_date: '2026-08-20',
+}
+
+check('booking-confirmed-paid includes official receipt details when present (ar + en)', () => {
+  const ar = renderTemplate('booking-confirmed-paid', 'ar', RECEIPT_VARS)
+  assert.ok(ar.includes('إيصال التحصيل الرسمي'), 'missing official receipt heading (ar)')
+  assert.ok(ar.includes('GOV-2026-004521'), 'missing receipt serial (ar)')
+  assert.ok(ar.includes('B12'), 'missing receipt book (ar)')
+  assert.ok(ar.includes('S3'), 'missing receipt series (ar)')
+
+  const en = renderTemplate('booking-confirmed-paid', 'en', RECEIPT_VARS)
+  assert.ok(en.includes('Official Collection Receipt'), 'missing official receipt heading (en)')
+  assert.ok(en.includes('GOV-2026-004521'), 'missing receipt serial (en)')
+})
+
+check('booking-confirmed-paid omits the receipt block entirely for non-government payments', () => {
+  const msg = renderTemplate('booking-confirmed-paid', 'ar', PAID_VARS)
+  assert.ok(!msg.includes('إيصال التحصيل الرسمي'), 'a receipt heading appeared with no receipt data supplied')
+})
+
+check('payment-received includes official receipt details when present, omits when absent', () => {
+  const withReceipt = renderTemplate('payment-received', 'ar', { ...PAID_VARS, receipt_serial: 'GOV-2026-009', receipt_date: '2026-08-20' })
+  assert.ok(withReceipt.includes('GOV-2026-009'), 'missing receipt serial in payment-received (ar)')
+
+  const withoutReceipt = renderTemplate('payment-received', 'ar', PAID_VARS)
+  assert.ok(!withoutReceipt.includes('إيصال التحصيل الرسمي'), 'a receipt heading appeared with no receipt data supplied')
+})
+
 // -----------------------------------------------------------------
 // Secure Booking Page language hand-off (directive Sections 28-32/40):
 // the /qr/ and /verify/ links must carry ?lang=ar|en matching the
