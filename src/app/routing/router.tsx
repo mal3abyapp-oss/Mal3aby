@@ -39,6 +39,8 @@ import { ReportCollectionsPage } from '@/features/reports/ReportCollectionsPage'
 import { ReportPaymentMethodsPage } from '@/features/reports/ReportPaymentMethodsPage'
 import { ReportExceptionsPage } from '@/features/reports/ReportExceptionsPage'
 import { ReportOfficialReceiptsPage } from '@/features/reports/ReportOfficialReceiptsPage'
+import { ReportReconciliationPage } from '@/features/reports/ReportReconciliationPage'
+import { ReportEmployeeLiabilityPage } from '@/features/reports/ReportEmployeeLiabilityPage'
 import { ReportAcademyPage } from '@/features/reports/ReportAcademyPage'
 import { ReportCustomersPage } from '@/features/reports/ReportCustomersPage'
 import { StaffPage } from '@/features/staff/StaffPage'
@@ -155,6 +157,8 @@ export const router = createBrowserRouter([
           { path: 'reports/payment-methods', element: <ReportPaymentMethodsPage /> },
           { path: 'reports/exceptions', element: <ReportExceptionsPage /> },
           { path: 'reports/official-receipts', element: <ReportOfficialReceiptsPage /> },
+          { path: 'reports/reconciliation', element: <ReportReconciliationPage /> },
+          { path: 'reports/employee-liability', element: <ReportEmployeeLiabilityPage /> },
           { path: 'reports/academy', element: <ReportAcademyPage /> },
           { path: 'reports/customers', element: <ReportCustomersPage /> },
           // P1-7: /app/club's content moved into the new Settings hub

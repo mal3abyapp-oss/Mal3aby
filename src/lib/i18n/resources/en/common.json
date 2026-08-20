@@ -1973,6 +1973,8 @@
       "paymentMethods": "Payment method reconciliation",
       "exceptions": "Financial exceptions",
       "officialReceipts": "Official Collection Receipts",
+      "reconciliation": "Financial reconciliation",
+      "employeeLiability": "Employee liability",
       "sectionAcademyCustomers": "Academy & Customers",
       "academy": "Academy",
       "customers": "Customers"
@@ -1981,6 +1983,41 @@
     "loading": "Loading...",
     "noData": "No data",
     "exportCsv": "Export CSV",
+    "reconciliation": {
+      "description": "Cash payments vs cash shifts vs official government receipts, cross-checked",
+      "exceptionsFound": "Exceptions found below — review before closing the books for this period.",
+      "noExceptions": "No exceptions found for this period.",
+      "cashPaymentsTotal": "Total cash payments",
+      "totalShortage": "Total shortage",
+      "totalOverage": "Total overage",
+      "shiftLinkage": "Cash shift linkage",
+      "linkedToShift": "Linked to a cash shift: {{amount}}",
+      "shiftsClosedCount": "{{count}} shift(s) closed in this period",
+      "unlinkedCount": "{{count}} cash payment(s) not linked to any shift",
+      "unreceiptedHeading": "Payments missing a required official receipt",
+      "missingReceipt": "Missing receipt"
+    },
+    "employeeLiability": {
+      "description": "Cash shortages and overages by employee, with settlement status",
+      "totalOutstanding": "Total outstanding",
+      "totalSettled": "Total settled",
+      "columns": {
+        "employee": "Employee",
+        "date": "Date",
+        "kind": "Type",
+        "originalAmount": "Original amount",
+        "outstanding": "Outstanding",
+        "status": "Status"
+      },
+      "kindLabels": {
+        "shortage": "Shortage",
+        "overage": "Overage"
+      },
+      "statusLabels": {
+        "outstanding": "Outstanding",
+        "settled": "Settled"
+      }
+    },
     "officialReceipts": {
       "description": "Official collection receipt log -- reconciliation, search, and collected totals",
       "searchSerialPlaceholder": "Search by receipt serial",

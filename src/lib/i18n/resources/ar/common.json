@@ -1972,6 +1972,8 @@
       "paymentMethods": "تسوية طرق الدفع",
       "exceptions": "الاستثناءات المالية",
       "officialReceipts": "إيصالات التحصيل الرسمية",
+      "reconciliation": "المطابقة المالية",
+      "employeeLiability": "مديونية الموظفين",
       "sectionAcademyCustomers": "الأكاديمية والعملاء",
       "academy": "الأكاديمية",
       "customers": "العملاء"
@@ -1980,6 +1982,41 @@
     "loading": "جارٍ التحميل...",
     "noData": "لا توجد بيانات",
     "exportCsv": "تصدير CSV",
+    "reconciliation": {
+      "description": "مطابقة المدفوعات النقدية مقابل ورديات النقدية مقابل الإيصالات الرسمية الحكومية",
+      "exceptionsFound": "تم العثور على استثناءات أدناه — راجعها قبل إقفال الحسابات لهذه الفترة.",
+      "noExceptions": "لا توجد استثناءات لهذه الفترة.",
+      "cashPaymentsTotal": "إجمالي المدفوعات النقدية",
+      "totalShortage": "إجمالي العجز",
+      "totalOverage": "إجمالي الزيادة",
+      "shiftLinkage": "ربط ورديات النقدية",
+      "linkedToShift": "مرتبط بوردية نقدية: {{amount}}",
+      "shiftsClosedCount": "{{count}} وردية مغلقة في هذه الفترة",
+      "unlinkedCount": "{{count}} دفعة نقدية غير مرتبطة بأي وردية",
+      "unreceiptedHeading": "مدفوعات تفتقد إيصالًا رسميًا مطلوبًا",
+      "missingReceipt": "إيصال مفقود"
+    },
+    "employeeLiability": {
+      "description": "العجز والزيادة النقدية حسب الموظف، مع حالة التسوية",
+      "totalOutstanding": "إجمالي المستحق",
+      "totalSettled": "إجمالي المُسوّى",
+      "columns": {
+        "employee": "الموظف",
+        "date": "التاريخ",
+        "kind": "النوع",
+        "originalAmount": "المبلغ الأصلي",
+        "outstanding": "المستحق",
+        "status": "الحالة"
+      },
+      "kindLabels": {
+        "shortage": "عجز",
+        "overage": "زيادة"
+      },
+      "statusLabels": {
+        "outstanding": "مستحق",
+        "settled": "تمت التسوية"
+      }
+    },
     "officialReceipts": {
       "description": "سجل إيصالات التحصيل الرسمية -- المطابقة، البحث، وإجماليات التحصيل",
       "searchSerialPlaceholder": "بحث برقم الإيصال",

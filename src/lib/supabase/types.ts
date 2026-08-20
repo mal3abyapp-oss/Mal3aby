@@ -5112,6 +5112,10 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      get_employee_liability_report: {
+        Args: { p_club_id: string; p_end_date: string; p_start_date: string }
+        Returns: Json
+      }
       get_executive_dashboard: {
         Args: { p_club_id: string; p_end_date: string; p_start_date: string }
         Returns: Json
@@ -5127,6 +5131,15 @@ export type Database = {
       }
       get_financial_exceptions_report: {
         Args: { p_club_id: string; p_end_date: string; p_start_date: string }
+        Returns: Json
+      }
+      get_financial_reconciliation_report: {
+        Args: {
+          p_branch_id?: string
+          p_club_id: string
+          p_end_date: string
+          p_start_date: string
+        }
         Returns: Json
       }
       get_government_compliance_exceptions: {
