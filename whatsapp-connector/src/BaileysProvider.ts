@@ -174,6 +174,34 @@ export function toWhatsAppJid(phoneDigitsOnly: string): string {
 }
 
 /**
+ * WHATSAPP DELIVERY TRUTH fix (2026-08-22) -- pure filtering/extraction
+ * logic for a real Baileys messages.update event array, pulled out of
+ * the socket.ev.on('messages.update', ...) listener so it is
+ * independently unit-testable without a real Baileys socket (same
+ * rationale as toWhatsAppJid() above -- see
+ * deliveryReceiptExtractionTest.ts).
+ *
+ * Filters to only entries that are:
+ *   - fromMe (a receipt for a message THIS account sent -- a receipt
+ *     for an incoming message, or a group-participant read receipt on
+ *     someone else's message, is a different concern this connector
+ *     does not track)
+ *   - carrying a real key.id (the correlation key back to
+ *     notification_queue.provider_reference)
+ *   - carrying a defined numeric update.status (proto.WebMessageInfo.Status)
+ */
+export function extractDeliveryReceipts(
+  updates: Array<{ key: { fromMe?: boolean | null; id?: string | null }; update: { status?: number | null } }>,
+): Array<{ messageKeyId: string; statusLevel: number }> {
+  const receipts: Array<{ messageKeyId: string; statusLevel: number }> = []
+  for (const { key, update } of updates) {
+    if (!key.fromMe || !key.id || update.status === undefined || update.status === null) continue
+    receipts.push({ messageKeyId: key.id, statusLevel: update.status })
+  }
+  return receipts
+}
+
+/**
  * TRUE ROOT CAUSE, CONFIRMED (send-hang investigation, 2026-08-18) --
  * this replaces every earlier diagnosis in this file's history
  * (USync-timeout-race, executeInitQueries collision, zombie socket,
@@ -314,6 +342,21 @@ export interface BaileysProviderHooks {
   ) => void
   /** Called whenever Baileys persists updated credentials to the local auth dir -- the caller is responsible for encrypting the dir's contents and pushing to Supabase (see SessionStore.encryptAuthDirForClub). */
   onCredsUpdate?: () => void
+  /**
+   * WHATSAPP DELIVERY TRUTH fix (2026-08-22, real production defect --
+   * see this class's own sendMessage() doc comment for the full
+   * incident): called whenever a REAL WhatsApp-server-originated
+   * receipt arrives for a message this connector sent, carrying the
+   * genuine proto.WebMessageInfo.Status ack level (0=ERROR 1=PENDING
+   * 2=SERVER_ACK 3=DELIVERY_ACK 4=READ 5=PLAYED) and the same
+   * client-generated message key this connector already stores as
+   * notification_queue.provider_reference at send time -- this is the
+   * ONLY event in this entire codebase that proves anything happened
+   * beyond "our own socket write completed". Never fired synthetically
+   * or inferred; only ever a direct pass-through of a genuine received
+   * receipt.
+   */
+  onDeliveryReceipt?: (messageKeyId: string, statusLevel: number) => void
 }
 
 export class BaileysProvider implements WhatsAppProvider {
@@ -588,6 +631,37 @@ export class BaileysProvider implements WhatsAppProvider {
       if (myGeneration !== this.generation) return
       await saveCreds()
       this.hooks.onCredsUpdate?.()
+    })
+
+    // WHATSAPP DELIVERY TRUTH fix (2026-08-22): real production defect
+    // -- notification_queue.status was set to 'sent' the instant
+    // sendMessage()'s Promise resolved (see that method's own doc
+    // comment), which only ever proved this connector wrote bytes to
+    // its own outbound socket -- confirmed by reading Baileys' own
+    // socket.js (sendNode -> sendRawMessage, a raw WebSocket write with
+    // no server acknowledgment involved) and messages-send.js
+    // (relayMessage awaits that same write, nothing more, then returns
+    // a purely CLIENT-generated message id). Real evidence of server
+    // acceptance/delivery/read DOES exist -- WhatsApp's protocol sends
+    // a genuine server-originated <receipt> stanza back over this same
+    // socket, which Baileys surfaces as messages.update, carrying a
+    // proto.WebMessageInfo.Status level and correlated by the SAME
+    // client-generated key.id already captured as provider_reference
+    // -- this listener is what was missing to ever observe it. No
+    // generation guard here (unlike connection.update/creds.update
+    // above, which are genuinely about THIS socket's own connection
+    // lifecycle) -- a receipt proves something real happened to a
+    // message that was genuinely sent under whatever generation it was
+    // sent under, and remains true even if a reconnect has since
+    // occurred; dropping it because of a generation mismatch would
+    // throw away real evidence for no correctness reason. Old sockets'
+    // listeners are still correctly torn down via
+    // teardownCurrentSocket()'s removeAllListeners, so a truly dead
+    // socket cannot double-report.
+    socket.ev.on('messages.update', (updates) => {
+      for (const { messageKeyId, statusLevel } of extractDeliveryReceipts(updates)) {
+        this.hooks.onDeliveryReceipt?.(messageKeyId, statusLevel)
+      }
     })
 
     socket.ev.on('connection.update', (update) => {

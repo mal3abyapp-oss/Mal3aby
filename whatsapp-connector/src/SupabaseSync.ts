@@ -50,6 +50,29 @@ export class SupabaseSync {
     if (error) throw new Error(`whatsapp_connector_report_status failed: ${error.message}`)
   }
 
+  /**
+   * WHATSAPP DELIVERY TRUTH fix (2026-08-22): records a REAL received
+   * delivery/read receipt -- the honest counterpart to
+   * reportSendResult(), which only ever proved provider acceptance.
+   * Best-effort, fire-and-forget by design (mirrors every other
+   * observability write in this file): a failure here must never
+   * disrupt the actual send/queue-processing path, and a dropped
+   * receipt update degrades gracefully (that message's delivered_at/
+   * read_at simply stays null, correctly read by the UI as
+   * "unverified", never as a false negative).
+   */
+  async reportDeliveryReceipt(providerReference: string, statusLevel: number): Promise<void> {
+    try {
+      const { error } = await this.client.rpc('whatsapp_connector_report_delivery_receipt', {
+        p_provider_reference: providerReference,
+        p_status_level: statusLevel,
+      })
+      if (error) console.error(`[connector] reportDeliveryReceipt failed for ref ${providerReference.slice(0, 12)}: (non-fatal):`, error.message)
+    } catch (err) {
+      console.error(`[connector] reportDeliveryReceipt threw for ref ${providerReference.slice(0, 12)} (non-fatal):`, (err as Error).message)
+    }
+  }
+
   async storeSession(clubId: string, encrypted: Buffer): Promise<void> {
     const { error } = await this.client.rpc('whatsapp_connector_store_session', {
       p_club_id: clubId,

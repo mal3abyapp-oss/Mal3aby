@@ -61,6 +61,13 @@ export class TenantConnectionManager {
             .then((encrypted) => this.sync.storeSession(clubId, encrypted))
             .catch((err) => console.error(`[connector] failed to persist session for club ${clubId.slice(0, 8)}:`, err.message))
         },
+        // WHATSAPP DELIVERY TRUTH fix (2026-08-22) -- see
+        // BaileysProviderHooks.onDeliveryReceipt's own doc comment for
+        // the full incident. This is the only place a real, evidence-
+        // backed delivered_at/read_at ever gets recorded.
+        onDeliveryReceipt: (messageKeyId, statusLevel) => {
+          void this.sync.reportDeliveryReceipt(messageKeyId, statusLevel)
+        },
       })
       // Claim BEFORE registering in the map and BEFORE any caller can
       // call initializeConnection()/reconnect() on this instance --
