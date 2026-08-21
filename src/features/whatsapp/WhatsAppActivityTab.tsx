@@ -71,7 +71,7 @@ const TEMPLATE_LABEL_KEYS = [
   'invoice-created',
 ] as const
 
-const STATUS_LABEL_KEYS = ['pending', 'retrying', 'sent', 'failed', 'expired', 'cancelled', 'suppressed_invalid_recipient'] as const
+const STATUS_LABEL_KEYS = ['pending', 'retrying', 'sent', 'failed', 'expired', 'cancelled', 'suppressed_invalid_recipient', 'suppressed_no_consent'] as const
 
 const STATUS_LABEL_KEYS_WITH_ALL = ['all', ...STATUS_LABEL_KEYS] as const
 
@@ -86,6 +86,7 @@ const STATUS_TONE: Record<string, StatusTone> = {
   // NOT a provider failure (directive section 44) -- distinct tone/
   // label so it never gets misread as "WhatsApp/provider is broken".
   suppressed_invalid_recipient: 'warning',
+  suppressed_no_consent: 'warning',
 }
 
 // Phase G (G5): template is the second highest-value filter alongside
@@ -301,6 +302,9 @@ export function WhatsAppActivityTab({
                       )}
                       {r.status === 'suppressed_invalid_recipient' && (
                         <p className="mt-1 max-w-xs text-xs text-status-warning">{t('phoneInput.invalidRecipient')}</p>
+                      )}
+                      {r.status === 'suppressed_no_consent' && (
+                        <p className="mt-1 max-w-xs text-xs text-status-warning">{t('whatsapp.page.activityTab.noConsentDetail')}</p>
                       )}
                     </td>
                     <td className="p-2 text-xs text-text-secondary">{formatDateTime(r.scheduledAt, i18n.language)}</td>

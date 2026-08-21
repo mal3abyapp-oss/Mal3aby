@@ -99,7 +99,7 @@ cp .env.example .env
 npm run dev
 ```
 
-`npm test` runs `src/selfTest.ts`, which opens a real Baileys
+`npm run test:connection` runs `src/selfTest.ts`, which opens a real Baileys
 connection and waits for a real QR payload from WhatsApp's servers --
 proof the integration is real, without requiring a phone scan (that
 step is the honest, non-automatable boundary; see the script's own
