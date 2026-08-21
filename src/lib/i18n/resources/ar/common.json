@@ -1520,7 +1520,11 @@
       "available": "متاح",
       "manageDialogTitle": "إعداد {{name}}",
       "tabHours": "مواعيد العمل",
-      "tabPricing": "الأسعار"
+      "tabPricing": "الأسعار",
+      "tabDetails": "التفاصيل",
+      "statusLabel": "الحالة",
+      "maintenance": "صيانة",
+      "branchImmutableHint": "لا يمكن نقل الملعب إلى فرع آخر بعد إنشائه لأن الحجوزات والسجلات المالية التاريخية تبقى مرتبطة بالفرع الأصلي."
     },
     "pricingEditor": {
       "allWeekDays": "كل أيام الأسبوع",
@@ -1560,6 +1564,9 @@
       "loading": "جارٍ التحميل...",
       "noBranches": "لا توجد فروع بعد.",
       "active": "نشط",
+      "inactive": "غير نشط",
+      "statusLabel": "الحالة",
+      "deactivateHint": "عطّل ملاعب الفرع أولًا. تظل السجلات التاريخية محفوظة ومتاحة.",
       "editTitle": "تعديل {{name}}",
       "saveError": "تعذّر حفظ بيانات الفرع."
     },

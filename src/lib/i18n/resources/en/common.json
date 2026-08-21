@@ -1521,7 +1521,11 @@
       "available": "Available",
       "manageDialogTitle": "Set up {{name}}",
       "tabHours": "Operating hours",
-      "tabPricing": "Pricing"
+      "tabPricing": "Pricing",
+      "tabDetails": "Details",
+      "statusLabel": "Status",
+      "maintenance": "Maintenance",
+      "branchImmutableHint": "A field's branch cannot be changed after creation because historical bookings and finance remain scoped to the original branch."
     },
     "pricingEditor": {
       "allWeekDays": "All week",
@@ -1561,6 +1565,9 @@
       "loading": "Loading...",
       "noBranches": "No branches yet.",
       "active": "Active",
+      "inactive": "Inactive",
+      "statusLabel": "Status",
+      "deactivateHint": "Deactivate this branch only after its fields have been deactivated. Historical records remain available.",
       "editTitle": "Edit {{name}}",
       "saveError": "Couldn't save the branch data."
     },

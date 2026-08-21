@@ -147,7 +147,8 @@ export function FieldsManagement() {
   const [fieldSport, setFieldSport] = useState('football')
   const [fieldBranchId, setFieldBranchId] = useState('')
   const [manageField, setManageField] = useState<FieldRow | null>(null)
-  const [manageTab, setManageTab] = useState<'hours' | 'pricing'>('hours')
+  const [manageTab, setManageTab] = useState<'details' | 'hours' | 'pricing'>('details')
+  const [manageError, setManageError] = useState<string | null>(null)
 
   const { data: fields = [], isLoading } = useQuery({
     queryKey: ['fields', currentClubId],
@@ -193,11 +194,14 @@ export function FieldsManagement() {
 
   const createFieldMutation = useMutation({
     mutationFn: async () => {
-      const { error } = await supabase.from('fields').insert({
-        club_id: currentClubId as string,
-        branch_id: fieldBranchId,
-        name: fieldName,
-        sport: fieldSport,
+      const { error } = await supabase.rpc('manage_field', {
+        p_field_id: null,
+        p_club_id: currentClubId as string,
+        p_branch_id: fieldBranchId,
+        p_name: fieldName,
+        p_sport: fieldSport,
+        p_status: 'active',
+        p_reason: 'Field created',
       })
       if (error) throw error
     },
@@ -206,6 +210,27 @@ export function FieldsManagement() {
       setFieldName('')
       void queryClient.invalidateQueries({ queryKey: ['fields', currentClubId] })
     },
+  })
+
+  const updateFieldMutation = useMutation({
+    mutationFn: async () => {
+      if (!manageField) throw new Error('no field selected')
+      const { error } = await supabase.rpc('manage_field', {
+        p_field_id: manageField.id,
+        p_club_id: currentClubId as string,
+        p_branch_id: manageField.branchId,
+        p_name: manageField.name,
+        p_sport: manageField.sport,
+        p_status: manageField.status,
+        p_reason: manageField.status === 'inactive' ? 'Field deactivated' : 'Field master data updated',
+      })
+      if (error) throw error
+    },
+    onSuccess: () => {
+      setManageError(null)
+      void queryClient.invalidateQueries({ queryKey: ['fields', currentClubId] })
+    },
+    onError: (error) => setManageError(error instanceof Error ? error.message : String(error)),
   })
 
   function handleCreateField(e: FormEvent) {
@@ -225,7 +250,7 @@ export function FieldsManagement() {
           className="text-accent-foreground hover:underline"
           onClick={() => {
             setManageField(f)
-            setManageTab('hours')
+            setManageTab('details')
           }}
         >
           {f.name}
@@ -326,6 +351,12 @@ export function FieldsManagement() {
 
           <div className="flex gap-1 border-b border-border">
             <button
+              className={`px-3 py-2 text-sm font-medium ${manageTab === 'details' ? 'border-b-2 border-accent text-text-primary' : 'text-text-secondary'}`}
+              onClick={() => setManageTab('details')}
+            >
+              {t('clubs.fieldsManagement.tabDetails')}
+            </button>
+            <button
               className={`px-3 py-2 text-sm font-medium ${manageTab === 'hours' ? 'border-b-2 border-accent text-text-primary' : 'text-text-secondary'}`}
               onClick={() => setManageTab('hours')}
             >
@@ -338,6 +369,35 @@ export function FieldsManagement() {
               {t('clubs.fieldsManagement.tabPricing')}
             </button>
           </div>
+
+          {manageTab === 'details' && manageField && (
+            <div className="flex flex-col gap-3 pt-2">
+              <div className="flex flex-col gap-1.5">
+                <label className="text-sm font-medium text-text-secondary">{t('clubs.fieldsManagement.nameLabel')}</label>
+                <Input value={manageField.name} onChange={(e) => setManageField({ ...manageField, name: e.target.value })} />
+              </div>
+              <div className="flex flex-col gap-1.5">
+                <label className="text-sm font-medium text-text-secondary">{t('clubs.fieldsManagement.sportLabel')}</label>
+                <Input value={manageField.sport} onChange={(e) => setManageField({ ...manageField, sport: e.target.value })} />
+              </div>
+              <div className="flex flex-col gap-1.5">
+                <label className="text-sm font-medium text-text-secondary">{t('clubs.fieldsManagement.statusLabel')}</label>
+                <Select value={manageField.status} onValueChange={(value) => setManageField({ ...manageField, status: value })}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="active">{t('clubs.fieldsManagement.available')}</SelectItem>
+                    <SelectItem value="maintenance">{t('clubs.fieldsManagement.maintenance')}</SelectItem>
+                    <SelectItem value="inactive">{t('clubs.fieldsManagement.inactive')}</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <p className="text-xs text-text-secondary">{t('clubs.fieldsManagement.branchImmutableHint')}</p>
+              {manageError && <p role="alert" className="text-sm text-status-danger">{manageError}</p>}
+              <Button disabled={!manageField.name.trim() || !manageField.sport.trim() || updateFieldMutation.isPending} onClick={() => updateFieldMutation.mutate()}>
+                {updateFieldMutation.isPending ? t('clubs.branchesCard.saving') : t('clubs.branchesCard.save')}
+              </Button>
+            </div>
+          )}
 
           {manageTab === 'hours' && manageField && (
             <div className="pt-2">
@@ -353,7 +413,7 @@ export function FieldsManagement() {
 
           {manageTab === 'pricing' && manageField && (
             <div className="pt-2">
-              <PricingEditor fieldId={manageField.id} clubId={currentClubId!} pricingRules={pricingRules} />
+              <PricingEditor fieldId={manageField.id} pricingRules={pricingRules} />
             </div>
           )}
         </DialogContent>

@@ -4708,6 +4708,40 @@ export type Database = {
       }
     }
     Functions: {
+      archive_field_pricing_rules: {
+        Args: { p_field_id: string; p_reason?: string; p_rule_ids: string[] }
+        Returns: undefined
+      }
+      create_field_pricing_rules: {
+        Args: { p_field_id: string; p_reason?: string; p_rules: Json }
+        Returns: Database["public"]["Tables"]["pricing_rules"]["Row"][]
+      }
+      manage_branch: {
+        Args: {
+          p_address: string
+          p_branch_code: string
+          p_branch_id: string | null
+          p_club_id: string
+          p_name: string
+          p_phone: string
+          p_phone_e164: string
+          p_reason?: string
+          p_status?: string
+        }
+        Returns: Database["public"]["Tables"]["branches"]["Row"]
+      }
+      manage_field: {
+        Args: {
+          p_branch_id: string
+          p_club_id: string
+          p_field_id: string | null
+          p_name: string
+          p_reason?: string
+          p_sport: string
+          p_status?: string
+        }
+        Returns: Database["public"]["Tables"]["fields"]["Row"]
+      }
       _activate_subscription_if_due_internal: {
         Args: { p_explicit?: boolean; p_subscription_id: string }
         Returns: boolean

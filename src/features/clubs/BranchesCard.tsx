@@ -72,6 +72,7 @@ export function BranchesCard() {
   const [address, setAddress] = useState('')
   const [phone, setPhone] = useState('')
   const [phoneCountry, setPhoneCountry] = useState<CountryCode>('EG')
+  const [status, setStatus] = useState<'active' | 'inactive'>('active')
 
   const { data: branches = [], isLoading } = useQuery({
     queryKey: ['branches-settings', currentClubId],
@@ -93,6 +94,7 @@ export function BranchesCard() {
     setPhone(b.phone ?? '')
     setPhoneCountry((clubCountry as CountryCode) ?? 'EG')
     setFormError(null)
+    setStatus(b.status === 'inactive' ? 'inactive' : 'active')
   }
 
   function openCreate() {
@@ -103,6 +105,7 @@ export function BranchesCard() {
     setPhone('')
     setPhoneCountry((clubCountry as CountryCode) ?? 'EG')
     setFormError(null)
+    setStatus('active')
   }
 
   const saveMutation = useMutation({
@@ -116,23 +119,18 @@ export function BranchesCard() {
         phoneE164 = result.e164
       }
 
-      if (editingBranch) {
-        const { error } = await supabase
-          .from('branches')
-          .update({ name, branch_code: branchCode, address: address || null, phone: phone || null, phone_e164: phoneE164 })
-          .eq('id', editingBranch.id)
-        if (error) throw error
-      } else {
-        const { error } = await supabase.from('branches').insert({
-          club_id: currentClubId as string,
-          name,
-          branch_code: branchCode,
-          address: address || null,
-          phone: phone || null,
-          phone_e164: phoneE164,
-        })
-        if (error) throw error
-      }
+      const { error } = await supabase.rpc('manage_branch', {
+        p_branch_id: editingBranch?.id ?? null,
+        p_club_id: currentClubId as string,
+        p_name: name,
+        p_branch_code: branchCode,
+        p_address: address,
+        p_phone: phone,
+        p_phone_e164: phoneE164 ?? '',
+        p_status: status,
+        p_reason: editingBranch ? 'Branch master data updated' : 'Branch created',
+      })
+      if (error) throw error
     },
     onSuccess: () => {
       setEditingBranch(null)
@@ -172,6 +170,16 @@ export function BranchesCard() {
           setPhoneCountry(v.country)
         }}
       />
+      {editingBranch && (
+        <div className="flex flex-col gap-1.5">
+          <label className="text-sm font-medium text-text-secondary">{t('clubs.branchesCard.statusLabel')}</label>
+          <select className="h-10 rounded-md border border-border bg-surface px-3 text-sm" value={status} onChange={(e) => setStatus(e.target.value as 'active' | 'inactive')}>
+            <option value="active">{t('clubs.branchesCard.active')}</option>
+            <option value="inactive">{t('clubs.branchesCard.inactive')}</option>
+          </select>
+          {status === 'inactive' && <p className="text-xs text-status-warning">{t('clubs.branchesCard.deactivateHint')}</p>}
+        </div>
+      )}
       {formError && <p role="alert" className="text-sm text-status-danger">{formError}</p>}
       <Button type="submit" disabled={!name.trim() || !branchCode.trim() || saveMutation.isPending}>
         {saveMutation.isPending ? t('clubs.branchesCard.saving') : t('clubs.branchesCard.save')}

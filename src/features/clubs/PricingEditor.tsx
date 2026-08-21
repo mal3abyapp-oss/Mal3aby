@@ -56,11 +56,9 @@ function formatDayRange(days: number[], dayNames: string[], t: (key: string) => 
 
 export function PricingEditor({
   fieldId,
-  clubId,
   pricingRules,
 }: {
   fieldId: string
-  clubId: string
   pricingRules: PricingRuleRow[]
 }) {
   const { t } = useTranslation()
@@ -90,15 +88,16 @@ export function PricingEditor({
     mutationFn: async () => {
       if (newDays.length === 0) throw new Error('no days selected')
       const rows = newDays.map((day) => ({
-        club_id: clubId,
-        field_id: fieldId,
         day_of_week: day,
+        date_specific: null,
         start_time: newStart,
         end_time: newEnd,
         price_per_hour: Number(newPrice),
         priority: Number(newPriority) || 1,
       }))
-      const { error } = await supabase.from('pricing_rules').insert(rows)
+      const { error } = await supabase.rpc('create_field_pricing_rules', {
+        p_field_id: fieldId, p_rules: rows, p_reason: 'Weekly field price added',
+      })
       if (error) throw error
     },
     onSuccess: () => {
@@ -112,14 +111,10 @@ export function PricingEditor({
 
   const addSpecialMutation = useMutation({
     mutationFn: async () => {
-      const { error } = await supabase.from('pricing_rules').insert({
-        club_id: clubId,
-        field_id: fieldId,
-        date_specific: specialDate,
-        start_time: '00:00',
-        end_time: '23:59',
-        price_per_hour: Number(specialPrice),
-        priority: 10,
+      const { error } = await supabase.rpc('create_field_pricing_rules', {
+        p_field_id: fieldId,
+        p_rules: [{ day_of_week: null, date_specific: specialDate, start_time: '00:00', end_time: '23:59', price_per_hour: Number(specialPrice), priority: 10 }],
+        p_reason: 'Special-date field price added',
       })
       if (error) throw error
     },
@@ -134,7 +129,9 @@ export function PricingEditor({
 
   const deleteMutation = useMutation({
     mutationFn: async (ruleIds: string[]) => {
-      const { error } = await supabase.from('pricing_rules').delete().in('id', ruleIds)
+      const { error } = await supabase.rpc('archive_field_pricing_rules', {
+        p_field_id: fieldId, p_rule_ids: ruleIds, p_reason: 'Field price rule archived',
+      })
       if (error) throw error
     },
     onSuccess: () => {
