@@ -422,7 +422,7 @@ export function BookingDetailSheet({
                         {officialReceipts.map((r, i) => (
                           <span key={i} className="block tabular-nums">
                             <bdi>{r.receipt_serial}</bdi>
-                            {r.status === 'reversed' && <span className="text-status-danger"> ({t('billing.detail.refunded')})</span>}
+                            {r.status === 'reversed' && <span className="text-status-danger"> ({t('billing.detail.refund')})</span>}
                           </span>
                         ))}
                       </span>

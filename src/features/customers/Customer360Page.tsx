@@ -275,7 +275,7 @@ export function Customer360Page() {
           <div className="mt-4">
             <DataTable
               columns={[
-                { key: 'field', header: t('bookings.field', { defaultValue: 'Field' }), render: (b: BookingRow) => b.field_name },
+                { key: 'field', header: t('bookings.detail.field', { defaultValue: 'Field' }), render: (b: BookingRow) => b.field_name },
                 { key: 'date', header: t('common.date', { defaultValue: 'Date' }), render: (b: BookingRow) => <span className="tabular-nums"><bdi>{new Date(b.start_at).toLocaleString(locale === 'en' ? 'en-US' : 'ar-EG', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}</bdi></span> },
                 { key: 'status', header: t('common.status', { defaultValue: 'Status' }), render: (b: BookingRow) => <StatusBadge tone={BOOKING_STATUS_TONE[b.status] ?? 'neutral'} label={t(`bookings.statusLabels.${b.status}`, { defaultValue: BOOKING_STATUS_LABELS[b.status] ?? b.status })} /> },
                 { key: 'total', header: t('common.total', { defaultValue: 'Total' }), render: (b: BookingRow) => <MoneyDisplay amount={b.total_price} size="sm" /> },

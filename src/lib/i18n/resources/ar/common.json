@@ -670,6 +670,7 @@
     "price": "السعر",
     "total": "الإجمالي",
     "currency": "ج.م",
+    "method": "طريقة الدفع",
     "paymentMethodLabels": {
       "cash": "نقدًا",
       "card": "بطاقة",

@@ -671,6 +671,7 @@
     "price": "Price",
     "total": "Total",
     "currency": "EGP",
+    "method": "Method",
     "paymentMethodLabels": {
       "cash": "Cash",
       "card": "Card",

@@ -794,7 +794,7 @@ export function BillingPage() {
                             <span className="block text-xs text-text-secondary">
                               {t('governmentCompliance.title')}: <bdi className="tabular-nums">{p.officialReceiptSerial}</bdi>
                               {p.officialReceiptStatus === 'reversed' && (
-                                <span className="text-status-danger"> ({t('billing.detail.refunded')})</span>
+                                <span className="text-status-danger"> ({t('billing.detail.refund')})</span>
                               )}
                             </span>
                           )}
