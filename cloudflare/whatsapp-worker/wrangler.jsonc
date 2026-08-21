@@ -144,7 +144,21 @@
       // the stuck-processing recovery can tell an already-delivered
       // crashed send apart from a genuinely stuck one and refuse to
       // resend it). GitHub Actions run 32500705345.
-      "image": "registry.cloudflare.com/35ac10727701095866b16c276b4a33d1/mala3by-whatsapp-connector:91eed80",
+      // v14, commit 0a33c27 -- INDEPENDENT AUDIT root-cause fix:
+      // generation is no longer a plain in-process counter always
+      // starting at 0 for a fresh process -- it is now atomically
+      // allocated by the database itself
+      // (whatsapp_connector_claim_generation, migration 20260821201000)
+      // exactly once per process lifetime, closing a real permanent
+      // status-write lockout confirmed live on club
+      // b9178c0f-00b5-4c71-abec-b8772ffb8682 (last_generation reached
+      // 17 through ordinary restart accumulation; a genuine WhatsApp
+      // logout could then never be recorded, since no fresh process's
+      // old-style counter could ever exceed 17 again). See
+      // BaileysProvider.ts's dbGeneration field doc comment and the
+      // migration's own comment for the full incident and fix.
+      // GitHub Actions run 32515277302.
+      "image": "registry.cloudflare.com/35ac10727701095866b16c276b4a33d1/mala3by-whatsapp-connector:0a33c27",
       // One container instance per WhatsApp account (one Durable
       // Object = one container, directive rule 21's chosen model --
       // NOT a shared container serving multiple clubs, which would
