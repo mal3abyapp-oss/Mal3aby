@@ -125,6 +125,7 @@ export function PaymentMethodsCard() {
   const { t } = useTranslation()
   const queryClient = useQueryClient()
   const [dialogOpen, setDialogOpen] = useState(false)
+  const [editingMethod, setEditingMethod] = useState<PaymentMethodRow | null>(null)
   const [underlyingMethod, setUnderlyingMethod] = useState<UnderlyingMethod>('bank_transfer')
   const [provider, setProvider] = useState<string>('')
   const [nameAr, setNameAr] = useState('')
@@ -142,6 +143,7 @@ export function PaymentMethodsCard() {
   })
 
   const resetForm = () => {
+    setEditingMethod(null)
     setUnderlyingMethod('bank_transfer')
     setProvider('')
     setNameAr('')
@@ -151,6 +153,20 @@ export function PaymentMethodsCard() {
     setDetailValues({})
     setCustomerVisible(true)
     setFormError(null)
+  }
+
+  const openEdit = (method: PaymentMethodRow) => {
+    setEditingMethod(method)
+    setUnderlyingMethod(method.underlyingMethod)
+    setProvider(method.provider ?? '')
+    setNameAr(method.nameAr)
+    setNameEn(method.nameEn)
+    setInstructionsAr(method.instructionsAr ?? '')
+    setInstructionsEn(method.instructionsEn ?? '')
+    setDetailValues(method.details)
+    setCustomerVisible(method.customerVisible)
+    setFormError(null)
+    setDialogOpen(true)
   }
 
   const createMutation = useMutation({
@@ -178,17 +194,55 @@ export function PaymentMethodsCard() {
     onError: (err) => setFormError(err instanceof Error ? err.message : translateSupabaseError(err, t('billing.paymentMethods.addError'))),
   })
 
+  const updateMutation = useMutation({
+    mutationFn: async () => {
+      if (!editingMethod) throw new Error(t('billing.paymentMethods.addError'))
+      if (!nameAr.trim() || !nameEn.trim()) throw new Error(t('billing.paymentMethods.nameRequiredError'))
+      const { error } = await supabase.rpc('update_payment_method_config', {
+        p_config_id: editingMethod.id,
+        p_provider: provider.trim(),
+        p_name_ar: nameAr.trim(),
+        p_name_en: nameEn.trim(),
+        p_instructions_ar: instructionsAr.trim(),
+        p_instructions_en: instructionsEn.trim(),
+        p_details: detailValues,
+        p_customer_visible: customerVisible,
+        p_is_active: editingMethod.isActive,
+        p_reason: 'Payment method details corrected from settings',
+      })
+      if (error) throw error
+    },
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ['payment-method-configs', currentClubId] })
+      setDialogOpen(false)
+      resetForm()
+    },
+    onError: (err) => setFormError(err instanceof Error ? err.message : translateSupabaseError(err, t('billing.paymentMethods.addError'))),
+  })
+
   const toggleActiveMutation = useMutation({
-    mutationFn: async ({ id, isActive }: { id: string; isActive: boolean }) => {
-      const { error } = await supabase.from('payment_method_configs').update({ is_active: !isActive }).eq('id', id)
+    mutationFn: async (method: PaymentMethodRow) => {
+      const { error } = await supabase.rpc('update_payment_method_config', {
+        p_config_id: method.id, p_provider: method.provider ?? '', p_name_ar: method.nameAr,
+        p_name_en: method.nameEn, p_instructions_ar: method.instructionsAr ?? '',
+        p_instructions_en: method.instructionsEn ?? '', p_details: method.details,
+        p_customer_visible: method.customerVisible, p_is_active: !method.isActive,
+        p_reason: method.isActive ? 'Payment method deactivated' : 'Payment method reactivated',
+      })
       if (error) throw error
     },
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['payment-method-configs', currentClubId] }),
   })
 
   const toggleVisibleMutation = useMutation({
-    mutationFn: async ({ id, customerVisible: visible }: { id: string; customerVisible: boolean }) => {
-      const { error } = await supabase.from('payment_method_configs').update({ customer_visible: !visible }).eq('id', id)
+    mutationFn: async (method: PaymentMethodRow) => {
+      const { error } = await supabase.rpc('update_payment_method_config', {
+        p_config_id: method.id, p_provider: method.provider ?? '', p_name_ar: method.nameAr,
+        p_name_en: method.nameEn, p_instructions_ar: method.instructionsAr ?? '',
+        p_instructions_en: method.instructionsEn ?? '', p_details: method.details,
+        p_customer_visible: !method.customerVisible, p_is_active: method.isActive,
+        p_reason: method.customerVisible ? 'Payment method hidden from customers' : 'Payment method shown to customers',
+      })
       if (error) throw error
     },
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['payment-method-configs', currentClubId] }),
@@ -203,12 +257,12 @@ export function PaymentMethodsCard() {
             <Plus className="me-1 size-4" /> {t('billing.paymentMethods.addMethod')}
           </Button>
           <DialogContent>
-            <DialogHeader><DialogTitle>{t('billing.paymentMethods.dialogTitle')}</DialogTitle></DialogHeader>
+            <DialogHeader><DialogTitle>{editingMethod ? t('common.edit') : t('billing.paymentMethods.dialogTitle')}</DialogTitle></DialogHeader>
             <div className="flex flex-col gap-3">
               {formError && <p className="text-sm text-status-danger">{formError}</p>}
               <div className="flex flex-col gap-1">
                 <label className="text-sm font-medium">{t('billing.paymentMethods.methodTypeLabel')}</label>
-                <Select value={underlyingMethod} onValueChange={(v) => { setUnderlyingMethod(v as UnderlyingMethod); setDetailValues({}); setProvider('') }}>
+                <Select disabled={!!editingMethod} value={underlyingMethod} onValueChange={(v) => { setUnderlyingMethod(v as UnderlyingMethod); setDetailValues({}); setProvider('') }}>
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
                     {(Object.keys(UNDERLYING_METHOD_LABEL_KEYS) as UnderlyingMethod[]).map((m) => (
@@ -263,7 +317,7 @@ export function PaymentMethodsCard() {
                 <input type="checkbox" checked={customerVisible} onChange={(e) => setCustomerVisible(e.target.checked)} className="size-4" />
                 {t('billing.paymentMethods.customerVisibleCheckbox')}
               </label>
-              <Button onClick={() => createMutation.mutate()} disabled={createMutation.isPending}>
+              <Button onClick={() => editingMethod ? updateMutation.mutate() : createMutation.mutate()} disabled={createMutation.isPending || updateMutation.isPending}>
                 {t('billing.paymentMethods.save')}
               </Button>
             </div>
@@ -291,10 +345,11 @@ export function PaymentMethodsCard() {
               <div className="flex flex-wrap items-center gap-2">
                 <StatusBadge tone={m.customerVisible ? 'success' : 'neutral'} label={m.customerVisible ? t('billing.paymentMethods.visibleToCustomers') : t('billing.paymentMethods.hiddenFromCustomers')} />
                 <StatusBadge tone={m.isActive ? 'success' : 'danger'} label={m.isActive ? t('billing.paymentMethods.active') : t('billing.paymentMethods.suspended')} />
-                <Button size="sm" variant="outline" onClick={() => toggleVisibleMutation.mutate({ id: m.id, customerVisible: m.customerVisible })}>
+                <Button size="sm" variant="outline" onClick={() => openEdit(m)}>{t('common.edit')}</Button>
+                <Button size="sm" variant="outline" onClick={() => toggleVisibleMutation.mutate(m)}>
                   {m.customerVisible ? t('billing.paymentMethods.hide') : t('billing.paymentMethods.show')}
                 </Button>
-                <Button size="sm" variant="outline" onClick={() => toggleActiveMutation.mutate({ id: m.id, isActive: m.isActive })}>
+                <Button size="sm" variant="outline" onClick={() => toggleActiveMutation.mutate(m)}>
                   {m.isActive ? t('billing.paymentMethods.deactivate') : t('billing.paymentMethods.activate')}
                 </Button>
               </div>

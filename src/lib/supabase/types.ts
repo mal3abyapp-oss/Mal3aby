@@ -5870,6 +5870,17 @@ export type Database = {
         Args: { p_club_id: string; p_customer_id: string }
         Returns: undefined
       }
+      update_academy_membership: {
+        Args: {
+          p_capacity: number
+          p_group_id: string
+          p_name: string
+          p_reason?: string
+          p_status: string
+          p_subscription_price: number
+        }
+        Returns: Database["public"]["Tables"]["groups"]["Row"]
+      }
       update_government_compliance_policy: {
         Args: {
           p_authority_type: string
@@ -5894,6 +5905,30 @@ export type Database = {
           p_platform_phone_e164?: string
         }
         Returns: undefined
+      }
+      update_payment_method_config: {
+        Args: {
+          p_config_id: string
+          p_customer_visible: boolean
+          p_details: Json
+          p_instructions_ar: string
+          p_instructions_en: string
+          p_is_active: boolean
+          p_name_ar: string
+          p_name_en: string
+          p_provider: string
+          p_reason?: string
+        }
+        Returns: Database["public"]["Tables"]["payment_method_configs"]["Row"]
+      }
+      update_platform_plan: {
+        Args: {
+          p_name_ar: string
+          p_plan_id: string
+          p_price: number
+          p_reason?: string
+        }
+        Returns: Database["public"]["Tables"]["platform_plans"]["Row"]
       }
       update_platform_settings: {
         Args: { p_default_trial_days: number }

@@ -74,7 +74,7 @@ export function PublicLayout() {
   })
 
   return (
-    <div className="flex min-h-screen flex-col bg-page-bg">
+    <div className="flex min-h-screen flex-col overflow-x-hidden bg-page-bg">
       <header className="sticky top-0 z-40 border-b border-border bg-surface/95 backdrop-blur">
         <div className="mx-auto flex max-w-6xl items-center justify-between px-4 py-3">
           <Link to="/" className="text-lg font-bold text-text-primary">

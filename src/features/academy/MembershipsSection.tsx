@@ -167,6 +167,7 @@ export function MembershipsSection() {
   const [showLegacy, setShowLegacy] = useState(false)
 
   const [selectedMembership, setSelectedMembership] = useState<MembershipRow | null>(null)
+  const [editingMembership, setEditingMembership] = useState<MembershipRow | null>(null)
   const [subscribeOpen, setSubscribeOpen] = useState(false)
 
   const { data: branches = [] } = useQuery({ queryKey: ['branches-for-academy-memberships', currentClubId], queryFn: () => fetchBranches(currentClubId!), enabled: !!currentClubId })
@@ -303,6 +304,19 @@ export function MembershipsSection() {
           membership={selectedMembership}
           onClose={() => setSelectedMembership(null)}
           onSubscribe={() => setSubscribeOpen(true)}
+          onEdit={() => setEditingMembership(selectedMembership)}
+        />
+      )}
+
+      {editingMembership && (
+        <EditMembershipDialog
+          membership={editingMembership}
+          onClose={() => setEditingMembership(null)}
+          onSaved={() => {
+            setEditingMembership(null)
+            setSelectedMembership(null)
+            void queryClient.invalidateQueries({ queryKey: ['academy-memberships', currentClubId] })
+          }}
         />
       )}
 
@@ -327,10 +341,12 @@ function MembershipDetailDialog({
   membership,
   onClose,
   onSubscribe,
+  onEdit,
 }: {
   membership: MembershipRow
   onClose: () => void
   onSubscribe: () => void
+  onEdit: () => void
 }) {
   const { t } = useTranslation()
   const { data: subscribers = [], isLoading } = useQuery({
@@ -350,7 +366,10 @@ function MembershipDetailDialog({
             </div>
             {membership.subscriptionPrice != null && <MoneyDisplay amount={membership.subscriptionPrice} size="sm" />}
           </div>
-          <Button onClick={onSubscribe}>{t('academy.memberships.addPlayerToMembership')}</Button>
+          <div className="flex gap-2">
+            <Button className="flex-1" onClick={onSubscribe} disabled={membership.status !== 'active'}>{t('academy.memberships.addPlayerToMembership')}</Button>
+            <Button variant="outline" onClick={onEdit}>{t('common.edit')}</Button>
+          </div>
 
           {isLoading ? (
             <p className="text-sm text-text-secondary">{t('academy.loading')}</p>
@@ -381,6 +400,56 @@ function MembershipDetailDialog({
               })}
             </div>
           )}
+        </div>
+      </DialogContent>
+    </Dialog>
+  )
+}
+
+function EditMembershipDialog({ membership, onClose, onSaved }: { membership: MembershipRow; onClose: () => void; onSaved: () => void }) {
+  const { t } = useTranslation()
+  const [name, setName] = useState(membership.name)
+  const [price, setPrice] = useState(String(membership.subscriptionPrice ?? ''))
+  const [capacity, setCapacity] = useState(String(membership.capacity))
+  const [status, setStatus] = useState(membership.status === 'closed' ? 'closed' : 'active')
+  const [error, setError] = useState<string | null>(null)
+
+  const mutation = useMutation({
+    mutationFn: async () => {
+      const { error: updateError } = await supabase.rpc('update_academy_membership', {
+        p_group_id: membership.id,
+        p_name: name.trim(),
+        p_capacity: Number(capacity),
+        p_subscription_price: Number(price),
+        p_status: status,
+        p_reason: status === 'closed' ? 'Membership archived from academy settings' : 'Membership definition updated',
+      })
+      if (updateError) throw updateError
+    },
+    onSuccess: onSaved,
+    onError: (err) => setError(translateSupabaseError(err, t('academy.memberships.createError'))),
+  })
+
+  return (
+    <Dialog open onOpenChange={(open) => !open && onClose()}>
+      <DialogContent>
+        <DialogHeader><DialogTitle>{t('common.edit')}</DialogTitle></DialogHeader>
+        <div className="flex flex-col gap-3">
+          <Input value={name} onChange={(e) => setName(e.target.value)} />
+          <Input type="number" min={0} value={price} onChange={(e) => setPrice(e.target.value)} />
+          <Input type="number" min={1} value={capacity} onChange={(e) => setCapacity(e.target.value)} />
+          <Select value={status} onValueChange={setStatus}>
+            <SelectTrigger><SelectValue /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="active">{t('academy.memberships.statusLabels.active')}</SelectItem>
+              <SelectItem value="closed">{t('academy.memberships.statusLabels.closed')}</SelectItem>
+            </SelectContent>
+          </Select>
+          <p className="text-xs text-text-secondary">{t('platform.plansPage.editDialog.priceChangeNote')}</p>
+          {error && <p role="alert" className="text-sm text-status-danger">{error}</p>}
+          <Button disabled={!name.trim() || Number(price) < 0 || Number(capacity) < 1 || mutation.isPending} onClick={() => mutation.mutate()}>
+            {t('billing.paymentMethods.save')}
+          </Button>
         </div>
       </DialogContent>
     </Dialog>

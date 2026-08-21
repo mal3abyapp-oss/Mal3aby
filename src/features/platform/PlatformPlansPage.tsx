@@ -61,10 +61,12 @@ export function PlatformPlansPage() {
   const updatePlanMutation = useMutation({
     mutationFn: async () => {
       if (!editingPlan) throw new Error('no plan selected')
-      const { error } = await supabase
-        .from('platform_plans')
-        .update({ name_ar: editName, price: Number(editPrice) })
-        .eq('id', editingPlan.id)
+      const { error } = await supabase.rpc('update_platform_plan', {
+        p_plan_id: editingPlan.id,
+        p_name_ar: editName.trim(),
+        p_price: Number(editPrice),
+        p_reason: 'Commercial plan definition updated',
+      })
       if (error) throw error
     },
     onSuccess: () => {
