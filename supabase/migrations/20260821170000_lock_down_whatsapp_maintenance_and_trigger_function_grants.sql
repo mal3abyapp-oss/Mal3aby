@@ -1,0 +1,44 @@
+-- SECURITY FIX (P1, confirmed live-exploitable by a fully unauthenticated
+-- caller): whatsapp_observability_retention_cleanup() had no auth.uid()
+-- check, no permission check, and no club scoping whatsoever -- the
+-- default PUBLIC execute grant Postgres applies to every new function
+-- (unless explicitly revoked) was never removed. Confirmed live:
+--
+--   begin;
+--   set local role anon;
+--   select public.whatsapp_observability_retention_cleanup();
+--   rollback;
+--
+-- executed successfully as a genuinely unauthenticated anon role, no
+-- error. Independently confirmed by the Supabase security advisor
+-- (anon_security_definer_function_executable_public,
+-- whatsapp_observability_retention_cleanup). Impact: availability/
+-- audit-trail integrity, not confidentiality -- no data is returned to
+-- the caller, but anyone on the internet could trigger unscheduled bulk
+-- deletion of whatsapp_delivery_traces (14-day retention) and resolved
+-- whatsapp_incidents (180-day retention) across EVERY club on the
+-- platform, undermining the incident/delivery history platform owners
+-- rely on via get_platform_whatsapp_health for support and debugging.
+--
+-- Fix: revoke execute from anon/authenticated entirely -- this function
+-- is a scheduled maintenance task (retention cleanup), never meant to be
+-- called by any application-level user, staff or otherwise. It should
+-- only run via service_role (a pg_cron job or the connector's own
+-- scheduled maintenance call, neither of which this migration changes --
+-- only the grant is tightened here, matching the minimal-scope pattern
+-- used throughout this engagement).
+revoke execute on function public.whatsapp_observability_retention_cleanup() from public, anon, authenticated;
+
+-- SECURITY HYGIENE (not independently exploitable -- documented here
+-- for completeness, matching the grant-hygiene pattern already applied
+-- to record_staff_whatsapp_consent and others this session):
+-- audit_notification_category_settings_change() and
+-- audit_notification_consent_change() are trigger functions (RETURNS
+-- trigger) that error immediately if invoked directly outside a real
+-- trigger context (no bound NEW/OLD row), so the anon/authenticated
+-- execute grants flagged by the Supabase advisor are not live-
+-- exploitable today. Still revoked as defense-in-depth and for
+-- consistency: a trigger function has no legitimate reason to be
+-- directly callable by any client role.
+revoke execute on function public.audit_notification_category_settings_change() from public, anon, authenticated;
+revoke execute on function public.audit_notification_consent_change() from public, anon, authenticated;
