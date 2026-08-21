@@ -183,7 +183,23 @@
       // rendering that line TWICE -- fixed to render once. 43/43
       // connector tests passing (up from 33). GitHub Actions run
       // 32527946934.
-      "image": "registry.cloudflare.com/35ac10727701095866b16c276b4a33d1/mala3by-whatsapp-connector:b4c5477",
+      // v17, commit af325e9 -- WHATSAPP DELIVERY TRUTH fix (P0, real
+      // production defect): notification_queue.status was set to
+      // 'sent' the instant sendMessage()'s Promise resolved, which only
+      // ever proved this connector wrote bytes to its own outbound
+      // socket (confirmed by reading Baileys' own socket.js/
+      // messages-send.js -- sendNode -> sendRawMessage, no server ack
+      // involved, the returned message id is purely client-generated).
+      // Real evidence exists via a genuine WhatsApp-server-originated
+      // receipt (messages.update, proto.WebMessageInfo.Status),
+      // correlated by the same key already stored as
+      // provider_reference -- was simply never listened to. Adds a
+      // messages.update listener -> whatsapp_connector_report_delivery_receipt()
+      // RPC, populating new provider_accepted_at/delivered_at/read_at
+      // columns. UI relabeled to match ("Sent" -> "Accepted by
+      // WhatsApp", a new real "Delivered" status). GitHub Actions run
+      // 32531345386.
+      "image": "registry.cloudflare.com/35ac10727701095866b16c276b4a33d1/mala3by-whatsapp-connector:af325e9",
       // One container instance per WhatsApp account (one Durable
       // Object = one container, directive rule 21's chosen model --
       // NOT a shared container serving multiple clubs, which would
