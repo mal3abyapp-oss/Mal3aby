@@ -172,7 +172,18 @@
       // Fix: the loggedOut branch now also clears the local auth dir,
       // mirroring logout()'s own existing correct behavior. GitHub
       // Actions run 32522227116.
-      "image": "registry.cloudflare.com/35ac10727701095866b16c276b4a33d1/mala3by-whatsapp-connector:a513976",
+      // v16, commit b4c5477 -- BUSINESS MESSAGING AUDIT template fixes:
+      // (1) partial payments now state the real outstanding balance
+      // (payment-received/booking-confirmed-paid, AR+EN) instead of
+      // only a translated status label with no number; (2) fields.sport
+      // (a real free-text column) is now localized in Arabic messages
+      // instead of showing the raw English value ("football" ->
+      // "كرة قدم"), mirroring the frontend's own established fallback
+      // pattern; (3) every template that shows a field name was
+      // rendering that line TWICE -- fixed to render once. 43/43
+      // connector tests passing (up from 33). GitHub Actions run
+      // 32527946934.
+      "image": "registry.cloudflare.com/35ac10727701095866b16c276b4a33d1/mala3by-whatsapp-connector:b4c5477",
       // One container instance per WhatsApp account (one Durable
       // Object = one container, directive rule 21's chosen model --
       // NOT a shared container serving multiple clubs, which would
