@@ -38,6 +38,11 @@ export default defineConfig({
       '**/{vite,vitest}.config.*',
       'whatsapp-connector/**',
       '.claude/worktrees/**',
+      // Same class of problem as whatsapp-connector/ above -- QA scratch
+      // scripts and any subproject fixtures a session drops here are not
+      // part of this app's test suite (and .codex-temp/ is gitignored
+      // entirely, so it should never affect a real CI run either).
+      '.codex-temp/**',
     ],
   },
 })
