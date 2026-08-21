@@ -199,7 +199,27 @@
       // columns. UI relabeled to match ("Sent" -> "Accepted by
       // WhatsApp", a new real "Delivered" status). GitHub Actions run
       // 32531345386.
-      "image": "registry.cloudflare.com/35ac10727701095866b16c276b4a33d1/mala3by-whatsapp-connector:af325e9",
+      // v18, commit 41eaa07 -- WHATSAPP DELIVERY TRUTH investigation
+      // continued: a real QA send to a newly-authorized, physically-
+      // verified number (+971502061209, confirmed by the user checking
+      // their own phone -- the message genuinely did NOT arrive despite
+      // a real provider_accepted_at) needed a way to distinguish
+      // "recipient not a registered WhatsApp account" from other
+      // failure modes. Adds BaileysProvider.checkRegistration() -- a
+      // real, read-only query against WhatsApp's own servers (Baileys
+      // onWhatsApp(), confirmed present in the installed package,
+      // sock.executeUSyncQuery() against a real USyncQuery -- not a
+      // local/cached guess), reusing the club's already-live socket (no
+      // second connection opened). Exposed as POST
+      // /check-registration on the existing internal-token-gated
+      // HealthServer, matching the established /repair-session pattern.
+      // Also adds the delivery-receipt reconciliation/timeout policy
+      // (whatsapp_delivery_confirmation_overdue(), STABLE and read-time-
+      // only -- never written to storage, never regresses a later real
+      // receipt; whatsapp_delivery_evidence_summary view,
+      // security_invoker=true so per-club RLS is correctly enforced),
+      // migration 20260822020000. GitHub Actions run 32536604129.
+      "image": "registry.cloudflare.com/35ac10727701095866b16c276b4a33d1/mala3by-whatsapp-connector:41eaa07",
       // One container instance per WhatsApp account (one Durable
       // Object = one container, directive rule 21's chosen model --
       // NOT a shared container serving multiple clubs, which would
