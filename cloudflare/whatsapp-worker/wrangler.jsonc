@@ -135,7 +135,16 @@
       // date/time + official receipt block added to the PDF. GitHub
       // Actions run 32355894455, digest
       // sha256:f37397cef615f5b49bc4247e4847d6a711df2f3ccc63c2a08f47f1122403619c.
-      "image": "registry.cloudflare.com/35ac10727701095866b16c276b4a33d1/mala3by-whatsapp-connector:fa49505",
+      // v13, commit 91eed80 -- WHATSAPP PRODUCTION HARDENING batch:
+      // duplicate-send mitigation on connector crash (see
+      // 20260821160000 migration + BaileysProvider/QueueConsumer/
+      // SupabaseSync/TenantConnectionManager/WhatsAppProvider changes --
+      // provider_reference is now recorded the moment Baileys confirms
+      // a text send, before media handling/the report round-trip, so
+      // the stuck-processing recovery can tell an already-delivered
+      // crashed send apart from a genuinely stuck one and refuse to
+      // resend it). GitHub Actions run 32500705345.
+      "image": "registry.cloudflare.com/35ac10727701095866b16c276b4a33d1/mala3by-whatsapp-connector:91eed80",
       // One container instance per WhatsApp account (one Durable
       // Object = one container, directive rule 21's chosen model --
       // NOT a shared container serving multiple clubs, which would
