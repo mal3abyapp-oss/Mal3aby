@@ -189,7 +189,19 @@ export class QueueConsumer {
       }
     }
 
-    const result = await this.connections.send(row.clubId, row.recipientPhone, body, media, row.templateKey)
+    const result = await this.connections.send(
+      row.clubId,
+      row.recipientPhone,
+      body,
+      media,
+      row.templateKey,
+      // Duplicate-send mitigation (20260821160000): persists proof of
+      // delivery the instant WhatsApp confirms the text, ahead of media
+      // handling and the full reportSendResult() round-trip below --
+      // narrows the crash window whatsapp_connector_expire_stale()'s
+      // stuck-processing recovery has to guess through.
+      (providerReference) => this.sync.markProviderReferenceInFlight(row.id, providerReference),
+    )
     // Observability (directive rule 18): id, media type/intent (never
     // the bytes or the token), success, provider reference, never any
     // customer-content beyond what's already logged elsewhere.

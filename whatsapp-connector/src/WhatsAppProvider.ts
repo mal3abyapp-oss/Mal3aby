@@ -114,8 +114,27 @@ export interface WhatsAppProvider {
    * Baileys API this provider can use to suppress that -- it is not
    * silently ignored, it is documented here and covered by the real
    * crash/retry test in the acceptance report.
+   *
+   * Duplicate-send mitigation (20260821160000): `onTextConfirmed`, when
+   * given, is invoked synchronously-awaited the MOMENT the text send
+   * resolves (before any media send is attempted), with Baileys' own
+   * message key id. This provider stays Supabase-agnostic -- it does
+   * not know what the callback does -- but awaiting it here (not
+   * fire-and-forget from the provider's side) is what actually shrinks
+   * the crash window: if the process dies during media handling or the
+   * final report round-trip, the fact that this text was sent is
+   * already durable. A slow or failing callback only delays this send
+   * by the callback's own duration; it must not throw (the caller is
+   * responsible for catching its own errors, matching every other
+   * best-effort write in this service).
    */
-  sendMessage(toPhoneDigitsOnly: string, body: string, media?: MediaAttachment, templateKey?: string): Promise<SendMessageResult>
+  sendMessage(
+    toPhoneDigitsOnly: string,
+    body: string,
+    media?: MediaAttachment,
+    templateKey?: string,
+    onTextConfirmed?: (providerReference: string) => Promise<void>,
+  ): Promise<SendMessageResult>
 
   /** Attempts to restore a previously-persisted session without requiring a new QR scan. */
   reconnect(): Promise<void>

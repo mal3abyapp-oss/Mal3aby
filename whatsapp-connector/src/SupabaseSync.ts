@@ -208,6 +208,31 @@ export class SupabaseSync {
     return (data as number) ?? 0
   }
 
+  /**
+   * Duplicate-send mitigation (20260821160000): records provider_reference
+   * the MOMENT Baileys confirms the text send, before media handling or
+   * the full reportSendResult() round-trip -- so a crash landing after
+   * this point but before reportSendResult() lets
+   * whatsapp_connector_expire_stale() tell a genuinely stuck row apart
+   * from an already-delivered one and refuse to resend it. Best-effort
+   * and fire-and-forget by design (mirrors the observability writes
+   * below): if this call itself fails or is slow, it must never delay
+   * or block the real send path, and the row simply falls back to the
+   * pre-existing (wider) recovery window -- not worse than before this
+   * fix existed, only not as narrow as intended for that one call.
+   */
+  async markProviderReferenceInFlight(queueId: string, providerReference: string): Promise<void> {
+    try {
+      const { error } = await this.client.rpc('whatsapp_connector_mark_provider_reference', {
+        p_queue_id: queueId,
+        p_provider_reference: providerReference,
+      })
+      if (error) console.error(`[connector] markProviderReferenceInFlight failed for queue row ${queueId.slice(0, 8)} (non-fatal):`, error.message)
+    } catch (err) {
+      console.error(`[connector] markProviderReferenceInFlight threw for queue row ${queueId.slice(0, 8)} (non-fatal):`, (err as Error).message)
+    }
+  }
+
   async reportSendResult(queueId: string, success: boolean, providerReference?: string, error?: string): Promise<void> {
     const { error: rpcError } = await this.client.rpc('whatsapp_connector_report_send_result', {
       p_queue_id: queueId,

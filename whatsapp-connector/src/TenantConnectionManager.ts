@@ -78,12 +78,19 @@ export class TenantConnectionManager {
     return provider.repairContactSession(toPhoneDigitsOnly)
   }
 
-  async send(clubId: string, toPhoneDigitsOnly: string, body: string, media?: MediaAttachment, templateKey?: string) {
+  async send(
+    clubId: string,
+    toPhoneDigitsOnly: string,
+    body: string,
+    media?: MediaAttachment,
+    templateKey?: string,
+    onTextConfirmed?: (providerReference: string) => Promise<void>,
+  ) {
     const provider = this.providers.get(clubId)
     if (!provider) {
       return { success: false as const, error: 'no active connection for this club' }
     }
-    return provider.sendMessage(toPhoneDigitsOnly, body, media, templateKey)
+    return provider.sendMessage(toPhoneDigitsOnly, body, media, templateKey, onTextConfirmed)
   }
 
   getConnectionState(clubId: string) {

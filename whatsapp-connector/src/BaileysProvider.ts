@@ -663,7 +663,13 @@ export class BaileysProvider implements WhatsAppProvider {
    * second time, which is a documented, tested trade-off, not a silent
    * gap.
    */
-  async sendMessage(toPhoneDigitsOnly: string, body: string, media?: MediaAttachment, templateKey = 'unknown'): Promise<SendMessageResult> {
+  async sendMessage(
+    toPhoneDigitsOnly: string,
+    body: string,
+    media?: MediaAttachment,
+    templateKey = 'unknown',
+    onTextConfirmed?: (providerReference: string) => Promise<void>,
+  ): Promise<SendMessageResult> {
     if (this.state !== 'connected' || !this.socket) {
       return { success: false, error: `not connected (state=${this.state})` }
     }
@@ -690,6 +696,13 @@ export class BaileysProvider implements WhatsAppProvider {
       const textResult = await withSendTimeout(this.socket.sendMessage(jid, { text: body }), 'text')
       textProviderReference = textResult?.key?.id ?? undefined
       recordSendStage(this.clubId, 'text_sent', Date.now() - sendStartedAt)
+      // Duplicate-send mitigation (20260821160000): persist proof of
+      // delivery THE MOMENT it's known, before media handling -- see
+      // WhatsAppProvider.sendMessage()'s doc comment for why this must
+      // be awaited here rather than fired-and-forgotten.
+      if (onTextConfirmed && textProviderReference) {
+        await onTextConfirmed(textProviderReference)
+      }
     } catch (err) {
       const timedOut = (err as Error).message.includes('never resolved')
       recordSendOutcome(this.clubId, timedOut ? 'timed_out' : 'failed', Date.now() - sendStartedAt, {
