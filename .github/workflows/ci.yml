@@ -1,0 +1,127 @@
+name: CI
+
+# Controlled-scale readiness SP-003: the project had zero automated gating
+# on push/PR (the only existing workflow, whatsapp-container-build.yml, is
+# manual-trigger only, per its own header comment). This runs the checks
+# every commit should have passed locally anyway, so a defect can't reach
+# main/deploy silently because a developer forgot a step.
+#
+# Deliberately does NOT run the .test.ts integration suites
+# (customer360.integration.test.ts, staff360.integration.test.ts) as
+# hard-fail gates here: they require real QA staff credentials
+# (CUSTOMER_360_TEST_EMAIL/PASSWORD, STAFF_360_*_EMAIL/PASSWORD) against
+# the live Supabase project and skip cleanly without them (see each
+# file's own header). Wiring real secrets into a public/shared CI runner
+# is a separate, deliberate decision the repo owner should make explicitly
+# (rule: "do not commit QA credentials" / "use secure environment/secret
+# management") -- this workflow surfaces that gap honestly in its summary
+# rather than silently skipping it. If/when those secrets are added as
+# repository secrets, uncomment the "env:" block on the "Run tests" step
+# to make them read as PASSED instead of SKIPPED here too.
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Typecheck + build
+        run: npm run build
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Secret scan (fail on likely committed credentials)
+        run: |
+          # Cheap, dependency-free scan for the shapes this project's own
+          # rules explicitly forbid committing (service_role JWTs, raw
+          # Supabase URLs with an embedded key, .env.local content). Not a
+          # replacement for a real secret-scanning service -- a fast,
+          # zero-setup first line of defense that fails loud on the most
+          # common accidental-commit patterns.
+          if git grep -nE "SUPABASE_SERVICE_ROLE_KEY\s*=\s*['\"]?ey" -- . ':!*.md' ':!.github/workflows/*'; then
+            echo "::error::possible service_role key committed"
+            exit 1
+          fi
+          if git grep -nE "sk_live_|sk_test_[A-Za-z0-9]{16,}" -- . ':!*.md'; then
+            echo "::error::possible live/test secret key committed"
+            exit 1
+          fi
+          if [ -f .env.local ] || [ -f .env ]; then
+            echo "::error::.env or .env.local is committed -- these must never be tracked (see .env.example)"
+            exit 1
+          fi
+
+      - name: Unit tests (integration suites skip without QA secrets -- see workflow header)
+        run: npm test
+        # env:
+        #   CUSTOMER_360_TEST_EMAIL: ${{ secrets.CUSTOMER_360_TEST_EMAIL }}
+        #   CUSTOMER_360_TEST_PASSWORD: ${{ secrets.CUSTOMER_360_TEST_PASSWORD }}
+        #   STAFF_360_OWNER_EMAIL: ${{ secrets.STAFF_360_OWNER_EMAIL }}
+        #   STAFF_360_OWNER_PASSWORD: ${{ secrets.STAFF_360_OWNER_PASSWORD }}
+        #   STAFF_360_EMPLOYEE_EMAIL: ${{ secrets.STAFF_360_EMPLOYEE_EMAIL }}
+        #   STAFF_360_EMPLOYEE_PASSWORD: ${{ secrets.STAFF_360_EMPLOYEE_PASSWORD }}
+
+      - name: Migration filename sanity check (new files only)
+        run: |
+          # Controlled-scale readiness SP-002: this project has a known,
+          # previously-audited, accepted body of historical filename/
+          # version drift (documented in
+          # docs/engineering/STAFF_360_FINAL_ACCEPTANCE_REPORT.md) --
+          # some pre-2026-08-21 migration filenames don't match the
+          # Supabase CLI's own <14-digit-timestamp>_<name>.sql convention,
+          # and some historical timestamp prefixes collide. Re-litigating
+          # or renaming that history is explicitly out of scope (rule:
+          # "do not rewrite already-applied migration history"). This
+          # check is therefore deliberately scoped to ONLY the migration
+          # files this PR/push actually adds -- it enforces determinism
+          # going forward without failing CI on inherited debt.
+          BASE_REF="${{ github.event.pull_request.base.sha || github.event.before }}"
+          if [ -z "$BASE_REF" ] || ! git cat-file -e "$BASE_REF" 2>/dev/null; then
+            echo "No usable base ref (first push to a new branch, or shallow history) -- skipping new-file diff, nothing to compare against."
+            exit 0
+          fi
+          new_files=$(git diff --name-only --diff-filter=A "$BASE_REF" HEAD -- supabase/migrations/ || true)
+          if [ -z "$new_files" ]; then
+            echo "No new migration files in this change."
+            exit 0
+          fi
+          echo "New migration files:"
+          echo "$new_files"
+          bad=0
+          for f in $new_files; do
+            base=$(basename "$f")
+            if ! echo "$base" | grep -qE '^[0-9]{14}_[a-zA-Z0-9_]+\.sql$'; then
+              echo "::error file=$f::migration filename does not match <14-digit-timestamp>_<name>.sql"
+              bad=1
+            fi
+          done
+          # No new file's timestamp prefix may collide with ANY existing
+          # migration (new-vs-new or new-vs-historical) -- ambiguous apply
+          # order is never acceptable going forward, even against old debt.
+          all_prefixes=$(ls supabase/migrations/*.sql | xargs -n1 basename | sed -E 's/^([0-9]{14})_.*/\1/')
+          for f in $new_files; do
+            prefix=$(basename "$f" | sed -E 's/^([0-9]{14})_.*/\1/')
+            count=$(echo "$all_prefixes" | grep -c "^${prefix}$" || true)
+            if [ "$count" -gt 1 ]; then
+              echo "::error file=$f::timestamp prefix $prefix collides with another migration"
+              bad=1
+            fi
+          done
+          if [ "$bad" -eq 1 ]; then exit 1; fi
+          echo "New migration filenames OK"
