@@ -182,6 +182,16 @@ export interface WhatsAppProvider {
    */
   repairContactSession(toPhoneDigitsOnly: string): Promise<string[]>
 
+  /**
+   * WHATSAPP DELIVERY TRUTH fix (2026-08-22), directive section 10 --
+   * a real, read-only query against WhatsApp's own servers (Baileys
+   * onWhatsApp(), reusing this provider's already-live socket) asking
+   * whether a given phone number is a currently-registered WhatsApp
+   * account at all. Returns null if this club has no live connection
+   * right now (distinct from a genuine "not registered" answer).
+   */
+  checkRegistration(toPhoneDigitsOnly: string): Promise<{ registered: boolean; jid: string | null } | null>
+
   /** Observability snapshot for a future admin health panel (review directive rule 17). */
   getDiagnostics(): {
     generation: number

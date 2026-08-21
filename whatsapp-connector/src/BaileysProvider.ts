@@ -1010,6 +1010,40 @@ export class BaileysProvider implements WhatsAppProvider {
     return matches
   }
 
+  /**
+   * WHATSAPP DELIVERY TRUTH fix (2026-08-22), directive section 10 --
+   * a genuine, read-only registration check against WhatsApp's own
+   * servers via Baileys' onWhatsApp() (confirmed present in the
+   * installed package at chats.js, calling sock.executeUSyncQuery()
+   * with a phone-number USyncQuery -- a real query to WhatsApp, not a
+   * local/cached guess). Answers a question sendMessage() itself
+   * cannot: is this JID a real, currently-registered WhatsApp account
+   * at all, independent of whether a prior send to it "succeeded"
+   * (send success only ever proved this connector's own outbound
+   * socket write completed -- see toWhatsAppJid()'s and
+   * extractDeliveryReceipts()'s doc comments for the full evidence
+   * chain this fix is built on).
+   *
+   * Deliberately reuses the SAME already-live, already-authenticated
+   * socket this club's provider already holds -- no second socket is
+   * opened, no existing connection is disturbed, matching this
+   * provider's one-socket-per-club invariant (TenantConnectionManager's
+   * own class-level doc comment). Safe to call at any time the
+   * connection is up; returns null (not a throw) if there is currently
+   * no live socket, so a caller can distinguish "this club isn't
+   * connected right now" from "we asked and the number is not
+   * registered".
+   */
+  async checkRegistration(toPhoneDigitsOnly: string): Promise<{ registered: boolean; jid: string | null } | null> {
+    if (this.state !== 'connected' || !this.socket) {
+      return null
+    }
+    const jid = toWhatsAppJid(toPhoneDigitsOnly)
+    const results = await this.socket.onWhatsApp(jid)
+    const match = results?.find((r) => r.jid === jid || r.jid?.startsWith(toPhoneDigitsOnly.replace(/\D/g, '')))
+    return { registered: !!match?.exists, jid: match?.jid ?? null }
+  }
+
   async logout(): Promise<void> {
     this.explicitLogout = true
     this.clearReconnectTimer()

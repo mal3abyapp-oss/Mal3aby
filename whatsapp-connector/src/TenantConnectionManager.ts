@@ -104,6 +104,16 @@ export class TenantConnectionManager {
     return provider.repairContactSession(toPhoneDigitsOnly)
   }
 
+  /** See WhatsAppProvider.checkRegistration's own doc comment. Returns null if this club has no active provider at all. */
+  async checkRegistration(
+    clubId: string,
+    toPhoneDigitsOnly: string,
+  ): Promise<{ registered: boolean; jid: string | null } | null> {
+    const provider = this.providers.get(clubId)
+    if (!provider) return null
+    return provider.checkRegistration(toPhoneDigitsOnly)
+  }
+
   async send(
     clubId: string,
     toPhoneDigitsOnly: string,

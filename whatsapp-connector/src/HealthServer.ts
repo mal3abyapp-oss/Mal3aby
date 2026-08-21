@@ -47,6 +47,10 @@ function safeTokenEquals(provided: string | undefined, expected: string): boolea
  *     during startup: confirms Supabase is reachable (a quick
  *     listAccounts() call) before the platform considers this instance
  *     ready to receive traffic/lifecycle decisions.
+ *   POST /check-registration -- WHATSAPP DELIVERY TRUTH fix (2026-08-22):
+ *     real, read-only WhatsApp-server query for whether a phone number
+ *     is a genuinely registered account (Baileys onWhatsApp(), same
+ *     internal-token gate and body shape as /repair-session).
  *   GET /status -- the ONE endpoint with real diagnostic detail (per-club
  *     connection states, generation counters, reconnect counts, whether
  *     ANY club has a live/healthy connection). This is what the
@@ -129,6 +133,49 @@ export function startHealthServer(sync: SupabaseSync, connections: TenantConnect
             }
             res.writeHead(200, { 'content-type': 'application/json' })
             res.end(JSON.stringify({ ok: true, sessionFilesRemoved: removed.length }))
+          } catch (err) {
+            res.writeHead(500, { 'content-type': 'application/json' })
+            res.end(JSON.stringify({ error: (err as Error).message }))
+          }
+        })()
+      })
+      return
+    }
+
+    if (url.pathname === '/check-registration' && req.method === 'POST') {
+      // Same internal-only gate as /status and /repair-session -- never
+      // public. WHATSAPP DELIVERY TRUTH fix (2026-08-22), directive
+      // section 10: a real, read-only WhatsApp-server query (Baileys
+      // onWhatsApp(), reusing the already-live socket -- no second
+      // connection opened) for whether a phone number is a genuinely
+      // registered WhatsApp account. Never logs the phone number itself
+      // to stdout (only the club prefix, matching every other endpoint
+      // here), and returns no message content.
+      const provided = req.headers['x-internal-token']
+      if (!internalToken || Array.isArray(provided) || !safeTokenEquals(provided, internalToken)) {
+        res.writeHead(403, { 'content-type': 'text/plain' })
+        res.end('forbidden')
+        return
+      }
+      let body = ''
+      req.on('data', (chunk) => { body += chunk })
+      req.on('end', () => {
+        void (async () => {
+          try {
+            const { clubId, phone } = JSON.parse(body) as { clubId?: string; phone?: string }
+            if (!clubId || !phone) {
+              res.writeHead(400, { 'content-type': 'application/json' })
+              res.end(JSON.stringify({ error: 'clubId and phone are required' }))
+              return
+            }
+            const result = await connections.checkRegistration(clubId, phone)
+            if (result === null) {
+              res.writeHead(404, { 'content-type': 'application/json' })
+              res.end(JSON.stringify({ error: 'no active connection for this club' }))
+              return
+            }
+            res.writeHead(200, { 'content-type': 'application/json' })
+            res.end(JSON.stringify(result))
           } catch (err) {
             res.writeHead(500, { 'content-type': 'application/json' })
             res.end(JSON.stringify({ error: (err as Error).message }))
