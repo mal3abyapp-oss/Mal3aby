@@ -66,6 +66,16 @@ async function main() {
     // never write back a mutated session over the real one mid-test.
   })
 
+  // Independent-audit fix (2026-08-21): this script's own doc comment
+  // already requires the production container to be stopped before
+  // running, so it is safe to be the sole writer here -- claim a real
+  // DB-allocated generation the same way the real connector does, so
+  // this diagnostic's own status transitions are correctly recorded
+  // (not silently refused by setState()'s guard) rather than leaving
+  // whatsapp_accounts in whatever stale state the stopped production
+  // process last wrote.
+  await provider.claimDbGeneration((clubId) => sync.claimGeneration(clubId))
+
   const connectStartedAt = Date.now()
   await provider.initializeConnection()
   await waitForConnected(provider, 30_000)

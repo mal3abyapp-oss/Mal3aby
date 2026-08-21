@@ -261,19 +261,49 @@ function withSendTimeout<T>(promise: Promise<T>, label: string): Promise<T> {
  * `wa.status = 'connected'` eligibility filter incorrectly exclude a
  * perfectly healthy, connected account's queued notifications.
  *
- * Fix (minimal correct design, not distributed coordination -- this is
- * a single Node process per club, so a simple monotonic in-memory
- * counter is sufficient, proven-needed before building anything more
- * elaborate): every state transition is stamped with this provider's
- * own `generation` (already existed, bumped on each real reconnect)
- * and a NEW `stateSeq` (bumped on every single setState() call,
- * finer-grained than generation -- multiple state changes can happen
- * within one generation, e.g. connecting -> qr_required -> connected).
- * whatsapp_connector_report_status now takes both and only applies the
- * write if (generation, stateSeq) is not older than what's already
- * stored -- "newer generation/sequence wins", "stale writer loses",
- * with zero possibility of a late-arriving stale write clobbering a
- * fresher one, regardless of network/RPC completion order.
+ * Fix, ORIGINAL VERSION (2026-08-18) -- SUPERSEDED, see the correction
+ * below: every state transition was stamped with this provider's own
+ * in-memory `generation` counter (bumped on each real socket reconnect)
+ * and a `stateSeq` (bumped on every setState() call). This assumed "a
+ * simple monotonic in-memory counter is sufficient... single Node
+ * process per club" -- an assumption that held only within one
+ * process's lifetime, and silently broke the first time that process
+ * ever restarted.
+ *
+ * CORRECTION (independent-audit fix, 2026-08-21, real incident):
+ * `generation` is a plain in-memory field, always starting at 0 for a
+ * fresh process. A restart (redeploy, crash, or a Cloudflare Container
+ * scale-to-zero/cold-start cycle -- all normal for this architecture,
+ * not bugs) creates a fresh provider whose generation can never exceed
+ * whatever accumulated in the DATABASE across every PRIOR process's own
+ * restarts. Once the database's remembered generation exceeds anything
+ * a fresh process can reach, EVERY future status write from EVERY
+ * future process is permanently rejected as stale -- including a
+ * correct, true 'logged_out' report. Confirmed live: club
+ * b9178c0f-00b5-4c71-abec-b8772ffb8682 reached last_generation=17
+ * through ordinary restart accumulation; a genuine WhatsApp-side logout
+ * then occurred and could never be recorded, leaving the UI/DB
+ * permanently showing 'connected' while the connector's own
+ * sendMessage() correctly refused to send ("not connected") -- a real,
+ * observable outage the database was actively lying about.
+ *
+ * Fix: the DB-fencing generation (`dbGeneration`, distinct from the
+ * unrelated in-process socket-level `generation` field above it in this
+ * class -- see that field's own doc comment) is no longer seeded from
+ * nothing. It is atomically allocated by the database itself, exactly
+ * once per process lifetime, via whatsapp_connector_claim_generation()
+ * -- see claimDbGeneration() below, called from
+ * TenantConnectionManager before this provider's connection is ever
+ * initialized. A fresh process therefore always receives
+ * current_generation + 1, correctly becoming the trusted current writer
+ * on every restart, while a genuinely stale old process (still shutting
+ * down, or racing during a rolling replacement) still correctly loses,
+ * because it is holding a generation the database has already moved
+ * past. whatsapp_connector_report_status() still applies the identical
+ * write-acceptance rule as before (newer generation always wins;
+ * within the same generation, only a strictly larger stateSeq is
+ * accepted) -- only the SOURCE of the generation number changed, not
+ * the fencing logic itself.
  */
 export interface BaileysProviderHooks {
   onStateChange?: (
@@ -295,10 +325,32 @@ export class BaileysProvider implements WhatsAppProvider {
   private reconnectAttempts = 0
   private explicitLogout = false
 
-  /** Generation counter -- see class-level doc comment, fix item 1. */
+  /** Generation counter -- see class-level doc comment, fix item 1. IN-PROCESS SOCKET fencing only (distinguishes one socket from the next WITHIN this process's lifetime) -- do not confuse with dbGeneration below, which fences DB status writes ACROSS process restarts and is a completely separate concern with a completely separate lifetime. */
   private generation = 0
   /** Monotonic per-state-transition sequence, for the status-write-race fix -- see BaileysProviderHooks' own doc comment. Never reset (unlike generation, which only bumps on a real reconnect) -- strictly increasing for the lifetime of this provider instance/process. */
   private stateSeq = 0
+  /**
+   * Cross-PROCESS status-write fencing generation (independent-audit
+   * fix, 2026-08-21). Unlike `generation` above (which is a local,
+   * in-memory socket counter that always starts at 0 for a fresh
+   * process), this value is atomically allocated by the database itself
+   * via whatsapp_connector_claim_generation() -- called exactly once,
+   * before this provider ever reports a status transition. This is
+   * what lets a genuinely NEW process correctly become the trusted
+   * current writer after a restart (redeploy, crash, or a Cloudflare
+   * Container scale-to-zero/cold-start cycle -- all normal, expected
+   * events for this architecture, not bugs), instead of every restart
+   * resetting to 0 and eventually being permanently fenced out by the
+   * database's own memory of a much higher generation from prior
+   * process instances. Real incident this fixes: club
+   * b9178c0f-00b5-4c71-abec-b8772ffb8682 reached last_generation=17
+   * through ordinary restart accumulation, then a genuine WhatsApp-side
+   * logout occurred and could never be recorded, because every fresh
+   * process's old-style generation=0/1/2... could never again exceed
+   * 17. `null` until claimDbGeneration() resolves; onStateChange is
+   * only ever invoked with a non-null value (see setState() below).
+   */
+  private dbGeneration: number | null = null
   /** Connection mutex -- see class-level doc comment, fix item 2. */
   private connectPromise: Promise<void> | null = null
   /** Single pending reconnect timer -- see class-level doc comment, fix item 6. */
@@ -334,7 +386,31 @@ export class BaileysProvider implements WhatsAppProvider {
   private setState(next: ConnectionState, detail?: Parameters<NonNullable<BaileysProviderHooks['onStateChange']>>[1]) {
     this.state = next
     this.stateSeq += 1
-    this.hooks.onStateChange?.(next, detail, { generation: this.generation, stateSeq: this.stateSeq })
+    // dbGeneration is only null in the brief window before
+    // claimDbGeneration() has resolved (see initializeConnection(),
+    // which awaits the claim before doing anything else) -- if a state
+    // change somehow fires before that, it is a real bug worth a loud
+    // failure rather than silently reporting a wrong/fabricated
+    // generation to the database.
+    if (this.dbGeneration === null) {
+      this.logger.error('setState() called before claimDbGeneration() resolved -- refusing to report a status write with no valid generation')
+      return
+    }
+    this.hooks.onStateChange?.(next, detail, { generation: this.dbGeneration, stateSeq: this.stateSeq })
+  }
+
+  /**
+   * Atomically claims this process's DB-fencing generation for this
+   * club, exactly once, before any status is ever reported. Must
+   * complete before initializeConnection() proceeds -- see its call
+   * site. See this class's own doc comment (above SETUP/STATUS-WRITE
+   * RACE) and dbGeneration's own field doc comment for the full
+   * incident this fixes.
+   */
+  async claimDbGeneration(claim: (clubId: string) => Promise<number>): Promise<void> {
+    if (this.dbGeneration !== null) return
+    this.dbGeneration = await claim(this.clubId)
+    this.logger.info({ dbGeneration: this.dbGeneration }, 'claimed DB status-write-fencing generation')
   }
 
   private clearReconnectTimer(): void {

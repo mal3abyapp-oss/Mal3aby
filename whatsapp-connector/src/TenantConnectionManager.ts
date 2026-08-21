@@ -20,7 +20,16 @@ export class TenantConnectionManager {
 
   constructor(private readonly sync: SupabaseSync) {}
 
-  private getOrCreateProvider(clubId: string): WhatsAppProvider {
+  /**
+   * Async because a freshly-created provider must atomically claim its
+   * DB-fencing generation (independent-audit fix, 2026-08-21) BEFORE it
+   * is returned to any caller -- see BaileysProvider.claimDbGeneration()
+   * and SupabaseSync.claimGeneration() for the full incident this
+   * fixes. An existing (already-claimed) provider is returned
+   * synchronously-fast, same as before; only the first-creation path
+   * now awaits the claim RPC.
+   */
+  private async getOrCreateProvider(clubId: string): Promise<WhatsAppProvider> {
     let provider = this.providers.get(clubId)
     if (!provider) {
       provider = new BaileysProvider(clubId, {
@@ -30,7 +39,10 @@ export class TenantConnectionManager {
           // late-arriving stale write instead of always applying
           // whichever call happens to land last -- see
           // BaileysProviderHooks' own doc comment in BaileysProvider.ts
-          // for the full proof and design.
+          // for the full proof and design. `generation` here is now
+          // BaileysProvider's own atomically-claimed dbGeneration
+          // (independent-audit fix, 2026-08-21), never the old
+          // always-starts-at-0 in-process counter.
           void this.sync
             .reportStatus({
               clubId,
@@ -50,13 +62,20 @@ export class TenantConnectionManager {
             .catch((err) => console.error(`[connector] failed to persist session for club ${clubId.slice(0, 8)}:`, err.message))
         },
       })
+      // Claim BEFORE registering in the map and BEFORE any caller can
+      // call initializeConnection()/reconnect() on this instance --
+      // guarantees no status transition can ever fire with
+      // dbGeneration still null (BaileysProvider.setState() also
+      // guards this defensively, but the real invariant is enforced
+      // here, at construction).
+      await provider.claimDbGeneration((id) => this.sync.claimGeneration(id))
       this.providers.set(clubId, provider)
     }
     return provider
   }
 
   async connect(clubId: string): Promise<void> {
-    const provider = this.getOrCreateProvider(clubId)
+    const provider = await this.getOrCreateProvider(clubId)
     await provider.initializeConnection()
   }
 
@@ -131,7 +150,7 @@ export class TenantConnectionManager {
         const encrypted = await this.sync.loadSession(clubId)
         if (!encrypted) continue
         await restoreAuthDirForClub(clubId, encrypted)
-        const provider = this.getOrCreateProvider(clubId)
+        const provider = await this.getOrCreateProvider(clubId)
         await provider.reconnect()
       } catch (err) {
         console.error(`[connector] failed to restore session for club ${clubId.slice(0, 8)}:`, (err as Error).message)

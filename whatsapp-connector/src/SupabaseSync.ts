@@ -74,6 +74,24 @@ export class SupabaseSync {
     return (data ?? []).map((row: { club_id: string; status: string }) => ({ clubId: row.club_id, status: row.status }))
   }
 
+  /**
+   * Atomically claims this process's DB-fencing generation for a club
+   * (independent-audit fix, 2026-08-21) -- see
+   * whatsapp_connector_claim_generation()'s own SQL-side doc comment
+   * and BaileysProvider.claimDbGeneration()'s doc comment for the full
+   * incident this fixes. Must be called exactly once per club per
+   * process lifetime, BEFORE that club's provider ever reports a
+   * status transition -- never fire-and-forget like reportStatus(),
+   * this one is awaited and its failure must propagate (an unclaimed
+   * generation must never silently fall back to reporting with a wrong
+   * or fabricated value).
+   */
+  async claimGeneration(clubId: string): Promise<number> {
+    const { data, error } = await this.client.rpc('whatsapp_connector_claim_generation', { p_club_id: clubId })
+    if (error) throw new Error(`whatsapp_connector_claim_generation failed: ${error.message}`)
+    return data as number
+  }
+
   async claimNextBatch(limit: number): Promise<
     Array<{
       id: string

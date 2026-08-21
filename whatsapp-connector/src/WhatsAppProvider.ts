@@ -78,6 +78,23 @@ export interface MediaAttachment {
 export interface WhatsAppProvider {
   readonly clubId: string
 
+  /**
+   * Atomically claims this process's DB-fencing generation for this
+   * club (independent-audit fix, 2026-08-21) -- MUST be awaited and
+   * complete before initializeConnection()/reconnect() is ever called.
+   * `claim` is the caller-supplied RPC (SupabaseSync.claimGeneration),
+   * kept as an injected function here (not a direct Supabase import) so
+   * this file stays free of any Supabase-specific dependency, matching
+   * this interface's own "connector-agnostic adapter boundary" design
+   * documented at the top of this file. See BaileysProvider's own
+   * dbGeneration field doc comment for the full incident this fixes:
+   * without this claim, a provider's status-write generation always
+   * started at 0/1/2... in-memory, which eventually became permanently
+   * fenced out by the database's own memory of a much higher
+   * generation accumulated across prior process restarts.
+   */
+  claimDbGeneration(claim: (clubId: string) => Promise<number>): Promise<void>
+
   /** Begins a connection attempt. Transitions disconnected -> connecting -> qr_required. */
   initializeConnection(): Promise<void>
 

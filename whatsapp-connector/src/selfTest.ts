@@ -25,6 +25,13 @@ async function main() {
     },
   })
 
+  // This standalone test never touches Supabase -- a trivial local
+  // stand-in for the real atomic DB claim (SupabaseSync.claimGeneration)
+  // is enough to satisfy setState()'s requirement that a generation be
+  // claimed before any transition is reported (independent-audit fix,
+  // 2026-08-21 -- see BaileysProvider's dbGeneration field doc comment).
+  await provider.claimDbGeneration(async () => 1)
+
   await provider.initializeConnection()
 
   // Poll for up to 20 seconds for a real QR to arrive from WhatsApp's
