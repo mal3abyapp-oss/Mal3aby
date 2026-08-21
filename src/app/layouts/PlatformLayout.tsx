@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { Suspense, useState } from 'react'
 import { NavLink, Outlet } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { cn } from '@/lib/utils'
@@ -6,6 +6,7 @@ import { Sheet, SheetContent, SheetTitle } from '@/components/ui/sheet'
 import { Button } from '@/components/ui/button'
 import { LanguageSwitcher } from '@/components/ui/language-switcher'
 import { useAuth } from '@/app/providers/AuthProvider'
+import { RouteLoadingFallback } from '@/app/routing/RouteLoadingFallback'
 import {
   LayoutDashboard,
   Building2,
@@ -170,7 +171,9 @@ export function PlatformLayout() {
           </div>
         </header>
         <main className="min-w-0 flex-1 p-4">
-          <Outlet />
+          <Suspense fallback={<RouteLoadingFallback />}>
+            <Outlet />
+          </Suspense>
         </main>
       </div>
 

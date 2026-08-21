@@ -1,9 +1,11 @@
+import { Suspense } from 'react'
 import { NavLink, Outlet } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { useAuth } from '@/app/providers/AuthProvider'
 import { CalendarDays, GraduationCap, Wallet, QrCode, User, LogOut } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 import { LanguageSwitcher } from '@/components/ui/language-switcher'
+import { RouteLoadingFallback } from '@/app/routing/RouteLoadingFallback'
 
 // Gate 3 — Unified User Dashboard shell. Deliberately separate from
 // AppLayout (the staff/employee product): a customer/guardian is never
@@ -53,7 +55,9 @@ export function PortalLayout() {
       </header>
 
       <main className="mx-auto w-full max-w-2xl flex-1 px-4 py-4 pb-24">
-        <Outlet />
+        <Suspense fallback={<RouteLoadingFallback />}>
+          <Outlet />
+        </Suspense>
       </main>
 
       <nav className="fixed inset-x-0 bottom-0 z-30 flex border-t border-border bg-surface">

@@ -1,3 +1,4 @@
+import { lazy, Suspense } from 'react'
 import { createBrowserRouter, Navigate } from 'react-router-dom'
 import { PublicLayout } from '@/app/layouts/PublicLayout'
 import { AppLayout } from '@/app/layouts/AppLayout'
@@ -5,7 +6,83 @@ import { PlatformLayout } from '@/app/layouts/PlatformLayout'
 import { PortalLayout } from '@/app/layouts/PortalLayout'
 import { RequireAuth, RequireNavDomain, RequirePlatformOwner, RequirePortalAuth } from '@/app/routing/RequireAuth'
 import { RedirectWithSearch } from '@/app/routing/RedirectWithSearch'
+import { RouteLoadingFallback } from '@/app/routing/RouteLoadingFallback'
 
+// Controlled-scale readiness SP-004: the production bundle was a single
+// ~2MB (535kB gzip) JS chunk -- every role's entire feature set (Finance,
+// Reports, Academy, Staff 360, Platform Owner, Settings...) downloaded and
+// parsed on first load regardless of which one role/page a given visit
+// actually needs. Route-level code splitting via React.lazy() below turns
+// each feature page into its own chunk, fetched only when its route is
+// actually visited. The small, always-needed public/marketing/auth pages
+// stay eagerly imported (below) since splitting a handful of tiny
+// components buys nothing and would only add request round-trips to the
+// very first thing every visitor sees. Every layout that renders one of
+// these lazy routes already wraps its <Outlet /> in a <Suspense> boundary
+// (see AppLayout.tsx, PortalLayout.tsx, PlatformLayout.tsx) with a small,
+// non-decorative loading fallback (RouteLoadingFallback.tsx).
+const OnboardingPage = lazy(() => import('@/features/onboarding/OnboardingPage').then((m) => ({ default: m.OnboardingPage })))
+const VerifyInvoicePage = lazy(() => import('@/features/verify/VerifyInvoicePage').then((m) => ({ default: m.VerifyInvoicePage })))
+const SecureBookingPage = lazy(() => import('@/features/verify/SecureBookingPage').then((m) => ({ default: m.SecureBookingPage })))
+const PublicClubBookingPage = lazy(() => import('@/features/public-booking/PublicClubBookingPage').then((m) => ({ default: m.PublicClubBookingPage })))
+
+const TodayPage = lazy(() => import('@/features/dashboard/TodayPage').then((m) => ({ default: m.TodayPage })))
+const MorePage = lazy(() => import('@/features/dashboard/MorePage').then((m) => ({ default: m.MorePage })))
+const BookingsPage = lazy(() => import('@/features/bookings/BookingsPage').then((m) => ({ default: m.BookingsPage })))
+const AcademyPage = lazy(() => import('@/features/academy/AcademyPage').then((m) => ({ default: m.AcademyPage })))
+const CustomersPage = lazy(() => import('@/features/customers/CustomersPage').then((m) => ({ default: m.CustomersPage })))
+const Customer360Page = lazy(() => import('@/features/customers/Customer360Page').then((m) => ({ default: m.Customer360Page })))
+const CustomerDuplicatesPage = lazy(() => import('@/features/customers/CustomerDuplicatesPage').then((m) => ({ default: m.CustomerDuplicatesPage })))
+const SubscriptionPage = lazy(() => import('@/features/billing/SubscriptionPage').then((m) => ({ default: m.SubscriptionPage })))
+const FinanceLayout = lazy(() => import('@/features/finance/FinanceLayout').then((m) => ({ default: m.FinanceLayout })))
+const FinanceOverviewPage = lazy(() => import('@/features/finance/FinanceOverviewPage').then((m) => ({ default: m.FinanceOverviewPage })))
+const FinancePaymentsPage = lazy(() => import('@/features/finance/FinancePaymentsPage').then((m) => ({ default: m.FinancePaymentsPage })))
+const FinanceInvoicesPage = lazy(() => import('@/features/finance/FinanceInvoicesPage').then((m) => ({ default: m.FinanceInvoicesPage })))
+const FinanceCashPage = lazy(() => import('@/features/finance/FinanceCashPage').then((m) => ({ default: m.FinanceCashPage })))
+const FinanceExpensesPage = lazy(() => import('@/features/finance/FinanceExpensesPage').then((m) => ({ default: m.FinanceExpensesPage })))
+const FinanceReportsPage = lazy(() => import('@/features/finance/FinanceReportsPage').then((m) => ({ default: m.FinanceReportsPage })))
+const ReportsOverviewPage = lazy(() => import('@/features/reports/ReportsOverviewPage').then((m) => ({ default: m.ReportsOverviewPage })))
+const ReportBookingsPage = lazy(() => import('@/features/reports/ReportBookingsPage').then((m) => ({ default: m.ReportBookingsPage })))
+const ReportOccupancyPage = lazy(() => import('@/features/reports/ReportOccupancyPage').then((m) => ({ default: m.ReportOccupancyPage })))
+const ReportRevenuePage = lazy(() => import('@/features/reports/ReportRevenuePage').then((m) => ({ default: m.ReportRevenuePage })))
+const ReportCollectionsPage = lazy(() => import('@/features/reports/ReportCollectionsPage').then((m) => ({ default: m.ReportCollectionsPage })))
+const ReportPaymentMethodsPage = lazy(() => import('@/features/reports/ReportPaymentMethodsPage').then((m) => ({ default: m.ReportPaymentMethodsPage })))
+const ReportExceptionsPage = lazy(() => import('@/features/reports/ReportExceptionsPage').then((m) => ({ default: m.ReportExceptionsPage })))
+const ReportOfficialReceiptsPage = lazy(() => import('@/features/reports/ReportOfficialReceiptsPage').then((m) => ({ default: m.ReportOfficialReceiptsPage })))
+const ReportReconciliationPage = lazy(() => import('@/features/reports/ReportReconciliationPage').then((m) => ({ default: m.ReportReconciliationPage })))
+const ReportEmployeeLiabilityPage = lazy(() => import('@/features/reports/ReportEmployeeLiabilityPage').then((m) => ({ default: m.ReportEmployeeLiabilityPage })))
+const ReportAcademyPage = lazy(() => import('@/features/reports/ReportAcademyPage').then((m) => ({ default: m.ReportAcademyPage })))
+const ReportCustomersPage = lazy(() => import('@/features/reports/ReportCustomersPage').then((m) => ({ default: m.ReportCustomersPage })))
+const StaffPage = lazy(() => import('@/features/staff/StaffPage').then((m) => ({ default: m.StaffPage })))
+const Employee360Page = lazy(() => import('@/features/staff/Employee360Page').then((m) => ({ default: m.Employee360Page })))
+const SettingsPage = lazy(() => import('@/features/settings/SettingsPage').then((m) => ({ default: m.SettingsPage })))
+const BranchesFieldsPage = lazy(() => import('@/features/clubs/BranchesFieldsPage').then((m) => ({ default: m.BranchesFieldsPage })))
+const AuditLogPage = lazy(() => import('@/features/settings/AuditLogPage').then((m) => ({ default: m.AuditLogPage })))
+const WhatsAppPage = lazy(() => import('@/features/whatsapp/WhatsAppPage').then((m) => ({ default: m.WhatsAppPage })))
+const ScanPage = lazy(() => import('@/features/scanner/ScanPage').then((m) => ({ default: m.ScanPage })))
+
+const PortalRoot = lazy(() => import('@/features/portal/PortalRoot').then((m) => ({ default: m.PortalRoot })))
+const PortalBookingsPage = lazy(() => import('@/features/portal/PortalBookingsPage').then((m) => ({ default: m.PortalBookingsPage })))
+const PortalAcademyPage = lazy(() => import('@/features/portal/PortalAcademyPage').then((m) => ({ default: m.PortalAcademyPage })))
+const PortalQrPage = lazy(() => import('@/features/portal/PortalQrPage').then((m) => ({ default: m.PortalQrPage })))
+const PortalPaymentsPage = lazy(() => import('@/features/portal/PortalPaymentsPage').then((m) => ({ default: m.PortalPaymentsPage })))
+const PortalProfilePage = lazy(() => import('@/features/portal/PortalProfilePage').then((m) => ({ default: m.PortalProfilePage })))
+
+const PlatformOverviewPage = lazy(() => import('@/features/platform/PlatformOverviewPage').then((m) => ({ default: m.PlatformOverviewPage })))
+const PlatformClubsPage = lazy(() => import('@/features/platform/PlatformClubsPage').then((m) => ({ default: m.PlatformClubsPage })))
+const PlatformClubDetailPage = lazy(() => import('@/features/platform/PlatformClubDetailPage').then((m) => ({ default: m.PlatformClubDetailPage })))
+const PlatformOwnersPage = lazy(() => import('@/features/platform/PlatformOwnersPage').then((m) => ({ default: m.PlatformOwnersPage })))
+const PlatformPlansPage = lazy(() => import('@/features/platform/PlatformPlansPage').then((m) => ({ default: m.PlatformPlansPage })))
+const PlatformTrialsPage = lazy(() => import('@/features/platform/PlatformTrialsPage').then((m) => ({ default: m.PlatformTrialsPage })))
+const PlatformLeadsPage = lazy(() => import('@/features/platform/PlatformLeadsPage').then((m) => ({ default: m.PlatformLeadsPage })))
+const PlatformReportsPage = lazy(() => import('@/features/platform/PlatformReportsPage').then((m) => ({ default: m.PlatformReportsPage })))
+const PlatformAlertsPage = lazy(() => import('@/features/platform/PlatformAlertsPage').then((m) => ({ default: m.PlatformAlertsPage })))
+const PlatformAuditPage = lazy(() => import('@/features/platform/PlatformAuditPage').then((m) => ({ default: m.PlatformAuditPage })))
+const PlatformSettingsPage = lazy(() => import('@/features/platform/PlatformSettingsPage').then((m) => ({ default: m.PlatformSettingsPage })))
+
+// Small, always-needed public/marketing/auth pages -- eagerly imported.
+// Splitting these would add request round-trips to the very first thing
+// every visitor sees for negligible bundle-size benefit.
 import { HomePage } from '@/features/public-site/HomePage'
 import { PricingPage } from '@/features/public-site/PricingPage'
 import { ContactPage } from '@/features/public-site/ContactPage'
@@ -16,65 +93,6 @@ import { LoginPage } from '@/features/auth/LoginPage'
 import { SignupPage } from '@/features/auth/SignupPage'
 import { ForgotPasswordPage } from '@/features/auth/ForgotPasswordPage'
 import { ResetPasswordPage } from '@/features/auth/ResetPasswordPage'
-
-import { OnboardingPage } from '@/features/onboarding/OnboardingPage'
-import { VerifyInvoicePage } from '@/features/verify/VerifyInvoicePage'
-import { SecureBookingPage } from '@/features/verify/SecureBookingPage'
-import { PublicClubBookingPage } from '@/features/public-booking/PublicClubBookingPage'
-
-import { TodayPage } from '@/features/dashboard/TodayPage'
-import { MorePage } from '@/features/dashboard/MorePage'
-import { BookingsPage } from '@/features/bookings/BookingsPage'
-import { AcademyPage } from '@/features/academy/AcademyPage'
-import { CustomersPage } from '@/features/customers/CustomersPage'
-import { Customer360Page } from '@/features/customers/Customer360Page'
-import { CustomerDuplicatesPage } from '@/features/customers/CustomerDuplicatesPage'
-import { SubscriptionPage } from '@/features/billing/SubscriptionPage'
-import { FinanceLayout } from '@/features/finance/FinanceLayout'
-import { FinanceOverviewPage } from '@/features/finance/FinanceOverviewPage'
-import { FinancePaymentsPage } from '@/features/finance/FinancePaymentsPage'
-import { FinanceInvoicesPage } from '@/features/finance/FinanceInvoicesPage'
-import { FinanceCashPage } from '@/features/finance/FinanceCashPage'
-import { FinanceExpensesPage } from '@/features/finance/FinanceExpensesPage'
-import { FinanceReportsPage } from '@/features/finance/FinanceReportsPage'
-import { ReportsOverviewPage } from '@/features/reports/ReportsOverviewPage'
-import { ReportBookingsPage } from '@/features/reports/ReportBookingsPage'
-import { ReportOccupancyPage } from '@/features/reports/ReportOccupancyPage'
-import { ReportRevenuePage } from '@/features/reports/ReportRevenuePage'
-import { ReportCollectionsPage } from '@/features/reports/ReportCollectionsPage'
-import { ReportPaymentMethodsPage } from '@/features/reports/ReportPaymentMethodsPage'
-import { ReportExceptionsPage } from '@/features/reports/ReportExceptionsPage'
-import { ReportOfficialReceiptsPage } from '@/features/reports/ReportOfficialReceiptsPage'
-import { ReportReconciliationPage } from '@/features/reports/ReportReconciliationPage'
-import { ReportEmployeeLiabilityPage } from '@/features/reports/ReportEmployeeLiabilityPage'
-import { ReportAcademyPage } from '@/features/reports/ReportAcademyPage'
-import { ReportCustomersPage } from '@/features/reports/ReportCustomersPage'
-import { StaffPage } from '@/features/staff/StaffPage'
-import { Employee360Page } from '@/features/staff/Employee360Page'
-import { SettingsPage } from '@/features/settings/SettingsPage'
-import { BranchesFieldsPage } from '@/features/clubs/BranchesFieldsPage'
-import { AuditLogPage } from '@/features/settings/AuditLogPage'
-import { WhatsAppPage } from '@/features/whatsapp/WhatsAppPage'
-import { ScanPage } from '@/features/scanner/ScanPage'
-
-import { PortalRoot } from '@/features/portal/PortalRoot'
-import { PortalBookingsPage } from '@/features/portal/PortalBookingsPage'
-import { PortalAcademyPage } from '@/features/portal/PortalAcademyPage'
-import { PortalQrPage } from '@/features/portal/PortalQrPage'
-import { PortalPaymentsPage } from '@/features/portal/PortalPaymentsPage'
-import { PortalProfilePage } from '@/features/portal/PortalProfilePage'
-
-import { PlatformOverviewPage } from '@/features/platform/PlatformOverviewPage'
-import { PlatformClubsPage } from '@/features/platform/PlatformClubsPage'
-import { PlatformClubDetailPage } from '@/features/platform/PlatformClubDetailPage'
-import { PlatformOwnersPage } from '@/features/platform/PlatformOwnersPage'
-import { PlatformPlansPage } from '@/features/platform/PlatformPlansPage'
-import { PlatformTrialsPage } from '@/features/platform/PlatformTrialsPage'
-import { PlatformLeadsPage } from '@/features/platform/PlatformLeadsPage'
-import { PlatformReportsPage } from '@/features/platform/PlatformReportsPage'
-import { PlatformAlertsPage } from '@/features/platform/PlatformAlertsPage'
-import { PlatformAuditPage } from '@/features/platform/PlatformAuditPage'
-import { PlatformSettingsPage } from '@/features/platform/PlatformSettingsPage'
 
 // Route guards: RequireAuth gates /app (any active membership),
 // RequirePlatformOwner gates /platform (a platform_owner-role membership).
@@ -97,14 +115,14 @@ export const router = createBrowserRouter([
   },
   {
     path: '/onboarding',
-    element: <OnboardingPage />,
+    element: <Suspense fallback={<RouteLoadingFallback />}><OnboardingPage /></Suspense>,
   },
   {
     // Task #86: public invoice verification -- no auth guard, reachable
     // by anyone holding the printed invoice/receipt QR. Standalone (no
     // PublicLayout marketing chrome), same pattern as /onboarding.
     path: '/verify/:token',
-    element: <VerifyInvoicePage />,
+    element: <Suspense fallback={<RouteLoadingFallback />}><VerifyInvoicePage /></Suspense>,
   },
   {
     // Secure Booking Page (directive Sections 28-32): the PRIMARY
@@ -118,7 +136,7 @@ export const router = createBrowserRouter([
     // never accidentally interchangeable at the routing layer even
     // though both are opaque hex strings.
     path: '/qr/:token',
-    element: <SecureBookingPage />,
+    element: <Suspense fallback={<RouteLoadingFallback />}><SecureBookingPage /></Suspense>,
   },
   {
     // Public Club Booking System (directive Sections 42-53): every
@@ -126,14 +144,14 @@ export const router = createBrowserRouter([
     // first, reachable by anyone holding the link/QR/printed poster.
     // Standalone, same pattern as /qr/:token and /verify/:token.
     path: '/c/:slug',
-    element: <PublicClubBookingPage />,
+    element: <Suspense fallback={<RouteLoadingFallback />}><PublicClubBookingPage /></Suspense>,
   },
   {
     element: <RequireAuth />,
     children: [
       {
         path: '/scan',
-        element: <RequireNavDomain domain="scan"><ScanPage /></RequireNavDomain>,
+        element: <RequireNavDomain domain="scan"><Suspense fallback={<RouteLoadingFallback />}><ScanPage /></Suspense></RequireNavDomain>,
       },
       {
         path: '/app',

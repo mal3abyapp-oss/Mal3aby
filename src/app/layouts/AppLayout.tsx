@@ -1,8 +1,10 @@
+import { Suspense } from 'react'
 import { NavLink, Outlet } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
 import { cn } from '@/lib/utils'
 import { useAuth } from '@/app/providers/AuthProvider'
+import { RouteLoadingFallback } from '@/app/routing/RouteLoadingFallback'
 import { supabase } from '@/lib/supabase/client'
 import { GlobalSearch } from '@/features/search/GlobalSearch'
 import { QuickActionsPalette } from '@/features/dashboard/QuickActionsPalette'
@@ -270,7 +272,9 @@ export function AppLayout() {
         )}
 
         <main className="flex-1 p-4 pb-20 md:pb-4">
-          <Outlet />
+          <Suspense fallback={<RouteLoadingFallback />}>
+            <Outlet />
+          </Suspense>
         </main>
 
         {/* Mobile bottom nav */}
