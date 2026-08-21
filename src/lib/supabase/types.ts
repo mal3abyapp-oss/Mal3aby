@@ -4716,6 +4716,21 @@ export type Database = {
         Args: { p_field_id: string; p_reason?: string; p_rules: Json }
         Returns: Database["public"]["Tables"]["pricing_rules"]["Row"][]
       }
+      create_payment_method_config: {
+        Args: {
+          p_club_id: string
+          p_customer_visible: boolean
+          p_details: Json
+          p_instructions_ar: string
+          p_instructions_en: string
+          p_name_ar: string
+          p_name_en: string
+          p_provider: string
+          p_reason?: string
+          p_underlying_method: string
+        }
+        Returns: Database["public"]["Tables"]["payment_method_configs"]["Row"]
+      }
       manage_branch: {
         Args: {
           p_address: string

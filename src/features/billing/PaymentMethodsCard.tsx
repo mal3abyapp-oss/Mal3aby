@@ -172,17 +172,17 @@ export function PaymentMethodsCard() {
   const createMutation = useMutation({
     mutationFn: async () => {
       if (!nameAr.trim() || !nameEn.trim()) throw new Error(t('billing.paymentMethods.nameRequiredError'))
-      const { error } = await supabase.from('payment_method_configs').insert({
-        club_id: currentClubId!,
-        underlying_method: underlyingMethod,
-        provider: provider.trim() || null,
-        name_ar: nameAr.trim(),
-        name_en: nameEn.trim(),
-        instructions_ar: instructionsAr.trim() || null,
-        instructions_en: instructionsEn.trim() || null,
-        details: detailValues,
-        customer_visible: customerVisible,
-        display_order: methods.length,
+      const { error } = await supabase.rpc('create_payment_method_config', {
+        p_club_id: currentClubId!,
+        p_underlying_method: underlyingMethod,
+        p_provider: provider.trim(),
+        p_name_ar: nameAr.trim(),
+        p_name_en: nameEn.trim(),
+        p_instructions_ar: instructionsAr.trim(),
+        p_instructions_en: instructionsEn.trim(),
+        p_details: detailValues,
+        p_customer_visible: customerVisible,
+        p_reason: 'Payment method created from settings',
       })
       if (error) throw error
     },
