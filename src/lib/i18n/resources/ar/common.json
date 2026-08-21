@@ -660,6 +660,7 @@
     "no": "لا",
     "today": "اليوم",
     "status": "الحالة",
+    "branch": "الفرع",
     "actions": "إجراءات",
     "name": "الاسم",
     "phone": "رقم الهاتف",
@@ -2478,13 +2479,15 @@
     "emptyTitle": "لا يوجد موظفون بعد",
     "emptyDescription": "أضف أول موظف لبدء إدارة صلاحيات النادي",
     "roles": {
+      "club_owner": "صاحب النادي",
       "club_manager": "مدير النادي",
       "branch_manager": "مدير الفرع",
       "receptionist": "موظف استقبال",
       "accountant": "محاسب",
       "academy_manager": "مدير الأكاديمية",
       "coach": "مدرب",
-      "scanner": "ماسح QR"
+      "scanner": "ماسح QR",
+      "platform_owner": "مالك المنصة"
     },
     "detail": {
       "tabs": {
@@ -2530,6 +2533,7 @@
       "settleError": "تعذّر سداد هذه المديونية.",
       "reasonOptional": "السبب (اختياري)",
       "noLiabilitiesYet": "لا توجد مديونيات بعد",
+      "notFoundOrDenied": "تعذّر العثور على هذا الموظف، أو لا تملك صلاحية عرضه.",
       "reference": "المرجع",
       "viewCustomer": "عرض العميل",
       "groupBookings": "الحجوزات",

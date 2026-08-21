@@ -123,10 +123,11 @@ export function Employee360Page() {
   const [activeTab, setActiveTab] = useState<TabKey>('overview')
   const [settleLiability, setSettleLiability] = useState<LiabilityRow | null>(null)
 
-  const { data: summary, isLoading } = useQuery({
+  const { data: summary, isLoading, isError } = useQuery({
     queryKey: ['staff-360-summary', currentClubId, membershipId],
     queryFn: () => fetchSummary(currentClubId!, membershipId!),
     enabled: !!currentClubId && !!membershipId,
+    retry: false,
   })
   const { data: access } = useQuery({
     queryKey: ['staff-360-access', currentClubId, membershipId],
@@ -185,6 +186,17 @@ export function Employee360Page() {
     },
     onSuccess: invalidateAll,
   })
+
+  if (isError) {
+    return (
+      <div className="flex flex-col items-start gap-2 p-4 text-sm">
+        <p className="text-status-danger">{t('staff.detail.notFoundOrDenied', { defaultValue: "This employee couldn't be found, or you don't have access to view them." })}</p>
+        <button onClick={() => navigate('/app/staff')} className="text-accent-foreground hover:underline">
+          {t('staff.title')}
+        </button>
+      </div>
+    )
+  }
 
   if (isLoading || !summary) {
     return <div className="p-4 text-sm text-text-secondary">{t('common.loading', { defaultValue: 'Loading...' })}</div>
@@ -311,7 +323,7 @@ export function Employee360Page() {
                 { key: 'opened', header: t('staff.detail.opened', { defaultValue: 'Opened' }), render: (r: ShiftRow) => <span className="tabular-nums"><bdi>{new Date(r.opened_at).toLocaleString(locale === 'en' ? 'en-US' : 'ar-EG')}</bdi></span> },
                 { key: 'collected', header: t('staff.detail.collected', { defaultValue: 'Collected' }), render: (r: ShiftRow) => <MoneyDisplay amount={r.cash_collected} size="sm" /> },
                 { key: 'variance', header: t('staff.detail.variance', { defaultValue: 'Variance' }), render: (r: ShiftRow) => r.variance == null ? '—' : <MoneyDisplay amount={r.variance} tone={r.variance < 0 ? 'danger' : r.variance > 0 ? 'success' : 'default'} size="sm" /> },
-                { key: 'status', header: t('common.status', { defaultValue: 'Status' }), render: (r: ShiftRow) => <StatusBadge tone={r.status === 'open' ? 'warning' : 'neutral'} label={r.status === 'open' ? t('billing.cashShift.open', { defaultValue: 'Open' }) : t('billing.cashShift.closed', { defaultValue: 'Closed' })} /> },
+                { key: 'status', header: t('common.status', { defaultValue: 'Status' }), render: (r: ShiftRow) => <StatusBadge tone={r.status === 'open' ? 'warning' : 'neutral'} label={r.status === 'open' ? t('billing.cashShift.statusLabels.open', { defaultValue: 'Open' }) : t('billing.cashShift.statusLabels.closed', { defaultValue: 'Closed' })} /> },
               ] as DataTableColumn<ShiftRow>[]}
               rows={shifts?.rows ?? []}
               rowKey={(r) => r.id}

@@ -202,7 +202,7 @@ export function StaffPage() {
         </button>
       ),
     },
-    { key: 'role', header: t('staff.columns.role'), render: (r) => r.roleNameAr },
+    { key: 'role', header: t('staff.columns.role'), render: (r) => t(`staff.roles.${r.roleKey}`, { defaultValue: r.roleNameAr }) },
     {
       key: 'branches',
       header: t('staff.columns.branchScope'),

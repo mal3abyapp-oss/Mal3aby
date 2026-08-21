@@ -661,6 +661,7 @@
     "no": "No",
     "today": "Today",
     "status": "Status",
+    "branch": "Branch",
     "actions": "Actions",
     "name": "Name",
     "phone": "Phone number",
@@ -2479,13 +2480,15 @@
     "emptyTitle": "No staff yet",
     "emptyDescription": "Add your first staff member to start managing club permissions",
     "roles": {
+      "club_owner": "Club owner",
       "club_manager": "Club manager",
       "branch_manager": "Branch manager",
       "receptionist": "Receptionist",
       "accountant": "Accountant",
       "academy_manager": "Academy manager",
       "coach": "Coach",
-      "scanner": "QR scanner"
+      "scanner": "QR scanner",
+      "platform_owner": "Platform owner"
     },
     "detail": {
       "tabs": {
@@ -2531,6 +2534,7 @@
       "settleError": "Couldn't settle this liability.",
       "reasonOptional": "Reason (optional)",
       "noLiabilitiesYet": "No liabilities yet",
+      "notFoundOrDenied": "This employee couldn't be found, or you don't have access to view them.",
       "reference": "Reference",
       "viewCustomer": "View customer",
       "groupBookings": "Bookings",
