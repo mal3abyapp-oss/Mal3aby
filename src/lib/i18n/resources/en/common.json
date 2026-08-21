@@ -2628,8 +2628,8 @@
       "description": "Clear subscription plans, no hidden fees",
       "unavailable": "Plans aren't available right now.",
       "startFreeTrial": "Start your free trial",
-      "intervals": { "1": "Monthly", "3": "Quarterly", "6": "Semiannual", "12": "Annual" },
-      "discounts": { "1": "", "3": "Save 10%", "6": "Save 17%", "12": "Save 25%" }
+      "intervals": { "month_1": "Monthly", "month_3": "Quarterly", "month_6": "Semiannual", "year_1": "Annual" },
+      "discounts": { "month_3": "Save 10%", "month_6": "Save 17%", "year_1": "Save 25%" }
     },
     "home": {
       "heroTitle": "Manage your club, academy, and fields from one place",

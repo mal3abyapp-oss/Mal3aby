@@ -30,12 +30,12 @@ export function PricingPage() {
           {plans.map((p) => (
             <Card key={p.name_ar}>
               <CardHeader>
-                <CardTitle>{i18n.language.startsWith('ar') ? p.name_ar : t(`publicSite.pricing.intervals.${p.billing_interval_count}`)}</CardTitle>
+                <CardTitle>{i18n.language.startsWith('ar') ? p.name_ar : t(`publicSite.pricing.intervals.${p.billing_interval}_${p.billing_interval_count}`)}</CardTitle>
                 {p.description_ar && i18n.language.startsWith('ar') && <p className="text-sm text-text-secondary">{p.description_ar}</p>}
               </CardHeader>
               <CardContent className="flex flex-col gap-3">
                 <MoneyDisplay amount={Number(p.price)} currency={p.currency ?? 'EGP'} size="lg" />
-                {p.discount_label && <p className="text-sm text-status-success">{i18n.language.startsWith('ar') ? p.discount_label : t(`publicSite.pricing.discounts.${p.billing_interval_count}`)}</p>}
+                {p.discount_label && <p className="text-sm text-status-success">{i18n.language.startsWith('ar') ? p.discount_label : t(`publicSite.pricing.discounts.${p.billing_interval}_${p.billing_interval_count}`)}</p>}
                 {p.features_summary && i18n.language.startsWith('ar') && <p className="text-sm text-text-secondary">{p.features_summary}</p>}
                 <Button asChild className="mt-2">
                   <Link to="/signup">{t('publicSite.pricing.startFreeTrial')}</Link>
