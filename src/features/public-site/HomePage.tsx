@@ -26,7 +26,7 @@ async function fetchPublicPlans() {
 }
 
 export function HomePage() {
-  const { t } = useTranslation()
+  const { t, i18n } = useTranslation()
   const { data: plans = [] } = useQuery({ queryKey: ['public-plans-home'], queryFn: fetchPublicPlans })
 
   return (
@@ -70,11 +70,17 @@ export function HomePage() {
             {plans.map((p) => (
               <Card key={p.name_ar}>
                 <CardHeader>
-                  <CardTitle className="text-base">{p.name_ar}</CardTitle>
+                  <CardTitle className="text-base">
+                    {i18n.language.startsWith('ar') ? p.name_ar : t(`publicSite.pricing.intervals.${p.billing_interval_count}`)}
+                  </CardTitle>
                 </CardHeader>
                 <CardContent className="flex flex-col gap-2">
                   <MoneyDisplay amount={Number(p.price)} currency={p.currency ?? 'EGP'} size="lg" />
-                  {p.discount_label && <p className="text-sm text-status-success">{p.discount_label}</p>}
+                  {p.discount_label && (
+                    <p className="text-sm text-status-success">
+                      {i18n.language.startsWith('ar') ? p.discount_label : t(`publicSite.pricing.discounts.${p.billing_interval_count}`)}
+                    </p>
+                  )}
                 </CardContent>
               </Card>
             ))}
