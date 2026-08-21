@@ -1,0 +1,50 @@
+-- SECURITY FIX (P1, confirmed live-exploitable): the
+-- notification_consent_self_service_update RLS policy authorized a
+-- customer's own linked auth user against `customer_id` ownership only
+-- -- it never re-validated club_id, and RLS UPDATE policies cannot
+-- restrict individual columns, so the policy allowed a customer to
+-- rewrite ANY column on their own consent row, including club_id
+-- itself, to any value.
+--
+-- Confirmed live-exploitable, independently reproduced (rolled back,
+-- no persisted change):
+--   1. A real Club A staff member legitimately creates a consent row
+--      for a real Club A self-service customer via
+--      record_staff_whatsapp_consent (correctly club-scoped, correctly
+--      rejects a foreign staff member).
+--   2. That customer's own linked auth.users session (self-service)
+--      runs: update notification_consent set club_id = <Club B's id>
+--      where customer_id = <themself> -- this SUCCEEDED, rewriting the
+--      row's tenant to a completely unrelated club with no
+--      relationship to this customer at all.
+--   3. Club B's own staff, using their own completely normal,
+--      unmodified club-scoped SELECT policy, would now see this
+--      forged row -- a direct cross-tenant PII leak (phone_e164,
+--      phone_display) plus data corruption (Club A's real consent
+--      record becomes unreachable via any RPC once club_id no longer
+--      matches, since every RPC requires nc.club_id = p_club_id).
+--
+-- Root cause: the unique constraint on this table is (customer_id,
+-- channel) with no club_id component, and the self-service policy
+-- assumed customer_id ownership alone was a sufficient tenant boundary
+-- -- it is not, because club_id itself is one of the columns the
+-- policy allowed the customer to write.
+--
+-- Fix: drop the self-service UPDATE policy entirely. Confirmed via a
+-- full-repo grep that nothing in this codebase currently performs a
+-- direct table write against notification_consent -- the one existing
+-- staff-facing consent-revoke UI (Customer360Page.tsx) already
+-- correctly goes through set_customer_whatsapp_consent(), a dedicated,
+-- properly club-scoped RPC that never touches club_id/phone/name. A
+-- future genuine customer self-service consent feature should get its
+-- own narrow SECURITY DEFINER RPC (matching every other consent-write
+-- path in this project) that only ever toggles enabled/revoked_at for
+-- the caller's own, unchanged club_id -- never a raw table UPDATE
+-- policy, which cannot safely restrict which columns are writable.
+--
+-- The self-service SELECT policy (notification_consent_self_service_select)
+-- is unaffected by this migration -- it only ever exposes the caller's
+-- own row for reading, has no analogous column-rewrite risk, and IS
+-- used by nothing today either but poses no comparable danger sitting
+-- unused.
+drop policy if exists notification_consent_self_service_update on public.notification_consent;
