@@ -2360,6 +2360,7 @@ export type Database = {
           club_id: string
           created_at: string
           dedup_key: string | null
+          delivered_at: string | null
           event_id: string | null
           expires_at: string | null
           id: string
@@ -2370,7 +2371,9 @@ export type Database = {
           media_type: string | null
           next_attempt_at: string | null
           priority: string
+          provider_accepted_at: string | null
           provider_reference: string | null
+          read_at: string | null
           recipient_customer_id: string | null
           recipient_email: string | null
           recipient_phone: string | null
@@ -2385,6 +2388,7 @@ export type Database = {
           club_id: string
           created_at?: string
           dedup_key?: string | null
+          delivered_at?: string | null
           event_id?: string | null
           expires_at?: string | null
           id?: string
@@ -2395,7 +2399,9 @@ export type Database = {
           media_type?: string | null
           next_attempt_at?: string | null
           priority?: string
+          provider_accepted_at?: string | null
           provider_reference?: string | null
+          read_at?: string | null
           recipient_customer_id?: string | null
           recipient_email?: string | null
           recipient_phone?: string | null
@@ -2410,6 +2416,7 @@ export type Database = {
           club_id?: string
           created_at?: string
           dedup_key?: string | null
+          delivered_at?: string | null
           event_id?: string | null
           expires_at?: string | null
           id?: string
@@ -2420,7 +2427,9 @@ export type Database = {
           media_type?: string | null
           next_attempt_at?: string | null
           priority?: string
+          provider_accepted_at?: string | null
           provider_reference?: string | null
+          read_at?: string | null
           recipient_customer_id?: string | null
           recipient_email?: string | null
           recipient_phone?: string | null
@@ -6252,6 +6261,10 @@ export type Database = {
         Args: { p_invoice_id: string; p_reason: string }
         Returns: undefined
       }
+      whatsapp_connector_claim_generation: {
+        Args: { p_club_id: string }
+        Returns: number
+      }
       whatsapp_connector_claim_next_batch: {
         Args: { p_limit?: number }
         Returns: {
@@ -6305,6 +6318,14 @@ export type Database = {
       whatsapp_connector_load_session: {
         Args: { p_club_id: string }
         Returns: string
+      }
+      whatsapp_connector_mark_provider_reference: {
+        Args: { p_provider_reference: string; p_queue_id: string }
+        Returns: undefined
+      }
+      whatsapp_connector_report_delivery_receipt: {
+        Args: { p_provider_reference: string; p_status_level: number }
+        Returns: undefined
       }
       whatsapp_connector_report_send_result: {
         Args: {

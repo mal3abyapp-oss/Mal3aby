@@ -51,6 +51,19 @@ interface ActivityRow {
   lastError: string | null
   attempts: number
   referenceType: string | null
+  // WHATSAPP DELIVERY TRUTH fix (2026-08-22, real production defect):
+  // 'sent' previously meant, and was labeled as, "delivered" -- it only
+  // ever proved the connector's own outbound socket write completed,
+  // never that WhatsApp's server or the recipient's device received
+  // anything. These three columns carry the REAL evidence (a genuine
+  // WhatsApp-server-originated receipt, see
+  // supabase/migrations/20260822010000) -- null means no such receipt
+  // has arrived, which for a row queued before this fix shipped means
+  // "unverified" forever (the receipt listener did not exist yet), not
+  // "not delivered". Never fabricated or backfilled.
+  providerAcceptedAt: string | null
+  deliveredAt: string | null
+  readAt: string | null
 }
 
 // Template/status label text lives in i18n resources under
@@ -71,14 +84,25 @@ const TEMPLATE_LABEL_KEYS = [
   'invoice-created',
 ] as const
 
-const STATUS_LABEL_KEYS = ['pending', 'retrying', 'sent', 'failed', 'expired', 'cancelled', 'suppressed_invalid_recipient', 'suppressed_no_consent'] as const
+// WHATSAPP DELIVERY TRUTH fix (2026-08-22): 'delivered' was defined in
+// the DB CHECK constraint from the start but never actually written by
+// anything (confirmed live) until this fix wired up a real receipt
+// listener -- see supabase/migrations/20260822010000. It now
+// represents genuine evidence-backed delivery, distinct from 'sent'
+// (provider-accepted only).
+const STATUS_LABEL_KEYS = ['pending', 'retrying', 'sent', 'delivered', 'failed', 'expired', 'cancelled', 'suppressed_invalid_recipient', 'suppressed_no_consent'] as const
 
 const STATUS_LABEL_KEYS_WITH_ALL = ['all', ...STATUS_LABEL_KEYS] as const
 
 const STATUS_TONE: Record<string, StatusTone> = {
   pending: 'neutral',
   retrying: 'warning',
-  sent: 'success',
+  // 'sent' is intentionally NOT 'success' anymore -- it only proves
+  // provider acceptance, not real delivery (the exact overstatement
+  // this fix corrects). 'delivered' below is the genuinely
+  // evidence-backed success state.
+  sent: 'neutral',
+  delivered: 'success',
   failed: 'danger',
   expired: 'danger',
   cancelled: 'neutral',
@@ -96,7 +120,7 @@ const STATUS_TONE: Record<string, StatusTone> = {
 async function fetchActivity(clubId: string, status: string, templateKey: string): Promise<ActivityRow[]> {
   let query = supabase
     .from('notification_queue')
-    .select('id, template_key, status, recipient_phone, recipient_customer_id, customers(full_name), created_at, scheduled_at, last_attempt_at, last_error, attempts')
+    .select('id, template_key, status, recipient_phone, recipient_customer_id, customers(full_name), created_at, scheduled_at, last_attempt_at, last_error, attempts, provider_accepted_at, delivered_at, read_at')
     .eq('club_id', clubId)
     .eq('channel', 'whatsapp')
     .order('created_at', { ascending: false })
@@ -122,6 +146,9 @@ async function fetchActivity(clubId: string, status: string, templateKey: string
     lastError: r.last_error,
     attempts: r.attempts,
     referenceType: null,
+    providerAcceptedAt: r.provider_accepted_at,
+    deliveredAt: r.delivered_at,
+    readAt: r.read_at,
   }))
 }
 
@@ -141,6 +168,10 @@ async function fetchFailedActivity(clubId: string): Promise<ActivityRow[]> {
     lastError: r.last_error,
     attempts: r.attempts,
     referenceType: r.reference_type,
+    // A failed row structurally cannot have delivery evidence.
+    providerAcceptedAt: null,
+    deliveredAt: null,
+    readAt: null,
   }))
 }
 
@@ -305,6 +336,28 @@ export function WhatsAppActivityTab({
                       )}
                       {r.status === 'suppressed_no_consent' && (
                         <p className="mt-1 max-w-xs text-xs text-status-warning">{t('whatsapp.page.activityTab.noConsentDetail')}</p>
+                      )}
+                      {/* WHATSAPP DELIVERY TRUTH fix (2026-08-22): a
+                          'sent' row with no deliveredAt is either
+                          genuinely awaiting a receipt, OR a legacy row
+                          from before the receipt listener existed --
+                          this cannot be distinguished from providerAcceptedAt
+                          alone, so both are honestly labeled
+                          "unverified" rather than silently implying
+                          delivery. Never claim more than the evidence
+                          supports. */}
+                      {r.status === 'sent' && !r.deliveredAt && (
+                        <p className="mt-1 max-w-xs text-xs text-text-secondary">{t('whatsapp.page.activityTab.sentLegacyUnverified')}</p>
+                      )}
+                      {r.deliveredAt && (
+                        <p className="mt-1 max-w-xs text-xs text-text-secondary">
+                          {t('whatsapp.page.activityTab.deliveredAtLabel')}: {formatDateTime(r.deliveredAt, i18n.language)}
+                        </p>
+                      )}
+                      {r.readAt && (
+                        <p className="mt-1 max-w-xs text-xs text-text-secondary">
+                          {t('whatsapp.page.activityTab.readAtLabel')}: {formatDateTime(r.readAt, i18n.language)}
+                        </p>
                       )}
                     </td>
                     <td className="p-2 text-xs text-text-secondary">{formatDateTime(r.scheduledAt, i18n.language)}</td>
