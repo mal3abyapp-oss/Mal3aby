@@ -146,7 +146,8 @@ const RECONNECT_BACKOFF_MS = [2000, 5000, 10000, 20000, 30000, 60000]
 const STABLE_CONNECTION_WINDOW_MS = 45000
 const MAX_RECONNECT_ATTEMPTS = 8
 
-function tenantAuthDir(clubId: string): string {
+/** Exported for test purposes only (authDirClearedOnLogoutTest.ts) -- every real caller in this file uses it unqualified. */
+export function tenantAuthDir(clubId: string): string {
   const hash = createHash('sha256').update(clubId).digest('hex')
   return path.join(TEMP_AUTH_ROOT, hash)
 }
@@ -652,6 +653,46 @@ export class BaileysProvider implements WhatsAppProvider {
           // NOT auto-reconnect -- that would silently re-request a
           // session the user deliberately ended.
           this.setState('logged_out', { error: 'Session was logged out.' })
+
+          // QR-PAIRING-AFTER-LOGOUT FIX (2026-08-21, real production
+          // incident): a WhatsApp-SIDE logout (not an explicit
+          // logout()) reached exactly this branch but historically
+          // never cleared the local auth directory -- only the
+          // explicit logout() method did that. The stale, WhatsApp-
+          // invalidated creds.json (registered:true) survived on local
+          // disk, so the NEXT initializeConnection() call (a fresh
+          // pairing request via start_whatsapp_pairing) re-read those
+          // same dead credentials via useMultiFileAuthState() and
+          // attempted to RESUME the old identity instead of starting a
+          // genuinely fresh, unregistered handshake. WhatsApp's own
+          // servers correctly recognized the resumed identity as
+          // already logged out and terminated the connection with
+          // ANOTHER loggedOut disconnect BEFORE ever sending the
+          // server-side `iq pair-device` stanza that triggers Baileys'
+          // own QR emission (confirmed by reading Baileys'
+          // socket.js -- QR generation is entirely server-driven, only
+          // offered when the presented identity is not already a dead
+          // registered one) -- confirmed live: 5 consecutive real
+          // pairing attempts on production each cycled
+          // connecting -> logged_out in 2-6 seconds, zero QR ever
+          // emitted.
+          //
+          // Fix: clear the local auth dir on ANY confirmed loggedOut
+          // transition, not only an explicit operator-initiated
+          // logout() call -- mirrors what logout() already correctly
+          // does, applied to the other real-world path that reaches
+          // the same terminal state. Best-effort (never let a cleanup
+          // failure crash the connection-close handler) and awaited
+          // only via a fire-and-forget promise, matching this handler's
+          // own synchronous-callback shape (connection.update cannot
+          // itself be async) -- the NEXT initializeConnection() call
+          // (whenever start_whatsapp_pairing next fires) is what
+          // actually depends on this having completed by then, and a
+          // human-driven QR request is always several seconds away at
+          // minimum, ample time for a local filesystem rm to finish.
+          void rm(tenantAuthDir(this.clubId), { recursive: true, force: true }).catch((err) => {
+            this.logger.error({ err: (err as Error).message }, 'failed to clear local auth dir after a WhatsApp-side logout (non-fatal, but the next pairing attempt may incorrectly try to resume the dead session)')
+          })
           return
         }
 
