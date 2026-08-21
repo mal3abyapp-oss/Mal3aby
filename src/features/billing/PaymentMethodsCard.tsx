@@ -122,7 +122,7 @@ async function fetchPaymentMethods(clubId: string): Promise<PaymentMethodRow[]> 
 
 export function PaymentMethodsCard() {
   const { currentClubId } = useAuth()
-  const { t } = useTranslation()
+  const { t, i18n } = useTranslation()
   const queryClient = useQueryClient()
   const [dialogOpen, setDialogOpen] = useState(false)
   const [editingMethod, setEditingMethod] = useState<PaymentMethodRow | null>(null)
@@ -335,11 +335,16 @@ export function PaymentMethodsCard() {
               <div className="flex min-w-0 flex-wrap items-center gap-2">
                 <CreditCard className="size-4 shrink-0 text-text-secondary" />
                 <div>
-                  <p className="font-medium">{m.nameAr}</p>
+                  <p className="font-medium">{i18n.language.startsWith('ar') ? m.nameAr : m.nameEn}</p>
                   <p className="text-xs text-text-secondary">
                     {t(UNDERLYING_METHOD_LABEL_KEYS[m.underlyingMethod])}
                     {Object.entries(m.details).filter(([, v]) => v).map(([, v]) => ` — ${v}`).join('')}
                   </p>
+                  {(i18n.language.startsWith('ar') ? m.instructionsAr : m.instructionsEn) && (
+                    <p className="mt-1 text-xs text-text-secondary">
+                      {i18n.language.startsWith('ar') ? m.instructionsAr : m.instructionsEn}
+                    </p>
+                  )}
                 </div>
               </div>
               <div className="flex flex-wrap items-center gap-2">
