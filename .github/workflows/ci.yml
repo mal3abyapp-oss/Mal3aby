@@ -69,6 +69,12 @@ jobs:
 
       - name: Unit tests (integration suites skip without QA secrets -- see workflow header)
         run: npm test
+        env:
+          # Unit suites import the shared client but never contact Supabase.
+          # Provide inert public-shaped values so module initialization succeeds;
+          # authenticated integration suites still skip without their QA secrets.
+          VITE_SUPABASE_URL: https://ci-placeholder.supabase.co
+          VITE_SUPABASE_ANON_KEY: ci-placeholder-anon-key
         # env:
         #   CUSTOMER_360_TEST_EMAIL: ${{ secrets.CUSTOMER_360_TEST_EMAIL }}
         #   CUSTOMER_360_TEST_PASSWORD: ${{ secrets.CUSTOMER_360_TEST_PASSWORD }}
