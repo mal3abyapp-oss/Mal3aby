@@ -158,7 +158,21 @@
       // BaileysProvider.ts's dbGeneration field doc comment and the
       // migration's own comment for the full incident and fix.
       // GitHub Actions run 32515277302.
-      "image": "registry.cloudflare.com/35ac10727701095866b16c276b4a33d1/mala3by-whatsapp-connector:0a33c27",
+      // v15, commit a513976 -- QR-PAIRING-AFTER-LOGOUT fix: a
+      // WhatsApp-side logout (connection.update's own loggedOut branch,
+      // distinct from an explicit logout() call) never cleared the
+      // local auth directory, only logout() did. The stale, WhatsApp-
+      // invalidated creds.json survived on local disk, so every
+      // subsequent "Link WhatsApp" pairing attempt re-read it and tried
+      // to RESUME the dead identity instead of starting fresh --
+      // WhatsApp's servers correctly rejected the resume with another
+      // loggedOut before ever offering a QR. Confirmed live: 5
+      // consecutive real pairing attempts on production each cycled
+      // connecting -> logged_out in 2-6 seconds, zero QR ever emitted.
+      // Fix: the loggedOut branch now also clears the local auth dir,
+      // mirroring logout()'s own existing correct behavior. GitHub
+      // Actions run 32522227116.
+      "image": "registry.cloudflare.com/35ac10727701095866b16c276b4a33d1/mala3by-whatsapp-connector:a513976",
       // One container instance per WhatsApp account (one Durable
       // Object = one container, directive rule 21's chosen model --
       // NOT a shared container serving multiple clubs, which would
