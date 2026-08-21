@@ -58,7 +58,7 @@ jobs:
             echo "::error::possible service_role key committed"
             exit 1
           fi
-          if git grep -nE "sk_live_|sk_test_[A-Za-z0-9]{16,}" -- . ':!*.md'; then
+          if git grep -nE "sk_live_|sk_test_[A-Za-z0-9]{16,}" -- . ':!*.md' ':!.github/workflows/*'; then
             echo "::error::possible live/test secret key committed"
             exit 1
           fi
