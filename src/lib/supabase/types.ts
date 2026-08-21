@@ -4708,55 +4708,6 @@ export type Database = {
       }
     }
     Functions: {
-      archive_field_pricing_rules: {
-        Args: { p_field_id: string; p_reason?: string; p_rule_ids: string[] }
-        Returns: undefined
-      }
-      create_field_pricing_rules: {
-        Args: { p_field_id: string; p_reason?: string; p_rules: Json }
-        Returns: Database["public"]["Tables"]["pricing_rules"]["Row"][]
-      }
-      create_payment_method_config: {
-        Args: {
-          p_club_id: string
-          p_customer_visible: boolean
-          p_details: Json
-          p_instructions_ar: string
-          p_instructions_en: string
-          p_name_ar: string
-          p_name_en: string
-          p_provider: string
-          p_reason?: string
-          p_underlying_method: string
-        }
-        Returns: Database["public"]["Tables"]["payment_method_configs"]["Row"]
-      }
-      manage_branch: {
-        Args: {
-          p_address: string
-          p_branch_code: string
-          p_branch_id: string | null
-          p_club_id: string
-          p_name: string
-          p_phone: string
-          p_phone_e164: string
-          p_reason?: string
-          p_status?: string
-        }
-        Returns: Database["public"]["Tables"]["branches"]["Row"]
-      }
-      manage_field: {
-        Args: {
-          p_branch_id: string
-          p_club_id: string
-          p_field_id: string | null
-          p_name: string
-          p_reason?: string
-          p_sport: string
-          p_status?: string
-        }
-        Returns: Database["public"]["Tables"]["fields"]["Row"]
-      }
       _activate_subscription_if_due_internal: {
         Args: { p_explicit?: boolean; p_subscription_id: string }
         Returns: boolean
@@ -4806,6 +4757,10 @@ export type Database = {
       approve_payment_proof: {
         Args: { p_payment_method?: string; p_proof_id: string }
         Returns: string
+      }
+      archive_field_pricing_rules: {
+        Args: { p_field_id: string; p_reason?: string; p_rule_ids: string[] }
+        Returns: undefined
       }
       cancel_booking: {
         Args: { p_booking_id: string; p_reason: string }
@@ -4956,6 +4911,67 @@ export type Database = {
           conflicting_booking_ids: string[]
         }[]
       }
+      create_field_pricing_rules: {
+        Args: { p_field_id: string; p_reason?: string; p_rules: Json }
+        Returns: {
+          club_id: string
+          created_at: string
+          date_specific: string | null
+          day_of_week: number | null
+          end_time: string
+          field_id: string | null
+          id: string
+          price_per_hour: number
+          priority: number
+          start_time: string
+          updated_at: string | null
+        }[]
+        SetofOptions: {
+          from: "*"
+          to: "pricing_rules"
+          isOneToOne: false
+          isSetofReturn: true
+        }
+      }
+      create_payment_method_config: {
+        Args: {
+          p_club_id: string
+          p_customer_visible: boolean
+          p_details: Json
+          p_instructions_ar: string
+          p_instructions_en: string
+          p_name_ar: string
+          p_name_en: string
+          p_provider: string
+          p_reason?: string
+          p_underlying_method: string
+        }
+        Returns: {
+          club_id: string
+          created_at: string
+          created_by: string | null
+          customer_visible: boolean
+          details: Json
+          display_order: number
+          id: string
+          instructions_ar: string | null
+          instructions_en: string | null
+          is_active: boolean
+          name_ar: string
+          name_en: string
+          proof_required: boolean
+          provider: string | null
+          reference_required: boolean
+          underlying_method: string
+          updated_at: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "payment_method_configs"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
       create_platform_subscription: {
         Args: {
           p_club_id: string
@@ -4966,6 +4982,21 @@ export type Database = {
           p_trial_origin?: string
         }
         Returns: string
+      }
+      create_player_with_guardian: {
+        Args: {
+          p_club_id: string
+          p_customer_id?: string
+          p_date_of_birth?: string
+          p_full_name: string
+          p_gender?: string
+          p_is_primary?: boolean
+          p_relationship?: string
+        }
+        Returns: {
+          guardian_link_id: string
+          player_id: string
+        }[]
       }
       create_public_booking: {
         Args: {
@@ -5400,6 +5431,10 @@ export type Database = {
           pending_count: number
         }[]
       }
+      get_player_360_summary: {
+        Args: { p_club_id: string; p_player_id: string }
+        Returns: Json
+      }
       get_public_booking_receipt_contact: {
         Args: { p_booking_id: string }
         Returns: {
@@ -5612,10 +5647,86 @@ export type Database = {
         Args: { p_branch_id: string; p_club_id: string }
         Returns: string
       }
+      link_guardian_to_player: {
+        Args: {
+          p_customer_id: string
+          p_is_primary?: boolean
+          p_player_id: string
+          p_relationship?: string
+        }
+        Returns: string
+      }
       log_own_password_changed: { Args: never; Returns: undefined }
       log_password_reset_event: {
         Args: { p_kind: string; p_target_user_id?: string }
         Returns: undefined
+      }
+      manage_branch: {
+        Args: {
+          p_address: string
+          p_branch_code: string
+          p_branch_id: string
+          p_club_id: string
+          p_name: string
+          p_phone: string
+          p_phone_e164: string
+          p_reason?: string
+          p_status?: string
+        }
+        Returns: {
+          address: string | null
+          branch_code: string
+          club_id: string
+          created_at: string
+          created_by: string | null
+          id: string
+          name: string
+          opening_hours: Json | null
+          phone: string | null
+          phone_e164: string | null
+          status: string
+          updated_at: string | null
+        }
+        SetofOptions: {
+          from: "*"
+          to: "branches"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      manage_field: {
+        Args: {
+          p_branch_id: string
+          p_club_id: string
+          p_field_id: string
+          p_name: string
+          p_reason?: string
+          p_sport: string
+          p_status?: string
+        }
+        Returns: {
+          branch_id: string
+          capacity: number | null
+          club_id: string
+          created_at: string
+          created_by: string | null
+          default_duration_minutes: number
+          id: string
+          images: Json | null
+          indoor: boolean
+          maintenance_status: string | null
+          name: string
+          notes: string | null
+          sport: string
+          status: string
+          updated_at: string | null
+        }
+        SetofOptions: {
+          from: "*"
+          to: "fields"
+          isOneToOne: true
+          isSetofReturn: false
+        }
       }
       mark_attendance: {
         Args: { p_player_id: string; p_session_id: string; p_status: string }
@@ -5877,6 +5988,10 @@ export type Database = {
         Args: { p_is_public: boolean; p_plan_id: string }
         Returns: undefined
       }
+      set_primary_guardian: {
+        Args: { p_customer_id: string; p_player_id: string }
+        Returns: undefined
+      }
       set_staff_branch_scope: {
         Args: {
           p_branch_ids: string[]
@@ -5915,6 +6030,10 @@ export type Database = {
         Args: { p_reason?: string; p_subscription_id: string }
         Returns: undefined
       }
+      unlink_guardian_from_player: {
+        Args: { p_guardian_link_id: string }
+        Returns: undefined
+      }
       unquarantine_customer: {
         Args: { p_club_id: string; p_customer_id: string }
         Returns: undefined
@@ -5928,7 +6047,30 @@ export type Database = {
           p_status: string
           p_subscription_price: number
         }
-        Returns: Database["public"]["Tables"]["groups"]["Row"]
+        Returns: {
+          age_group_id: string | null
+          assistant_coach_id: string | null
+          branch_id: string
+          capacity: number
+          club_id: string
+          coach_id: string | null
+          created_at: string
+          created_by: string | null
+          field_id: string | null
+          id: string
+          name: string
+          program_id: string | null
+          season_id: string | null
+          status: string
+          subscription_price: number | null
+          updated_at: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "groups"
+          isOneToOne: true
+          isSetofReturn: false
+        }
       }
       update_government_compliance_policy: {
         Args: {
@@ -5947,14 +6089,6 @@ export type Database = {
         }
         Returns: string
       }
-      update_platform_contact: {
-        Args: {
-          p_platform_email: string
-          p_platform_phone: string
-          p_platform_phone_e164?: string
-        }
-        Returns: undefined
-      }
       update_payment_method_config: {
         Args: {
           p_config_id: string
@@ -5968,7 +6102,39 @@ export type Database = {
           p_provider: string
           p_reason?: string
         }
-        Returns: Database["public"]["Tables"]["payment_method_configs"]["Row"]
+        Returns: {
+          club_id: string
+          created_at: string
+          created_by: string | null
+          customer_visible: boolean
+          details: Json
+          display_order: number
+          id: string
+          instructions_ar: string | null
+          instructions_en: string | null
+          is_active: boolean
+          name_ar: string
+          name_en: string
+          proof_required: boolean
+          provider: string | null
+          reference_required: boolean
+          underlying_method: string
+          updated_at: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "payment_method_configs"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      update_platform_contact: {
+        Args: {
+          p_platform_email: string
+          p_platform_phone: string
+          p_platform_phone_e164?: string
+        }
+        Returns: undefined
       }
       update_platform_plan: {
         Args: {
@@ -5977,10 +6143,44 @@ export type Database = {
           p_price: number
           p_reason?: string
         }
-        Returns: Database["public"]["Tables"]["platform_plans"]["Row"]
+        Returns: {
+          billing_interval: string
+          billing_interval_count: number
+          created_at: string
+          currency: string
+          default_grace_period_days: number
+          description_ar: string | null
+          discount_label: string | null
+          display_order: number
+          features_summary: string | null
+          id: string
+          is_public: boolean
+          name: string
+          name_ar: string
+          price: number
+          status: string
+          updated_at: string | null
+        }
+        SetofOptions: {
+          from: "*"
+          to: "platform_plans"
+          isOneToOne: true
+          isSetofReturn: false
+        }
       }
       update_platform_settings: {
         Args: { p_default_trial_days: number }
+        Returns: undefined
+      }
+      update_player: {
+        Args: {
+          p_date_of_birth?: string
+          p_full_name?: string
+          p_gender?: string
+          p_medical_notes?: string
+          p_player_id: string
+          p_status?: string
+        }
         Returns: undefined
       }
       upsert_customer: {
@@ -6000,6 +6200,14 @@ export type Database = {
         }[]
       }
       user_club_ids: { Args: never; Returns: string[] }
+      user_has_branch_access: {
+        Args: { p_branch_id: string; p_club_id: string }
+        Returns: boolean
+      }
+      user_has_field_access: {
+        Args: { p_club_id: string; p_field_id: string }
+        Returns: boolean
+      }
       verify_booking_qr_public: {
         Args: { p_token: string }
         Returns: {

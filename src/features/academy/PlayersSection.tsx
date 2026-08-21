@@ -30,6 +30,7 @@ import { useOfficialReceipt, OfficialCollectionReceiptFields } from '@/component
 import { PAYMENT_METHOD_LABELS, fetchInvoicePaymentSummaries } from '@/lib/domain/billing'
 import { addMonthsToDate, getAcademySubscriptionDisplayStatus } from '@/lib/domain/academy'
 import { PlayerStatusPanel } from './PlayerStatusPanel'
+import { Zap } from 'lucide-react'
 
 // Academy radical simplification directive sections 6-8: Player is a
 // minimal operational record (name + guardian link), never a scouting
@@ -182,10 +183,16 @@ export function PlayersSection() {
     {
       key: 'name',
       header: t('common.name'),
+      // Academy Player/Guardian/Customer integrity closure (directive
+      // section 20/65): "click player -> Player 360... Player 360 is the
+      // canonical detail/edit location." The old inline PlayerDetailDialog
+      // remains reachable via a separate quick-actions button (attendance
+      // QR, fast subscribe/collect) but is no longer the primary
+      // destination of the player's own name.
       render: (p) => (
-        <button className="font-medium text-accent-foreground hover:underline" onClick={() => setSelectedPlayer(p)}>
+        <Link to={`/app/academy/players/${p.id}`} className="font-medium text-accent-foreground hover:underline">
           {p.fullName}
-        </button>
+        </Link>
       ),
     },
     { key: 'guardian', header: t('academy.players.guardianColumn'), render: (p) => p.guardianName ?? '—' },
@@ -204,6 +211,23 @@ export function PlayersSection() {
           tone={p.displayStatus === 'active' ? 'success' : p.displayStatus === 'due' || p.displayStatus === 'frozen' ? 'warning' : p.displayStatus === 'expired' ? 'danger' : 'neutral'}
           label={t(`academy.subscriptionStatusLabels.${p.displayStatus}`, { defaultValue: p.displayStatus === 'none' ? t('academy.players.noActiveSubscription') : p.displayStatus })}
         />
+      ),
+    },
+    {
+      key: 'quickActions',
+      header: '',
+      // Directive section 20: "Quick actions may remain where useful, but
+      // Player 360 is the canonical detail/edit location" -- keeps the
+      // existing fast subscribe/collect/attendance-QR dialog reachable
+      // without it being the primary destination of the player's name.
+      render: (p) => (
+        <button
+          className="rounded-md p-1.5 text-text-secondary hover:bg-muted hover:text-text-primary"
+          title={t('academy.players.quickActions', { defaultValue: 'Quick actions' })}
+          onClick={() => setSelectedPlayer(p)}
+        >
+          <Zap className="size-4" />
+        </button>
       ),
     },
   ]
@@ -296,51 +320,49 @@ function AddPlayerDialog({ onAdded }: { onAdded: () => void }) {
   const [playerName, setPlayerName] = useState('')
   const [error, setError] = useState<string | null>(null)
 
-  // Customer 360 closure gap: this dialog previously ran its own
-  // check-then-insert against `customers` (not upsert_customer's
-  // concurrency-safe path) and wrote consent through legacy
-  // normalizeMobile() digit-stripping instead of the real E.164
-  // pipeline -- the exact drift the shared CustomerSelector exists to
-  // eliminate. The guardian is never re-created here: CustomerSelector
-  // already returns either an existing customer's real id or a
-  // freshly upsert_customer-created one.
+  // Academy Player/Guardian/Customer integrity closure: previously two
+  // independent client-side .insert() calls (players, then
+  // guardian_links) with no transaction -- a failure between them left
+  // an orphan player with zero guardians, which later hard-failed
+  // billing (create_enrollment_with_subscription requires a resolvable
+  // payer). create_player_with_guardian does both writes in one
+  // transaction server-side. Guardian is also no longer force-required
+  // here: a player can legitimately exist with zero guardians (added
+  // later from either Player 360 or here) -- the RPC accepts a null
+  // customer id, matching directive rule 7/49 ("do not require a
+  // guardian for every player without a real business rule").
   const addMutation = useMutation({
     mutationFn: async () => {
-      if (!guardian) throw new Error(t('academy.players.chooseCustomer'))
-
-      const { data: player, error: playerError } = await supabase
-        .from('players')
-        .insert({ club_id: currentClubId as string, full_name: playerName })
-        .select('id')
-        .single()
-      if (playerError) throw playerError
-
-      const { error: linkError } = await supabase.from('guardian_links').insert({
-        customer_id: guardian.id,
-        player_id: player.id,
-        relationship: 'guardian',
-        is_primary: true,
+      const { error: rpcError } = await supabase.rpc('create_player_with_guardian', {
+        p_club_id: currentClubId as string,
+        p_full_name: playerName,
+        p_customer_id: guardian?.id ?? undefined,
+        p_relationship: 'guardian',
+        p_is_primary: true,
       })
-      if (linkError) throw linkError
+      if (rpcError) throw rpcError
     },
     onSuccess: onAdded,
     onError: (err) => setError(translateSupabaseError(err, t('academy.players.addError'))),
   })
 
-  const canSubmit = !!playerName.trim() && !!guardian
+  const canSubmit = !!playerName.trim()
 
   return (
     <DialogContent>
       <DialogHeader><DialogTitle>{t('academy.players.addPlayer')}</DialogTitle></DialogHeader>
       <div className="flex flex-col gap-3">
         <div className="flex flex-col gap-1.5">
-          <label className="text-sm font-medium text-text-secondary">{t('academy.players.guardianColumn')}</label>
-          <CustomerSelector clubId={currentClubId as string} value={guardian} onSelect={setGuardian} />
+          <label className="text-sm font-medium text-text-secondary">{t('academy.players.fullName')}</label>
+          <Input required value={playerName} onChange={(e) => setPlayerName(e.target.value)} />
         </div>
 
         <div className="flex flex-col gap-1.5">
-          <label className="text-sm font-medium text-text-secondary">{t('academy.players.fullName')}</label>
-          <Input required value={playerName} onChange={(e) => setPlayerName(e.target.value)} />
+          <label className="text-sm font-medium text-text-secondary">
+            {t('academy.players.guardianColumn')} <span className="font-normal text-text-secondary">({t('common.optional', { defaultValue: 'optional' })})</span>
+          </label>
+          <CustomerSelector clubId={currentClubId as string} value={guardian} onSelect={setGuardian} />
+          <p className="text-xs text-text-secondary">{t('academy.players.guardianOptionalHint', { defaultValue: 'You can add a guardian later from the player’s page.' })}</p>
         </div>
 
         {error && <p role="alert" className="text-sm text-status-danger">{error}</p>}

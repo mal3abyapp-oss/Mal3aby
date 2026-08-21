@@ -128,6 +128,7 @@ export function Customer360Page() {
   const [editOpen, setEditOpen] = useState(false)
   const [collectOpen, setCollectOpen] = useState(false)
   const [collectInvoice, setCollectInvoice] = useState<LedgerRow | null>(null)
+  const [addPlayerOpen, setAddPlayerOpen] = useState(false)
 
   const { data: summary, isLoading: summaryLoading } = useQuery({
     queryKey: ['customer-360-summary', currentClubId, customerId],
@@ -288,10 +289,25 @@ export function Customer360Page() {
         </TabsContent>
 
         <TabsContent value="academy">
-          <div className="mt-4">
+          <div className="mt-4 flex flex-col gap-3">
+            {/* Academy Player/Guardian/Customer integrity closure (directive
+                sections 13-14): mandatory "Add Player" workflow from
+                Customer 360 -- the current customer automatically becomes
+                the guardian relationship, no duplicate customer creation,
+                no re-searching for the guardian. */}
+            <div className="flex justify-end">
+              <Button size="sm" onClick={() => setAddPlayerOpen(true)}>{t('academy.players.addPlayer')}</Button>
+            </div>
             <DataTable
               columns={[
-                { key: 'name', header: t('common.name'), render: (p: PlayerRow) => <div>{p.full_name}<span className="ms-2 text-xs text-text-secondary">{t(`customers.relationshipLabels.${p.relationship}`, { defaultValue: p.relationship })}{p.is_primary ? ` ${t('academy.players.primary')}` : ''}</span></div> },
+                {
+                  key: 'name', header: t('common.name'), render: (p: PlayerRow) => (
+                    <Link to={`/app/academy/players/${p.player_id}`} className="text-accent-foreground hover:underline">
+                      {p.full_name}
+                      <span className="ms-2 text-xs text-text-secondary">{t(`customers.relationshipLabels.${p.relationship}`, { defaultValue: p.relationship })}{p.is_primary ? ` ${t('academy.players.primary')}` : ''}</span>
+                    </Link>
+                  ),
+                },
                 { key: 'membership', header: t('academy.memberships.name'), render: (p: PlayerRow) => p.membership_name ?? t('academy.players.noActiveSubscription') },
                 { key: 'end', header: t('academy.players.expiry'), render: (p: PlayerRow) => p.end_date ?? '—' },
                 { key: 'outstanding', header: t('customers.outstanding'), render: (p: PlayerRow) => p.outstanding > 0 ? <MoneyDisplay amount={p.outstanding} tone="danger" size="sm" /> : <span className="text-status-success">—</span> },
@@ -299,6 +315,7 @@ export function Customer360Page() {
               rows={players ?? []}
               rowKey={(p) => p.player_id}
               emptyTitle={t('academy.players.emptyTitle')}
+              emptyDescription={t('academy.players.emptyDescription')}
             />
           </div>
         </TabsContent>
@@ -394,7 +411,92 @@ export function Customer360Page() {
           }}
         />
       )}
+
+      {addPlayerOpen && (
+        <AddPlayerFromCustomerDialog
+          clubId={currentClubId!}
+          customerId={c.id}
+          onClose={() => setAddPlayerOpen(false)}
+          onAdded={() => { setAddPlayerOpen(false); invalidateAll() }}
+        />
+      )}
     </div>
+  )
+}
+
+// Academy Player/Guardian/Customer integrity closure (directive section
+// 14): "Add Player" from Customer 360 -- the current Customer
+// automatically becomes the Guardian relationship. No duplicate Customer
+// creation, no guardian re-search -- p_customer_id is fixed to this
+// page's own customer, reusing the same create_player_with_guardian RPC
+// Academy's own Add Player dialog uses (never a second engine).
+function AddPlayerFromCustomerDialog({
+  clubId, customerId, onClose, onAdded,
+}: {
+  clubId: string
+  customerId: string
+  onClose: () => void
+  onAdded: () => void
+}) {
+  const { t } = useTranslation()
+  const [fullName, setFullName] = useState('')
+  const [dateOfBirth, setDateOfBirth] = useState('')
+  const [relationship, setRelationship] = useState('guardian')
+  const [isPrimary, setIsPrimary] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+
+  const addMutation = useMutation({
+    mutationFn: async () => {
+      const { error: rpcError } = await supabase.rpc('create_player_with_guardian', {
+        p_club_id: clubId,
+        p_full_name: fullName,
+        p_date_of_birth: dateOfBirth || undefined,
+        p_customer_id: customerId,
+        p_relationship: relationship,
+        p_is_primary: isPrimary,
+      })
+      if (rpcError) throw rpcError
+    },
+    onSuccess: onAdded,
+    onError: (err) => setError(translateSupabaseError(err, t('academy.players.addError'))),
+  })
+
+  return (
+    <Dialog open onOpenChange={(open) => !open && onClose()}>
+      <DialogContent>
+        <DialogHeader><DialogTitle>{t('academy.players.addPlayer')}</DialogTitle></DialogHeader>
+        <div className="flex flex-col gap-3">
+          <div className="flex flex-col gap-1.5">
+            <label className="text-sm font-medium text-text-secondary">{t('academy.players.fullName')}</label>
+            <Input required value={fullName} onChange={(e) => setFullName(e.target.value)} />
+          </div>
+          <div className="flex flex-col gap-1.5">
+            <label className="text-sm font-medium text-text-secondary">{t('academy.players.dateOfBirth', { defaultValue: 'Date of birth' })}</label>
+            <Input type="date" value={dateOfBirth} onChange={(e) => setDateOfBirth(e.target.value)} />
+          </div>
+          <div className="flex flex-col gap-1.5">
+            <label className="text-sm font-medium text-text-secondary">{t('academy.players.guardianColumn')}</label>
+            <Select value={relationship} onValueChange={setRelationship}>
+              <SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="father">{t('customers.relationshipLabels.father', { defaultValue: 'Father' })}</SelectItem>
+                <SelectItem value="mother">{t('customers.relationshipLabels.mother', { defaultValue: 'Mother' })}</SelectItem>
+                <SelectItem value="guardian">{t('customers.relationshipLabels.guardian', { defaultValue: 'Guardian' })}</SelectItem>
+                <SelectItem value="other">{t('customers.relationshipLabels.other', { defaultValue: 'Other' })}</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          <label className="flex items-center gap-2 text-sm">
+            <input type="checkbox" checked={isPrimary} onChange={(e) => setIsPrimary(e.target.checked)} />
+            {t('academy.players.setPrimary', { defaultValue: 'Set as primary guardian' })}
+          </label>
+          {error && <p role="alert" className="text-sm text-status-danger">{error}</p>}
+          <Button disabled={!fullName.trim() || addMutation.isPending} onClick={() => addMutation.mutate()}>
+            {addMutation.isPending ? t('academy.players.adding') : t('academy.players.add')}
+          </Button>
+        </div>
+      </DialogContent>
+    </Dialog>
   )
 }
 

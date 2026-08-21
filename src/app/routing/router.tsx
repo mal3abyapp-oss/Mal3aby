@@ -30,6 +30,7 @@ const TodayPage = lazy(() => import('@/features/dashboard/TodayPage').then((m) =
 const MorePage = lazy(() => import('@/features/dashboard/MorePage').then((m) => ({ default: m.MorePage })))
 const BookingsPage = lazy(() => import('@/features/bookings/BookingsPage').then((m) => ({ default: m.BookingsPage })))
 const AcademyPage = lazy(() => import('@/features/academy/AcademyPage').then((m) => ({ default: m.AcademyPage })))
+const Player360Page = lazy(() => import('@/features/academy/Player360Page').then((m) => ({ default: m.Player360Page })))
 const CustomersPage = lazy(() => import('@/features/customers/CustomersPage').then((m) => ({ default: m.CustomersPage })))
 const Customer360Page = lazy(() => import('@/features/customers/Customer360Page').then((m) => ({ default: m.Customer360Page })))
 const CustomerDuplicatesPage = lazy(() => import('@/features/customers/CustomerDuplicatesPage').then((m) => ({ default: m.CustomerDuplicatesPage })))
@@ -160,6 +161,12 @@ export const router = createBrowserRouter([
           { index: true, element: <RequireNavDomain domain="today"><TodayPage /></RequireNavDomain> },
           { path: 'bookings', element: <RequireNavDomain domain="bookings"><BookingsPage /></RequireNavDomain> },
           { path: 'academy', element: <RequireNavDomain domain="academy"><AcademyPage /></RequireNavDomain> },
+          // Academy Player/Guardian/Customer integrity closure: the
+          // canonical Player 360 detail/edit page, same pattern as
+          // Customer 360 (/app/customers/:customerId) and Staff 360
+          // (/app/staff/:membershipId). Static "academy" route above
+          // this, so the dynamic :playerId route never shadows it.
+          { path: 'academy/players/:playerId', element: <RequireNavDomain domain="academy"><Player360Page /></RequireNavDomain> },
           { path: 'customers', element: <RequireNavDomain domain="customers"><CustomersPage /></RequireNavDomain> },
           // Static route must come before the :customerId dynamic
           // route below, or "duplicates" would itself be matched and

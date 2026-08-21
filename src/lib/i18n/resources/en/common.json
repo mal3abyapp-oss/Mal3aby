@@ -672,6 +672,7 @@
     "total": "Total",
     "currency": "EGP",
     "method": "Method",
+    "optional": "optional",
     "paymentMethodLabels": {
       "cash": "Cash",
       "card": "Card",
@@ -979,8 +980,10 @@
           "failed": "Failed permanently",
           "expired": "Expired",
           "cancelled": "Cancelled",
-          "suppressed_invalid_recipient": "Invalid recipient phone"
+          "suppressed_invalid_recipient": "Invalid recipient phone",
+          "suppressed_no_consent": "Suppressed — no matching consent"
         },
+        "noConsentDetail": "Consent is absent, revoked, or belongs to a different phone number.",
         "loading": "Loading...",
         "emptyTitle": "No WhatsApp messages in this range yet.",
         "emptyFailed": "No permanently failed messages -- everything is sending normally.",
@@ -1078,7 +1081,8 @@
     },
     "attendance": {
       "recordForMembership": "Record attendance for a membership",
-      "open": "Open"
+      "open": "Open",
+      "emptyTitle": "No attendance recorded yet"
     },
     "overview": {
       "addPlayer": "Add player",
@@ -1142,7 +1146,14 @@
       "newCustomer": "New customer",
       "renew": "Renew",
       "subscribe": "Subscribe",
-      "collectPayment": "Collect payment"
+      "collectPayment": "Collect payment",
+      "quickActions": "Quick actions",
+      "guardianOptionalHint": "You can add a guardian later from the player's page.",
+      "playerNotFoundOrDenied": "This player couldn't be found, or you don't have access to view them.",
+      "saveError": "Couldn't save player.",
+      "setPrimary": "Set primary",
+      "confirmUnlinkGuardian": "Remove this guardian relationship?",
+      "linkGuardianError": "Couldn't add this guardian."
     },
     "enrollments": {
       "manageSubtitle": "Enroll a player in a group and create their subscription",
@@ -1180,6 +1191,7 @@
       "renewError": "Couldn't renew the subscription",
       "startDate": "Start date",
       "endDate": "End date",
+      "planType": "Plan",
       "noSubscription": "No linked subscription.",
       "activationPolicy": "Subscription activation policy",
       "activationPolicyManagedFrom": "The subscription activation policy is managed from the",

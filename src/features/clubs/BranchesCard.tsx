@@ -120,7 +120,12 @@ export function BranchesCard() {
       }
 
       const { error } = await supabase.rpc('manage_branch', {
-        p_branch_id: editingBranch?.id ?? null,
+        // manage_branch(p_branch_id, ...) has no SQL DEFAULT (positional
+        // required param), so the generated types mark it non-nullable
+        // `string` -- but the function body explicitly branches on
+        // `if p_branch_id is null` to decide create-vs-update, so null
+        // is a genuine, intended value here, not a type error.
+        p_branch_id: (editingBranch?.id ?? null) as unknown as string,
         p_club_id: currentClubId as string,
         p_name: name,
         p_branch_code: branchCode,

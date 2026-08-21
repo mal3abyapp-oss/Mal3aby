@@ -195,7 +195,12 @@ export function FieldsManagement() {
   const createFieldMutation = useMutation({
     mutationFn: async () => {
       const { error } = await supabase.rpc('manage_field', {
-        p_field_id: null,
+        // manage_field(p_field_id, ...) has no SQL DEFAULT (it's a
+        // positional required param), so the generated types mark it
+        // non-nullable `string` -- but the function body explicitly
+        // branches on `if p_field_id is null` to decide create-vs-update,
+        // so null is a genuine, intended value here, not a type error.
+        p_field_id: null as unknown as string,
         p_club_id: currentClubId as string,
         p_branch_id: fieldBranchId,
         p_name: fieldName,

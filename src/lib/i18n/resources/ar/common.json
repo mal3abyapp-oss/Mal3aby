@@ -671,6 +671,7 @@
     "total": "الإجمالي",
     "currency": "ج.م",
     "method": "طريقة الدفع",
+    "optional": "اختياري",
     "paymentMethodLabels": {
       "cash": "نقدًا",
       "card": "بطاقة",
@@ -978,8 +979,10 @@
           "failed": "فشلت نهائيًا",
           "expired": "منتهية الصلاحية",
           "cancelled": "أُلغيت",
-          "suppressed_invalid_recipient": "رقم هاتف المستلم غير صحيح"
+          "suppressed_invalid_recipient": "رقم هاتف المستلم غير صحيح",
+          "suppressed_no_consent": "موقوفة — لا توجد موافقة مطابقة"
         },
+        "noConsentDetail": "الموافقة غير موجودة أو ملغاة أو تخص رقم هاتف مختلفًا.",
         "loading": "جارٍ التحميل...",
         "emptyTitle": "لا توجد رسائل واتساب في هذا النطاق بعد.",
         "emptyFailed": "لا توجد رسائل فشلت نهائيًا -- كل شيء يُرسل بشكل طبيعي.",
@@ -1077,7 +1080,8 @@
     },
     "attendance": {
       "recordForMembership": "تسجيل الحضور لعضوية",
-      "open": "فتح"
+      "open": "فتح",
+      "emptyTitle": "لا يوجد حضور مسجل بعد"
     },
     "overview": {
       "addPlayer": "إضافة لاعب",
@@ -1141,7 +1145,14 @@
       "newCustomer": "عميل جديد",
       "renew": "تجديد",
       "subscribe": "اشتراك",
-      "collectPayment": "تحصيل الدفع"
+      "collectPayment": "تحصيل الدفع",
+      "quickActions": "إجراءات سريعة",
+      "guardianOptionalHint": "يمكنك إضافة ولي أمر لاحقًا من صفحة اللاعب.",
+      "playerNotFoundOrDenied": "تعذّر العثور على هذا اللاعب، أو لا تملك صلاحية عرضه.",
+      "saveError": "تعذّر حفظ بيانات اللاعب.",
+      "setPrimary": "تعيين كأساسي",
+      "confirmUnlinkGuardian": "هل تريد إزالة علاقة ولي الأمر هذا؟",
+      "linkGuardianError": "تعذّرت إضافة ولي الأمر هذا."
     },
     "enrollments": {
       "manageSubtitle": "تسجيل لاعب في مجموعة وإنشاء اشتراكه",
@@ -1179,6 +1190,7 @@
       "renewError": "تعذّر تجديد الاشتراك",
       "startDate": "تاريخ البداية",
       "endDate": "تاريخ النهاية",
+      "planType": "الخطة",
       "noSubscription": "لا يوجد اشتراك مرتبط.",
       "activationPolicy": "سياسة تفعيل الاشتراك",
       "activationPolicyManagedFrom": "سياسة تفعيل الاشتراك تُدار من",
