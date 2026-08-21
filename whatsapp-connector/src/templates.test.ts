@@ -262,6 +262,132 @@ check('booking-confirmed-paid omits the invoice link when invoice_token is absen
   assert.ok(msg.includes('/qr/qrtok-paid-1'), 'the QR link should still be present')
 })
 
+// -----------------------------------------------------------------
+// Business-messaging audit fix (directive rule 12 "Partial payment is
+// not full payment" / Section 15): a customer receiving a
+// partially-paid confirmation must be told, explicitly, how much is
+// still owed -- not just a translated "partially paid" status label
+// that gives no number. Covers both booking-confirmed-paid (a payment
+// recorded in the SAME transaction as booking creation, which only
+// ever carries total_price/amount_paid -- no separate
+// remaining_outstanding field) and payment-received (a later,
+// independent payment via record_payment(), which DOES pass
+// remaining_outstanding directly from the RPC).
+// -----------------------------------------------------------------
+
+const PARTIALLY_PAID_VARS = {
+  ...PAID_VARS,
+  amount_paid: 100, // total_price (from BASE_VARS) is 220 -- 120 still owed
+  payment_status: 'partially_paid',
+}
+
+check('booking-confirmed-paid shows the real outstanding balance for a partial payment (ar + en)', () => {
+  const ar = renderTemplate('booking-confirmed-paid', 'ar', PARTIALLY_PAID_VARS)
+  assert.ok(ar.includes('المتبقي'), 'expected an outstanding-balance line in the Arabic message')
+  assert.ok(ar.includes('120.00') || ar.includes('١٢٠٫٠٠') || ar.includes('١٢٠.٠٠'), 'expected the correct 120.00 outstanding amount (220 total - 100 paid)')
+
+  const en = renderTemplate('booking-confirmed-paid', 'en', PARTIALLY_PAID_VARS)
+  assert.ok(en.includes('Outstanding'), 'expected an outstanding-balance line in the English message')
+  assert.ok(en.includes('120.00'), 'expected the correct 120.00 outstanding amount in English')
+})
+
+check('booking-confirmed-paid NEVER shows an outstanding-balance line for a fully-paid booking', () => {
+  // PAID_VARS itself is fully paid: total_price=220 (BASE_VARS), amount_paid=220.
+  const ar = renderTemplate('booking-confirmed-paid', 'ar', PAID_VARS)
+  assert.ok(!ar.includes('المتبقي'), 'an outstanding-balance line appeared for a fully-paid booking (should be silent, not "0.00")')
+
+  const en = renderTemplate('booking-confirmed-paid', 'en', PAID_VARS)
+  assert.ok(!en.includes('Outstanding'), 'an outstanding-balance line appeared for a fully-paid booking (should be silent, not "0.00")')
+})
+
+check('payment-received uses the RPC-provided remaining_outstanding directly when present (ar + en)', () => {
+  // record_payment() passes remaining_outstanding explicitly -- this
+  // must take priority over any total_price/amount_paid derivation,
+  // since remaining_outstanding accounts for prior payments/refunds
+  // this template call alone cannot see.
+  const vars = { ...PAID_VARS, amount: 100, payment_status: 'partially_paid', remaining_outstanding: 75 }
+  const ar = renderTemplate('payment-received', 'ar', vars)
+  assert.ok(ar.includes('المتبقي'), 'expected an outstanding-balance line')
+  assert.ok(ar.includes('75.00') || ar.includes('٧٥٫٠٠') || ar.includes('٧٥.٠٠'), 'expected the RPC-provided 75.00 outstanding amount, not a derived one')
+
+  const en = renderTemplate('payment-received', 'en', vars)
+  assert.ok(en.includes('75.00'), 'expected the RPC-provided 75.00 outstanding amount in English')
+})
+
+check('payment-received omits the outstanding-balance line when remaining_outstanding is zero (fully paid)', () => {
+  const vars = { ...PAID_VARS, amount: 220, payment_status: 'paid', remaining_outstanding: 0 }
+  const ar = renderTemplate('payment-received', 'ar', vars)
+  assert.ok(!ar.includes('المتبقي'), 'an outstanding-balance line appeared despite remaining_outstanding=0')
+})
+
+// -----------------------------------------------------------------
+// Business-messaging audit fix (directive Section 29 "no ملعب ملعب/
+// football-in-Arabic bug" -- localize the actual taxonomy source):
+// fields.sport is a real free-text DB column, confirmed live to store
+// raw English-ish values like "football"/"basketball"/"padel" (not the
+// already-Arabic string BASE_VARS happens to use, which never actually
+// exercised this path). An Arabic message must show "كرة قدم", not the
+// literal English word.
+// -----------------------------------------------------------------
+
+// -----------------------------------------------------------------
+// Real bug found live during this audit (2026-08-22): every single
+// template that shows a field name rendered the "🏟️ *الملعب:*"/
+// "🏟️ *Field:*" line TWICE (a duplicated line() call, present in all
+// 4 Arabic and all 4 English templates) -- a real customer would have
+// seen the field name repeated back-to-back in every booking message.
+// The pre-existing .includes(...) assertions never caught this since
+// they only check presence, not exact occurrence count.
+// -----------------------------------------------------------------
+
+check('the field name line never appears more than once in any template', () => {
+  const templates = ['booking-created', 'booking-confirmed', 'booking-confirmed-paid', 'booking-cancelled'] as const
+  for (const key of templates) {
+    for (const lang of ['ar', 'en'] as const) {
+      const msg = renderTemplate(key, lang, PAID_VARS)
+      const fieldLabel = lang === 'ar' ? 'الملعب' : 'Field'
+      const occurrences = msg.split(fieldLabel).length - 1
+      assert.ok(occurrences <= 1, `${key} (${lang}) showed the field name line ${occurrences} times, expected at most 1`)
+    }
+  }
+})
+
+check('a raw "football" sport value renders as localized Arabic in an Arabic message', () => {
+  const msg = renderTemplate('booking-created', 'ar', { ...BASE_VARS, sport: 'football' })
+  assert.ok(msg.includes('كرة قدم'), 'expected the localized Arabic sport label')
+  assert.ok(!msg.includes('football'), 'the raw English sport value leaked into the Arabic message')
+})
+
+check('a raw "football" sport value renders as "Football" in an English message', () => {
+  const msg = renderTemplate('booking-created', 'en', { ...BASE_VARS, sport: 'football' })
+  assert.ok(msg.includes('Football'), 'expected the capitalized English sport label')
+})
+
+check('an unrecognized free-text sport value falls back to showing the raw text, never blanked', () => {
+  // fields.sport has no DB-level enum constraint -- a club can type
+  // anything. An unmapped value must still show real information to
+  // the customer, not silently disappear (unlike a genuinely optional
+  // field like customer_name, which correctly drops when absent).
+  const msg = renderTemplate('booking-created', 'ar', { ...BASE_VARS, sport: 'squash' })
+  assert.ok(msg.includes('squash'), 'an unrecognized sport value was dropped instead of falling back to the raw text')
+})
+
+check('basketball and padel both localize correctly in Arabic', () => {
+  const basketball = renderTemplate('booking-created', 'ar', { ...BASE_VARS, sport: 'basketball' })
+  assert.ok(basketball.includes('كرة سلة'), 'expected the localized Arabic label for basketball')
+  const padel = renderTemplate('booking-created', 'ar', { ...BASE_VARS, sport: 'padel' })
+  assert.ok(padel.includes('بادل'), 'expected the localized Arabic label for padel')
+})
+
+check('payment-received never shows a negative or nonsensical outstanding amount', () => {
+  // A refund or an overpayment could in principle push a naive
+  // total-minus-paid derivation negative -- must never surface that to
+  // a customer as "outstanding: -30.00".
+  const vars = { ...PAID_VARS, amount_paid: 250, total_price: 220 } // overpaid by 30, no explicit remaining_outstanding
+  const msg = renderTemplate('booking-confirmed-paid', 'ar', vars)
+  assert.ok(!msg.includes('المتبقي'), 'a negative/overpaid outstanding line leaked through instead of being suppressed')
+})
+
 // Master Operational Simplification directive Sections 4/7: official
 // collection receipt details must appear in the customer WhatsApp
 // message for government-club payments, but never for non-government

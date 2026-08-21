@@ -164,6 +164,39 @@ function formatMoney(amount: unknown, currencySuffixAr: string, currencySuffixEn
   return `${formatted} ${language === 'en' ? currencySuffixEn : currencySuffixAr}`
 }
 
+/**
+ * Business-messaging audit fix (2026-08-22, directive rule 12 "Partial
+ * payment is not full payment" / Section 15): payment-received and
+ * booking-confirmed-paid both showed a translated payment_status label
+ * (e.g. "مدفوعة جزئيًا" / "Partially paid") but never stated HOW MUCH
+ * was still owed -- a customer receiving a partial-payment message had
+ * no way to know their outstanding balance from the message itself,
+ * only by clicking through to the invoice link. record_payment()
+ * already computes and passes remaining_outstanding for the
+ * payment-received path; booking-confirmed-paid (fired from
+ * _create_booking_internal, a payment recorded in the SAME transaction
+ * as booking creation) does not pass an equivalent field, so this
+ * derives it from total_price - amount_paid when remaining_outstanding
+ * itself is absent -- both call sites already have the raw numbers
+ * needed, this is a pure rendering-layer fix, no RPC/migration change
+ * required. Returns null (line() then drops it entirely, matching
+ * every other optional line in this file) whenever there is nothing
+ * meaningful to show: a fully-paid booking, a missing/non-numeric
+ * amount, or a computed value that rounds to zero or below (never show
+ * "outstanding: -5.00" or "outstanding: 0.00" -- both are noise, not
+ * information, once the balance is actually settled).
+ */
+function outstandingAmount(explicitRemaining: unknown, total: unknown, paid: unknown): number | null {
+  if (typeof explicitRemaining === 'number' && Number.isFinite(explicitRemaining)) {
+    return explicitRemaining > 0.004 ? explicitRemaining : null
+  }
+  const totalN = typeof total === 'number' ? total : typeof total === 'string' ? Number(total) : NaN
+  const paidN = typeof paid === 'number' ? paid : typeof paid === 'string' ? Number(paid) : NaN
+  if (!Number.isFinite(totalN) || !Number.isFinite(paidN)) return null
+  const remaining = totalN - paidN
+  return remaining > 0.004 ? remaining : null
+}
+
 // Mirrors BOOKING_STATUS_LABELS (src/lib/domain/booking.ts) -- same
 // Arabic wording as the app's own UI, not reinvented.
 const BOOKING_STATUS_LABELS_AR: Record<string, string> = {
@@ -222,6 +255,31 @@ const PAYMENT_METHOD_LABELS_EN: Record<string, string> = {
   other: 'Other',
 }
 
+// Business-messaging audit fix (2026-08-22, directive rule "Use actual
+// taxonomy/localization source" / Section 29): fields.sport is a
+// free-text column (confirmed live: staff enter it via a plain
+// unconstrained <Input>, FieldsManagement.tsx -- not a strict DB enum),
+// so a raw "football"/"basketball"/"padel" was rendering literally
+// inside an Arabic message instead of "كرة قدم"/"كرة سلة"/"بادل".
+// Mirrors src/lib/i18n/resources/{ar,en}/common.json's own
+// publicBooking.sportLabels map and its own established fallback
+// pattern (PublicClubBookingPage.tsx:
+// t(`publicBooking.sportLabels.${f.sport}`, { defaultValue: f.sport })
+// -- translate the known values, but since a club can genuinely type
+// any free-text sport name, NEVER drop or blank an unrecognized one;
+// fall back to showing it as-is rather than silently hiding real
+// information a customer needs (which field name).
+const SPORT_LABELS_AR: Record<string, string> = {
+  football: 'كرة قدم',
+  padel: 'بادل',
+  basketball: 'كرة سلة',
+}
+const SPORT_LABELS_EN: Record<string, string> = {
+  football: 'Football',
+  padel: 'Padel',
+  basketball: 'Basketball',
+}
+
 function bookingStatusLabel(status: unknown, language: string): string | null {
   if (!isPresent(status)) return null
   const table = language === 'en' ? BOOKING_STATUS_LABELS_EN : BOOKING_STATUS_LABELS_AR
@@ -236,6 +294,12 @@ function paymentMethodLabel(method: unknown, language: string): string | null {
   if (!isPresent(method)) return null
   const table = language === 'en' ? PAYMENT_METHOD_LABELS_EN : PAYMENT_METHOD_LABELS_AR
   return table[String(method)] ?? null
+}
+/** Translates a known sport value; falls back to the raw stored value for anything else, since fields.sport is genuinely free-text, not a closed enum -- never blanks real information. */
+function sportLabel(sport: unknown, language: string): string | null {
+  if (!isPresent(sport)) return null
+  const table = language === 'en' ? SPORT_LABELS_EN : SPORT_LABELS_AR
+  return table[String(sport)] ?? String(sport)
 }
 
 /** "*{club_name} عبر ملعبي*" when a reliable club name is available, "*ملعبي*"/"*Mal3aby*" otherwise -- directive rule 21. */
@@ -296,7 +360,7 @@ const AR: Record<TemplateKey, Renderer> = {
       'استلمنا طلب حجزك بنجاح، وهذه التفاصيل:',
       '',
       line('🏟️', 'الملعب', v.field_name),
-      line('⚽', 'النشاط', v.sport),
+      line('⚽', 'النشاط', sportLabel(v.sport, 'ar')),
       line('📅', 'التاريخ', date),
       line('🕐', 'الوقت', time),
       line('🔖', 'رقم الحجز', v.booking_ref),
@@ -324,7 +388,7 @@ const AR: Record<TemplateKey, Renderer> = {
       'تم تأكيد حجزك بنجاح.',
       '',
       line('🏟️', 'الملعب', v.field_name),
-      line('⚽', 'النشاط', v.sport),
+      line('⚽', 'النشاط', sportLabel(v.sport, 'ar')),
       line('📅', 'التاريخ', date),
       line('🕐', 'الوقت', time),
       line('🔖', 'رقم الحجز', v.booking_ref),
@@ -354,6 +418,7 @@ const AR: Record<TemplateKey, Renderer> = {
     const time = isPresent(v.start_at) ? formatTime(String(v.start_at), tz, 'ar-EG') : null
     const total = formatMoney(v.total_price, 'ج.م', 'EGP', 'ar')
     const paid = formatMoney(v.amount_paid, 'ج.م', 'EGP', 'ar')
+    const outstanding = formatMoney(outstandingAmount(v.remaining_outstanding, v.total_price, v.amount_paid), 'ج.م', 'EGP', 'ar')
     const paymentStatus = paymentStatusLabel(v.payment_status, 'ar')
     const method = paymentMethodLabel(v.method, 'ar')
     const qrUrl = bookingQrUrl(v.booking_qr_token, 'ar')
@@ -366,13 +431,17 @@ const AR: Record<TemplateKey, Renderer> = {
       'تم تأكيد حجزك وتسجيل دفعتك بنجاح.',
       '',
       line('🏟️', 'الملعب', v.field_name),
-      line('⚽', 'النشاط', v.sport),
+      line('⚽', 'النشاط', sportLabel(v.sport, 'ar')),
       line('📅', 'التاريخ', date),
       line('🕐', 'الوقت', time),
       line('🔖', 'رقم الحجز', v.booking_ref),
       '',
       line('💰', 'الإجمالي', total),
       line('✅', 'المدفوع', paid),
+      // Business-messaging audit fix: only shown for a genuine positive
+      // balance -- never for a fully-paid booking, where it would be a
+      // confusing "outstanding: 0.00" line.
+      line('⏳', 'المتبقي', outstanding),
       line('💳', 'طريقة الدفع', method),
       line('💳', 'حالة الدفع', paymentStatus),
       line('🧾', 'رقم الفاتورة', v.invoice_number),
@@ -406,7 +475,7 @@ const AR: Record<TemplateKey, Renderer> = {
       isPresent(v.booking_ref) ? `تم إلغاء حجزك رقم *${String(v.booking_ref)}*.` : 'تم إلغاء حجزك.',
       '',
       line('🏟️', 'الملعب', v.field_name),
-      line('⚽', 'النشاط', v.sport),
+      line('⚽', 'النشاط', sportLabel(v.sport, 'ar')),
       line('📅', 'التاريخ', date),
       line('🕐', 'الوقت', time),
       isPresent(v.reason) ? `\nالسبب: ${String(v.reason)}` : '',
@@ -419,6 +488,7 @@ const AR: Record<TemplateKey, Renderer> = {
 
   'payment-received': (v) => {
     const amount = formatMoney(v.amount, 'ج.م', 'EGP', 'ar')
+    const outstanding = formatMoney(outstandingAmount(v.remaining_outstanding, v.total_price, v.amount_paid), 'ج.م', 'EGP', 'ar')
     const paymentStatus = paymentStatusLabel(v.payment_status, 'ar')
     const method = paymentMethodLabel(v.method, 'ar')
     const invoiceLink = invoiceUrl(v.invoice_token, 'ar')
@@ -432,6 +502,9 @@ const AR: Record<TemplateKey, Renderer> = {
       line('🔖', 'رقم الحجز', v.booking_ref),
       line('🧾', 'رقم الفاتورة', v.invoice_number),
       line('💳', 'حالة الدفع', paymentStatus),
+      // Business-messaging audit fix (directive rule 12): only shown for
+      // a genuine positive balance -- never for a fully-paid invoice.
+      line('⏳', 'المتبقي', outstanding),
       isPresent(v.receipt_serial) ? '🏛️ *إيصال التحصيل الرسمي*' : '',
       line('🧾', 'رقم الإيصال', v.receipt_serial),
       line('📘', 'رقم الدفتر', v.receipt_book),
@@ -500,7 +573,7 @@ const EN: Record<TemplateKey, Renderer> = {
       'We received your booking request. Here are the details:',
       '',
       line('🏟️', 'Field', v.field_name),
-      line('⚽', 'Sport', v.sport),
+      line('⚽', 'Sport', sportLabel(v.sport, 'en')),
       line('📅', 'Date', date),
       line('🕐', 'Time', time),
       line('🔖', 'Booking #', v.booking_ref),
@@ -528,7 +601,7 @@ const EN: Record<TemplateKey, Renderer> = {
       'Your booking is confirmed.',
       '',
       line('🏟️', 'Field', v.field_name),
-      line('⚽', 'Sport', v.sport),
+      line('⚽', 'Sport', sportLabel(v.sport, 'en')),
       line('📅', 'Date', date),
       line('🕐', 'Time', time),
       line('🔖', 'Booking #', v.booking_ref),
@@ -549,6 +622,7 @@ const EN: Record<TemplateKey, Renderer> = {
     const time = isPresent(v.start_at) ? formatTime(String(v.start_at), tz, 'en-US') : null
     const total = formatMoney(v.total_price, 'ج.م', 'EGP', 'en')
     const paid = formatMoney(v.amount_paid, 'ج.م', 'EGP', 'en')
+    const outstanding = formatMoney(outstandingAmount(v.remaining_outstanding, v.total_price, v.amount_paid), 'ج.م', 'EGP', 'en')
     const paymentStatus = paymentStatusLabel(v.payment_status, 'en')
     const method = paymentMethodLabel(v.method, 'en')
     const qrUrl = bookingQrUrl(v.booking_qr_token, 'en')
@@ -561,13 +635,14 @@ const EN: Record<TemplateKey, Renderer> = {
       'Your booking is confirmed and your payment has been recorded.',
       '',
       line('🏟️', 'Field', v.field_name),
-      line('⚽', 'Sport', v.sport),
+      line('⚽', 'Sport', sportLabel(v.sport, 'en')),
       line('📅', 'Date', date),
       line('🕐', 'Time', time),
       line('🔖', 'Booking #', v.booking_ref),
       '',
       line('💰', 'Total', total),
       line('✅', 'Paid', paid),
+      line('⏳', 'Outstanding', outstanding),
       line('💳', 'Method', method),
       line('💳', 'Payment status', paymentStatus),
       line('🧾', 'Invoice #', v.invoice_number),
@@ -596,7 +671,7 @@ const EN: Record<TemplateKey, Renderer> = {
       isPresent(v.booking_ref) ? `Your booking *${String(v.booking_ref)}* was cancelled.` : 'Your booking was cancelled.',
       '',
       line('🏟️', 'Field', v.field_name),
-      line('⚽', 'Sport', v.sport),
+      line('⚽', 'Sport', sportLabel(v.sport, 'en')),
       line('📅', 'Date', date),
       line('🕐', 'Time', time),
       isPresent(v.reason) ? `\nReason: ${String(v.reason)}` : '',
@@ -609,6 +684,7 @@ const EN: Record<TemplateKey, Renderer> = {
 
   'payment-received': (v) => {
     const amount = formatMoney(v.amount, 'ج.م', 'EGP', 'en')
+    const outstanding = formatMoney(outstandingAmount(v.remaining_outstanding, v.total_price, v.amount_paid), 'ج.م', 'EGP', 'en')
     const paymentStatus = paymentStatusLabel(v.payment_status, 'en')
     const method = paymentMethodLabel(v.method, 'en')
     const invoiceLink = invoiceUrl(v.invoice_token, 'en')
@@ -622,6 +698,7 @@ const EN: Record<TemplateKey, Renderer> = {
       line('🔖', 'Booking #', v.booking_ref),
       line('🧾', 'Invoice #', v.invoice_number),
       line('💳', 'Payment status', paymentStatus),
+      line('⏳', 'Outstanding', outstanding),
       isPresent(v.receipt_serial) ? '🏛️ *Official Collection Receipt*' : '',
       line('🧾', 'Receipt #', v.receipt_serial),
       line('📘', 'Book', v.receipt_book),
