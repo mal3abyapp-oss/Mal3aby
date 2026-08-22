@@ -302,7 +302,18 @@
       // /manage/:clubId/incoming-message-diagnostics route, so the next
       // real send can be checked for any such notice. GitHub Actions
       // run 32566136793.
-      "image": "registry.cloudflare.com/35ac10727701095866b16c276b4a33d1/mala3by-whatsapp-connector:03a58cc",
+      // v22, commit 9bb8157 -- ROOT-CAUSE INVESTIGATION continued,
+      // directive section 9: getSenderIdentity() now also reports
+      // AuthenticationCreds.registered (Baileys' own belief about
+      // whether this device identity completed real WhatsApp-server
+      // registration -- distinct from the socket merely being open)
+      // and whether creds.account (the signed device-identity
+      // credential required to be a trusted delivery target) is
+      // present at all. Either being false/absent despite
+      // status='connected' would be a concrete root-cause candidate for
+      // "accepts sends locally, WhatsApp's servers never actually
+      // deliver". GitHub Actions run 32566606604.
+      "image": "registry.cloudflare.com/35ac10727701095866b16c276b4a33d1/mala3by-whatsapp-connector:9bb8157",
       // One container instance per WhatsApp account (one Durable
       // Object = one container, directive rule 21's chosen model --
       // NOT a shared container serving multiple clubs, which would
