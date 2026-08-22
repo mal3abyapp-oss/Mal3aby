@@ -405,7 +405,21 @@
       // first-hand proof this socket never receives ANY server-
       // originated receipt traffic at all -- distinct from "receipts
       // arrive but get filtered out". GitHub Actions run 32572743009.
-      "image": "registry.cloudflare.com/35ac10727701095866b16c276b4a33d1/mala3by-whatsapp-connector:53c7f9f",
+      // v28, commit 07befda -- WHATSAPP BUSINESS MESSAGING FINAL
+      // HARDENING (2026-08-22): pure templates.ts changes, zero
+      // session/protocol/queue-processing code touched. (1) Removed
+      // dead/fragmenting templates 'booking-confirmed'/'invoice-
+      // created' (never queued by any live RPC as of this phase --
+      // real historical notification_queue rows with these keys still
+      // render correctly via the frontend's own fallback, unaffected
+      // by removing them here). (2) Added 'academy-payment-received'
+      // -- the first-ever Academy-specific WhatsApp message in this
+      // codebase (see supabase migration 20260822080000): names the
+      // specific player (a guardian may have multiple children),
+      // shows academy/group + subscription dates, distinct headline
+      // from Field Booking's payment-received. All 51 template tests
+      // + full connector suite pass. GitHub Actions run 32581144580.
+      "image": "registry.cloudflare.com/35ac10727701095866b16c276b4a33d1/mala3by-whatsapp-connector:07befda",
       // One container instance per WhatsApp account (one Durable
       // Object = one container, directive rule 21's chosen model --
       // NOT a shared container serving multiple clubs, which would
