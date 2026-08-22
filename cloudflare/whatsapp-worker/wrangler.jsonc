@@ -336,7 +336,34 @@
       // app-level workaround -- v7 does this correctly and more
       // completely at the protocol layer. 82/82 tests pass. GitHub
       // Actions run 32568750484.
-      "image": "registry.cloudflare.com/35ac10727701095866b16c276b4a33d1/mala3by-whatsapp-connector:04a757d",
+      // v24, commit 7149441 -- ROOT-CAUSE INVESTIGATION continued
+      // (directive sections 3-4, 6-7): the Baileys v7 upgrade (v23)
+      // was deployed and physically verified to STILL not deliver --
+      // critically, the message did not even appear in the SENDER's
+      // own WhatsApp chat history, correcting an earlier
+      // over-interpretation in this investigation (the "fromMe echo"
+      // observed via messages.upsert is confirmed, by direct source
+      // inspection, to be a PURELY LOCAL in-process artifact fired via
+      // process.nextTick() right after relayMessage() returns, gated
+      // only by the client-side emitOwnEvents flag -- NOT a
+      // server-confirmed sync event). relayMessage() never awaits any
+      // server acknowledgment (confirmed again, unchanged from
+      // 6.7.24) -- the one piece of real evidence its own code
+      // produces is a debug-level log line, "sending message to N
+      // devices", immediately before its fire-and-forget socket write.
+      // This connector's logger has always run at 'info' level in
+      // production, silently dropping this and every session/crypto
+      // error signal (Bad MAC/No session/Invalid PreKey/Untrusted
+      // identity/Failed to decrypt). Adds SendProtocolDiagnostics.ts: a
+      // pino hooks.logMethod interceptor wired into the SAME logger
+      // passed to makeWASocket(), capturing a strict, content-free
+      // allowlist of these lines into an in-memory ring buffer exposed
+      // via a new /manage/:clubId/send-protocol-diagnostics route.
+      // Also re-verified single-active-container ownership with
+      // CURRENT data (wrangler containers instances): exactly one
+      // running instance for this club. GitHub Actions run
+      // 32570071825.
+      "image": "registry.cloudflare.com/35ac10727701095866b16c276b4a33d1/mala3by-whatsapp-connector:7149441",
       // One container instance per WhatsApp account (one Durable
       // Object = one container, directive rule 21's chosen model --
       // NOT a shared container serving multiple clubs, which would
