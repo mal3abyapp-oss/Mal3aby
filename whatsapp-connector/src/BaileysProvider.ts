@@ -174,38 +174,6 @@ export function toWhatsAppJid(phoneDigitsOnly: string): string {
 }
 
 /**
- * ROOT-CAUSE INVESTIGATION fix (2026-08-22) -- pure JID-selection logic
- * pulled out of BaileysProvider.resolveRealSendJid() so it is
- * independently unit-testable without a real Baileys socket (same
- * rationale as toWhatsAppJid() and extractDeliveryReceipts() above --
- * see resolveRealSendJidTest.ts).
- *
- * Given a real onWhatsApp() result array (or undefined, on a failed/
- * empty lookup) and the plain PN JID that was queried, returns the LID
- * from the matching entry when one genuinely exists, otherwise the
- * original PN JID unchanged. See sendMessage()'s and
- * resolveRealSendJid()'s own doc comments for the full incident this
- * fixes: the installed Baileys version never auto-upgrades a
- * recipient's PN JID to LID even when the recipient's real account has
- * migrated, so this connector now resolves it explicitly, but only
- * ever on genuine positive evidence -- never a guess.
- */
-export function selectRealSendJid(
-  results: Array<{ jid?: string; exists?: unknown; lid?: unknown }> | undefined,
-  fallbackPnJid: string,
-  toPhoneDigitsOnly: string,
-): string {
-  const match = results?.find(
-    (r) => r.jid === fallbackPnJid || r.jid?.startsWith(toPhoneDigitsOnly.replace(/\D/g, '')),
-  )
-  const rawLid = match?.lid
-  if (match?.exists && typeof rawLid === 'string' && rawLid.length > 0) {
-    return rawLid
-  }
-  return fallbackPnJid
-}
-
-/**
  * WHATSAPP DELIVERY TRUTH fix (2026-08-22) -- pure filtering/extraction
  * logic for a real Baileys messages.update event array, pulled out of
  * the socket.ev.on('messages.update', ...) listener so it is
@@ -611,13 +579,29 @@ export class BaileysProvider implements WhatsAppProvider {
     }
     // fetchLatestBaileysVersion() itself has a try/catch that falls
     // back to a bundled default version on failure -- but its
-    // underlying axios call has no timeout, so a network stall to
-    // GitHub (confirmed live during this fix: raw.githubusercontent.com
-    // unreachable, hanging past 10s with no timeout) blocks the whole
-    // connector's startup/reconnect indefinitely instead of falling
-    // back. An explicit timeout here is what actually makes the
-    // existing fallback logic reachable.
-    const { version } = await fetchLatestBaileysVersion({ timeout: 8000 })
+    // underlying HTTP call has no timeout of its own, so a network
+    // stall to GitHub (confirmed live during the original fix:
+    // raw.githubusercontent.com unreachable, hanging past 10s with no
+    // timeout) blocks the whole connector's startup/reconnect
+    // indefinitely instead of falling back. An explicit timeout here is
+    // what actually makes the existing fallback logic reachable.
+    //
+    // BAILEYS v7 UPGRADE (2026-08-22) -- this options object's shape
+    // changed: v6's underlying axios call accepted `{ timeout: ms }`;
+    // v7 switched to the native fetch() API, whose options are a plain
+    // RequestInit (no `timeout` field at all -- confirmed via v7's own
+    // .d.ts and by direct source inspection of
+    // Utils/generics.js:fetchLatestBaileysVersion, which forwards only
+    // `dispatcher`/`method`/`headers` from its options argument, NOT a
+    // signal). AbortSignal.timeout() is the correct native-fetch
+    // equivalent -- confirmed by inspection that
+    // fetchLatestBaileysVersion's entire body is wrapped in a
+    // try/catch that returns the bundled fallback version on ANY
+    // thrown error, including the AbortError a timed-out signal
+    // produces, so this preserves the exact same original guarantee
+    // (a stalled network call can never block startup) under the new
+    // API shape, not just silence the type error.
+    const { version } = await fetchLatestBaileysVersion({ signal: AbortSignal.timeout(8000) })
 
     const socket = makeWASocket({
       auth: state,
@@ -930,47 +914,6 @@ export class BaileysProvider implements WhatsAppProvider {
    * second time, which is a documented, tested trade-off, not a silent
    * gap.
    */
-  /**
-   * ROOT-CAUSE INVESTIGATION FIX (2026-08-22), directive section 5 --
-   * see sendMessage()'s own doc comment above the pnJid/jid lines for
-   * the full incident. Resolves the actual JID to send to via a real
-   * onWhatsApp() query, preferring a returned LID over the constructed
-   * plain-PN JID. Fails safe in every direction: any exception, a
-   * missing/empty result, or no `lid` field on the match all fall
-   * through to returning the original `fallbackPnJid` unchanged --
-   * this method can only ever change the JID sendMessage() uses when it
-   * has genuine, fresh, positive evidence from WhatsApp's own servers
-   * that a LID exists for this exact recipient right now.
-   */
-  private async resolveRealSendJid(fallbackPnJid: string, toPhoneDigitsOnly: string): Promise<string> {
-    if (!this.socket) return fallbackPnJid
-    // Bounded separately from SEND_TIMEOUT_MS/withSendTimeout on
-    // purpose: THAT timeout rejects (a hard send failure), which is
-    // correct for the real send itself, but a slow/hung JID-resolution
-    // query must never fail the whole send -- it must fail SAFE to the
-    // original PN JID instead, matching every other failure branch in
-    // this method. A short, separate ceiling (well under
-    // SEND_TIMEOUT_MS) also guarantees this new lookup step cannot
-    // reintroduce anything resembling the original send-hang defect
-    // this same file already fixed once (see toWhatsAppJid()'s own doc
-    // comment).
-    const RESOLVE_TIMEOUT_MS = 10_000
-    try {
-      const results = await Promise.race([
-        this.socket.onWhatsApp(fallbackPnJid),
-        new Promise<never>((_, reject) =>
-          setTimeout(() => reject(new Error('onWhatsApp() lookup timed out')), RESOLVE_TIMEOUT_MS),
-        ),
-      ])
-      return selectRealSendJid(results, fallbackPnJid, toPhoneDigitsOnly)
-    } catch {
-      // Best-effort resolution only -- a failed or slow lookup must
-      // never block or fail the actual send; fall back to the pre-fix
-      // behavior (plain PN JID).
-      return fallbackPnJid
-    }
-  }
-
   async sendMessage(
     toPhoneDigitsOnly: string,
     body: string,
@@ -990,38 +933,32 @@ export class BaileysProvider implements WhatsAppProvider {
     // response for, causing a ~60s hang that had nothing to do with
     // Baileys, the network, or the database/queue layer.
     //
-    // ROOT-CAUSE INVESTIGATION FIX (2026-08-22), directive section 5 --
-    // a SECOND, independent JID defect, found by direct source
-    // inspection (messages-send.js): the installed
-    // @whiskeysockets/baileys@6.7.24 has NO internal LID-mapping store
-    // anywhere in the package (confirmed via a full grep of the whole
-    // lib/ tree) -- isLid detection in the relay path is driven
-    // entirely by the literal JID string passed to sendMessage(), and
-    // only the SENDER's own devices are ever auto-upgraded to LID
-    // addressing when isLid is true (messages-send.js line ~412:
-    // `isMe && isLid ? authState.creds?.me?.lid... : user` -- note
-    // "isMe &&", the recipient's own JID is never touched by this
-    // logic). A plain @s.whatsapp.net JID for the recipient is used
-    // completely verbatim, even when that recipient's real account has
-    // since migrated to LID addressing -- confirmed live via
-    // checkRegistration() against this exact production account pair:
-    // BOTH the sender (this club's own connected number, platform
-    // "smba" -- a genuine WhatsApp Business API account) and the QA
-    // recipient (+971502061209) have real, non-null `lid` values
-    // (onWhatsApp()'s own USyncQuery result), while every real send in
-    // this entire investigation used the plain PN JID and received
-    // zero delivery receipts. Fix: resolve the real send-target JID via
-    // the same onWhatsApp() registration query BEFORE sending, and
-    // prefer the returned LID over the constructed PN JID whenever one
-    // is present -- this is the sanctioned Baileys API for exactly this
-    // purpose (real WhatsApp-server evidence, not a guess), only ever
-    // touches the recipient side (never the auth/session state), and
-    // fails safe: if the registration query itself fails or returns no
-    // LID, the original PN JID is used unchanged (today's exact
-    // behavior), so this can never make delivery worse than the
-    // pre-fix baseline, only potentially better.
-    const pnJid = toWhatsAppJid(toPhoneDigitsOnly)
-    const jid = await this.resolveRealSendJid(pnJid, toPhoneDigitsOnly)
+    // BAILEYS v7 UPGRADE (2026-08-22), superseding the app-level
+    // resolveRealSendJid()/selectRealSendJid() workaround added earlier
+    // in this same investigation: @whiskeysockets/baileys@6.7.24 (the
+    // version this workaround was built against) had genuinely NO
+    // internal LID-mapping store anywhere in the package -- confirmed
+    // by a full grep of its lib/ tree -- so this connector had to
+    // manually query onWhatsApp() and pass the resolved LID JID to
+    // sendMessage() itself. That manual fix was deployed and tested
+    // live, but did NOT resolve real delivery to a real, physically-
+    // checked recipient phone (see git history for the full
+    // investigation). Upgrading to v7 (npm dist-tag "latest";
+    // 6.7.24 is npm dist-tag "legacy") replaces this with the correct,
+    // protocol-layer fix Baileys itself now ships: a real
+    // Signal/lid-mapping.js module wired directly into
+    // messages-send.js's own relay path
+    // (signalRepository.lidMapping.getLIDsForPNs(...), confirmed by
+    // direct source inspection), which resolves PN->LID automatically
+    // for EVERY send regardless of which JID form the caller passes in
+    // -- including establishing the underlying Signal session under the
+    // correct identity form from the start (the app-level workaround
+    // could only pick the right JID string; it could not fix a session
+    // already negotiated under the wrong form, which is the deeper
+    // layer v7's dedicated lid-mapping store actually addresses). The
+    // plain PN JID is therefore passed unchanged here -- v7 does the
+    // right thing with it internally.
+    const jid = toWhatsAppJid(toPhoneDigitsOnly)
     const myGeneration = this.generation
     const sendStartedAt = Date.now()
     // Send-hang investigation (2026-08-18): records THIS attempt's
