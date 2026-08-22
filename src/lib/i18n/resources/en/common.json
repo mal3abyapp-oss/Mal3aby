@@ -1086,6 +1086,7 @@
     "viewFullScreen": "View full screen",
     "closeFullScreen": "Close",
     "viewInvoice": "View invoice",
+    "loadingInvoice": "Loading...",
     "bookingStatusLabels": {
       "pending_payment": "Awaiting payment",
       "confirmed": "Confirmed",

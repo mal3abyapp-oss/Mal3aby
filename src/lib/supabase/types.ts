@@ -5772,6 +5772,10 @@ export type Database = {
         Args: { p_booking_id: string; p_reason?: string }
         Returns: undefined
       }
+      mint_invoice_token_for_booking_qr: {
+        Args: { p_booking_qr_token: string }
+        Returns: string
+      }
       my_customer_invoice_ids: { Args: never; Returns: string[] }
       my_customer_payment_ids: { Args: never; Returns: string[] }
       next_eligible_send_time: {
@@ -5807,6 +5811,7 @@ export type Database = {
         Args: { p_token: string }
         Returns: {
           booking_id: string
+          diagnostic_code: string
           result: string
         }[]
       }
@@ -5822,6 +5827,7 @@ export type Database = {
         Returns: {
           club_id: string
           credential_id: string
+          diagnostic_code: string
           display_name: string
           display_photo_url: string
           display_subtitle: string
@@ -6321,6 +6327,7 @@ export type Database = {
           currency: string
           customer_name: string
           field_name: string
+          group_name: string
           invoice_id: string
           invoice_number: string
           issued_at: string
@@ -6328,11 +6335,14 @@ export type Database = {
           paid: number
           payment_method: string
           payment_status: string
+          player_name: string
           receipt_book: string
           receipt_date: string
           receipt_serial: string
           receipt_series: string
           refunded: number
+          subscription_end_date: string
+          subscription_start_date: string
           total: number
         }[]
       }

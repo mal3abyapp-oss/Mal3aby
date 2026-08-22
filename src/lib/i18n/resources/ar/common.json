@@ -1085,6 +1085,7 @@
     "viewFullScreen": "عرض بملء الشاشة",
     "closeFullScreen": "إغلاق",
     "viewInvoice": "عرض الفاتورة",
+    "loadingInvoice": "جارٍ التحميل...",
     "bookingStatusLabels": {
       "pending_payment": "بانتظار الدفع",
       "confirmed": "مؤكد",

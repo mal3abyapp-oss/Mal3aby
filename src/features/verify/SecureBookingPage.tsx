@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useParams, useSearchParams } from 'react-router-dom'
-import { useQuery } from '@tanstack/react-query'
+import { useMutation, useQuery } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
 import QRCode from 'qrcode'
 import { supabase } from '@/lib/supabase/client'
@@ -132,6 +132,31 @@ export function SecureBookingPage() {
   const [qrDataUrl, setQrDataUrl] = useState<string | null>(null)
   const [fullScreenOpen, setFullScreenOpen] = useState(false)
 
+  // Real bug found 2026-08-23 (same investigation as the QR-payload
+  // fix below): "View Invoice" used to build /verify/${token} with
+  // this page's own BOOKING QR token -- but /verify/:token needs an
+  // INVOICE verification token, a different token from a different
+  // table. verify_booking_qr_public() can only ever report a boolean
+  // (an invoice token already exists) since the raw invoice token is
+  // never persisted/recoverable (hash-only storage). Fixed via a new,
+  // narrowly-scoped RPC: possessing a currently-valid booking QR token
+  // is treated as sufficient proof of legitimate access to mint a
+  // fresh invoice link for that same booking's invoice (mirrors this
+  // page's own no-login trust model) -- minting is safe to repeat
+  // (does not revoke the invoice link already sent via WhatsApp, per
+  // the fix in migration 20260822060000).
+  const invoiceLinkMutation = useMutation({
+    mutationFn: async () => {
+      if (!token) throw new Error('no token')
+      const { data, error } = await supabase.rpc('mint_invoice_token_for_booking_qr', { p_booking_qr_token: token })
+      if (error) throw error
+      return data as string
+    },
+    onSuccess: (invoiceToken) => {
+      window.location.assign(`/verify/${invoiceToken}?lang=${locale}`)
+    },
+  })
+
   // Seed the locale from a one-time ?lang= param on first mount only --
   // never fights a visitor who then uses the in-page language switcher,
   // and never overrides a real returning-visitor preference already in
@@ -153,22 +178,48 @@ export function SecureBookingPage() {
   })
 
   const result: VerifyResult = isError || !data ? 'invalid' : data.result
-  const tz = data?.timezone ?? 'Africa/Cairo'
-  const qrUrl = typeof window !== 'undefined' && token ? `${window.location.origin}/qr/${token}` : null
 
+  const tz = data?.timezone ?? 'Africa/Cairo'
+
+  // WHATSAPP BUSINESS MESSAGING FINAL HARDENING (2026-08-23) -- real
+  // root cause found via the directive's mandated "test the existing
+  // button first" step: this page used to encode a full URL
+  // (`${origin}/qr/${token}`) into the QR image, but the real
+  // production Staff Scanner (ScanPage.tsx) passes whatever raw string
+  // it decodes straight to qr_validate()/qr_confirm_checkin() with NO
+  // URL parsing -- and those RPCs hash `p_token` exactly as given
+  // (`encode(digest(p_token, 'sha256'), 'hex')`) to look it up against
+  // qr_credentials.token_hash, which was computed from the BARE raw
+  // token at mint time. A URL's hash can never match the bare token's
+  // hash, so a QR encoding a URL is structurally unscannable -- this
+  // was proven, not assumed: `ensure_booking_qr()` (the existing
+  // "عرض رمز QR لتسجيل الحضور" button in BookingDetailSheet.tsx, which
+  // already correctly encodes the bare token via
+  // `QRCode.toDataURL(rawToken, ...)`) round-tripped through
+  // qr_validate() successfully against a real confirmed production
+  // booking; the URL-encoding this page used would not have.
+  //
+  // One canonical QR credential contract, one scanner contract (per
+  // this directive's explicit "One QR Source of Truth" requirement) --
+  // this page now encodes the SAME bare token the existing button
+  // already used successfully in production, rather than inventing a
+  // second, incompatible payload shape. The page's own visible link
+  // text/URL bar still shows the full `/qr/:token` address (that part
+  // was never the problem -- only the QR image's own encoded payload
+  // was wrong).
   useEffect(() => {
-    if (result !== 'valid' || !qrUrl) {
+    if (result !== 'valid' || !token) {
       setQrDataUrl(null)
       return
     }
     let cancelled = false
-    void QRCode.toDataURL(qrUrl, { width: 480, margin: 1 }).then((url) => {
+    void QRCode.toDataURL(token, { width: 480, margin: 1 }).then((url) => {
       if (!cancelled) setQrDataUrl(url)
     })
     return () => {
       cancelled = true
     }
-  }, [result, qrUrl])
+  }, [result, token])
 
   const Icon = STATE_ICON[result]
   const tone = STATE_TONE[result]
@@ -252,12 +303,14 @@ export function SecureBookingPage() {
                   </div>
                 )}
                 {data.invoiceTokenAvailable && (
-                  <a
-                    href={`/verify/${token ?? ''}`}
-                    className="mt-2 inline-block text-sm font-medium text-accent-foreground underline"
+                  <button
+                    type="button"
+                    onClick={() => invoiceLinkMutation.mutate()}
+                    disabled={invoiceLinkMutation.isPending}
+                    className="mt-2 inline-block text-sm font-medium text-accent-foreground underline disabled:opacity-60"
                   >
-                    {t('secureBooking.viewInvoice')}
-                  </a>
+                    {invoiceLinkMutation.isPending ? t('secureBooking.loadingInvoice') : t('secureBooking.viewInvoice')}
+                  </button>
                 )}
               </div>
             )}
