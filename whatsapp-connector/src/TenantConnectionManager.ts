@@ -108,10 +108,19 @@ export class TenantConnectionManager {
   async checkRegistration(
     clubId: string,
     toPhoneDigitsOnly: string,
-  ): Promise<{ registered: boolean; jid: string | null } | null> {
+  ): Promise<{ registered: boolean; jid: string | null; lid: string | null; rawResults: unknown } | null> {
     const provider = this.providers.get(clubId)
     if (!provider) return null
     return provider.checkRegistration(toPhoneDigitsOnly)
+  }
+
+  /** See WhatsAppProvider.getSenderIdentity's own doc comment. Returns null if this club has no active provider at all. */
+  getSenderIdentity(
+    clubId: string,
+  ): { id: string | null; lid: string | null; name: string | null; platform: string | null } | null {
+    const provider = this.providers.get(clubId)
+    if (!provider) return null
+    return provider.getSenderIdentity()
   }
 
   async send(

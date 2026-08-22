@@ -455,7 +455,7 @@ export class WhatsAppAccountObject extends Container<Env> {
   async checkRegistration(
     clubId: string,
     phone: string,
-  ): Promise<{ ok: boolean; registered?: boolean; jid?: string | null; error?: string }> {
+  ): Promise<{ ok: boolean; registered?: boolean; jid?: string | null; lid?: string | null; error?: string }> {
     try {
       const res = await this.containerFetch(
         'http://container/check-registration',
@@ -466,11 +466,59 @@ export class WhatsAppAccountObject extends Container<Env> {
         },
         this.defaultPort,
       )
-      const body = (await res.json()) as { registered?: boolean; jid?: string | null; error?: string }
+      // Note: rawResults (the full unfiltered onWhatsApp() response) is
+      // deliberately NOT forwarded past this point -- it stays available
+      // on the connector's own internal /check-registration response
+      // for direct forensic inspection there, but this Worker-level
+      // proxy is the one genuinely public-internet-facing surface in
+      // this whole architecture (see this file's class-level doc
+      // comment), so only the already-structured, minimal fields are
+      // passed through.
+      const body = (await res.json()) as {
+        registered?: boolean
+        jid?: string | null
+        lid?: string | null
+        error?: string
+      }
       if (!res.ok) {
         return { ok: false, error: body.error ?? `http_${res.status}` }
       }
-      return { ok: true, registered: body.registered, jid: body.jid }
+      return { ok: true, registered: body.registered, jid: body.jid, lid: body.lid }
+    } catch (err) {
+      return { ok: false, error: (err as Error).message }
+    }
+  }
+
+  /**
+   * ROOT-CAUSE INVESTIGATION (2026-08-22), directive section 6 -- proxies
+   * BaileysProvider.getSenderIdentity's own doc comment: the SENDER
+   * account's own identity as Baileys itself sees it (authState.creds.me),
+   * for direct comparison against whatsapp_accounts.connected_phone_number.
+   */
+  async getSenderIdentity(
+    clubId: string,
+  ): Promise<{ ok: boolean; id?: string | null; lid?: string | null; name?: string | null; platform?: string | null; error?: string }> {
+    try {
+      const res = await this.containerFetch(
+        'http://container/sender-identity',
+        {
+          method: 'POST',
+          headers: { 'x-internal-token': this.env.CONTAINER_INTERNAL_TOKEN, 'content-type': 'application/json' },
+          body: JSON.stringify({ clubId }),
+        },
+        this.defaultPort,
+      )
+      const body = (await res.json()) as {
+        id?: string | null
+        lid?: string | null
+        name?: string | null
+        platform?: string | null
+        error?: string
+      }
+      if (!res.ok) {
+        return { ok: false, error: body.error ?? `http_${res.status}` }
+      }
+      return { ok: true, id: body.id, lid: body.lid, name: body.name, platform: body.platform }
     } catch (err) {
       return { ok: false, error: (err as Error).message }
     }

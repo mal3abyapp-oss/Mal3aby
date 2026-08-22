@@ -185,6 +185,41 @@ export function startHealthServer(sync: SupabaseSync, connections: TenantConnect
       return
     }
 
+    if (url.pathname === '/sender-identity' && req.method === 'POST') {
+      // ROOT-CAUSE INVESTIGATION (2026-08-22), directive section 6.
+      // Same internal-only gate as every other /manage-proxied route.
+      const provided = req.headers['x-internal-token']
+      if (!internalToken || Array.isArray(provided) || !safeTokenEquals(provided, internalToken)) {
+        res.writeHead(403, { 'content-type': 'text/plain' })
+        res.end('forbidden')
+        return
+      }
+      let body = ''
+      req.on('data', (chunk) => { body += chunk })
+      req.on('end', () => {
+        try {
+          const { clubId } = JSON.parse(body) as { clubId?: string }
+          if (!clubId) {
+            res.writeHead(400, { 'content-type': 'application/json' })
+            res.end(JSON.stringify({ error: 'clubId is required' }))
+            return
+          }
+          const result = connections.getSenderIdentity(clubId)
+          if (result === null) {
+            res.writeHead(404, { 'content-type': 'application/json' })
+            res.end(JSON.stringify({ error: 'no active connection for this club' }))
+            return
+          }
+          res.writeHead(200, { 'content-type': 'application/json' })
+          res.end(JSON.stringify(result))
+        } catch (err) {
+          res.writeHead(500, { 'content-type': 'application/json' })
+          res.end(JSON.stringify({ error: (err as Error).message }))
+        }
+      })
+      return
+    }
+
     if (url.pathname === '/status') {
       // Internal-only: requires the shared token the owning Durable
       // Object was provisioned with (Container class' envVars), not a

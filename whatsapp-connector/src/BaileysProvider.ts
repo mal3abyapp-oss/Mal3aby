@@ -1034,14 +1034,61 @@ export class BaileysProvider implements WhatsAppProvider {
    * connected right now" from "we asked and the number is not
    * registered".
    */
-  async checkRegistration(toPhoneDigitsOnly: string): Promise<{ registered: boolean; jid: string | null } | null> {
+  async checkRegistration(
+    toPhoneDigitsOnly: string,
+  ): Promise<{ registered: boolean; jid: string | null; lid: string | null; rawResults: unknown } | null> {
     if (this.state !== 'connected' || !this.socket) {
       return null
     }
     const jid = toWhatsAppJid(toPhoneDigitsOnly)
     const results = await this.socket.onWhatsApp(jid)
     const match = results?.find((r) => r.jid === jid || r.jid?.startsWith(toPhoneDigitsOnly.replace(/\D/g, '')))
-    return { registered: !!match?.exists, jid: match?.jid ?? null }
+    // ROOT-CAUSE INVESTIGATION (2026-08-22), directive section 5 -- the
+    // installed @whiskeysockets/baileys@6.7.24 has NO internal
+    // lidMapping store at all (confirmed absent via a full grep of
+    // node_modules/@whiskeysockets/baileys/lib for
+    // lidMapping/LIDMappingStore/getLIDForPN -- zero matches anywhere
+    // in this version, not just the send path). messages-send.js's own
+    // isLid detection (`server === 'lid'`) is driven ENTIRELY by
+    // whatever JID string the caller already passed in -- there is no
+    // auto-upgrade from a plain @s.whatsapp.net JID to @lid even if
+    // WhatsApp's servers would prefer/require LID addressing for this
+    // specific contact. onWhatsApp()'s own `lid` field (raw, unfiltered
+    // here -- typed `unknown` upstream) is the one place this
+    // installed version surfaces that information at all, so it is
+    // captured and returned verbatim rather than the earlier fix's
+    // narrower {registered, jid} shape, which silently discarded it.
+    const rawLid = (match as { lid?: unknown } | undefined)?.lid
+    return {
+      registered: !!match?.exists,
+      jid: match?.jid ?? null,
+      lid: typeof rawLid === 'string' ? rawLid : null,
+      rawResults: results ?? null,
+    }
+  }
+
+  /**
+   * ROOT-CAUSE INVESTIGATION (2026-08-22), directive section 6 -- the
+   * SENDER account's own identity, read directly from this socket's
+   * authenticated creds (authState.creds.me), not merely "a socket
+   * object exists and state === 'connected'". A socket can technically
+   * hold `state === 'connected'` while its underlying identity is in
+   * some other way stale/invalid; this surfaces exactly what Baileys
+   * itself believes this account's own id/lid/name/platform to be, for
+   * direct comparison against what Mal3aby's DB (whatsapp_accounts.
+   * connected_phone_number) shows.
+   */
+  getSenderIdentity(): { id: string | null; lid: string | null; name: string | null; platform: string | null } | null {
+    if (this.state !== 'connected' || !this.socket) {
+      return null
+    }
+    const me = this.socket.authState?.creds?.me
+    return {
+      id: me?.id ?? null,
+      lid: me?.lid ?? null,
+      name: me?.name ?? null,
+      platform: this.socket.authState?.creds?.platform ?? null,
+    }
   }
 
   async logout(): Promise<void> {
