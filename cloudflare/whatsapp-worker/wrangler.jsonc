@@ -244,7 +244,24 @@
       // nor the connection-lifecycle code paths. Re-deployed v18 per
       // explicit user instruction, to be monitored more closely this
       // time. GitHub Actions run 32536604129 (image build).
-      "image": "registry.cloudflare.com/35ac10727701095866b16c276b4a33d1/mala3by-whatsapp-connector:41eaa07",
+      // v19, commit 826674c -- ROOT-CAUSE INVESTIGATION continued
+      // (directive sections 5-6): checkRegistration() now also returns
+      // the raw `lid` field from onWhatsApp() and the full unfiltered
+      // rawResults array (connector-internal only, not forwarded past
+      // the Worker's public /manage/* proxy). Confirmed via a full
+      // source grep that the installed @whiskeysockets/baileys@6.7.24
+      // has NO internal lidMapping store anywhere in the package --
+      // isLid detection in messages-send.js is driven entirely by
+      // whatever JID string the caller passes in, with no auto-upgrade
+      // from a plain @s.whatsapp.net JID to @lid even if WhatsApp's
+      // servers expect LID addressing for a given contact -- a real
+      // candidate root cause for silent delivery failure to a
+      // confirmed-registered number. New getSenderIdentity() reads the
+      // connected socket's own authState.creds.me (id/lid/name) and
+      // creds.platform directly, for comparison against
+      // whatsapp_accounts.connected_phone_number. GitHub Actions run
+      // 32564150867.
+      "image": "registry.cloudflare.com/35ac10727701095866b16c276b4a33d1/mala3by-whatsapp-connector:826674c",
       // One container instance per WhatsApp account (one Durable
       // Object = one container, directive rule 21's chosen model --
       // NOT a shared container serving multiple clubs, which would
