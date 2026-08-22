@@ -114,6 +114,13 @@ export interface InvoiceDocumentData {
   receiptBook: string | null
   receiptSeries: string | null
   receiptDate: string | null
+  // Academy invoice identity (2026-08-22, found live during production
+  // QA acceptance testing) -- mirrors bookingRef/fieldName's role for a
+  // Field Booking invoice; an invoice only ever has one side populated.
+  playerName: string | null
+  groupName: string | null
+  subscriptionStartDate: string | null
+  subscriptionEndDate: string | null
 }
 
 const PAYMENT_METHOD_LABELS_AR: Record<string, string> = {
@@ -191,6 +198,40 @@ function formatBookingDateTime(startIso: string, endIso: string | null, timezone
   if (Number.isNaN(end.getTime())) return `${datePart} ${startTime}`
   const endTime = new Intl.DateTimeFormat(locale, { timeZone: tz, hour: 'numeric', minute: '2-digit', hour12: true }).format(end)
   return `${datePart}, ${startTime} - ${endTime}`
+}
+
+/**
+ * Academy subscription period (2026-08-22, found live during
+ * production QA acceptance testing) -- subscriptionStartDate/EndDate
+ * are plain SQL dates ('2026-09-01'), not timestamptz instants, so
+ * this deliberately does not apply any timezone conversion, matching
+ * templates.ts's own formatCalendarDate() for the same data.
+ */
+function formatSubscriptionRange(startDate: string, endDate: string, language: 'ar' | 'en'): string {
+  const start = new Date(`${startDate}T00:00:00Z`)
+  const end = new Date(`${endDate}T00:00:00Z`)
+  if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) return `${startDate} - ${endDate}`
+  const locale = language === 'en' ? 'en-GB' : 'en-GB'
+  const opts: Intl.DateTimeFormatOptions = { timeZone: 'UTC', day: '2-digit', month: '2-digit', year: 'numeric' }
+  return `${new Intl.DateTimeFormat(locale, opts).format(start)} - ${new Intl.DateTimeFormat(locale, opts).format(end)}`
+}
+
+/**
+ * Same class of bug as receiptDateLabel() in templates.ts (found live
+ * during production QA acceptance testing, 2026-08-22): the PDF's own
+ * receipt date rendering had the identical defect -- a raw SQL date
+ * string ("2026-08-22") instead of a formatted date, confirmed via a
+ * direct rasterized visual check of a real Academy invoice PDF built
+ * from this file, AFTER the templates.ts fix was already applied --
+ * this file was a separate, un-fixed instance of the same defect
+ * class, not covered by that earlier fix since InvoicePdf.ts has its
+ * own independent rendering path.
+ */
+function formatReceiptDate(dateStr: string, language: 'ar' | 'en'): string {
+  const d = new Date(`${dateStr}T00:00:00Z`)
+  if (Number.isNaN(d.getTime())) return dateStr
+  const locale = language === 'en' ? 'en-GB' : 'en-GB'
+  return new Intl.DateTimeFormat(locale, { timeZone: 'UTC', day: '2-digit', month: '2-digit', year: 'numeric' }).format(d)
 }
 
 /**
@@ -286,9 +327,18 @@ function renderArabic(
   doc.moveDown(0.2)
   divider()
 
-  line('بيانات الحجز', { bold: true, size: 12 })
+  // Academy invoice identity (2026-08-22, found live during production
+  // QA acceptance testing): an Academy invoice has no booking, so the
+  // heading and body switch to the subscription's own identity fields
+  // -- a guardian must be able to tell which child this invoice is
+  // for, matching the WhatsApp message text's own player_name
+  // requirement (Section 29).
+  line(data.playerName ? 'بيانات الاشتراك' : 'بيانات الحجز', { bold: true, size: 12 })
   doc.moveDown(0.2)
   if (data.customerName) row('العميل', data.customerName)
+  if (data.playerName) row('اللاعب', data.playerName)
+  if (data.groupName) row('الأكاديمية/المجموعة', data.groupName)
+  if (data.subscriptionStartDate && data.subscriptionEndDate) row('مدة الاشتراك', formatSubscriptionRange(data.subscriptionStartDate, data.subscriptionEndDate, 'ar'))
   if (data.fieldName) row('الملعب', data.fieldName)
   if (data.bookingStartAt) row('موعد الحجز', formatBookingDateTime(data.bookingStartAt, data.bookingEndAt, data.clubTimezone, 'ar'))
   doc.moveDown(0.2)
@@ -317,7 +367,7 @@ function renderArabic(
     row('رقم الإيصال', data.receiptSerial, { bold: true })
     if (data.receiptBook) row('رقم الدفتر', data.receiptBook)
     if (data.receiptSeries) row('السلسلة', data.receiptSeries)
-    if (data.receiptDate) row('تاريخ الإيصال', data.receiptDate)
+    if (data.receiptDate) row('تاريخ الإيصال', formatReceiptDate(data.receiptDate, 'ar'))
   }
 
   doc.moveDown(0.6)
@@ -411,9 +461,13 @@ function renderEnglish(
   doc.moveDown(0.3)
   divider()
 
-  heading('Booking details', { bold: true, size: 12 })
+  // English mirror of the Arabic Academy-identity fix above.
+  heading(data.playerName ? 'Subscription details' : 'Booking details', { bold: true, size: 12 })
   doc.moveDown(0.3)
   if (data.customerName) row('Customer', data.customerName)
+  if (data.playerName) row('Player', data.playerName)
+  if (data.groupName) row('Academy/Group', data.groupName)
+  if (data.subscriptionStartDate && data.subscriptionEndDate) row('Subscription period', formatSubscriptionRange(data.subscriptionStartDate, data.subscriptionEndDate, 'en'))
   if (data.fieldName) row('Field', data.fieldName)
   if (data.bookingStartAt) row('Booking time', formatBookingDateTime(data.bookingStartAt, data.bookingEndAt, data.clubTimezone, 'en'))
   doc.moveDown(0.3)
@@ -438,7 +492,7 @@ function renderEnglish(
     row('Receipt #', data.receiptSerial, { bold: true })
     if (data.receiptBook) row('Book', data.receiptBook)
     if (data.receiptSeries) row('Series', data.receiptSeries)
-    if (data.receiptDate) row('Receipt date', data.receiptDate)
+    if (data.receiptDate) row('Receipt date', formatReceiptDate(data.receiptDate, 'en'))
   }
 
   doc.moveDown(0.8)

@@ -142,6 +142,10 @@ async function main() {
     receiptBook: null,
     receiptSeries: null,
     receiptDate: null,
+    playerName: null,
+    groupName: null,
+    subscriptionStartDate: null,
+    subscriptionEndDate: null,
   })
   check('Invoice PDF generation produces a non-empty PDF buffer', pdf.length > 0)
   check('Invoice PDF starts with the %PDF magic bytes', pdf.subarray(0, 5).toString('ascii') === '%PDF-')
@@ -176,6 +180,10 @@ async function main() {
     receiptBook: null,
     receiptSeries: null,
     receiptDate: null,
+    playerName: null,
+    groupName: null,
+    subscriptionStartDate: null,
+    subscriptionEndDate: null,
   })
   const refundPdfText = await extractPdfText(refundPdf)
   check('Invoice PDF with a real refund embeds the refunded amount as real extractable text', refundPdfText.includes('50.00 EGP'))
@@ -215,6 +223,10 @@ async function main() {
     receiptBook: null,
     receiptSeries: null,
     receiptDate: null,
+    playerName: null,
+    groupName: null,
+    subscriptionStartDate: null,
+    subscriptionEndDate: null,
   })
   check('Invoice PDF generation succeeds with no refund present', noRefundPdf.length > 0)
 
@@ -243,11 +255,75 @@ async function main() {
     receiptBook: 'B12',
     receiptSeries: 'S3',
     receiptDate: '2026-08-20',
+    playerName: null,
+    groupName: null,
+    subscriptionStartDate: null,
+    subscriptionEndDate: null,
   })
   const govPdfText = await extractPdfText(govPdf)
   check('Invoice PDF with an official receipt embeds the receipt serial as real extractable text', govPdfText.includes('GOV-2026-004521'), govPdfText)
   check('Invoice PDF with an official receipt embeds the receipt book as real extractable text', govPdfText.includes('B12'))
   check('Invoice PDF omits the receipt block entirely when no receipt is linked (non-government payment)', !pdfTextContainsArabic(pdfText, 'إيصال التحصيل'))
+  // Real bug found live during production QA acceptance testing
+  // (2026-08-22, via an actual rasterized visual check of a real
+  // Academy invoice PDF, not just code inspection): the receipt date
+  // rendered as a raw unformatted SQL date string ("2026-08-20")
+  // instead of a real formatted date -- confirmed here as extractable
+  // text (Latin-numeric content, unaffected by the separate Arabic-
+  // shaping-vs-extraction caveat this file documents elsewhere).
+  check('Invoice PDF never embeds the raw unformatted SQL receipt date string', !govPdfText.includes('2026-08-20'), govPdfText)
+  check('Invoice PDF embeds a real formatted receipt date (DD/MM/YYYY)', govPdfText.includes('20/08/2026'), govPdfText)
+
+  // Academy invoice identity (2026-08-22, found in the same live QA
+  // pass): a real Academy invoice's PDF showed no player/group
+  // identity at all -- only booking_ref/field_name existed, both
+  // correctly null for an Academy invoice, but nothing took their
+  // place, leaving the guardian no way to tell which child the
+  // invoice was for.
+  const academyPdf = await buildInvoicePdfBuffer({
+    invoiceId: 'test-invoice-id-5',
+    invoiceNumber: 'INV-2026-0300',
+    clubName: 'أكاديمية الناشئين',
+    customerName: 'ولي الأمر أحمد',
+    bookingRef: null,
+    fieldName: null,
+    bookingStartAt: null,
+    bookingEndAt: null,
+    clubTimezone: 'Africa/Cairo',
+    issuedAt: new Date().toISOString(),
+    total: 300,
+    paid: 300,
+    refunded: 0,
+    outstanding: 0,
+    paymentStatus: 'paid',
+    currency: 'EGP',
+    paymentMethod: 'wallet',
+    receiptSerial: null,
+    receiptBook: null,
+    receiptSeries: null,
+    receiptDate: null,
+    playerName: 'محمد أحمد',
+    groupName: 'أكاديمية القاهرة',
+    subscriptionStartDate: '2026-09-01',
+    subscriptionEndDate: '2026-10-01',
+  })
+  const academyPdfText = await extractPdfText(academyPdf)
+  // Some individual Arabic words extract as a single clean text-layer
+  // item (e.g. 'محمد' below); others split across multiple PDF text
+  // items with irregular internal spacing in their real ToUnicode
+  // mapping (a pre-existing font-kerning/positioning artifact of this
+  // exact rendering pipeline, confirmed harmless via a direct
+  // rasterized visual check earlier in this QA pass -- the VISIBLE
+  // glyphs render correctly; only the raw multi-item extracted-text
+  // join is uneven for some words). This assertion only checks the one
+  // word confirmed to extract cleanly -- 'محمد' (part of the player
+  // name, which the PDF previously never showed at all for an Academy
+  // invoice) -- as a real, reliable regression guard for the actual
+  // fix (player identity now present), without being fragile against
+  // this separate, pre-existing extraction-layer quirk.
+  check('An Academy invoice PDF embeds the player name as real extractable text', academyPdfText.includes('محمد'), academyPdfText)
+  check('An Academy invoice PDF never embeds the raw unformatted SQL subscription dates', !academyPdfText.includes('2026-09-01') && !academyPdfText.includes('2026-10-01'), academyPdfText)
+  check('An Academy invoice PDF embeds a real formatted subscription date range (DD/MM/YYYY)', academyPdfText.includes('01/09/2026') && academyPdfText.includes('01/10/2026'), academyPdfText)
 
   // Regression test for a real bug found via rasterized visual QA
   // (directive Section 10 -- "actually generate real QA PDFs and
@@ -290,6 +366,10 @@ async function main() {
       receiptBook: null,
       receiptSeries: null,
       receiptDate: null,
+      playerName: null,
+      groupName: null,
+      subscriptionStartDate: null,
+      subscriptionEndDate: null,
     },
     { language: 'en', compress: false },
   )

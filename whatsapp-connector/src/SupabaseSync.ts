@@ -188,6 +188,17 @@ export class SupabaseSync {
     receiptBook: string | null
     receiptSeries: string | null
     receiptDate: string | null
+    // Real bug found live during production QA acceptance testing
+    // (2026-08-22): an Academy invoice's PDF showed no player/group
+    // identity at all (only booking_ref/field_name existed, both
+    // correctly null for an Academy invoice) -- the guardian had no
+    // way to tell which child's subscription the PDF was for, even
+    // though the WhatsApp message text itself already correctly named
+    // the player. See migration 20260822090000.
+    playerName: string | null
+    groupName: string | null
+    subscriptionStartDate: string | null
+    subscriptionEndDate: string | null
   } | null> {
     const { data, error } = await this.client.rpc('whatsapp_connector_get_invoice_document_data', { p_invoice_id: invoiceId })
     if (error) throw new Error(`whatsapp_connector_get_invoice_document_data failed: ${error.message}`)
@@ -214,6 +225,10 @@ export class SupabaseSync {
           receipt_book: string | null
           receipt_series: string | null
           receipt_date: string | null
+          player_name: string | null
+          group_name: string | null
+          subscription_start_date: string | null
+          subscription_end_date: string | null
         }
       | undefined
     if (!row) return null
@@ -239,6 +254,10 @@ export class SupabaseSync {
       receiptBook: row.receipt_book,
       receiptSeries: row.receipt_series,
       receiptDate: row.receipt_date,
+      playerName: row.player_name,
+      groupName: row.group_name,
+      subscriptionStartDate: row.subscription_start_date,
+      subscriptionEndDate: row.subscription_end_date,
     }
   }
 
