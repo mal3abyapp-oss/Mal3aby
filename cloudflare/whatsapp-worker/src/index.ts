@@ -96,25 +96,6 @@ async function handleManage(request: Request, env: Env): Promise<Response> {
     return Response.json({ clubId, action: 'repair-session', ...result })
   }
 
-  if (action === 'check-registration') {
-    // POST /manage/:clubId/check-registration { "phone": "971502061209" }
-    // WHATSAPP DELIVERY TRUTH fix (2026-08-22). Same auth gate as every
-    // other /manage/* action. See WhatsAppAccountObject.checkRegistration's
-    // own doc comment.
-    let phone: string | undefined
-    try {
-      const body = (await request.json()) as { phone?: string }
-      phone = body.phone
-    } catch {
-      return new Response('invalid JSON body, expected {"phone": "..."}', { status: 400 })
-    }
-    if (!phone) {
-      return new Response('phone is required', { status: 400 })
-    }
-    const result = await stub.checkRegistration(clubId, phone)
-    return Response.json({ clubId, action: 'check-registration', ...result })
-  }
-
   if (action === 'restart') {
     // ADVERSARIAL PROOF SEQUENCE addition (2026-08-18): a legitimate,
     // controlled restart capability was missing entirely -- this Worker
