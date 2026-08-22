@@ -70,6 +70,17 @@ interface ActivityRow {
 // whatsapp.page.activityTab.templateLabels / .statusLabels (see
 // WhatsAppActivityTab render below) -- these keys are the lookup keys,
 // not the display text.
+// WHATSAPP BUSINESS MESSAGING FINAL HARDENING (2026-08-22): 'booking-
+// confirmed' and 'invoice-created' were removed from templates.ts as
+// dead/fragmenting templates -- no live RPC queues either key anymore
+// (confirmed: zero Postgres functions reference 'booking-confirmed'/
+// 'invoice-created' as a template_key). They are DELIBERATELY kept
+// here, though: real historical notification_queue rows exist with
+// these template_keys (11 'booking-confirmed' rows, 2026-08-17/18,
+// confirmed via direct query) and must still show a real label rather
+// than falling back to the raw key string when staff filter/view old
+// activity. Do not remove these two entries unless the historical rows
+// are also being purged.
 const TEMPLATE_LABEL_KEYS = [
   'booking-created',
   'booking-confirmed',
