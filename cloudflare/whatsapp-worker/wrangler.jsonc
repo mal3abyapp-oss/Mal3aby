@@ -284,7 +284,25 @@
       // this can only match or improve on the pre-fix delivery
       // baseline. 91/91 connector tests pass (9 new, in
       // resolveRealSendJidTest.ts). GitHub Actions run 32564844096.
-      "image": "registry.cloudflare.com/35ac10727701095866b16c276b4a33d1/mala3by-whatsapp-connector:727cc12",
+      // v21, commit 03a58cc -- ROOT-CAUSE INVESTIGATION continued: the
+      // v20 PN/LID fix was deployed and re-tested, but the user
+      // physically confirmed the post-fix send STILL never arrived on
+      // the QA phone -- PN/LID was a real, confirmed structural gap,
+      // but not (or not the complete) root cause of the delivery
+      // failure. Moving to the next investigation layer: this connector
+      // had a real, confirmed diagnostic blind spot -- it never
+      // listened to messages.upsert at all (zero grep matches before
+      // this fix), meaning it could not see ANY incoming message,
+      // including a genuine WhatsApp-server account-risk/status notice
+      // (a documented real phenomenon for Baileys/unofficial-client
+      // accounts -- "your account may be using unauthorized tools" --
+      // which arrives as an ordinary message from WhatsApp's own system
+      // JID). Adds a safe-metadata-only messages.upsert listener + an
+      // in-memory diagnostics ring buffer exposed via a new
+      // /manage/:clubId/incoming-message-diagnostics route, so the next
+      // real send can be checked for any such notice. GitHub Actions
+      // run 32566136793.
+      "image": "registry.cloudflare.com/35ac10727701095866b16c276b4a33d1/mala3by-whatsapp-connector:03a58cc",
       // One container instance per WhatsApp account (one Durable
       // Object = one container, directive rule 21's chosen model --
       // NOT a shared container serving multiple clubs, which would
