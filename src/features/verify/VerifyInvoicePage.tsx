@@ -1,13 +1,15 @@
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { useParams, useSearchParams } from 'react-router-dom'
-import { useQuery } from '@tanstack/react-query'
+import { useMutation, useQuery } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
+import QRCode from 'qrcode'
 import { supabase } from '@/lib/supabase/client'
 import { StatusBadge } from '@/components/ui/status-badge'
+import { QrCodeViewer } from '@/components/ui/qr-code-viewer'
 import { PAYMENT_STATUS_TONE, type PaymentStatus } from '@/lib/domain/billing'
 import { useDirection } from '@/app/providers/DirectionProvider'
 import { formatCurrency, formatDate, type SupportedLocale } from '@/lib/i18n/config'
-import { CheckCircle2, XCircle } from 'lucide-react'
+import { CheckCircle2, XCircle, Ticket, Ban } from 'lucide-react'
 
 // Task #86: public invoice verification page. Reachable with NO login
 // (verify_invoice_public() is granted to anon), matching the documented
@@ -33,6 +35,21 @@ import { CheckCircle2, XCircle } from 'lucide-react'
 // was the one surface missing government receipt data. Every active
 // receipt against the invoice is shown (Section 43 -- multiple cash
 // payments can each carry their own receipt; none are dropped).
+//
+// INVOICE QR BUTTON (2026-08-23): "عرض رمز QR" / "View QR Code",
+// Field Booking invoices only. Reuses the SAME canonical QR
+// architecture as Booking Details "Show QR" (ensure_booking_qr) and
+// Secure Booking Page "Show QR" -- via get_booking_qr_for_invoice_token
+// (migration 20260823020000), which mints through the shared
+// _mint_booking_qr_token_internal() primitive, and renders through the
+// shared <QrCodeViewer> component (no separate InvoiceQr
+// implementation). The button is lazy -- nothing is minted just from
+// this invoice page loading, only on click -- and never shown for
+// Academy/subscription invoices (no linked booking -- see
+// data.bookingRef gate below), never affects official-receipt data,
+// and the RPC re-validates the booking's own status server-side on
+// every click (cancelled/checked-in/not-eligible), so a stale or
+// tampered client can't force a QR for an invalid booking.
 
 interface OfficialReceipt {
   receiptSerial: string | null
@@ -85,11 +102,42 @@ async function verifyInvoice(token: string): Promise<VerificationResult> {
   }
 }
 
+type BookingQrStatus =
+  | 'active'
+  | 'invalid_invoice_token'
+  | 'not_a_booking_invoice'
+  | 'booking_cancelled'
+  | 'already_checked_in'
+  | 'booking_not_eligible'
+
+interface BookingQrResult {
+  status: BookingQrStatus
+  rawToken: string | null
+  bookingRef: string | null
+  fieldName: string | null
+  startAt: string | null
+}
+
+async function fetchBookingQr(invoiceToken: string): Promise<BookingQrResult> {
+  const { data, error } = await supabase.rpc('get_booking_qr_for_invoice_token', { p_invoice_token: invoiceToken })
+  if (error) throw error
+  const row = data?.[0]
+  return {
+    status: (row?.status as BookingQrStatus) ?? 'invalid_invoice_token',
+    rawToken: row?.raw_token ?? null,
+    bookingRef: row?.booking_ref ?? null,
+    fieldName: row?.field_name ?? null,
+    startAt: row?.start_at ?? null,
+  }
+}
+
 export function VerifyInvoicePage() {
   const { token } = useParams<{ token: string }>()
   const [searchParams] = useSearchParams()
   const { t } = useTranslation()
   const { direction, locale, setLocale } = useDirection()
+  const [qrDataUrl, setQrDataUrl] = useState<string | null>(null)
+  const [qrOpen, setQrOpen] = useState(false)
 
   // Secure Booking Page language hand-off (directive Sections 28-32/40):
   // invoiceUrl() now appends ?lang=ar|en matching the WhatsApp message's
@@ -112,6 +160,26 @@ export function VerifyInvoicePage() {
     enabled: !!token,
     retry: false,
   })
+
+  // "عرض رمز QR" / "View QR Code" -- lazy, click-triggered only. Calls
+  // get_booking_qr_for_invoice_token (the same server-side chain that
+  // re-validates invoice -> booking -> QR eligibility on every call --
+  // see the doc comment above), then encodes the returned bare token
+  // (never a URL -- matching the fix applied to SecureBookingPage.tsx
+  // this session; qr_validate/qr_confirm_checkin hash the token exactly
+  // as given, with zero URL parsing).
+  const bookingQrMutation = useMutation({
+    mutationFn: () => fetchBookingQr(token!),
+    onSuccess: async (result) => {
+      if (result.status === 'active' && result.rawToken) {
+        const url = await QRCode.toDataURL(result.rawToken, { width: 480, margin: 1 })
+        setQrDataUrl(url)
+      }
+      setQrOpen(true)
+    },
+  })
+
+  const bookingQr = bookingQrMutation.data
 
   return (
     <div dir={direction} className="flex min-h-screen items-center justify-center bg-page-bg p-4">
@@ -219,6 +287,93 @@ export function VerifyInvoicePage() {
                     </div>
                   ))}
                 </div>
+              </div>
+            )}
+
+            {/* Directive item 5/F: only Field Booking invoices get the QR
+                button -- data.bookingRef is only populated by
+                verify_invoice_public() when this invoice has a linked
+                booking, so an Academy/subscription invoice never shows
+                this section at all. */}
+            {data.bookingRef && (
+              <div className="w-full rounded-md border border-border p-4 text-start text-sm">
+                {!qrOpen && (
+                  <button
+                    type="button"
+                    onClick={() => bookingQrMutation.mutate()}
+                    disabled={bookingQrMutation.isPending}
+                    className="flex w-full items-center justify-center gap-2 rounded-md bg-brand-primary px-4 py-2 font-medium text-white transition hover:opacity-90 disabled:opacity-60"
+                  >
+                    <Ticket className="size-4" />
+                    {bookingQrMutation.isPending ? t('verifyInvoice.qrAction.loading') : t('verifyInvoice.qrAction.viewQr')}
+                  </button>
+                )}
+
+                {bookingQrMutation.isError && (
+                  <p className="mt-2 text-sm text-status-danger">{t('verifyInvoice.qrAction.loadError')}</p>
+                )}
+
+                {qrOpen && bookingQr && (
+                  <div className="flex flex-col items-center gap-3">
+                    <p className="font-medium">{t('verifyInvoice.qrAction.sectionTitle')}</p>
+                    <div className="w-full text-sm">
+                      {bookingQr.bookingRef && (
+                        <div className="flex justify-between py-1">
+                          <span className="text-text-secondary">{t('verifyInvoice.bookingRef')}</span>
+                          <span className="font-medium"><bdi>{bookingQr.bookingRef}</bdi></span>
+                        </div>
+                      )}
+                      {bookingQr.fieldName && (
+                        <div className="flex justify-between py-1">
+                          <span className="text-text-secondary">{t('verifyInvoice.qrAction.field')}</span>
+                          <span className="font-medium">{bookingQr.fieldName}</span>
+                        </div>
+                      )}
+                      {bookingQr.startAt && (
+                        <>
+                          <div className="flex justify-between py-1">
+                            <span className="text-text-secondary">{t('verifyInvoice.qrAction.date')}</span>
+                            <span className="font-medium">
+                              {formatDate(bookingQr.startAt, locale as SupportedLocale, 'Africa/Cairo', { day: 'numeric', month: 'long', year: 'numeric' })}
+                            </span>
+                          </div>
+                          <div className="flex justify-between py-1">
+                            <span className="text-text-secondary">{t('verifyInvoice.qrAction.time')}</span>
+                            <span className="font-medium">
+                              {formatDate(bookingQr.startAt, locale as SupportedLocale, 'Africa/Cairo', { hour: 'numeric', minute: '2-digit' })}
+                            </span>
+                          </div>
+                        </>
+                      )}
+                    </div>
+
+                    {bookingQr.status === 'booking_cancelled' && (
+                      <div className="flex flex-col items-center gap-2 text-status-danger">
+                        <Ban className="size-8" />
+                        <p className="font-medium">{t('verifyInvoice.qrAction.bookingCancelled')}</p>
+                      </div>
+                    )}
+
+                    {bookingQr.status === 'already_checked_in' && (
+                      <div className="flex flex-col items-center gap-2 text-status-success">
+                        <CheckCircle2 className="size-8" />
+                        <p className="font-medium">{t('verifyInvoice.qrAction.alreadyCheckedIn')}</p>
+                      </div>
+                    )}
+
+                    {bookingQr.status === 'booking_not_eligible' && (
+                      <p className="text-sm text-text-secondary">{t('verifyInvoice.qrAction.notEligible')}</p>
+                    )}
+
+                    {bookingQr.status === 'active' && qrDataUrl && (
+                      <QrCodeViewer
+                        qrDataUrl={qrDataUrl}
+                        label={t('verifyInvoice.qrAction.attendanceQr')}
+                        hint={t('verifyInvoice.qrAction.attendanceQrHint')}
+                      />
+                    )}
+                  </div>
+                )}
               </div>
             )}
           </div>

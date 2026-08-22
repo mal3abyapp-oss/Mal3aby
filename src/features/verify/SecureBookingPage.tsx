@@ -8,8 +8,8 @@ import { useDirection } from '@/app/providers/DirectionProvider'
 import { formatCurrency, formatDate, type SupportedLocale } from '@/lib/i18n/config'
 import { LanguageSwitcher } from '@/components/ui/language-switcher'
 import { StatusBadge } from '@/components/ui/status-badge'
-import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog'
-import { CheckCircle2, XCircle, Clock, Ban, Maximize2 } from 'lucide-react'
+import { QrCodeViewer } from '@/components/ui/qr-code-viewer'
+import { CheckCircle2, XCircle, Clock, Ban } from 'lucide-react'
 
 /**
  * SecureBookingPage -- the Secure Booking Page (directive Sections
@@ -130,7 +130,6 @@ export function SecureBookingPage() {
   const { t } = useTranslation()
   const { locale, direction, setLocale } = useDirection()
   const [qrDataUrl, setQrDataUrl] = useState<string | null>(null)
-  const [fullScreenOpen, setFullScreenOpen] = useState(false)
 
   // Real bug found 2026-08-23 (same investigation as the QR-payload
   // fix below): "View Invoice" used to build /verify/${token} with
@@ -316,32 +315,15 @@ export function SecureBookingPage() {
             )}
 
             {qrDataUrl && (
-              <div className="flex flex-col items-center gap-2 rounded-lg border border-border bg-surface p-4">
-                <p className="text-xs font-medium text-text-secondary">{t('secureBooking.attendanceQr')}</p>
-                <button
-                  type="button"
-                  onClick={() => setFullScreenOpen(true)}
-                  className="group relative"
-                  aria-label={t('secureBooking.viewFullScreen')}
-                >
-                  <img src={qrDataUrl} alt={t('secureBooking.attendanceQr')} className="size-40" />
-                  <span className="absolute inset-0 flex items-center justify-center bg-black/0 opacity-0 transition group-hover:bg-black/40 group-hover:opacity-100">
-                    <Maximize2 className="size-6 text-white" />
-                  </span>
-                </button>
-                <p className="text-xs text-text-secondary">{t('secureBooking.attendanceQrHint')}</p>
-              </div>
+              <QrCodeViewer
+                qrDataUrl={qrDataUrl}
+                label={t('secureBooking.attendanceQr')}
+                hint={t('secureBooking.attendanceQrHint')}
+              />
             )}
           </div>
         )}
       </div>
-
-      <Dialog open={fullScreenOpen} onOpenChange={setFullScreenOpen}>
-        <DialogContent className="flex max-w-none flex-col items-center justify-center gap-4 border-none bg-white p-8 sm:max-w-none">
-          <DialogTitle className="sr-only">{t('secureBooking.attendanceQr')}</DialogTitle>
-          {qrDataUrl && <img src={qrDataUrl} alt={t('secureBooking.attendanceQr')} className="size-[min(80vw,80vh)]" />}
-        </DialogContent>
-      </Dialog>
     </div>
   )
 }

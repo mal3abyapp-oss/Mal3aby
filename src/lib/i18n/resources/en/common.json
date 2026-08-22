@@ -2424,6 +2424,21 @@
       "paid": "Fully paid",
       "partially_refunded": "Partially refunded",
       "refunded": "Fully refunded"
+    },
+    "qrAction": {
+      "viewQr": "View QR Code",
+      "loading": "Loading...",
+      "sectionTitle": "Field Booking",
+      "attendanceQr": "Check-in QR Code",
+      "attendanceQrHint": "Show this code to staff when you arrive",
+      "field": "Field",
+      "date": "Date",
+      "time": "Time",
+      "status": "Status",
+      "bookingCancelled": "Booking cancelled — entry code not available",
+      "alreadyCheckedIn": "Already checked in",
+      "notEligible": "Entry code is not currently available for this booking",
+      "loadError": "Couldn't show the QR code."
     }
   },
   "settings": {

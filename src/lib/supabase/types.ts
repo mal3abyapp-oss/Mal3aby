@@ -5160,6 +5160,19 @@ export type Database = {
         Args: { p_end_date: string; p_status: string }
         Returns: string
       }
+      get_booking_qr_for_invoice_token: {
+        Args: { p_invoice_token: string }
+        Returns: {
+          booking_ref: string
+          booking_status: string
+          end_at: string
+          field_name: string
+          raw_token: string
+          start_at: string
+          status: string
+          timezone: string
+        }[]
+      }
       get_booking_report: {
         Args: {
           p_branch_id?: string

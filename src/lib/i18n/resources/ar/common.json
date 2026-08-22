@@ -2427,6 +2427,21 @@
       "paid": "مدفوعة بالكامل",
       "partially_refunded": "مستردة جزئيًا",
       "refunded": "مستردة بالكامل"
+    },
+    "qrAction": {
+      "viewQr": "عرض رمز QR",
+      "loading": "جارٍ التحميل...",
+      "sectionTitle": "حجز ملعب",
+      "attendanceQr": "رمز تسجيل الحضور",
+      "attendanceQrHint": "اعرض هذا الرمز لموظفي الاستقبال عند الوصول",
+      "field": "الملعب",
+      "date": "التاريخ",
+      "time": "الوقت",
+      "status": "الحالة",
+      "bookingCancelled": "الحجز ملغي — رمز الدخول غير متاح",
+      "alreadyCheckedIn": "تم تسجيل الحضور",
+      "notEligible": "رمز الدخول غير متاح لهذا الحجز حاليًا",
+      "loadError": "تعذّر عرض رمز QR."
     }
   },
   "settings": {
