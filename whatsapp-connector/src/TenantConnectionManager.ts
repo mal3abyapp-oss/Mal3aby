@@ -128,7 +128,14 @@ export class TenantConnectionManager {
   /** See WhatsAppProvider.getSenderIdentity's own doc comment. Returns null if this club has no active provider at all. */
   getSenderIdentity(
     clubId: string,
-  ): { id: string | null; lid: string | null; name: string | null; platform: string | null } | null {
+  ): {
+    id: string | null
+    lid: string | null
+    name: string | null
+    platform: string | null
+    registered: boolean | null
+    accountSignaturePresent: boolean
+  } | null {
     const provider = this.providers.get(clubId)
     if (!provider) return null
     return provider.getSenderIdentity()

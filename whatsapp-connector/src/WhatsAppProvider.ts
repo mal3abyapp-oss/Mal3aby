@@ -198,7 +198,14 @@ export interface WhatsAppProvider {
    * ROOT-CAUSE INVESTIGATION (2026-08-22), directive section 6 -- see
    * BaileysProvider.getSenderIdentity's own doc comment.
    */
-  getSenderIdentity(): { id: string | null; lid: string | null; name: string | null; platform: string | null } | null
+  getSenderIdentity(): {
+    id: string | null
+    lid: string | null
+    name: string | null
+    platform: string | null
+    registered: boolean | null
+    accountSignaturePresent: boolean
+  } | null
 
   /** Observability snapshot for a future admin health panel (review directive rule 17). */
   getDiagnostics(): {

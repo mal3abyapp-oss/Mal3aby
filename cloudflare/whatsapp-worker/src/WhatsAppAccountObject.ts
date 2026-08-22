@@ -551,9 +551,16 @@ export class WhatsAppAccountObject extends Container<Env> {
    * account's own identity as Baileys itself sees it (authState.creds.me),
    * for direct comparison against whatsapp_accounts.connected_phone_number.
    */
-  async getSenderIdentity(
-    clubId: string,
-  ): Promise<{ ok: boolean; id?: string | null; lid?: string | null; name?: string | null; platform?: string | null; error?: string }> {
+  async getSenderIdentity(clubId: string): Promise<{
+    ok: boolean
+    id?: string | null
+    lid?: string | null
+    name?: string | null
+    platform?: string | null
+    registered?: boolean | null
+    accountSignaturePresent?: boolean
+    error?: string
+  }> {
     try {
       const res = await this.containerFetch(
         'http://container/sender-identity',
@@ -569,12 +576,22 @@ export class WhatsAppAccountObject extends Container<Env> {
         lid?: string | null
         name?: string | null
         platform?: string | null
+        registered?: boolean | null
+        accountSignaturePresent?: boolean
         error?: string
       }
       if (!res.ok) {
         return { ok: false, error: body.error ?? `http_${res.status}` }
       }
-      return { ok: true, id: body.id, lid: body.lid, name: body.name, platform: body.platform }
+      return {
+        ok: true,
+        id: body.id,
+        lid: body.lid,
+        name: body.name,
+        platform: body.platform,
+        registered: body.registered,
+        accountSignaturePresent: body.accountSignaturePresent,
+      }
     } catch (err) {
       return { ok: false, error: (err as Error).message }
     }

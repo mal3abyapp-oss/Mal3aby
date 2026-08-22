@@ -1227,16 +1227,40 @@ export class BaileysProvider implements WhatsAppProvider {
    * direct comparison against what Mal3aby's DB (whatsapp_accounts.
    * connected_phone_number) shows.
    */
-  getSenderIdentity(): { id: string | null; lid: string | null; name: string | null; platform: string | null } | null {
+  getSenderIdentity(): {
+    id: string | null
+    lid: string | null
+    name: string | null
+    platform: string | null
+    registered: boolean | null
+    accountSignaturePresent: boolean
+  } | null {
     if (this.state !== 'connected' || !this.socket) {
       return null
     }
     const me = this.socket.authState?.creds?.me
+    const creds = this.socket.authState?.creds
     return {
       id: me?.id ?? null,
       lid: me?.lid ?? null,
       name: me?.name ?? null,
-      platform: this.socket.authState?.creds?.platform ?? null,
+      platform: creds?.platform ?? null,
+      // ROOT-CAUSE INVESTIGATION (2026-08-22), directive section 9 --
+      // AuthenticationCreds.registered is Baileys' own belief about
+      // whether this device identity completed real WhatsApp-server
+      // registration (distinct from the socket merely being open/
+      // authenticated for THIS session -- a device can be connected at
+      // the transport level while this flag is stale/false if
+      // registration itself never fully completed or was later
+      // invalidated). accountSignaturePresent checks
+      // creds.account (proto.IADVSignedDeviceIdentity) is non-null --
+      // WhatsApp's own signed device-identity credential, required for
+      // this device to be a trusted delivery target; its absence would
+      // be a genuine, concrete signal of a broken/incomplete device
+      // registration that could plausibly explain "accepts sends
+      // locally, WhatsApp's servers never actually deliver".
+      registered: typeof creds?.registered === 'boolean' ? creds.registered : null,
+      accountSignaturePresent: !!creds?.account,
     }
   }
 
