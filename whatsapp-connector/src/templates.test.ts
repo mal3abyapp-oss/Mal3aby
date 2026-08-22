@@ -429,6 +429,31 @@ check('payment-received includes official receipt details when present, omits wh
   assert.ok(!withoutReceipt.includes('إيصال التحصيل الرسمي'), 'a receipt heading appeared with no receipt data supplied')
 })
 
+// Real bug found during production QA acceptance testing (2026-08-22):
+// receipt_date rendered as a raw unformatted SQL date string
+// ("2026-08-22") in every template that shows it, while every other
+// date in the same message was correctly localized -- confirmed live
+// against a real production WhatsApp send before this fix.
+check('the official receipt date is a real formatted date, never a raw SQL date string (ar + en, all three receipt-bearing templates)', () => {
+  const rawDate = '2026-08-22'
+  const receiptVars = { ...PAID_VARS, receipt_serial: 'GOV-2026-777', receipt_date: rawDate }
+
+  for (const templateKey of ['booking-confirmed-paid', 'payment-received'] as const) {
+    const ar = renderTemplate(templateKey, 'ar', receiptVars)
+    assert.ok(!ar.includes(rawDate), `${templateKey} (ar) leaked the raw SQL receipt date string`)
+    assert.ok(ar.includes('أغسطس'), `${templateKey} (ar) missing a real Arabic month name for the receipt date`)
+
+    const en = renderTemplate(templateKey, 'en', receiptVars)
+    assert.ok(!en.includes(rawDate), `${templateKey} (en) leaked the raw SQL receipt date string`)
+    assert.ok(en.includes('August'), `${templateKey} (en) missing a real English month name for the receipt date`)
+  }
+
+  const academyVars = { customer_name: 'ولي الأمر', player_name: 'أحمد', group_name: 'الأكاديمية', amount: 100, method: 'cash', invoice_number: 'INV-1', payment_status: 'paid', receipt_serial: 'GOV-2026-778', receipt_date: rawDate }
+  const academyAr = renderTemplate('academy-payment-received', 'ar', academyVars)
+  assert.ok(!academyAr.includes(rawDate), 'academy-payment-received (ar) leaked the raw SQL receipt date string')
+  assert.ok(academyAr.includes('أغسطس'), 'academy-payment-received (ar) missing a real Arabic month name for the receipt date')
+})
+
 // -----------------------------------------------------------------
 // Secure Booking Page language hand-off (directive Sections 28-32/40):
 // the /qr/ and /verify/ links must carry ?lang=ar|en matching the

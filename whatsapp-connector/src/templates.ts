@@ -354,6 +354,25 @@ function sportLabel(sport: unknown, language: string): string | null {
   return table[String(sport)] ?? String(sport)
 }
 
+/**
+ * Real bug found during production QA acceptance testing (2026-08-22):
+ * every template showing an official-receipt date passed `v.receipt_date`
+ * straight to `line()` with no formatting -- the raw SQL date string
+ * ('2026-08-22') rendered literally in an otherwise fully-localized
+ * Arabic/English message (every other date field already went through
+ * formatCalendarDate()/formatDate()). Confirmed live: a real production
+ * QA message showed "📅 *تاريخ الإيصال:* 2026-08-22" surrounded by
+ * properly formatted Arabic dates everywhere else. receipt_date is a
+ * plain calendar date (not a timestamptz instant), so this reuses
+ * formatCalendarDate() -- the same helper subscription_start_date/
+ * subscription_end_date already use -- rather than formatDate()'s
+ * timezone-instant logic.
+ */
+function receiptDateLabel(receiptDate: unknown, language: string): string | null {
+  if (!isPresent(receiptDate)) return null
+  return formatCalendarDate(String(receiptDate), language === 'en' ? 'en-US' : 'ar-EG')
+}
+
 /** "*{club_name} عبر ملعبي*" when a reliable club name is available, "*ملعبي*"/"*Mal3aby*" otherwise -- directive rule 21. */
 function brandLine(vars: Vars, language: string): string {
   if (isPresent(vars.club_name)) {
@@ -478,7 +497,7 @@ const AR: Record<TemplateKey, Renderer> = {
       line('🧾', 'رقم الإيصال', v.receipt_serial),
       line('📘', 'رقم الدفتر', v.receipt_book),
       line('🔢', 'السلسلة', v.receipt_series),
-      line('📅', 'تاريخ الإيصال', v.receipt_date),
+      line('📅', 'تاريخ الإيصال', receiptDateLabel(v.receipt_date, 'ar')),
       '',
       qrUrl ? `تفاصيل الحجز ورمز الحضور:\n${qrUrl}` : '',
       invoiceLink ? `عرض الفاتورة:\n${invoiceLink}` : '',
@@ -533,7 +552,7 @@ const AR: Record<TemplateKey, Renderer> = {
       line('🧾', 'رقم الإيصال', v.receipt_serial),
       line('📘', 'رقم الدفتر', v.receipt_book),
       line('🔢', 'السلسلة', v.receipt_series),
-      line('📅', 'تاريخ الإيصال', v.receipt_date),
+      line('📅', 'تاريخ الإيصال', receiptDateLabel(v.receipt_date, 'ar')),
       '',
       invoiceLink ? `عرض الفاتورة:\n${invoiceLink}` : '',
       '',
@@ -587,7 +606,7 @@ const AR: Record<TemplateKey, Renderer> = {
       line('🧾', 'رقم الإيصال', v.receipt_serial),
       line('📘', 'رقم الدفتر', v.receipt_book),
       line('🔢', 'السلسلة', v.receipt_series),
-      line('📅', 'تاريخ الإيصال', v.receipt_date),
+      line('📅', 'تاريخ الإيصال', receiptDateLabel(v.receipt_date, 'ar')),
       '',
       invoiceLink ? `عرض الفاتورة:\n${invoiceLink}` : '',
       '',
@@ -678,7 +697,7 @@ const EN: Record<TemplateKey, Renderer> = {
       line('🧾', 'Receipt #', v.receipt_serial),
       line('📘', 'Book', v.receipt_book),
       line('🔢', 'Series', v.receipt_series),
-      line('📅', 'Receipt date', v.receipt_date),
+      line('📅', 'Receipt date', receiptDateLabel(v.receipt_date, 'en')),
       '',
       qrUrl ? `View booking details and entry code:\n${qrUrl}` : '',
       invoiceLink ? `View invoice:\n${invoiceLink}` : '',
@@ -731,7 +750,7 @@ const EN: Record<TemplateKey, Renderer> = {
       line('🧾', 'Receipt #', v.receipt_serial),
       line('📘', 'Book', v.receipt_book),
       line('🔢', 'Series', v.receipt_series),
-      line('📅', 'Receipt date', v.receipt_date),
+      line('📅', 'Receipt date', receiptDateLabel(v.receipt_date, 'en')),
       '',
       invoiceLink ? `View invoice:\n${invoiceLink}` : '',
       '',
@@ -774,7 +793,7 @@ const EN: Record<TemplateKey, Renderer> = {
       line('🧾', 'Receipt #', v.receipt_serial),
       line('📘', 'Book', v.receipt_book),
       line('🔢', 'Series', v.receipt_series),
-      line('📅', 'Receipt date', v.receipt_date),
+      line('📅', 'Receipt date', receiptDateLabel(v.receipt_date, 'en')),
       '',
       invoiceLink ? `View invoice:\n${invoiceLink}` : '',
       '',
