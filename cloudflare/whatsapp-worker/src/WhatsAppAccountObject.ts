@@ -445,6 +445,38 @@ export class WhatsAppAccountObject extends Container<Env> {
   }
 
   /**
+   * WHATSAPP DELIVERY TRUTH fix (2026-08-22) -- proxies a real, read-
+   * only WhatsApp registration query into the container's internal
+   * /check-registration endpoint. See BaileysProvider.checkRegistration's
+   * own doc comment for what this does and why it exists (directive
+   * section 10: distinguishing "recipient is not a registered WhatsApp
+   * account at all" from every other possible delivery-failure mode).
+   */
+  async checkRegistration(
+    clubId: string,
+    phone: string,
+  ): Promise<{ ok: boolean; registered?: boolean; jid?: string | null; error?: string }> {
+    try {
+      const res = await this.containerFetch(
+        'http://container/check-registration',
+        {
+          method: 'POST',
+          headers: { 'x-internal-token': this.env.CONTAINER_INTERNAL_TOKEN, 'content-type': 'application/json' },
+          body: JSON.stringify({ clubId, phone }),
+        },
+        this.defaultPort,
+      )
+      const body = (await res.json()) as { registered?: boolean; jid?: string | null; error?: string }
+      if (!res.ok) {
+        return { ok: false, error: body.error ?? `http_${res.status}` }
+      }
+      return { ok: true, registered: body.registered, jid: body.jid }
+    } catch (err) {
+      return { ok: false, error: (err as Error).message }
+    }
+  }
+
+  /**
    * REAL BUG found live (a THIRD, independent bug in this same class --
    * found by adding temporary diagnostic logging after the first two
    * fixes above did not stop the reconnect cycle): calling
