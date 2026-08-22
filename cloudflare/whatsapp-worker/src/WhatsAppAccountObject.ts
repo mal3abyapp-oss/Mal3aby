@@ -416,6 +416,38 @@ export class WhatsAppAccountObject extends Container<Env> {
   }
 
   /**
+   * ROOT-CAUSE INVESTIGATION (2026-08-22), directive sections 8-9 --
+   * proxies a genuinely isolated, plain-text-only, transport-layer-only
+   * diagnostic send into the container's internal /diagnostic-send
+   * endpoint. See HealthServer.ts's own doc comment: the recipient
+   * phone is hardcoded connector-side (never accepted from this
+   * Worker's caller either), matching directSendDiagnostic.ts's own
+   * established safety discipline for exactly this authorized QA
+   * number. No notification_queue row, no template, no media -- pure
+   * transport isolation.
+   */
+  async diagnosticSend(clubId: string): Promise<{ ok: boolean; success?: boolean; providerReference?: string; error?: string }> {
+    try {
+      const res = await this.containerFetch(
+        'http://container/diagnostic-send',
+        {
+          method: 'POST',
+          headers: { 'x-internal-token': this.env.CONTAINER_INTERNAL_TOKEN, 'content-type': 'application/json' },
+          body: JSON.stringify({ clubId }),
+        },
+        this.defaultPort,
+      )
+      const respBody = (await res.json()) as { success?: boolean; providerReference?: string; error?: string }
+      if (!res.ok) {
+        return { ok: false, error: respBody.error ?? `http_${res.status}` }
+      }
+      return { ok: true, success: respBody.success, providerReference: respBody.providerReference, error: respBody.error }
+    } catch (err) {
+      return { ok: false, error: (err as Error).message }
+    }
+  }
+
+  /**
    * ROOT-CAUSE INVESTIGATION (2026-08-22) -- proxies the container's
    * internal /status endpoint's incomingMessageDiagnostics field
    * through to the public /manage/* surface. Deliberately a SEPARATE

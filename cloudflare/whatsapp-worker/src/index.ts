@@ -134,6 +134,18 @@ async function handleManage(request: Request, env: Env): Promise<Response> {
     return Response.json({ clubId, action: 'incoming-message-diagnostics', ...result })
   }
 
+  if (action === 'diagnostic-send') {
+    // POST /manage/:clubId/diagnostic-send -- ROOT-CAUSE INVESTIGATION
+    // (2026-08-22), directive sections 8-9: one genuinely isolated,
+    // plain-text-only, transport-layer-only test send. Same auth gate
+    // as every other /manage/* action. See
+    // WhatsAppAccountObject.diagnosticSend's own doc comment -- the
+    // recipient is hardcoded connector-side, no phone is ever accepted
+    // from this route's caller.
+    const result = await stub.diagnosticSend(clubId)
+    return Response.json({ clubId, action: 'diagnostic-send', ...result })
+  }
+
   if (action === 'send-protocol-diagnostics') {
     // GET/POST /manage/:clubId/send-protocol-diagnostics --
     // ROOT-CAUSE INVESTIGATION (2026-08-22). Same auth gate as every

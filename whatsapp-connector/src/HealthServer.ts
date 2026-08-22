@@ -144,6 +144,54 @@ export function startHealthServer(sync: SupabaseSync, connections: TenantConnect
       return
     }
 
+    if (url.pathname === '/diagnostic-send' && req.method === 'POST') {
+      // ROOT-CAUSE INVESTIGATION (2026-08-22), directive sections 8-9:
+      // a genuinely isolated, plain-text-only, transport-layer-only
+      // test send -- no notification_queue, no QueueConsumer, no
+      // template rendering, no media -- through the SAME already-live
+      // socket this club's provider already holds (no second
+      // connection, unlike directSendDiagnostic.ts's own documented
+      // safety requirement to stop the production container first).
+      // The recipient phone is HARDCODED here, exactly matching
+      // directSendDiagnostic.ts's own established safety discipline --
+      // never read from the request body, so this endpoint cannot be
+      // pointed at an arbitrary number even by a caller holding the
+      // internal token. Same internal-only gate as every other
+      // endpoint here.
+      const provided = req.headers['x-internal-token']
+      if (!internalToken || Array.isArray(provided) || !safeTokenEquals(provided, internalToken)) {
+        res.writeHead(403, { 'content-type': 'text/plain' })
+        res.end('forbidden')
+        return
+      }
+      let body = ''
+      req.on('data', (chunk) => { body += chunk })
+      req.on('end', () => {
+        void (async () => {
+          try {
+            const { clubId } = JSON.parse(body) as { clubId?: string }
+            if (!clubId) {
+              res.writeHead(400, { 'content-type': 'application/json' })
+              res.end(JSON.stringify({ error: 'clubId is required' }))
+              return
+            }
+            const AUTHORIZED_QA_PHONE_DIGITS_ONLY = '971502061209'
+            const result = await connections.send(
+              clubId,
+              AUTHORIZED_QA_PHONE_DIGITS_ONLY,
+              'Mal3aby transport diagnostic -- plain text, no template, no media.',
+            )
+            res.writeHead(200, { 'content-type': 'application/json' })
+            res.end(JSON.stringify(result))
+          } catch (err) {
+            res.writeHead(500, { 'content-type': 'application/json' })
+            res.end(JSON.stringify({ error: (err as Error).message }))
+          }
+        })()
+      })
+      return
+    }
+
     if (url.pathname === '/check-registration' && req.method === 'POST') {
       // Same internal-only gate as /status and /repair-session -- never
       // public. WHATSAPP DELIVERY TRUTH fix (2026-08-22), directive
