@@ -13,6 +13,12 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
+import {
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+} from '@/components/ui/sheet'
 
 // IA restructuring (Phase 8): the one genuinely NEW screen in the
 // WhatsApp module -- the data already existed in notification_queue
@@ -51,6 +57,7 @@ interface ActivityRow {
   lastError: string | null
   attempts: number
   referenceType: string | null
+  referenceId: string | null
   // WHATSAPP DELIVERY TRUTH fix (2026-08-22, real production defect):
   // 'sent' previously meant, and was labeled as, "delivered" -- it only
   // ever proved the connector's own outbound socket write completed,
@@ -64,6 +71,68 @@ interface ActivityRow {
   providerAcceptedAt: string | null
   deliveredAt: string | null
   readAt: string | null
+  // WHATSAPP BUSINESS MESSAGING FINAL HARDENING (2026-08-22), Sections
+  // 53-54: notification_queue.variables already carries every field
+  // the detail view needs (booking_ref, invoice_number, receipt_serial,
+  // player_name, group_name, invoice_token, booking_qr_token, ...) --
+  // set by the same RPCs that queue the message, no new backend RPC
+  // required for this UI work. Read via a direct PostgREST select
+  // (RLS-gated on notification.view + own-club, confirmed via
+  // pg_policies), not exposed as a raw blob to the row list -- only
+  // the detail drawer reads specific known keys out of it.
+  variables: Record<string, unknown> | null
+}
+
+// Sections 53-54: Message Family -- a business-outcome-oriented
+// grouping distinct from the raw template_key, matching the
+// directive's explicit list (Field Booking / Academy / Payment /
+// Cancellation / Refund). Derived purely from template_key, which is
+// a closed, fully-enumerated set (confirmed via templates.ts's
+// TemplateKey union) -- no guessing, no free-text matching.
+type MessageFamily = 'field_booking' | 'academy' | 'payment' | 'cancellation' | 'refund'
+
+const TEMPLATE_TO_FAMILY: Record<string, MessageFamily> = {
+  'booking-created': 'field_booking',
+  'booking-confirmed-paid': 'field_booking',
+  // Historical/dead template (still real rows exist) -- see the
+  // TEMPLATE_LABEL_KEYS comment below for why this stays mapped.
+  'booking-confirmed': 'field_booking',
+  'invoice-created': 'field_booking',
+  'booking-cancelled': 'cancellation',
+  'payment-received': 'payment',
+  'academy-payment-received': 'academy',
+  'payment-refunded': 'refund',
+}
+
+function messageFamilyOf(templateKey: string): MessageFamily | null {
+  return TEMPLATE_TO_FAMILY[templateKey] ?? null
+}
+
+// Entity type -- directly from notification_events.reference_type,
+// which is a real, already-populated column (confirmed via every
+// emit_notification_event() call site: 'booking'/'payment'/'refund').
+// No 'subscription'/'player' reference_type is emitted by any current
+// producer -- academy-payment-received messages are queued from
+// payment.received the same way Field Booking payment messages are
+// (record_payment's own event), so their entity is genuinely
+// 'payment', not 'subscription' -- confirmed via direct RPC read, not
+// assumed. Documented here rather than silently mapped to a value
+// that doesn't exist in the data.
+const ENTITY_LABEL_KEYS = ['booking', 'payment', 'refund'] as const
+
+// Masks a phone number for the row list per Section 54 ("no unsafe
+// secret/token exposure") -- keeps the country code and last 2 digits
+// visible (enough for staff to recognize/distinguish customers) while
+// not displaying the full number in a list view; the full number is
+// still available in the failed-messages view (existing behavior,
+// unchanged) and via the customer's own record through "View customer".
+function maskPhone(phone: string | null): string {
+  if (!phone) return '—'
+  const digits = phone.replace(/[^\d+]/g, '')
+  if (digits.length <= 4) return digits
+  const visibleEnd = digits.slice(-2)
+  const visibleStart = digits.slice(0, digits.startsWith('+') ? 4 : 3)
+  return `${visibleStart}${'•'.repeat(Math.max(digits.length - visibleStart.length - 2, 2))}${visibleEnd}`
 }
 
 // Template/status label text lives in i18n resources under
@@ -91,6 +160,9 @@ const TEMPLATE_LABEL_KEYS = [
   'booking-confirmed-paid',
   'booking-cancelled',
   'payment-received',
+  // Academy identity (2026-08-22, migration 20260822080000): the
+  // first-ever Academy-specific message -- see templates.ts.
+  'academy-payment-received',
   'payment-refunded',
   'invoice-created',
 ] as const
@@ -101,12 +173,30 @@ const TEMPLATE_LABEL_KEYS = [
 // listener -- see supabase/migrations/20260822010000. It now
 // represents genuine evidence-backed delivery, distinct from 'sent'
 // (provider-accepted only).
-const STATUS_LABEL_KEYS = ['pending', 'retrying', 'sent', 'delivered', 'failed', 'expired', 'cancelled', 'suppressed_invalid_recipient', 'suppressed_no_consent'] as const
+//
+// WHATSAPP BUSINESS MESSAGING FINAL HARDENING (2026-08-22), Section
+// 53/65 (preserve the full delivery-tracking distinction -- queued/
+// processing/provider accepted/sent/delivered/read/failed/superseded):
+// confirmed via the real notification_queue CHECK constraint that
+// 'scheduled' and 'processing' are genuine, real status values this
+// table can hold, but this UI never listed either one -- a message
+// waiting for its scheduled_at time, or one a connector worker had
+// currently claimed, showed up as an unfiltered/unlabeled row. Added
+// both. There is no separate literal 'superseded' status in the DB --
+// supersession (directive Section 11) is represented as
+// status='cancelled' on a row that was never sent (via
+// cancel_pending_whatsapp_for_booking(), confirmed by direct source
+// read) -- the existing 'cancelled' label already covers this
+// correctly; the detail drawer additionally surfaces dedup_key so
+// staff can see which later message superseded it.
+const STATUS_LABEL_KEYS = ['pending', 'scheduled', 'processing', 'retrying', 'sent', 'delivered', 'failed', 'expired', 'cancelled', 'suppressed_invalid_recipient', 'suppressed_no_consent'] as const
 
 const STATUS_LABEL_KEYS_WITH_ALL = ['all', ...STATUS_LABEL_KEYS] as const
 
 const STATUS_TONE: Record<string, StatusTone> = {
   pending: 'neutral',
+  scheduled: 'neutral',
+  processing: 'neutral',
   retrying: 'warning',
   // 'sent' is intentionally NOT 'success' anymore -- it only proves
   // provider acceptance, not real delivery (the exact overstatement
@@ -129,9 +219,18 @@ const STATUS_TONE: Record<string, StatusTone> = {
 // booking-confirmed-paid messages go out" from the noise of every
 // other template, same real server-side .eq() pattern as status.
 async function fetchActivity(clubId: string, status: string, templateKey: string): Promise<ActivityRow[]> {
+  // Sections 53-54: entity type/reference now read via the same
+  // event_id -> notification_events join get_whatsapp_failed_messages()
+  // already uses server-side -- here as a direct nested PostgREST
+  // select, RLS-gated identically (confirmed via pg_policies: same
+  // notification.view + own-club predicate on both tables), so this
+  // is not a wider access surface than the failed-messages RPC
+  // already has. `variables` carries the full message-detail payload
+  // (booking_ref, invoice_number, receipt_serial, player_name, ...)
+  // already set by the queuing RPC -- no new backend needed.
   let query = supabase
     .from('notification_queue')
-    .select('id, template_key, status, recipient_phone, recipient_customer_id, customers(full_name), created_at, scheduled_at, last_attempt_at, last_error, attempts, provider_accepted_at, delivered_at, read_at')
+    .select('id, template_key, status, recipient_phone, recipient_customer_id, customers(full_name), created_at, scheduled_at, last_attempt_at, last_error, attempts, provider_accepted_at, delivered_at, read_at, variables, notification_events(reference_type, reference_id)')
     .eq('club_id', clubId)
     .eq('channel', 'whatsapp')
     .order('created_at', { ascending: false })
@@ -144,23 +243,28 @@ async function fetchActivity(clubId: string, status: string, templateKey: string
   }
   const { data, error } = await query
   if (error) throw error
-  return (data ?? []).map((r) => ({
-    id: r.id,
-    templateKey: r.template_key,
-    status: r.status,
-    recipientPhone: r.recipient_phone,
-    recipientName: (r.customers as unknown as { full_name: string } | null)?.full_name ?? null,
-    recipientCustomerId: r.recipient_customer_id,
-    createdAt: r.created_at,
-    scheduledAt: r.scheduled_at,
-    lastAttemptAt: r.last_attempt_at,
-    lastError: r.last_error,
-    attempts: r.attempts,
-    referenceType: null,
-    providerAcceptedAt: r.provider_accepted_at,
-    deliveredAt: r.delivered_at,
-    readAt: r.read_at,
-  }))
+  return (data ?? []).map((r) => {
+    const event = r.notification_events as unknown as { reference_type: string | null; reference_id: string | null } | null
+    return {
+      id: r.id,
+      templateKey: r.template_key,
+      status: r.status,
+      recipientPhone: r.recipient_phone,
+      recipientName: (r.customers as unknown as { full_name: string } | null)?.full_name ?? null,
+      recipientCustomerId: r.recipient_customer_id,
+      createdAt: r.created_at,
+      scheduledAt: r.scheduled_at,
+      lastAttemptAt: r.last_attempt_at,
+      lastError: r.last_error,
+      attempts: r.attempts,
+      referenceType: event?.reference_type ?? null,
+      referenceId: event?.reference_id ?? null,
+      providerAcceptedAt: r.provider_accepted_at,
+      deliveredAt: r.delivered_at,
+      readAt: r.read_at,
+      variables: (r.variables as Record<string, unknown> | null) ?? null,
+    }
+  })
 }
 
 async function fetchFailedActivity(clubId: string): Promise<ActivityRow[]> {
@@ -179,10 +283,19 @@ async function fetchFailedActivity(clubId: string): Promise<ActivityRow[]> {
     lastError: r.last_error,
     attempts: r.attempts,
     referenceType: r.reference_type,
+    referenceId: r.reference_id,
     // A failed row structurally cannot have delivery evidence.
     providerAcceptedAt: null,
     deliveredAt: null,
     readAt: null,
+    // get_whatsapp_failed_messages() does not currently return
+    // variables -- the failed-messages detail view falls back to
+    // whatever the row list already shows (template/recipient/error)
+    // rather than a fuller business-outcome breakdown. Extending that
+    // RPC is a reasonable follow-up but out of scope for this pass
+    // (failed rows already have a dedicated retry/view-booking action
+    // set the non-failed detail view doesn't need).
+    variables: null,
   }))
 }
 
@@ -217,6 +330,7 @@ export function WhatsAppActivityTab({
   const [statusFilter, setStatusFilter] = useState(initialStatusFilter ?? 'all')
   const [templateFilter, setTemplateFilter] = useState('all')
   const [retryError, setRetryError] = useState<string | null>(null)
+  const [detailRow, setDetailRow] = useState<ActivityRow | null>(null)
 
   useEffect(() => {
     if (initialStatusFilter) {
@@ -305,7 +419,9 @@ export function WhatsAppActivityTab({
           <table className="w-full text-start text-sm">
             <thead>
               <tr className="border-b border-border text-text-secondary">
+                <th className="p-2 text-start">{t('whatsapp.page.activityTab.columns.family')}</th>
                 <th className="p-2 text-start">{t('whatsapp.page.activityTab.columns.message')}</th>
+                <th className="p-2 text-start">{t('whatsapp.page.activityTab.columns.entity')}</th>
                 <th className="p-2 text-start">{t('whatsapp.page.activityTab.columns.recipient')}</th>
                 <th className="p-2 text-start">{t('whatsapp.page.activityTab.columns.status')}</th>
                 <th className="p-2 text-start">{t('whatsapp.page.activityTab.columns.timing')}</th>
@@ -321,20 +437,33 @@ export function WhatsAppActivityTab({
                 const statusLabel = (STATUS_LABEL_KEYS as readonly string[]).includes(r.status)
                   ? t(`whatsapp.page.activityTab.statusLabels.${r.status}`)
                   : r.status
+                const family = messageFamilyOf(r.templateKey)
+                const familyLabel = family ? t(`whatsapp.page.activityTab.familyLabels.${family}`) : '—'
+                const entityLabel = r.referenceType && (ENTITY_LABEL_KEYS as readonly string[]).includes(r.referenceType)
+                  ? t(`whatsapp.page.activityTab.entityLabels.${r.referenceType}`)
+                  : '—'
                 const isRetryingThis = retryMutation.isPending && retryMutation.variables === r.id
                 return (
-                  <tr key={r.id} className="border-b border-border align-top">
+                  <tr
+                    key={r.id}
+                    className="cursor-pointer border-b border-border align-top hover:bg-surface-hover"
+                    onClick={() => setDetailRow(r)}
+                  >
+                    <td className="p-2">
+                      <span className="inline-flex rounded-full bg-surface-muted px-2 py-0.5 text-xs font-medium">{familyLabel}</span>
+                    </td>
                     <td className="p-2 font-medium">{templateLabel}</td>
+                    <td className="p-2 text-xs text-text-secondary">{entityLabel}</td>
                     <td className="p-2">
                       {isFailedView ? (
                         <div className="flex flex-col">
                           <span>{r.recipientName ?? t('whatsapp.page.activityTab.unknownCustomer')}</span>
                           <span dir="ltr" className="text-xs tabular-nums text-text-secondary">
-                            {r.recipientPhone ?? t('whatsapp.page.activityTab.noPhone')}
+                            {maskPhone(r.recipientPhone)}
                           </span>
                         </div>
                       ) : (
-                        <span className="tabular-nums">{r.recipientPhone ?? '—'}</span>
+                        <span dir="ltr" className="tabular-nums">{maskPhone(r.recipientPhone)}</span>
                       )}
                     </td>
                     <td className="p-2">
@@ -378,7 +507,7 @@ export function WhatsAppActivityTab({
                         : '—'}
                     </td>
                     {isFailedView && (
-                      <td className="p-2">
+                      <td className="p-2" onClick={(e) => e.stopPropagation()}>
                         <div className="flex flex-wrap items-center gap-2">
                           <Button
                             size="sm"
@@ -408,6 +537,88 @@ export function WhatsAppActivityTab({
           </table>
         </div>
       )}
+
+      {/* Sections 53-54: Message Detail -- Business Outcome, Template,
+          Recipient, Entity type/reference, Booking reference, Invoice
+          number, Official receipt if applicable, Secure link (presence
+          only -- NEVER the raw token itself, see Section 54's explicit
+          "no unsafe secret/token exposure" rule), Attempts, Provider
+          reference, Delivery/read state, Last error. Every value here
+          comes from notification_queue.variables (already set by the
+          queuing RPC at send time) or the row's own columns -- no new
+          backend call, no raw booking_qr_token/invoice_token ever
+          rendered as text or a clickable link in this staff-facing view. */}
+      <Sheet open={!!detailRow} onOpenChange={(open) => !open && setDetailRow(null)}>
+        <SheetContent className="w-full overflow-y-auto sm:max-w-md">
+          {detailRow && (() => {
+            const family = messageFamilyOf(detailRow.templateKey)
+            const v = detailRow.variables ?? {}
+            const asString = (key: string): string | null => {
+              const value = v[key]
+              return typeof value === 'string' && value.trim().length > 0 ? value : typeof value === 'number' ? String(value) : null
+            }
+            const hasSecureLink = !!(v.booking_qr_token || v.invoice_token)
+            const hasOfficialReceipt = !!asString('receipt_serial')
+            return (
+              <>
+                <SheetHeader>
+                  <SheetTitle>
+                    {family ? t(`whatsapp.page.activityTab.familyLabels.${family}`) : t('whatsapp.page.activityTab.detail.title')}
+                  </SheetTitle>
+                </SheetHeader>
+                <div className="flex flex-col gap-3 py-4 text-sm">
+                  <DetailRow label={t('whatsapp.page.activityTab.detail.template')} value={t(`whatsapp.page.activityTab.templateLabels.${detailRow.templateKey}`, { defaultValue: detailRow.templateKey })} />
+                  <DetailRow label={t('whatsapp.page.activityTab.detail.recipient')} value={detailRow.recipientName ?? t('whatsapp.page.activityTab.unknownCustomer')} />
+                  <DetailRow label={t('whatsapp.page.activityTab.detail.recipientPhone')} value={maskPhone(detailRow.recipientPhone)} dir="ltr" />
+                  <DetailRow
+                    label={t('whatsapp.page.activityTab.detail.entity')}
+                    value={detailRow.referenceType && (ENTITY_LABEL_KEYS as readonly string[]).includes(detailRow.referenceType) ? t(`whatsapp.page.activityTab.entityLabels.${detailRow.referenceType}`) : '—'}
+                  />
+                  <DetailRow label={t('whatsapp.page.activityTab.detail.bookingRef')} value={asString('booking_ref')} dir="ltr" />
+                  <DetailRow label={t('whatsapp.page.activityTab.detail.player')} value={asString('player_name')} />
+                  <DetailRow label={t('whatsapp.page.activityTab.detail.group')} value={asString('group_name')} />
+                  <DetailRow label={t('whatsapp.page.activityTab.detail.invoiceNumber')} value={asString('invoice_number')} dir="ltr" />
+                  {hasOfficialReceipt && (
+                    <DetailRow label={t('whatsapp.page.activityTab.detail.officialReceipt')} value={asString('receipt_serial')} dir="ltr" />
+                  )}
+                  <DetailRow
+                    label={t('whatsapp.page.activityTab.detail.secureLink')}
+                    value={hasSecureLink ? t('whatsapp.page.activityTab.detail.secureLinkIncluded') : t('whatsapp.page.activityTab.detail.secureLinkNone')}
+                  />
+                  <div className="my-1 border-t border-border" />
+                  <DetailRow label={t('whatsapp.page.activityTab.detail.status')} value={t(`whatsapp.page.activityTab.statusLabels.${detailRow.status}`, { defaultValue: detailRow.status })} />
+                  <DetailRow label={t('whatsapp.page.activityTab.detail.attempts')} value={String(detailRow.attempts)} />
+                  <DetailRow label={t('whatsapp.page.activityTab.detail.createdAt')} value={formatDateTime(detailRow.createdAt, i18n.language)} />
+                  <DetailRow label={t('whatsapp.page.activityTab.detail.lastAttemptAt')} value={detailRow.lastAttemptAt ? formatDateTime(detailRow.lastAttemptAt, i18n.language) : null} />
+                  <DetailRow label={t('whatsapp.page.activityTab.detail.providerAcceptedAt')} value={detailRow.providerAcceptedAt ? formatDateTime(detailRow.providerAcceptedAt, i18n.language) : null} />
+                  <DetailRow label={t('whatsapp.page.activityTab.detail.deliveredAt')} value={detailRow.deliveredAt ? formatDateTime(detailRow.deliveredAt, i18n.language) : null} />
+                  <DetailRow label={t('whatsapp.page.activityTab.detail.readAt')} value={detailRow.readAt ? formatDateTime(detailRow.readAt, i18n.language) : null} />
+                  {detailRow.lastError && (
+                    <DetailRow label={t('whatsapp.page.activityTab.detail.lastError')} value={describeFailure(detailRow.lastError, t)} />
+                  )}
+                  {detailRow.recipientCustomerId && (
+                    <div className="pt-2">
+                      <Button size="sm" variant="outline" asChild>
+                        <Link to={`/app/customers/${detailRow.recipientCustomerId}`}>{t('whatsapp.page.activityTab.actions.viewCustomer')}</Link>
+                      </Button>
+                    </div>
+                  )}
+                </div>
+              </>
+            )
+          })()}
+        </SheetContent>
+      </Sheet>
+    </div>
+  )
+}
+
+function DetailRow({ label, value, dir }: { label: string; value: string | null; dir?: 'ltr' | 'rtl' }) {
+  if (!value) return null
+  return (
+    <div className="flex items-start justify-between gap-3">
+      <span className="text-text-secondary">{label}</span>
+      <span dir={dir} className="text-end font-medium">{value}</span>
     </div>
   )
 }

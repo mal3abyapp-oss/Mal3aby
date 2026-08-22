@@ -72,13 +72,16 @@ async function verifyInvoice(token: string): Promise<VerificationResult> {
     customerName: row?.customer_name ?? null,
     bookingRef: row?.booking_ref ?? null,
     fieldName: row?.field_name ?? null,
-    officialReceipts: rawReceipts.map((r: Record<string, unknown>) => ({
-      receiptSerial: (r.receipt_serial as string) ?? null,
-      receiptBook: (r.receipt_book as string) ?? null,
-      receiptSeries: (r.receipt_series as string) ?? null,
-      receiptDate: (r.receipt_date as string) ?? null,
-      receiptAmount: r.receipt_amount !== null && r.receipt_amount !== undefined ? Number(r.receipt_amount) : null,
-    })),
+    officialReceipts: rawReceipts.map((raw) => {
+      const r = (raw && typeof raw === 'object' ? raw : {}) as Record<string, unknown>
+      return {
+        receiptSerial: (r.receipt_serial as string) ?? null,
+        receiptBook: (r.receipt_book as string) ?? null,
+        receiptSeries: (r.receipt_series as string) ?? null,
+        receiptDate: (r.receipt_date as string) ?? null,
+        receiptAmount: r.receipt_amount !== null && r.receipt_amount !== undefined ? Number(r.receipt_amount) : null,
+      }
+    }),
   }
 }
 

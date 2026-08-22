@@ -968,12 +968,27 @@
           "booking-confirmed-paid": "تأكيد حجز مع الدفع",
           "booking-cancelled": "إلغاء حجز",
           "payment-received": "استلام دفعة",
+          "academy-payment-received": "استلام دفعة اشتراك أكاديمية",
           "payment-refunded": "استرداد دفعة",
           "invoice-created": "إصدار فاتورة"
+        },
+        "familyLabels": {
+          "field_booking": "حجز ملعب",
+          "academy": "أكاديمية",
+          "payment": "دفعة",
+          "cancellation": "إلغاء",
+          "refund": "استرداد"
+        },
+        "entityLabels": {
+          "booking": "حجز",
+          "payment": "دفعة",
+          "refund": "استرداد"
         },
         "statusLabels": {
           "all": "كل الحالات",
           "pending": "قيد الانتظار",
+          "scheduled": "مجدولة",
+          "processing": "قيد المعالجة",
           "retrying": "إعادة محاولة",
           "sent": "قبله واتساب",
           "delivered": "تم التسليم إلى الهاتف",
@@ -992,7 +1007,9 @@
         "emptyTitle": "لا توجد رسائل واتساب في هذا النطاق بعد.",
         "emptyFailed": "لا توجد رسائل فشلت نهائيًا -- كل شيء يُرسل بشكل طبيعي.",
         "columns": {
+          "family": "النوع",
           "message": "الرسالة",
+          "entity": "الكيان",
           "recipient": "المستلم",
           "status": "الحالة",
           "timing": "التوقيت",
@@ -1015,6 +1032,29 @@
           "retryInvalidSource": "الحجز أو الدفعة المرتبطة بهذه الرسالة لم تعد صالحة، لذا لا يمكن إعادة المحاولة.",
           "viewBooking": "عرض الحجوزات",
           "viewCustomer": "عرض العميل"
+        },
+        "detail": {
+          "title": "تفاصيل الرسالة",
+          "template": "القالب",
+          "recipient": "المستلم",
+          "recipientPhone": "الهاتف",
+          "entity": "الكيان",
+          "bookingRef": "رقم الحجز",
+          "player": "اللاعب",
+          "group": "الأكاديمية/المجموعة",
+          "invoiceNumber": "رقم الفاتورة",
+          "officialReceipt": "رقم الإيصال الرسمي",
+          "secureLink": "الرابط الآمن",
+          "secureLinkIncluded": "مُرفق في الرسالة",
+          "secureLinkNone": "غير مُرفق",
+          "status": "الحالة",
+          "attempts": "المحاولات",
+          "createdAt": "تاريخ الإنشاء",
+          "lastAttemptAt": "آخر محاولة",
+          "providerAcceptedAt": "استلمها واتساب",
+          "deliveredAt": "وصلت للهاتف",
+          "readAt": "قُرئت",
+          "lastError": "آخر خطأ"
         }
       }
     }

@@ -969,12 +969,27 @@
           "booking-confirmed-paid": "Booking confirmed with payment",
           "booking-cancelled": "Booking cancelled",
           "payment-received": "Payment received",
+          "academy-payment-received": "Academy payment received",
           "payment-refunded": "Payment refunded",
           "invoice-created": "Invoice issued"
+        },
+        "familyLabels": {
+          "field_booking": "Field Booking",
+          "academy": "Academy",
+          "payment": "Payment",
+          "cancellation": "Cancellation",
+          "refund": "Refund"
+        },
+        "entityLabels": {
+          "booking": "Booking",
+          "payment": "Payment",
+          "refund": "Refund"
         },
         "statusLabels": {
           "all": "All statuses",
           "pending": "Pending",
+          "scheduled": "Scheduled",
+          "processing": "Processing",
           "retrying": "Retrying",
           "sent": "Accepted by WhatsApp",
           "delivered": "Delivered to phone",
@@ -993,7 +1008,9 @@
         "emptyTitle": "No WhatsApp messages in this range yet.",
         "emptyFailed": "No permanently failed messages -- everything is sending normally.",
         "columns": {
+          "family": "Type",
           "message": "Message",
+          "entity": "Entity",
           "recipient": "Recipient",
           "status": "Status",
           "timing": "Timing",
@@ -1016,6 +1033,29 @@
           "retryInvalidSource": "This message's booking or payment is no longer valid, so it can't be retried.",
           "viewBooking": "View bookings",
           "viewCustomer": "View customer"
+        },
+        "detail": {
+          "title": "Message detail",
+          "template": "Template",
+          "recipient": "Recipient",
+          "recipientPhone": "Phone",
+          "entity": "Entity",
+          "bookingRef": "Booking #",
+          "player": "Player",
+          "group": "Academy/Group",
+          "invoiceNumber": "Invoice #",
+          "officialReceipt": "Official receipt #",
+          "secureLink": "Secure link",
+          "secureLinkIncluded": "Included in the message",
+          "secureLinkNone": "Not included",
+          "status": "Status",
+          "attempts": "Attempts",
+          "createdAt": "Created",
+          "lastAttemptAt": "Last attempt",
+          "providerAcceptedAt": "Accepted by WhatsApp",
+          "deliveredAt": "Delivered",
+          "readAt": "Read",
+          "lastError": "Last error"
         }
       }
     }
