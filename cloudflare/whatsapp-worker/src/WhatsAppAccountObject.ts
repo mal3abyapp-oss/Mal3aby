@@ -472,6 +472,47 @@ export class WhatsAppAccountObject extends Container<Env> {
   }
 
   /**
+   * ROOT-CAUSE INVESTIGATION (2026-08-22), directive sections 3-4, 6-7
+   * -- proxies the container's internal /status endpoint's
+   * sendProtocolDiagnostics field. See SendProtocolDiagnostics.ts's own
+   * doc comment (connector side) for the full incident: Baileys' own
+   * relayMessage() logs `sending message to N devices` at debug level
+   * immediately before its fire-and-forget socket write -- the one
+   * piece of real evidence about what the send actually attempted,
+   * never captured anywhere else in this connector until this fix.
+   */
+  async getSendProtocolDiagnostics(): Promise<{
+    ok: boolean
+    totalRecorded?: number
+    recent?: Array<{ pattern: string; detail: string; recordedAt: string }>
+    error?: string
+  }> {
+    try {
+      const res = await this.containerFetch(
+        'http://container/status',
+        { headers: { 'x-internal-token': this.env.CONTAINER_INTERNAL_TOKEN } },
+        this.defaultPort,
+      )
+      const body = (await res.json()) as {
+        sendProtocolDiagnostics?: {
+          totalRecorded: number
+          recent: Array<{ pattern: string; detail: string; recordedAt: string }>
+        }
+      }
+      if (!res.ok) {
+        return { ok: false, error: `http_${res.status}` }
+      }
+      return {
+        ok: true,
+        totalRecorded: body.sendProtocolDiagnostics?.totalRecorded,
+        recent: body.sendProtocolDiagnostics?.recent,
+      }
+    } catch (err) {
+      return { ok: false, error: (err as Error).message }
+    }
+  }
+
+  /**
    * Proxies a single-contact session repair into the container's
    * internal /repair-session endpoint. See BaileysProvider.
    * repairContactSession's own doc comment for what this does and why

@@ -11,6 +11,7 @@ import { mkdir, rm, readdir } from 'node:fs/promises'
 import { createHash, randomInt } from 'node:crypto'
 import type { ConnectionState, MediaAttachment, SendMessageResult, WhatsAppProvider } from './WhatsAppProvider.js'
 import { recordSendStart, recordSendStage, recordSendOutcome, recordConnectionOpen } from './SendDiagnostics.js'
+import { inspectBaileysLogCall } from './SendProtocolDiagnostics.js'
 
 /**
  * BaileysProvider -- the ONLY file in this service allowed to import
@@ -435,7 +436,37 @@ export class BaileysProvider implements WhatsAppProvider {
     // undefined under JS field-init ordering. Assign first, always.
     this.clubId = clubId
     this.hooks = hooks
-    this.logger = pino({ level: process.env.LOG_LEVEL ?? 'info' }).child({ clubId: this.redactedClubId() })
+    // ROOT-CAUSE INVESTIGATION (2026-08-22), directive sections 3-4,
+    // 6-7 -- this logger is now passed DIRECTLY to makeWASocket() as
+    // its own `logger` option (see initializeConnection() below), so
+    // Baileys' own internal logger.debug() calls -- including the
+    // exact "sending message to N devices" line in messages-send.js's
+    // relayMessage(), the ONE piece of real evidence about what
+    // relayMessage() actually attempted, confirmed by direct source
+    // inspection to never be captured anywhere else -- flow through
+    // THIS logger, not a separate one Baileys constructs internally.
+    // WHATSAPP_LOG_LEVEL defaults to 'debug' rather than reusing
+    // LOG_LEVEL (which stays 'info' for this connector's OWN business
+    // logs) so Baileys' internal debug volume doesn't force every
+    // other log call in this service to also become debug-verbose --
+    // the two are independently controllable. The hooks.logMethod
+    // interceptor below only ever captures a fixed, safe allowlist of
+    // known-content-free log templates (see
+    // SendProtocolDiagnostics.ts's own doc comment for the full
+    // safety argument) into an in-memory ring buffer exposed via
+    // /status -- this process's own stdout is confirmed NOT visible
+    // via `wrangler tail` for a Cloudflare Container, so this is the
+    // only way to see this evidence at all without SSHing into the
+    // container directly.
+    this.logger = pino({
+      level: process.env.WHATSAPP_LOG_LEVEL ?? 'debug',
+      hooks: {
+        logMethod(args, method) {
+          inspectBaileysLogCall(args)
+          return method.apply(this, args)
+        },
+      },
+    }).child({ clubId: this.redactedClubId() })
   }
 
   /** Never log a full clubId (UUID) at higher-than-necessary correlation granularity in aggregated logs -- short prefix only. */

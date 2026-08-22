@@ -5,6 +5,7 @@ import type { TenantConnectionManager } from './TenantConnectionManager.js'
 import { getProcessDiagnosticsSnapshot } from './ProcessDiagnostics.js'
 import { getSendDiagnosticsSnapshot } from './SendDiagnostics.js'
 import { getIncomingMessageDiagnosticsSnapshot } from './IncomingMessageDiagnostics.js'
+import { getSendProtocolDiagnosticsSnapshot } from './SendProtocolDiagnostics.js'
 
 /**
  * Constant-time token comparison. The /status endpoint is internal-only
@@ -270,6 +271,10 @@ export function startHealthServer(sync: SupabaseSync, connections: TenantConnect
           // IncomingMessageDiagnostics.ts's own doc comment. Safe
           // metadata only (no content, no phone numbers).
           incomingMessageDiagnostics: getIncomingMessageDiagnosticsSnapshot(),
+          // ROOT-CAUSE INVESTIGATION (2026-08-22) -- see
+          // SendProtocolDiagnostics.ts's own doc comment. Safe,
+          // allowlisted metadata only.
+          sendProtocolDiagnostics: getSendProtocolDiagnosticsSnapshot(),
         }),
       )
       return

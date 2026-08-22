@@ -134,6 +134,16 @@ async function handleManage(request: Request, env: Env): Promise<Response> {
     return Response.json({ clubId, action: 'incoming-message-diagnostics', ...result })
   }
 
+  if (action === 'send-protocol-diagnostics') {
+    // GET/POST /manage/:clubId/send-protocol-diagnostics --
+    // ROOT-CAUSE INVESTIGATION (2026-08-22). Same auth gate as every
+    // other /manage/* action. See
+    // WhatsAppAccountObject.getSendProtocolDiagnostics's own doc
+    // comment.
+    const result = await stub.getSendProtocolDiagnostics()
+    return Response.json({ clubId, action: 'send-protocol-diagnostics', ...result })
+  }
+
   if (action === 'restart') {
     // ADVERSARIAL PROOF SEQUENCE addition (2026-08-18): a legitimate,
     // controlled restart capability was missing entirely -- this Worker
