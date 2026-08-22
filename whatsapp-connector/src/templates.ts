@@ -65,12 +65,29 @@
 // genuinely distinct business outcome needs either message, add a new
 // template_key key with correctly-scoped identity, rather than
 // resurrecting these.
+// WHATSAPP BUSINESS MESSAGING FINAL HARDENING (2026-08-22), Sections
+// 14/28-35 (Field Booking vs Academy message identity): confirmed via
+// the full message-producer matrix audit that NO Academy-specific
+// WhatsApp message existed anywhere in this codebase before this
+// change -- create_enrollment_with_subscription() enqueues zero
+// messages (enrollment/subscription creation is silent by design,
+// matching _create_booking_internal's "created silently, message on
+// the actual paid outcome" pattern), and the only customer-facing
+// message an Academy payment ever produced was the generic
+// 'payment-received' template -- identical wording, identical
+// structure, ZERO player name, for both a field-booking installment
+// AND an academy enrollment payment. This directly violated Section
+// 14 (two distinct message families required) and Section 29 (Academy
+// message MUST name the specific player). 'academy-payment-received'
+// closes this gap -- see record_payment()'s new Academy-detection
+// branch (migration 20260822080000) for how this is selected.
 export type TemplateKey =
   | 'booking-created'
   | 'booking-confirmed-paid'
   | 'booking-cancelled'
   | 'payment-received'
   | 'payment-refunded'
+  | 'academy-payment-received'
 
 type Vars = Record<string, unknown>
 type Renderer = (vars: Vars) => string
@@ -161,6 +178,21 @@ function formatTime(instant: string, timezone: string, locale: string): string |
   const d = new Date(instant)
   if (Number.isNaN(d.getTime())) return null
   return new Intl.DateTimeFormat(locale, { timeZone: timezone, hour: 'numeric', minute: '2-digit', hour12: true }).format(d)
+}
+
+/**
+ * Academy subscription dates (subscriptions.start_date/end_date) are
+ * plain SQL `date` values ('2026-09-01'), not timestamptz instants --
+ * no venue timezone conversion applies (a calendar date is the same
+ * date everywhere), so this deliberately does NOT go through
+ * formatDate()/timezone at all -- parsing 'YYYY-MM-DD' as UTC midnight
+ * and formatting with timeZone:'UTC' keeps the calendar date stable
+ * regardless of the connector process's own local timezone.
+ */
+function formatCalendarDate(dateStr: string, locale: string): string | null {
+  const d = new Date(`${dateStr}T00:00:00Z`)
+  if (Number.isNaN(d.getTime())) return null
+  return new Intl.DateTimeFormat(locale, { timeZone: 'UTC', day: 'numeric', month: 'long', year: 'numeric' }).format(d)
 }
 
 /**
@@ -511,6 +543,60 @@ const AR: Record<TemplateKey, Renderer> = {
     )
   },
 
+  /**
+   * Academy identity (Sections 14/28-35): distinct headline from Field
+   * Booking's payment-received, ALWAYS names the specific player
+   * (Section 29 -- a guardian may have multiple children, so
+   * "دفعتك"/"your payment" alone is never enough), and picks between
+   * "دفعة" (partial, Section 34) vs "استكمال دفع" (final/full, Section
+   * 35) wording based on the real resulting payment_status --
+   * record_payment() computes this the identical way it does for
+   * payment-received ('paid' when the invoice's new outstanding
+   * balance is <= 0, 'partially_paid' otherwise), so this is never
+   * guessed independently of the actual invoice state.
+   */
+  'academy-payment-received': (v) => {
+    const isFinal = v.payment_status === 'paid'
+    const playerName = isPresent(v.player_name) ? String(v.player_name) : null
+    const amount = formatMoney(v.amount, 'ج.م', 'EGP', 'ar')
+    const outstanding = formatMoney(outstandingAmount(v.remaining_outstanding, v.total_price, v.amount_paid), 'ج.م', 'EGP', 'ar')
+    const paymentStatus = paymentStatusLabel(v.payment_status, 'ar')
+    const method = paymentMethodLabel(v.method, 'ar')
+    const startDate = isPresent(v.subscription_start_date) ? formatCalendarDate(String(v.subscription_start_date), 'ar-EG') : null
+    const endDate = isPresent(v.subscription_end_date) ? formatCalendarDate(String(v.subscription_end_date), 'ar-EG') : null
+    const invoiceLink = invoiceUrl(v.invoice_token, 'ar')
+    return joinLines(
+      isFinal ? '🏅 *تم استكمال دفع اشتراك اللاعب*' : '🏅 *تم تسجيل دفعة لاشتراك اللاعب*',
+      '',
+      greeting(v, 'ar'),
+      '',
+      playerName
+        ? (isFinal ? `تم استكمال دفع اشتراك اللاعب *${playerName}* بنجاح.` : `تم تسجيل دفعة لاشتراك اللاعب *${playerName}*.`)
+        : (isFinal ? 'تم استكمال دفع الاشتراك بنجاح.' : 'تم تسجيل دفعة للاشتراك.'),
+      '',
+      line('🏅', 'اللاعب', playerName),
+      line('🏫', 'الأكاديمية/المجموعة', v.group_name),
+      startDate && endDate ? `📅 *مدة الاشتراك:* ${startDate} — ${endDate}` : '',
+      '',
+      line('💰', 'المبلغ المدفوع الآن', amount),
+      line('💳', 'طريقة الدفع', method),
+      line('🧾', 'رقم الفاتورة', v.invoice_number),
+      line('💳', 'حالة الدفع', paymentStatus),
+      line('⏳', 'المتبقي', outstanding),
+      isPresent(v.receipt_serial) ? '🏛️ *إيصال التحصيل الرسمي*' : '',
+      line('🧾', 'رقم الإيصال', v.receipt_serial),
+      line('📘', 'رقم الدفتر', v.receipt_book),
+      line('🔢', 'السلسلة', v.receipt_series),
+      line('📅', 'تاريخ الإيصال', v.receipt_date),
+      '',
+      invoiceLink ? `عرض الفاتورة:\n${invoiceLink}` : '',
+      '',
+      'شكرًا لك.',
+      '',
+      brandLine(v, 'ar'),
+    )
+  },
+
   'payment-refunded': (v) => {
     const amount = formatMoney(v.amount, 'ج.م', 'EGP', 'ar')
     return joinLines(
@@ -638,6 +724,49 @@ const EN: Record<TemplateKey, Renderer> = {
       line('💰', 'Amount', amount),
       line('💳', 'Method', method),
       line('🔖', 'Booking #', v.booking_ref),
+      line('🧾', 'Invoice #', v.invoice_number),
+      line('💳', 'Payment status', paymentStatus),
+      line('⏳', 'Outstanding', outstanding),
+      isPresent(v.receipt_serial) ? '🏛️ *Official Collection Receipt*' : '',
+      line('🧾', 'Receipt #', v.receipt_serial),
+      line('📘', 'Book', v.receipt_book),
+      line('🔢', 'Series', v.receipt_series),
+      line('📅', 'Receipt date', v.receipt_date),
+      '',
+      invoiceLink ? `View invoice:\n${invoiceLink}` : '',
+      '',
+      'Thank you.',
+      '',
+      brandLine(v, 'en'),
+    )
+  },
+
+  /** English mirror of AR's 'academy-payment-received' -- see its doc comment for the full identity/wording rationale. */
+  'academy-payment-received': (v) => {
+    const isFinal = v.payment_status === 'paid'
+    const playerName = isPresent(v.player_name) ? String(v.player_name) : null
+    const amount = formatMoney(v.amount, 'ج.م', 'EGP', 'en')
+    const outstanding = formatMoney(outstandingAmount(v.remaining_outstanding, v.total_price, v.amount_paid), 'ج.م', 'EGP', 'en')
+    const paymentStatus = paymentStatusLabel(v.payment_status, 'en')
+    const method = paymentMethodLabel(v.method, 'en')
+    const startDate = isPresent(v.subscription_start_date) ? formatCalendarDate(String(v.subscription_start_date), 'en-US') : null
+    const endDate = isPresent(v.subscription_end_date) ? formatCalendarDate(String(v.subscription_end_date), 'en-US') : null
+    const invoiceLink = invoiceUrl(v.invoice_token, 'en')
+    return joinLines(
+      isFinal ? '🏅 *Academy subscription payment complete*' : '🏅 *Academy payment recorded*',
+      '',
+      greeting(v, 'en'),
+      '',
+      playerName
+        ? (isFinal ? `Payment for *${playerName}*'s academy subscription is now complete.` : `A payment was recorded for *${playerName}*'s academy subscription.`)
+        : (isFinal ? 'Payment for the academy subscription is now complete.' : 'A payment was recorded for the academy subscription.'),
+      '',
+      line('🏅', 'Player', playerName),
+      line('🏫', 'Academy/Group', v.group_name),
+      startDate && endDate ? `📅 *Subscription period:* ${startDate} — ${endDate}` : '',
+      '',
+      line('💰', 'Amount paid now', amount),
+      line('💳', 'Method', method),
       line('🧾', 'Invoice #', v.invoice_number),
       line('💳', 'Payment status', paymentStatus),
       line('⏳', 'Outstanding', outstanding),

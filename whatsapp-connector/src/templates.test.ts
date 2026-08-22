@@ -459,6 +459,86 @@ check('booking-confirmed-paid (en) QR and invoice links both carry ?lang=en', ()
   assert.ok(msg.includes('/verify/invtok-paid-1?lang=en'), 'expected ?lang=en suffix on the invoice link')
 })
 
+// ----------------------------------------------------------------
+// Academy message identity (Sections 14/28-35, added 2026-08-22):
+// 'academy-payment-received' -- the first-ever Academy-specific
+// WhatsApp template in this codebase. Must be clearly distinct from
+// Field Booking's payment-received, must ALWAYS name the specific
+// player, and must pick the right headline for partial vs final
+// payment based on the real resulting payment_status.
+// ----------------------------------------------------------------
+
+const ACADEMY_VARS = {
+  customer_name: 'ولي الأمر مصطفى',
+  player_name: 'أحمد مصطفى',
+  group_name: 'أكاديمية الناشئين',
+  club_name: 'نادي الاختبار الشامل',
+  amount: 300,
+  method: 'cash',
+  invoice_number: 'ACADEMY-2026-000001',
+  subscription_start_date: '2026-09-01',
+  subscription_end_date: '2026-10-01',
+  payment_status: 'partially_paid',
+  remaining_outstanding: 200,
+  invoice_token: 'academytok123',
+}
+
+check('academy-payment-received names the specific player, never a generic "your payment" (ar + en)', () => {
+  const ar = renderTemplate('academy-payment-received', 'ar', ACADEMY_VARS)
+  assert.ok(ar.includes('أحمد مصطفى'), 'missing the player name in the Arabic Academy message')
+  assert.ok(ar.includes('🏅'), 'missing the Academy identity emoji')
+  const en = renderTemplate('academy-payment-received', 'en', { ...ACADEMY_VARS, player_name: 'Ahmed Mustafa' })
+  assert.ok(en.includes('Ahmed Mustafa'), 'missing the player name in the English Academy message')
+})
+
+check('academy-payment-received is structurally distinct from payment-received (different headline)', () => {
+  const academyMsg = renderTemplate('academy-payment-received', 'ar', ACADEMY_VARS)
+  const bookingMsg = renderTemplate('payment-received', 'ar', { ...BASE_VARS, amount: 300, method: 'cash' })
+  assert.notStrictEqual(academyMsg.split('\n')[0], bookingMsg.split('\n')[0], 'Academy and Field Booking payment messages must not share the same headline')
+  assert.ok(!academyMsg.includes('تم استلام دفعتك بنجاح'), 'Academy message should not reuse the generic Field Booking payment headline')
+})
+
+check('academy-payment-received picks the partial-payment wording when not yet fully paid', () => {
+  const msg = renderTemplate('academy-payment-received', 'ar', { ...ACADEMY_VARS, payment_status: 'partially_paid' })
+  assert.ok(msg.includes('تم تسجيل دفعة لاشتراك اللاعب'), 'expected the partial-payment headline for a partially_paid academy payment')
+  assert.ok(!msg.includes('تم استكمال دفع اشتراك اللاعب'), 'should not show the final-payment headline for a partial payment')
+})
+
+check('academy-payment-received picks the final-payment wording when fully paid', () => {
+  const msg = renderTemplate('academy-payment-received', 'ar', { ...ACADEMY_VARS, payment_status: 'paid', remaining_outstanding: 0 })
+  assert.ok(msg.includes('تم استكمال دفع اشتراك اللاعب'), 'expected the final-payment headline for a fully paid academy payment')
+  assert.ok(!msg.includes('تم تسجيل دفعة لاشتراك اللاعب'), 'should not show the partial-payment headline once fully paid')
+})
+
+check('academy-payment-received shows the subscription date range as real formatted dates, never a raw ISO/date string', () => {
+  const msg = renderTemplate('academy-payment-received', 'ar', ACADEMY_VARS)
+  assert.ok(!msg.includes('2026-09-01'), 'raw subscription start date leaked into the message')
+  assert.ok(!msg.includes('2026-10-01'), 'raw subscription end date leaked into the message')
+  assert.ok(msg.includes('سبتمبر') || msg.includes('أكتوبر'), 'expected an Arabic month name in the subscription date range')
+})
+
+check('academy-payment-received omits the group/academy line when group_name is absent, never renders it blank', () => {
+  const msg = renderTemplate('academy-payment-received', 'ar', { ...ACADEMY_VARS, group_name: undefined })
+  assert.ok(!msg.includes('الأكاديمية/المجموعة'), 'the group line should not render at all when group_name is missing')
+})
+
+check('academy-payment-received includes official receipt details when present, matching the Field Booking pattern', () => {
+  const msg = renderTemplate('academy-payment-received', 'ar', {
+    ...ACADEMY_VARS,
+    receipt_serial: 'GOV-ACADEMY-001',
+    receipt_book: '12',
+    receipt_series: 'A',
+    receipt_date: '2026-08-22',
+  })
+  assert.ok(msg.includes('🏛️ *إيصال التحصيل الرسمي*'), 'missing the official receipt block')
+  assert.ok(msg.includes('GOV-ACADEMY-001'), 'missing the receipt serial number')
+})
+
+check('academy-payment-received includes a /verify/ invoice link, matching the Field Booking pattern', () => {
+  const msg = renderTemplate('academy-payment-received', 'ar', ACADEMY_VARS)
+  assert.ok(msg.includes('/verify/academytok123'), 'missing the invoice verification link')
+})
+
 console.log(`\n[templates.test] ${passed} test(s) passed.`)
 if (process.exitCode) {
   console.error('[templates.test] SOME TESTS FAILED.')
