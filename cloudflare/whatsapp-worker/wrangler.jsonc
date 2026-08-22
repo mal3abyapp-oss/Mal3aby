@@ -373,7 +373,26 @@
       // message construction". Recipient phone hardcoded connector-
       // side, matching directSendDiagnostic.ts's own safety
       // discipline. GitHub Actions run 32570470302.
-      "image": "registry.cloudflare.com/35ac10727701095866b16c276b4a33d1/mala3by-whatsapp-connector:54931b7",
+      // v26, commit cf1f94e -- ROOT-CAUSE INVESTIGATION continued
+      // after the manual phone-to-phone control test PASSED (a real
+      // send from the account's own primary phone reached its
+      // recipient cleanly), definitively ruling out account-level
+      // restriction and isolating the defect to the Baileys companion/
+      // session path. Directive priorities A/B: adds
+      // SessionPersistenceDiagnostics.ts tracking per-source (creds_
+      // update/keys_set/session_repair) fired/success/failure counts
+      // for the onCredsUpdate Postgres-persistence write, which has
+      // always been entirely fire-and-forget with its only failure
+      // signal (console.error) confirmed invisible via `wrangler
+      // tail`. Priorities C/D/F: captures assertSessions()'s "fetching
+      // sessions" line's jidsRequiringFetch/wireJids array LENGTHS
+      // (never contents) -- the one genuinely real, awaited server
+      // round-trip (query()/waitForMessage()) in the entire relay
+      // path. Priority G: captures "Using LID/PN identity for ...
+      // conversation" verbatim, revealing which addressing form
+      // Baileys v7 itself chose internally. GitHub Actions run
+      // 32571573053.
+      "image": "registry.cloudflare.com/35ac10727701095866b16c276b4a33d1/mala3by-whatsapp-connector:cf1f94e",
       // One container instance per WhatsApp account (one Durable
       // Object = one container, directive rule 21's chosen model --
       // NOT a shared container serving multiple clubs, which would
