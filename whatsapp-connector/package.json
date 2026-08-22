@@ -8,7 +8,7 @@
     "dev": "tsx watch --env-file=.env src/index.ts",
     "build": "tsc -p tsconfig.json",
     "start": "node --env-file=.env dist/index.js",
-    "test": "npm run test:templates && npm run test:send-reliability && npm run test:root-cause && npm run test:status-fencing && npm run test:auth-dir-cleanup && npm run test:delivery-receipts && npm run test:send-protocol-diagnostics",
+    "test": "npm run test:templates && npm run test:send-reliability && npm run test:root-cause && npm run test:status-fencing && npm run test:auth-dir-cleanup && npm run test:delivery-receipts && npm run test:send-protocol-diagnostics && npm run test:receipt-chain-diagnostics",
     "test:connection": "tsx --env-file=.env src/selfTest.ts",
     "test:templates": "tsx src/templates.test.ts",
     "test:media": "tsx src/mediaTest.ts",
@@ -17,7 +17,8 @@
     "test:status-fencing": "tsx src/statusFencingTest.ts",
     "test:auth-dir-cleanup": "tsx src/authDirClearedOnLogoutTest.ts",
     "test:delivery-receipts": "tsx src/deliveryReceiptExtractionTest.ts",
-    "test:send-protocol-diagnostics": "tsx src/sendProtocolDiagnosticsTest.ts"
+    "test:send-protocol-diagnostics": "tsx src/sendProtocolDiagnosticsTest.ts",
+    "test:receipt-chain-diagnostics": "tsx src/receiptChainDiagnosticsTest.ts"
   },
   "dependencies": {
     "@hapi/boom": "^9.1.4",

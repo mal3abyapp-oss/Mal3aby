@@ -144,6 +144,16 @@ async function handleManage(request: Request, env: Env): Promise<Response> {
     return Response.json({ clubId, action: 'session-persistence-diagnostics', ...result })
   }
 
+  if (action === 'receipt-chain-diagnostics') {
+    // GET/POST /manage/:clubId/receipt-chain-diagnostics --
+    // ROOT-CAUSE INVESTIGATION (2026-08-22). Same auth gate as every
+    // other /manage/* action. See
+    // WhatsAppAccountObject.getReceiptChainDiagnostics's own doc
+    // comment.
+    const result = await stub.getReceiptChainDiagnostics()
+    return Response.json({ clubId, action: 'receipt-chain-diagnostics', ...result })
+  }
+
   if (action === 'diagnostic-send') {
     // POST /manage/:clubId/diagnostic-send -- ROOT-CAUSE INVESTIGATION
     // (2026-08-22), directive sections 8-9: one genuinely isolated,

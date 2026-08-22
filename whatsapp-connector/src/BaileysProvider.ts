@@ -12,6 +12,7 @@ import { createHash, randomInt } from 'node:crypto'
 import type { ConnectionState, MediaAttachment, SendMessageResult, WhatsAppProvider } from './WhatsAppProvider.js'
 import { recordSendStart, recordSendStage, recordSendOutcome, recordConnectionOpen } from './SendDiagnostics.js'
 import { inspectBaileysLogCall } from './SendProtocolDiagnostics.js'
+import { recordRawMessagesUpdateEvent } from './ReceiptChainDiagnostics.js'
 
 /**
  * BaileysProvider -- the ONLY file in this service allowed to import
@@ -738,6 +739,14 @@ export class BaileysProvider implements WhatsAppProvider {
     // teardownCurrentSocket()'s removeAllListeners, so a truly dead
     // socket cannot double-report.
     socket.ev.on('messages.update', (updates) => {
+      // ROOT-CAUSE INVESTIGATION (2026-08-22) -- records the RAW event
+      // BEFORE extractDeliveryReceipts()'s own filtering, so a
+      // completely silent messages.update listener (zero events ever
+      // reaching this line, for ANY reason) is distinguishable from
+      // "events arrive but get filtered out" -- see
+      // ReceiptChainDiagnostics.ts's own doc comment for the full
+      // incident this closes.
+      recordRawMessagesUpdateEvent(updates)
       for (const { messageKeyId, statusLevel } of extractDeliveryReceipts(updates)) {
         this.hooks.onDeliveryReceipt?.(messageKeyId, statusLevel)
       }

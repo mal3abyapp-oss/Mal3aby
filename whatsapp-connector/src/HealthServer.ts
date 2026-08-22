@@ -7,6 +7,7 @@ import { getSendDiagnosticsSnapshot } from './SendDiagnostics.js'
 import { getIncomingMessageDiagnosticsSnapshot } from './IncomingMessageDiagnostics.js'
 import { getSendProtocolDiagnosticsSnapshot } from './SendProtocolDiagnostics.js'
 import { getSessionPersistenceDiagnosticsSnapshot } from './SessionPersistenceDiagnostics.js'
+import { getReceiptChainDiagnosticsSnapshot } from './ReceiptChainDiagnostics.js'
 
 /**
  * Constant-time token comparison. The /status endpoint is internal-only
@@ -331,6 +332,14 @@ export function startHealthServer(sync: SupabaseSync, connections: TenantConnect
           // Postgres persistence write -- never message content or
           // key material.
           sessionPersistenceDiagnostics: getSessionPersistenceDiagnosticsSnapshot(),
+          // ROOT-CAUSE INVESTIGATION (2026-08-22) -- see
+          // ReceiptChainDiagnostics.ts's own doc comment. The raw,
+          // pre-filter messages.update event count/shape -- proves
+          // whether the listener itself receives ANY server-originated
+          // receipt traffic at all, distinct from whether
+          // extractDeliveryReceipts() finds one relevant to our own
+          // sent messages specifically.
+          receiptChainDiagnostics: getReceiptChainDiagnosticsSnapshot(),
         }),
       )
       return

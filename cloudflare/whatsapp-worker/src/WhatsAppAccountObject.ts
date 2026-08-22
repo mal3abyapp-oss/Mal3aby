@@ -600,6 +600,59 @@ export class WhatsAppAccountObject extends Container<Env> {
   }
 
   /**
+   * ROOT-CAUSE INVESTIGATION (2026-08-22) -- proxies the container's
+   * internal /status endpoint's receiptChainDiagnostics field. See
+   * ReceiptChainDiagnostics.ts's own doc comment (connector side): the
+   * raw, pre-filter messages.update event evidence -- proves whether
+   * the socket receives ANY server-originated receipt traffic at all.
+   */
+  async getReceiptChainDiagnostics(): Promise<{
+    ok: boolean
+    totalMessagesUpdateEventsFired?: number
+    totalIndividualUpdatesRecorded?: number
+    recent?: Array<{
+      fromMe: boolean | null
+      hasKeyId: boolean
+      statusLevel: number | null
+      hasOtherUpdateFields: boolean
+      recordedAt: string
+    }>
+    error?: string
+  }> {
+    try {
+      const res = await this.containerFetch(
+        'http://container/status',
+        { headers: { 'x-internal-token': this.env.CONTAINER_INTERNAL_TOKEN } },
+        this.defaultPort,
+      )
+      const body = (await res.json()) as {
+        receiptChainDiagnostics?: {
+          totalMessagesUpdateEventsFired: number
+          totalIndividualUpdatesRecorded: number
+          recent: Array<{
+            fromMe: boolean | null
+            hasKeyId: boolean
+            statusLevel: number | null
+            hasOtherUpdateFields: boolean
+            recordedAt: string
+          }>
+        }
+      }
+      if (!res.ok) {
+        return { ok: false, error: `http_${res.status}` }
+      }
+      return {
+        ok: true,
+        totalMessagesUpdateEventsFired: body.receiptChainDiagnostics?.totalMessagesUpdateEventsFired,
+        totalIndividualUpdatesRecorded: body.receiptChainDiagnostics?.totalIndividualUpdatesRecorded,
+        recent: body.receiptChainDiagnostics?.recent,
+      }
+    } catch (err) {
+      return { ok: false, error: (err as Error).message }
+    }
+  }
+
+  /**
    * Proxies a single-contact session repair into the container's
    * internal /repair-session endpoint. See BaileysProvider.
    * repairContactSession's own doc comment for what this does and why
