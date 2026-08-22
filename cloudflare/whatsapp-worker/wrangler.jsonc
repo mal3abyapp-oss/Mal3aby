@@ -392,7 +392,20 @@
       // conversation" verbatim, revealing which addressing form
       // Baileys v7 itself chose internally. GitHub Actions run
       // 32571573053.
-      "image": "registry.cloudflare.com/35ac10727701095866b16c276b4a33d1/mala3by-whatsapp-connector:cf1f94e",
+      // v27, commit 53c7f9f -- ROOT-CAUSE INVESTIGATION continued,
+      // pivoting from send-path debugging to delivery/receipt-path
+      // debugging specifically: a fully-instrumented plain-text send
+      // showed a completely clean send-path evidence chain yet still
+      // physically did not arrive. Direct source inspection of
+      // messages-recv.js confirms handleReceipt()/getStatusFromReceiptType()
+      // are genuinely correct and unchanged from 6.7.24. Adds
+      // ReceiptChainDiagnostics.ts: records the RAW messages.update
+      // event count BEFORE any filtering, so a persistently-zero
+      // totalMessagesUpdateEventsFired across real sends is direct,
+      // first-hand proof this socket never receives ANY server-
+      // originated receipt traffic at all -- distinct from "receipts
+      // arrive but get filtered out". GitHub Actions run 32572743009.
+      "image": "registry.cloudflare.com/35ac10727701095866b16c276b4a33d1/mala3by-whatsapp-connector:53c7f9f",
       // One container instance per WhatsApp account (one Durable
       // Object = one container, directive rule 21's chosen model --
       // NOT a shared container serving multiple clubs, which would
