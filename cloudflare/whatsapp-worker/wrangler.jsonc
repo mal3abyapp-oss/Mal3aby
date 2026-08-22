@@ -219,7 +219,28 @@
       // receipt; whatsapp_delivery_evidence_summary view,
       // security_invoker=true so per-club RLS is correctly enforced),
       // migration 20260822020000. GitHub Actions run 32536604129.
-      "image": "registry.cloudflare.com/35ac10727701095866b16c276b4a33d1/mala3by-whatsapp-connector:41eaa07",
+      // ROLLED BACK to v17 (2026-08-22, ~00:35 UTC): after deploying
+      // v18 and restarting the container twice, notification_queue
+      // stopped being claimed at all -- two real rows sat 'pending'/
+      // attempts=0 for 5+ minutes despite whatsapp_accounts correctly
+      // showing status='connected' and the generation counter advancing
+      // normally on each restart (24->26->27, no new QR). Three earlier
+      // sends (858eea39, 29577391, 672d0ae0) DID process successfully
+      // in the hour before these restarts, under v17. whatsapp_accounts.
+      // last_seen_at also stopped advancing post-restart -- consistent
+      // with the connector process itself stalling, not merely the
+      // queue-claim path. The v18 diff (git range 64c3f90..41eaa07) is
+      // reviewed and is purely additive -- a new checkRegistration()
+      // method and a new /check-registration HTTP route, touching
+      // neither QueueConsumer nor the connection-lifecycle code paths
+      // -- so the causal link to v18 specifically is NOT yet proven,
+      // only the timing correlation. Rolling back to the last
+      // known-good v17 image to isolate whether v18 is the actual
+      // cause before investigating further, per explicit user
+      // instruction (do not keep debugging live on top of an unproven
+      // regression). See WHATSAPP DELIVERY TRUTH final report for the
+      // full incident writeup once isolated.
+      "image": "registry.cloudflare.com/35ac10727701095866b16c276b4a33d1/mala3by-whatsapp-connector:af325e9",
       // One container instance per WhatsApp account (one Durable
       // Object = one container, directive rule 21's chosen model --
       // NOT a shared container serving multiple clubs, which would
