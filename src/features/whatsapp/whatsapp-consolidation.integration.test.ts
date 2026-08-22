@@ -171,7 +171,7 @@ describeIfConfigured('WhatsApp message consolidation (live integration)', () => 
 
       const messages = await activeMessagesForBooking(bookingId)
       expect(messages.length).toBe(1)
-      expect(messages[0].dedup_key).toContain(bookingId)
+      expect(messages[0]?.dedup_key).toContain(bookingId)
     })
 
     it('two concurrent record_payment() calls with the SAME idempotency key produce exactly one payment and one message', async () => {
@@ -253,7 +253,7 @@ describeIfConfigured('WhatsApp message consolidation (live integration)', () => 
 
       const messages = await activeMessagesForBooking(bookingId)
       expect(messages.length).toBe(1)
-      expect(messages[0].template_key).toBe('booking-created')
+      expect(messages[0]?.template_key).toBe('booking-created')
     })
 
     it('B. booking + full payment in the SAME business flow -> exactly one final consolidated message (booking-confirmed-paid), never booking-created too', async () => {
@@ -286,7 +286,7 @@ describeIfConfigured('WhatsApp message consolidation (live integration)', () => 
 
       const messages = await activeMessagesForBooking(bookingId)
       expect(messages.length).toBe(1)
-      expect(messages[0].template_key).toBe('booking-confirmed-paid')
+      expect(messages[0]?.template_key).toBe('booking-confirmed-paid')
       // The specific fragmentation this directive forbids: booking-
       // created must NEVER also be present for this same booking.
       const hasBookingCreatedToo = messages.some((m) => m.template_key === 'booking-created')
