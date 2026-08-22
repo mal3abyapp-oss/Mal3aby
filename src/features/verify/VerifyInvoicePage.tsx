@@ -26,6 +26,21 @@ import { CheckCircle2, XCircle } from 'lucide-react'
 // WhatsApp message (not a random QR-scanner-in-the-wild scenario the
 // way the printed-receipt case is), so showing their own name back to
 // them is correct, not an over-exposure.
+//
+// WHATSAPP BUSINESS MESSAGING FINAL HARDENING (2026-08-22), Sections
+// 40/42/45: official_receipts now renders here too, matching the
+// WhatsApp message templates and the PDF invoice -- previously this
+// was the one surface missing government receipt data. Every active
+// receipt against the invoice is shown (Section 43 -- multiple cash
+// payments can each carry their own receipt; none are dropped).
+
+interface OfficialReceipt {
+  receiptSerial: string | null
+  receiptBook: string | null
+  receiptSeries: string | null
+  receiptDate: string | null
+  receiptAmount: number | null
+}
 
 interface VerificationResult {
   result: 'success' | 'invalid'
@@ -38,12 +53,14 @@ interface VerificationResult {
   customerName: string | null
   bookingRef: string | null
   fieldName: string | null
+  officialReceipts: OfficialReceipt[]
 }
 
 async function verifyInvoice(token: string): Promise<VerificationResult> {
   const { data, error } = await supabase.rpc('verify_invoice_public', { p_token: token })
   if (error) throw error
   const row = data?.[0]
+  const rawReceipts = Array.isArray(row?.official_receipts) ? row.official_receipts : []
   return {
     result: (row?.result as 'success' | 'invalid') ?? 'invalid',
     invoiceNumber: row?.invoice_number ?? null,
@@ -55,6 +72,13 @@ async function verifyInvoice(token: string): Promise<VerificationResult> {
     customerName: row?.customer_name ?? null,
     bookingRef: row?.booking_ref ?? null,
     fieldName: row?.field_name ?? null,
+    officialReceipts: rawReceipts.map((r: Record<string, unknown>) => ({
+      receiptSerial: (r.receipt_serial as string) ?? null,
+      receiptBook: (r.receipt_book as string) ?? null,
+      receiptSeries: (r.receipt_series as string) ?? null,
+      receiptDate: (r.receipt_date as string) ?? null,
+      receiptAmount: r.receipt_amount !== null && r.receipt_amount !== undefined ? Number(r.receipt_amount) : null,
+    })),
   }
 }
 
@@ -162,6 +186,38 @@ export function VerifyInvoicePage() {
                 )}
               </div>
             </div>
+
+            {data.officialReceipts.length > 0 && (
+              <div className="w-full rounded-md border border-border bg-page-bg p-4 text-start text-sm">
+                <p className="mb-2 font-medium">
+                  {t(data.officialReceipts.length > 1 ? 'verifyInvoice.officialReceipts.titlePlural' : 'verifyInvoice.officialReceipts.title')}
+                </p>
+                <div className="flex flex-col gap-2">
+                  {data.officialReceipts.map((receipt, index) => (
+                    <div key={`${receipt.receiptSerial ?? 'receipt'}-${index}`} className="rounded border border-border/60 p-2">
+                      <div className="flex justify-between py-0.5">
+                        <span className="text-text-secondary">{t('verifyInvoice.officialReceipts.number')}</span>
+                        <span className="font-medium"><bdi>{receipt.receiptSerial ?? '—'}</bdi></span>
+                      </div>
+                      <div className="flex justify-between py-0.5">
+                        <span className="text-text-secondary">{t('verifyInvoice.officialReceipts.date')}</span>
+                        <span className="font-medium">
+                          {receipt.receiptDate
+                            ? formatDate(receipt.receiptDate, locale as SupportedLocale, 'Africa/Cairo', { day: 'numeric', month: 'long', year: 'numeric' })
+                            : '—'}
+                        </span>
+                      </div>
+                      <div className="flex justify-between py-0.5">
+                        <span className="text-text-secondary">{t('verifyInvoice.officialReceipts.amount')}</span>
+                        <span className="font-medium">
+                          {receipt.receiptAmount !== null ? formatCurrency(receipt.receiptAmount, locale as SupportedLocale) : '—'}
+                        </span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
         )}
       </div>

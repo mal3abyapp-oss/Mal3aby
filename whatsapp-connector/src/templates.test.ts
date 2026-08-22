@@ -89,8 +89,8 @@ check('payment status never renders as a raw enum value', () => {
 })
 
 check('booking status/payment status enums used elsewhere never leak raw', () => {
-  const msg = renderTemplate('booking-confirmed', 'ar', { ...BASE_VARS, payment_status: 'partially_paid' })
-  assert.ok(!msg.includes('partially_paid'), 'raw enum leaked into booking-confirmed message')
+  const msg = renderTemplate('booking-confirmed-paid', 'ar', { ...BASE_VARS, payment_status: 'partially_paid' })
+  assert.ok(!msg.includes('partially_paid'), 'raw enum leaked into booking-confirmed-paid message')
   assert.ok(msg.includes('مدفوعة جزئيًا'), 'expected the human Arabic label for partially_paid')
 })
 
@@ -142,9 +142,13 @@ check('unknown template_key throws rather than silently rendering nothing', () =
 
 // ----------------------------------------------------------------
 // WhatsApp secure links directive (rules 17/19): booking-created/
-// booking-confirmed must carry a QR check-in link when a token is
-// present, payment-received/invoice-created must carry an invoice
-// link. All must NEVER include one when the token is absent.
+// booking-confirmed-paid must carry a QR check-in link when a token is
+// present, payment-received must carry an invoice link. All must NEVER
+// include one when the token is absent. (booking-confirmed and
+// invoice-created were removed as dead/fragmenting templates -- see
+// templates.ts's TemplateKey doc comment, business-messaging-hardening
+// 2026-08-22 -- their coverage below now targets the surviving
+// booking-confirmed-paid/payment-received templates instead.)
 // ----------------------------------------------------------------
 
 check('booking-created includes a /qr/ link when booking_qr_token is present', () => {
@@ -159,12 +163,12 @@ check('booking-created omits the QR link entirely when booking_qr_token is absen
   assert.ok(!msg.includes('رمز الحضور'), 'the QR-link label appeared with no token supplied')
 })
 
-check('booking-confirmed includes a /qr/ link when booking_qr_token is present (ar + en)', () => {
-  const ar = renderTemplate('booking-confirmed', 'ar', { ...BASE_VARS, booking_qr_token: 'xyz789' })
+check('booking-confirmed-paid includes a /qr/ link when booking_qr_token is present (ar + en)', () => {
+  const ar = renderTemplate('booking-confirmed-paid', 'ar', { ...BASE_VARS, booking_qr_token: 'xyz789' })
   assert.ok(ar.includes('/qr/xyz789'), 'missing the booking QR link (ar)')
-  const en = renderTemplate('booking-confirmed', 'en', { ...BASE_VARS, booking_qr_token: 'xyz789' })
+  const en = renderTemplate('booking-confirmed-paid', 'en', { ...BASE_VARS, booking_qr_token: 'xyz789' })
   assert.ok(en.includes('/qr/xyz789'), 'missing the booking QR link (en)')
-  assert.ok(en.includes('Check-in code'), 'missing the English QR-link label')
+  assert.ok(en.includes('entry code'), 'missing the English QR-link label')
 })
 
 check('payment-received includes a /verify/ link when invoice_token is present', () => {
@@ -178,10 +182,10 @@ check('payment-received omits the invoice link entirely when invoice_token is ab
   assert.ok(!msg.includes('/verify/'), 'an invoice link appeared with no token supplied')
 })
 
-check('invoice-created includes a /verify/ link when invoice_token is present (ar + en)', () => {
-  const ar = renderTemplate('invoice-created', 'ar', { ...BASE_VARS, total: 220, invoice_token: 'invtok789' })
+check('payment-received includes a /verify/ link when invoice_token is present (ar + en)', () => {
+  const ar = renderTemplate('payment-received', 'ar', { ...BASE_VARS, amount: 220, method: 'cash', invoice_token: 'invtok789' })
   assert.ok(ar.includes('/verify/invtok789'), 'missing the invoice verification link (ar)')
-  const en = renderTemplate('invoice-created', 'en', { ...BASE_VARS, total: 220, invoice_token: 'invtok789' })
+  const en = renderTemplate('payment-received', 'en', { ...BASE_VARS, amount: 220, method: 'cash', invoice_token: 'invtok789' })
   assert.ok(en.includes('/verify/invtok789'), 'missing the invoice verification link (en)')
 })
 
@@ -341,7 +345,7 @@ check('payment-received omits the outstanding-balance line when remaining_outsta
 // -----------------------------------------------------------------
 
 check('the field name line never appears more than once in any template', () => {
-  const templates = ['booking-created', 'booking-confirmed', 'booking-confirmed-paid', 'booking-cancelled'] as const
+  const templates = ['booking-created', 'booking-confirmed-paid', 'booking-cancelled'] as const
   for (const key of templates) {
     for (const lang of ['ar', 'en'] as const) {
       const msg = renderTemplate(key, lang, PAID_VARS)

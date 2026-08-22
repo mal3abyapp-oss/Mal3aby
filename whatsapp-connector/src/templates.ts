@@ -43,14 +43,34 @@
  * use it.
  */
 
+// WHATSAPP BUSINESS MESSAGING FINAL HARDENING (2026-08-22), Sections
+// 5/9 (one meaningful business outcome -> one message; no
+// fragmentation): 'booking-confirmed' and 'invoice-created' were
+// removed here. Both were confirmed dead code (no live RPC ever
+// queues either template_key -- verified via
+// `select proname from pg_proc where prosrc ilike '%queue_whatsapp_notification%'`
+// across the whole schema) AND, on their own merits, would have
+// violated this directive if ever wired up: booking.confirmed is
+// already fully covered by 'booking-confirmed-paid' (fired in the
+// same transaction when a booking is created-and-paid, or implied by
+// 'payment-received' when payment completes later) -- a standalone
+// booking-confirmed message would be exactly the "created, then
+// confirmed, then invoiced" fragmentation Section 9 forbids. Likewise
+// every invoice today is issued in the same transaction as a booking
+// or payment event that already reports invoice_number/total/payment
+// status -- a standalone "invoice created" message would fragment
+// against that. 'booking-confirmed' also used the ambiguous "تم تأكيد
+// حجزك" / "Booking confirmed" wording Section 15 explicitly flags as
+// insufficiently specific (no "Field Booking" identity). If a future,
+// genuinely distinct business outcome needs either message, add a new
+// template_key key with correctly-scoped identity, rather than
+// resurrecting these.
 export type TemplateKey =
   | 'booking-created'
-  | 'booking-confirmed'
   | 'booking-confirmed-paid'
   | 'booking-cancelled'
   | 'payment-received'
   | 'payment-refunded'
-  | 'invoice-created'
 
 type Vars = Record<string, unknown>
 type Renderer = (vars: Vars) => string
@@ -374,34 +394,6 @@ const AR: Record<TemplateKey, Renderer> = {
     )
   },
 
-  'booking-confirmed': (v) => {
-    const tz = isPresent(v.timezone) ? String(v.timezone) : DEFAULT_TIMEZONE
-    const date = isPresent(v.start_at) ? formatDate(String(v.start_at), tz, 'ar-EG') : null
-    const time = isPresent(v.start_at) ? formatTime(String(v.start_at), tz, 'ar-EG') : null
-    const paymentStatus = paymentStatusLabel(v.payment_status, 'ar')
-    const qrUrl = bookingQrUrl(v.booking_qr_token, 'ar')
-    return joinLines(
-      '✅ *تم تأكيد حجزك*',
-      '',
-      greeting(v, 'ar'),
-      '',
-      'تم تأكيد حجزك بنجاح.',
-      '',
-      line('🏟️', 'الملعب', v.field_name),
-      line('⚽', 'النشاط', sportLabel(v.sport, 'ar')),
-      line('📅', 'التاريخ', date),
-      line('🕐', 'الوقت', time),
-      line('🔖', 'رقم الحجز', v.booking_ref),
-      line('💳', 'حالة الدفع', paymentStatus),
-      '',
-      qrUrl ? `رمز الحضور:\n${qrUrl}` : '',
-      '',
-      'نتمنى لك وقتًا ممتعًا ⚽',
-      '',
-      brandLine(v, 'ar'),
-    )
-  },
-
   /**
    * Duplicate-message fix (2026-08-18, directive Sections 22-24): fired
    * ONCE instead of the old booking-created + booking-confirmed +
@@ -535,28 +527,6 @@ const AR: Record<TemplateKey, Renderer> = {
     )
   },
 
-  // Not currently queued by any RPC (verified: no live call site) --
-  // kept implemented, in the same quality bar, in case invoice-created
-  // wiring is added later. Never rendered against fabricated data.
-  'invoice-created': (v) => {
-    const total = formatMoney(v.total, 'ج.م', 'EGP', 'ar')
-    const paymentStatus = paymentStatusLabel(v.payment_status, 'ar')
-    const invoiceLink = invoiceUrl(v.invoice_token, 'ar')
-    return joinLines(
-      '🧾 *تم إصدار فاتورتك*',
-      '',
-      'تم إصدار فاتورة مرتبطة بحجزك.',
-      '',
-      line('🔖', 'رقم الحجز', v.booking_ref),
-      line('🧾', 'رقم الفاتورة', v.invoice_number),
-      line('💰', 'الإجمالي', total),
-      line('💳', 'حالة الدفع', paymentStatus),
-      '',
-      invoiceLink ? `الفاتورة:\n${invoiceLink}` : '',
-      '',
-      brandLine(v, 'ar'),
-    )
-  },
 }
 
 const EN: Record<TemplateKey, Renderer> = {
@@ -582,34 +552,6 @@ const EN: Record<TemplateKey, Renderer> = {
       "We'll message you again once your booking is confirmed.",
       '',
       qrUrl ? `Check-in code:\n${qrUrl}` : '',
-      '',
-      brandLine(v, 'en'),
-    )
-  },
-
-  'booking-confirmed': (v) => {
-    const tz = isPresent(v.timezone) ? String(v.timezone) : DEFAULT_TIMEZONE
-    const date = isPresent(v.start_at) ? formatDate(String(v.start_at), tz, 'en-US') : null
-    const time = isPresent(v.start_at) ? formatTime(String(v.start_at), tz, 'en-US') : null
-    const paymentStatus = paymentStatusLabel(v.payment_status, 'en')
-    const qrUrl = bookingQrUrl(v.booking_qr_token, 'en')
-    return joinLines(
-      '✅ *Booking confirmed*',
-      '',
-      greeting(v, 'en'),
-      '',
-      'Your booking is confirmed.',
-      '',
-      line('🏟️', 'Field', v.field_name),
-      line('⚽', 'Sport', sportLabel(v.sport, 'en')),
-      line('📅', 'Date', date),
-      line('🕐', 'Time', time),
-      line('🔖', 'Booking #', v.booking_ref),
-      line('💳', 'Payment status', paymentStatus),
-      '',
-      qrUrl ? `Check-in code:\n${qrUrl}` : '',
-      '',
-      'See you there ⚽',
       '',
       brandLine(v, 'en'),
     )
@@ -729,25 +671,6 @@ const EN: Record<TemplateKey, Renderer> = {
     )
   },
 
-  'invoice-created': (v) => {
-    const total = formatMoney(v.total, 'ج.م', 'EGP', 'en')
-    const paymentStatus = paymentStatusLabel(v.payment_status, 'en')
-    const invoiceLink = invoiceUrl(v.invoice_token, 'en')
-    return joinLines(
-      '🧾 *Your invoice is ready*',
-      '',
-      'An invoice was issued for your booking.',
-      '',
-      line('🔖', 'Booking #', v.booking_ref),
-      line('🧾', 'Invoice #', v.invoice_number),
-      line('💰', 'Total', total),
-      line('💳', 'Payment status', paymentStatus),
-      '',
-      invoiceLink ? `Invoice:\n${invoiceLink}` : '',
-      '',
-      brandLine(v, 'en'),
-    )
-  },
 }
 
 export function renderTemplate(templateKey: string, language: string, variables: Record<string, unknown>): string {

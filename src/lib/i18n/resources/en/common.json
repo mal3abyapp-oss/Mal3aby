@@ -2363,6 +2363,13 @@
     "paid": "Paid",
     "outstanding": "Outstanding",
     "paymentStatus": "Payment status",
+    "officialReceipts": {
+      "title": "🏛️ Official Collection Receipt",
+      "titlePlural": "🏛️ Official Collection Receipts",
+      "number": "Receipt #",
+      "date": "Date",
+      "amount": "Amount"
+    },
     "states": {
       "invalidTitle": "Invalid code",
       "invalidMessage": "No matching invoice was found for this code. Make sure you scanned the correct code, or contact the club directly to confirm.",

@@ -4688,6 +4688,33 @@ export type Database = {
         }
         Relationships: []
       }
+      whatsapp_delivery_evidence_summary: {
+        Row: {
+          club_id: string | null
+          confirmation_overdue: number | null
+          failed: number | null
+          provider_accepted_no_delivery_evidence: number | null
+          total_provider_accepted: number | null
+          with_delivery_receipt: number | null
+          with_read_receipt: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "notification_queue_club_id_fkey"
+            columns: ["club_id"]
+            isOneToOne: false
+            referencedRelation: "clubs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "notification_queue_club_id_fkey"
+            columns: ["club_id"]
+            isOneToOne: false
+            referencedRelation: "commercial_entitlements_usage"
+            referencedColumns: ["club_id"]
+          },
+        ]
+      }
       whatsapp_queue_diagnostics: {
         Row: {
           club_id: string | null
@@ -6246,6 +6273,7 @@ export type Database = {
           field_name: string
           invoice_number: string
           issued_at: string
+          official_receipts: Json
           outstanding: number
           paid: number
           payment_status: string
@@ -6386,6 +6414,14 @@ export type Database = {
           p_template_key: string
         }
         Returns: string
+      }
+      whatsapp_delivery_confirmation_overdue: {
+        Args: {
+          p_delivered_at: string
+          p_provider_accepted_at: string
+          p_status: string
+        }
+        Returns: boolean
       }
       whatsapp_observability_retention_cleanup: {
         Args: never
