@@ -261,7 +261,30 @@
       // creds.platform directly, for comparison against
       // whatsapp_accounts.connected_phone_number. GitHub Actions run
       // 32564150867.
-      "image": "registry.cloudflare.com/35ac10727701095866b16c276b4a33d1/mala3by-whatsapp-connector:826674c",
+      // v20, commit 727cc12 -- ROOT CAUSE FIX (P0): PN/LID JID
+      // mismatch. Live diagnostic evidence (checkRegistration()/
+      // getSenderIdentity(), v19): sender account (201116505553,
+      // platform "smba" -- a genuine WhatsApp Business API account) has
+      // its own real LID (49779342049412:15@lid); QA recipient
+      // (+971502061209, physically confirmed by the user to never
+      // receive any of 3 real test sends despite each showing
+      // provider_accepted_at) ALSO has a real LID
+      // (214417870442550@lid). Confirmed via full source inspection:
+      // the installed @whiskeysockets/baileys@6.7.24 has NO internal
+      // LID-mapping store anywhere in the package -- the relay path's
+      // LID auto-upgrade only ever applies to the SENDER's own devices,
+      // never the recipient's, so every send in this investigation used
+      // the recipient's plain PN JID verbatim even though their real
+      // account has migrated to LID. Fix: sendMessage() now resolves
+      // the real send-target JID via a real onWhatsApp() query
+      // immediately before every send, preferring the recipient's
+      // genuine LID over the constructed PN JID whenever WhatsApp's own
+      // servers confirm one exists -- fails safe (query failure, 10s
+      // timeout, no lid field) to the original PN JID unchanged, so
+      // this can only match or improve on the pre-fix delivery
+      // baseline. 91/91 connector tests pass (9 new, in
+      // resolveRealSendJidTest.ts). GitHub Actions run 32564844096.
+      "image": "registry.cloudflare.com/35ac10727701095866b16c276b4a33d1/mala3by-whatsapp-connector:727cc12",
       // One container instance per WhatsApp account (one Durable
       // Object = one container, directive rule 21's chosen model --
       // NOT a shared container serving multiple clubs, which would
