@@ -313,7 +313,30 @@
       // status='connected' would be a concrete root-cause candidate for
       // "accepts sends locally, WhatsApp's servers never actually
       // deliver". GitHub Actions run 32566606604.
-      "image": "registry.cloudflare.com/35ac10727701095866b16c276b4a33d1/mala3by-whatsapp-connector:9bb8157",
+      // v23, commit 04a757d -- ROOT CAUSE FIX (P0): upgraded
+      // @whiskeysockets/baileys from 6.7.24 (npm dist-tag "legacy",
+      // confirmed retired the SAME MINUTE 7.0.0-rc14 became "latest")
+      // to 7.0.0-rc14. Confirmed via three independent sources (npm
+      // dist-tags, GitHub v7.0.0-rc10 release notes explicitly listing
+      // "LID<->PN Mappings from contactAction, historySync, and more",
+      // and direct source inspection of a new Signal/lid-mapping.js
+      // module wired into messages-send.js's own relay path) that
+      // 6.7.24 genuinely lacked any internal LID-mapping/session
+      // infrastructure -- the deeper root cause behind
+      // provider-accepted-but-never-delivered sends that the earlier
+      // v20 app-level JID-selection workaround and a forced fresh-
+      // Signal-session repair (v22) BOTH failed to actually fix (user
+      // physically confirmed on their own phone: still did not arrive,
+      // no "Waiting for this message" indicator either). API
+      // compatibility verified before upgrading, not blind (see commit
+      // 04a757d's own message for the full verification). Only one
+      // real breaking change (fetchLatestBaileysVersion()'s options
+      // shape, axios->native-fetch) found and fixed. Removes the
+      // now-superseded v20 resolveRealSendJid()/selectRealSendJid()
+      // app-level workaround -- v7 does this correctly and more
+      // completely at the protocol layer. 82/82 tests pass. GitHub
+      // Actions run 32568750484.
+      "image": "registry.cloudflare.com/35ac10727701095866b16c276b4a33d1/mala3by-whatsapp-connector:04a757d",
       // One container instance per WhatsApp account (one Durable
       // Object = one container, directive rule 21's chosen model --
       // NOT a shared container serving multiple clubs, which would
