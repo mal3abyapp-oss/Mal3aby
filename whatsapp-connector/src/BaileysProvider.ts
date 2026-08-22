@@ -389,6 +389,22 @@ export interface BaileysProviderHooks {
    * receipt.
    */
   onDeliveryReceipt?: (messageKeyId: string, statusLevel: number) => void
+
+  /**
+   * ROOT-CAUSE INVESTIGATION (2026-08-22) -- see the messages.upsert
+   * listener's own doc comment above for the full incident this closes
+   * (a real, previously-unfilled diagnostic gap: this connector never
+   * observed ANY incoming message at all, including a genuine
+   * WhatsApp-server account-risk/status notice). SAFE METADATA ONLY --
+   * never message content, never the sender's phone number/JID itself.
+   */
+  onIncomingMessageMeta?: (meta: {
+    fromMe: boolean
+    isFromWhatsAppSystem: boolean
+    messageType: string | null
+    upsertType: string
+    timestampMs: number | null
+  }) => void
 }
 
 export class BaileysProvider implements WhatsAppProvider {
@@ -693,6 +709,34 @@ export class BaileysProvider implements WhatsAppProvider {
     socket.ev.on('messages.update', (updates) => {
       for (const { messageKeyId, statusLevel } of extractDeliveryReceipts(updates)) {
         this.hooks.onDeliveryReceipt?.(messageKeyId, statusLevel)
+      }
+    })
+
+    // ROOT-CAUSE INVESTIGATION (2026-08-22), directive section 3 -- a
+    // real, previously-unfilled gap: this connector never listened to
+    // messages.upsert at all (confirmed by grep before this fix -- zero
+    // matches), meaning ANY incoming message to this account --
+    // including a genuine WhatsApp-server-originated account-status/
+    // risk notice, which arrives as an ordinary message from WhatsApp's
+    // own system JID, not a connection.update event -- was silently
+    // dropped and never logged anywhere. Logs ONLY safe, non-content
+    // metadata (remoteJid's own account-risk-relevant prefix is NOT
+    // even logged -- only whether the sender is WhatsApp's own known
+    // system/notify JID, fromMe, message type, and timestamp): never
+    // message text, never media, never any other field. Best-effort,
+    // fire-and-forget, matches the write-discipline of every other
+    // observability hook in this file.
+    socket.ev.on('messages.upsert', ({ messages, type }) => {
+      for (const msg of messages) {
+        const fromJid = msg.key?.remoteJid ?? null
+        const isFromWhatsAppSystem = fromJid === '0@s.whatsapp.net' || fromJid === 'status@broadcast'
+        this.hooks.onIncomingMessageMeta?.({
+          fromMe: !!msg.key?.fromMe,
+          isFromWhatsAppSystem,
+          messageType: msg.message ? Object.keys(msg.message)[0] ?? null : null,
+          upsertType: type,
+          timestampMs: typeof msg.messageTimestamp === 'number' ? msg.messageTimestamp * 1000 : null,
+        })
       }
     })
 

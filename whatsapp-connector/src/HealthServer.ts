@@ -4,6 +4,7 @@ import type { SupabaseSync } from './SupabaseSync.js'
 import type { TenantConnectionManager } from './TenantConnectionManager.js'
 import { getProcessDiagnosticsSnapshot } from './ProcessDiagnostics.js'
 import { getSendDiagnosticsSnapshot } from './SendDiagnostics.js'
+import { getIncomingMessageDiagnosticsSnapshot } from './IncomingMessageDiagnostics.js'
 
 /**
  * Constant-time token comparison. The /status endpoint is internal-only
@@ -265,6 +266,10 @@ export function startHealthServer(sync: SupabaseSync, connections: TenantConnect
           // exist. No message content, no phone numbers, no tokens.
           processDiagnostics: getProcessDiagnosticsSnapshot(),
           sendDiagnostics: getSendDiagnosticsSnapshot(),
+          // ROOT-CAUSE INVESTIGATION (2026-08-22) -- see
+          // IncomingMessageDiagnostics.ts's own doc comment. Safe
+          // metadata only (no content, no phone numbers).
+          incomingMessageDiagnostics: getIncomingMessageDiagnosticsSnapshot(),
         }),
       )
       return

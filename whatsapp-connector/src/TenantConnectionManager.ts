@@ -2,6 +2,7 @@ import { BaileysProvider } from './BaileysProvider.js'
 import { encryptAuthDirForClub, restoreAuthDirForClub } from './SessionStore.js'
 import type { SupabaseSync } from './SupabaseSync.js'
 import type { MediaAttachment, WhatsAppProvider } from './WhatsAppProvider.js'
+import { recordIncomingMessage } from './IncomingMessageDiagnostics.js'
 
 /**
  * TenantConnectionManager -- holds one WhatsAppProvider per club and
@@ -67,6 +68,16 @@ export class TenantConnectionManager {
         // backed delivered_at/read_at ever gets recorded.
         onDeliveryReceipt: (messageKeyId, statusLevel) => {
           void this.sync.reportDeliveryReceipt(messageKeyId, statusLevel)
+        },
+        // ROOT-CAUSE INVESTIGATION (2026-08-22) -- see
+        // BaileysProviderHooks.onIncomingMessageMeta's own doc comment
+        // and IncomingMessageDiagnostics.ts's own doc comment for why
+        // this is a /status-exposed in-memory ring buffer, not a
+        // console.log (this process's stdout is confirmed NOT visible
+        // via `wrangler tail` for a Cloudflare Container). Diagnostic-
+        // only, not a new DB write path, safe metadata only.
+        onIncomingMessageMeta: (meta) => {
+          recordIncomingMessage(meta)
         },
       })
       // Claim BEFORE registering in the map and BEFORE any caller can

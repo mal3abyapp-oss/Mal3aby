@@ -416,6 +416,62 @@ export class WhatsAppAccountObject extends Container<Env> {
   }
 
   /**
+   * ROOT-CAUSE INVESTIGATION (2026-08-22) -- proxies the container's
+   * internal /status endpoint's incomingMessageDiagnostics field
+   * through to the public /manage/* surface. Deliberately a SEPARATE
+   * method from pollHealthAndDecide() above rather than widening that
+   * method's own return shape -- pollHealthAndDecide() is on the hot
+   * lifecycle-decision path (called every health-poll tick) and its
+   * contract is relied on elsewhere; this is purely an on-demand
+   * diagnostic read, matching the established checkRegistration()/
+   * getSenderIdentity() pattern in this same file.
+   */
+  async getIncomingMessageDiagnostics(): Promise<{
+    ok: boolean
+    totalRecorded?: number
+    recent?: Array<{
+      fromMe: boolean
+      isFromWhatsAppSystem: boolean
+      messageType: string | null
+      upsertType: string
+      timestampMs: number | null
+      recordedAt: string
+    }>
+    error?: string
+  }> {
+    try {
+      const res = await this.containerFetch(
+        'http://container/status',
+        { headers: { 'x-internal-token': this.env.CONTAINER_INTERNAL_TOKEN } },
+        this.defaultPort,
+      )
+      const body = (await res.json()) as {
+        incomingMessageDiagnostics?: {
+          totalRecorded: number
+          recent: Array<{
+            fromMe: boolean
+            isFromWhatsAppSystem: boolean
+            messageType: string | null
+            upsertType: string
+            timestampMs: number | null
+            recordedAt: string
+          }>
+        }
+      }
+      if (!res.ok) {
+        return { ok: false, error: `http_${res.status}` }
+      }
+      return {
+        ok: true,
+        totalRecorded: body.incomingMessageDiagnostics?.totalRecorded,
+        recent: body.incomingMessageDiagnostics?.recent,
+      }
+    } catch (err) {
+      return { ok: false, error: (err as Error).message }
+    }
+  }
+
+  /**
    * Proxies a single-contact session repair into the container's
    * internal /repair-session endpoint. See BaileysProvider.
    * repairContactSession's own doc comment for what this does and why

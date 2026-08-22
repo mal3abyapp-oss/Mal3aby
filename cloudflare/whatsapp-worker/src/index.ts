@@ -124,6 +124,16 @@ async function handleManage(request: Request, env: Env): Promise<Response> {
     return Response.json({ clubId, action: 'sender-identity', ...result })
   }
 
+  if (action === 'incoming-message-diagnostics') {
+    // GET/POST /manage/:clubId/incoming-message-diagnostics --
+    // ROOT-CAUSE INVESTIGATION (2026-08-22). Same auth gate as every
+    // other /manage/* action. See
+    // WhatsAppAccountObject.getIncomingMessageDiagnostics's own doc
+    // comment.
+    const result = await stub.getIncomingMessageDiagnostics()
+    return Response.json({ clubId, action: 'incoming-message-diagnostics', ...result })
+  }
+
   if (action === 'restart') {
     // ADVERSARIAL PROOF SEQUENCE addition (2026-08-18): a legitimate,
     // controlled restart capability was missing entirely -- this Worker
