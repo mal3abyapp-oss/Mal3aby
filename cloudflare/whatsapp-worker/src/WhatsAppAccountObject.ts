@@ -545,6 +545,61 @@ export class WhatsAppAccountObject extends Container<Env> {
   }
 
   /**
+   * ROOT-CAUSE INVESTIGATION (2026-08-22), directive priority A/B --
+   * proxies the container's internal /status endpoint's
+   * sessionPersistenceDiagnostics field. See
+   * SessionPersistenceDiagnostics.ts's own doc comment (connector
+   * side): per-source (creds_update/keys_set/session_repair) fired/
+   * success/failure counts for the fire-and-forget Postgres
+   * persistence write that backs auth-state/Signal-session durability
+   * across a container restart.
+   */
+  async getSessionPersistenceDiagnostics(): Promise<{
+    ok: boolean
+    diagnostics?: Record<
+      'creds_update' | 'keys_set' | 'session_repair',
+      {
+        firedCount: number
+        successCount: number
+        failureCount: number
+        lastFiredAt: string | null
+        lastSuccessAt: string | null
+        lastFailureAt: string | null
+        lastFailureMessage: string | null
+      }
+    >
+    error?: string
+  }> {
+    try {
+      const res = await this.containerFetch(
+        'http://container/status',
+        { headers: { 'x-internal-token': this.env.CONTAINER_INTERNAL_TOKEN } },
+        this.defaultPort,
+      )
+      const body = (await res.json()) as {
+        sessionPersistenceDiagnostics?: Record<
+          'creds_update' | 'keys_set' | 'session_repair',
+          {
+            firedCount: number
+            successCount: number
+            failureCount: number
+            lastFiredAt: string | null
+            lastSuccessAt: string | null
+            lastFailureAt: string | null
+            lastFailureMessage: string | null
+          }
+        >
+      }
+      if (!res.ok) {
+        return { ok: false, error: `http_${res.status}` }
+      }
+      return { ok: true, diagnostics: body.sessionPersistenceDiagnostics }
+    } catch (err) {
+      return { ok: false, error: (err as Error).message }
+    }
+  }
+
+  /**
    * Proxies a single-contact session repair into the container's
    * internal /repair-session endpoint. See BaileysProvider.
    * repairContactSession's own doc comment for what this does and why

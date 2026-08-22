@@ -6,6 +6,7 @@ import { getProcessDiagnosticsSnapshot } from './ProcessDiagnostics.js'
 import { getSendDiagnosticsSnapshot } from './SendDiagnostics.js'
 import { getIncomingMessageDiagnosticsSnapshot } from './IncomingMessageDiagnostics.js'
 import { getSendProtocolDiagnosticsSnapshot } from './SendProtocolDiagnostics.js'
+import { getSessionPersistenceDiagnosticsSnapshot } from './SessionPersistenceDiagnostics.js'
 
 /**
  * Constant-time token comparison. The /status endpoint is internal-only
@@ -323,6 +324,13 @@ export function startHealthServer(sync: SupabaseSync, connections: TenantConnect
           // SendProtocolDiagnostics.ts's own doc comment. Safe,
           // allowlisted metadata only.
           sendProtocolDiagnostics: getSendProtocolDiagnosticsSnapshot(),
+          // ROOT-CAUSE INVESTIGATION (2026-08-22), directive priority
+          // A/B -- see SessionPersistenceDiagnostics.ts's own doc
+          // comment. Per-source (creds_update/keys_set/session_repair)
+          // fired/success/failure counts and timestamps for the
+          // Postgres persistence write -- never message content or
+          // key material.
+          sessionPersistenceDiagnostics: getSessionPersistenceDiagnosticsSnapshot(),
         }),
       )
       return

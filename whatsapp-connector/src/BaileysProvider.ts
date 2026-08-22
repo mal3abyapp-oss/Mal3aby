@@ -341,8 +341,24 @@ export interface BaileysProviderHooks {
     detail?: { qr?: string; qrTtlSeconds?: number; connectedPhoneNumber?: string; error?: string },
     fencing?: { generation: number; stateSeq: number },
   ) => void
-  /** Called whenever Baileys persists updated credentials to the local auth dir -- the caller is responsible for encrypting the dir's contents and pushing to Supabase (see SessionStore.encryptAuthDirForClub). */
-  onCredsUpdate?: () => void
+  /**
+   * Called whenever Baileys persists updated credentials to the local
+   * auth dir -- the caller is responsible for encrypting the dir's
+   * contents and pushing to Supabase (see
+   * SessionStore.encryptAuthDirForClub).
+   *
+   * ROOT-CAUSE INVESTIGATION (2026-08-22), directive priority A/B --
+   * `source` distinguishes WHICH of this file's three trigger sites
+   * fired, so SessionPersistenceDiagnostics.ts can track them
+   * separately: 'creds_update' (the real Baileys creds.update event --
+   * top-level identity/registration state), 'keys_set' (the wrapped
+   * state.keys.set() -- per-contact Signal session keys, the exact
+   * path the 2026-08-19 "Waiting for this message" fix added a
+   * persistence trigger to, since it previously had none), and
+   * 'session_repair' (repairContactSession()'s own explicit push after
+   * deleting stale session files).
+   */
+  onCredsUpdate?: (source: 'creds_update' | 'keys_set' | 'session_repair') => void
   /**
    * WHATSAPP DELIVERY TRUTH fix (2026-08-22, real production defect --
    * see this class's own sendMessage() doc comment for the full
@@ -605,7 +621,7 @@ export class BaileysProvider implements WhatsAppProvider {
       if (keysPersistTimer) clearTimeout(keysPersistTimer)
       keysPersistTimer = setTimeout(() => {
         if (myGeneration !== this.generation) return
-        this.hooks.onCredsUpdate?.()
+        this.hooks.onCredsUpdate?.('keys_set')
       }, 500)
     }
     // fetchLatestBaileysVersion() itself has a try/catch that falls
@@ -693,7 +709,7 @@ export class BaileysProvider implements WhatsAppProvider {
     socket.ev.on('creds.update', async () => {
       if (myGeneration !== this.generation) return
       await saveCreds()
-      this.hooks.onCredsUpdate?.()
+      this.hooks.onCredsUpdate?.('creds_update')
     })
 
     // WHATSAPP DELIVERY TRUTH fix (2026-08-22): real production defect
@@ -1122,7 +1138,7 @@ export class BaileysProvider implements WhatsAppProvider {
       // restart before the next unrelated key write would silently
       // restore the just-deleted stale session from the last Postgres
       // snapshot, undoing this repair.
-      this.hooks.onCredsUpdate?.()
+      this.hooks.onCredsUpdate?.('session_repair')
     }
     return matches
   }

@@ -3,6 +3,11 @@ import { encryptAuthDirForClub, restoreAuthDirForClub } from './SessionStore.js'
 import type { SupabaseSync } from './SupabaseSync.js'
 import type { MediaAttachment, WhatsAppProvider } from './WhatsAppProvider.js'
 import { recordIncomingMessage } from './IncomingMessageDiagnostics.js'
+import {
+  recordPersistenceFired,
+  recordPersistenceSuccess,
+  recordPersistenceFailure,
+} from './SessionPersistenceDiagnostics.js'
 
 /**
  * TenantConnectionManager -- holds one WhatsAppProvider per club and
@@ -57,10 +62,24 @@ export class TenantConnectionManager {
             })
             .catch((err) => console.error(`[connector] failed to report status for club ${clubId.slice(0, 8)}:`, err.message))
         },
-        onCredsUpdate: () => {
+        // ROOT-CAUSE INVESTIGATION (2026-08-22), directive priority
+        // A/B -- this was already a real gap: this write is entirely
+        // fire-and-forget, and this process's own stdout (the
+        // console.error below) is confirmed NOT visible via
+        // `wrangler tail` for a Cloudflare Container, so a silently-
+        // failing persistence write here was completely invisible from
+        // outside the container. Now also tracked in
+        // SessionPersistenceDiagnostics.ts, per-source, so success/
+        // failure/timing is answerable via /status instead of guessed.
+        onCredsUpdate: (source) => {
+          recordPersistenceFired(source)
           void encryptAuthDirForClub(clubId)
             .then((encrypted) => this.sync.storeSession(clubId, encrypted))
-            .catch((err) => console.error(`[connector] failed to persist session for club ${clubId.slice(0, 8)}:`, err.message))
+            .then(() => recordPersistenceSuccess(source))
+            .catch((err) => {
+              recordPersistenceFailure(source, err.message)
+              console.error(`[connector] failed to persist session for club ${clubId.slice(0, 8)}:`, err.message)
+            })
         },
         // WHATSAPP DELIVERY TRUTH fix (2026-08-22) -- see
         // BaileysProviderHooks.onDeliveryReceipt's own doc comment for

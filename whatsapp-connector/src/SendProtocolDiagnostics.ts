@@ -85,18 +85,93 @@ const ALLOWED_PATTERNS: Array<{ name: string; test: (msg: string) => boolean; ex
     // -- never message content) -- capped length as defense in depth.
     extract: (msg) => msg.slice(0, 150),
   },
+  {
+    // ROOT-CAUSE INVESTIGATION (2026-08-22), directive priorities C/D/F
+    // -- messages-send.js's assertSessions() logs this line with a
+    // merging object carrying `jids` (every JID this send is being
+    // encrypted to) BEFORE checking which already have a valid local
+    // Signal session. The template alone (captured via the message-
+    // string path below) doesn't carry the count -- this pattern is
+    // matched by TEMPLATE here for symmetry with the others, but its
+    // real count comes from the separate array-length extraction path
+    // in inspectBaileysLogCall (never the raw jids array itself).
+    name: 'assert_sessions_call',
+    test: (msg) => msg === 'assertSessions call with jids',
+    extract: () => 'assertSessions call with jids',
+  },
+  {
+    // The genuinely real server round-trip in this whole file: unlike
+    // the fire-and-forget sendNode(stanza) at the end of relayMessage,
+    // this one IS awaited via query()/waitForMessage() -- a real IQ
+    // request/response with WhatsApp's own servers, fetching PreKey
+    // bundles for any JID that didn't already have a valid session.
+    // jidsRequiringFetch.length === 0 here would mean every recipient
+    // device already had a valid session (no fresh negotiation
+    // needed); a non-zero count proves a real prekey fetch was
+    // attempted -- and this call's own success/failure (it can throw,
+    // e.g. on a query timeout) is what genuinely determines whether
+    // devices lacking a session got one before the send proceeded.
+    name: 'fetching_sessions',
+    test: (msg) => msg === 'fetching sessions',
+    extract: () => 'fetching sessions (real IQ round-trip to WhatsApp servers)',
+  },
+  {
+    // Directive priority G: which addressing form Baileys itself chose
+    // for THIS specific conversation -- LID or PN -- decided
+    // internally now (v7), not by anything this connector passes in.
+    name: 'lid_or_pn_identity_choice',
+    test: (msg) => /Using (LID|PN) identity for @(lid|s\.whatsapp\.net) conversation/.test(msg),
+    extract: (msg) => msg,
+  },
 ]
+
+// ROOT-CAUSE INVESTIGATION (2026-08-22), directive priorities C/D/F --
+// a SEPARATE, narrow allowlist for extracting a SAFE ARRAY LENGTH ONLY
+// (never the array's own contents -- no JIDs, ever) from the merging
+// object Baileys passes alongside specific known message templates.
+// Each entry names the exact template string it applies to and the
+// exact key(s) whose .length is safe to read.
+const ARRAY_LENGTH_EXTRACTORS: Array<{ template: string; keys: string[] }> = [
+  { template: 'assertSessions call with jids', keys: ['jids'] },
+  { template: 'fetching sessions', keys: ['jidsRequiringFetch', 'wireJids'] },
+]
+
+function safeArrayLength(mergingObject: unknown, key: string): number | null {
+  if (mergingObject === null || typeof mergingObject !== 'object') return null
+  const value = (mergingObject as Record<string, unknown>)[key]
+  return Array.isArray(value) ? value.length : null
+}
 
 /**
  * Pino hooks.logMethod signature: (args, method, level) => void, called
  * BEFORE the log line is actually written. `args[0]` is the merging
  * object or message string depending on call shape; Baileys' own code
  * consistently calls `logger.debug({...}, 'message template')`, so
- * args[1] is what we inspect here.
+ * args[1] is what we inspect here for the message text. The merging
+ * object at args[0] is NEVER captured wholesale -- only specific,
+ * pre-named keys' array LENGTHS are ever read from it (see
+ * ARRAY_LENGTH_EXTRACTORS above), and only when the message template
+ * matches one of that allowlist's exact strings.
  */
 export function inspectBaileysLogCall(args: unknown[]): void {
   const msg = typeof args[1] === 'string' ? args[1] : typeof args[0] === 'string' ? args[0] : null
   if (!msg) return
+
+  const lengthExtractor = ARRAY_LENGTH_EXTRACTORS.find((e) => e.template === msg)
+  if (lengthExtractor && typeof args[1] === 'string') {
+    const mergingObject = args[0]
+    const counts = lengthExtractor.keys
+      .map((key) => `${key}=${safeArrayLength(mergingObject, key) ?? '?'}`)
+      .join(', ')
+    recentEvents.push({
+      pattern: `${msg.replace(/\s+/g, '_')}_counts`,
+      detail: counts,
+      recordedAt: new Date().toISOString(),
+    })
+    if (recentEvents.length > MAX_ENTRIES) recentEvents.shift()
+    return
+  }
+
   for (const pattern of ALLOWED_PATTERNS) {
     if (pattern.test(msg)) {
       recentEvents.push({ pattern: pattern.name, detail: pattern.extract(msg), recordedAt: new Date().toISOString() })

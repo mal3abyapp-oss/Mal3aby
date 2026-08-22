@@ -134,6 +134,16 @@ async function handleManage(request: Request, env: Env): Promise<Response> {
     return Response.json({ clubId, action: 'incoming-message-diagnostics', ...result })
   }
 
+  if (action === 'session-persistence-diagnostics') {
+    // GET/POST /manage/:clubId/session-persistence-diagnostics --
+    // ROOT-CAUSE INVESTIGATION (2026-08-22), directive priority A/B.
+    // Same auth gate as every other /manage/* action. See
+    // WhatsAppAccountObject.getSessionPersistenceDiagnostics's own doc
+    // comment.
+    const result = await stub.getSessionPersistenceDiagnostics()
+    return Response.json({ clubId, action: 'session-persistence-diagnostics', ...result })
+  }
+
   if (action === 'diagnostic-send') {
     // POST /manage/:clubId/diagnostic-send -- ROOT-CAUSE INVESTIGATION
     // (2026-08-22), directive sections 8-9: one genuinely isolated,
