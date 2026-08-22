@@ -363,7 +363,17 @@
       // CURRENT data (wrangler containers instances): exactly one
       // running instance for this club. GitHub Actions run
       // 32570071825.
-      "image": "registry.cloudflare.com/35ac10727701095866b16c276b4a33d1/mala3by-whatsapp-connector:7149441",
+      // v25, commit 54931b7 -- ROOT-CAUSE INVESTIGATION continued
+      // (directive sections 8-9): adds POST /diagnostic-send -- a
+      // genuinely isolated, plain-text-only, transport-layer-only test
+      // send through the club's already-live socket (no
+      // notification_queue row, no template, no media), so the next
+      // controlled test can isolate "is this a transport/protocol
+      // issue" from "is this specific to this connector's business-
+      // message construction". Recipient phone hardcoded connector-
+      // side, matching directSendDiagnostic.ts's own safety
+      // discipline. GitHub Actions run 32570470302.
+      "image": "registry.cloudflare.com/35ac10727701095866b16c276b4a33d1/mala3by-whatsapp-connector:54931b7",
       // One container instance per WhatsApp account (one Durable
       // Object = one container, directive rule 21's chosen model --
       // NOT a shared container serving multiple clubs, which would
