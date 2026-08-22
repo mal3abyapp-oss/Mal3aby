@@ -428,7 +428,18 @@
       // sites), zero session/protocol code touched. All 52 template
       // tests + full connector suite pass. GitHub Actions run
       // 32584614105.
-      "image": "registry.cloudflare.com/35ac10727701095866b16c276b4a33d1/mala3by-whatsapp-connector:bf94d32",
+      // v30, commit cd6f94b -- two more real bugs found live during the
+      // same production QA acceptance pass, confirmed via an actual
+      // rasterized visual check of a real Academy invoice PDF: (1) the
+      // PDF attached to an Academy payment showed no player/group
+      // identity at all (whatsapp_connector_get_invoice_document_data()
+      // now joins subscriptions -> enrollments -> players/groups,
+      // additive columns only); (2) the PDF's own receipt date had the
+      // same raw-SQL-string bug already fixed in templates.ts, on a
+      // separate independent rendering path that earlier fix never
+      // covered. All mediaTest.ts + full connector suite pass. GitHub
+      // Actions run 32586111379.
+      "image": "registry.cloudflare.com/35ac10727701095866b16c276b4a33d1/mala3by-whatsapp-connector:cd6f94b",
       // One container instance per WhatsApp account (one Durable
       // Object = one container, directive rule 21's chosen model --
       // NOT a shared container serving multiple clubs, which would
