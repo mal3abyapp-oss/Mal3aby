@@ -35,6 +35,25 @@
     --input: 220 13% 91%;
     --ring: 74 84% 63%;
     --radius: 0.75rem;
+    /* SELECT/DROPDOWN/POPOVER AUDIT (2026-08-23) -- proven root cause of
+       dropdown content rendering with a transparent background (page
+       content visibly showing/overlapping through the open menu, e.g.
+       Academy Attendance's membership select): select.tsx/dropdown-
+       menu.tsx both use the shadcn `bg-popover`/`text-popover-
+       foreground` utility classes, but --popover/--popover-foreground
+       were never defined here (every sibling shadcn token --
+       background, primary, secondary, muted, etc. -- has one; this
+       pair was simply missing), so Tailwind generated no CSS rule for
+       bg-popover at all and the computed background-color silently
+       fell back to transparent. Confirmed live via getComputedStyle()
+       on a real open SelectContent before this fix: backgroundColor
+       was exactly "rgba(0, 0, 0, 0)". Mapped onto the same solid
+       surface color the rest of the design system already uses for
+       elevated/floating UI (--color-surface, #ffffff) -- not a new
+       color choice, matching existing dropdown/dialog/sheet
+       backgrounds. */
+    --popover: 0 0% 100%;
+    --popover-foreground: 220 26% 14%;
   }
 
   html {
