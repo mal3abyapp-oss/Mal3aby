@@ -177,6 +177,28 @@ export function activationUrl(token: unknown, language?: string): string | null 
   return `${PUBLIC_APP_URL}/activate/${encodeURIComponent(String(token))}${suffix}`
 }
 
+// CUSTOMER ACTIVATION TAKEOVER GAP -- SECURITY CLOSURE (2026-08-23):
+// the activation link alone is no longer sufficient to activate an
+// account -- _mint_portal_invite_internal now also generates an
+// INDEPENDENT activation secret (never derived from the token, never
+// present anywhere in the URL), which the customer must type in
+// manually on the activation page alongside their registered phone
+// number. This is the ONLY place that secret is ever transmitted: it
+// travels solely inside this WhatsApp message body as plain text,
+// never as a link, never logged, never shown in any staff-facing UI
+// (Customer360's "Send/Resend Invite" action only ever triggers
+// send_portal_invite() server-side and never reads/displays its
+// return value -- see Customer360Page.tsx's sendInviteMutation). This
+// helper does no more than isPresent-guard + trim/format the raw
+// value for display -- it never derives or validates the secret
+// itself, that's exclusively verify_portal_invite_secret()'s job.
+export function activationSecretLine(secret: unknown, language: string): string | null {
+  if (!isPresent(secret)) return null
+  const raw = String(secret).trim()
+  if (!raw) return null
+  return language === 'en' ? `🔑 *Activation code:* ${raw}` : `🔑 *رمز التفعيل:* ${raw}`
+}
+
 /**
  * Venue-timezone-aware date/time formatting -- mirrors the frontend's
  * formatInstant() (src/lib/domain/time.ts) intent exactly: never a raw
@@ -445,6 +467,7 @@ const AR: Record<TemplateKey, Renderer> = {
     const time = isPresent(v.start_at) ? formatTime(String(v.start_at), tz, 'ar-EG') : null
     const qrUrl = bookingQrUrl(v.booking_qr_token, 'ar')
     const activateUrl = activationUrl(v.activation_token, 'ar')
+    const activateSecret = activationSecretLine(v.activation_secret, 'ar')
     return joinLines(
       '📝 *تم استلام طلب الحجز*',
       '',
@@ -468,6 +491,7 @@ const AR: Record<TemplateKey, Renderer> = {
       // message -- only present when _create_booking_internal found no
       // linked portal account for this customer at booking time.
       activateUrl ? `🔐 فعّل حسابك لمتابعة حجوزاتك والحجز مستقبلاً:\n${activateUrl}` : '',
+      activateSecret,
       '',
       brandLine(v, 'ar'),
     )
@@ -495,6 +519,7 @@ const AR: Record<TemplateKey, Renderer> = {
     const qrUrl = bookingQrUrl(v.booking_qr_token, 'ar')
     const invoiceLink = invoiceUrl(v.invoice_token, 'ar')
     const activateUrl = activationUrl(v.activation_token, 'ar')
+    const activateSecret = activationSecretLine(v.activation_secret, 'ar')
     return joinLines(
       '✅ *تم تأكيد حجزك*',
       '',
@@ -532,6 +557,7 @@ const AR: Record<TemplateKey, Renderer> = {
       invoiceLink ? `عرض الفاتورة:\n${invoiceLink}` : '',
       '',
       activateUrl ? `🔐 فعّل حسابك لمتابعة حجوزاتك والحجز مستقبلاً:\n${activateUrl}` : '',
+      activateSecret,
       'نتمنى لك وقتًا ممتعًا ⚽',
       '',
       brandLine(v, 'ar'),
@@ -712,6 +738,7 @@ const EN: Record<TemplateKey, Renderer> = {
     const time = isPresent(v.start_at) ? formatTime(String(v.start_at), tz, 'en-US') : null
     const qrUrl = bookingQrUrl(v.booking_qr_token, 'en')
     const activateUrl = activationUrl(v.activation_token, 'en')
+    const activateSecret = activationSecretLine(v.activation_secret, 'en')
     return joinLines(
       '📝 *Booking request received*',
       '',
@@ -731,6 +758,7 @@ const EN: Record<TemplateKey, Renderer> = {
       qrUrl ? `Check-in code:\n${qrUrl}` : '',
       '',
       activateUrl ? `🔐 Activate your account to manage your bookings and book yourself next time:\n${activateUrl}` : '',
+      activateSecret,
       brandLine(v, 'en'),
     )
   },
@@ -748,6 +776,7 @@ const EN: Record<TemplateKey, Renderer> = {
     const qrUrl = bookingQrUrl(v.booking_qr_token, 'en')
     const invoiceLink = invoiceUrl(v.invoice_token, 'en')
     const activateUrl = activationUrl(v.activation_token, 'en')
+    const activateSecret = activationSecretLine(v.activation_secret, 'en')
     return joinLines(
       '✅ *Booking confirmed*',
       '',
@@ -777,6 +806,7 @@ const EN: Record<TemplateKey, Renderer> = {
       invoiceLink ? `View invoice:\n${invoiceLink}` : '',
       '',
       activateUrl ? `🔐 Activate your account to manage your bookings and book yourself next time:\n${activateUrl}` : '',
+      activateSecret,
       'See you there ⚽',
       '',
       brandLine(v, 'en'),

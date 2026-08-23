@@ -290,6 +290,62 @@ check('booking-confirmed-paid includes the activation CTA when activation_token 
   assert.ok(!withoutToken.includes('/activate/'), 'an activation link appeared even though activation_token was not provided')
 })
 
+// -----------------------------------------------------------------
+// CUSTOMER ACTIVATION TAKEOVER GAP -- SECURITY CLOSURE (2026-08-23):
+// the activation secret is an INDEPENDENT factor from the token --
+// it must appear as plain text (never inside a URL/link) alongside
+// the activation link, and must be entirely absent whenever
+// activation_secret itself is absent (mirrors activation_token's own
+// presence-gating, but is a wholly separate variable/check).
+// -----------------------------------------------------------------
+
+check('booking-created includes the activation secret as plain text, never inside a URL, when present (ar + en)', () => {
+  const ar = renderTemplate('booking-created', 'ar', { ...BASE_VARS, activation_token: 'activate-test-token', activation_secret: 'K7M4-P9Q2' })
+  assert.ok(ar.includes('K7M4-P9Q2'), 'missing the activation secret text (ar)')
+  assert.ok(ar.includes('رمز التفعيل'), 'missing the Arabic activation-code label')
+  assert.ok(!/\/activate\/[^\s]*K7M4-P9Q2/.test(ar), 'the activation secret leaked into the activation URL itself (ar)')
+  const en = renderTemplate('booking-created', 'en', { ...BASE_VARS, activation_token: 'activate-test-token', activation_secret: 'K7M4-P9Q2' })
+  assert.ok(en.includes('K7M4-P9Q2'), 'missing the activation secret text (en)')
+  assert.ok(/activation code/i.test(en), 'missing the English activation-code label')
+  assert.ok(!/\/activate\/[^\s]*K7M4-P9Q2/.test(en), 'the activation secret leaked into the activation URL itself (en)')
+})
+
+check('booking-created omits the activation secret entirely when activation_secret is absent, even if activation_token is present', () => {
+  const ar = renderTemplate('booking-created', 'ar', { ...BASE_VARS, activation_token: 'activate-test-token' })
+  assert.ok(!ar.includes('رمز التفعيل'), 'the activation-code label appeared even though activation_secret was not provided (ar)')
+  const en = renderTemplate('booking-created', 'en', { ...BASE_VARS, activation_token: 'activate-test-token' })
+  assert.ok(!/activation code/i.test(en), 'the activation-code label appeared even though activation_secret was not provided (en)')
+})
+
+check('booking-confirmed-paid includes the activation secret as plain text when present, omits when absent (ar + en)', () => {
+  const withSecret = renderTemplate('booking-confirmed-paid', 'ar', { ...BASE_VARS, amount_paid: 220, method: 'cash', activation_token: 'activate-test-token', activation_secret: 'K7M4-P9Q2' })
+  assert.ok(withSecret.includes('K7M4-P9Q2'), 'missing the activation secret text')
+  assert.ok(!/\/activate\/[^\s]*K7M4-P9Q2/.test(withSecret), 'the activation secret leaked into the activation URL itself')
+  const withoutSecret = renderTemplate('booking-confirmed-paid', 'ar', { ...BASE_VARS, amount_paid: 220, method: 'cash', activation_token: 'activate-test-token' })
+  assert.ok(!withoutSecret.includes('رمز التفعيل'), 'the activation-code label appeared even though activation_secret was not provided')
+})
+
+check('the activation secret is never logged by templates.ts -- rendering never triggers console output as a side effect', () => {
+  // templates.ts is a pure string-building module (no console.*/logger
+  // calls anywhere in its render path) -- this test asserts that
+  // invariant holds by spying on console.log/console.error around a
+  // render call that includes a secret, rather than grepping source
+  // text, so a future accidental `console.log(vars)` debug statement
+  // added to templates.ts would fail this test immediately.
+  const originalLog = console.log
+  const originalError = console.error
+  const calls: unknown[] = []
+  console.log = (...args: unknown[]) => { calls.push(args) }
+  console.error = (...args: unknown[]) => { calls.push(args) }
+  try {
+    renderTemplate('booking-created', 'ar', { ...BASE_VARS, activation_token: 'activate-test-token', activation_secret: 'K7M4-P9Q2' })
+  } finally {
+    console.log = originalLog
+    console.error = originalError
+  }
+  assert.strictEqual(calls.length, 0, 'rendering a template with an activation secret produced console output -- the secret must never be logged')
+})
+
 check('the booking-created and booking-confirmed-paid messages never carry two separate CTAs when both QR and activation are present -- exactly one message, multiple sections is fine, but never a second standalone message marker', () => {
   // This is a structural sanity check, not a multi-message test (this
   // connector only ever renders one string per template call) -- it

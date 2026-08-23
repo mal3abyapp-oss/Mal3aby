@@ -3565,9 +3565,12 @@ export type Database = {
           phone_attempt_count: number
           phone_verified_at: string | null
           purpose: string
+          secret_hash: string | null
+          secret_verified_at: string | null
           status: string
           token_hash: string
           triggering_booking_id: string | null
+          verification_attempt_count: number
         }
         Insert: {
           club_id: string
@@ -3580,9 +3583,12 @@ export type Database = {
           phone_attempt_count?: number
           phone_verified_at?: string | null
           purpose?: string
+          secret_hash?: string | null
+          secret_verified_at?: string | null
           status?: string
           token_hash: string
           triggering_booking_id?: string | null
+          verification_attempt_count?: number
         }
         Update: {
           club_id?: string
@@ -3595,9 +3601,12 @@ export type Database = {
           phone_attempt_count?: number
           phone_verified_at?: string | null
           purpose?: string
+          secret_hash?: string | null
+          secret_verified_at?: string | null
           status?: string
           token_hash?: string
           triggering_booking_id?: string | null
+          verification_attempt_count?: number
         }
         Relationships: [
           {
@@ -4880,7 +4889,10 @@ export type Database = {
           p_expires_at: string
           p_triggering_booking_id: string
         }
-        Returns: string
+        Returns: {
+          raw_secret: string
+          raw_token: string
+        }[]
       }
       activate_subscription_if_due: {
         Args: { p_subscription_id: string }
@@ -4948,6 +4960,10 @@ export type Database = {
         Returns: string
       }
       claim_portal_invite: { Args: { p_raw_token: string }; Returns: string }
+      claim_portal_invite_service: {
+        Args: { p_raw_token: string; p_user_id: string }
+        Returns: string
+      }
       close_cash_shift: {
         Args: { p_closing_count: number; p_notes?: string; p_shift_id: string }
         Returns: Json
@@ -6179,7 +6195,13 @@ export type Database = {
         Args: { p_approve: boolean; p_reason?: string; p_request_id: string }
         Returns: undefined
       }
-      send_portal_invite: { Args: { p_customer_id: string }; Returns: string }
+      send_portal_invite: {
+        Args: { p_customer_id: string }
+        Returns: {
+          raw_secret: string
+          raw_token: string
+        }[]
+      }
       set_club_booking_policy: {
         Args: {
           p_cash_reservation_allowed?: boolean
@@ -6470,6 +6492,10 @@ export type Database = {
       }
       verify_portal_invite_phone: {
         Args: { p_entered_phone_e164: string; p_raw_token: string }
+        Returns: boolean
+      }
+      verify_portal_invite_secret: {
+        Args: { p_entered_secret: string; p_raw_token: string }
         Returns: boolean
       }
       void_invoice: {

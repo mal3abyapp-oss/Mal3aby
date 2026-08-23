@@ -70,6 +70,17 @@ function jsonResponse(body: unknown, status = 200) {
   })
 }
 
+// Mirrors encode(extensions.digest(x, 'sha256'), 'hex') exactly --
+// same hash, same lowercase-hex encoding -- so this lookup matches the
+// identical token_hash value the SQL side computes and stores.
+async function sha256Hex(raw: string): Promise<string> {
+  const bytes = new TextEncoder().encode(raw)
+  const digest = await crypto.subtle.digest('SHA-256', bytes)
+  return Array.from(new Uint8Array(digest))
+    .map((b) => b.toString(16).padStart(2, '0'))
+    .join('')
+}
+
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: CORS_HEADERS })
@@ -105,7 +116,7 @@ Deno.serve(async (req) => {
 
   // Re-validate the invite is genuinely claimable BEFORE creating any
   // auth user -- avoids creating an orphan account for a request that
-  // was never going to succeed anyway (invalid/expired/not-yet-phone-
+  // was never going to succeed anyway (invalid/expired/not-yet-
   // verified token). The authoritative, atomic check still happens
   // inside claim_portal_invite_service() below regardless.
   const { data: inviteRows, error: inviteError } = await admin.rpc('get_portal_invite_context', { p_raw_token: rawToken })
@@ -115,6 +126,32 @@ Deno.serve(async (req) => {
   const invite = inviteRows[0]
   if (invite.status !== 'pending' || invite.is_expired) {
     return jsonResponse({ error: 'this invite is no longer valid' }, 400)
+  }
+
+  // CUSTOMER ACTIVATION TAKEOVER GAP -- SECURITY CLOSURE: explicit
+  // pre-check that BOTH the phone factor and the independent
+  // message-only secret factor have already been verified (via
+  // verify_portal_invite_phone/verify_portal_invite_secret, called by
+  // the frontend before this endpoint is ever reached) -- direct-read
+  // from portal_invites rather than trusting a client-supplied flag,
+  // so a client that skipped straight to this endpoint with only the
+  // token cannot reach auth.admin.createUser() at all. This is a
+  // defense-in-depth optimization (avoids creating-then-deleting an
+  // orphan auth user on every incomplete attempt) -- the AUTHORITATIVE
+  // enforcement is still claim_portal_invite_service()'s own
+  // phone_verified_at/secret_verified_at checks below, which this
+  // pre-check can never weaken or bypass.
+  const { data: statusRows, error: statusError } = await admin
+    .from('portal_invites')
+    .select('phone_verified_at, secret_verified_at')
+    .eq('token_hash', await sha256Hex(rawToken))
+    .limit(1)
+  if (statusError || !statusRows || statusRows.length === 0) {
+    return jsonResponse({ error: 'invalid invite link' }, 400)
+  }
+  const verificationState = statusRows[0]
+  if (!verificationState.phone_verified_at || !verificationState.secret_verified_at) {
+    return jsonResponse({ error: 'phone and activation code verification must both be completed first' }, 400)
   }
 
   // Create the auth user pre-confirmed -- zero outbound email, zero

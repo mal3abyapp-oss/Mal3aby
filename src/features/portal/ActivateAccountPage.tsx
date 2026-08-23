@@ -14,32 +14,44 @@ import { CheckCircle2, XCircle, ShieldCheck, LogIn } from 'lucide-react'
 
 /**
  * ActivateAccountPage -- CUSTOMER ACCOUNT / CLUB PORTAL: ZERO-COST
- * ACTIVATION (amendment 2026-08-23). Standalone public route
- * (/activate/:token), same pattern as SecureBookingPage/
+ * ACTIVATION, with the CUSTOMER ACTIVATION TAKEOVER GAP security
+ * closure (amendment 2026-08-23, closure same day). Standalone public
+ * route (/activate/:token), same pattern as SecureBookingPage/
  * VerifyInvoicePage/PublicClubBookingPage -- no auth guard, no
  * PublicLayout marketing chrome, reachable only via the opaque token
  * delivered in a WhatsApp booking message.
  *
- * Three-step flow, each step server-verified, minimum information
- * shown before ownership is proven (amendment section 7):
+ * Four-factor flow (steps 2+3 combined into one visual screen, per the
+ * security closure's own explicit allowance), each step server-
+ * verified, minimum information shown before ownership is proven:
  *   1. Context: masked phone + first name + (if invite was triggered
  *      by a booking) a minimal booking summary. Never full history.
- *   2. Registered-phone confirmation: the zero-cost second factor
- *      (amendment section 8) -- possession of the link alone is not
- *      enough. Reuses the exact same PhoneInput/normalizePhone
- *      pipeline as every other phone-accepting form in this app.
- *   3. Email + password (customer's own choice, never staff-assigned)
- *      -> supabase.auth.signUp() -> claim_portal_invite() atomically
- *      links the new auth user to the canonical customer -> redirect
- *      straight into /portal.
+ *   2. Registered-phone confirmation (verify_portal_invite_phone) --
+ *      reuses the exact same PhoneInput/normalizePhone pipeline as
+ *      every other phone-accepting form in this app.
+ *   3. Independent activation secret (verify_portal_invite_secret) --
+ *      a SEPARATE credential from the URL token, delivered only in the
+ *      WhatsApp message body, that the customer types in manually.
+ *      Closes the residual takeover risk where someone who already
+ *      knows the customer's phone number and obtains the activation
+ *      URL could otherwise activate the account alone.
+ *   4. Email + password (customer's own choice, never staff-assigned)
+ *      -> activate-portal-account Edge Function, which itself
+ *      re-verifies BOTH phone_verified_at AND secret_verified_at
+ *      server-side (never trusts this page's own step-gating) before
+ *      auth.admin.createUser() ever runs -> claim_portal_invite_service()
+ *      atomically links the new auth user to the canonical customer ->
+ *      sign-in -> redirect straight into /portal.
  *
  * Every step derives identity exclusively from the raw token in the
- * URL -- the server never trusts a customer_id from this page, and
- * this page never learns the customer's real phone number (only ever
- * receives a masked version back for display).
+ * URL -- the server never trusts a customer_id from this page, this
+ * page never learns the customer's real phone number (only ever
+ * receives a masked version back for display), and the account-
+ * creation endpoint is unreachable with only the token+phone (or only
+ * the token+secret) -- both factors are independently required.
  */
 
-type Step = 'loading' | 'context' | 'phone' | 'credentials' | 'success' | 'invalid' | 'already_activated'
+type Step = 'loading' | 'context' | 'verify' | 'credentials' | 'success' | 'invalid' | 'already_activated'
 
 interface InviteContext {
   customerName: string | null
@@ -77,7 +89,8 @@ export function ActivateAccountPage() {
   const [phoneRaw, setPhoneRaw] = useState('')
   const [phoneCountry, setPhoneCountry] = useState<CountryCode>('EG')
   const [phoneValid, setPhoneValid] = useState(false)
-  const [phoneError, setPhoneError] = useState<string | null>(null)
+  const [secretRaw, setSecretRaw] = useState('')
+  const [verifyError, setVerifyError] = useState<string | null>(null)
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
@@ -113,30 +126,50 @@ export function ActivateAccountPage() {
     if (step === 'loading') setStep('context')
   }, [contextLoading, contextError, context, step])
 
-  const phoneMutation = useMutation({
+  // CUSTOMER ACTIVATION TAKEOVER GAP -- SECURITY CLOSURE: phone and
+  // secret are two INDEPENDENT server checks, called sequentially here
+  // (both must return true) -- the server itself never accepts one as
+  // a substitute for the other, and the generic failure message below
+  // deliberately never reveals which of the two factors was wrong
+  // (directive section 27/7's explicit rule), matching the identical
+  // generic-error pattern verify_portal_invite_phone already used
+  // alone before this closure.
+  const verifyMutation = useMutation({
     mutationFn: async () => {
       const phoneResult = normalizePhone(phoneRaw, phoneCountry)
       if (!phoneResult.valid || !phoneResult.e164) {
         throw new Error(t('activate.invalidPhone'))
       }
-      const { data, error } = await supabase.rpc('verify_portal_invite_phone', {
+      if (!secretRaw.trim()) {
+        throw new Error(t('activate.invalidSecret'))
+      }
+
+      const { data: phoneMatched, error: phoneErr } = await supabase.rpc('verify_portal_invite_phone', {
         p_raw_token: token!,
         p_entered_phone_e164: phoneResult.e164,
       })
-      if (error) throw error
-      return data as boolean
+      if (phoneErr) throw phoneErr
+
+      const { data: secretMatched, error: secretErr } = await supabase.rpc('verify_portal_invite_secret', {
+        p_raw_token: token!,
+        p_entered_secret: secretRaw.trim(),
+      })
+      if (secretErr) throw secretErr
+
+      return Boolean(phoneMatched) && Boolean(secretMatched)
     },
-    onSuccess: (matched) => {
-      if (matched) {
-        setPhoneError(null)
+    onSuccess: (bothMatched) => {
+      if (bothMatched) {
+        setVerifyError(null)
         setStep('credentials')
       } else {
-        // Section 27: generic failure, never reveal which part was wrong.
-        setPhoneError(t('activate.phoneMismatch'))
+        // Section 27: generic failure, never reveal which factor (phone
+        // or secret, or both) was wrong.
+        setVerifyError(t('activate.verifyMismatch'))
       }
     },
     onError: (error: { message?: string }) => {
-      setPhoneError(error?.message || t('activate.genericError'))
+      setVerifyError(error?.message || t('activate.genericError'))
     },
   })
 
@@ -266,13 +299,13 @@ export function ActivateAccountPage() {
               </p>
             )}
 
-            <Button className="w-full" onClick={() => setStep('phone')}>
+            <Button className="w-full" onClick={() => setStep('verify')}>
               {t('activate.activateButton')}
             </Button>
           </div>
         )}
 
-        {step === 'phone' && (
+        {step === 'verify' && (
           <div className="flex flex-col gap-4 rounded-xl border border-border bg-surface p-6 shadow-sm">
             <div className="text-center">
               <ShieldCheck className="mx-auto size-10 text-accent-foreground" />
@@ -288,14 +321,35 @@ export function ActivateAccountPage() {
               onValidChange={(r) => setPhoneValid(r.valid)}
             />
 
-            {phoneError && <p role="alert" className="text-sm text-status-danger">{phoneError}</p>}
+            {/* CUSTOMER ACTIVATION TAKEOVER GAP -- SECURITY CLOSURE: the
+                independent activation secret, delivered ONLY inside the
+                WhatsApp message body -- never present anywhere in this
+                page's own URL. Uppercased as typed since the secret's
+                own alphabet is uppercase-only (mirrors the server's own
+                upper(trim(...)) comparison, so a customer typing in
+                lowercase still matches). */}
+            <div className="flex flex-col gap-1.5">
+              <label className="text-sm font-medium text-text-secondary">{t('activate.secretLabel')}</label>
+              <p className="text-xs text-text-secondary">{t('activate.secretHint')}</p>
+              <Input
+                required
+                dir="ltr"
+                className="text-center font-mono tracking-widest uppercase"
+                value={secretRaw}
+                onChange={(e) => setSecretRaw(e.target.value.toUpperCase())}
+                placeholder="XXXX-XXXX"
+                maxLength={9}
+              />
+            </div>
+
+            {verifyError && <p role="alert" className="text-sm text-status-danger">{verifyError}</p>}
 
             <Button
               className="w-full"
-              disabled={!phoneValid || phoneMutation.isPending}
-              onClick={() => phoneMutation.mutate()}
+              disabled={!phoneValid || !secretRaw.trim() || verifyMutation.isPending}
+              onClick={() => verifyMutation.mutate()}
             >
-              {phoneMutation.isPending ? t('activate.verifying') : t('activate.confirmButton')}
+              {verifyMutation.isPending ? t('activate.verifying') : t('activate.confirmButton')}
             </Button>
           </div>
         )}
