@@ -1,0 +1,24 @@
+{
+  "name": "mala3by-email-worker",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Cloudflare Worker -- polls Supabase notification_queue (channel='email') on a Cron Trigger and sends transactional email via Resend. Same architectural shape as ../whatsapp-worker's connector (poll -> render -> send -> update status), but stateless -- no Durable Object, no long-lived session, since a REST API call per message needs none. See EMAIL_NOTIFICATION_AUDIT_2026-08-23.md for the audited recommendation this scaffold implements.",
+  "scripts": {
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy",
+    "typecheck": "tsc --noEmit",
+    "typecheck:test": "tsc --noEmit -p tsconfig.test.json",
+    "test": "tsx src/templates.test.ts"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "^5.20260811.1",
+    "@types/node": "^22.10.1",
+    "typescript": "^5.6.2",
+    "tsx": "^4.19.1",
+    "wrangler": "^4.0.0"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.47.0"
+  }
+}

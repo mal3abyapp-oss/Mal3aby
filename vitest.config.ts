@@ -37,6 +37,11 @@ export default defineConfig({
       '**/.{idea,git,cache,output,temp}/**',
       '**/{vite,vitest}.config.*',
       'whatsapp-connector/**',
+      // Same class of problem as whatsapp-connector/ above --
+      // cloudflare/email-worker/ is its own independent Node subproject
+      // with its own tsx-based self-test runner (src/templates.test.ts,
+      // plain node:assert, no describe/it blocks), not vitest.
+      'cloudflare/**',
       '.claude/worktrees/**',
       // Same class of problem as whatsapp-connector/ above -- QA scratch
       // scripts and any subproject fixtures a session drops here are not

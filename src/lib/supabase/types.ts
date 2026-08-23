@@ -5197,6 +5197,31 @@ export type Database = {
         Returns: undefined
       }
       disconnect_whatsapp: { Args: { p_club_id: string }; Returns: undefined }
+      email_worker_claim_next_batch: {
+        Args: { p_limit?: number }
+        Returns: {
+          attempts: number
+          club_id: string
+          id: string
+          language: string
+          recipient_customer_id: string
+          recipient_email: string
+          template_key: string
+          variables: Json
+        }[]
+      }
+      email_worker_expire_stale: { Args: never; Returns: number }
+      email_worker_report_send_result: {
+        Args: {
+          p_error?: string
+          p_permanent?: boolean
+          p_provider_reference?: string
+          p_queue_id: string
+          p_retry_after_seconds?: number
+          p_success: boolean
+        }
+        Returns: undefined
+      }
       emit_notification_event: {
         Args: {
           p_club_id: string
@@ -6020,6 +6045,19 @@ export type Database = {
         Args: { p_club_id: string; p_customer_id: string; p_reason?: string }
         Returns: undefined
       }
+      queue_email_notification: {
+        Args: {
+          p_category: string
+          p_club_id: string
+          p_customer_id: string
+          p_dedup_key?: string
+          p_event_id: string
+          p_priority?: string
+          p_template_key: string
+          p_variables: Json
+        }
+        Returns: string
+      }
       queue_whatsapp_notification: {
         Args: {
           p_category: string
@@ -6158,6 +6196,10 @@ export type Database = {
           new_total_price: number
           price_changed: boolean
         }[]
+      }
+      resolve_customer_notification_email: {
+        Args: { p_customer_id: string }
+        Returns: string
       }
       resolve_field_operating_hours: {
         Args: { p_date: string; p_field_id: string }

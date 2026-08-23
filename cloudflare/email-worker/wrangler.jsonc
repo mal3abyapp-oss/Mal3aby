@@ -1,0 +1,55 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "mala3by-email-worker",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-08-23",
+  "compatibility_flags": ["nodejs_compat"],
+
+  // EMAIL CHANNEL -- ZERO-COST TRANSACTIONAL EMAIL (audited 2026-08-23,
+  // see EMAIL_NOTIFICATION_AUDIT_2026-08-23.md for the full read-only
+  // audit + verification that led to this architecture). This Worker
+  // does NOT run on every request -- it has no "fetch" handler wired to
+  // real traffic (see src/index.ts's own doc comment) and exists purely
+  // to poll notification_queue on a schedule, exactly mirroring
+  // ../whatsapp-worker's connector poll -> render -> send -> update
+  // pattern, except stateless: sending one transactional email via
+  // Resend's REST API needs no long-lived session/Durable Object the
+  // way a real WhatsApp connection does.
+  //
+  // NO Secrets defined here as plaintext -- RESEND_API_KEY and
+  // SUPABASE_SERVICE_ROLE_KEY are set via `wrangler secret put <NAME>`
+  // (or the Cloudflare dashboard's Worker Settings -> Variables and
+  // Secrets, marked "Encrypt"), never in this file, never in git. See
+  // this project's own README/runbook for the exact commands -- the
+  // user runs these themselves; this scaffold intentionally does not
+  // set any secret value.
+  "vars": {
+    // Non-secret, safe to keep in version control -- same value/pattern
+    // already used by ../whatsapp-worker and ../frontend-worker's own
+    // wrangler.jsonc.
+    "SUPABASE_URL": "https://gxkrtlvpjwxhcqdisyob.supabase.co"
+  },
+
+  // Polls notification_queue every minute -- the tightest granularity
+  // Cron Triggers support. A minute of added latency on top of the
+  // existing booking/payment/etc. transaction is an acceptable
+  // trade-off for zero-cost transactional email (matches this
+  // project's own "notifications must never block or fail the business
+  // transaction" rule, proven for WhatsApp -- see
+  // queue_whatsapp_notification's `perform` (not `select`) call sites).
+  "triggers": {
+    "crons": ["* * * * *"]
+  },
+
+  // Workers Logs -- free-tier eligible, no plan upgrade required. Same
+  // pattern as ../frontend-worker's own wrangler.jsonc.
+  "observability": {
+    "enabled": true
+  }
+
+  // No routes/custom domain -- this Worker never serves public HTTP
+  // traffic, so no "routes" block is needed (unlike
+  // ../frontend-worker's mal3aby.app/www.mal3aby.app bindings). It is
+  // reachable only via its own Cron Trigger and, for local testing,
+  // `wrangler dev --test-scheduled`'s /cdn-cgi/handler/scheduled route.
+}
