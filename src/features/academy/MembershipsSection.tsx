@@ -26,19 +26,35 @@ import {
 import { useOfficialReceipt, OfficialCollectionReceiptFields } from '@/components/ui/official-collection-receipt-fields'
 import { PAYMENT_METHOD_LABELS, fetchInvoicePaymentSummaries } from '@/lib/domain/billing'
 import { addMonthsToDate, getAcademySubscriptionDisplayStatus, type EnrollmentRow } from '@/lib/domain/academy'
-import { ProgramsGroupsSection } from './ProgramsGroupsSection'
-import { ChevronDown, Users } from 'lucide-react'
+import { Users } from 'lucide-react'
 
 // Academy radical simplification directive: "Membership" is the
 // primary product (sections 2-4). This screen replaces the old
 // top-level "Structure" tab -- the underlying table is still `groups`
 // (unchanged, per section 28: no destructive migration), but every
 // label, form, and flow here speaks "Membership" because that's the
-// concept staff actually work with day to day. Program/Season/Age
-// Group/Coach/Field/Schedule remain fully available (nothing deleted,
-// section 28) but are demoted to an explicit "Legacy / Advanced" panel
-// (ProgramsGroupsSection, unchanged internals) reachable from here,
-// never a competing primary tab.
+// concept staff actually work with day to day.
+//
+// LEGACY ACADEMY MUST BE INVISIBLE directive (2026-08-23): the
+// Program/Season/Age Group/Coach/legacy-Schedule management UI
+// (formerly ProgramsGroupsSection, reachable here via a "خيارات
+// متقدمة / قديمة" disclosure toggle) has been removed from this
+// screen entirely -- not collapsed behind a button, genuinely deleted
+// from the active user experience, per that directive's explicit
+// "لا أريد إخفاءها خلف زر... أريدها REMOVED FROM ACTIVE USER
+// EXPERIENCE" rule. Confirmed safe before removal: groups.program_id/
+// season_id/age_group_id/coach_id/assistant_coach_id/field_id are all
+// nullable columns (verified live against the schema), and this
+// screen's own createMutation already never sets any of them --
+// Membership creation/editing was already fully independent of the
+// legacy fields. Real historical data on existing groups (6 of 8 real
+// production groups have program_id/season_id set) is preserved
+// untouched in the database -- only the UI that created/edited/
+// displayed it is gone. ProgramsGroupsSection.tsx itself has been
+// deleted (confirmed zero other importers before deletion) rather
+// than merely unlinked, since a per-directive "removed" bar means
+// gone from the codebase's active surface, not just unreachable dead
+// code left to accumulate.
 interface MembershipRow {
   id: string
   branchId: string
@@ -164,7 +180,6 @@ export function MembershipsSection() {
   const [price, setPrice] = useState('')
   const [capacity, setCapacity] = useState('20')
   const [createError, setCreateError] = useState<string | null>(null)
-  const [showLegacy, setShowLegacy] = useState(false)
 
   const [selectedMembership, setSelectedMembership] = useState<MembershipRow | null>(null)
   const [editingMembership, setEditingMembership] = useState<MembershipRow | null>(null)
@@ -279,25 +294,6 @@ export function MembershipsSection() {
         emptyTitle={t('academy.memberships.emptyTitle')}
         emptyDescription={t('academy.memberships.emptyDescription')}
       />
-
-      {/* Directive section 27/28: Program/Season/Age Group/Coach/Field/
-          Schedule are real, working features -- kept fully intact, just
-          never forced on the common path. One disclosure link here
-          instead of a top-level "Structure" tab every user sees. */}
-      <button
-        type="button"
-        onClick={() => setShowLegacy((v) => !v)}
-        className="flex items-center gap-1.5 self-start text-sm text-text-secondary hover:text-text-primary"
-      >
-        <ChevronDown className={`size-4 transition-transform ${showLegacy ? 'rotate-180' : ''}`} />
-        {t('academy.memberships.advancedLegacyToggle')}
-      </button>
-      {showLegacy && (
-        <div className="rounded-lg border border-border p-3">
-          <p className="mb-3 text-xs text-text-secondary">{t('academy.memberships.advancedLegacyDescription')}</p>
-          <ProgramsGroupsSection />
-        </div>
-      )}
 
       {selectedMembership && (
         <MembershipDetailDialog
