@@ -19,6 +19,7 @@ import { BOOKING_STATUS_LABELS, FIELD_BLOCK_TYPE_LABELS, type BookingRow, type F
 import { QuickBookingSheet, type QuickBookingSlot } from './QuickBookingSheet'
 import { BookingDetailSheet } from './BookingDetailSheet'
 import { BookingsMobileView } from './BookingsMobileView'
+import { BookingsFieldDayView } from './BookingsFieldDayView'
 import { resolveHoursForDay, useResolvedFieldPrice, useClubTimezone } from './useFieldPricing'
 import { toInstant, fromInstant } from '@/lib/domain/time'
 
@@ -182,6 +183,12 @@ export function BookingsPage() {
   const [branchId, setBranchId] = useState<string | null>(null)
   const [slotSelection, setSlotSelection] = useState<QuickBookingSlot | null>(null)
   const [selectedBooking, setSelectedBooking] = useState<BookingRow | null>(null)
+  // BOOKING CALENDAR UX PHASE: the single-field daily view is the
+  // primary desktop workflow now (directive sections 3-4, 25-27); the
+  // dense multi-field spreadsheet grid (already correct and unchanged)
+  // becomes an opt-in secondary "All Fields" view via this toggle.
+  const [desktopViewMode, setDesktopViewMode] = useState<'field' | 'all'>('field')
+  const [selectedFieldId, setSelectedFieldId] = useState<string | null>(null)
 
   const newBookingCustomerId = searchParams.get('newBookingCustomer')
   const { data: preselectedCustomerRow } = useQuery({
@@ -302,7 +309,6 @@ export function BookingsPage() {
             fields={fields}
             bookings={bookings}
             blocks={blocks}
-            hoursRows={hoursRows}
             clubTimezone={clubTimezone}
             onSlotSelect={setSlotSelection}
             onBookingSelect={setSelectedBooking}
@@ -372,8 +378,52 @@ export function BookingsPage() {
         </div>
       )}
 
+      {/* View toggle: single field (primary/default) vs. all fields
+          (secondary overview, section 5). Kept as a plain two-button
+          toggle rather than a Select -- it's a binary mode switch a
+          receptionist should recognize at a glance, not a list to pick
+          from. */}
+      {fields.length > 0 && (
+        <div className="inline-flex w-fit items-center gap-1 rounded-lg border border-border bg-muted/30 p-1">
+          <button
+            type="button"
+            onClick={() => setDesktopViewMode('field')}
+            className={cn(
+              'rounded-md px-3 py-1.5 text-sm font-medium transition',
+              desktopViewMode === 'field' ? 'bg-surface text-text-primary shadow-sm' : 'text-text-secondary hover:text-text-primary',
+            )}
+          >
+            {t('bookings.page.viewSelectedField')}
+          </button>
+          <button
+            type="button"
+            onClick={() => setDesktopViewMode('all')}
+            className={cn(
+              'rounded-md px-3 py-1.5 text-sm font-medium transition',
+              desktopViewMode === 'all' ? 'bg-surface text-text-primary shadow-sm' : 'text-text-secondary hover:text-text-primary',
+            )}
+          >
+            {t('bookings.page.viewAllFields')}
+          </button>
+        </div>
+      )}
+
       {fields.length === 0 ? (
         <p className="text-sm text-text-secondary">{t('bookings.page.noFields')}</p>
+      ) : desktopViewMode === 'field' ? (
+        clubTimezone && (
+          <BookingsFieldDayView
+            date={date}
+            fields={fields}
+            selectedFieldId={selectedFieldId}
+            onFieldChange={setSelectedFieldId}
+            bookings={bookings}
+            blocks={blocks}
+            clubTimezone={clubTimezone}
+            onSlotSelect={setSlotSelection}
+            onBookingSelect={setSelectedBooking}
+          />
+        )
       ) : (
         <div className="max-h-[calc(100vh-220px)] overflow-auto rounded-lg border border-border">
           <table className="w-full border-collapse text-sm">

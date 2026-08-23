@@ -709,7 +709,10 @@
       "closedToday": "Closed today",
       "pricePerHourNow": "{{price}} EGP/hour now",
       "priceVariesByTime": "Price varies by time",
-      "pickSlotForCustomer": "Pick an empty slot to book for {{name}}."
+      "pickSlotForCustomer": "Pick an empty slot to book for {{name}}.",
+      "field": "Field",
+      "viewSelectedField": "Selected field",
+      "viewAllFields": "All fields"
     },
     "detail": {
       "title": "Booking details",
@@ -772,7 +775,17 @@
       "pricePerHour": "{{price}} EGP/hour",
       "noApprovedPrice": "No approved price",
       "closed": "Closed",
-      "available": "Available"
+      "available": "Available",
+      "duration": "Duration",
+      "durationOptions": {
+        "30": "30m",
+        "60": "1h",
+        "90": "1.5h",
+        "120": "2h"
+      },
+      "fieldClosedToday": "This field is closed today",
+      "fieldClosedTodayHint": "Choose another day or field to see availability.",
+      "noMoreSlotsToday": "No more available start times today for this duration."
     },
     "quick": {
       "title": "New booking",

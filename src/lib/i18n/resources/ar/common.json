@@ -708,7 +708,10 @@
       "closedToday": "مغلق اليوم",
       "pricePerHourNow": "{{price}} ج.م/ساعة الآن",
       "priceVariesByTime": "السعر متغيّر حسب الوقت",
-      "pickSlotForCustomer": "اختر موعدًا فارغًا للحجز لصالح {{name}}."
+      "pickSlotForCustomer": "اختر موعدًا فارغًا للحجز لصالح {{name}}.",
+      "field": "الملعب",
+      "viewSelectedField": "الملعب المحدد",
+      "viewAllFields": "كل الملاعب"
     },
     "detail": {
       "title": "تفاصيل الحجز",
@@ -771,7 +774,17 @@
       "pricePerHour": "{{price}} ج.م/ساعة",
       "noApprovedPrice": "لا يوجد سعر معتمد",
       "closed": "مغلق",
-      "available": "متاح"
+      "available": "متاح",
+      "duration": "المدة",
+      "durationOptions": {
+        "30": "30 د",
+        "60": "ساعة",
+        "90": "ساعة ونصف",
+        "120": "ساعتان"
+      },
+      "fieldClosedToday": "هذا الملعب مغلق اليوم",
+      "fieldClosedTodayHint": "اختر يومًا أو ملعبًا آخر لعرض الأوقات المتاحة.",
+      "noMoreSlotsToday": "لا توجد أوقات بداية متاحة أخرى اليوم لهذه المدة."
     },
     "quick": {
       "title": "حجز جديد",
