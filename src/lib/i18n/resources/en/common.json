@@ -2184,6 +2184,8 @@
     "loading": "Loading...",
     "noData": "No data",
     "exportCsv": "Export CSV",
+    "dateFrom": "From",
+    "dateTo": "To",
     "reconciliation": {
       "description": "Cash payments vs cash shifts vs official government receipts, cross-checked",
       "exceptionsFound": "Exceptions found below — review before closing the books for this period.",

@@ -39,7 +39,15 @@ export function FinanceReportsPage() {
 
   return (
     <div>
-      <div className="mb-4 flex flex-wrap gap-1 overflow-x-auto rounded-lg bg-muted p-1">
+      {/* NAVIGATION/TABS/RTL AUDIT (2026-08-23): `flex-wrap` combined
+          with `overflow-x-auto` was self-defeating -- flex-wrap breaks
+          items onto new rows the moment the row is full, so the
+          overflow-x-auto scroll never actually engages; the intended
+          "single scrollable row" behavior (correct on FinanceReportsPage's
+          sibling, the shared TabsList in components/ui/tabs.tsx) never
+          took effect here. `shrink-0` on each button keeps items at
+          their natural width so wrap is no longer needed. */}
+      <div className="mb-4 flex max-w-full items-center gap-1 overflow-x-auto rounded-lg bg-muted p-1">
         {REPORT_TABS.map((tab) => (
           <button
             key={tab.key}

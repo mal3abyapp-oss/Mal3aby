@@ -13,22 +13,31 @@ import type { LucideIcon } from 'lucide-react'
 
 // Master IA/UX audit (Reports decomposition phase): replaces the old
 // single Tabs.Root (all 9 reports as siblings sharing one active-tab
-// state in one 1127-line file) with real routed screens grouped under
-// labeled sections -- matching the target structure the audit
-// recommended (Overview / التشغيل / المالية / الأكاديمية والعملاء).
-// Each report is now its own screen/route with its own bundle, own
-// state, no shared active-tab coupling -- "one primary responsibility
-// per screen" applied for real, not just visually.
+// state in one 1127-line file) with real routed screens.
 //
-// Finance IA consolidation directive section 27/30: the 7 financial
-// reports (Revenue, Collections, Payment Methods, Exceptions, Official
-// Receipts, Reconciliation, Employee Liability) moved their nav home to
-// /app/finance/reports -- this was the "third parallel Finance grouping"
-// the pre-consolidation audit flagged as confusing (three different
-// screens all called themselves "Finance"). Their routes still exist
-// unchanged for old bookmarks (redirect not needed -- the content itself
-// didn't move, just this nav's listing of it), reachable here via one
-// link into the real Finance Reports tab instead of 7 separate entries.
+// NAVIGATION/TABS/RTL AUDIT (2026-08-23): the previous version of this
+// component grouped these 6 destinations into FOUR separately-boxed
+// pill clusters (each its own `bg-muted p-1 rounded-lg` div, with
+// section-title labels floating above two of them), laid out with
+// `flex flex-wrap gap-4` on the parent. Confirmed live at a real
+// viewport (666px): this wrapped onto two visual rows with uneven
+// group widths -- exactly the "متقطع / غير متوازن" (fragmented /
+// unbalanced) complaint. That layout was never actually a Tabs
+// pattern; it read as 4 unrelated toolbars.
+//
+// This is genuinely ONE primary navigation -- a visitor is choosing
+// between 6 sibling report destinations for the currently-active
+// club, one at a time, never several simultaneously -- so it now
+// renders as ONE single-row tab bar, matching the exact same
+// overflow-x-auto scrollable pattern already proven correct in the
+// shared TabsList component (components/ui/tabs.tsx) and reused by
+// FinanceReportsPage's own report switcher: on a narrow viewport the
+// row scrolls horizontally within itself rather than wrapping the
+// page or breaking into multiple rows. "Financial Reports" remains a
+// single link into its own sub-tab hub (FinanceReportsPage) rather
+// than 7 separate top-level entries -- unchanged decision from the
+// Finance IA consolidation directive, just no longer visually
+// separated into its own box.
 interface ReportNavItem {
   to: string
   labelKey: string
@@ -36,63 +45,39 @@ interface ReportNavItem {
   end?: boolean
 }
 
-interface ReportNavGroup {
-  titleKey: string | null
-  items: ReportNavItem[]
-}
-
-const REPORT_NAV: ReportNavGroup[] = [
-  { titleKey: null, items: [{ to: '/app/reports', labelKey: 'reports.nav.overview', icon: LayoutDashboard, end: true }] },
-  {
-    titleKey: 'reports.nav.sectionOperations',
-    items: [
-      { to: '/app/reports/bookings', labelKey: 'reports.nav.bookings', icon: CalendarCheck2 },
-      { to: '/app/reports/occupancy', labelKey: 'reports.nav.occupancy', icon: Landmark },
-    ],
-  },
-  {
-    titleKey: null,
-    items: [
-      { to: '/app/finance/reports', labelKey: 'reports.nav.financialReports', icon: BarChart3 },
-    ],
-  },
-  {
-    titleKey: 'reports.nav.sectionAcademyCustomers',
-    items: [
-      { to: '/app/reports/academy', labelKey: 'reports.nav.academy', icon: GraduationCap },
-      { to: '/app/reports/customers', labelKey: 'reports.nav.customers', icon: Users },
-    ],
-  },
+const REPORT_NAV_ITEMS: ReportNavItem[] = [
+  { to: '/app/reports', labelKey: 'reports.nav.overview', icon: LayoutDashboard, end: true },
+  { to: '/app/reports/bookings', labelKey: 'reports.nav.bookings', icon: CalendarCheck2 },
+  { to: '/app/reports/occupancy', labelKey: 'reports.nav.occupancy', icon: Landmark },
+  { to: '/app/finance/reports', labelKey: 'reports.nav.financialReports', icon: BarChart3 },
+  { to: '/app/reports/academy', labelKey: 'reports.nav.academy', icon: GraduationCap },
+  { to: '/app/reports/customers', labelKey: 'reports.nav.customers', icon: Users },
 ]
 
 export function ReportsNav() {
   const { t } = useTranslation()
   return (
-    <nav className="mb-4 flex flex-wrap gap-4">
-      {REPORT_NAV.map((group, i) => (
-        <div key={group.titleKey ?? `group-${i}`} className="flex flex-col gap-1">
-          {group.titleKey && <p className="px-1 text-xs font-medium text-text-secondary">{t(group.titleKey)}</p>}
-          <div className="flex flex-wrap gap-1 rounded-lg bg-muted p-1">
-            {group.items.map((item) => (
-              <NavLink
-                key={item.to}
-                to={item.to}
-                end={item.end}
-                className={({ isActive }) =>
-                  cn(
-                    'inline-flex items-center gap-1.5 whitespace-nowrap rounded-md px-3 py-1 text-sm font-medium transition-all',
-                    isActive
-                      ? 'bg-background text-foreground shadow'
-                      : 'text-muted-foreground hover:text-foreground',
-                  )
-                }
-              >
-                <item.icon className="size-4" />
-                {t(item.labelKey)}
-              </NavLink>
-            ))}
-          </div>
-        </div>
+    <nav
+      aria-label={t('reports.title')}
+      className="mb-4 flex max-w-full items-center gap-1 overflow-x-auto rounded-lg bg-muted p-1"
+    >
+      {REPORT_NAV_ITEMS.map((item) => (
+        <NavLink
+          key={item.to}
+          to={item.to}
+          end={item.end}
+          className={({ isActive }) =>
+            cn(
+              'inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-md px-3 py-1.5 text-sm font-medium transition-all',
+              isActive
+                ? 'bg-background text-foreground shadow'
+                : 'text-muted-foreground hover:text-foreground',
+            )
+          }
+        >
+          <item.icon className="size-4" />
+          {t(item.labelKey)}
+        </NavLink>
       ))}
     </nav>
   )

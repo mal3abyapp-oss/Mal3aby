@@ -1,5 +1,6 @@
 import { createContext, useContext, useEffect, useState, type ReactNode } from 'react'
 import { useTranslation } from 'react-i18next'
+import { DirectionProvider as RadixDirectionProvider } from '@radix-ui/react-direction'
 import '@/lib/i18n/config'
 import { LOCALE_STORAGE_KEY, type SupportedLocale } from '@/lib/i18n/config'
 
@@ -54,7 +55,22 @@ export function DirectionProvider({ children }: { children: ReactNode }) {
 
   return (
     <DirectionContext.Provider value={{ locale, direction, setLocale }}>
-      {children}
+      {/* NAVIGATION/TABS/RTL AUDIT (2026-08-23) -- proven root cause of
+          "tabs render LTR despite the page being RTL": @radix-ui/react-
+          direction's own useDirection() hook (used internally by every
+          Radix primitive -- Tabs, Select, DropdownMenu, Dialog, Sheet)
+          defaults to "ltr" whenever no <DirectionProvider> from THAT
+          package wraps the tree, regardless of document.documentElement.
+          dir. Confirmed live: a rendered TabsList had a literal
+          dir="ltr" HTML attribute Radix set on itself, overriding the
+          inherited RTL from <html dir="rtl">, because this provider was
+          never wired -- our own DirectionProvider above only ever set
+          document.documentElement.dir, which Radix's internal hook
+          never reads. This single wrapper fixes every Radix consumer at
+          once (no per-component patching), staying in sync with the
+          same `direction` this provider already computes -- one source
+          of truth, never able to drift from the app's real locale. */}
+      <RadixDirectionProvider dir={direction}>{children}</RadixDirectionProvider>
     </DirectionContext.Provider>
   )
 }
