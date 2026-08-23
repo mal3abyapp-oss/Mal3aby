@@ -97,26 +97,35 @@ async function fetchPublicClub(slug: string): Promise<PublicClub | null> {
   }
 }
 
-interface Availability {
-  openTime: string | null
-  closeTime: string | null
-  hasAnyConfig: boolean
-  busyRanges: Array<{ start_at: string; end_at: string }>
+// BOOKING ENGINE / AVAILABILITY directive, sections 3 + 21-24: duration
+// is now a real customer choice (not a hardcoded 60-minute constant),
+// and which start times are actually bookable for that duration is
+// computed SERVER-SIDE via get_public_field_available_starts -- never
+// walked client-side from busy_ranges. 60 minutes remains the default
+// to preserve today's exact behavior for anyone who doesn't touch the
+// picker. The DB is still the final authority regardless (the
+// EXCLUDE constraint + create_public_booking's own exclusion_violation
+// catch already guarantee that) -- this only fixes what the UI OFFERS.
+const DURATION_OPTIONS_MINUTES = [30, 60, 90, 120] as const
+const DEFAULT_DURATION_MINUTES = 60
+
+interface AvailableStart {
+  time: string // HH:MM, venue-local
+  isAvailable: boolean
 }
 
-async function fetchAvailability(fieldId: string, date: string): Promise<Availability> {
-  const { data, error } = await supabase.rpc('get_public_field_availability', { p_field_id: fieldId, p_date: date })
+async function fetchAvailableStarts(fieldId: string, date: string, durationMinutes: number, timezone: string): Promise<AvailableStart[]> {
+  const { data, error } = await supabase.rpc('get_public_field_available_starts', {
+    p_field_id: fieldId,
+    p_date: date,
+    p_duration_minutes: durationMinutes,
+  })
   if (error) throw error
-  const row = data?.[0]
-  return {
-    openTime: row?.open_time ?? null,
-    closeTime: row?.close_time ?? null,
-    hasAnyConfig: row?.has_any_config ?? false,
-    busyRanges: (row?.busy_ranges ?? []) as Array<{ start_at: string; end_at: string }>,
-  }
+  return (data ?? []).map((row) => ({
+    time: new Date(row.start_at).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', hour12: false, timeZone: timezone }),
+    isAvailable: row.is_available,
+  }))
 }
-
-const DURATION_MINUTES = 60
 
 function toDateKey(d: Date): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
@@ -182,6 +191,7 @@ export function PublicClubBookingPage() {
   const [step, setStep] = useState<Step>('field')
   const [selectedFieldId, setSelectedFieldId] = useState<string | null>(null)
   const [selectedDate, setSelectedDate] = useState<Date | null>(null)
+  const [selectedDuration, setSelectedDuration] = useState<number>(DEFAULT_DURATION_MINUTES)
   const [selectedTime, setSelectedTime] = useState<string | null>(null)
   const [customerName, setCustomerName] = useState('')
   const [customerMobile, setCustomerMobile] = useState('')
@@ -252,17 +262,25 @@ export function PublicClubBookingPage() {
   )
   const isTodaySelected = selectedDateOption?.isToday ?? false
 
-  const { data: availability, isLoading: availabilityLoading } = useQuery({
-    queryKey: ['public-field-availability', selectedFieldId, dateKey],
-    queryFn: () => fetchAvailability(selectedFieldId!, dateKey!),
-    enabled: !!selectedFieldId && !!dateKey && (step === 'time' || step === 'date'),
+  // BOOKING ENGINE / AVAILABILITY directive: available START TIMES for
+  // the chosen duration are now server-computed (get_public_field_available_starts),
+  // not walked client-side from raw busy_ranges. The DB is the final
+  // authority on every candidate this returns -- this call can only
+  // ever be as fresh as its last fetch, which is exactly why
+  // create_public_booking() still independently re-validates on submit
+  // (see bookMutation's exclusion_violation handling below); this list
+  // is UX, not the enforcement boundary.
+  const { data: timeSlotsRaw, isLoading: availabilityLoading } = useQuery({
+    queryKey: ['public-field-available-starts', selectedFieldId, dateKey, selectedDuration],
+    queryFn: () => fetchAvailableStarts(selectedFieldId!, dateKey!, selectedDuration, club!.timezone),
+    enabled: !!selectedFieldId && !!dateKey && !!club && (step === 'time' || step === 'date'),
   })
 
   const { data: price } = useQuery({
-    queryKey: ['public-field-price', selectedFieldId, dateKey, selectedTime],
+    queryKey: ['public-field-price', selectedFieldId, dateKey, selectedTime, selectedDuration],
     queryFn: async () => {
       const [h, m] = selectedTime!.split(':').map(Number)
-      const endMinutes = (h ?? 0) * 60 + (m ?? 0) + DURATION_MINUTES
+      const endMinutes = (h ?? 0) * 60 + (m ?? 0) + selectedDuration
       const endTime = `${String(Math.floor(endMinutes / 60) % 24).padStart(2, '0')}:${String(endMinutes % 60).padStart(2, '0')}`
       const { data, error } = await supabase.rpc('get_public_field_price', {
         p_field_id: selectedFieldId!,
@@ -277,43 +295,20 @@ export function PublicClubBookingPage() {
   })
 
   const timeSlots = useMemo(() => {
-    if (!availability?.hasAnyConfig || !availability.openTime || !availability.closeTime || !dateKey) return []
-    const slots: Array<{ time: string; isAvailable: boolean }> = []
-    const [openH, openM] = availability.openTime.split(':').map(Number)
-    const [closeH, closeM] = availability.closeTime.split(':').map(Number)
-    let cursor = (openH ?? 0) * 60 + (openM ?? 0)
-    const end = (closeH ?? 0) * 60 + (closeM ?? 0)
-    const now = new Date()
-    while (cursor + DURATION_MINUTES <= end) {
-      const h = Math.floor(cursor / 60)
-      const m = cursor % 60
-      const slotStart = new Date(`${dateKey}T${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:00`)
-      const slotEnd = new Date(slotStart.getTime() + DURATION_MINUTES * 60000)
-      const isPast = slotStart <= now
-      const isBusy = availability.busyRanges.some((r) => new Date(r.start_at) < slotEnd && new Date(r.end_at) > slotStart)
-      // TODAY slots that are past or busy are simply omitted (matches
-      // future-day behavior) -- what differs for today is the CTA shown
-      // per remaining slot (contact, not online booking), handled at
-      // render time via isTodaySelected, not here.
-      if (!isPast) {
-        const time = `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`
-        // HIGH-ROI UX PASS 01, supplementary item 8: force this exact
-        // slot unavailable in the UI the instant a real booking-conflict
-        // error names it, even if the availability refetch triggered
-        // alongside it hasn't resolved yet -- avoids a flash where the
-        // just-taken slot briefly still renders as bookable.
-        slots.push({ time, isAvailable: !isBusy && time !== conflictSlot })
-      }
-      cursor += DURATION_MINUTES
-    }
-    return slots
-  }, [availability, dateKey, conflictSlot])
+    if (!timeSlotsRaw) return []
+    // HIGH-ROI UX PASS 01, supplementary item 8: force this exact slot
+    // unavailable in the UI the instant a real booking-conflict error
+    // names it, even if the availability refetch triggered alongside it
+    // hasn't resolved yet -- avoids a flash where the just-taken slot
+    // briefly still renders as bookable.
+    return timeSlotsRaw.map((s) => (s.time === conflictSlot ? { ...s, isAvailable: false } : s))
+  }, [timeSlotsRaw, conflictSlot])
 
   const bookMutation = useMutation({
     mutationFn: async () => {
       if (!slug || !selectedFieldId || !dateKey || !selectedTime) throw new Error('missing input')
       const [h, m] = selectedTime.split(':').map(Number)
-      const endMinutes = (h ?? 0) * 60 + (m ?? 0) + DURATION_MINUTES
+      const endMinutes = (h ?? 0) * 60 + (m ?? 0) + selectedDuration
       const endTime = `${String(Math.floor(endMinutes / 60) % 24).padStart(2, '0')}:${String(endMinutes % 60).padStart(2, '0')}`
       const startAt = new Date(`${dateKey}T${selectedTime}:00`).toISOString()
       const endAt = new Date(`${dateKey}T${endTime}:00`).toISOString()
@@ -503,6 +498,38 @@ export function PublicClubBookingPage() {
           <div className="flex flex-col gap-3">
             <h1 className="text-lg font-semibold">{t('publicBooking.chooseTime')}</h1>
             {selectedDate && <p className="text-sm text-text-secondary">{formatDate(selectedDate, locale as SupportedLocale, club.timezone, { day: 'numeric', month: 'long', year: 'numeric' })}</p>}
+
+            {/* BOOKING ENGINE / AVAILABILITY directive section 3: duration
+                is a real, separate choice from the 30-minute availability
+                increment -- picking a duration re-queries
+                get_public_field_available_starts server-side (see the
+                timeSlotsRaw query above), it never re-slices a
+                client-cached grid. Changing duration after a time was
+                already picked clears the pick so the customer can't
+                submit a stale start/duration pairing the server never
+                actually validated together. */}
+            <div className="flex flex-wrap gap-2">
+              {DURATION_OPTIONS_MINUTES.map((mins) => (
+                <button
+                  key={mins}
+                  type="button"
+                  onClick={() => {
+                    if (mins !== selectedDuration) {
+                      setSelectedDuration(mins)
+                      setSelectedTime(null)
+                      setConflictSlot(null)
+                    }
+                  }}
+                  className={`rounded-full border px-3 py-1.5 text-sm font-medium transition ${
+                    mins === selectedDuration
+                      ? 'border-accent bg-accent/10 text-accent-foreground'
+                      : 'border-border bg-surface text-text-secondary hover:border-accent'
+                  }`}
+                >
+                  {t(`publicBooking.durationOptions.${mins}`)}
+                </button>
+              ))}
+            </div>
 
             {conflictSlot && (
               <div role="alert" className="rounded-lg border border-status-warning/40 bg-status-warning/5 p-3 text-sm text-status-warning">
@@ -695,7 +722,7 @@ export function PublicClubBookingPage() {
                     fieldName: selectedField.name,
                     address: club.address,
                     startAt: new Date(`${dateKey}T${selectedTime}:00`),
-                    endAt: new Date(new Date(`${dateKey}T${selectedTime}:00`).getTime() + DURATION_MINUTES * 60000),
+                    endAt: new Date(new Date(`${dateKey}T${selectedTime}:00`).getTime() + selectedDuration * 60000),
                     bookingRef: confirmedRef,
                   })}
                   download={`${confirmedRef ?? 'booking'}.ics`}

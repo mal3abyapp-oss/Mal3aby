@@ -210,6 +210,54 @@ check('the token itself is never used as a bare value -- always embedded inside 
 })
 
 // -----------------------------------------------------------------
+// booking-rescheduled -- BOOKING ENGINE / AVAILABILITY / RESCHEDULING
+// directive (2026-08-23): one new business event (reschedule), exactly
+// one message, no QR image (a link only, same pattern as every other
+// template here) -- see templates.ts's own doc comment for the full
+// rationale.
+const RESCHEDULE_VARS = {
+  ...BASE_VARS,
+  old_start_at: '2026-08-25T14:00:00+00:00',
+  old_end_at: '2026-08-25T15:00:00+00:00',
+  start_at: '2026-08-25T16:00:00+00:00',
+  end_at: '2026-08-25T17:30:00+00:00',
+  booking_qr_token: 'reschedule-test-token',
+}
+
+check('booking-rescheduled never leaks a raw ISO timestamp (old or new)', () => {
+  const msg = renderTemplate('booking-rescheduled', 'ar', RESCHEDULE_VARS)
+  assert.ok(!/\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/.test(msg), 'an ISO-shaped timestamp leaked into the rescheduled message')
+})
+
+check('booking-rescheduled shows both the OLD and the NEW time, not just one', () => {
+  // Directive: the customer-facing message must make clear something
+  // changed, not just state a new time with no reference to what it
+  // replaced.
+  const ar = renderTemplate('booking-rescheduled', 'ar', RESCHEDULE_VARS)
+  assert.ok(ar.includes('الموعد السابق'), 'missing the "previous time" label (ar)')
+  assert.ok(ar.includes('الموعد الجديد'), 'missing the "new time" label (ar)')
+  const en = renderTemplate('booking-rescheduled', 'en', RESCHEDULE_VARS)
+  assert.ok(/previous|old/i.test(en), 'missing an old-time reference (en)')
+  assert.ok(/new/i.test(en), 'missing a new-time reference (en)')
+})
+
+check('booking-rescheduled links to the QR page, never embeds a QR image', () => {
+  // Directive section 44/87: "No QR image" -- this connector generates
+  // zero QR images anywhere (QrImage.ts was deleted this session); this
+  // asserts the rescheduled template specifically follows the same
+  // link-only pattern as every other template, not an image attachment
+  // reference of any kind.
+  const msg = renderTemplate('booking-rescheduled', 'ar', RESCHEDULE_VARS)
+  assert.ok(msg.includes('/qr/reschedule-test-token'), 'missing the expected /qr/<token> link')
+  assert.ok(!/\.(png|jpg|jpeg)/i.test(msg), 'an image file reference leaked into the rescheduled message')
+})
+
+check('booking-rescheduled includes the booking reference so the customer can match it to their prior confirmation', () => {
+  const msg = renderTemplate('booking-rescheduled', 'ar', RESCHEDULE_VARS)
+  assert.ok(msg.includes(RESCHEDULE_VARS.booking_ref), 'missing the booking reference')
+})
+
+// -----------------------------------------------------------------
 // booking-confirmed-paid -- duplicate-message fix (directive Sections
 // 22-24): the single merged message for a booking + same-transaction
 // payment, replacing the old booking-created + booking-confirmed +

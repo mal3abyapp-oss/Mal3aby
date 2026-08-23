@@ -4769,6 +4769,19 @@ export type Database = {
         }
         Returns: string
       }
+      _field_available_starts_internal: {
+        Args: {
+          p_date: string
+          p_duration_minutes: number
+          p_field_id: string
+          p_increment_minutes?: number
+        }
+        Returns: {
+          end_at: string
+          is_available: boolean
+          start_at: string
+        }[]
+      }
       _mint_booking_qr_token_internal: {
         Args: {
           p_booking_id: string
@@ -5281,6 +5294,19 @@ export type Database = {
         Args: { p_club_id: string; p_end_date: string; p_start_date: string }
         Returns: Json
       }
+      get_field_available_starts: {
+        Args: {
+          p_date: string
+          p_duration_minutes: number
+          p_field_id: string
+          p_increment_minutes?: number
+        }
+        Returns: {
+          end_at: string
+          is_available: boolean
+          start_at: string
+        }[]
+      }
       get_field_occupancy_report: {
         Args: {
           p_club_id: string
@@ -5534,6 +5560,19 @@ export type Database = {
           close_time: string
           has_any_config: boolean
           open_time: string
+        }[]
+      }
+      get_public_field_available_starts: {
+        Args: {
+          p_date: string
+          p_duration_minutes: number
+          p_field_id: string
+          p_increment_minutes?: number
+        }
+        Returns: {
+          end_at: string
+          is_available: boolean
+          start_at: string
         }[]
       }
       get_public_field_price: {
@@ -5978,6 +6017,20 @@ export type Database = {
           p_player_id: string
         }
         Returns: string
+      }
+      reschedule_booking: {
+        Args: {
+          p_booking_id: string
+          p_new_end_at: string
+          p_new_field_id?: string
+          p_new_start_at: string
+          p_reason?: string
+        }
+        Returns: {
+          booking_id: string
+          new_total_price: number
+          price_changed: boolean
+        }[]
       }
       resolve_field_operating_hours: {
         Args: { p_date: string; p_field_id: string }

@@ -85,6 +85,7 @@ export type TemplateKey =
   | 'booking-created'
   | 'booking-confirmed-paid'
   | 'booking-cancelled'
+  | 'booking-rescheduled'
   | 'payment-received'
   | 'payment-refunded'
   | 'academy-payment-received'
@@ -531,6 +532,47 @@ const AR: Record<TemplateKey, Renderer> = {
     )
   },
 
+  /**
+   * BOOKING ENGINE / RESCHEDULING directive (2026-08-23): ONE message
+   * per reschedule event (directive rule "لا ترسل عدة رسائل لنفس
+   * العملية"), fired once from reschedule_booking() -- never a
+   * cancellation message followed by a separate new-booking message,
+   * which would misrepresent one operation as two. Shows the OLD time
+   * struck through conceptually via explicit "من/إلى" framing (old ->
+   * new), the field/date/time/duration/booking reference/payment
+   * status the directive requires, and the secure booking link text
+   * (never a QR image -- this connector generates no QR images at
+   * all, per the QR-unification directive earlier this session; the
+   * QR itself only ever renders client-side on the link's destination
+   * page).
+   */
+  'booking-rescheduled': (v) => {
+    const tz = isPresent(v.timezone) ? String(v.timezone) : DEFAULT_TIMEZONE
+    const oldDate = isPresent(v.old_start_at) ? formatDate(String(v.old_start_at), tz, 'ar-EG') : null
+    const oldTime = isPresent(v.old_start_at) ? formatTime(String(v.old_start_at), tz, 'ar-EG') : null
+    const newDate = isPresent(v.start_at) ? formatDate(String(v.start_at), tz, 'ar-EG') : null
+    const newTime = isPresent(v.start_at) ? formatTime(String(v.start_at), tz, 'ar-EG') : null
+    const newEndTime = isPresent(v.end_at) ? formatTime(String(v.end_at), tz, 'ar-EG') : null
+    const qrUrl = bookingQrUrl(v.booking_qr_token, 'ar')
+    return joinLines(
+      '🔄 *تم تعديل حجز الملعب*',
+      '',
+      isPresent(v.booking_ref) ? `تم تعديل موعد حجزك رقم *${String(v.booking_ref)}*.` : 'تم تعديل موعد حجزك.',
+      '',
+      line('🏟️', 'الملعب', v.field_name),
+      line('⚽', 'النشاط', sportLabel(v.sport, 'ar')),
+      '',
+      isPresent(oldDate) ? `الموعد السابق: ${oldDate} — ${oldTime}` : '',
+      isPresent(newDate) ? `الموعد الجديد: *${newDate} — ${newTime}${newEndTime ? ` إلى ${newEndTime}` : ''}*` : '',
+      '',
+      line('💰', 'الإجمالي', formatMoney(v.total_price, 'ج.م', 'EGP', 'ar')),
+      '',
+      qrUrl ? `تفاصيل الحجز ورمز الحضور:\n${qrUrl}` : '',
+      '',
+      brandLine(v, 'ar'),
+    )
+  },
+
   'payment-received': (v) => {
     const amount = formatMoney(v.amount, 'ج.م', 'EGP', 'ar')
     const outstanding = formatMoney(outstandingAmount(v.remaining_outstanding, v.total_price, v.amount_paid), 'ج.م', 'EGP', 'ar')
@@ -726,6 +768,34 @@ const EN: Record<TemplateKey, Renderer> = {
       isPresent(v.reason) ? `\nReason: ${String(v.reason)}` : '',
       '',
       'You can create a new booking any time through Mal3aby.',
+      '',
+      brandLine(v, 'en'),
+    )
+  },
+
+  /** English mirror of AR's 'booking-rescheduled' -- see its doc comment for the full one-message-per-event rationale. */
+  'booking-rescheduled': (v) => {
+    const tz = isPresent(v.timezone) ? String(v.timezone) : DEFAULT_TIMEZONE
+    const oldDate = isPresent(v.old_start_at) ? formatDate(String(v.old_start_at), tz, 'en-US') : null
+    const oldTime = isPresent(v.old_start_at) ? formatTime(String(v.old_start_at), tz, 'en-US') : null
+    const newDate = isPresent(v.start_at) ? formatDate(String(v.start_at), tz, 'en-US') : null
+    const newTime = isPresent(v.start_at) ? formatTime(String(v.start_at), tz, 'en-US') : null
+    const newEndTime = isPresent(v.end_at) ? formatTime(String(v.end_at), tz, 'en-US') : null
+    const qrUrl = bookingQrUrl(v.booking_qr_token, 'en')
+    return joinLines(
+      '🔄 *Your booking was rescheduled*',
+      '',
+      isPresent(v.booking_ref) ? `Your booking *${String(v.booking_ref)}* has a new time.` : 'Your booking has a new time.',
+      '',
+      line('🏟️', 'Field', v.field_name),
+      line('⚽', 'Sport', sportLabel(v.sport, 'en')),
+      '',
+      isPresent(oldDate) ? `Previous time: ${oldDate} — ${oldTime}` : '',
+      isPresent(newDate) ? `New time: *${newDate} — ${newTime}${newEndTime ? ` to ${newEndTime}` : ''}*` : '',
+      '',
+      line('💰', 'Total', formatMoney(v.total_price, 'ج.م', 'EGP', 'en')),
+      '',
+      qrUrl ? `View booking details and check-in code:\n${qrUrl}` : '',
       '',
       brandLine(v, 'en'),
     )

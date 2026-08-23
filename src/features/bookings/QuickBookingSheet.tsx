@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { useMutation } from '@tanstack/react-query'
+import { useMutation, useQuery } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
 import { supabase } from '@/lib/supabase/client'
 import { translateSupabaseError } from '@/lib/errors'
@@ -101,7 +101,58 @@ export function QuickBookingSheet({
     }
   }, [slot])
 
-  const durations = DURATION_VALUES.map((value) => ({ value, label: t(`bookings.quick.durations.${value}`) }))
+  // BOOKING ENGINE / AVAILABILITY directive section 23: only show
+  // durations that don't collide with the next booking/closure/hold/
+  // closing time from this exact start. Server-authoritative: fetches
+  // this field's day-of candidate starts at a fine (15-min) increment
+  // via get_field_available_starts (the same engine the public flow
+  // now uses) once per slot open, then for each duration option checks
+  // whether every increment covering [start, start+duration) is free --
+  // equivalent to asking "would this exact start+duration combination
+  // be offered," without one round-trip per duration. The DB exclusion
+  // constraint remains the real enforcement boundary regardless (a
+  // staff member could still submit a stale duration between fetch and
+  // submit and get the same friendly conflict error QuickBookingSheet's
+  // onError already surfaces) -- this only improves what's OFFERED,
+  // matching section 18's "staff uses the exact same engine, no bypass."
+  const CHECK_INCREMENT_MINUTES = 15
+  const { data: fineStarts } = useQuery({
+    queryKey: ['quick-booking-duration-availability', slot?.fieldId, slot?.date],
+    queryFn: async () => {
+      const { data, error } = await supabase.rpc('get_field_available_starts', {
+        p_field_id: slot!.fieldId,
+        p_date: slot!.date,
+        p_duration_minutes: CHECK_INCREMENT_MINUTES,
+        p_increment_minutes: CHECK_INCREMENT_MINUTES,
+      })
+      if (error) throw error
+      return data ?? []
+    },
+    enabled: !!slot,
+  })
+
+  const durations = DURATION_VALUES.map((value) => {
+    let isAvailable = true
+    if (slot && fineStarts && clubTimezone) {
+      const startInstant = new Date(toInstant(slot.date, slot.startTime, clubTimezone)).getTime()
+      const endInstant = startInstant + Number(value) * 60 * 60000
+      // Every fine-grained increment that overlaps [start, end) must
+      // itself be free AND actually offered (covers the whole
+      // increment, i.e. present in fineStarts) for this duration to be
+      // safely offered -- a gap (increment not returned at all, e.g.
+      // past closing time) or a busy increment both disqualify it.
+      let cursor = startInstant
+      while (cursor < endInstant) {
+        const row = fineStarts.find((r) => new Date(r.start_at).getTime() === cursor)
+        if (!row || !row.is_available) {
+          isAvailable = false
+          break
+        }
+        cursor += CHECK_INCREMENT_MINUTES * 60000
+      }
+    }
+    return { value, label: t(`bookings.quick.durations.${value}`), isAvailable }
+  })
 
   const endTime = useMemo(() => {
     if (!slot) return null
@@ -232,7 +283,10 @@ export function QuickBookingSheet({
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
                   {durations.map((d) => (
-                    <SelectItem key={d.value} value={d.value}>{d.label}</SelectItem>
+                    <SelectItem key={d.value} value={d.value} disabled={!d.isAvailable}>
+                      {d.label}
+                      {!d.isAvailable && ` — ${t('bookings.quick.durationUnavailable')}`}
+                    </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
