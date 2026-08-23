@@ -439,7 +439,39 @@
       // separate independent rendering path that earlier fix never
       // covered. All mediaTest.ts + full connector suite pass. GitHub
       // Actions run 32586111379.
-      "image": "registry.cloudflare.com/35ac10727701095866b16c276b4a33d1/mala3by-whatsapp-connector:cd6f94b",
+      // v31, commit ee7ee3f -- MAL3ABY QR DISCOVERY + UNIFICATION
+      // (2026-08-23): removed QrImage.ts (generateBookingQrPng()) and
+      // its dead 'booking_qr' media_intent branch in QueueConsumer.ts's
+      // buildMediaAttachment() -- the PROVEN root cause of "رمز غير
+      // صالح" on real customer scans. That module encoded the FULL
+      // bookingQrUrl() (`https://mal3aby.app/qr/<token>`) into the
+      // WhatsApp-attached PNG, but qr_validate()/qr_confirm_checkin()
+      // hash the token exactly as given with zero URL parsing -- a
+      // URL's sha256 hash can never match the bare token's stored
+      // hash, so every image this connector ever attached for a
+      // booking_qr-intent row was structurally unscannable. Confirmed
+      // via notification_queue: rows with media_intent='booking_qr'
+      // exist as recently as 2026-08-22 13:32:40 UTC (~10.5 hours
+      // before this fix), all pre-dating the DB-side migration
+      // (20260822144037) that stopped new rows from ever being queued
+      // this way -- zero such rows exist after that timestamp, so the
+      // DB side was already safe; this release removes the now-
+      // unreachable connector-side code entirely rather than leaving
+      // it as a landmine a future call site could accidentally re-
+      // wire. This connector no longer generates any QR image --
+      // WhatsApp carries the secure link only (unchanged), and the QR
+      // itself renders client-side on the link's destination page
+      // (SecureBookingPage.tsx/BookingDetailSheet.tsx/
+      // VerifyInvoicePage.tsx, all three now proven, via a live
+      // decode-and-validate round-trip with an independent QR decoder,
+      // to already share the exact same bare-token payload contract).
+      // Zero session/protocol/pairing/queue-claim code touched -- only
+      // the media-attachment branch. mediaTest.ts's QR-PNG tests
+      // removed (nothing left to test); invoice PDF generation/tests
+      // unaffected. Full connector suite + mediaTest.ts pass. GitHub
+      // Actions run 32608441124, digest
+      // sha256:5b1d2a4f9d0ce18695032e44c057ab2521287a1b88ff06e0210f292a550eadb6.
+      "image": "registry.cloudflare.com/35ac10727701095866b16c276b4a33d1/mala3by-whatsapp-connector:ee7ee3f",
       // One container instance per WhatsApp account (one Durable
       // Object = one container, directive rule 21's chosen model --
       // NOT a shared container serving multiple clubs, which would
