@@ -471,7 +471,15 @@
       // unaffected. Full connector suite + mediaTest.ts pass. GitHub
       // Actions run 32608441124, digest
       // sha256:5b1d2a4f9d0ce18695032e44c057ab2521287a1b88ff06e0210f292a550eadb6.
-      "image": "registry.cloudflare.com/35ac10727701095866b16c276b4a33d1/mala3by-whatsapp-connector:ee7ee3f",
+      //
+      // BOOKING ENGINE / AVAILABILITY / RESCHEDULING directive
+      // (2026-08-23): rebuilt because templates.ts genuinely changed
+      // (new 'booking-rescheduled' AR/EN renderer for the new
+      // reschedule_booking() RPC's WhatsApp message) -- zero
+      // session/protocol/pairing/queue-claim code touched. GitHub
+      // Actions run 32638585859, digest
+      // sha256:dd8b611fe381c8473d1a1516017de537d1f07a2f9f1b89a5e62f4080e000e0d2.
+      "image": "registry.cloudflare.com/35ac10727701095866b16c276b4a33d1/mala3by-whatsapp-connector:0d5aab8",
       // One container instance per WhatsApp account (one Durable
       // Object = one container, directive rule 21's chosen model --
       // NOT a shared container serving multiple clubs, which would
