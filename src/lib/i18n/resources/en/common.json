@@ -1083,6 +1083,8 @@
     "paymentStatus": "Payment status",
     "attendanceQr": "Entry code",
     "attendanceQrHint": "Show this code to staff when you arrive",
+    "viewQrButton": "View QR Code for Check-in",
+    "generatingQr": "Generating...",
     "viewFullScreen": "View full screen",
     "closeFullScreen": "Close",
     "viewInvoice": "View invoice",

@@ -1082,6 +1082,8 @@
     "paymentStatus": "حالة السداد",
     "attendanceQr": "رمز الحضور",
     "attendanceQrHint": "اعرض هذا الرمز لموظفي الاستقبال عند الوصول",
+    "viewQrButton": "عرض رمز QR لتسجيل الحضور",
+    "generatingQr": "جارٍ الإنشاء...",
     "viewFullScreen": "عرض بملء الشاشة",
     "closeFullScreen": "إغلاق",
     "viewInvoice": "عرض الفاتورة",

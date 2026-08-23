@@ -1,7 +1,6 @@
 import type { SupabaseSync } from './SupabaseSync.js'
 import type { TenantConnectionManager } from './TenantConnectionManager.js'
-import { renderTemplate, bookingQrUrl } from './templates.js'
-import { generateBookingQrPng } from './QrImage.js'
+import { renderTemplate } from './templates.js'
 import { buildInvoicePdfBuffer } from './InvoicePdf.js'
 import type { MediaAttachment } from './WhatsAppProvider.js'
 import { classifyRootCause, type ClassificationInput } from './RootCauseClassifier.js'
@@ -249,25 +248,34 @@ export class QueueConsumer {
    * never logs the raw booking_qr_token/invoice token (rule 18).
    */
   private async buildMediaAttachment(row: Awaited<ReturnType<SupabaseSync['claimNextBatch']>>[number]): Promise<MediaAttachment> {
-    if (row.mediaIntent === 'booking_qr') {
-      const token = row.variables?.booking_qr_token
-      const url = bookingQrUrl(token, row.language)
-      if (!url) {
-        // Directive rule 4: never send a QR image for an event without
-        // an active credential -- a missing/empty token here means the
-        // business RPC didn't mint one (e.g. this template_key should
-        // never have been queued with media_intent set), which is a
-        // real bug worth a loud failure, not a silently-skipped image.
-        throw new Error('booking_qr media_intent but no booking_qr_token present in variables')
-      }
-      const png = await generateBookingQrPng(url)
-      return {
-        kind: 'image',
-        buffer: png,
-        caption: row.language === 'en' ? 'Your booking check-in code / keep it or show it on arrival' : 'رمز حضور حجزك في ملعبي / احتفظ به أو اعرضه عند الوصول',
-      }
-    }
-
+    // MAL3ABY QR DISCOVERY + UNIFICATION (2026-08-23): the 'booking_qr'
+    // media_intent branch that used to live here has been removed, not
+    // just stopped from being queued. Root cause proven live in this
+    // pass: generateBookingQrPng() (formerly QrImage.ts) encoded the
+    // FULL bookingQrUrl() (`https://mal3aby.app/qr/<token>`) into the
+    // WhatsApp-attached PNG, but qr_validate()/qr_confirm_checkin()
+    // hash p_token EXACTLY as given with zero URL parsing -- a URL's
+    // sha256 hash can never match the bare token's stored hash, so
+    // every one of these images was structurally unscannable by the
+    // real Staff Scanner. Confirmed via notification_queue: every row
+    // with media_intent='booking_qr' queued before the DB-side fix
+    // (migration 20260822144037, which stopped new rows from ever
+    // being queued this way) is provably broken; zero such rows exist
+    // after that timestamp. The one QR that has always worked --
+    // BookingDetailSheet.tsx's "عرض رمز QR لتسجيل الحضور" -- and its
+    // now-unified siblings (SecureBookingPage.tsx, VerifyInvoicePage.
+    // tsx) all render the QR client-side from the bare raw token via
+    // the `qrcode` npm package, inside the actual destination page --
+    // never as a separately-generated WhatsApp image attachment. That
+    // client-side rendering is the ONLY QR image generation path left
+    // in the product; this connector no longer generates QR images at
+    // all, only the invoice PDF document below. Leaving the dead
+    // branch in place risked a future call site accidentally re-
+    // wiring it and reintroducing the exact same silent failure --
+    // removed entirely per directive: "remove duplicated QR logic
+    // after proof; if obsolete, remove safely after checking
+    // dependencies." No WhatsApp transport/session/pairing code was
+    // touched -- only this queue-side media-attachment branch.
     if (row.mediaIntent === 'invoice_pdf') {
       const invoiceId = row.variables?.invoice_id
       if (typeof invoiceId !== 'string' || !invoiceId) {

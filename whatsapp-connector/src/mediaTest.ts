@@ -2,16 +2,26 @@
  * mediaTest.ts -- automated coverage for the MAL3ABY WHATSAPP QR IMAGE
  * + INVOICE DOCUMENT DELIVERY task (directive rule 26), covering
  * everything that CAN be tested without a live Baileys connection or a
- * live Supabase project: QR image generation, QR URL content match,
- * invoice PDF generation, financial-field correctness in the rendered
- * PDF, and template fallback-link presence. Live delivery/scan/
- * cancellation tests against the real approved number
+ * live Supabase project: QR URL content match (the text-fallback link,
+ * still sent), invoice PDF generation, financial-field correctness in
+ * the rendered PDF, and template fallback-link presence. Live
+ * delivery/scan/cancellation tests against the real approved number
  * (+971502061209) are a separate, manual/live phase -- not something
  * this offline test file can or should fake.
  *
+ * QR IMAGE generation itself (QrImage.ts, generateBookingQrPng()) was
+ * removed 2026-08-23 (MAL3ABY QR DISCOVERY + UNIFICATION) -- proven
+ * root cause of "رمز غير صالح" on real customer scans: it encoded the
+ * full bookingQrUrl() into the WhatsApp-attached PNG, but the real
+ * scanner's qr_validate()/qr_confirm_checkin() hash the token exactly
+ * as given with zero URL parsing, so that image could never validate.
+ * The QR is now rendered client-side only, on the link's own
+ * destination page, from the bare raw token -- this connector no
+ * longer generates any QR image at all, so those tests are gone with
+ * the code they covered, not merely skipped.
+ *
  * Run with: npx tsx src/mediaTest.ts
  */
-import { generateBookingQrPng } from './QrImage.js'
 import { buildInvoicePdfBuffer } from './InvoicePdf.js'
 import { renderTemplate, bookingQrUrl, invoiceUrl } from './templates.js'
 // pdfjs-dist (Mozilla's own PDF.js, dev-dependency, test-only) --
@@ -64,21 +74,6 @@ function check(name: string, condition: boolean, detail?: string): void {
 }
 
 async function main() {
-  // ---- QR image generation ----
-  const qrUrl = 'https://mal3aby.app/qr/test-opaque-token-abc123'
-  const qrPng = await generateBookingQrPng(qrUrl)
-  check('QR PNG generation produces a non-empty PNG buffer', qrPng.length > 0)
-  check('QR PNG starts with the PNG magic bytes', qrPng.subarray(0, 8).equals(Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a])))
-  check('QR PNG stays reasonably small (<20KB) for a WhatsApp image attachment', qrPng.length < 20_000, `${qrPng.length} bytes`)
-
-  let qrEmptyUrlThrew = false
-  try {
-    await generateBookingQrPng('')
-  } catch {
-    qrEmptyUrlThrew = true
-  }
-  check('QR generation rejects an empty url rather than silently encoding "undefined"', qrEmptyUrlThrew)
-
   // ---- QR URL content match (directive rule 1: same secure url, never a raw booking_id) ----
   const token = 'opaque-token-xyz-789'
   const urlFromTemplates = bookingQrUrl(token)

@@ -47,14 +47,19 @@ export interface SendMessageResult {
 }
 
 /**
- * Optional media attachment for a single sendMessage() call --
- * MAL3ABY WHATSAPP QR IMAGE + INVOICE DOCUMENT DELIVERY directive.
+ * Optional media attachment for a single sendMessage() call. Currently
+ * only used for the invoice PDF (InvoicePdf.ts) -- the booking QR
+ * image attachment this type originally also served (QrImage.ts) was
+ * removed 2026-08-23 (see QueueConsumer.ts's buildMediaAttachment doc
+ * comment): it encoded a full URL into the QR, which the real scanner
+ * could never validate, and is superseded by the QR now being rendered
+ * client-side on the link's destination page instead.
  *
  * `buffer` is always an in-memory Buffer generated transiently by the
- * caller (QrImage.ts / InvoicePdf.ts) immediately before this call and
- * discarded immediately after -- never a file path, never anything
- * persisted to disk or object storage (directive rule 5: "الأفضل
- * توليد في الذاكرة → إرسال Buffer → تجاهل").
+ * caller immediately before this call and discarded immediately after
+ * -- never a file path, never anything persisted to disk or object
+ * storage (directive rule 5: "الأفضل توليد في الذاكرة → إرسال Buffer →
+ * تجاهل").
  */
 export interface MediaAttachment {
   kind: 'image' | 'document'

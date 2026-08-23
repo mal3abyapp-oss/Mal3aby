@@ -130,6 +130,7 @@ export function SecureBookingPage() {
   const { t } = useTranslation()
   const { locale, direction, setLocale } = useDirection()
   const [qrDataUrl, setQrDataUrl] = useState<string | null>(null)
+  const [qrRevealed, setQrRevealed] = useState(false)
 
   // Real bug found 2026-08-23 (same investigation as the QR-payload
   // fix below): "View Invoice" used to build /verify/${token} with
@@ -206,8 +207,18 @@ export function SecureBookingPage() {
   // text/URL bar still shows the full `/qr/:token` address (that part
   // was never the problem -- only the QR image's own encoded payload
   // was wrong).
+  //
+  // MAL3ABY QR DISCOVERY + UNIFICATION (2026-08-23), directive Sections
+  // 14/15: this used to render the QR the instant the page loaded (the
+  // effect below ran unconditionally on `result === 'valid'`). That
+  // directly violates "QR لا يظهر مباشرة... يظهر بعد الضغط على الزر
+  // فقط" -- the golden reference (BookingDetailSheet.tsx's "عرض رمز QR
+  // لتسجيل الحضور") only ever shows its QR after an explicit click, and
+  // this page now matches that exactly: `qrRevealed` starts false, the
+  // encode only runs once the visitor taps the button below, mirroring
+  // the same lazy-reveal UX the internal screen has always had.
   useEffect(() => {
-    if (result !== 'valid' || !token) {
+    if (result !== 'valid' || !token || !qrRevealed) {
       setQrDataUrl(null)
       return
     }
@@ -218,7 +229,14 @@ export function SecureBookingPage() {
     return () => {
       cancelled = true
     }
-  }, [result, token])
+  }, [result, token, qrRevealed])
+
+  // Reset the reveal state whenever we land on a genuinely different
+  // token (a fresh navigation to another booking's secure link) so a
+  // previous booking's QR never lingers visible for the new one.
+  useEffect(() => {
+    setQrRevealed(false)
+  }, [token])
 
   const Icon = STATE_ICON[result]
   const tone = STATE_TONE[result]
@@ -314,7 +332,29 @@ export function SecureBookingPage() {
               </div>
             )}
 
-            {qrDataUrl && (
+            {/* Directive Sections 14/15: hidden by default, only ever
+                shown after this explicit tap -- never auto-revealed on
+                page load. Only offered for a booking that isn't
+                cancelled/no-show (data.bookingStatus already gates the
+                whole `result === 'valid'` branch to non-cancelled
+                bookings via verify_booking_qr_public()'s own 'cancelled'
+                result, so a cancelled booking never reaches this button
+                at all -- Section 24 is enforced upstream, not here). */}
+            {!qrRevealed && (
+              <button
+                type="button"
+                onClick={() => setQrRevealed(true)}
+                className="w-full rounded-md bg-brand-primary px-4 py-2 text-sm font-medium text-white transition hover:opacity-90"
+              >
+                {t('secureBooking.viewQrButton')}
+              </button>
+            )}
+
+            {qrRevealed && !qrDataUrl && (
+              <p className="text-sm text-text-secondary">{t('secureBooking.generatingQr')}</p>
+            )}
+
+            {qrRevealed && qrDataUrl && (
               <QrCodeViewer
                 qrDataUrl={qrDataUrl}
                 label={t('secureBooking.attendanceQr')}

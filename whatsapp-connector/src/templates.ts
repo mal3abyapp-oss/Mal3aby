@@ -131,11 +131,13 @@ function line(emoji: string, label: string, value: unknown): string {
 // ----------------------------------------------------------------
 const PUBLIC_APP_URL = (process.env.PUBLIC_APP_URL ?? 'http://localhost:5173').replace(/\/+$/, '')
 
-// Exported (not just used internally) so QrImage.ts can encode the
-// EXACT SAME url this file puts in the message text -- directive rule
-// 1: the QR image must encode the same secure opaque URL already used,
-// never a second, independently-built URL that could silently drift
-// from the text fallback link.
+// Exported (not just used internally) so message text always carries
+// this exact secure link -- the QR image itself is no longer generated
+// by this connector at all (QrImage.ts removed 2026-08-23, see
+// QueueConsumer.ts's buildMediaAttachment doc comment): the WhatsApp
+// message is link-only, and the QR is rendered client-side, in the
+// browser, on the link's own destination page (SecureBookingPage.tsx),
+// directly from the bare raw token -- never from this URL.
 //
 // `language` (directive Sections 28-32/40 -- Secure Booking Page must
 // open in the customer's own language, not force a re-detection/guess

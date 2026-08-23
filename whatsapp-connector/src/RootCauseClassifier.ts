@@ -72,7 +72,7 @@ export interface ClassificationInput {
   recentContainerRestart?: { reason: 'exit' | 'runtime_signal' | 'rollout' | 'eviction' } | null
   /** Circuit breaker currently open for this club? */
   circuitBreakerOpen: boolean
-  /** Media generation specifically failed (QrImage.ts/InvoicePdf.ts threw), distinct from the send itself. */
+  /** Media generation specifically failed (InvoicePdf.ts threw), distinct from the send itself. 'qr' kind is legacy/unreachable since the booking_qr media_intent was removed (2026-08-23) -- kept in the union only so historical incident records with that kind still type-check. */
   mediaGenerationFailed?: { kind: 'qr' | 'pdf' | 'unknown' }
   /** Media generation succeeded but the upload/send of it failed. */
   mediaUploadFailed?: boolean
