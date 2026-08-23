@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next'
 import { BrowserQRCodeReader, type IScannerControls } from '@zxing/browser'
 import { supabase } from '@/lib/supabase/client'
 import { Button } from '@/components/ui/button'
+import { formatMoney } from '@/lib/domain/billing'
 import { ArrowLeft, CheckCircle2, XCircle, Clock, ShieldAlert } from 'lucide-react'
 
 // /scan -- camera-based QR scanner. Two explicit steps, never one (ADR-011e):
@@ -21,12 +22,27 @@ type ValidateResult = {
   display_photo_url: string | null
   display_subtitle: string | null
   subscription_status: string | null
+  // P0 CHECK-IN FINANCIAL ELIGIBILITY HOTFIX (2026-08-23): qr_validate
+  // now returns the real outstanding amount whenever result is
+  // 'payment_required' (0 otherwise) -- QR CREDENTIAL VALIDITY and
+  // CHECK-IN ELIGIBILITY are two separate questions; a cryptographically
+  // valid, non-expired, non-consumed QR for a booking that still has an
+  // outstanding balance must never be presented to staff as "صالح" --
+  // see qr_confirm_checkin/qr_validate's own migration doc comment
+  // (20260823170000_checkin_financial_eligibility_hotfix.sql) for the
+  // full incident/root-cause writeup.
+  amount_due: number | null
 }
 
 // Gate 6: added subscription_inactive (a real gap found in this pass --
 // qr_mark_attendance previously checked enrollment status but never the
 // player's actual paid subscription status, so a frozen/expired/
 // cancelled member could still check in).
+//
+// P0 hotfix: added payment_required (booking QR valid, but the booking
+// still has an outstanding balance -- must never be collapsed into the
+// generic 'invalid' outcome, since staff need to see this is a distinct,
+// actionable "collect payment first" state, not a broken/fake QR).
 const OUTCOME_TONES: Record<string, 'success' | 'danger' | 'warning'> = {
   success: 'success',
   already_used: 'warning',
@@ -35,6 +51,7 @@ const OUTCOME_TONES: Record<string, 'success' | 'danger' | 'warning'> = {
   wrong_club: 'danger',
   permission_denied: 'danger',
   subscription_inactive: 'danger',
+  payment_required: 'danger',
 }
 
 const OUTCOME_LABEL_KEYS: Record<string, string> = {
@@ -45,6 +62,7 @@ const OUTCOME_LABEL_KEYS: Record<string, string> = {
   wrong_club: 'scanner.outcomes.wrong_club',
   permission_denied: 'scanner.outcomes.permission_denied',
   subscription_inactive: 'scanner.outcomes.subscription_inactive',
+  payment_required: 'scanner.outcomes.payment_required',
 }
 
 const SUBSCRIPTION_STATUS_LABEL_KEYS: Record<string, string> = {
@@ -74,7 +92,7 @@ async function fetchOpenSessionsForCoach(): Promise<OpenSession[]> {
 }
 
 export function ScanPage() {
-  const { t } = useTranslation()
+  const { t, i18n } = useTranslation()
   const navigate = useNavigate()
   const videoRef = useRef<HTMLVideoElement>(null)
   const controlsRef = useRef<IScannerControls | null>(null)
@@ -125,6 +143,7 @@ export function ScanPage() {
       setValidated({
         result: 'invalid', credential_id: null, reference_type: null, reference_id: null, club_id: null,
         display_name: null, display_photo_url: null, display_subtitle: null, subscription_status: null,
+        amount_due: null,
       })
       return
     }
@@ -244,11 +263,29 @@ export function ScanPage() {
           {validated.result === 'success' && validated.reference_type === 'player_membership' && (
             <p className="text-white/60">{t('scanner.membershipChooseSession')}</p>
           )}
+          {/* P0 CHECK-IN FINANCIAL ELIGIBILITY HOTFIX: QR credential
+              validity and check-in eligibility are two separate
+              questions -- this booking's QR is real, non-expired, and
+              non-consumed, but the booking still carries an outstanding
+              balance, so entry is denied until it is settled. Staff see
+              the exact amount owed (never customer-facing/public
+              scanner surfaces); the actual enforcement lives server-side
+              in qr_confirm_checkin, this is purely informative. */}
+          {validated.result === 'payment_required' && (
+            <p className="text-white/60">
+              {t('scanner.paymentRequiredAmount', { amount: formatMoney(validated.amount_due ?? 0, 'EGP', i18n.language === 'en' ? 'en' : 'ar') })}
+            </p>
+          )}
 
           <div className="mt-4 flex w-full max-w-xs flex-col gap-2">
             {validated.result === 'success' && validated.reference_type === 'booking' && (
               <Button size="lg" disabled={busy} onClick={() => void handleConfirm()}>
                 {busy ? t('scanner.confirming') : t('scanner.confirmCheckin')}
+              </Button>
+            )}
+            {validated.result === 'payment_required' && (
+              <Button size="lg" onClick={() => navigate('/app/bookings')}>
+                {t('scanner.collectPayment')}
               </Button>
             )}
             {validated.result === 'success' && validated.reference_type === 'player_membership' && (

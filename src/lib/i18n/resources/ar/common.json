@@ -2677,8 +2677,11 @@
       "invalid": "غير صالح",
       "wrong_club": "لا ينتمي لهذا النادي",
       "permission_denied": "لا تملك صلاحية هذا الإجراء",
-      "subscription_inactive": "الاشتراك غير نشط"
+      "subscription_inactive": "الاشتراك غير نشط",
+      "payment_required": "لا يمكن تسجيل الحضور — يوجد مبلغ مستحق"
     },
+    "paymentRequiredAmount": "المبلغ المستحق: {{amount}}. يجب إتمام السداد قبل تسجيل الحضور.",
+    "collectPayment": "تحصيل الدفعة",
     "subscriptionStatus": {
       "pending": "بانتظار التفعيل",
       "active": "نشط",

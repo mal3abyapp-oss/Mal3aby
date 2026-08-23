@@ -2674,8 +2674,11 @@
       "invalid": "Invalid",
       "wrong_club": "Doesn't belong to this club",
       "permission_denied": "You don't have permission for this action",
-      "subscription_inactive": "Subscription isn't active"
+      "subscription_inactive": "Subscription isn't active",
+      "payment_required": "Check-in denied — outstanding balance"
     },
+    "paymentRequiredAmount": "Amount due: {{amount}}. Payment must be completed before check-in.",
+    "collectPayment": "Collect payment",
     "subscriptionStatus": {
       "pending": "Awaiting activation",
       "active": "Active",

@@ -6003,6 +6003,7 @@ export type Database = {
       qr_validate: {
         Args: { p_token: string }
         Returns: {
+          amount_due: number
           club_id: string
           credential_id: string
           diagnostic_code: string
