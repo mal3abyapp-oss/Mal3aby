@@ -166,6 +166,30 @@ export function Customer360Page() {
     enabled: !!currentClubId && !!customerId && activeTab === 'activity',
   })
 
+  // CUSTOMER ACCOUNT / CLUB PORTAL -- ZERO-COST ACTIVATION (amendment
+  // section 23): Portal Account status card, read-only summary of
+  // get_customer_portal_status(). Never shows/generates a password --
+  // the only action here is "Send/Resend Activation Invite".
+  const { data: portalStatus } = useQuery({
+    queryKey: ['customer-360-portal-status', customerId],
+    queryFn: async () => {
+      const { data, error } = await supabase.rpc('get_customer_portal_status', { p_customer_id: customerId! })
+      if (error) throw error
+      return data?.[0] ?? null
+    },
+    enabled: !!customerId,
+  })
+
+  const sendInviteMutation = useMutation({
+    mutationFn: async () => {
+      const { error } = await supabase.rpc('send_portal_invite', { p_customer_id: customerId! })
+      if (error) throw error
+    },
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ['customer-360-portal-status', customerId] })
+    },
+  })
+
   function invalidateAll() {
     void queryClient.invalidateQueries({ queryKey: ['customer-360-summary', currentClubId, customerId] })
     void queryClient.invalidateQueries({ queryKey: ['customer-360-financial', currentClubId, customerId] })
@@ -260,6 +284,55 @@ export function Customer360Page() {
                 <p className="text-sm text-text-secondary">{t('customers.detail.noBookingsYet')}</p>
               )}
             </div>
+
+            {/* CUSTOMER ACCOUNT / CLUB PORTAL -- ZERO-COST ACTIVATION
+                (amendment section 23): Portal Account status, never a
+                password field/action -- only Send/Resend Activation
+                Invite, gated on this customer having a usable phone
+                number (server-enforced too, this is UX only). */}
+            <div className="rounded-lg border border-border p-4">
+              <p className="mb-2 text-sm font-medium text-text-secondary">{t('customers.detail.portalAccount', { defaultValue: 'Portal account' })}</p>
+              <div className="flex items-center justify-between gap-3">
+                <StatusBadge
+                  tone={
+                    portalStatus?.status === 'activated' ? 'success'
+                    : portalStatus?.status === 'invite_sent' ? 'info'
+                    : portalStatus?.status === 'invite_expired' ? 'warning'
+                    : 'neutral'
+                  }
+                  label={
+                    portalStatus?.status === 'activated' ? t('customers.detail.portalActivated', { defaultValue: 'Activated' })
+                    : portalStatus?.status === 'invite_sent' ? t('customers.detail.portalInviteSent', { defaultValue: 'Invite sent' })
+                    : portalStatus?.status === 'invite_expired' ? t('customers.detail.portalInviteExpired', { defaultValue: 'Invite expired' })
+                    : t('customers.detail.portalNotActivated', { defaultValue: 'Not activated' })
+                  }
+                />
+                {portalStatus?.status !== 'activated' && (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    disabled={!c.phone_e164 || sendInviteMutation.isPending}
+                    onClick={() => sendInviteMutation.mutate()}
+                  >
+                    {sendInviteMutation.isPending
+                      ? t('customers.detail.portalInviteSending', { defaultValue: 'Sending...' })
+                      : portalStatus?.status === 'invite_sent' || portalStatus?.status === 'invite_expired'
+                        ? t('customers.detail.portalResendInvite', { defaultValue: 'Resend invite' })
+                        : t('customers.detail.portalSendInvite', { defaultValue: 'Send activation invite' })}
+                  </Button>
+                )}
+              </div>
+              {!c.phone_e164 && portalStatus?.status !== 'activated' && (
+                <p className="mt-2 text-xs text-status-warning">{t('customers.detail.portalNeedsPhone', { defaultValue: 'أضف رقم هاتف صالحًا لإرسال دعوة تفعيل الحساب.' })}</p>
+              )}
+              {sendInviteMutation.isError && (
+                <p className="mt-2 text-xs text-status-danger">{translateSupabaseError(sendInviteMutation.error, t('customers.detail.portalInviteError', { defaultValue: "Couldn't send the activation invite." }))}</p>
+              )}
+              {sendInviteMutation.isSuccess && (
+                <p className="mt-2 text-xs text-status-success">{t('customers.detail.portalInviteSentToast', { defaultValue: 'Activation invite sent via WhatsApp.' })}</p>
+              )}
+            </div>
+
             <div className="rounded-lg border border-border p-4">
               <p className="mb-2 text-sm font-medium text-text-secondary">{t('customers.detail.financialSummary', { defaultValue: 'Financial summary' })}</p>
               <div className="grid grid-cols-2 gap-3 text-sm sm:grid-cols-4">

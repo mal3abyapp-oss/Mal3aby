@@ -258,6 +258,49 @@ check('booking-rescheduled includes the booking reference so the customer can ma
 })
 
 // -----------------------------------------------------------------
+// CUSTOMER ACCOUNT / CLUB PORTAL -- ZERO-COST ACTIVATION (2026-08-23):
+// booking-created and booking-confirmed-paid must carry the account
+// activation CTA ONLY when activation_token is present (i.e. only when
+// _create_booking_internal found no linked portal account for this
+// customer at booking time) -- never a separate message, and never
+// present at all for an already-activated customer's booking.
+// -----------------------------------------------------------------
+
+check('booking-created includes the activation CTA when activation_token is present (ar + en)', () => {
+  const ar = renderTemplate('booking-created', 'ar', { ...BASE_VARS, activation_token: 'activate-test-token' })
+  assert.ok(ar.includes('/activate/activate-test-token'), 'missing the expected /activate/<token> link (ar)')
+  assert.ok(ar.includes('فعّل حسابك'), 'missing the Arabic activation CTA wording')
+  const en = renderTemplate('booking-created', 'en', { ...BASE_VARS, activation_token: 'activate-test-token' })
+  assert.ok(en.includes('/activate/activate-test-token'), 'missing the expected /activate/<token> link (en)')
+  assert.ok(/activate your account/i.test(en), 'missing the English activation CTA wording')
+})
+
+check('booking-created omits the activation CTA entirely when activation_token is absent (already-activated customer)', () => {
+  const ar = renderTemplate('booking-created', 'ar', BASE_VARS)
+  assert.ok(!ar.includes('/activate/'), 'an activation link appeared even though activation_token was not provided (ar)')
+  assert.ok(!ar.includes('فعّل حسابك'), 'the activation CTA wording appeared even though activation_token was not provided (ar)')
+  const en = renderTemplate('booking-created', 'en', BASE_VARS)
+  assert.ok(!en.includes('/activate/'), 'an activation link appeared even though activation_token was not provided (en)')
+})
+
+check('booking-confirmed-paid includes the activation CTA when activation_token is present, omits when absent (ar + en)', () => {
+  const withToken = renderTemplate('booking-confirmed-paid', 'ar', { ...BASE_VARS, amount_paid: 220, method: 'cash', activation_token: 'activate-test-token' })
+  assert.ok(withToken.includes('/activate/activate-test-token'), 'missing the expected /activate/<token> link')
+  const withoutToken = renderTemplate('booking-confirmed-paid', 'ar', { ...BASE_VARS, amount_paid: 220, method: 'cash' })
+  assert.ok(!withoutToken.includes('/activate/'), 'an activation link appeared even though activation_token was not provided')
+})
+
+check('the booking-created and booking-confirmed-paid messages never carry two separate CTAs when both QR and activation are present -- exactly one message, multiple sections is fine, but never a second standalone message marker', () => {
+  // This is a structural sanity check, not a multi-message test (this
+  // connector only ever renders one string per template call) -- it
+  // confirms the activation CTA is additive content within the SAME
+  // message, not something that duplicates the headline/greeting.
+  const msg = renderTemplate('booking-created', 'ar', { ...BASE_VARS, activation_token: 'activate-test-token' })
+  const headlineCount = (msg.match(/تم استلام طلب الحجز/g) ?? []).length
+  assert.strictEqual(headlineCount, 1, 'the booking headline appeared more than once -- suggests a duplicated/concatenated message rather than one combined message')
+})
+
+// -----------------------------------------------------------------
 // booking-confirmed-paid -- duplicate-message fix (directive Sections
 // 22-24): the single merged message for a booking + same-transaction
 // payment, replacing the old booking-created + booking-confirmed +

@@ -159,6 +159,24 @@ export function invoiceUrl(token: unknown, language?: string): string | null {
   return `${PUBLIC_APP_URL}/verify/${encodeURIComponent(String(token))}${suffix}`
 }
 
+// CUSTOMER ACCOUNT / CLUB PORTAL -- ZERO-COST ACTIVATION (2026-08-23).
+// Same bare-raw-token URL pattern as bookingQrUrl/invoiceUrl above --
+// the /activate/:token route resolves everything server-side from the
+// token alone (get_portal_invite_context), never from anything else in
+// this URL. `variables.activation_token` is only ever present on a
+// queued booking-created/booking-confirmed-paid message when
+// _create_booking_internal found the customer had no linked portal
+// account at booking time (customers.user_id was null) -- an
+// already-activated customer's message never carries this variable at
+// all, so the renderers below render nothing extra for them by simply
+// checking isPresent(v.activation_token), no separate "is activated"
+// flag needed.
+export function activationUrl(token: unknown, language?: string): string | null {
+  if (!isPresent(token)) return null
+  const suffix = language === 'en' || language === 'ar' ? `?lang=${language}` : ''
+  return `${PUBLIC_APP_URL}/activate/${encodeURIComponent(String(token))}${suffix}`
+}
+
 /**
  * Venue-timezone-aware date/time formatting -- mirrors the frontend's
  * formatInstant() (src/lib/domain/time.ts) intent exactly: never a raw
@@ -426,6 +444,7 @@ const AR: Record<TemplateKey, Renderer> = {
     const date = isPresent(v.start_at) ? formatDate(String(v.start_at), tz, 'ar-EG') : null
     const time = isPresent(v.start_at) ? formatTime(String(v.start_at), tz, 'ar-EG') : null
     const qrUrl = bookingQrUrl(v.booking_qr_token, 'ar')
+    const activateUrl = activationUrl(v.activation_token, 'ar')
     return joinLines(
       '📝 *تم استلام طلب الحجز*',
       '',
@@ -443,6 +462,12 @@ const AR: Record<TemplateKey, Renderer> = {
       'سنرسل لك رسالة أخرى فور تأكيد الحجز.',
       '',
       qrUrl ? `رمز الحضور:\n${qrUrl}` : '',
+      '',
+      // CUSTOMER ACCOUNT / CLUB PORTAL directive (amendment sections
+      // 3-4, 48-49): ONE combined message, never a separate activation
+      // message -- only present when _create_booking_internal found no
+      // linked portal account for this customer at booking time.
+      activateUrl ? `🔐 فعّل حسابك لمتابعة حجوزاتك والحجز مستقبلاً:\n${activateUrl}` : '',
       '',
       brandLine(v, 'ar'),
     )
@@ -469,6 +494,7 @@ const AR: Record<TemplateKey, Renderer> = {
     const method = paymentMethodLabel(v.method, 'ar')
     const qrUrl = bookingQrUrl(v.booking_qr_token, 'ar')
     const invoiceLink = invoiceUrl(v.invoice_token, 'ar')
+    const activateUrl = activationUrl(v.activation_token, 'ar')
     return joinLines(
       '✅ *تم تأكيد حجزك*',
       '',
@@ -505,6 +531,7 @@ const AR: Record<TemplateKey, Renderer> = {
       qrUrl ? `تفاصيل الحجز ورمز الحضور:\n${qrUrl}` : '',
       invoiceLink ? `عرض الفاتورة:\n${invoiceLink}` : '',
       '',
+      activateUrl ? `🔐 فعّل حسابك لمتابعة حجوزاتك والحجز مستقبلاً:\n${activateUrl}` : '',
       'نتمنى لك وقتًا ممتعًا ⚽',
       '',
       brandLine(v, 'ar'),
@@ -684,6 +711,7 @@ const EN: Record<TemplateKey, Renderer> = {
     const date = isPresent(v.start_at) ? formatDate(String(v.start_at), tz, 'en-US') : null
     const time = isPresent(v.start_at) ? formatTime(String(v.start_at), tz, 'en-US') : null
     const qrUrl = bookingQrUrl(v.booking_qr_token, 'en')
+    const activateUrl = activationUrl(v.activation_token, 'en')
     return joinLines(
       '📝 *Booking request received*',
       '',
@@ -702,6 +730,7 @@ const EN: Record<TemplateKey, Renderer> = {
       '',
       qrUrl ? `Check-in code:\n${qrUrl}` : '',
       '',
+      activateUrl ? `🔐 Activate your account to manage your bookings and book yourself next time:\n${activateUrl}` : '',
       brandLine(v, 'en'),
     )
   },
@@ -718,6 +747,7 @@ const EN: Record<TemplateKey, Renderer> = {
     const method = paymentMethodLabel(v.method, 'en')
     const qrUrl = bookingQrUrl(v.booking_qr_token, 'en')
     const invoiceLink = invoiceUrl(v.invoice_token, 'en')
+    const activateUrl = activationUrl(v.activation_token, 'en')
     return joinLines(
       '✅ *Booking confirmed*',
       '',
@@ -746,6 +776,7 @@ const EN: Record<TemplateKey, Renderer> = {
       qrUrl ? `View booking details and entry code:\n${qrUrl}` : '',
       invoiceLink ? `View invoice:\n${invoiceLink}` : '',
       '',
+      activateUrl ? `🔐 Activate your account to manage your bookings and book yourself next time:\n${activateUrl}` : '',
       'See you there ⚽',
       '',
       brandLine(v, 'en'),

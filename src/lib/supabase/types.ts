@@ -3553,6 +3553,83 @@ export type Database = {
           },
         ]
       }
+      portal_invites: {
+        Row: {
+          club_id: string
+          consumed_at: string | null
+          created_at: string
+          created_by: string | null
+          customer_id: string
+          expires_at: string
+          id: string
+          phone_attempt_count: number
+          phone_verified_at: string | null
+          purpose: string
+          status: string
+          token_hash: string
+          triggering_booking_id: string | null
+        }
+        Insert: {
+          club_id: string
+          consumed_at?: string | null
+          created_at?: string
+          created_by?: string | null
+          customer_id: string
+          expires_at: string
+          id?: string
+          phone_attempt_count?: number
+          phone_verified_at?: string | null
+          purpose?: string
+          status?: string
+          token_hash: string
+          triggering_booking_id?: string | null
+        }
+        Update: {
+          club_id?: string
+          consumed_at?: string | null
+          created_at?: string
+          created_by?: string | null
+          customer_id?: string
+          expires_at?: string
+          id?: string
+          phone_attempt_count?: number
+          phone_verified_at?: string | null
+          purpose?: string
+          status?: string
+          token_hash?: string
+          triggering_booking_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "portal_invites_club_id_fkey"
+            columns: ["club_id"]
+            isOneToOne: false
+            referencedRelation: "clubs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "portal_invites_club_id_fkey"
+            columns: ["club_id"]
+            isOneToOne: false
+            referencedRelation: "commercial_entitlements_usage"
+            referencedColumns: ["club_id"]
+          },
+          {
+            foreignKeyName: "portal_invites_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "customers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "portal_invites_triggering_booking_id_fkey"
+            columns: ["triggering_booking_id"]
+            isOneToOne: false
+            referencedRelation: "bookings"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       pricing_rules: {
         Row: {
           club_id: string
@@ -4795,6 +4872,16 @@ export type Database = {
         Args: { p_club_id: string; p_created_by: string; p_invoice_id: string }
         Returns: string
       }
+      _mint_portal_invite_internal: {
+        Args: {
+          p_club_id: string
+          p_created_by: string
+          p_customer_id: string
+          p_expires_at: string
+          p_triggering_booking_id: string
+        }
+        Returns: string
+      }
       activate_subscription_if_due: {
         Args: { p_subscription_id: string }
         Returns: boolean
@@ -4860,6 +4947,7 @@ export type Database = {
         }
         Returns: string
       }
+      claim_portal_invite: { Args: { p_raw_token: string }; Returns: string }
       close_cash_shift: {
         Args: { p_closing_count: number; p_notes?: string; p_shift_id: string }
         Returns: Json
@@ -5257,6 +5345,15 @@ export type Database = {
         }
         Returns: Json
       }
+      get_customer_portal_status: {
+        Args: { p_customer_id: string }
+        Returns: {
+          activated_at: string
+          invite_expires_at: string
+          invited_at: string
+          status: string
+        }[]
+      }
       get_effective_government_policy: {
         Args: { p_branch_id?: string; p_club_id: string; p_field_id?: string }
         Returns: {
@@ -5509,6 +5606,19 @@ export type Database = {
       get_player_360_summary: {
         Args: { p_club_id: string; p_player_id: string }
         Returns: Json
+      }
+      get_portal_invite_context: {
+        Args: { p_raw_token: string }
+        Returns: {
+          booking_end_at: string
+          booking_field_name: string
+          booking_start_at: string
+          club_name: string
+          customer_name: string
+          is_expired: boolean
+          masked_phone: string
+          status: string
+        }[]
       }
       get_public_booking_receipt_contact: {
         Args: { p_booking_id: string }
@@ -6069,6 +6179,7 @@ export type Database = {
         Args: { p_approve: boolean; p_reason?: string; p_request_id: string }
         Returns: undefined
       }
+      send_portal_invite: { Args: { p_customer_id: string }; Returns: string }
       set_club_booking_policy: {
         Args: {
           p_cash_reservation_allowed?: boolean
@@ -6356,6 +6467,10 @@ export type Database = {
       verify_manual_payment_claim: {
         Args: { p_approve: boolean; p_claim_id: string; p_reason?: string }
         Returns: string
+      }
+      verify_portal_invite_phone: {
+        Args: { p_entered_phone_e164: string; p_raw_token: string }
+        Returns: boolean
       }
       void_invoice: {
         Args: { p_invoice_id: string; p_reason: string }

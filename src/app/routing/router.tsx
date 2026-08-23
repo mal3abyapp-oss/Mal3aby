@@ -25,6 +25,7 @@ const OnboardingPage = lazy(() => import('@/features/onboarding/OnboardingPage')
 const VerifyInvoicePage = lazy(() => import('@/features/verify/VerifyInvoicePage').then((m) => ({ default: m.VerifyInvoicePage })))
 const SecureBookingPage = lazy(() => import('@/features/verify/SecureBookingPage').then((m) => ({ default: m.SecureBookingPage })))
 const PublicClubBookingPage = lazy(() => import('@/features/public-booking/PublicClubBookingPage').then((m) => ({ default: m.PublicClubBookingPage })))
+const ActivateAccountPage = lazy(() => import('@/features/portal/ActivateAccountPage').then((m) => ({ default: m.ActivateAccountPage })))
 
 const TodayPage = lazy(() => import('@/features/dashboard/TodayPage').then((m) => ({ default: m.TodayPage })))
 const MorePage = lazy(() => import('@/features/dashboard/MorePage').then((m) => ({ default: m.MorePage })))
@@ -146,6 +147,16 @@ export const router = createBrowserRouter([
     // Standalone, same pattern as /qr/:token and /verify/:token.
     path: '/c/:slug',
     element: <Suspense fallback={<RouteLoadingFallback />}><PublicClubBookingPage /></Suspense>,
+  },
+  {
+    // CUSTOMER ACCOUNT / CLUB PORTAL -- ZERO-COST ACTIVATION: the
+    // secure account-activation entrypoint from a WhatsApp booking
+    // message's CTA. No auth guard, standalone, same pattern as
+    // /qr/:token and /verify/:token -- a distinct route so an
+    // activation token is never accidentally interchangeable with a
+    // booking-QR or invoice-verify token at the routing layer.
+    path: '/activate/:token',
+    element: <Suspense fallback={<RouteLoadingFallback />}><ActivateAccountPage /></Suspense>,
   },
   {
     element: <RequireAuth />,
