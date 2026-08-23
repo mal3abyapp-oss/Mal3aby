@@ -479,7 +479,23 @@
       // session/protocol/pairing/queue-claim code touched. GitHub
       // Actions run 32638585859, digest
       // sha256:dd8b611fe381c8473d1a1516017de537d1f07a2f9f1b89a5e62f4080e000e0d2.
-      "image": "registry.cloudflare.com/35ac10727701095866b16c276b4a33d1/mala3by-whatsapp-connector:0d5aab8",
+      //
+      // CUSTOMER ACCOUNT / CLUB PORTAL -- ZERO-COST ACTIVATION
+      // (2026-08-23): rebuilt because templates.ts genuinely changed
+      // again (activationUrl() helper + the activation CTA line added
+      // to booking-created/booking-confirmed-paid, both AR+EN) -- zero
+      // session/protocol/pairing/queue-claim code touched. A real
+      // production booking's WhatsApp message was already sent
+      // successfully with the OLD container before this redeploy (the
+      // activation_token variable reached notification_queue
+      // correctly regardless -- that part of the wiring lives in the
+      // database, not the connector), but the CTA line itself could
+      // not actually render until this rebuild landed, since the
+      // connector renders message text from its own templates.ts at
+      // send time and does not persist rendered content. GitHub
+      // Actions run 32648716780, digest
+      // sha256:d5ff6af15aed947d35b241c535209307d5892a0595ce62e77ed79b71b0f00a99.
+      "image": "registry.cloudflare.com/35ac10727701095866b16c276b4a33d1/mala3by-whatsapp-connector:b6933a6",
       // One container instance per WhatsApp account (one Durable
       // Object = one container, directive rule 21's chosen model --
       // NOT a shared container serving multiple clubs, which would
