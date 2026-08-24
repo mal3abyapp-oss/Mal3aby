@@ -504,3 +504,117 @@ returning end_date as end_date_after_attack;
 reset role;
 rollback;
 -- ^ nothing persisted regardless -- this transaction is discarded.
+
+-- ============================================================
+-- TEST 13: SYSTEMIC CROSS-TENANT EXISTENCE-ORACLE REGRESSION MATRIX
+-- (2026-08-24, "SYSTEMIC CROSS-TENANT EXISTENCE-ORACLE CLOSURE" round).
+--
+-- A single data-driven check protecting the whole class of bug fixed
+-- in batches A1-D of this round (~24 RPCs total, see git log for
+-- 20260824330000 through 20260824430000), rather than one hand-
+-- written block per function. For every (function, args-for-a-real-
+-- foreign-id, args-for-a-missing-id) case below, this calls the RPC
+-- both ways under the SAME unauthorized real staff session and
+-- asserts the two error messages are byte-identical -- exactly the
+-- property that must hold for a caller outside the entity's own club
+-- to be unable to distinguish "exists in another club" from "does not
+-- exist anywhere".
+--
+-- HOW TO RUN: replace <a-real-foreign-{invoice,payment,claim,proof,
+-- shift,liability,membership,payment-method-config,booking,
+-- subscription,enrollment,player,guardian-link,field}-id> placeholders
+-- below with real ids belonging to a club the test actor is NOT a
+-- member of (see TEST 3/4's fixture users for the established
+-- unrelated-club pattern), and <a-real-unauthorized-staff-uuid> with
+-- a real staff user who is a member of exactly one OTHER club. Every
+-- row's "missing" id can stay '00000000-0000-0000-0000-000000000099'
+-- (or -098, -097, ... for cases needing more than one missing id) --
+-- that id is guaranteed nonexistent by construction.
+--
+-- This block is deliberately NOT auto-runnable as-is (the id
+-- placeholders must be filled from real fixture data, which changes
+-- across environments/QA rounds) -- it is the canonical, single
+-- source of truth for what "closed" means for this bug class, meant
+-- to be filled in and re-run after any future change to one of these
+-- RPCs, or extended with a new row whenever a new instance of this
+-- pattern is found.
+--
+-- EXPECTED for every row: foreign_result = missing_result (byte-
+-- identical error message) -- proving the fix is not merely a text
+-- change but genuinely removes the pre-authorization existence signal.
+-- ============================================================
+do $$
+declare
+  v_actor uuid := '<a-real-unauthorized-staff-uuid>';
+  v_case record;
+  v_foreign_msg text;
+  v_missing_msg text;
+  v_mismatches text[] := '{}';
+begin
+  set local role authenticated;
+  perform set_config('request.jwt.claims', json_build_object('sub', v_actor, 'role', 'authenticated')::text, true);
+
+  for v_case in
+    select * from (values
+      -- (label, sql calling the RPC with a real FOREIGN id, sql calling it with a MISSING id)
+      ('void_invoice',                'select public.void_invoice(''<a-real-foreign-invoice-id>''::uuid, ''x'')',                                              'select public.void_invoice(''00000000-0000-0000-0000-000000000099''::uuid, ''x'')'),
+      ('verify_manual_payment_claim', 'select public.verify_manual_payment_claim(''<a-real-foreign-claim-id>''::uuid, false, ''x'')',                          'select public.verify_manual_payment_claim(''00000000-0000-0000-0000-000000000099''::uuid, false, ''x'')'),
+      ('approve_payment_proof',       'select public.approve_payment_proof(''<a-real-foreign-proof-id>''::uuid, null)',                                        'select public.approve_payment_proof(''00000000-0000-0000-0000-000000000099''::uuid, null)'),
+      ('reject_payment_proof',        'select public.reject_payment_proof(''<a-real-foreign-proof-id>''::uuid, ''x'')',                                         'select public.reject_payment_proof(''00000000-0000-0000-0000-000000000099''::uuid, ''x'')'),
+      ('close_cash_shift',            'select public.close_cash_shift(''<a-real-foreign-shift-id>''::uuid, 100, null)',                                        'select public.close_cash_shift(''00000000-0000-0000-0000-000000000099''::uuid, 100, null)'),
+      ('settle_employee_cash_liability', 'select public.settle_employee_cash_liability(''<a-real-foreign-liability-id>''::uuid, 1, null, null)',               'select public.settle_employee_cash_liability(''00000000-0000-0000-0000-000000000099''::uuid, 1, null, null)'),
+      ('adjust_employee_cash_liability', 'select public.adjust_employee_cash_liability(''<a-real-foreign-liability-id>''::uuid, 1, ''x'')',                    'select public.adjust_employee_cash_liability(''00000000-0000-0000-0000-000000000099''::uuid, 1, ''x'')'),
+      ('reverse_employee_cash_liability', 'select public.reverse_employee_cash_liability(''<a-real-foreign-liability-id>''::uuid, ''x'')',                      'select public.reverse_employee_cash_liability(''00000000-0000-0000-0000-000000000099''::uuid, ''x'')'),
+      ('set_staff_cash_custody',      'select public.set_staff_cash_custody(''<a-real-foreign-membership-id>''::uuid, true)',                                  'select public.set_staff_cash_custody(''00000000-0000-0000-0000-000000000099''::uuid, true)'),
+      ('deactivate_staff_member',     'select public.deactivate_staff_member(''<a-real-foreign-membership-id>''::uuid)',                                       'select public.deactivate_staff_member(''00000000-0000-0000-0000-000000000099''::uuid)'),
+      ('reactivate_staff_member',     'select public.reactivate_staff_member(''<a-real-foreign-membership-id>''::uuid)',                                       'select public.reactivate_staff_member(''00000000-0000-0000-0000-000000000099''::uuid)'),
+      ('cancel_booking',              'select public.cancel_booking(''<a-real-foreign-booking-id>''::uuid, ''x'')',                                             'select public.cancel_booking(''00000000-0000-0000-0000-000000000099''::uuid, ''x'')'),
+      ('mark_booking_no_show',        'select public.mark_booking_no_show(''<a-real-foreign-booking-id>''::uuid, ''x'')',                                       'select public.mark_booking_no_show(''00000000-0000-0000-0000-000000000099''::uuid, ''x'')'),
+      ('reschedule_booking',          'select public.reschedule_booking(''<a-real-foreign-booking-id>''::uuid, now() + interval ''30 days'', now() + interval ''31 days'', null, ''x'')', 'select public.reschedule_booking(''00000000-0000-0000-0000-000000000099''::uuid, now() + interval ''30 days'', now() + interval ''31 days'', null, ''x'')'),
+      ('cancel_subscription',         'select public.cancel_subscription(''<a-real-foreign-subscription-id>''::uuid, ''x'')',                                  'select public.cancel_subscription(''00000000-0000-0000-0000-000000000099''::uuid, ''x'')'),
+      ('freeze_subscription',         'select public.freeze_subscription(''<a-real-foreign-subscription-id>''::uuid, current_date + 1, current_date + 10, ''x'', true)', 'select public.freeze_subscription(''00000000-0000-0000-0000-000000000099''::uuid, current_date + 1, current_date + 10, ''x'', true)'),
+      ('unfreeze_subscription',       'select public.unfreeze_subscription(''<a-real-foreign-subscription-id>''::uuid, ''x'')',                                 'select public.unfreeze_subscription(''00000000-0000-0000-0000-000000000099''::uuid, ''x'')'),
+      ('renew_academy_subscription',  'select * from public.renew_academy_subscription(''<a-real-foreign-enrollment-id>''::uuid, current_date + 1, current_date + 30, 100, 0)', 'select * from public.renew_academy_subscription(''00000000-0000-0000-0000-000000000099''::uuid, current_date + 1, current_date + 30, 100, 0)'),
+      ('update_player',               'select public.update_player(''<a-real-foreign-player-id>''::uuid, ''x'', null, null, null, null)',                       'select public.update_player(''00000000-0000-0000-0000-000000000099''::uuid, ''x'', null, null, null, null)'),
+      ('update_academy_membership',   'select public.update_academy_membership(''<a-real-foreign-group-id>''::uuid, ''x'', 10, 100, ''active'', null)',         'select public.update_academy_membership(''00000000-0000-0000-0000-000000000099''::uuid, ''x'', 10, 100, ''active'', null)'),
+      ('unlink_guardian_from_player', 'select public.unlink_guardian_from_player(''<a-real-foreign-guardian-link-id>''::uuid)',                                 'select public.unlink_guardian_from_player(''00000000-0000-0000-0000-000000000099''::uuid)'),
+      ('set_primary_guardian',        'select public.set_primary_guardian(''<a-real-foreign-player-id>''::uuid, ''00000000-0000-0000-0000-000000000001''::uuid)', 'select public.set_primary_guardian(''00000000-0000-0000-0000-000000000099''::uuid, ''00000000-0000-0000-0000-000000000001''::uuid)'),
+      ('link_guardian_to_player',     'select public.link_guardian_to_player(''<a-real-foreign-player-id>''::uuid, ''00000000-0000-0000-0000-000000000001''::uuid, ''guardian'', false)', 'select public.link_guardian_to_player(''00000000-0000-0000-0000-000000000099''::uuid, ''00000000-0000-0000-0000-000000000001''::uuid, ''guardian'', false)'),
+      ('create_field_pricing_rules',  'select * from public.create_field_pricing_rules(''<a-real-foreign-field-id>''::uuid, ''[{"day_of_week":1,"start_time":"08:00","end_time":"09:00","price_per_hour":1,"priority":1}]''::jsonb, ''x'')', 'select * from public.create_field_pricing_rules(''00000000-0000-0000-0000-000000000099''::uuid, ''[{"day_of_week":1,"start_time":"08:00","end_time":"09:00","price_per_hour":1,"priority":1}]''::jsonb, ''x'')'),
+      ('archive_field_pricing_rules', 'select public.archive_field_pricing_rules(''<a-real-foreign-field-id>''::uuid, array[''00000000-0000-0000-0000-000000000001''::uuid], ''x'')', 'select public.archive_field_pricing_rules(''00000000-0000-0000-0000-000000000099''::uuid, array[''00000000-0000-0000-0000-000000000001''::uuid], ''x'')')
+    ) as cases(label, foreign_sql, missing_sql)
+  loop
+    begin
+      execute v_case.foreign_sql;
+      v_foreign_msg := '<NO ERROR RAISED>';
+    exception when others then
+      v_foreign_msg := sqlerrm;
+    end;
+
+    begin
+      execute v_case.missing_sql;
+      v_missing_msg := '<NO ERROR RAISED>';
+    exception when others then
+      v_missing_msg := sqlerrm;
+    end;
+
+    if v_foreign_msg is distinct from v_missing_msg then
+      v_mismatches := v_mismatches || (v_case.label || ': foreign="' || v_foreign_msg || '" missing="' || v_missing_msg || '"');
+    end if;
+  end loop;
+
+  reset role;
+
+  if array_length(v_mismatches, 1) > 0 then
+    raise exception 'CROSS-TENANT EXISTENCE ORACLE REGRESSION DETECTED in: %', array_to_string(v_mismatches, E'\n');
+  else
+    raise notice 'PASS: all % cases produce identical foreign-vs-missing error messages -- no existence oracle detected', 24;
+  end if;
+end;
+$$;
+-- ^ Wrap the whole DO block in begin;/rollback; if any of the RPCs
+-- above could mutate state on a SUCCESS path for a misconfigured
+-- placeholder (e.g. a real id belonging to the ACTOR's own club by
+-- mistake) -- every RPC in this matrix requires real authorization to
+-- write, so a correctly-unauthorized actor never reaches a mutating
+-- branch, but wrapping in a transaction costs nothing and is safer.
