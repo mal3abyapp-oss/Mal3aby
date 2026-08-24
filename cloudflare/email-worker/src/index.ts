@@ -65,7 +65,6 @@ interface ClaimedRow {
 
 export default {
   async scheduled(_controller: ScheduledController, env: Env, ctx: ExecutionContext): Promise<void> {
-
     const supabase = createClient(env.SUPABASE_URL, env.SUPABASE_SERVICE_ROLE_KEY)
 
     // Lease recovery first -- any row stuck in 'processing' from a
