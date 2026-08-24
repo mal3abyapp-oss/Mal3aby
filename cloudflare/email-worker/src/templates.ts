@@ -175,9 +175,20 @@ function renderShell(opts: {
     )
     .join('')
   const brand = isPresent(opts.clubName) ? `${esc(opts.clubName)} <span style="color:#9ca3af;">${opts.language === 'en' ? 'via Mal3aby' : 'عبر ملعبي'}</span>` : 'Mal3aby'
+  // BUG FIX (2026-08-24, deliverability hardening): this was previously
+  // a bare <tr><td>...</td></tr> with no enclosing <table> -- invalid
+  // HTML (a table row cannot be a direct child of a <td>), confirmed
+  // live via Resend's own stored HTML for a real sent email. Outlook's
+  // Word-based rendering engine is notably strict about malformed
+  // table nesting and can drop or misrender content it cannot parse as
+  // a well-formed table, unlike most webmail clients which silently
+  // tolerate it -- a plausible contributor to inconsistent rendering
+  // on Outlook/Hotmail specifically. Wrapped in its own <table>, same
+  // role="presentation" pattern used by every other table in this
+  // shell.
   const cta =
     opts.ctaLabel && opts.ctaUrl
-      ? `<tr><td style="padding:24px 0 0;"><a href="${esc(opts.ctaUrl)}" style="display:inline-block;background:#16a34a;color:#ffffff;text-decoration:none;font-size:15px;font-weight:600;padding:12px 28px;border-radius:8px;">${esc(opts.ctaLabel)}</a></td></tr>`
+      ? `<table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr><td style="padding:24px 0 0;"><a href="${esc(opts.ctaUrl)}" style="display:inline-block;background:#16a34a;color:#ffffff;text-decoration:none;font-size:15px;font-weight:600;padding:12px 28px;border-radius:8px;">${esc(opts.ctaLabel)}</a></td></tr></table>`
       : ''
   return `<!doctype html>
 <html dir="${dir}" lang="${opts.language}">

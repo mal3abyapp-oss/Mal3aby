@@ -88,6 +88,14 @@ check('unknown template_key throws rather than silently rendering nothing', () =
   assert.throws(() => renderEmailTemplate('not-a-real-template', 'ar', BASE_VARS), /Unknown email template_key/)
 })
 
+check('deliverability hardening: HTML table structure is well-formed -- every <tr> lives inside a <table>...</table> pair, no orphan rows (Outlook/Word-engine rendering fix)', () => {
+  const withCta = renderEmailTemplate('booking-confirmed-paid', 'ar', { ...BASE_VARS, amount_paid: 220, method: 'cash', booking_qr_token: 'tok123' })
+  const opens = (withCta.html.match(/<table/g) || []).length
+  const closes = (withCta.html.match(/<\/table>/g) || []).length
+  assert.strictEqual(opens, closes, `unbalanced <table> tags: ${opens} opens vs ${closes} closes -- a <tr> is very likely orphaned outside any <table>, which Outlook's Word-based renderer handles unpredictably`)
+  assert.ok(opens >= 4, 'expected at least 4 tables (outer wrapper, card, details rows, CTA) when a CTA is present')
+})
+
 check('booking-confirmed-paid shows total/paid/outstanding correctly formatted, never a raw number', () => {
   const result = renderEmailTemplate('booking-confirmed-paid', 'ar', { ...BASE_VARS, amount_paid: 220, method: 'cash' })
   assert.ok(!result.html.includes('220.000000'), 'unformatted money leaked into the message')
