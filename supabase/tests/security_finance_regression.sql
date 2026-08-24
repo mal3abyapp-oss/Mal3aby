@@ -436,3 +436,71 @@ reset role;
 
 rollback;
 -- ^ the status update above is discarded -- the real booking is left exactly as it was.
+
+-- ============================================================
+-- TEST 11: record_payment() / create_refund() cross-tenant
+-- existence-oracle fix (2026-08-24 MANDATORY REAL PLATFORM TESTING
+-- round, live-verified via a genuine password-authenticated staff
+-- session -- see src/features/staff/staff_role_matrix.integration.
+-- test.ts). Before the fix, an authenticated staff member of ANY
+-- club could distinguish "this invoice/payment id exists somewhere"
+-- from "it doesn't", for ANY uuid system-wide, because both RPCs
+-- looked the row up (raising a distinct "not found" exception)
+-- BEFORE checking has_permission(...) (which raises a different
+-- "not authorized" exception). Fixed by collapsing lookup + auth
+-- into one club/permission-scoped WHERE clause.
+-- EXPECTED: both a genuinely nonexistent id AND a real id belonging
+-- to a club the caller is NOT a member of raise the IDENTICAL
+-- message -- no distinguishing signal.
+-- Replace <a-coach-or-similar-staff-uuid> with a real staff user who
+-- is a member of exactly one club, and <a-real-invoice-id-in-a-
+-- DIFFERENT-club> / <a-real-payment-id-in-a-DIFFERENT-club> with real
+-- ids from a club that staff member is NOT a member of.
+-- ============================================================
+set role authenticated;
+select set_config('request.jwt.claims', json_build_object('sub','<a-coach-or-similar-staff-uuid>','role','authenticated')::text, true);
+
+select public.record_payment('00000000-0000-0000-0000-000000000099'::uuid, 1, 'cash', 'regression-fake', null, null);
+-- ^ EXPECTED: raises 'invoice not found or you do not have permission to record a payment against it'
+select public.record_payment('<a-real-invoice-id-in-a-DIFFERENT-club>'::uuid, 1, 'cash', 'regression-cross-tenant', null, null);
+-- ^ EXPECTED: raises the IDENTICAL message as above -- same string, no distinguishing signal
+
+select public.create_refund('00000000-0000-0000-0000-000000000099'::uuid, 1, 'regression-fake');
+-- ^ EXPECTED: raises 'payment not found or you do not have permission to refund it'
+select public.create_refund('<a-real-payment-id-in-a-DIFFERENT-club>'::uuid, 1, 'regression-cross-tenant');
+-- ^ EXPECTED: raises the IDENTICAL message as above -- same string, no distinguishing signal
+reset role;
+
+-- ============================================================
+-- TEST 12: subscriptions.end_date immutability (2026-08-24 MANDATORY
+-- REAL PLATFORM TESTING round -- HIGH finding, live-confirmed:
+-- academy_manager/club_manager/club_owner could previously extend a
+-- subscription's paid validity indefinitely via a raw UPDATE, with
+-- NO invoice, NO payment, and NO audit_logs entry -- invisible to
+-- the audit trail every legitimate lifecycle RPC writes to).
+-- protect_subscription_price_immutable() now also freezes end_date,
+-- with no escape-hatch flag (renew_academy_subscription always
+-- INSERTs a new row rather than UPDATing end_date on an existing
+-- one, and freeze/unfreeze never touch end_date -- confirmed via
+-- pg_get_functiondef during this fix).
+-- EXPECTED: the UPDATE "succeeds" (no error, matching every other
+-- frozen column's silent-revert behavior) but end_date is unchanged
+-- from its value before the statement.
+-- Replace <a-real-subscription-id> and <a-club-owner-or-manager-uuid>
+-- with real fixtures on the same club.
+-- ============================================================
+begin;
+set local role authenticated;
+select set_config('request.jwt.claims', json_build_object('sub','<a-club-owner-or-manager-uuid>','role','authenticated')::text, true);
+
+select end_date as end_date_before from public.subscriptions where id = '<a-real-subscription-id>'::uuid;
+
+update public.subscriptions set end_date = end_date + interval '365 days'
+where id = '<a-real-subscription-id>'::uuid
+returning end_date as end_date_after_attack;
+-- ^ EXPECTED: end_date_after_attack = end_date_before -- the trigger
+-- silently reverted the attacker's change, exactly like price/
+-- discount/enrollment_id/plan_type/start_date already did.
+reset role;
+rollback;
+-- ^ nothing persisted regardless -- this transaction is discarded.
