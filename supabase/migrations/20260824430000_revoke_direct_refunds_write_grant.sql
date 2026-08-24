@@ -1,0 +1,34 @@
+-- SECURITY FIX (HIGH, live-verified via this audit's final direct-DML
+-- mutation-surface sweep -- project gxkrtlvpjwxhcqdisyob): the
+-- refunds_insert_with_permission RLS policy grants direct client-side
+-- INSERT on public.refunds to anyone holding payment.create (via the
+-- referenced payment's club), checking only club/permission access --
+-- none of create_refund()'s financial-integrity guards: no cap
+-- against the payment's actual amount minus already-refunded sum, no
+-- reason-required check, no club_write_allowed('settle_existing')
+-- subscription check.
+--
+-- Live-reproduced (rolled back, no persisted change) as a real
+-- authenticated Owner session: a raw insert created a fully
+-- 'completed' refund of 999,999.00 EGP against a real 150.00 EGP
+-- payment -- a fabricated refund of an arbitrary amount, unconstrained
+-- by the payment's actual refundable balance. This is a genuine
+-- cash-out fraud vector (a fabricated 'completed' refund record could
+-- be used to justify an actual cash withdrawal, or to falsify
+-- financial/collections reporting) -- same bypass class as the
+-- earlier-fixed direct-payments-INSERT, direct-bookings-write,
+-- direct-invoice_items-write, and direct-official_collection_receipts
+-- HIGH findings.
+--
+-- Confirmed via repo-wide grep that no frontend code performs a
+-- direct .from('refunds').insert() -- the only legitimate creation
+-- path is create_refund() (SECURITY DEFINER), which doesn't depend on
+-- the caller's own table grant.
+--
+-- Fix: revoke INSERT on public.refunds from anon/authenticated.
+-- SELECT policy (refunds_select_club_staff) untouched -- reads are
+-- unaffected. No UPDATE policy exists on this table at all (confirmed
+-- via pg_policies), so only INSERT needs revoking here.
+
+revoke insert on public.refunds from authenticated;
+revoke insert on public.refunds from anon;
