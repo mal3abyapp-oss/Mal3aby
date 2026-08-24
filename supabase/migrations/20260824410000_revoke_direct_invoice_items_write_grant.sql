@@ -1,0 +1,34 @@
+-- SECURITY FIX (HIGH, live-verified via this audit's final direct-DML
+-- mutation-surface sweep -- project gxkrtlvpjwxhcqdisyob): the
+-- invoice_items_insert_with_permission RLS policy grants direct
+-- client-side INSERT on public.invoice_items to anyone holding
+-- invoice.create, checking only invoice club/permission/branch access
+-- -- no validation of unit_price/quantity/line_total against any real
+-- business calculation, and no cap tying line_total back to what the
+-- invoice's total should actually be.
+--
+-- Live-reproduced (rolled back, no persisted change) as a real
+-- authenticated Owner session: a raw
+--   insert into public.invoice_items (invoice_id, description,
+--     reference_type, reference_id, quantity, unit_price, line_total)
+--   values ('<a real issued 300.00 EGP invoice>', 'fraud probe',
+--     'other', gen_random_uuid(), 1, 999999, 999999)
+-- succeeded, attaching a fabricated 999,999.00 EGP line item to a real
+-- 300.00 EGP invoice -- directly inflating what a customer owes (or,
+-- with a negative line_total, could be used to erase a debt) with
+-- zero business validation. Same bypass class as the earlier-fixed
+-- direct-payments-INSERT and direct-bookings-write HIGH findings.
+--
+-- Confirmed via repo-wide grep that no frontend code performs a
+-- direct .from('invoice_items').insert()/.update() -- every legitimate
+-- invoice_items write in this codebase happens inside a SECURITY
+-- DEFINER RPC (create_booking, create_enrollment_with_subscription,
+-- renew_academy_subscription, reschedule_booking's re-pricing branch,
+-- etc.), none of which depend on the caller's own table grant.
+--
+-- Fix: revoke INSERT/UPDATE on public.invoice_items from anon/
+-- authenticated. SELECT policy (invoice_items_select_club_staff)
+-- untouched -- reads are unaffected.
+
+revoke insert, update on public.invoice_items from authenticated;
+revoke insert, update on public.invoice_items from anon;
