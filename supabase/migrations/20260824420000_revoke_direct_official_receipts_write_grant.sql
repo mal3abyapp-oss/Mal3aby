@@ -1,0 +1,40 @@
+-- SECURITY FIX (HIGH, live-verified via this audit's final direct-DML
+-- mutation-surface sweep -- project gxkrtlvpjwxhcqdisyob): the
+-- ocr_insert_club_staff RLS policy grants direct client-side INSERT
+-- on public.official_collection_receipts to anyone holding
+-- payment.create, checking only club/permission/branch access -- no
+-- validation tying the receipt to any real payment/cash collection
+-- event, and payment_id is nullable.
+--
+-- Live-reproduced (rolled back, no persisted change) as a real
+-- authenticated Owner session: a raw insert created a fully 'active',
+-- unlinked (payment_id null) official government collection receipt
+-- with a fabricated serial number -- a receipt entirely disconnected
+-- from any real cash collection. This directly undermines the
+-- government-compliance receipt control this codebase's own
+-- record_payment()/record_payment_with_official_receipt() logic
+-- relies on: those RPCs validate a REFERENCED receipt is active,
+-- unused (payment_id is null), belongs to the club, and its amount
+-- matches -- but never verify who created it or why, so a fabricated
+-- receipt inserted this way would pass every one of record_payment()'s
+-- checks and could be used to satisfy a government-receipt-required
+-- payment with no real underlying collection ever having happened.
+-- Same bypass class as the earlier-fixed direct-payments-INSERT,
+-- direct-bookings-write, and direct-invoice_items-write HIGH findings.
+--
+-- Confirmed via repo-wide grep that no frontend code performs a
+-- direct .from('official_collection_receipts').insert() -- the only
+-- legitimate creation paths are record_payment_with_official_receipt()
+-- (SECURITY DEFINER, validates receipt-image-required policy before
+-- inserting) and record_payment()'s own linking of an
+-- already-existing receipt -- neither depends on the caller's own
+-- table grant.
+--
+-- Fix: revoke INSERT on public.official_collection_receipts from
+-- anon/authenticated. SELECT policies (ocr_select_club_staff,
+-- ocr_select_platform_owner) untouched -- reads are unaffected. No
+-- UPDATE policy exists on this table at all (confirmed via
+-- pg_policies), so only INSERT needs revoking here.
+
+revoke insert on public.official_collection_receipts from authenticated;
+revoke insert on public.official_collection_receipts from anon;
