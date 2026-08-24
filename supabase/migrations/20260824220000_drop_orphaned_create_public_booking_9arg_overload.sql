@@ -1,0 +1,47 @@
+-- URGENT FIX: 20260824210000_public_booking_optional_customer_email.sql
+-- added p_customer_email as a new trailing parameter to
+-- create_public_booking() via "create or replace function" -- but
+-- since the parameter LIST changed (9 args -> 10 args), Postgres
+-- registers this as a SEPARATE OVERLOADED FUNCTION, not a replacement
+-- of the existing one. The old 9-arg version was never dropped and
+-- remained live alongside the new 10-arg version.
+--
+-- Confirmed live in production immediately after deploy (via a real
+-- browser E2E test of the actual public booking flow): the frontend
+-- calls supabase.rpc('create_public_booking', { ..., p_customer_email:
+-- trimmedEmail || undefined, ... }) -- when the customer leaves email
+-- blank, p_customer_email is OMITTED from the request body entirely
+-- (JSON.stringify drops keys with value undefined). PostgREST then
+-- cannot disambiguate between the 9-arg and 10-arg overloads (both are
+-- valid candidates when p_customer_email is absent, since it has a
+-- DEFAULT on the 10-arg version) and returns: "Could not choose the
+-- best candidate function between: create_public_booking(... 9 args
+-- ...), create_public_booking(... 10 args ...)". This broke EVERY
+-- public booking submitted without an email since the fix deployed --
+-- a strictly worse regression than the gap being fixed (the email
+-- field itself worked fine when populated, since that resolves
+-- unambiguously to the 10-arg overload; only the common "email left
+-- blank" case was broken).
+--
+-- This exact overload-orphaning class of bug has happened before in
+-- this codebase (see drop_orphaned_create_booking_overloads,
+-- drop_orphaned_activate_subscription_overload,
+-- drop_orphaned_source_validity_2arg_overload,
+-- drop_orphaned_cancel_pending_whatsapp_1arg_overload -- all prior
+-- fixes for the identical pattern: "create or replace" with a changed
+-- parameter list leaves the old signature behind as a live, callable,
+-- now-orphaned overload).
+--
+-- Fix: drop the old 9-arg overload explicitly by its exact parameter
+-- list. The 10-arg version (kept, unchanged) already has
+-- p_customer_email DEFAULT NULL, so every existing caller that omits
+-- it continues to work correctly once the ambiguous overload is gone.
+--
+-- Applied directly to production first (this migration documents that
+-- already-applied hotfix) since it was a live-breaking regression
+-- discovered mid-E2E-verification of the same session's own prior
+-- migration -- consistent with this session's own "no production
+-- degradation left standing" rule (directive section 35 from an
+-- earlier segment). Re-applying this migration file is idempotent
+-- (drop function if exists).
+drop function if exists public.create_public_booking(text, uuid, timestamp with time zone, timestamp with time zone, text, text, text, text, text);
