@@ -96,6 +96,24 @@ check('deliverability hardening: HTML table structure is well-formed -- every <t
   assert.ok(opens >= 4, 'expected at least 4 tables (outer wrapper, card, details rows, CTA) when a CTA is present')
 })
 
+check('Microsoft/Outlook deliverability optimization: every CTA-bearing template shares the fixed renderShell() and renders a balanced table structure -- not just booking-confirmed-paid', () => {
+  const ctaCases: Array<[string, Vars]> = [
+    ['booking-created', { ...BASE_VARS, booking_qr_token: 'tok1' }],
+    ['booking-confirmed-paid', { ...BASE_VARS, amount_paid: 220, method: 'cash', booking_qr_token: 'tok2' }],
+    ['booking-rescheduled', { ...BASE_VARS, old_start_at: '2026-08-10T07:00:00+00:00', booking_qr_token: 'tok3' }],
+    ['payment-received', { ...BASE_VARS, amount: 220, invoice_token: 'inv1' }],
+    ['academy-payment-received', { ...BASE_VARS, player_name: 'أحمد', group_name: 'مجموعة', amount: 500, invoice_token: 'inv2' }],
+  ]
+  for (const [key, vars] of ctaCases) {
+    const result = renderEmailTemplate(key, 'ar', vars)
+    const opens = (result.html.match(/<table/g) || []).length
+    const closes = (result.html.match(/<\/table>/g) || []).length
+    assert.strictEqual(opens, closes, `${key}: unbalanced <table> tags (${opens} opens vs ${closes} closes)`)
+    assert.ok(!/<\/td>\s*<tr>|<tr>(?!.*<table)/s.test(result.html) || opens === closes, `${key}: possible orphan <tr> outside a <table>`)
+    assert.ok(result.html.includes('<a href='), `${key}: expected a CTA link to be present given a QR/invoice token was supplied`)
+  }
+})
+
 check('booking-confirmed-paid shows total/paid/outstanding correctly formatted, never a raw number', () => {
   const result = renderEmailTemplate('booking-confirmed-paid', 'ar', { ...BASE_VARS, amount_paid: 220, method: 'cash' })
   assert.ok(!result.html.includes('220.000000'), 'unformatted money leaked into the message')
