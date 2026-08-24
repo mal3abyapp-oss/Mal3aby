@@ -51,7 +51,7 @@ import { CheckCircle2, XCircle, ShieldCheck, LogIn } from 'lucide-react'
  * the token+secret) -- both factors are independently required.
  */
 
-type Step = 'loading' | 'context' | 'verify' | 'credentials' | 'success' | 'invalid' | 'already_activated'
+type Step = 'loading' | 'context' | 'verify' | 'credentials' | 'linking' | 'success' | 'invalid' | 'already_activated'
 
 interface InviteContext {
   customerName: string | null
@@ -147,6 +147,25 @@ export function ActivateAccountPage() {
   // (directive section 27/7's explicit rule), matching the identical
   // generic-error pattern verify_portal_invite_phone already used
   // alone before this closure.
+  // Multi-Club E2E audit (2026-08-24): a customer who already has a
+  // Mal3aby account (from any club) and opens a DIFFERENT club's
+  // activation link while still signed in must never be pushed through
+  // "create a new password" -- that either (a) silently produces a
+  // second, disconnected Auth user for the same real person if they
+  // type a different email (the exact violation this audit's own
+  // objective prohibits), or (b) hits activate-portal-account's
+  // "email already registered" 409 if they type their real one, which
+  // read as a raw/confusing error rather than the graceful
+  // "log in and link this club" path the product should offer. Since
+  // this page has no auth guard (reachable pre-session, the common
+  // case), an existing session is genuinely optional context here --
+  // checked once at mount, not assumed.
+  const { data: existingSession } = useQuery({
+    queryKey: ['activate-existing-session'],
+    queryFn: async () => (await supabase.auth.getSession()).data.session,
+    staleTime: Infinity,
+  })
+
   const verifyMutation = useMutation({
     mutationFn: async () => {
       const phoneResult = normalizePhone(phoneRaw, phoneCountry)
@@ -172,17 +191,49 @@ export function ActivateAccountPage() {
       return Boolean(phoneMatched) && Boolean(secretMatched)
     },
     onSuccess: (bothMatched) => {
-      if (bothMatched) {
-        setVerifyError(null)
-        setStep('credentials')
-      } else {
+      if (!bothMatched) {
         // Section 27: generic failure, never reveal which factor (phone
         // or secret, or both) was wrong.
         setVerifyError(t('activate.verifyMismatch'))
+        return
       }
+      setVerifyError(null)
+      // Both proof factors are already independently server-verified at
+      // this point -- an existing session skips straight to linking
+      // (no new password needed, no new Auth user created); a
+      // brand-new visitor still proceeds to choose credentials exactly
+      // as before.
+      setStep(existingSession ? 'linking' : 'credentials')
     },
     onError: (error: { message?: string }) => {
       setVerifyError(error?.message || t('activate.genericError'))
+    },
+  })
+
+  // Existing-session path: claim_portal_invite(text) is the
+  // authenticated-role counterpart of claim_portal_invite_service --
+  // identical body/invariants (pending/unexpired/both-factors-verified/
+  // idempotent/ownership-checked), just keyed off auth.uid() instead of
+  // an explicit p_user_id, since a real session already exists here.
+  // Never creates an Auth user -- only ever links the CURRENT session's
+  // existing identity to this invite's customer row.
+  const linkMutation = useMutation({
+    mutationFn: async () => {
+      const { data, error } = await supabase.rpc('claim_portal_invite', { p_raw_token: token! })
+      if (error) throw error
+      return data as string
+    },
+    onSuccess: () => {
+      setStep('success')
+      setTimeout(() => navigate('/portal', { replace: true }), 1200)
+    },
+    onError: (error: { message?: string }) => {
+      const message = error?.message ?? ''
+      if (message.includes('already been used') || message.includes('already linked to a different account')) {
+        setStep('already_activated')
+        return
+      }
+      setCredentialsError(message || t('activate.genericError'))
     },
   })
 
@@ -375,6 +426,15 @@ export function ActivateAccountPage() {
           </div>
         )}
 
+        {step === 'linking' && (
+          <ExistingSessionLinkStep
+            clubName={context?.clubName ?? null}
+            isPending={linkMutation.isPending}
+            error={credentialsError}
+            onConfirm={() => linkMutation.mutate()}
+          />
+        )}
+
         {step === 'credentials' && (
           <div className="flex flex-col gap-4 rounded-xl border border-border bg-surface p-6 shadow-sm">
             <div className="text-center">
@@ -417,6 +477,44 @@ export function ActivateAccountPage() {
           </div>
         )}
       </main>
+    </div>
+  )
+}
+
+// Multi-Club E2E audit (2026-08-24): shown only when phone+secret are
+// already verified AND a real existing session was detected at mount --
+// an explicit confirm step (not auto-linked the instant verification
+// succeeds) so the customer can see plainly which club is being added
+// to their existing account before it happens, per this audit's own
+// CTA-wording requirement ("Log in and link this club", never a second
+// "create account" prompt for someone who already has one).
+function ExistingSessionLinkStep({
+  clubName,
+  isPending,
+  error,
+  onConfirm,
+}: {
+  clubName: string | null
+  isPending: boolean
+  error: string | null
+  onConfirm: () => void
+}) {
+  const { t } = useTranslation()
+  return (
+    <div className="flex flex-col gap-4 rounded-xl border border-border bg-surface p-6 shadow-sm">
+      <div className="text-center">
+        <LogIn className="mx-auto size-10 text-accent-foreground" />
+        <p className="mt-2 font-medium">{t('activate.linkExistingTitle')}</p>
+        <p className="mt-1 text-sm text-text-secondary">
+          {clubName ? t('activate.linkExistingHintWithClub', { club: clubName }) : t('activate.linkExistingHint')}
+        </p>
+      </div>
+
+      {error && <p role="alert" className="text-sm text-status-danger">{error}</p>}
+
+      <Button className="w-full" disabled={isPending} onClick={onConfirm}>
+        {isPending ? t('activate.linking') : t('activate.linkExistingButton')}
+      </Button>
     </div>
   )
 }

@@ -23,6 +23,7 @@ import {
 } from '@/lib/domain/billing'
 import { translateSupabaseError } from '@/lib/errors'
 import { useDirection } from '@/app/providers/DirectionProvider'
+import { usePortalClub } from '@/app/providers/PortalClubProvider'
 import { Wallet } from 'lucide-react'
 
 // Master Payment Directive Sections 46-53, 86-87: "My Payments" -- a
@@ -53,10 +54,15 @@ interface PaymentMethodOption {
   referenceRequired: boolean
 }
 
-async function fetchMyInvoices(): Promise<InvoiceRow[]> {
+// Multi-Club E2E audit (2026-08-24): now club-scoped -- see the same
+// note on PortalBookingsPage.fetchMyBookings. A club_id-required
+// signature so this can never silently regress back to a
+// merged-everything query.
+async function fetchMyInvoices(clubId: string): Promise<InvoiceRow[]> {
   const { data, error } = await supabase
     .from('invoices')
     .select('id, invoice_number, total, status, issued_at')
+    .eq('club_id', clubId)
     .order('created_at', { ascending: false })
     .limit(30)
   if (error) throw error
@@ -215,8 +221,18 @@ export function PortalPaymentsPage() {
   // dialog correctly has nothing to do), so only the not-found case
   // gets a message.
   const [invoiceNotFound, setInvoiceNotFound] = useState(false)
+  // Multi-Club E2E audit (2026-08-24): same deep-link-to-a-different-club
+  // disambiguation as PortalQrPage's wrongClubBookingId -- an
+  // ?invoiceId= can legitimately belong to another linked club now that
+  // this query is club-scoped.
+  const [wrongClubInvoiceId, setWrongClubInvoiceId] = useState<string | null>(null)
+  const { activeClubId, isLoading: clubLoading, customerMemberships, setActiveClubId } = usePortalClub()
 
-  const { data: invoices = [], isLoading } = useQuery({ queryKey: ['portal', 'my-invoices'], queryFn: fetchMyInvoices })
+  const { data: invoices = [], isLoading } = useQuery({
+    queryKey: ['portal', 'my-invoices', activeClubId],
+    queryFn: () => fetchMyInvoices(activeClubId!),
+    enabled: !!activeClubId,
+  })
 
   useEffect(() => {
     if (isLoading) return
@@ -224,9 +240,18 @@ export function PortalPaymentsPage() {
     if (!invoiceId || claimingInvoice) return
     const target = invoices.find((i) => i.id === invoiceId)
     if (target && target.outstanding > 0) {
+      setWrongClubInvoiceId(null)
       void supabase.from('invoices').select('club_id').eq('id', invoiceId).single().then(({ data }) => {
         setClaimClubId(data?.club_id ?? null)
         setClaimingInvoice(target)
+      })
+    } else if (!target && customerMemberships.length > 1) {
+      void supabase.from('invoices').select('club_id').eq('id', invoiceId).maybeSingle().then(({ data }) => {
+        if (data?.club_id && customerMemberships.some((m) => m.clubId === data.club_id)) {
+          setWrongClubInvoiceId(invoiceId)
+        } else {
+          setInvoiceNotFound(true)
+        }
       })
     } else if (!target) {
       setInvoiceNotFound(true)
@@ -238,12 +263,29 @@ export function PortalPaymentsPage() {
     <div className="flex flex-col gap-4">
       <PageHeader title={t('portal.paymentsPage.title')} description={t('portal.paymentsPage.description')} />
 
-      {isLoading && <p className="text-sm text-text-secondary">{t('portal.paymentsPage.loading')}</p>}
+      {(isLoading || clubLoading) && <p className="text-sm text-text-secondary">{t('portal.paymentsPage.loading')}</p>}
 
       {!isLoading && invoiceNotFound && (
         <p role="alert" className="rounded-lg border border-status-warning/30 bg-status-warning/5 p-3 text-sm text-status-warning">
           {t('portal.paymentsPage.invoiceNotFound')}
         </p>
+      )}
+
+      {!isLoading && wrongClubInvoiceId && (
+        <div role="alert" className="flex flex-col gap-2 rounded-lg border border-status-warning/30 bg-status-warning/5 p-3 text-sm text-status-warning">
+          <p>{t('portal.paymentsPage.wrongClubInvoice')}</p>
+          <button
+            type="button"
+            className="self-start font-medium underline"
+            onClick={async () => {
+              const { data } = await supabase.from('invoices').select('club_id').eq('id', wrongClubInvoiceId).maybeSingle()
+              if (data?.club_id) setActiveClubId(data.club_id)
+              setWrongClubInvoiceId(null)
+            }}
+          >
+            {t('portal.paymentsPage.switchClubAction')}
+          </button>
+        </div>
       )}
 
       {!isLoading && invoices.length === 0 && (

@@ -59,6 +59,9 @@
       "profile": "My Account"
     },
     "logout": "Log out",
+    "clubSwitcher": {
+      "label": "Choose a club"
+    },
     "academyPage": {
       "title": "My Academy",
       "description": "Your children enrolled in the academy",
@@ -83,6 +86,8 @@
       "description": "Your invoices, payment status, and payment methods",
       "loading": "Loading...",
       "invoiceNotFound": "The requested invoice wasn't found. Browse your invoices below.",
+      "wrongClubInvoice": "This invoice belongs to a different club you're linked to.",
+      "switchClubAction": "Switch to that club",
       "emptyTitle": "No invoices yet.",
       "total": "Total {{amount}}",
       "paid": "Paid {{amount}}",
@@ -130,6 +135,8 @@
       "description": "QR code for check-in on arrival",
       "loading": "Loading...",
       "bookingNotFound": "The requested booking wasn't found — it may have already passed or been cancelled. Choose a booking from the list below.",
+      "wrongClubBooking": "This booking belongs to a different club you're linked to.",
+      "switchClubAction": "Switch to that club",
       "emptyTitle": "No upcoming bookings.",
       "choosePlaceholder": "Choose a booking to view its code",
       "generateError": "Couldn't generate the QR code for this booking.",
@@ -1384,6 +1391,11 @@
     "invalidPhone": "Enter a valid phone number.",
     "invalidSecret": "Enter the activation code from the WhatsApp message.",
     "verifyMismatch": "That phone number or activation code doesn't match our records. Please try again.",
+    "linkExistingTitle": "You already have a Mal3aby account",
+    "linkExistingHint": "Link this club to your existing account -- no new password needed.",
+    "linkExistingHintWithClub": "Link {{club}} to your existing account -- no new password needed.",
+    "linkExistingButton": "Link this club to my account",
+    "linking": "Linking...",
     "createCredentialsTitle": "Create your account",
     "createCredentialsHint": "Choose an email and password to sign in from now on.",
     "emailLabel": "Email",
