@@ -1,0 +1,57 @@
+-- SECURITY FIX (high, confirmed-exploitable): Direct client INSERT into
+-- public.payments bypasses every financial integrity guard that
+-- record_payment() enforces.
+--
+-- Confirmed live against project gxkrtlvpjwxhcqdisyob: the
+-- payments_insert_with_permission RLS policy (see
+-- 20260821050000_enforce_branch_scope_on_core_operational_rls.sql:301-306)
+-- only checks club membership, has_permission('payment.create', club_id),
+-- and branch access -- nothing about invoice linkage, outstanding balance,
+-- cash-shift custody, or government-receipt requirements. A real
+-- Receptionist session was impersonated (SET ROLE authenticated +
+-- set_config('request.jwt.claims', ...), the proven live-test technique
+-- this project's own supabase/tests/security_finance_regression.sql
+-- documents) and successfully inserted a 99,999.00 EGP cash payment
+-- against an invoice whose real outstanding balance was only 300.00 EGP,
+-- with cash_shift_id left NULL and no official receipt -- entirely
+-- unlinked from any invoice via payment_allocations. The test row was
+-- verified created then immediately deleted (0 residue).
+--
+-- Root cause: public.payments has no invoice_id column at all -- the
+-- link to an invoice is only ever created via payment_allocations, and
+-- only record_payment() (SECURITY DEFINER, supabase/migrations/
+-- 20260822070000_fix_record_payment_booking_confirm_race.sql) creates
+-- that allocation row and enforces invoice.status = 'issued', idempotency
+-- dedup, the government-receipt requirement, the outstanding-balance cap,
+-- and active cash-shift resolution -- purely in PL/pgSQL, with zero
+-- database-level backstop (confirmed via pg_trigger: the only triggers on
+-- payments are branch-scope and tenant-id-immutability checks, neither of
+-- which validates amount/invoice/shift/receipt). A direct client INSERT
+-- skips all of this. src/ contains zero direct
+-- `.from('payments').insert(...)` calls -- the app only ever calls
+-- record_payment -- so this gap is invisible from the UI but fully
+-- reachable by anyone issuing authenticated REST calls with a staff
+-- session, which RLS is supposed to prevent independent of UI behavior.
+--
+-- Fix: record_payment() and the other payment-writing RPCs
+-- (record_payment_with_official_receipt, record_payment_proof_upload) are
+-- all SECURITY DEFINER and run as the function owner, not as the calling
+-- `authenticated`/`anon` role -- so they do not need, and never used,
+-- `authenticated`'s own table-level INSERT privilege on public.payments.
+-- No migration ever explicitly granted INSERT on payments to
+-- authenticated/anon either -- it came from Supabase's default
+-- schema-wide grant. Revoking it here removes the client's ability to
+-- write to payments directly at all (RLS's WITH CHECK can no longer be
+-- reached by a client INSERT regardless of what it allows), while leaving
+-- every legitimate write path -- the SECURITY DEFINER RPCs -- fully
+-- functional, exactly matching the pattern already used to lock down
+-- invoices post-issue (invoices_update_draft_only).
+--
+-- SELECT and UPDATE grants are untouched: payments_select_club_staff and
+-- payments_update_with_permission continue to gate reads and the existing
+-- (narrower, status-only) update paths as before. This migration only
+-- removes the ability to fabricate a brand-new payment row outside
+-- record_payment().
+
+revoke insert on public.payments from authenticated;
+revoke insert on public.payments from anon;
