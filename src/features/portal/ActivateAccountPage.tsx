@@ -57,6 +57,7 @@ interface InviteContext {
   customerName: string | null
   clubName: string | null
   maskedPhone: string | null
+  status: string | null
   isExpired: boolean
   bookingFieldName: string | null
   bookingStartAt: string | null
@@ -71,6 +72,7 @@ async function fetchInviteContext(token: string): Promise<InviteContext> {
     customerName: row?.customer_name ?? null,
     clubName: row?.club_name ?? null,
     maskedPhone: row?.masked_phone ?? null,
+    status: row?.status ?? null,
     isExpired: row?.is_expired ?? false,
     bookingFieldName: row?.booking_field_name ?? null,
     bookingStartAt: row?.booking_start_at ?? null,
@@ -121,6 +123,17 @@ export function ActivateAccountPage() {
     }
     if (context.isExpired) {
       setStep('invalid')
+      return
+    }
+    // A consumed (already-activated) invite must never let the customer
+    // re-enter phone + activation secret -- route straight to the
+    // friendly "already activated / go to login" screen instead of
+    // letting them proceed through context/verify only to hit a raw,
+    // unrouted server error later (verify_portal_invite_phone/secret and
+    // activate-portal-account all independently reject a non-pending
+    // invite, but with a generic message this page doesn't parse).
+    if (context.status === 'consumed') {
+      setStep('already_activated')
       return
     }
     if (step === 'loading') setStep('context')
@@ -228,8 +241,16 @@ export function ActivateAccountPage() {
       setTimeout(() => navigate('/portal', { replace: true }), 1200)
     },
     onError: (error: { message?: string }) => {
+      // This mutation only ever reaches the activate-portal-account Edge
+      // Function, which surfaces claim_portal_invite_service()'s error
+      // messages verbatim. That function (not the staff-only
+      // send_portal_invite RPC, which this unauthenticated page never
+      // calls) can raise 'this invite has already been used' or 'this
+      // customer record is already linked to a different account' for a
+      // stale/already-consumed link -- both route to the friendly
+      // "already activated" screen instead of a raw error.
       const message = error?.message ?? ''
-      if (message.includes('already has an activated portal account') || message.includes('already linked to a different account')) {
+      if (message.includes('already been used') || message.includes('already linked to a different account')) {
         setStep('already_activated')
         return
       }

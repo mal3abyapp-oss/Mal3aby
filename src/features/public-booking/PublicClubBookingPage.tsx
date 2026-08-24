@@ -147,6 +147,16 @@ function toWaDigits(phone: string): string {
 // P0 Phone Identity directive. The old hand-rolled digit-strip regex
 // (no country-code awareness) is retired from this file.
 
+// Email stays OPTIONAL on the public booking form (product decision --
+// do not make this required). This is a light format check only, used
+// to block obviously-malformed input before it reaches the RPC; the
+// server independently normalizes/trims (nullif(trim(p_customer_email),
+// '')) and never requires the field.
+const EMAIL_FORMAT_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+function isPlausibleEmail(value: string): boolean {
+  return EMAIL_FORMAT_RE.test(value.trim())
+}
+
 // HIGH-ROI UX PASS 01, item 19 (Add to Calendar): builds a plain .ics
 // data URI from already-known booking fields -- no payment
 // secrets/tokens in the description, per the directive's explicit
@@ -194,6 +204,7 @@ export function PublicClubBookingPage() {
   const [selectedDuration, setSelectedDuration] = useState<number>(DEFAULT_DURATION_MINUTES)
   const [selectedTime, setSelectedTime] = useState<string | null>(null)
   const [customerName, setCustomerName] = useState('')
+  const [customerEmail, setCustomerEmail] = useState('')
   const [customerMobile, setCustomerMobile] = useState('')
   const [customerPhoneCountry, setCustomerPhoneCountry] = useState<CountryCode>('EG')
   const [phoneValid, setPhoneValid] = useState(false)
@@ -318,6 +329,11 @@ export function PublicClubBookingPage() {
         throw new Error(t('publicBooking.mobileInvalid'))
       }
 
+      const trimmedEmail = customerEmail.trim()
+      if (trimmedEmail && !isPlausibleEmail(trimmedEmail)) {
+        throw new Error(t('publicBooking.emailInvalid'))
+      }
+
       const { data, error } = await supabase.rpc('create_public_booking', {
         p_club_slug: slug,
         p_field_id: selectedFieldId,
@@ -326,6 +342,7 @@ export function PublicClubBookingPage() {
         p_customer_name: customerName.trim(),
         p_customer_mobile: customerMobile.trim(),
         p_customer_phone_e164: phoneResult.e164,
+        p_customer_email: trimmedEmail || undefined,
         p_source: 'club_public_link',
       })
       if (error) throw error
@@ -670,6 +687,24 @@ export function PublicClubBookingPage() {
               }}
               onValidChange={(r) => setPhoneValid(r.valid)}
             />
+            <p className="-mt-1 text-xs text-text-secondary">{t('publicBooking.mobileHelper')}</p>
+
+            {/* Email stays OPTIONAL -- product decision, do not make this
+                required. Explaining what providing it unlocks (and what
+                skipping it costs) so the customer can make an informed
+                choice, without pressuring them. */}
+            <div className="flex flex-col gap-1.5">
+              <label className="text-sm font-medium text-text-secondary">{t('publicBooking.emailLabel')}</label>
+              <Input
+                type="email"
+                autoComplete="email"
+                value={customerEmail}
+                onChange={(e) => setCustomerEmail(e.target.value)}
+                placeholder={t('publicBooking.emailPlaceholder')}
+                dir="ltr"
+              />
+              <p className="text-xs text-text-secondary">{t('publicBooking.emailHelper')}</p>
+            </div>
 
             {formError && <p role="alert" className="text-sm text-status-danger">{formError}</p>}
 
@@ -679,6 +714,7 @@ export function PublicClubBookingPage() {
                 !customerName.trim() ||
                 !customerMobile.trim() ||
                 !phoneValid ||
+                (!!customerEmail.trim() && !isPlausibleEmail(customerEmail)) ||
                 bookMutation.isPending
               }
               onClick={() => bookMutation.mutate()}
@@ -784,6 +820,20 @@ export function PublicClubBookingPage() {
             )}
 
             <p className="text-center text-xs text-text-secondary">{t('publicBooking.whatsappHint')}</p>
+
+            {/* Confirmed gap fix: the confirmation screen previously never
+                mentioned that a self-service account/portal exists at all
+                (see claim_customer_self_service() /
+                customers.user_id -- My Bookings, My Subscriptions, etc).
+                This is a short, informational note only -- no new CTA/flow
+                is invented here; it just tells the customer, at the one
+                moment they'd care most, that providing an email (above,
+                still optional) is what would let them access that portal
+                later. Only shown when an email was actually provided this
+                time, since that's the precondition for future access. */}
+            {customerEmail.trim() && (
+              <p className="text-center text-xs text-text-secondary">{t('publicBooking.accountAwarenessNote')}</p>
+            )}
           </div>
         )}
       </main>

@@ -5154,6 +5154,7 @@ export type Database = {
       create_public_booking: {
         Args: {
           p_club_slug: string
+          p_customer_email?: string
           p_customer_mobile: string
           p_customer_name: string
           p_customer_phone_e164: string
