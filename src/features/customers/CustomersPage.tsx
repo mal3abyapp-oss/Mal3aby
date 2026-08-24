@@ -20,7 +20,7 @@ import {
 } from '@/components/ui/dialog'
 import type { CustomerRow } from '@/lib/domain/people'
 import { translateSupabaseError } from '@/lib/errors'
-import { normalizePhone } from '@/lib/domain/phone'
+import { normalizePhone, convertArabicDigits } from '@/lib/domain/phone'
 
 // Phase 4: search, create, edit customers. Guardian linking (from the
 // player side) lives in AcademyPage's Player Profile per SCREEN_MAP.md
@@ -28,13 +28,38 @@ import { normalizePhone } from '@/lib/domain/phone'
 async function fetchCustomers(clubId: string, search: string) {
   let query = supabase
     .from('customers')
-    .select('id, full_name, mobile_display, email, whatsapp')
+    .select('id, full_name, mobile_display, phone_e164, email, whatsapp')
     .eq('club_id', clubId)
     .order('full_name')
     .limit(50)
 
-  if (search.trim()) {
-    query = query.or(`full_name.ilike.%${search}%,mobile_display.ilike.%${search}%`)
+  const trimmedSearch = search.trim()
+  if (trimmedSearch) {
+    // Escape ilike wildcard/separator characters so raw user input can't
+    // alter the pattern (e.g. a literal '%' or ',' in the search box).
+    const escapedSearch = trimmedSearch.replace(/[%,]/g, '\\$&')
+    const filters = [`full_name.ilike.%${escapedSearch}%`, `mobile_display.ilike.%${escapedSearch}%`]
+
+    // phone_e164 is the canonical/normalized phone identity column (see
+    // supabase/migrations/20260819300000_phone_e164_canonical_schema.sql);
+    // mobile_display only stores whatever raw string staff typed at
+    // creation time, so a literal ilike against it alone misses matches
+    // when the search term's formatting (spacing, leading zero, Arabic-
+    // Indic digits) doesn't match the stored display string verbatim.
+    // Run every search term through the same Arabic-Indic-digit
+    // conversion normalizePhone() applies (per src/lib/domain/phone.ts:
+    // "every screen that accepts a phone number must go through
+    // normalizePhone()"), then strip to digits-only so a phone search in
+    // any format/spacing can still match the canonical E.164 value. Full
+    // normalizePhone() isn't used here because it rejects partial digit
+    // sequences (e.g. "0111" while the user is still typing), which
+    // would silently drop matches instead of broadening them.
+    const digitsOnly = convertArabicDigits(trimmedSearch).replace(/\D/g, '')
+    if (digitsOnly) {
+      filters.push(`phone_e164.ilike.%${digitsOnly}%`)
+    }
+
+    query = query.or(filters.join(','))
   }
 
   const { data, error } = await query
@@ -194,7 +219,11 @@ export function CustomersPage() {
         p_full_name: fullName,
         p_phone_e164: phoneE164 as string,
         p_mobile_display: mobile || undefined,
-        p_email: email || undefined,
+        // '' (not undefined) so a deliberately-cleared field is sent as
+        // an explicit clear signal, not "no change" -- see
+        // upsert_customer's NULL-vs-'' semantics in
+        // 20260824070000_upsert_customer_email_clear_semantics.sql.
+        p_email: email.trim(),
         p_whatsapp_consent: phoneE164 && whatsappConsent !== null ? whatsappConsent : undefined,
         p_customer_id: editingCustomer?.id,
       })

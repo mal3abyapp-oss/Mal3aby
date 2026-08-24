@@ -17,7 +17,11 @@ interface SearchResults {
 }
 
 async function search(clubId: string, term: string): Promise<SearchResults> {
-  const like = `%${term}%`
+  // Escape ilike wildcard/separator characters so raw user input can't
+  // alter the pattern or break out of the .or() clause boundary (e.g. a
+  // literal '%' or ',' in the search box) -- same fix as CustomersPage.tsx.
+  const escapedTerm = term.replace(/[%,]/g, '\\$&')
+  const like = `%${escapedTerm}%`
   const [customersRes, playersRes, invoicesRes] = await Promise.all([
     supabase.from('customers').select('id, full_name, mobile_display').eq('club_id', clubId).or(`full_name.ilike.${like},mobile_display.ilike.${like}`).limit(5),
     supabase.from('players_safe').select('id, full_name').eq('club_id', clubId).ilike('full_name', like).limit(5),

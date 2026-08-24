@@ -3,8 +3,10 @@ import { useTranslation } from 'react-i18next'
 import { PageHeader } from '@/components/ui/page-header'
 import { Button } from '@/components/ui/button'
 import { StatCard } from '@/components/ui/stat-card'
+import { ErrorState } from '@/components/ui/error-state'
 import { formatMoney } from '@/lib/domain/billing'
 import { rowsToCsv, downloadCsv } from '@/lib/csv'
+import { translateSupabaseError } from '@/lib/errors'
 import { useDirection } from '@/app/providers/DirectionProvider'
 import { Users, Download } from 'lucide-react'
 import { useDateRange, useDateRangeReport } from './hooks/useDateRangeReport'
@@ -24,7 +26,7 @@ export function ReportCustomersPage() {
   const { t } = useTranslation()
   const { locale } = useDirection()
   const { startDate, setStartDate, endDate, setEndDate } = useDateRange()
-  const { data, isLoading } = useDateRangeReport<CustomerReport>('get_customer_activity_report', startDate, endDate)
+  const { data, isLoading, isError, error, refetch } = useDateRangeReport<CustomerReport>('get_customer_activity_report', startDate, endDate)
 
   return (
     <div>
@@ -32,6 +34,7 @@ export function ReportCustomersPage() {
       <ReportsNav />
       <DateRangeFilter startDate={startDate} endDate={endDate} onStart={setStartDate} onEnd={setEndDate} />
       {isLoading && <p className="text-sm text-text-secondary">{t('reports.loading')}</p>}
+      {isError && <ErrorState message={translateSupabaseError(error, t('reports.loadError'))} onRetry={() => void refetch()} />}
       {data && (
         <>
           <div className="mb-6">

@@ -6,8 +6,10 @@ import { StatCard } from '@/components/ui/stat-card'
 import { StatusBadge } from '@/components/ui/status-badge'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
+import { ErrorState } from '@/components/ui/error-state'
 import { formatMoney } from '@/lib/domain/billing'
 import { rowsToCsv, downloadCsv } from '@/lib/csv'
+import { translateSupabaseError } from '@/lib/errors'
 import { useDirection } from '@/app/providers/DirectionProvider'
 import { useAuth } from '@/app/providers/AuthProvider'
 import { supabase } from '@/lib/supabase/client'
@@ -61,7 +63,7 @@ export function ReportOfficialReceiptsContent() {
   const { startDate, setStartDate, endDate, setEndDate } = useDateRange()
   const [serialSearch, setSerialSearch] = useState('')
 
-  const { data, isLoading } = useDateRangeReport<ReceiptsReport>(
+  const { data, isLoading, isError, error, refetch } = useDateRangeReport<ReceiptsReport>(
     'get_official_receipts_report',
     startDate,
     endDate,
@@ -96,6 +98,7 @@ export function ReportOfficialReceiptsContent() {
       </div>
 
       {isLoading && <p className="text-sm text-text-secondary">{t('reports.loading')}</p>}
+      {isError && <ErrorState message={translateSupabaseError(error, t('reports.loadError'))} onRetry={() => void refetch()} />}
 
       {exceptions && (exceptions.missing_receipt_payment_count > 0 || exceptions.reversed_awaiting_review_count > 0) && (
         <div className="mb-6 flex flex-col gap-2 rounded-lg border border-status-warning/40 bg-status-warning/10 p-4">

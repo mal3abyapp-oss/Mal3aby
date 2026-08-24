@@ -1,4 +1,4 @@
-import { NavLink } from 'react-router-dom'
+import { NavLink, useLocation } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { cn } from '@/lib/utils'
 import {
@@ -54,31 +54,63 @@ const REPORT_NAV_ITEMS: ReportNavItem[] = [
   { to: '/app/reports/customers', labelKey: 'reports.nav.customers', icon: Users },
 ]
 
+// Dead-end nav fix: router.tsx still registers 6 standalone financial
+// report routes (revenue, collections, payment-methods, exceptions,
+// official-receipts, reconciliation -- kept live for old bookmarks/
+// deep-links, e.g. OwnerFinanceTransparency.tsx navigates straight to
+// /app/reports/exceptions from the Dashboard). Each of those pages
+// renders this same ReportsNav, but none of the 6 legacy slugs appear
+// in REPORT_NAV_ITEMS above (intentionally -- the Finance IA directive
+// says one "Financial Reports" entry, not 7). Without this map, a user
+// landing on e.g. /app/reports/reconciliation had no way to reach any
+// of its 5 financial-report siblings from this nav bar at all: the
+// "Financial Reports" link went to /app/finance/reports?tab=revenue by
+// default, silently dropping them back to Revenue instead of where
+// they were. This map lets "Financial Reports" (a) light up as active
+// while on any of these legacy routes, and (b) deep-link into the
+// matching tab of the FinanceReportsPage hub via ?tab=, so the lateral
+// path is real instead of merely present.
+const LEGACY_FINANCIAL_REPORT_TABS: Record<string, string> = {
+  '/app/reports/revenue': 'revenue',
+  '/app/reports/collections': 'collections',
+  '/app/reports/payment-methods': 'payment-methods',
+  '/app/reports/exceptions': 'exceptions',
+  '/app/reports/official-receipts': 'official-receipts',
+  '/app/reports/reconciliation': 'reconciliation',
+}
+
 export function ReportsNav() {
   const { t } = useTranslation()
+  const location = useLocation()
+  const legacyTab = LEGACY_FINANCIAL_REPORT_TABS[location.pathname]
+
   return (
     <nav
       aria-label={t('reports.title')}
       className="mb-4 flex max-w-full items-center gap-1 overflow-x-auto rounded-lg bg-muted p-1"
     >
-      {REPORT_NAV_ITEMS.map((item) => (
-        <NavLink
-          key={item.to}
-          to={item.to}
-          end={item.end}
-          className={({ isActive }) =>
-            cn(
-              'inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-md px-3 py-1.5 text-sm font-medium transition-all',
-              isActive
-                ? 'bg-background text-foreground shadow'
-                : 'text-muted-foreground hover:text-foreground',
-            )
-          }
-        >
-          <item.icon className="size-4" />
-          {t(item.labelKey)}
-        </NavLink>
-      ))}
+      {REPORT_NAV_ITEMS.map((item) => {
+        const isFinancialReports = item.to === '/app/finance/reports'
+        const to = isFinancialReports && legacyTab ? `${item.to}?tab=${legacyTab}` : item.to
+        return (
+          <NavLink
+            key={item.to}
+            to={to}
+            end={item.end}
+            className={({ isActive }) =>
+              cn(
+                'inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-md px-3 py-1.5 text-sm font-medium transition-all',
+                isActive || (isFinancialReports && legacyTab)
+                  ? 'bg-background text-foreground shadow'
+                  : 'text-muted-foreground hover:text-foreground',
+              )
+            }
+          >
+            <item.icon className="size-4" />
+            {t(item.labelKey)}
+          </NavLink>
+        )
+      })}
     </nav>
   )
 }

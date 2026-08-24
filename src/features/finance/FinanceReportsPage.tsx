@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { cn } from '@/lib/utils'
 import { Wallet, HandCoins, Banknote, ReceiptText, ShieldCheck, Scale, UserX } from 'lucide-react'
@@ -33,9 +34,40 @@ const REPORT_TABS: { key: ReportKey; labelKey: string; icon: LucideIcon }[] = [
   { key: 'employee-liability', labelKey: 'finance.reportsPage.employeeLiability', icon: UserX },
 ]
 
+const REPORT_KEYS = new Set<ReportKey>(REPORT_TABS.map((tab) => tab.key))
+
+function isReportKey(value: string | null): value is ReportKey {
+  return value !== null && REPORT_KEYS.has(value as ReportKey)
+}
+
 export function FinanceReportsPage() {
   const { t } = useTranslation()
-  const [reportKey, setReportKey] = useState<ReportKey>('revenue')
+  const [searchParams, setSearchParams] = useSearchParams()
+  // Reports IA follow-up (dead-end nav fix): the standalone legacy
+  // routes under /app/reports/<slug> (revenue, collections,
+  // payment-methods, exceptions, official-receipts, reconciliation,
+  // employee-liability) are kept live for old bookmarks/deep-links --
+  // e.g. the Dashboard's OwnerFinanceTransparency "has exceptions
+  // today" card still navigates straight to /app/reports/exceptions --
+  // but this hub previously had no URL-addressable tab state, so
+  // nothing could deep-link *into* a specific tab here. Reading/writing
+  // `?tab=` closes that gap: the legacy pages' own "open in Financial
+  // Reports hub" link (see ReportsNav's per-page callout) can now land
+  // on the matching sub-report instead of always resetting to Revenue.
+  const tabParam = searchParams.get('tab')
+  const [reportKey, setReportKey] = useState<ReportKey>(isReportKey(tabParam) ? tabParam : 'revenue')
+
+  const selectReport = (key: ReportKey) => {
+    setReportKey(key)
+    setSearchParams(
+      (prev) => {
+        const next = new URLSearchParams(prev)
+        next.set('tab', key)
+        return next
+      },
+      { replace: true },
+    )
+  }
 
   return (
     <div>
@@ -52,7 +84,7 @@ export function FinanceReportsPage() {
           <button
             key={tab.key}
             type="button"
-            onClick={() => setReportKey(tab.key)}
+            onClick={() => selectReport(tab.key)}
             className={cn(
               'inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-md px-3 py-1.5 text-sm font-medium transition-all',
               reportKey === tab.key ? 'bg-background text-foreground shadow' : 'text-muted-foreground hover:text-foreground',

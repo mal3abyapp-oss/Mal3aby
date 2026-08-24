@@ -7,7 +7,9 @@ import { PageHeader } from '@/components/ui/page-header'
 import { StatCard } from '@/components/ui/stat-card'
 import { StatusBadge } from '@/components/ui/status-badge'
 import { DataTable, type DataTableColumn } from '@/components/ui/data-table'
+import { ErrorState } from '@/components/ui/error-state'
 import { formatMoney } from '@/lib/domain/billing'
+import { translateSupabaseError } from '@/lib/errors'
 import { useDirection } from '@/app/providers/DirectionProvider'
 import { UserX } from 'lucide-react'
 import { useDateRange, useDateRangeReport } from './hooks/useDateRangeReport'
@@ -55,7 +57,7 @@ export function ReportEmployeeLiabilityContent() {
   const { locale } = useDirection()
   const { currentClubId } = useAuth()
   const { startDate, setStartDate, endDate, setEndDate } = useDateRange()
-  const { data = [], isLoading } = useDateRangeReport<LiabilityRow[]>('get_employee_liability_report', startDate, endDate)
+  const { data = [], isLoading, isError, error, refetch } = useDateRangeReport<LiabilityRow[]>('get_employee_liability_report', startDate, endDate)
 
   const employeeIds = [...new Set(data.map((r) => r.employee_id))]
   const { data: membershipByUser } = useQuery({
@@ -95,7 +97,8 @@ export function ReportEmployeeLiabilityContent() {
     <div>
       <DateRangeFilter startDate={startDate} endDate={endDate} onStart={setStartDate} onEnd={setEndDate} />
       {isLoading && <p className="text-sm text-text-secondary">{t('reports.loading')}</p>}
-      {!isLoading && (
+      {isError && <ErrorState message={translateSupabaseError(error, t('reports.loadError'))} onRetry={() => void refetch()} />}
+      {!isLoading && !isError && (
         <>
           <div className="mb-6 grid gap-4 md:grid-cols-2">
             <StatCard label={t('reports.employeeLiability.totalOutstanding')} value={formatMoney(totalOutstanding, 'EGP', locale)} icon={UserX} tone={totalOutstanding > 0 ? 'danger' : 'default'} />

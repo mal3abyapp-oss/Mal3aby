@@ -35,10 +35,15 @@ interface DuplicateGroup {
   customers: DuplicateMember[]
 }
 
+interface EmailDuplicateGroup {
+  email: string
+  customers: DuplicateMember[]
+}
+
 async function fetchDuplicateGroups(clubId: string) {
   const { data, error } = await supabase.rpc('get_customer_duplicate_groups', { p_club_id: clubId })
   if (error) throw error
-  return (data as unknown as { groups: DuplicateGroup[] }).groups
+  return data as unknown as { groups: DuplicateGroup[]; email_groups?: EmailDuplicateGroup[] }
 }
 
 export function CustomerDuplicatesPage() {
@@ -46,11 +51,13 @@ export function CustomerDuplicatesPage() {
   const { currentClubId } = useAuth()
   const queryClient = useQueryClient()
 
-  const { data: groups, isLoading } = useQuery({
+  const { data, isLoading } = useQuery({
     queryKey: ['customer-duplicate-groups', currentClubId],
     queryFn: () => fetchDuplicateGroups(currentClubId!),
     enabled: !!currentClubId,
   })
+  const groups = data?.groups
+  const emailGroups = data?.email_groups
 
   const quarantineMutation = useMutation({
     mutationFn: async ({ customerId, quarantine }: { customerId: string; quarantine: boolean }) => {
@@ -72,47 +79,29 @@ export function CustomerDuplicatesPage() {
 
       {isLoading ? (
         <p className="text-sm text-text-secondary">{t('common.loading', { defaultValue: 'Loading...' })}</p>
-      ) : !groups || groups.length === 0 ? (
+      ) : (!groups || groups.length === 0) && (!emailGroups || emailGroups.length === 0) ? (
         <p className="text-sm text-text-secondary">{t('customers.duplicates.empty', { defaultValue: 'No duplicate phone numbers found.' })}</p>
       ) : (
         <div className="flex flex-col gap-4">
-          {groups.map((group) => (
-            <div key={group.phone_e164} className="rounded-lg border border-border p-4">
+          {groups?.map((group) => (
+            <div key={`phone-${group.phone_e164}`} className="rounded-lg border border-border p-4">
               <p className="mb-3 text-sm font-medium text-text-secondary tabular-nums"><bdi>{group.phone_e164}</bdi></p>
-              <div className="flex flex-col gap-2">
-                {group.customers.map((c) => (
-                  <div key={c.id} className="flex flex-wrap items-center justify-between gap-2 rounded-md border border-border p-3">
-                    <div className="flex flex-col gap-1">
-                      <div className="flex items-center gap-2">
-                        <Link to={`/app/customers/${c.id}`} className="font-medium text-accent-foreground hover:underline">{c.full_name}</Link>
-                        <StatusBadge
-                          tone={c.duplicate_review_status === 'quarantined_pending_review' ? 'warning' : 'success'}
-                          label={c.duplicate_review_status === 'quarantined_pending_review'
-                            ? t('customers.duplicates.quarantined', { defaultValue: 'Quarantined' })
-                            : t('customers.duplicates.canonical', { defaultValue: 'Canonical' })}
-                        />
-                      </div>
-                      <p className="text-xs text-text-secondary">
-                        {t('customers.duplicates.activitySummary', {
-                          defaultValue: '{{bookings}} bookings · {{players}} players · {{invoices}}',
-                          bookings: c.bookings_count,
-                          players: c.players_count,
-                          invoices: c.has_invoices ? t('customers.duplicates.hasInvoices', { defaultValue: 'has invoices' }) : t('customers.duplicates.noInvoices', { defaultValue: 'no invoices' }),
-                        })}
-                      </p>
-                    </div>
-                    {c.duplicate_review_status === 'quarantined_pending_review' ? (
-                      <Button size="sm" variant="outline" disabled={quarantineMutation.isPending} onClick={() => quarantineMutation.mutate({ customerId: c.id, quarantine: false })}>
-                        {t('customers.duplicates.unquarantine', { defaultValue: 'Restore as canonical' })}
-                      </Button>
-                    ) : (
-                      <Button size="sm" variant="outline" disabled={quarantineMutation.isPending} onClick={() => quarantineMutation.mutate({ customerId: c.id, quarantine: true })}>
-                        {t('customers.duplicates.quarantine', { defaultValue: 'Mark as duplicate' })}
-                      </Button>
-                    )}
-                  </div>
-                ))}
+              <DuplicateMemberList members={group.customers} quarantineMutation={quarantineMutation} t={t} />
+              {quarantineMutation.isError && (
+                <p role="alert" className="mt-2 text-sm text-status-danger">{translateSupabaseError(quarantineMutation.error, t('customers.duplicates.actionError', { defaultValue: "Couldn't update this customer." }))}</p>
+              )}
+            </div>
+          ))}
+          {emailGroups?.map((group) => (
+            <div key={`email-${group.email}`} className="rounded-lg border border-border p-4">
+              <div className="mb-3 flex items-center gap-2">
+                <p className="text-sm font-medium text-text-secondary"><bdi>{group.email}</bdi></p>
+                <StatusBadge tone="warning" label={t('customers.duplicates.emailMatch', { defaultValue: 'Shared email' })} />
               </div>
+              <p className="mb-3 text-xs text-text-secondary">
+                {t('customers.duplicates.emailGroupHint', { defaultValue: 'These customers share this email address. This is a softer signal than a matching phone number (e.g. family members can share an inbox), so review before quarantining.' })}
+              </p>
+              <DuplicateMemberList members={group.customers} quarantineMutation={quarantineMutation} t={t} />
               {quarantineMutation.isError && (
                 <p role="alert" className="mt-2 text-sm text-status-danger">{translateSupabaseError(quarantineMutation.error, t('customers.duplicates.actionError', { defaultValue: "Couldn't update this customer." }))}</p>
               )}
@@ -120,6 +109,53 @@ export function CustomerDuplicatesPage() {
           ))}
         </div>
       )}
+    </div>
+  )
+}
+
+function DuplicateMemberList({
+  members,
+  quarantineMutation,
+  t,
+}: {
+  members: DuplicateMember[]
+  quarantineMutation: ReturnType<typeof useMutation<void, unknown, { customerId: string; quarantine: boolean }>>
+  t: ReturnType<typeof useTranslation>['t']
+}) {
+  return (
+    <div className="flex flex-col gap-2">
+      {members.map((c) => (
+        <div key={c.id} className="flex flex-wrap items-center justify-between gap-2 rounded-md border border-border p-3">
+          <div className="flex flex-col gap-1">
+            <div className="flex items-center gap-2">
+              <Link to={`/app/customers/${c.id}`} className="font-medium text-accent-foreground hover:underline">{c.full_name}</Link>
+              <StatusBadge
+                tone={c.duplicate_review_status === 'quarantined_pending_review' ? 'warning' : 'success'}
+                label={c.duplicate_review_status === 'quarantined_pending_review'
+                  ? t('customers.duplicates.quarantined', { defaultValue: 'Quarantined' })
+                  : t('customers.duplicates.canonical', { defaultValue: 'Canonical' })}
+              />
+            </div>
+            <p className="text-xs text-text-secondary">
+              {t('customers.duplicates.activitySummary', {
+                defaultValue: '{{bookings}} bookings · {{players}} players · {{invoices}}',
+                bookings: c.bookings_count,
+                players: c.players_count,
+                invoices: c.has_invoices ? t('customers.duplicates.hasInvoices', { defaultValue: 'has invoices' }) : t('customers.duplicates.noInvoices', { defaultValue: 'no invoices' }),
+              })}
+            </p>
+          </div>
+          {c.duplicate_review_status === 'quarantined_pending_review' ? (
+            <Button size="sm" variant="outline" disabled={quarantineMutation.isPending} onClick={() => quarantineMutation.mutate({ customerId: c.id, quarantine: false })}>
+              {t('customers.duplicates.unquarantine', { defaultValue: 'Restore as canonical' })}
+            </Button>
+          ) : (
+            <Button size="sm" variant="outline" disabled={quarantineMutation.isPending} onClick={() => quarantineMutation.mutate({ customerId: c.id, quarantine: true })}>
+              {t('customers.duplicates.quarantine', { defaultValue: 'Mark as duplicate' })}
+            </Button>
+          )}
+        </div>
+      ))}
     </div>
   )
 }

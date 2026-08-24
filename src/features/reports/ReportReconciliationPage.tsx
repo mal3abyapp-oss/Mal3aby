@@ -2,7 +2,9 @@ import { useTranslation } from 'react-i18next'
 import { PageHeader } from '@/components/ui/page-header'
 import { StatCard } from '@/components/ui/stat-card'
 import { StatusBadge } from '@/components/ui/status-badge'
+import { ErrorState } from '@/components/ui/error-state'
 import { formatMoney } from '@/lib/domain/billing'
+import { translateSupabaseError } from '@/lib/errors'
 import { useDirection } from '@/app/providers/DirectionProvider'
 import { Scale, AlertTriangle, CheckCircle2 } from 'lucide-react'
 import { useDateRange, useDateRangeReport } from './hooks/useDateRangeReport'
@@ -29,7 +31,7 @@ export function ReportReconciliationContent() {
   const { t } = useTranslation()
   const { locale } = useDirection()
   const { startDate, setStartDate, endDate, setEndDate } = useDateRange()
-  const { data, isLoading } = useDateRangeReport<ReconciliationReport>('get_financial_reconciliation_report', startDate, endDate)
+  const { data, isLoading, isError, error, refetch } = useDateRangeReport<ReconciliationReport>('get_financial_reconciliation_report', startDate, endDate)
 
   const hasExceptions = !!data && (data.unreceipted_required_payments.length > 0 || data.total_shortage > 0)
 
@@ -37,6 +39,7 @@ export function ReportReconciliationContent() {
     <div>
       <DateRangeFilter startDate={startDate} endDate={endDate} onStart={setStartDate} onEnd={setEndDate} />
       {isLoading && <p className="text-sm text-text-secondary">{t('reports.loading')}</p>}
+      {isError && <ErrorState message={translateSupabaseError(error, t('reports.loadError'))} onRetry={() => void refetch()} />}
       {data && (
         <>
           {/* F5: exceptions surfaced clearly, not buried -- a clean

@@ -6,6 +6,7 @@ import { useAuth } from '@/app/providers/AuthProvider'
 import { PageHeader } from '@/components/ui/page-header'
 import { Button } from '@/components/ui/button'
 import { StatCard } from '@/components/ui/stat-card'
+import { ErrorState } from '@/components/ui/error-state'
 import { formatMoney, PAYMENT_METHOD_LABELS } from '@/lib/domain/billing'
 import { rowsToCsv, downloadCsv } from '@/lib/csv'
 import { translateSupabaseError } from '@/lib/errors'
@@ -76,7 +77,7 @@ export function ReportPaymentMethodsContent() {
   const { startDate, setStartDate, endDate, setEndDate } = useDateRange()
   const [reconcileError, setReconcileError] = useState<string | null>(null)
 
-  const { data, isLoading } = useDateRangeReport<PaymentMethodReport>('get_payment_method_report', startDate, endDate)
+  const { data, isLoading, isError, error, refetch } = useDateRangeReport<PaymentMethodReport>('get_payment_method_report', startDate, endDate)
 
   const { data: reconciliations = [] } = useQuery({
     queryKey: ['payment-reconciliations', currentClubId, startDate, endDate],
@@ -106,6 +107,7 @@ export function ReportPaymentMethodsContent() {
     <div>
       <DateRangeFilter startDate={startDate} endDate={endDate} onStart={setStartDate} onEnd={setEndDate} />
       {isLoading && <p className="text-sm text-text-secondary">{t('reports.loading')}</p>}
+      {isError && <ErrorState message={translateSupabaseError(error, t('reports.loadError'))} onRetry={() => void refetch()} />}
       {data && (
         <>
           <div className="mb-6 grid gap-4 sm:grid-cols-3">

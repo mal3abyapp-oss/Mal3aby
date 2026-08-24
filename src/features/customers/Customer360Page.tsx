@@ -33,6 +33,7 @@ import {
 import { useOfficialReceipt, OfficialCollectionReceiptFields } from '@/components/ui/official-collection-receipt-fields'
 import { PAYMENT_METHOD_LABELS, PAYMENT_STATUS_LABELS, PAYMENT_STATUS_TONE, formatMoney, type PaymentStatus } from '@/lib/domain/billing'
 import { BOOKING_STATUS_LABELS, BOOKING_STATUS_TONE } from '@/lib/domain/booking'
+import { actionLabel } from '@/lib/domain/audit'
 import { ArrowLeft, Wallet, Calendar, GraduationCap, MessageCircle, AlertTriangle } from 'lucide-react'
 
 // Customer 360 directive: "ONE CUSTOMER, ONE SOURCE OF TRUTH." Replaces
@@ -112,6 +113,25 @@ async function fetchActivity(clubId: string, customerId: string) {
   return data as unknown as { rows: ActivityRow[]; total_count: number }
 }
 
+// Customer 360 Activity tab used to render a.action as a raw untranslated
+// audit_logs code (e.g. "customer.self_service_claim") and never surfaced
+// a.before/a.after at all, even though get_customer_activity() already
+// returns both -- unreadable for the Arabic-only staff this whole page is
+// otherwise localized for, and strictly behind the pattern already
+// established by AuditLogPage.tsx (which uses actionLabel() + a before/
+// after diff). This mirrors that: actionLabel() for the action cell, and
+// a compact "changed keys" summary of before/after instead of dropping
+// them, without pulling in AuditLogPage's full technical-details dialog.
+function summarizeActivityDiff(before: unknown, after: unknown): string | null {
+  const b = (before ?? {}) as Record<string, unknown>
+  const a = (after ?? {}) as Record<string, unknown>
+  const keys = [...new Set([...Object.keys(b), ...Object.keys(a)])].filter(
+    (k) => JSON.stringify(b[k]) !== JSON.stringify(a[k]),
+  )
+  if (keys.length === 0) return null
+  return keys.join(', ')
+}
+
 async function fetchClubCountry(clubId: string) {
   const { data } = await supabase.from('clubs').select('country').eq('id', clubId).maybeSingle()
   return (data?.country as CountryCode | null) ?? null
@@ -180,13 +200,30 @@ export function Customer360Page() {
     enabled: !!customerId,
   })
 
+  // send_portal_invite mints/revokes the invite row server-side but has
+  // no WhatsApp delivery side effect of its own (unlike the
+  // booking-creation flow, which folds activation_token/activation_secret
+  // into queue_whatsapp_notification's booking-created/booking-confirmed-paid
+  // payload). Claiming "sent via WhatsApp" here was a false positive, and
+  // on a resend it silently revoked a still-valid, already-delivered
+  // invite and replaced it with one nobody could ever receive. Surface
+  // the raw token/secret for staff to relay manually instead of claiming
+  // an automatic delivery that never happens.
+  const [manualInvite, setManualInvite] = useState<{ url: string; secret: string } | null>(null)
   const sendInviteMutation = useMutation({
     mutationFn: async () => {
-      const { error } = await supabase.rpc('send_portal_invite', { p_customer_id: customerId! })
+      const { data, error } = await supabase.rpc('send_portal_invite', { p_customer_id: customerId! })
       if (error) throw error
+      return data?.[0] as { raw_token: string; raw_secret: string } | undefined
     },
-    onSuccess: () => {
+    onSuccess: (data) => {
       void queryClient.invalidateQueries({ queryKey: ['customer-360-portal-status', customerId] })
+      if (data?.raw_token) {
+        setManualInvite({
+          url: `${window.location.origin}/activate/${encodeURIComponent(data.raw_token)}`,
+          secret: data.raw_secret,
+        })
+      }
     },
   })
 
@@ -328,9 +365,6 @@ export function Customer360Page() {
               {sendInviteMutation.isError && (
                 <p className="mt-2 text-xs text-status-danger">{translateSupabaseError(sendInviteMutation.error, t('customers.detail.portalInviteError', { defaultValue: "Couldn't send the activation invite." }))}</p>
               )}
-              {sendInviteMutation.isSuccess && (
-                <p className="mt-2 text-xs text-status-success">{t('customers.detail.portalInviteSentToast', { defaultValue: 'Activation invite sent via WhatsApp.' })}</p>
-              )}
             </div>
 
             <div className="rounded-lg border border-border p-4">
@@ -451,8 +485,16 @@ export function Customer360Page() {
             <DataTable
               columns={[
                 { key: 'date', header: t('common.date', { defaultValue: 'Date' }), render: (a: ActivityRow) => <span className="tabular-nums"><bdi>{new Date(a.created_at).toLocaleString(locale === 'en' ? 'en-US' : 'ar-EG')}</bdi></span> },
-                { key: 'action', header: t('customers.detail.action', { defaultValue: 'Action' }), render: (a: ActivityRow) => a.action },
+                { key: 'action', header: t('customers.detail.action', { defaultValue: 'Action' }), render: (a: ActivityRow) => actionLabel(a.action, locale === 'en' ? 'en' : 'ar') },
                 { key: 'actor', header: t('customers.detail.actor', { defaultValue: 'By' }), render: (a: ActivityRow) => a.actor_name ?? '—' },
+                {
+                  key: 'details',
+                  header: t('customers.detail.activityDetails', { defaultValue: 'Details' }),
+                  render: (a: ActivityRow) => {
+                    const summary = summarizeActivityDiff(a.before, a.after)
+                    return summary ? <span className="text-text-secondary">{summary}</span> : '—'
+                  },
+                },
               ] as DataTableColumn<ActivityRow>[]}
               rows={activity?.rows ?? []}
               rowKey={(a) => a.id}
@@ -461,6 +503,42 @@ export function Customer360Page() {
           </div>
         </TabsContent>
       </Tabs>
+
+      {manualInvite && (
+        <Dialog open onOpenChange={(open) => { if (!open) setManualInvite(null) }}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>{t('customers.detail.portalInviteManualTitle', { defaultValue: 'Deliver this activation invite manually' })}</DialogTitle>
+            </DialogHeader>
+            <div className="flex flex-col gap-3 text-sm">
+              <p className="text-text-secondary">
+                {t('customers.detail.portalInviteManualHelp', { defaultValue: 'This invite was not sent automatically. Copy the link and the code below and send them to the customer yourself (e.g. via WhatsApp chat or SMS). The code must be delivered separately from the link.' })}
+              </p>
+              <div>
+                <p className="mb-1 text-xs font-medium text-text-secondary">{t('customers.detail.portalInviteLinkLabel', { defaultValue: 'Activation link' })}</p>
+                <div className="flex items-center gap-2">
+                  <Input readOnly value={manualInvite.url} onFocus={(e) => e.currentTarget.select()} className="font-mono text-xs" />
+                  <Button type="button" size="sm" variant="outline" onClick={() => { void navigator.clipboard.writeText(manualInvite.url) }}>
+                    {t('common.copy', { defaultValue: 'Copy' })}
+                  </Button>
+                </div>
+              </div>
+              <div>
+                <p className="mb-1 text-xs font-medium text-text-secondary">{t('customers.detail.portalInviteSecretLabel', { defaultValue: 'Activation code' })}</p>
+                <div className="flex items-center gap-2">
+                  <Input readOnly value={manualInvite.secret} onFocus={(e) => e.currentTarget.select()} className="font-mono text-xs" />
+                  <Button type="button" size="sm" variant="outline" onClick={() => { void navigator.clipboard.writeText(manualInvite.secret) }}>
+                    {t('common.copy', { defaultValue: 'Copy' })}
+                  </Button>
+                </div>
+              </div>
+              <Button type="button" size="sm" onClick={() => setManualInvite(null)}>
+                {t('common.close', { defaultValue: 'Close' })}
+              </Button>
+            </div>
+          </DialogContent>
+        </Dialog>
+      )}
 
       {editOpen && (
         <EditCustomerDialog
@@ -613,7 +691,11 @@ function EditCustomerDialog({
         p_full_name: fullName,
         p_phone_e164: phoneE164 as string,
         p_mobile_display: mobile || undefined,
-        p_email: email || undefined,
+        // '' (not undefined) so a deliberately-cleared field is sent as
+        // an explicit clear signal, not "no change" -- see
+        // upsert_customer's NULL-vs-'' semantics in
+        // 20260824070000_upsert_customer_email_clear_semantics.sql.
+        p_email: email.trim(),
         p_customer_id: customer.id,
       })
       if (rpcError) throw rpcError

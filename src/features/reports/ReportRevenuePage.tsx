@@ -3,8 +3,10 @@ import { useTranslation } from 'react-i18next'
 import { PageHeader } from '@/components/ui/page-header'
 import { Button } from '@/components/ui/button'
 import { StatCard } from '@/components/ui/stat-card'
+import { ErrorState } from '@/components/ui/error-state'
 import { formatMoney, PAYMENT_METHOD_LABELS } from '@/lib/domain/billing'
 import { rowsToCsv, downloadCsv } from '@/lib/csv'
+import { translateSupabaseError } from '@/lib/errors'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { useDirection } from '@/app/providers/DirectionProvider'
 import { Wallet, Download } from 'lucide-react'
@@ -15,14 +17,17 @@ import { ReportsNav } from './components/ReportsNav'
 // Master IA/UX audit (Reports decomposition phase): extracted from
 // ReportsPage.tsx's RevenueReportTab -- this is the "financial source"
 // most other numbers (Dashboard's total_revenue, Overview's revenue
-// card) point back to. Confirmed by the audit: get_executive_dashboard
-// and get_revenue_report independently compute the same total_revenue/
-// refunds_total predicate in two separate SQL bodies -- see the
-// canonical-metrics note in MAL3ABY_IA_RESTRUCTURE_STATE.md for the
-// consistency-risk tracking; not fixed at the SQL level in this pass
-// (would require a migration, out of scope for a UI decomposition),
-// but flagged here so a future SQL consolidation task has a clear home
-// to land in.
+// card) point back to. get_executive_dashboard's total_revenue/
+// refunds_total previously duplicated this RPC's SQL body independently;
+// that drift risk is now closed at the SQL level -- get_executive_dashboard
+// calls get_revenue_report() internally for those fields (see migration
+// 20260824100000_consolidate_executive_dashboard_revenue_predicate.sql),
+// so there is exactly one SQL body computing total_revenue/refunds_total
+// for both Finance Overview and this Revenue report/tab. (The other
+// duplicate-predicate pairs noted in
+// 20260818110000_document_duplicate_metric_predicates.sql --
+// outstanding_total, active_enrollments, new_customers -- are unrelated
+// to this component and remain tracked separately.)
 interface RevenueReport {
   total_revenue: number
   by_day: { date: string; revenue: number }[]
@@ -39,7 +44,7 @@ export function ReportRevenueContent() {
   const { locale } = useDirection()
   const { startDate, setStartDate, endDate, setEndDate } = useDateRange()
   const [method, setMethod] = useState<string>('all')
-  const { data, isLoading } = useDateRangeReport<RevenueReport>(
+  const { data, isLoading, isError, error, refetch } = useDateRangeReport<RevenueReport>(
     'get_revenue_report',
     startDate,
     endDate,
@@ -63,6 +68,7 @@ export function ReportRevenueContent() {
         </Select>
       </div>
       {isLoading && <p className="text-sm text-text-secondary">{t('reports.loading')}</p>}
+      {isError && <ErrorState message={translateSupabaseError(error, t('reports.loadError'))} onRetry={() => void refetch()} />}
       {data && (
         <>
           <div className="mb-6 grid grid-cols-2 gap-3 md:grid-cols-3">

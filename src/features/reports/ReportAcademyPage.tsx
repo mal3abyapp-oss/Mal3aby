@@ -3,6 +3,8 @@ import { useTranslation } from 'react-i18next'
 import { PageHeader } from '@/components/ui/page-header'
 import { Button } from '@/components/ui/button'
 import { StatCard } from '@/components/ui/stat-card'
+import { ErrorState } from '@/components/ui/error-state'
+import { translateSupabaseError } from '@/lib/errors'
 import { GraduationCap } from 'lucide-react'
 import { useDateRange, useDateRangeReport } from './hooks/useDateRangeReport'
 import { DateRangeFilter } from './components/DateRangeFilter'
@@ -20,7 +22,7 @@ interface AcademyReport {
 export function ReportAcademyPage() {
   const { t } = useTranslation()
   const { startDate, setStartDate, endDate, setEndDate } = useDateRange()
-  const { data, isLoading } = useDateRangeReport<AcademyReport>('get_academy_report', startDate, endDate)
+  const { data, isLoading, isError, error, refetch } = useDateRangeReport<AcademyReport>('get_academy_report', startDate, endDate)
 
   return (
     <div>
@@ -28,6 +30,7 @@ export function ReportAcademyPage() {
       <ReportsNav />
       <DateRangeFilter startDate={startDate} endDate={endDate} onStart={setStartDate} onEnd={setEndDate} />
       {isLoading && <p className="text-sm text-text-secondary">{t('reports.loading')}</p>}
+      {isError && <ErrorState message={translateSupabaseError(error, t('reports.loadError'))} onRetry={() => void refetch()} />}
       {data && (
         <>
           <div className="mb-6 grid grid-cols-2 gap-3 md:grid-cols-3">
