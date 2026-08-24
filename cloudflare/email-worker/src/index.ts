@@ -63,71 +63,8 @@ interface ClaimedRow {
   attempts: number
 }
 
-/**
- * Read-only, secret-safe diagnostics (never logs the key value itself)
- * -- exists purely to answer "is the secret binding present/well-formed"
- * without ever exposing it. Logged once per Cron tick so `wrangler
- * tail` can show this alongside any RPC error, without requiring
- * anyone to view or re-enter the actual credential.
- */
-function logCredentialShape(env: Env): void {
-  const url = env.SUPABASE_URL ?? ''
-  const key = env.SUPABASE_SERVICE_ROLE_KEY ?? ''
-  const prefixClass = key.startsWith('eyJ')
-    ? 'legacy_jwt'
-    : key.startsWith('sb_secret_')
-      ? 'new_secret_key'
-      : key.startsWith('sb_publishable_')
-        ? 'publishable_key_WRONG_TYPE'
-        : key.length === 0
-          ? 'empty'
-          : 'unrecognized_prefix'
-  const resendKey = env.RESEND_API_KEY ?? ''
-  console.log(
-    'credential_shape',
-    JSON.stringify({
-      supabase_url: url,
-      url_matches_expected_project: url === 'https://gxkrtlvpjwxhcqdisyob.supabase.co',
-      key_present: key.length > 0,
-      key_length: key.length,
-      key_prefix_class: prefixClass,
-      resend_key_present: resendKey.length > 0,
-      resend_key_length: resendKey.length,
-      resend_key_prefix_class: resendKey.startsWith('re_') ? 're_prefix_ok' : resendKey.length === 0 ? 'empty' : 'unrecognized_prefix',
-    }),
-  )
-}
-
-/**
- * Direct REST probe against a harmless, unauthenticated-shape endpoint
- * (PostgREST's own root) using the exact same headers the Worker's
- * real RPC calls use -- isolates whether "Invalid API key" originates
- * from Cloudflare's own network path (proxy/DNS/TLS) or from
- * Supabase's gateway genuinely rejecting this specific key value, run
- * from the Worker's OWN runtime rather than a local curl (which
- * proved the gateway/error shape from a different network path, not
- * this one). Never logs the key itself -- only the resulting HTTP
- * status and Supabase's own (non-secret) error body.
- */
-async function probeRestGateway(env: Env): Promise<void> {
-  try {
-    const response = await fetch(`${env.SUPABASE_URL}/rest/v1/`, {
-      headers: {
-        apikey: env.SUPABASE_SERVICE_ROLE_KEY,
-        Authorization: `Bearer ${env.SUPABASE_SERVICE_ROLE_KEY}`,
-      },
-    })
-    const bodyText = await response.text().catch(() => '')
-    console.log('rest_gateway_probe', JSON.stringify({ status: response.status, ok: response.ok, body: bodyText.slice(0, 300) }))
-  } catch (err) {
-    console.error('rest_gateway_probe_network_error', err instanceof Error ? err.message : 'unknown')
-  }
-}
-
 export default {
   async scheduled(_controller: ScheduledController, env: Env, ctx: ExecutionContext): Promise<void> {
-    logCredentialShape(env)
-    await probeRestGateway(env)
 
     const supabase = createClient(env.SUPABASE_URL, env.SUPABASE_SERVICE_ROLE_KEY)
 
