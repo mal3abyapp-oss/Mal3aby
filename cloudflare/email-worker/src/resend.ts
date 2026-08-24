@@ -89,19 +89,5 @@ export async function sendEmail(input: SendEmailInput): Promise<SendEmailResult>
   // Never includes the raw response body in the returned errorClass
   // (could theoretically echo back request content) -- only a coarse
   // classification safe to persist in notification_queue.last_error.
-  //
-  // TEMPORARY DIAGNOSTIC (2026-08-24): logging Resend's own error body
-  // to wrangler tail to pin down a live 401 -- this body describes
-  // what Resend rejected about the REQUEST (e.g. unverified sender
-  // domain, malformed field), it never contains the API key itself
-  // (the key is only ever sent, never echoed back in any response).
-  // Remove once the root cause is confirmed and fixed.
-  try {
-    const diagBody = await response.clone().text()
-    console.error('resend_error_body', response.status, diagBody.slice(0, 500))
-  } catch {
-    // best-effort diagnostic only
-  }
-
   return { outcome: 'permanent_failure', statusCode: response.status, errorClass: response.status === 401 || response.status === 403 ? 'auth_or_permission_error' : 'invalid_request_or_recipient' }
 }
