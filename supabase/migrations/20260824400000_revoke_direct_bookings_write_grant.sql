@@ -1,0 +1,41 @@
+-- SECURITY FIX (HIGH, live-verified via this audit's final direct-DML
+-- mutation-surface sweep -- project gxkrtlvpjwxhcqdisyob): the
+-- bookings_insert_with_permission / bookings_update_with_permission
+-- RLS policies grant direct client-side INSERT/UPDATE on
+-- public.bookings to anyone holding booking.create/booking.update
+-- (Receptionist, Branch Manager, Club Manager, Club Owner), checking
+-- only club_id/permission/branch access -- none of the invariants that
+-- public.create_booking()/reschedule_booking() enforce in application
+-- logic: server-computed price (resolve_field_price(), never trusted
+-- from the client), operating-hours/field-block validation, and the
+-- exclusion constraint's overlap protection is a DB-level guarantee
+-- independent of this gap, but pricing is not.
+--
+-- Live-reproduced (rolled back, no persisted change) as a real
+-- authenticated Receptionist session: a raw `insert into
+-- public.bookings (..., total_price, status) values (..., 0.01,
+-- 'confirmed')` succeeded, creating a fully confirmed booking at a
+-- fabricated price with zero invoice, zero payment, and none of
+-- create_booking()'s pricing/validation logic applied -- the exact
+-- same bypass class as the earlier-fixed direct-payments-INSERT HIGH
+-- finding (20260824240000_revoke_direct_payments_insert_grant.sql),
+-- just on bookings instead of payments.
+--
+-- Confirmed via repo-wide grep that no frontend code anywhere
+-- performs a direct .from('bookings').insert(...)/.update(...) --
+-- create_booking() and reschedule_booking() (both SECURITY DEFINER,
+-- and neither depends on the caller's own table grant) are the only
+-- legitimate write paths, matching exactly how payments/record_payment
+-- already work. No customer self-service INSERT/UPDATE policy exists
+-- on bookings either -- only the two staff-permission-scoped policies
+-- being revoked here.
+--
+-- Fix: revoke the client-side table grant. RLS SELECT policies
+-- (bookings_select_club_staff, bookings_self_service_select,
+-- bookings_platform_owner_select) are untouched -- reads are
+-- unaffected. This does not touch the two policies themselves (they
+-- remain defined but become unreachable without the underlying table
+-- grant, matching the pattern already used for payments).
+
+revoke insert, update on public.bookings from authenticated;
+revoke insert, update on public.bookings from anon;
