@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button'
 import { LanguageSwitcher } from '@/components/ui/language-switcher'
 import { useAuth } from '@/app/providers/AuthProvider'
 import { RouteLoadingFallback } from '@/app/routing/RouteLoadingFallback'
+import { PlatformGlobalSearch } from '@/features/platform/PlatformGlobalSearch'
 import {
   LayoutDashboard,
   Building2,
@@ -169,6 +170,13 @@ export function PlatformLayout() {
               <Menu className="size-5" />
             </Button>
           </div>
+        </header>
+        {/* PERSONA COUNCIL AUDIT (2026-08-25) -- Platform Owner persona
+            finding: this shell had no cross-page search entry point at
+            all, unlike AppLayout's own desktop header (mirrors that
+            same layout: a dedicated bar, desktop-only, above main). */}
+        <header className="hidden h-14 items-center gap-4 border-b border-border bg-surface px-4 md:flex">
+          <PlatformGlobalSearch />
         </header>
         <main className="min-w-0 flex-1 p-4">
           <Suspense fallback={<RouteLoadingFallback />}>

@@ -6,6 +6,8 @@ import { PageHeader } from '@/components/ui/page-header'
 import { StatCard } from '@/components/ui/stat-card'
 import { MoneyDisplay } from '@/components/ui/money-display'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { ErrorState } from '@/components/ui/error-state'
+import { translateSupabaseError } from '@/lib/errors'
 import { isSubscriptionExpiringSoon } from './labels'
 
 // Platform Overview dashboard — real aggregate counts from clubs +
@@ -140,11 +142,28 @@ async function fetchOverview(): Promise<OverviewData> {
 
 export function PlatformOverviewPage() {
   const { t } = useTranslation()
-  const { data, isLoading } = useQuery({ queryKey: ['platform-overview'], queryFn: fetchOverview })
+  const { data, isLoading, isError, error, refetch } = useQuery({ queryKey: ['platform-overview'], queryFn: fetchOverview })
 
   return (
     <div>
       <PageHeader title={t('platform.overviewPage.title')} description={t('platform.overviewPage.description')} />
+      {/* PERSONA COUNCIL AUDIT (2026-08-25) -- Platform Owner persona
+          finding: this query threw on any real failure inside
+          fetchOverview() itself, but the render only ever destructured
+          {data, isLoading} -- on a genuine error, every card silently
+          fell through to its `?? 0` default and showed "0", visually
+          identical to a genuinely healthy, empty platform. A Platform
+          Owner reading "0 clubs need attention" had no way to tell that
+          apart from "the query failed, I don't actually know." Every
+          card below now also renders "—" (not "0") while isError is
+          true, and this banner surfaces the real failure with a retry. */}
+      {isError && (
+        <ErrorState
+          message={translateSupabaseError(error, t('platform.overviewPage.loadError', { defaultValue: 'Could not load the dashboard. The numbers below may be wrong or missing.' }))}
+          onRetry={() => void refetch()}
+          className="mb-4"
+        />
+      )}
       {/* Master IA/UX audit (Platform Owner phase, Audit 5) confirmed all 7
           cards here were dead-ends -- every card linked to the same
           unfiltered /platform/clubs list regardless of which was clicked.
@@ -153,28 +172,28 @@ export function PlatformOverviewPage() {
           contract) -- each card below links to a genuinely filtered view
           instead of the same undifferentiated list. */}
       <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
-        <StatCard label={t('platform.overviewPage.cards.totalClubs')} value={isLoading ? '—' : String(data?.totalClubs ?? 0)} to="/platform/clubs" />
-        <StatCard label={t('platform.overviewPage.cards.activeClubs')} value={isLoading ? '—' : String(data?.activeClubs ?? 0)} to="/platform/clubs?status=active" />
+        <StatCard label={t('platform.overviewPage.cards.totalClubs')} value={isLoading || isError ? '—' : String(data?.totalClubs ?? 0)} to="/platform/clubs" />
+        <StatCard label={t('platform.overviewPage.cards.activeClubs')} value={isLoading || isError ? '—' : String(data?.activeClubs ?? 0)} to="/platform/clubs?status=active" />
         {/* Renamed from "أندية موقوفة" -- that label was ambiguous with
             "حالة الاشتراك: موقوف" on PlatformClubsPage, a different
             concept (subscription/billing access, not admin status).
             See blockedAccessClubs card below for that other signal. */}
-        <StatCard label={t('platform.overviewPage.cards.adminSuspendedClubs')} value={isLoading ? '—' : String(data?.adminSuspendedClubs ?? 0)} to="/platform/clubs?status=suspended" />
+        <StatCard label={t('platform.overviewPage.cards.adminSuspendedClubs')} value={isLoading || isError ? '—' : String(data?.adminSuspendedClubs ?? 0)} to="/platform/clubs?status=suspended" />
         <StatCard
           label={t('platform.overviewPage.cards.blockedAccessClubs')}
-          value={isLoading ? '—' : String(data?.blockedAccessClubs ?? 0)}
+          value={isLoading || isError ? '—' : String(data?.blockedAccessClubs ?? 0)}
           to="/platform/clubs?access=blocked"
         />
-        <StatCard label={t('platform.overviewPage.cards.trialCount')} value={isLoading ? '—' : String(data?.trialCount ?? 0)} to="/platform/trials" />
+        <StatCard label={t('platform.overviewPage.cards.trialCount')} value={isLoading || isError ? '—' : String(data?.trialCount ?? 0)} to="/platform/trials" />
         {/* Label no longer says "(7 أيام)" -- the underlying threshold is
             now isSubscriptionExpiringSoon() (3d trial / 7d paid), not a
             flat 7 days; see labels.ts. */}
         <StatCard
           label={t('platform.overviewPage.cards.expiringSoonCount')}
-          value={isLoading ? '—' : String(data?.expiringSoonCount ?? 0)}
+          value={isLoading || isError ? '—' : String(data?.expiringSoonCount ?? 0)}
           to="/platform/alerts"
         />
-        <StatCard label={t('platform.overviewPage.cards.newClubsThisMonth')} value={isLoading ? '—' : String(data?.newClubsThisMonth ?? 0)} to="/platform/clubs?created=this_month" />
+        <StatCard label={t('platform.overviewPage.cards.newClubsThisMonth')} value={isLoading || isError ? '—' : String(data?.newClubsThisMonth ?? 0)} to="/platform/clubs?created=this_month" />
       </div>
 
       {/* Gate 13 #56: pending action items were invisible platform-wide --
@@ -274,7 +293,7 @@ export function PlatformOverviewPage() {
           <CardTitle className="text-base">{t('platform.overviewPage.revenueThisMonth')}</CardTitle>
         </CardHeader>
         <CardContent>
-          {isLoading ? '—' : <MoneyDisplay amount={data?.revenueThisMonth ?? 0} size="lg" />}
+          {isLoading || isError ? '—' : <MoneyDisplay amount={data?.revenueThisMonth ?? 0} size="lg" />}
         </CardContent>
       </Card>
     </div>

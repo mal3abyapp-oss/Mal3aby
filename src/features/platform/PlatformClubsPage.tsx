@@ -16,6 +16,8 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { CLUB_STATUS_LABELS, ACCESS_TONE, ACCESS_LABEL } from '@/features/platform/labels'
+import { ErrorState } from '@/components/ui/error-state'
+import { translateSupabaseError } from '@/lib/errors'
 
 // Master IA/UX audit (Platform Owner phase, Audit 5): a hard `.limit(100)`
 // silently dropped any club beyond the 100th with zero indication a cutoff
@@ -100,7 +102,7 @@ export function PlatformClubsPage() {
     setSearchParams(next)
   }
 
-  const { data, isLoading, isFetching } = useQuery({
+  const { data, isLoading, isFetching, isError, error, refetch } = useQuery({
     queryKey: ['platform-clubs', pages],
     queryFn: async () => {
       const results = await Promise.all(Array.from({ length: pages }, (_, i) => fetchClubs(i * PAGE_SIZE)))
@@ -164,6 +166,19 @@ export function PlatformClubsPage() {
   return (
     <div>
       <PageHeader title={t('platform.clubsPage.title')} description={t('platform.clubsPage.description')} />
+
+      {/* PERSONA COUNCIL AUDIT (2026-08-25) -- Platform Owner persona,
+          same silent-read-error pattern as PlatformOverviewPage: a real
+          query failure here previously rendered an empty list with no
+          indication it was a failure rather than a genuinely empty
+          platform. */}
+      {isError && (
+        <ErrorState
+          message={translateSupabaseError(error, t('platform.clubsPage.loadError', { defaultValue: 'Could not load clubs.' }))}
+          onRetry={() => void refetch()}
+          className="mb-4"
+        />
+      )}
 
       <div className="mb-4 flex flex-wrap gap-3">
         <Input

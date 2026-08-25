@@ -11,6 +11,8 @@ import { StatusBadge } from '@/components/ui/status-badge'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { CLUB_STATUS_LABELS } from '@/features/platform/labels'
+import { ErrorState } from '@/components/ui/error-state'
+import { translateSupabaseError } from '@/lib/errors'
 
 // Gate 13 task #55: the platform owner console had no way to see WHO
 // owns each club -- ownership is a club_memberships row (role = club_owner),
@@ -78,7 +80,7 @@ export function PlatformOwnersPage() {
   const [pages, setPages] = useState(1)
   const [resetSentFor, setResetSentFor] = useState<string | null>(null)
   const [resetError, setResetError] = useState<string | null>(null)
-  const { data, isLoading, isFetching } = useQuery({
+  const { data, isLoading, isFetching, isError, error, refetch } = useQuery({
     queryKey: ['platform-owners', search, pages],
     queryFn: async () => {
       const results = await Promise.all(Array.from({ length: pages }, (_, i) => fetchOwners(search, i * PAGE_SIZE)))
@@ -243,6 +245,17 @@ export function PlatformOwnersPage() {
   return (
     <div>
       <PageHeader title={t('platform.ownersPage.title')} description={t('platform.ownersPage.description')} />
+
+      {/* PERSONA COUNCIL AUDIT (2026-08-25) -- Platform Owner persona,
+          same silent-read-error pattern as PlatformOverviewPage/
+          PlatformClubsPage. */}
+      {isError && (
+        <ErrorState
+          message={translateSupabaseError(error, t('platform.ownersPage.loadError', { defaultValue: 'Could not load club owners.' }))}
+          onRetry={() => void refetch()}
+          className="mb-4"
+        />
+      )}
 
       {/* Cross-phase directive (U1): Platform Owner accounts, previously
           invisible anywhere on the console -- only discoverable via a

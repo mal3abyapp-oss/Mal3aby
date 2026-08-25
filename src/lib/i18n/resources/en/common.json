@@ -216,6 +216,7 @@
     },
     "clubDetailPage": {
       "loadingTitle": "...",
+      "loadError": "Some of this club's data failed to load. Numbers or status shown below may be stale or missing -- refresh before making a decision.",
       "limitTypeLabels": {
         "branch_limit": "Branches",
         "field_limit": "Fields",
@@ -409,6 +410,7 @@
         "subscriptionStatus": "Subscription status"
       },
       "searchPlaceholder": "Search by name or code",
+      "loadError": "Could not load clubs.",
       "filters": {
         "status": "Administrative status",
         "allStatuses": "All statuses",
@@ -452,6 +454,7 @@
     "overviewPage": {
       "title": "Overview",
       "description": "Platform performance summary",
+      "loadError": "Could not load the dashboard. The numbers below may be wrong or missing.",
       "cards": {
         "totalClubs": "Total clubs",
         "activeClubs": "Active clubs",
@@ -486,6 +489,7 @@
     "ownersPage": {
       "title": "Club Owners",
       "description": "All club owners registered on the platform, and each owner's linked clubs",
+      "loadError": "Could not load club owners.",
       "platformOwnersHeading": "Platform Owner accounts",
       "alsoClubOwnerOf": "Also owns {{count}} club",
       "alsoClubOwnerOf_plural": "Also owns {{count}} clubs",

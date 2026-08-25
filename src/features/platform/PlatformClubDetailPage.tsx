@@ -27,6 +27,7 @@ import {
 import { LIFECYCLE_STATUS_LABELS, SUBSCRIPTION_KIND_LABELS, ACCESS_TONE, ACCESS_LABEL } from './labels'
 import { actionLabel, entityLabel } from '@/lib/domain/audit'
 import { useDirection } from '@/app/providers/DirectionProvider'
+import { ErrorState } from '@/components/ui/error-state'
 
 // Per-club detail: Overview / Current Subscription / History / Payment
 // History / Access Status / Audit, plus the Actions panel wired to every
@@ -143,7 +144,7 @@ export function PlatformClubDetailPage() {
   const [fieldLimitInput, setFieldLimitInput] = useState('')
   const [academyLimitInput, setAcademyLimitInput] = useState('')
 
-  const { data: club } = useQuery({ queryKey: ['platform-club', clubId], queryFn: () => fetchClub(clubId!), enabled: !!clubId })
+  const { data: club, isError: clubError } = useQuery({ queryKey: ['platform-club', clubId], queryFn: () => fetchClub(clubId!), enabled: !!clubId })
   // Phase C directive (Club 360): the audit's core test -- "if a club
   // owner calls support right now, can the platform owner understand
   // that club's full state within under a minute?" -- was a confirmed
@@ -151,7 +152,7 @@ export function PlatformClubDetailPage() {
   // contact, facilities, or booking/customer volume. One batched RPC
   // (not per-section queries, consistent with the Phase A N+1 fix)
   // covers all of it in a single round trip.
-  const { data: club360 } = useQuery({
+  const { data: club360, isError: club360Error } = useQuery({
     queryKey: ['platform-club-360', clubId],
     queryFn: async () => {
       const { data, error } = await supabase.rpc('get_platform_club_360', { p_club_id: clubId! })
@@ -200,7 +201,7 @@ export function PlatformClubDetailPage() {
     },
     enabled: !!clubId,
   })
-  const { data: access } = useQuery({
+  const { data: access, isError: accessError } = useQuery({
     queryKey: ['platform-club-access', clubId],
     queryFn: async () => {
       const { data, error } = await supabase.rpc('get_club_platform_access', { p_club_id: clubId! })
@@ -209,12 +210,12 @@ export function PlatformClubDetailPage() {
     },
     enabled: !!clubId,
   })
-  const { data: subscriptions = [] } = useQuery({
+  const { data: subscriptions = [], isError: subscriptionsError } = useQuery({
     queryKey: ['platform-club-subs', clubId],
     queryFn: () => fetchSubscriptions(clubId!),
     enabled: !!clubId,
   })
-  const { data: invoices = [] } = useQuery({
+  const { data: invoices = [], isError: invoicesError } = useQuery({
     queryKey: ['platform-club-invoices', clubId],
     queryFn: () => fetchInvoices(clubId!),
     enabled: !!clubId,
@@ -225,12 +226,12 @@ export function PlatformClubDetailPage() {
     enabled: !!clubId,
   })
   const { data: plans = [] } = useQuery({ queryKey: ['platform-plans-active'], queryFn: fetchPlans })
-  const { data: entitlements } = useQuery({
+  const { data: entitlements, isError: entitlementsError } = useQuery({
     queryKey: ['platform-club-entitlements', clubId],
     queryFn: () => fetchEntitlements(clubId!),
     enabled: !!clubId,
   })
-  const { data: usage } = useQuery({
+  const { data: usage, isError: usageError } = useQuery({
     queryKey: ['platform-club-usage', clubId],
     queryFn: () => fetchUsage(clubId!),
     enabled: !!clubId,
@@ -240,6 +241,21 @@ export function PlatformClubDetailPage() {
     queryFn: () => fetchUpgradeRequests(clubId!),
     enabled: !!clubId,
   })
+
+  // PERSONA COUNCIL AUDIT (2026-08-25) -- Platform Owner persona
+  // finding: this page runs ~14 independent reads feeding a real,
+  // action-dense screen (suspend/reactivate/renew/change-plan/adjust-
+  // limits) -- none of them surfaced a read failure to the UI, only
+  // mutations did (see actionError below). A transient failure on any
+  // of the reads that inform those decisions (identity, operational
+  // summary, subscription access, invoices, entitlements/usage) could
+  // silently show stale or blank data with no indication anything was
+  // wrong, right before a Platform Owner makes a real decision from it.
+  // One aggregated banner covering the reads that most directly inform
+  // an action here, rather than instrumenting all 14 individually --
+  // the lower-stakes reads (audit log, active plans list) keep their
+  // existing silent-empty fallback, unchanged.
+  const hasReadError = clubError || club360Error || accessError || subscriptionsError || invoicesError || entitlementsError || usageError
 
   const currentSub = subscriptions.find((s) => s.lifecycle_status !== 'cancelled')
   const pendingRequests = upgradeRequests.filter((r) => r.status === 'pending')
@@ -566,6 +582,13 @@ export function PlatformClubDetailPage() {
           )
         }
       />
+
+      {hasReadError && (
+        <ErrorState
+          message={t('platform.clubDetailPage.loadError', { defaultValue: 'Some of this club\'s data failed to load. Numbers or status shown below may be stale or missing -- refresh before making a decision.' })}
+          className="mb-3"
+        />
+      )}
 
       {actionError && (
         <p role="alert" className="mb-3 text-sm text-status-danger">

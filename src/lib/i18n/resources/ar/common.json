@@ -216,6 +216,7 @@
     },
     "clubDetailPage": {
       "loadingTitle": "...",
+      "loadError": "بعض بيانات هذا النادي تعذّر تحميلها. الأرقام أو الحالة الظاهرة أدناه قد تكون قديمة أو غير مكتملة -- حدّث الصفحة قبل اتخاذ أي قرار.",
       "limitTypeLabels": {
         "branch_limit": "الفروع",
         "field_limit": "الملاعب",
@@ -409,6 +410,7 @@
         "subscriptionStatus": "حالة الاشتراك"
       },
       "searchPlaceholder": "بحث بالاسم أو الكود",
+      "loadError": "تعذّر تحميل الأندية.",
       "filters": {
         "status": "الحالة الإدارية",
         "allStatuses": "كل الحالات",
@@ -452,6 +454,7 @@
     "overviewPage": {
       "title": "نظرة عامة",
       "description": "ملخص أداء المنصة",
+      "loadError": "تعذّر تحميل لوحة المعلومات. الأرقام أدناه قد تكون غير صحيحة أو غير مكتملة.",
       "cards": {
         "totalClubs": "إجمالي الأندية",
         "activeClubs": "أندية نشطة",
@@ -486,6 +489,7 @@
     "ownersPage": {
       "title": "أصحاب الأندية",
       "description": "جميع أصحاب الأندية المسجّلين على المنصة، وربط كل مالك بناديه",
+      "loadError": "تعذّر تحميل أصحاب الأندية.",
       "platformOwnersHeading": "أصحاب صلاحية المنصة (Platform Owner)",
       "alsoClubOwnerOf": "يملك أيضًا {{count}} نادٍ",
       "alsoClubOwnerOf_plural": "يملك أيضًا {{count}} أندية",
