@@ -194,8 +194,8 @@ export function StaffPage() {
       const { error } = await supabase.rpc('invite_staff_member', {
         p_club_id: currentClubId as string,
         p_email: email,
-        p_role_key: isCustom ? null : roleSelection,
-        p_custom_role_id: isCustom ? roleSelection.slice('custom:'.length) : null,
+        p_role_key: isCustom ? undefined : roleSelection,
+        p_custom_role_id: isCustom ? roleSelection.slice('custom:'.length) : undefined,
         p_branch_ids: allBranches ? [] : selectedBranchIds,
       })
       if (error) throw error

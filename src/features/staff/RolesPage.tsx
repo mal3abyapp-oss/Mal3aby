@@ -9,7 +9,6 @@ import { StatusBadge } from '@/components/ui/status-badge'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { Textarea } from '@/components/ui/textarea'
 import {
   Dialog,
   DialogContent,
@@ -325,7 +324,7 @@ function RoleEditorDialog({
           p_club_role_id: roleId!,
           p_name_ar: nameAr,
           p_name_en: nameEn,
-          p_description: description || null,
+          p_description: description,
           p_permission_keys: keys,
           p_is_active: true,
         })
@@ -335,7 +334,7 @@ function RoleEditorDialog({
           p_club_id: clubId,
           p_name_ar: nameAr,
           p_name_en: nameEn,
-          p_description: description || null,
+          p_description: description,
           p_permission_keys: keys,
         })
         if (err) throw err
@@ -377,7 +376,12 @@ function RoleEditorDialog({
           </div>
           <div className="flex flex-col gap-1.5">
             <label className="text-sm font-medium text-text-secondary">{t('roles.descriptionLabel')}</label>
-            <Textarea value={description} onChange={(e) => setDescription(e.target.value)} rows={2} />
+            <textarea
+              className="min-h-16 rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm"
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              rows={2}
+            />
           </div>
 
           {/* Mobile: stacked group tabs (horizontal scroll) above the

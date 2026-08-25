@@ -2715,7 +2715,10 @@
       "groupStaff": "Staff",
       "groupSettings": "Settings",
       "groupScanner": "Scanner / Attendance"
-    }
+    },
+    "customRoleOption": "Custom: {{name}}",
+    "manageRolesLink": "Manage roles",
+    "customRoleBadge": "Custom"
   },
   "scanner": {
     "title": "Scan QR",
@@ -2793,8 +2796,17 @@
       "description": "Clear subscription plans, no hidden fees",
       "unavailable": "Plans aren't available right now.",
       "startFreeTrial": "Start your free trial",
-      "intervals": { "month_1": "Monthly", "month_3": "Quarterly", "month_6": "Semiannual", "year_1": "Annual" },
-      "discounts": { "month_3": "Save 10%", "month_6": "Save 17%", "year_1": "Save 25%" }
+      "intervals": {
+        "month_1": "Monthly",
+        "month_3": "Quarterly",
+        "month_6": "Semiannual",
+        "year_1": "Annual"
+      },
+      "discounts": {
+        "month_3": "Save 10%",
+        "month_6": "Save 17%",
+        "year_1": "Save 25%"
+      }
     },
     "home": {
       "heroTitle": "Manage your club, academy, and fields from one place",
@@ -2975,6 +2987,290 @@
       "officialReceipts": "Official receipts",
       "reconciliation": "Reconciliation",
       "employeeLiability": "Employee liability"
+    }
+  },
+  "roles": {
+    "title": "Roles",
+    "description": "Manage system roles and create custom roles with exactly the permissions you choose",
+    "createRole": "Create role",
+    "editRole": "Edit role",
+    "columns": {
+      "name": "Name",
+      "scope": "Scope",
+      "employees": "Employees",
+      "permissions": "Permissions",
+      "status": "Status"
+    },
+    "scopeSystem": "System",
+    "scopeCustom": "Custom",
+    "active": "Active",
+    "inactive": "Disabled",
+    "edit": "Edit",
+    "copy": "Copy",
+    "delete": "Delete",
+    "emptyTitle": "No roles yet",
+    "emptyDescription": "System roles are always available; create a custom role to grant exactly the access you need",
+    "nameArLabel": "Name (Arabic)",
+    "nameEnLabel": "Name (English)",
+    "descriptionLabel": "Description (optional)",
+    "nameRequired": "Both an Arabic and an English name are required.",
+    "saveError": "Couldn't save this role. Make sure you're not trying to grant a permission you don't hold yourself.",
+    "copyError": "Couldn't copy this role.",
+    "deleteError": "Couldn't delete this role.",
+    "deleteBlockedInUse": "This role is assigned to {{count}} active employee(s) — reassign or suspend them first.",
+    "save": "Save",
+    "saving": "Saving...",
+    "copyDialogTitle": "Copy \"{{name}}\"",
+    "selectAllGroup": "Select all",
+    "clearGroup": "Clear",
+    "groupEmpty": "No permissions in this group yet.",
+    "sensitive": "Sensitive",
+    "cannotGrantHint": "You can't grant a permission you don't hold yourself.",
+    "summaryTitle": "Access summary",
+    "summaryPermissionCount": "{{count}} permission(s) selected",
+    "summarySensitiveWarning": "This role includes one or more sensitive permissions.",
+    "summaryNavHint": "This role would see:",
+    "summaryNoNavAccess": "No main navigation sections yet — select permissions to see what this role can access.",
+    "navDomains": {
+      "bookings": "Bookings",
+      "customers": "Customers",
+      "academy": "Academy",
+      "finance": "Finance",
+      "reports": "Reports",
+      "staff": "Staff",
+      "settings": "Settings",
+      "scan": "Scan"
+    },
+    "groups": {
+      "main": "Main",
+      "bookings": "Bookings",
+      "customers": "Customers",
+      "academy": "Academy",
+      "finance": "Finance",
+      "cash": "Collections & Custody",
+      "reports": "Reports",
+      "staff": "Staff",
+      "branches": "Branches & Fields",
+      "settings": "Settings",
+      "audit": "Activity log"
+    }
+  },
+  "permissions": {
+    "booking.view": {
+      "label": "View bookings",
+      "description": "See the bookings calendar and list"
+    },
+    "booking.create": {
+      "label": "Create bookings",
+      "description": "Create a new booking for a customer"
+    },
+    "booking.update": {
+      "label": "Edit bookings",
+      "description": "Change the details of an existing booking"
+    },
+    "booking.cancel": {
+      "label": "Cancel bookings",
+      "description": "Cancel an existing booking"
+    },
+    "booking.discount.apply": {
+      "label": "Apply booking discounts",
+      "description": "Apply a standard discount to a booking"
+    },
+    "booking.discount.override": {
+      "label": "Override discount limits",
+      "description": "Apply a discount beyond the standard limit"
+    },
+    "customer.view": {
+      "label": "View customers",
+      "description": "See the customer list and profiles"
+    },
+    "customer.create": {
+      "label": "Create customers",
+      "description": "Add a new customer"
+    },
+    "customer.update": {
+      "label": "Edit customers",
+      "description": "Update a customer's details"
+    },
+    "player.view": {
+      "label": "View players",
+      "description": "See player profiles (excluding medical notes)"
+    },
+    "player.create": {
+      "label": "Create players",
+      "description": "Add a new player"
+    },
+    "player.update": {
+      "label": "Edit players",
+      "description": "Update a player's details"
+    },
+    "player.medical_notes.view": {
+      "label": "View medical notes",
+      "description": "See a player's medical notes"
+    },
+    "player.medical_notes.update": {
+      "label": "Edit medical notes",
+      "description": "Update a player's medical notes"
+    },
+    "academy.group.manage": {
+      "label": "Manage academy groups",
+      "description": "Create and update groups and their weekly schedule"
+    },
+    "academy.program.manage": {
+      "label": "Manage academy programs",
+      "description": "Create and update programs, seasons, and age groups"
+    },
+    "enrollment.view": {
+      "label": "View enrollments",
+      "description": "See academy enrollments"
+    },
+    "enrollment.create": {
+      "label": "Create enrollments",
+      "description": "Enroll a player into a group"
+    },
+    "enrollment.update": {
+      "label": "Edit enrollments",
+      "description": "Update or withdraw an enrollment"
+    },
+    "session.view": {
+      "label": "View training sessions",
+      "description": "See scheduled training sessions"
+    },
+    "session.manage": {
+      "label": "Manage training sessions",
+      "description": "Generate and update training sessions"
+    },
+    "attendance.view": {
+      "label": "View attendance",
+      "description": "See attendance records"
+    },
+    "attendance.mark": {
+      "label": "Mark attendance",
+      "description": "Mark attendance for a session"
+    },
+    "subscription.view": {
+      "label": "View subscriptions",
+      "description": "See academy subscriptions"
+    },
+    "subscription.create": {
+      "label": "Create subscriptions",
+      "description": "Create a subscription for an enrollment"
+    },
+    "subscription.update": {
+      "label": "Edit subscriptions",
+      "description": "Update a subscription's status or activation"
+    },
+    "subscription.freeze.create": {
+      "label": "Freeze subscriptions",
+      "description": "Freeze a subscription temporarily"
+    },
+    "invoice.view": {
+      "label": "View invoices",
+      "description": "See invoices"
+    },
+    "invoice.create": {
+      "label": "Create invoices",
+      "description": "Create and issue an invoice"
+    },
+    "invoice.update": {
+      "label": "Edit draft invoices",
+      "description": "Update a draft invoice before it's issued"
+    },
+    "payment.view": {
+      "label": "View payments",
+      "description": "See recorded payments"
+    },
+    "payment.create": {
+      "label": "Record payments",
+      "description": "Record a payment against an invoice"
+    },
+    "payment.verify": {
+      "label": "Verify payment claims",
+      "description": "Verify or reject a customer's manual payment claim"
+    },
+    "payment.refund": {
+      "label": "Issue refunds",
+      "description": "Issue a refund against a completed payment"
+    },
+    "payment.methods.view": {
+      "label": "View payment methods",
+      "description": "See the club's configured payment methods"
+    },
+    "payment.methods.manage": {
+      "label": "Manage payment methods",
+      "description": "Create, edit, or disable payment methods"
+    },
+    "report.view": {
+      "label": "View reports",
+      "description": "See revenue, occupancy, academy, and customer reports"
+    },
+    "notification.view": {
+      "label": "View notifications",
+      "description": "See notification events and the delivery queue"
+    },
+    "staff.view": {
+      "label": "View staff",
+      "description": "See the staff list and employee details"
+    },
+    "staff.create": {
+      "label": "Add staff",
+      "description": "Invite a new staff member"
+    },
+    "staff.update": {
+      "label": "Edit staff",
+      "description": "Change a staff member's role, branches, or status"
+    },
+    "roles.view": {
+      "label": "View roles",
+      "description": "See custom roles and their permission sets"
+    },
+    "roles.manage": {
+      "label": "Manage roles",
+      "description": "Create, edit, copy, or delete custom roles"
+    },
+    "field.view": {
+      "label": "View fields",
+      "description": "See fields, their hours, and blocks"
+    },
+    "field.create": {
+      "label": "Create fields",
+      "description": "Add a new field"
+    },
+    "field.update": {
+      "label": "Edit fields",
+      "description": "Update a field, its hours, or create a block"
+    },
+    "branch.create": {
+      "label": "Create branches",
+      "description": "Add a new branch"
+    },
+    "branch.update": {
+      "label": "Edit branches",
+      "description": "Update a branch's details"
+    },
+    "pricing.view": {
+      "label": "View pricing",
+      "description": "See pricing rules"
+    },
+    "pricing.update": {
+      "label": "Edit pricing",
+      "description": "Manage pricing rules"
+    },
+    "qr.scan": {
+      "label": "Scan QR codes",
+      "description": "Validate a QR code"
+    },
+    "qr.checkin.confirm": {
+      "label": "Confirm check-in",
+      "description": "Confirm booking check-in from a validated QR scan"
+    },
+    "club.update": {
+      "label": "Manage club settings",
+      "description": "Update the club's identity and business settings"
+    },
+    "manage_whatsapp_connection": {
+      "label": "Manage WhatsApp connection",
+      "description": "Connect or disconnect the club's WhatsApp account"
     }
   }
 }

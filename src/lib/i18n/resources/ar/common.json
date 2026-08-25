@@ -2719,7 +2719,10 @@
       "groupStaff": "الموظفون",
       "groupSettings": "الإعدادات",
       "groupScanner": "المسح / الحضور"
-    }
+    },
+    "customRoleOption": "مخصص: {{name}}",
+    "manageRolesLink": "إدارة الأدوار",
+    "customRoleBadge": "مخصص"
   },
   "scanner": {
     "title": "مسح QR",
@@ -2977,6 +2980,290 @@
       "officialReceipts": "الإيصالات الرسمية",
       "reconciliation": "المطابقة المالية",
       "employeeLiability": "مديونية الموظفين"
+    }
+  },
+  "roles": {
+    "title": "الأدوار",
+    "description": "أدر الأدوار الأساسية وأنشئ أدوارًا مخصصة بالصلاحيات التي تختارها بالضبط",
+    "createRole": "إنشاء دور",
+    "editRole": "تعديل الدور",
+    "columns": {
+      "name": "الاسم",
+      "scope": "النطاق",
+      "employees": "الموظفون",
+      "permissions": "الصلاحيات",
+      "status": "الحالة"
+    },
+    "scopeSystem": "أساسي",
+    "scopeCustom": "مخصص",
+    "active": "مفعّل",
+    "inactive": "معطّل",
+    "edit": "تعديل",
+    "copy": "نسخ",
+    "delete": "حذف",
+    "emptyTitle": "لا توجد أدوار بعد",
+    "emptyDescription": "الأدوار الأساسية متاحة دائمًا؛ أنشئ دورًا مخصصًا لمنح الصلاحيات التي تحتاجها بالضبط",
+    "nameArLabel": "الاسم (عربي)",
+    "nameEnLabel": "الاسم (إنجليزي)",
+    "descriptionLabel": "الوصف (اختياري)",
+    "nameRequired": "الاسم بالعربية والإنجليزية مطلوبان.",
+    "saveError": "تعذّر حفظ هذا الدور. تأكد من أنك لا تحاول منح صلاحية لا تملكها بنفسك.",
+    "copyError": "تعذّر نسخ هذا الدور.",
+    "deleteError": "تعذّر حذف هذا الدور.",
+    "deleteBlockedInUse": "هذا الدور مُسند إلى {{count}} موظف نشط — أعد إسنادهم أو عطّلهم أولًا.",
+    "save": "حفظ",
+    "saving": "جارٍ الحفظ...",
+    "copyDialogTitle": "نسخ \"{{name}}\"",
+    "selectAllGroup": "تحديد الكل",
+    "clearGroup": "مسح",
+    "groupEmpty": "لا توجد صلاحيات في هذه المجموعة بعد.",
+    "sensitive": "حساسة",
+    "cannotGrantHint": "لا يمكنك منح صلاحية لا تملكها بنفسك.",
+    "summaryTitle": "ملخص الوصول",
+    "summaryPermissionCount": "تم تحديد {{count}} صلاحية",
+    "summarySensitiveWarning": "يتضمن هذا الدور صلاحية حساسة واحدة أو أكثر.",
+    "summaryNavHint": "سيرى هذا الدور:",
+    "summaryNoNavAccess": "لا توجد أقسام في التنقل الرئيسي بعد — اختر صلاحيات لمعرفة ما يمكن لهذا الدور الوصول إليه.",
+    "navDomains": {
+      "bookings": "الحجوزات",
+      "customers": "العملاء",
+      "academy": "الأكاديمية",
+      "finance": "المالية",
+      "reports": "التقارير",
+      "staff": "الموظفون",
+      "settings": "الإعدادات",
+      "scan": "المسح"
+    },
+    "groups": {
+      "main": "الرئيسية",
+      "bookings": "الحجوزات",
+      "customers": "العملاء",
+      "academy": "الأكاديمية",
+      "finance": "المالية",
+      "cash": "التحصيل والعهدة",
+      "reports": "التقارير",
+      "staff": "الموظفون",
+      "branches": "الفروع والملاعب",
+      "settings": "الإعدادات",
+      "audit": "سجل النشاط"
+    }
+  },
+  "permissions": {
+    "booking.view": {
+      "label": "عرض الحجوزات",
+      "description": "رؤية تقويم وقائمة الحجوزات"
+    },
+    "booking.create": {
+      "label": "إنشاء حجوزات",
+      "description": "إنشاء حجز جديد لعميل"
+    },
+    "booking.update": {
+      "label": "تعديل الحجوزات",
+      "description": "تغيير تفاصيل حجز موجود"
+    },
+    "booking.cancel": {
+      "label": "إلغاء الحجوزات",
+      "description": "إلغاء حجز موجود"
+    },
+    "booking.discount.apply": {
+      "label": "تطبيق خصومات على الحجوزات",
+      "description": "تطبيق خصم عادي على حجز"
+    },
+    "booking.discount.override": {
+      "label": "تجاوز حدود الخصم",
+      "description": "تطبيق خصم يتجاوز الحد المسموح"
+    },
+    "customer.view": {
+      "label": "عرض العملاء",
+      "description": "رؤية قائمة العملاء وملفاتهم"
+    },
+    "customer.create": {
+      "label": "إنشاء عملاء",
+      "description": "إضافة عميل جديد"
+    },
+    "customer.update": {
+      "label": "تعديل بيانات العملاء",
+      "description": "تحديث بيانات عميل"
+    },
+    "player.view": {
+      "label": "عرض اللاعبين",
+      "description": "رؤية ملفات اللاعبين (بدون الملاحظات الطبية)"
+    },
+    "player.create": {
+      "label": "إنشاء لاعبين",
+      "description": "إضافة لاعب جديد"
+    },
+    "player.update": {
+      "label": "تعديل بيانات اللاعبين",
+      "description": "تحديث بيانات لاعب"
+    },
+    "player.medical_notes.view": {
+      "label": "عرض الملاحظات الطبية",
+      "description": "رؤية الملاحظات الطبية للاعب"
+    },
+    "player.medical_notes.update": {
+      "label": "تعديل الملاحظات الطبية",
+      "description": "تحديث الملاحظات الطبية للاعب"
+    },
+    "academy.group.manage": {
+      "label": "إدارة مجموعات الأكاديمية",
+      "description": "إنشاء وتعديل المجموعات وجدولها الأسبوعي"
+    },
+    "academy.program.manage": {
+      "label": "إدارة برامج الأكاديمية",
+      "description": "إنشاء وتعديل البرامج والمواسم والفئات العمرية"
+    },
+    "enrollment.view": {
+      "label": "عرض التسجيلات",
+      "description": "رؤية تسجيلات الأكاديمية"
+    },
+    "enrollment.create": {
+      "label": "إنشاء تسجيلات",
+      "description": "تسجيل لاعب في مجموعة"
+    },
+    "enrollment.update": {
+      "label": "تعديل التسجيلات",
+      "description": "تحديث أو سحب تسجيل"
+    },
+    "session.view": {
+      "label": "عرض التدريبات",
+      "description": "رؤية جلسات التدريب المجدولة"
+    },
+    "session.manage": {
+      "label": "إدارة التدريبات",
+      "description": "إنشاء وتحديث جلسات التدريب"
+    },
+    "attendance.view": {
+      "label": "عرض الحضور",
+      "description": "رؤية سجلات الحضور"
+    },
+    "attendance.mark": {
+      "label": "تسجيل الحضور",
+      "description": "تسجيل حضور جلسة"
+    },
+    "subscription.view": {
+      "label": "عرض الاشتراكات",
+      "description": "رؤية اشتراكات الأكاديمية"
+    },
+    "subscription.create": {
+      "label": "إنشاء اشتراكات",
+      "description": "إنشاء اشتراك لتسجيل"
+    },
+    "subscription.update": {
+      "label": "تعديل الاشتراكات",
+      "description": "تحديث حالة أو تفعيل اشتراك"
+    },
+    "subscription.freeze.create": {
+      "label": "تجميد الاشتراكات",
+      "description": "تجميد اشتراك مؤقتًا"
+    },
+    "invoice.view": {
+      "label": "عرض الفواتير",
+      "description": "رؤية الفواتير"
+    },
+    "invoice.create": {
+      "label": "إنشاء فواتير",
+      "description": "إنشاء وإصدار فاتورة"
+    },
+    "invoice.update": {
+      "label": "تعديل الفواتير",
+      "description": "تحديث فاتورة قبل إصدارها"
+    },
+    "payment.view": {
+      "label": "عرض المدفوعات",
+      "description": "رؤية المدفوعات المسجّلة"
+    },
+    "payment.create": {
+      "label": "تسجيل المدفوعات",
+      "description": "تسجيل دفعة على فاتورة"
+    },
+    "payment.verify": {
+      "label": "التحقق من طلبات الدفع",
+      "description": "قبول أو رفض طلب دفع يدوي من عميل"
+    },
+    "payment.refund": {
+      "label": "إصدار المبالغ المستردة",
+      "description": "إصدار استرداد لدفعة مكتملة"
+    },
+    "payment.methods.view": {
+      "label": "عرض طرق الدفع",
+      "description": "رؤية طرق الدفع المُعدّة للنادي"
+    },
+    "payment.methods.manage": {
+      "label": "إدارة طرق الدفع",
+      "description": "إنشاء أو تعديل أو تعطيل طرق الدفع"
+    },
+    "report.view": {
+      "label": "عرض التقارير",
+      "description": "رؤية تقارير الإيرادات والإشغال والأكاديمية والعملاء"
+    },
+    "notification.view": {
+      "label": "عرض الإشعارات",
+      "description": "رؤية أحداث الإشعارات وقائمة الإرسال"
+    },
+    "staff.view": {
+      "label": "عرض الموظفين",
+      "description": "رؤية قائمة الموظفين وتفاصيلهم"
+    },
+    "staff.create": {
+      "label": "إضافة موظفين",
+      "description": "دعوة موظف جديد"
+    },
+    "staff.update": {
+      "label": "تعديل الموظفين",
+      "description": "تغيير دور الموظف أو فروعه أو حالته"
+    },
+    "roles.view": {
+      "label": "عرض الأدوار",
+      "description": "رؤية الأدوار المخصصة وصلاحياتها"
+    },
+    "roles.manage": {
+      "label": "إدارة الأدوار",
+      "description": "إنشاء أو تعديل أو نسخ أو حذف الأدوار المخصصة"
+    },
+    "field.view": {
+      "label": "عرض الملاعب",
+      "description": "رؤية الملاعب ومواعيدها وحجوزات الحظر"
+    },
+    "field.create": {
+      "label": "إنشاء ملاعب",
+      "description": "إضافة ملعب جديد"
+    },
+    "field.update": {
+      "label": "تعديل الملاعب",
+      "description": "تحديث ملعب أو مواعيده أو إنشاء حظر"
+    },
+    "branch.create": {
+      "label": "إنشاء فروع",
+      "description": "إضافة فرع جديد"
+    },
+    "branch.update": {
+      "label": "تعديل الفروع",
+      "description": "تحديث بيانات فرع"
+    },
+    "pricing.view": {
+      "label": "عرض التسعير",
+      "description": "رؤية قواعد التسعير"
+    },
+    "pricing.update": {
+      "label": "تعديل التسعير",
+      "description": "إدارة قواعد التسعير"
+    },
+    "qr.scan": {
+      "label": "مسح رمز QR",
+      "description": "التحقق من رمز QR"
+    },
+    "qr.checkin.confirm": {
+      "label": "تأكيد تسجيل الوصول",
+      "description": "تأكيد وصول الحجز بعد مسح رمز QR صالح"
+    },
+    "club.update": {
+      "label": "إدارة إعدادات النادي",
+      "description": "تحديث هوية النادي وإعداداته"
+    },
+    "manage_whatsapp_connection": {
+      "label": "إدارة اتصال واتساب",
+      "description": "ربط أو فصل حساب واتساب الخاص بالنادي"
     }
   }
 }

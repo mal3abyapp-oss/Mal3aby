@@ -6054,26 +6054,16 @@ export type Database = {
         Args: { p_club_id: string; p_key: string }
         Returns: boolean
       }
-      invite_staff_member:
-        | {
-            Args: {
-              p_branch_ids?: string[]
-              p_club_id: string
-              p_email: string
-              p_role_key: string
-            }
-            Returns: string
-          }
-        | {
-            Args: {
-              p_branch_ids?: string[]
-              p_club_id: string
-              p_custom_role_id?: string
-              p_email: string
-              p_role_key: string
-            }
-            Returns: string
-          }
+      invite_staff_member: {
+        Args: {
+          p_branch_ids?: string[]
+          p_club_id: string
+          p_custom_role_id?: string
+          p_email: string
+          p_role_key?: string
+        }
+        Returns: string
+      }
       is_guardian_of_group: { Args: { p_group_id: string }; Returns: boolean }
       is_phone_plausible: {
         Args: { p_normalized_phone: string }
@@ -6505,24 +6495,15 @@ export type Database = {
         Args: { p_has_custody: boolean; p_membership_id: string }
         Returns: undefined
       }
-      set_staff_role:
-        | {
-            Args: {
-              p_club_id: string
-              p_membership_id: string
-              p_role_key: string
-            }
-            Returns: undefined
-          }
-        | {
-            Args: {
-              p_club_id: string
-              p_custom_role_id?: string
-              p_membership_id: string
-              p_role_key: string
-            }
-            Returns: undefined
-          }
+      set_staff_role: {
+        Args: {
+          p_club_id: string
+          p_custom_role_id?: string
+          p_membership_id: string
+          p_role_key?: string
+        }
+        Returns: undefined
+      }
       settle_employee_cash_liability: {
         Args: {
           p_amount: number
