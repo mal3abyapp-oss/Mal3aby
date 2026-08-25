@@ -5486,6 +5486,36 @@ export type Database = {
           total: number
         }[]
       }
+      get_my_portal_academy: {
+        Args: never
+        Returns: {
+          enrollment_id: string
+          enrollment_status: string
+          group_name: string
+          player_full_name: string
+          player_id: string
+          player_photo_url: string
+          subscription_end_date: string
+          subscription_status: string
+        }[]
+      }
+      get_my_portal_bookings: {
+        Args: never
+        Returns: {
+          booking_id: string
+          branch_id: string
+          branch_name: string
+          club_id: string
+          club_name_ar: string
+          club_timezone: string
+          end_at: string
+          field_name: string
+          invoice_id: string
+          start_at: string
+          status: string
+          total_price: number
+        }[]
+      }
       get_my_portal_customers: {
         Args: never
         Returns: {
@@ -5497,6 +5527,28 @@ export type Database = {
           full_name: string
           mobile_display: string
           whatsapp: string
+        }[]
+      }
+      get_my_portal_invoices: {
+        Args: never
+        Returns: {
+          club_id: string
+          created_at: string
+          customer_id: string
+          invoice_id: string
+          invoice_number: string
+          issued_at: string
+          status: string
+          total: number
+        }[]
+      }
+      get_my_portal_qr_bookings: {
+        Args: never
+        Returns: {
+          booking_id: string
+          club_id: string
+          field_name: string
+          start_at: string
         }[]
       }
       get_official_receipts_report: {

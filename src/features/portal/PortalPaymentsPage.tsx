@@ -46,6 +46,17 @@ interface InvoiceRow {
   issuedAt: string | null
 }
 
+interface PortalInvoiceRpcRow {
+  invoice_id: string
+  invoice_number: string
+  total: number
+  status: string
+  issued_at: string | null
+  created_at: string
+  customer_id: string
+  club_id: string
+}
+
 interface PaymentMethodOption {
   id: string
   nameAr: string
@@ -54,43 +65,44 @@ interface PaymentMethodOption {
   referenceRequired: boolean
 }
 
-// Multi-Club E2E audit (2026-08-24): scoped per-club so a customer
-// linked to more than one club doesn't see every club's invoices
-// interleaved.
-//
-// PORTAL CROSS-PERSONA AUTHORIZATION VULNERABILITY FIX (HIGH, 2026-08-25):
-// the original `.eq('club_id', clubId)` filter alone was NOT sufficient
-// -- invoices_select_club_staff RLS is ALSO club_id-scoped, so a staff
-// member's Portal session received every customer's invoices in that
-// club. Proven live via a real authenticated REST call (5 real
-// unrelated invoices, real amounts, returned to a Portal session with no
-// linked customer at all). Now filters by `customer_id`, sourced
-// exclusively from get_my_portal_customers() -- see the same rationale
-// on PortalBookingsPage.fetchMyBookings.
-async function fetchMyInvoices(customerId: string): Promise<InvoiceRow[]> {
-  const { data, error } = await supabase
-    .from('invoices')
-    .select('id, invoice_number, total, status, issued_at')
-    .eq('customer_id', customerId)
-    .order('created_at', { ascending: false })
-    .limit(30)
+// PORTAL PERSONA-SCOPED DATA CONTRACT HARDENING (2026-08-25), follow-up
+// to the cross-persona authorization fix. A frontend `.eq('customer_id',
+// ...)` filter is a UX scoping concern, not a security boundary -- it
+// depends on every current and future Portal code path applying it
+// correctly, with invoices_select_club_staff RLS sitting immediately
+// behind it as a silent fallback the moment that filter is ever dropped
+// (the exact failure mode of the original bug -- 5 real unrelated
+// invoices, real amounts, were returned to a Portal session with no
+// linked customer at all before this fix). get_my_portal_invoices() is a
+// SECURITY DEFINER RPC hard-coded to customers.user_id = auth.uid() in
+// its own SQL body -- no way for a client request to reach outside the
+// caller's own linked customer id(s). Live-verified against the same
+// real production session: returns [] where the old query returned 5
+// real invoices. Has no club_id parameter (mirrors get_my_portal_
+// bookings()); the caller filters to the active club client-side, a UX
+// concern, not the security boundary.
+async function fetchMyInvoices(): Promise<(InvoiceRow & { customerId: string; clubId: string })[]> {
+  const { data, error } = await supabase.rpc('get_my_portal_invoices')
   if (error) throw error
+  const rows = (data ?? []) as PortalInvoiceRpcRow[]
 
-  const ids = (data ?? []).map((i) => i.id)
+  const ids = rows.map((i) => i.invoice_id)
   const summaries = await fetchInvoicePaymentSummaries(ids)
 
-  return (data ?? [])
+  return rows
     .filter((i) => i.status !== 'draft')
     .map((i) => {
-      const s = summaries.get(i.id)
+      const s = summaries.get(i.invoice_id)
       return {
-        id: i.id,
+        id: i.invoice_id,
         invoiceNumber: i.invoice_number,
         total: Number(i.total),
         paid: s?.paid ?? 0,
         outstanding: s?.outstanding ?? Number(i.total),
         paymentStatus: s?.paymentStatus ?? 'unpaid',
         issuedAt: i.issued_at,
+        customerId: i.customer_id,
+        clubId: i.club_id,
       }
     })
 }
@@ -237,11 +249,12 @@ export function PortalPaymentsPage() {
   const [wrongClubInvoiceId, setWrongClubInvoiceId] = useState<string | null>(null)
   const { activeCustomerId, isLoading: clubLoading, customerMemberships, setActiveClubId } = usePortalClub()
 
-  const { data: invoices = [], isLoading } = useQuery({
-    queryKey: ['portal', 'my-invoices', activeCustomerId],
-    queryFn: () => fetchMyInvoices(activeCustomerId!),
+  const { data: allInvoices = [], isLoading } = useQuery({
+    queryKey: ['portal', 'my-invoices'],
+    queryFn: fetchMyInvoices,
     enabled: !!activeCustomerId,
   })
+  const invoices = allInvoices.filter((i) => i.customerId === activeCustomerId)
 
   useEffect(() => {
     if (isLoading) return

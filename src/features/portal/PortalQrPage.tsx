@@ -17,44 +17,50 @@ import { usePortalClub } from '@/app/providers/PortalClubProvider'
 interface UpcomingBooking {
   id: string
   start_at: string
+  club_id: string
   fields: { name: string } | null
 }
 
-// Multi-Club E2E audit (2026-08-24): scoped per-club so a customer
-// linked to two clubs doesn't get an actively misleading QR/booking
-// selector (ensure_booking_qr resolves club_id from the booking row
-// itself, so the QR content was always correct -- this is a UX
-// scoping concern for the selector, not the security boundary).
-//
-// PORTAL CROSS-PERSONA AUTHORIZATION VULNERABILITY FIX (HIGH, 2026-08-25):
-// the original `.eq('club_id', clubId)` filter alone was NOT sufficient
-// -- bookings_select_club_staff RLS is ALSO club_id-scoped, so a staff
-// member's Portal session would have seen every upcoming booking in
-// that club, not just their own (same class of bug proven live on
-// PortalBookingsPage/PortalPaymentsPage). Now filters by `customer_id`,
-// sourced exclusively from get_my_portal_customers().
-async function fetchUpcomingBookings(customerId: string): Promise<UpcomingBooking[]> {
-  const { data, error } = await supabase
-    .from('bookings')
-    .select('id, start_at, fields(name)')
-    .eq('customer_id', customerId)
-    .in('status', ['confirmed', 'pending_payment'])
-    .gte('start_at', new Date().toISOString())
-    .order('start_at')
-    .limit(20)
+interface PortalQrBookingRpcRow {
+  booking_id: string
+  start_at: string
+  field_name: string | null
+  club_id: string
+}
+
+// PORTAL PERSONA-SCOPED DATA CONTRACT HARDENING (2026-08-25), follow-up
+// to the cross-persona authorization fix. ensure_booking_qr resolves
+// club_id from the booking row itself, so the QR content was always
+// correct -- the selector's club-scoping remains a UX concern. The real
+// fix is the LISTING query itself: get_my_portal_qr_bookings() is a
+// SECURITY DEFINER RPC hard-coded to customers.user_id = auth.uid() in
+// its own SQL body -- the old `.eq('club_id', clubId)` direct-table
+// filter alone was NOT sufficient (bookings_select_club_staff RLS is
+// ALSO club_id-scoped; same class of bug proven live on
+// PortalBookingsPage/PortalPaymentsPage). No client request can make
+// this RPC return a booking outside the caller's own linked customer
+// id(s), regardless of any staff permission on the same auth.uid().
+async function fetchUpcomingBookings(): Promise<UpcomingBooking[]> {
+  const { data, error } = await supabase.rpc('get_my_portal_qr_bookings')
   if (error) throw error
-  return (data ?? []) as unknown as UpcomingBooking[]
+  return ((data ?? []) as PortalQrBookingRpcRow[]).map((r) => ({
+    id: r.booking_id,
+    start_at: r.start_at,
+    club_id: r.club_id,
+    fields: r.field_name ? { name: r.field_name } : null,
+  }))
 }
 
 export function PortalQrPage() {
   const { t } = useTranslation()
   const { locale } = useDirection()
-  const { activeCustomerId, isLoading: clubLoading } = usePortalClub()
-  const { data: bookings = [], isLoading } = useQuery({
-    queryKey: ['portal', 'qr-bookings', activeCustomerId],
-    queryFn: () => fetchUpcomingBookings(activeCustomerId!),
+  const { activeClubId, activeCustomerId, isLoading: clubLoading } = usePortalClub()
+  const { data: allBookings = [], isLoading } = useQuery({
+    queryKey: ['portal', 'qr-bookings'],
+    queryFn: fetchUpcomingBookings,
     enabled: !!activeCustomerId,
   })
+  const bookings = allBookings.filter((b) => b.club_id === activeClubId)
   const [selectedId, setSelectedId] = useState<string>('')
   const [qrDataUrl, setQrDataUrl] = useState<string | null>(null)
   const [qrError, setQrError] = useState<string | null>(null)

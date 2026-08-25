@@ -20,10 +20,21 @@ import { createClient, type SupabaseClient } from '@supabase/supabase-js'
 //
 // FIX: get_my_portal_customers() -- a SECURITY DEFINER RPC that checks
 // customers.user_id = auth.uid() directly in its own SQL body, never
-// delegating to RLS's OR-combined policy set. Every Portal screen now
-// derives its customer_id allowlist exclusively from this RPC, then
-// filters bookings/invoices/guardian_links by that explicit,
-// ownership-proven id set.
+// delegating to RLS's OR-combined policy set.
+//
+// PORTAL PERSONA-SCOPED DATA CONTRACT HARDENING (2026-08-25, same-day
+// follow-up): the initial fix moved customer IDENTITY resolution
+// server-side but left bookings/invoices/guardian_links as direct table
+// reads with a frontend `customer_id` filter -- correct, but not itself
+// a security boundary (it depends on every current/future Portal code
+// path applying it, with the same OR-combined staff RLS one dropped
+// filter away). Four more SECURITY DEFINER RPCs -- get_my_portal_
+// bookings(), get_my_portal_invoices(), get_my_portal_qr_bookings(),
+// get_my_portal_academy() -- make the DATA CONTRACT ITSELF
+// persona-scoped: each hard-codes customers.user_id = auth.uid() in its
+// own SQL body, with no parameter or code path that can reach outside
+// the caller's own linked customer id(s), regardless of any staff
+// permission the same auth.uid() might hold.
 //
 // This suite reuses the SAME QA staff fixture as dual-identity-email-
 // isolation.integration.test.ts (a real account with an active
@@ -163,6 +174,67 @@ describeIfConfigured('Portal cross-persona authorization (live integration)', ()
     expect(error).toBeNull()
     if (ownedCustomerIds.length === 0) {
       expect((rpcRows ?? []).length).toBe(0)
+    }
+  })
+
+  // PORTAL PERSONA-SCOPED DATA CONTRACT HARDENING (2026-08-25): the
+  // remaining four RPCs (bookings, invoices, QR bookings, academy) must
+  // each independently prove they never return a row outside this
+  // account's own customer.user_id link -- reproducing the exact live
+  // proof (5 unrelated invoices/bookings, 8 unrelated guardian_links)
+  // this hardening round closed. Every assertion here targets the SAME
+  // staff-permission-holding account that triggered the original OR-
+  // combined RLS bleed, not a plain customer account.
+  it('get_my_portal_bookings() never returns a booking outside this account\'s own linked customer(s)', async () => {
+    const { data, error } = await client.rpc('get_my_portal_bookings')
+    expect(error).toBeNull()
+    for (const row of data ?? []) {
+      const { data: booking } = await client.from('bookings').select('customer_id').eq('id', row.booking_id).maybeSingle()
+      expect(ownedCustomerIds).toContain(booking?.customer_id)
+    }
+    if (ownedCustomerIds.length === 0) {
+      expect((data ?? []).length).toBe(0)
+    }
+  })
+
+  it('get_my_portal_invoices() never returns an invoice outside this account\'s own linked customer(s)', async () => {
+    const { data, error } = await client.rpc('get_my_portal_invoices')
+    expect(error).toBeNull()
+    for (const row of data ?? []) {
+      expect(ownedCustomerIds).toContain(row.customer_id)
+    }
+    if (ownedCustomerIds.length === 0) {
+      expect((data ?? []).length).toBe(0)
+    }
+  })
+
+  it('get_my_portal_qr_bookings() never returns an upcoming booking outside this account\'s own linked customer(s)', async () => {
+    const { data, error } = await client.rpc('get_my_portal_qr_bookings')
+    expect(error).toBeNull()
+    for (const row of data ?? []) {
+      const { data: booking } = await client.from('bookings').select('customer_id').eq('id', row.booking_id).maybeSingle()
+      expect(ownedCustomerIds).toContain(booking?.customer_id)
+    }
+    if (ownedCustomerIds.length === 0) {
+      expect((data ?? []).length).toBe(0)
+    }
+  })
+
+  it('get_my_portal_academy() never returns a player outside this account\'s own guardian_links', async () => {
+    const { data, error } = await client.rpc('get_my_portal_academy')
+    expect(error).toBeNull()
+    if (ownedCustomerIds.length === 0) {
+      expect((data ?? []).length).toBe(0)
+      return
+    }
+    for (const row of data ?? []) {
+      const { data: link } = await client
+        .from('guardian_links')
+        .select('customer_id')
+        .eq('player_id', row.player_id)
+        .in('customer_id', ownedCustomerIds)
+        .maybeSingle()
+      expect(link).not.toBeNull()
     }
   })
 })

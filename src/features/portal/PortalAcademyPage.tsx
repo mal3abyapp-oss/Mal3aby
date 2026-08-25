@@ -21,44 +21,66 @@ interface PortalPlayer {
   }[]
 }
 
-// PORTAL CROSS-PERSONA AUTHORIZATION VULNERABILITY FIX (HIGH, 2026-08-25):
-// this used to query `guardian_links` with zero filter, relying on RLS
-// alone (guardian_links_self_service_select) -- for a staff member's
-// Portal session, guardian_links_select_club_staff (customer.view on the
-// customer's own club) is ALSO an applicable SELECT policy and
-// OR-combines with it, so this returned every guardian_link in that
-// club, not just the caller's own. Proven live via a real authenticated
-// REST call (8 real unrelated guardian_links, exposing real players'
-// enrollment data, returned to a Portal session with no linked customer
-// at all). Now filters explicitly by customer_id IN (this account's own
-// customer ids, sourced exclusively from get_my_portal_customers()) --
-// an ownership-proven allowlist, not an ambient RLS assumption.
-async function fetchMyPlayers(ownedCustomerIds: string[]): Promise<PortalPlayer[]> {
-  if (ownedCustomerIds.length === 0) return []
-  const { data: links, error: linksError } = await supabase
-    .from('guardian_links')
-    .select('player_id')
-    .in('customer_id', ownedCustomerIds)
-  if (linksError) throw linksError
+interface PortalAcademyRpcRow {
+  player_id: string
+  player_full_name: string
+  player_photo_url: string | null
+  enrollment_id: string | null
+  enrollment_status: string | null
+  group_name: string | null
+  subscription_status: string | null
+  subscription_end_date: string | null
+}
 
-  const playerIds = [...new Set((links ?? []).map((l) => l.player_id))]
-  if (playerIds.length === 0) return []
-
-  const { data: players, error } = await supabase
-    .from('players')
-    .select('id, full_name, photo_url, enrollments(id, status, groups(name), subscriptions(status, end_date))')
-    .in('id', playerIds)
+// PORTAL PERSONA-SCOPED DATA CONTRACT HARDENING (2026-08-25), follow-up
+// to the cross-persona authorization fix. A frontend `.in('customer_id',
+// ownedCustomerIds)` filter is a UX/data-shape concern, not a security
+// boundary on its own -- it depends on every current and future Portal
+// code path applying it correctly, with guardian_links_select_club_staff
+// RLS sitting immediately behind it as a silent fallback the moment that
+// filter is ever dropped (the exact failure mode of the original bug --
+// 8 real unrelated guardian_links, exposing real players' enrollment
+// data, were returned to a Portal session with no linked customer at all
+// before that fix). get_my_portal_academy() is a SECURITY DEFINER RPC
+// hard-coded to customers.user_id = auth.uid() in its own SQL body --
+// no way for a client request to reach outside the caller's own linked
+// customer's guardian_links, regardless of any staff permission on the
+// same auth.uid(). Live-verified against the same real production
+// session: returns [] where the old query returned 8 real rows.
+//
+// Returns one row per (player, enrollment) -- grouped back into
+// PortalPlayer[] here so the existing "every active enrollment as its
+// own row" fix (Phase 10 IA restructuring) keeps working unchanged.
+async function fetchMyPlayers(): Promise<PortalPlayer[]> {
+  const { data, error } = await supabase.rpc('get_my_portal_academy')
   if (error) throw error
-  return (players ?? []) as unknown as PortalPlayer[]
+  const rows = (data ?? []) as PortalAcademyRpcRow[]
+
+  const byPlayer = new Map<string, PortalPlayer>()
+  for (const r of rows) {
+    let player = byPlayer.get(r.player_id)
+    if (!player) {
+      player = { id: r.player_id, full_name: r.player_full_name, photo_url: r.player_photo_url, enrollments: [] }
+      byPlayer.set(r.player_id, player)
+    }
+    if (r.enrollment_id && r.enrollment_status) {
+      player.enrollments.push({
+        id: r.enrollment_id,
+        status: r.enrollment_status,
+        groups: r.group_name ? { name: r.group_name } : null,
+        subscriptions: r.subscription_status && r.subscription_end_date ? [{ status: r.subscription_status, end_date: r.subscription_end_date }] : [],
+      })
+    }
+  }
+  return [...byPlayer.values()]
 }
 
 export function PortalAcademyPage() {
   const { t } = useTranslation()
-  const { customerMemberships, isLoading: clubLoading } = usePortalClub()
-  const ownedCustomerIds = customerMemberships.map((m) => m.customerId)
+  const { isLoading: clubLoading } = usePortalClub()
   const { data: players = [], isLoading, error } = useQuery({
-    queryKey: ['portal', 'my-players', ownedCustomerIds],
-    queryFn: () => fetchMyPlayers(ownedCustomerIds),
+    queryKey: ['portal', 'my-players'],
+    queryFn: fetchMyPlayers,
     enabled: !clubLoading,
   })
 

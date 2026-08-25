@@ -23,35 +23,54 @@ interface PortalBooking {
   status: string
   total_price: number
   invoice_id: string | null
+  club_id: string
   fields: { name: string; branch_id: string; branches: { name: string; timezone?: string } | null } | null
   clubs: { name_ar: string; timezone: string } | null
 }
 
-// Multi-Club E2E audit (2026-08-24): scoped per-club so a customer
-// linked to more than one club doesn't see every club's bookings
-// interleaved with no way to tell them apart.
-//
-// PORTAL CROSS-PERSONA AUTHORIZATION VULNERABILITY FIX (HIGH, 2026-08-25):
-// the original `.eq('club_id', clubId)` filter alone was NOT sufficient
-// -- bookings_select_club_staff RLS is ALSO club_id-scoped, so a staff
-// member's Portal session (same club they're staff on) received every
-// customer's bookings in that club, not just their own. Proven live via
-// a real authenticated REST call. Now filters by `customer_id`, sourced
-// exclusively from get_my_portal_customers() (an explicit,
-// ownership-proven id, never re-derived from club membership or RLS
-// alone) -- this is safe even though bookings_select_club_staff can
-// still independently apply, because the WHERE clause itself no longer
-// depends on RLS to narrow the result; customer_id already identifies
-// exactly one owned row.
-async function fetchMyBookings(customerId: string): Promise<PortalBooking[]> {
-  const { data, error } = await supabase
-    .from('bookings')
-    .select('id, start_at, end_at, status, total_price, invoice_id, club_id, fields(name, branch_id, branches(name)), clubs(name_ar, timezone)')
-    .eq('customer_id', customerId)
-    .order('start_at', { ascending: false })
-    .limit(50)
+interface PortalBookingRpcRow {
+  booking_id: string
+  start_at: string
+  end_at: string
+  status: string
+  total_price: number
+  invoice_id: string | null
+  club_id: string
+  club_name_ar: string | null
+  club_timezone: string | null
+  field_name: string | null
+  branch_id: string | null
+  branch_name: string | null
+}
+
+// PORTAL PERSONA-SCOPED DATA CONTRACT HARDENING (2026-08-25), follow-up to
+// the cross-persona authorization fix. A frontend `.eq('customer_id', ...)`
+// filter is a UX scoping concern, not a security boundary on its own -- it
+// depends on every current and future Portal code path applying it
+// correctly, with bookings_select_club_staff RLS sitting immediately
+// behind it as a silent fallback the moment that filter is ever dropped
+// or bypassed. get_my_portal_bookings() makes the data contract itself
+// persona-scoped: a SECURITY DEFINER RPC hard-coded to
+// customers.user_id = auth.uid() in its own SQL body -- no parameter, no
+// code path, and no way for a client request to reach outside the
+// caller's own linked customer id(s), regardless of any staff permission
+// the same auth.uid() might also hold. Live-verified against a real
+// production staff+portal session: returns [] where the old
+// club_id-filtered direct read still returned 5 real unrelated bookings.
+async function fetchMyBookings(): Promise<PortalBooking[]> {
+  const { data, error } = await supabase.rpc('get_my_portal_bookings')
   if (error) throw error
-  return (data ?? []) as unknown as PortalBooking[]
+  return ((data ?? []) as PortalBookingRpcRow[]).map((r) => ({
+    id: r.booking_id,
+    start_at: r.start_at,
+    end_at: r.end_at,
+    status: r.status,
+    total_price: Number(r.total_price),
+    invoice_id: r.invoice_id,
+    club_id: r.club_id,
+    fields: r.field_name ? { name: r.field_name, branch_id: r.branch_id ?? '', branches: r.branch_name ? { name: r.branch_name } : null } : null,
+    clubs: { name_ar: r.club_name_ar ?? '', timezone: r.club_timezone ?? 'UTC' },
+  }))
 }
 
 // Master IA/UX audit (Customer Portal phase): confirmed the real gap --
@@ -68,12 +87,17 @@ async function fetchOutstandingByInvoice(invoiceIds: string[]): Promise<Map<stri
 
 export function PortalBookingsPage() {
   const { t } = useTranslation()
-  const { activeCustomerId, isLoading: clubLoading } = usePortalClub()
-  const { data: bookings = [], isLoading } = useQuery({
-    queryKey: ['portal', 'my-bookings', activeCustomerId],
-    queryFn: () => fetchMyBookings(activeCustomerId!),
+  const { activeClubId, activeCustomerId, isLoading: clubLoading } = usePortalClub()
+  const { data: allBookings = [], isLoading } = useQuery({
+    queryKey: ['portal', 'my-bookings'],
+    queryFn: fetchMyBookings,
     enabled: !!activeCustomerId,
   })
+  // get_my_portal_bookings() returns every linked club's bookings (it has
+  // no club_id parameter -- see the RPC's own rationale) -- filtering to
+  // the active club here is purely the same UX scoping the multi-club
+  // audit already established, not a re-introduced security dependency.
+  const bookings = allBookings.filter((b) => b.club_id === activeClubId)
 
   const invoiceIds = bookings.map((b) => b.invoice_id).filter((id): id is string => !!id)
   const { data: summaries } = useQuery({
