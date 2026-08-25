@@ -68,7 +68,8 @@
       "loading": "جارٍ التحميل...",
       "loadError": "تعذّر تحميل البيانات.",
       "emptyTitle": "لا يوجد لاعبون مرتبطون بحسابك حاليًا.",
-      "notEnrolled": "غير مسجّل حاليًا"
+      "notEnrolled": "غير مسجّل حاليًا",
+      "subscriptionUntil": "حتى {{date}}"
     },
     "bookingsPage": {
       "title": "حجوزاتي",

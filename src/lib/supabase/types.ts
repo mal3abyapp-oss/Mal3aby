@@ -5489,8 +5489,10 @@ export type Database = {
       get_my_portal_academy: {
         Args: never
         Returns: {
+          branch_name: string
           enrollment_id: string
           enrollment_status: string
+          field_name: string
           group_name: string
           player_full_name: string
           player_id: string

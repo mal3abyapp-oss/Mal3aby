@@ -4,6 +4,7 @@ import { supabase } from '@/lib/supabase/client'
 import { PageHeader } from '@/components/ui/page-header'
 import { StatusBadge } from '@/components/ui/status-badge'
 import { usePortalClub } from '@/app/providers/PortalClubProvider'
+import { useDirection } from '@/app/providers/DirectionProvider'
 
 // Gate 3 — My Academies / My Children: shows every player linked to
 // this account as a guardian (via guardian_links), each with their
@@ -16,7 +17,7 @@ interface PortalPlayer {
   enrollments: {
     id: string
     status: string
-    groups: { name: string } | null
+    groups: { name: string; branchName: string | null; fieldName: string | null } | null
     subscriptions: { status: string; end_date: string }[]
   }[]
 }
@@ -28,6 +29,8 @@ interface PortalAcademyRpcRow {
   enrollment_id: string | null
   enrollment_status: string | null
   group_name: string | null
+  branch_name: string | null
+  field_name: string | null
   subscription_status: string | null
   subscription_end_date: string | null
 }
@@ -51,6 +54,19 @@ interface PortalAcademyRpcRow {
 // Returns one row per (player, enrollment) -- grouped back into
 // PortalPlayer[] here so the existing "every active enrollment as its
 // own row" fix (Phase 10 IA restructuring) keeps working unchanged.
+//
+// PERSONA COUNCIL AUDIT (2026-08-25) -- Customer persona finding: this
+// screen answered "is my subscription active" but not "until when" or
+// "where do I go" -- subscription_end_date was already fetched into the
+// old data model and simply never rendered, and branch/field were never
+// fetched at all despite being real, joinable columns on `groups`
+// (branch_id/field_id). Widened the RPC to include branch_name/
+// field_name (see the migration's own DROP+CREATE note) -- no schedule/
+// timetable data exists anywhere in this product's data model
+// (`groups` has no day/time columns at all, confirmed against the live
+// schema), so that specific question genuinely cannot be answered here
+// without inventing a feature; expiry date and location are the real,
+// available parts of "where/when do I go" and are now shown.
 async function fetchMyPlayers(): Promise<PortalPlayer[]> {
   const { data, error } = await supabase.rpc('get_my_portal_academy')
   if (error) throw error
@@ -67,7 +83,7 @@ async function fetchMyPlayers(): Promise<PortalPlayer[]> {
       player.enrollments.push({
         id: r.enrollment_id,
         status: r.enrollment_status,
-        groups: r.group_name ? { name: r.group_name } : null,
+        groups: r.group_name ? { name: r.group_name, branchName: r.branch_name, fieldName: r.field_name } : null,
         subscriptions: r.subscription_status && r.subscription_end_date ? [{ status: r.subscription_status, end_date: r.subscription_end_date }] : [],
       })
     }
@@ -77,6 +93,7 @@ async function fetchMyPlayers(): Promise<PortalPlayer[]> {
 
 export function PortalAcademyPage() {
   const { t } = useTranslation()
+  const { locale } = useDirection()
   const { isLoading: clubLoading } = usePortalClub()
   const { data: players = [], isLoading, error } = useQuery({
     queryKey: ['portal', 'my-players'],
@@ -125,10 +142,21 @@ export function PortalAcademyPage() {
               ) : (
                 activeEnrollments.map((enrollment) => {
                   const sub = enrollment.subscriptions?.[0]
+                  const location = [enrollment.groups?.branchName, enrollment.groups?.fieldName].filter(Boolean).join(' · ')
                   return (
-                    <div key={enrollment.id} className="flex items-center justify-between gap-2">
-                      <p className="text-xs text-text-secondary">{enrollment.groups?.name ?? '—'}</p>
-                      {sub && <StatusBadge tone={sub.status === 'active' ? 'success' : sub.status === 'frozen' ? 'warning' : 'neutral'} label={SUB_STATUS_LABELS[sub.status] ?? sub.status} />}
+                    <div key={enrollment.id} className="flex flex-col gap-0.5">
+                      <div className="flex items-center justify-between gap-2">
+                        <p className="text-xs text-text-secondary">{enrollment.groups?.name ?? '—'}</p>
+                        {sub && <StatusBadge tone={sub.status === 'active' ? 'success' : sub.status === 'frozen' ? 'warning' : 'neutral'} label={SUB_STATUS_LABELS[sub.status] ?? sub.status} />}
+                      </div>
+                      {location && <p className="text-xs text-text-secondary">{location}</p>}
+                      {sub?.end_date && (
+                        <p className="text-xs text-text-secondary">
+                          {t('portal.academyPage.subscriptionUntil', {
+                            date: new Date(sub.end_date).toLocaleDateString(locale === 'en' ? 'en-US' : 'ar-EG', { day: 'numeric', month: 'long', year: 'numeric' }),
+                          })}
+                        </p>
+                      )}
                     </div>
                   )
                 })

@@ -68,7 +68,8 @@
       "loading": "Loading...",
       "loadError": "Couldn't load the data.",
       "emptyTitle": "No players are linked to your account yet.",
-      "notEnrolled": "Not currently enrolled"
+      "notEnrolled": "Not currently enrolled",
+      "subscriptionUntil": "Until {{date}}"
     },
     "bookingsPage": {
       "title": "My Bookings",

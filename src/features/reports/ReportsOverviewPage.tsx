@@ -58,7 +58,23 @@ export function ReportsOverviewPage() {
             <StatCard label={t('reports.overview.cards.currentOutstanding')} value={formatMoney(data.outstanding_total, 'EGP', locale)} tone={data.outstanding_total > 0 ? 'warning' : undefined} to="/app/finance/payments?status=outstanding" />
             <StatCard label={t('reports.overview.cards.refunds')} value={formatMoney(data.refunds_total, 'EGP', locale)} tone="danger" to="/app/finance/reports" />
             <StatCard label={t('reports.overview.cards.confirmedBookings')} value={data.bookings_count} icon={CalendarCheck2} to="/app/reports/bookings" />
-            <StatCard label={t('reports.overview.cards.cancelledBookings')} value={data.bookings_cancelled_count} to="/app/reports/bookings" />
+            {/* PERSONA COUNCIL AUDIT (2026-08-25) -- Club Owner persona
+                finding: this and the card above are the same shape and
+                tone regardless of the actual numbers -- live-confirmed
+                a real state where cancellations (33) exceeded confirmed
+                bookings (26) for the selected range with zero visual
+                signal that something operationally unusual was
+                happening. A club owner scanning cards by color/shape,
+                not reading every number, could easily miss it. Now
+                flags danger tone when cancellations are the larger
+                share -- a real, meaningful comparison (both counts are
+                for the exact same date range and club), not decoration. */}
+            <StatCard
+              label={t('reports.overview.cards.cancelledBookings')}
+              value={data.bookings_cancelled_count}
+              tone={data.bookings_cancelled_count > data.bookings_count ? 'danger' : undefined}
+              to="/app/reports/bookings"
+            />
             <StatCard label={t('reports.overview.cards.bookedHours')} value={data.total_booked_hours} to="/app/reports/occupancy" />
             <StatCard label={t('reports.overview.cards.activeAcademyEnrollments')} value={data.active_enrollments} icon={GraduationCap} to="/app/reports/academy" />
             <StatCard label={t('reports.overview.cards.newCustomers')} value={data.new_customers} icon={Users} to="/app/reports/customers" />
