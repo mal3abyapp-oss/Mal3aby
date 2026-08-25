@@ -649,6 +649,10 @@
     "subscriptionExpired": "Subscription expired — contact us to activate your subscription",
     "subscriptionGrace": "Your subscription is in grace period — new operations are temporarily paused"
   },
+  "routing": {
+    "noClubAccess": "This account has no club staff access. If you're a customer, use the customer portal instead. If you believe this is a mistake, contact your club owner.",
+    "signOut": "Sign out"
+  },
   "common": {
     "save": "Save",
     "cancel": "Cancel",
