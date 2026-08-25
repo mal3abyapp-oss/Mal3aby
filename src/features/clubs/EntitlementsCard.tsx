@@ -138,7 +138,9 @@ export function EntitlementsCard() {
   }
   const LIMITS: LimitDef[] = LIMIT_DEFS.map((def) => ({ ...def, label: LIMIT_TYPE_LABELS[def.key] as string }))
   const { currentClubId, currentMembership } = useAuth()
-  const isOwnerOrManager = currentMembership?.roleKey === 'club_owner' || currentMembership?.roleKey === 'club_manager'
+  // STAFF ACCESS CONTROL & CUSTOM ROLES (2026-08-25): see SettingsPage.tsx
+  // for the same fix and rationale -- permission-based, not role-name.
+  const isOwnerOrManager = currentMembership?.permissionKeys.includes('club.update') ?? false
 
   const { data, isLoading } = useQuery({
     queryKey: ['commercial-entitlements-usage', currentClubId],

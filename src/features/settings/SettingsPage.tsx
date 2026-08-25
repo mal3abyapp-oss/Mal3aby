@@ -48,7 +48,15 @@ import { GovernmentComplianceCard } from '@/features/clubs/GovernmentComplianceC
 export function SettingsPage() {
   const { t } = useTranslation()
   const { currentMembership, session } = useAuth()
-  const isOwnerOrManager = currentMembership?.roleKey === 'club_owner' || currentMembership?.roleKey === 'club_manager'
+  // STAFF ACCESS CONTROL & CUSTOM ROLES (2026-08-25): was a hardcoded
+  // roleKey check (club_owner/club_manager only) -- a custom role can
+  // now reach this screen via the nav's real club.update permission
+  // check without ever matching either roleKey, which used to leave
+  // this section's edit controls silently disabled with no visible
+  // reason. Keyed on the same permission that actually gates the
+  // underlying club.update RPC/RLS now, matching how the nav domain
+  // itself is derived (see navigation.ts).
+  const isOwnerOrManager = currentMembership?.permissionKeys.includes('club.update') ?? false
 
   return (
     <div className="flex flex-col gap-6">

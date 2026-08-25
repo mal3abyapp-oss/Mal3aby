@@ -63,7 +63,7 @@ export function FirstRunChecklist() {
     { label: t('dashboard.checklist.addField'), done: !!data?.hasField, to: '/app/fields', domain: 'settings' as const },
     { label: t('dashboard.checklist.createFirstBooking'), done: !!data?.hasBooking, to: '/app/bookings', domain: 'bookings' as const },
   ]
-  const items = allItems.filter((item) => canSeeNavDomain(currentMembership?.roleKey, item.domain))
+  const items = allItems.filter((item) => canSeeNavDomain(currentMembership?.permissionKeys, item.domain))
 
   if (items.length === 0) return null
 

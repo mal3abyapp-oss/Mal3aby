@@ -72,8 +72,8 @@ export function RequireNavDomain({ domain, children }: { domain: NavDomain; chil
     )
   }
 
-  if (!currentMembership || !canSeeNavDomain(currentMembership.roleKey, domain)) {
-    return <Navigate to={canSeeNavDomain(currentMembership?.roleKey, 'today') ? '/app' : '/scan'} replace />
+  if (!currentMembership || !canSeeNavDomain(currentMembership.permissionKeys, domain)) {
+    return <Navigate to={canSeeNavDomain(currentMembership?.permissionKeys, 'today') ? '/app' : '/scan'} replace />
   }
 
   return children

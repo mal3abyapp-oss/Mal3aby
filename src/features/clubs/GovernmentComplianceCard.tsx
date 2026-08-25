@@ -61,7 +61,15 @@ export function GovernmentComplianceCard() {
   const { t } = useTranslation()
   const { currentClubId, currentMembership } = useAuth()
   const queryClient = useQueryClient()
-  const canEdit = currentMembership?.roleKey === 'club_owner'
+  // STAFF ACCESS CONTROL & CUSTOM ROLES (2026-08-25): was hardcoded to
+  // club_owner only, but the real RLS write gate on
+  // government_collection_policies (gcp_write_club_staff) is
+  // has_permission('club.update', ...) -- the same permission
+  // club_manager already holds and could already write through via a
+  // direct table call, just with the UI button hidden from them. Fixed
+  // to match the real server boundary exactly (Section 20 of the phase
+  // directive: UI and server must agree).
+  const canEdit = currentMembership?.permissionKeys.includes('club.update') ?? false
 
   const { data, isLoading } = useQuery({
     queryKey: ['government-compliance-policy', currentClubId],

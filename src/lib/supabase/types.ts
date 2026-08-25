@@ -10,7 +10,7 @@ export type Database = {
   // Allows to automatically instantiate createClient with right options
   // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
   __InternalSupabase: {
-    PostgrestVersion: "14.15"
+    PostgrestVersion: "14.17"
   }
   public: {
     Tables: {
@@ -619,9 +619,10 @@ export type Database = {
         Row: {
           club_id: string
           created_at: string
+          custom_role_id: string | null
           has_cash_custody: boolean
           id: string
-          role_id: string
+          role_id: string | null
           status: string
           updated_at: string | null
           user_id: string
@@ -629,9 +630,10 @@ export type Database = {
         Insert: {
           club_id: string
           created_at?: string
+          custom_role_id?: string | null
           has_cash_custody?: boolean
           id?: string
-          role_id: string
+          role_id?: string | null
           status?: string
           updated_at?: string | null
           user_id: string
@@ -639,9 +641,10 @@ export type Database = {
         Update: {
           club_id?: string
           created_at?: string
+          custom_role_id?: string | null
           has_cash_custody?: boolean
           id?: string
-          role_id?: string
+          role_id?: string | null
           status?: string
           updated_at?: string | null
           user_id?: string
@@ -662,11 +665,99 @@ export type Database = {
             referencedColumns: ["club_id"]
           },
           {
+            foreignKeyName: "club_memberships_custom_role_id_fkey"
+            columns: ["custom_role_id"]
+            isOneToOne: false
+            referencedRelation: "club_roles"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "club_memberships_role_id_fkey"
             columns: ["role_id"]
             isOneToOne: false
             referencedRelation: "roles"
             referencedColumns: ["id"]
+          },
+        ]
+      }
+      club_role_permissions: {
+        Row: {
+          club_role_id: string
+          permission_id: string
+        }
+        Insert: {
+          club_role_id: string
+          permission_id: string
+        }
+        Update: {
+          club_role_id?: string
+          permission_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "club_role_permissions_club_role_id_fkey"
+            columns: ["club_role_id"]
+            isOneToOne: false
+            referencedRelation: "club_roles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "club_role_permissions_permission_id_fkey"
+            columns: ["permission_id"]
+            isOneToOne: false
+            referencedRelation: "permissions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      club_roles: {
+        Row: {
+          club_id: string
+          created_at: string
+          created_by: string | null
+          description: string | null
+          id: string
+          is_active: boolean
+          name_ar: string
+          name_en: string
+          updated_at: string
+        }
+        Insert: {
+          club_id: string
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          id?: string
+          is_active?: boolean
+          name_ar: string
+          name_en: string
+          updated_at?: string
+        }
+        Update: {
+          club_id?: string
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          id?: string
+          is_active?: boolean
+          name_ar?: string
+          name_en?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "club_roles_club_id_fkey"
+            columns: ["club_id"]
+            isOneToOne: false
+            referencedRelation: "clubs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "club_roles_club_id_fkey"
+            columns: ["club_id"]
+            isOneToOne: false
+            referencedRelation: "commercial_entitlements_usage"
+            referencedColumns: ["club_id"]
           },
         ]
       }
@@ -4910,6 +5001,7 @@ export type Database = {
         Args: { p_field_id: string; p_reason?: string; p_rule_ids: string[] }
         Returns: undefined
       }
+      caller_permission_keys: { Args: { p_club_id: string }; Returns: string[] }
       cancel_booking: {
         Args: { p_booking_id: string; p_reason: string }
         Returns: undefined
@@ -4968,6 +5060,10 @@ export type Database = {
         Args: { p_closing_count: number; p_notes?: string; p_shift_id: string }
         Returns: Json
       }
+      club_would_lose_last_owner: {
+        Args: { p_club_id: string; p_excluding_membership_id: string }
+        Returns: boolean
+      }
       club_write_allowed: {
         Args: { p_action_category: string; p_club_id: string }
         Returns: boolean
@@ -5002,6 +5098,14 @@ export type Database = {
         }
         Returns: string
       }
+      copy_club_role: {
+        Args: {
+          p_club_role_id: string
+          p_new_name_ar: string
+          p_new_name_en: string
+        }
+        Returns: string
+      }
       correct_official_receipt: {
         Args: {
           p_new_receipt_book?: string
@@ -5031,6 +5135,16 @@ export type Database = {
           p_receipt_series?: string
           p_record_payment?: boolean
           p_start_at: string
+        }
+        Returns: string
+      }
+      create_club_role: {
+        Args: {
+          p_club_id: string
+          p_description: string
+          p_name_ar: string
+          p_name_en: string
+          p_permission_keys: string[]
         }
         Returns: string
       }
@@ -5197,6 +5311,7 @@ export type Database = {
         Args: { p_membership_id: string }
         Returns: undefined
       }
+      delete_club_role: { Args: { p_club_role_id: string }; Returns: undefined }
       disconnect_whatsapp: { Args: { p_club_id: string }; Returns: undefined }
       email_worker_claim_next_batch: {
         Args: { p_limit?: number }
@@ -5326,6 +5441,10 @@ export type Database = {
         Returns: Json
       }
       get_club_platform_access: { Args: { p_club_id: string }; Returns: string }
+      get_club_role_permissions: {
+        Args: { p_club_role_id: string }
+        Returns: string[]
+      }
       get_collections_report: {
         Args: {
           p_branch_id?: string
@@ -5935,15 +6054,26 @@ export type Database = {
         Args: { p_club_id: string; p_key: string }
         Returns: boolean
       }
-      invite_staff_member: {
-        Args: {
-          p_branch_ids?: string[]
-          p_club_id: string
-          p_email: string
-          p_role_key: string
-        }
-        Returns: string
-      }
+      invite_staff_member:
+        | {
+            Args: {
+              p_branch_ids?: string[]
+              p_club_id: string
+              p_email: string
+              p_role_key: string
+            }
+            Returns: string
+          }
+        | {
+            Args: {
+              p_branch_ids?: string[]
+              p_club_id: string
+              p_custom_role_id?: string
+              p_email: string
+              p_role_key: string
+            }
+            Returns: string
+          }
       is_guardian_of_group: { Args: { p_group_id: string }; Returns: boolean }
       is_phone_plausible: {
         Args: { p_normalized_phone: string }
@@ -5962,6 +6092,21 @@ export type Database = {
           p_relationship?: string
         }
         Returns: string
+      }
+      list_club_roles: {
+        Args: { p_club_id: string }
+        Returns: {
+          created_at: string
+          description: string
+          employee_count: number
+          id: string
+          is_active: boolean
+          is_system: boolean
+          name_ar: string
+          name_en: string
+          permission_count: number
+          updated_at: string
+        }[]
       }
       log_own_password_changed: { Args: never; Returns: undefined }
       log_password_reset_event: {
@@ -6069,6 +6214,10 @@ export type Database = {
           p_opening_float: number
         }
         Returns: string
+      }
+      permission_set_escalates: {
+        Args: { p_club_id: string; p_permission_keys: string[] }
+        Returns: boolean
       }
       platform_reactivate_club: {
         Args: { p_club_id: string }
@@ -6356,10 +6505,24 @@ export type Database = {
         Args: { p_has_custody: boolean; p_membership_id: string }
         Returns: undefined
       }
-      set_staff_role: {
-        Args: { p_club_id: string; p_membership_id: string; p_role_key: string }
-        Returns: undefined
-      }
+      set_staff_role:
+        | {
+            Args: {
+              p_club_id: string
+              p_membership_id: string
+              p_role_key: string
+            }
+            Returns: undefined
+          }
+        | {
+            Args: {
+              p_club_id: string
+              p_custom_role_id?: string
+              p_membership_id: string
+              p_role_key: string
+            }
+            Returns: undefined
+          }
       settle_employee_cash_liability: {
         Args: {
           p_amount: number
@@ -6423,6 +6586,17 @@ export type Database = {
           isOneToOne: true
           isSetofReturn: false
         }
+      }
+      update_club_role: {
+        Args: {
+          p_club_role_id: string
+          p_description: string
+          p_is_active: boolean
+          p_name_ar: string
+          p_name_en: string
+          p_permission_keys: string[]
+        }
+        Returns: undefined
       }
       update_government_compliance_policy: {
         Args: {

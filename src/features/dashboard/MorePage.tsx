@@ -65,7 +65,7 @@ const ITEMS: MoreItem[] = [
 export function MorePage() {
   const { t } = useTranslation()
   const { currentMembership, signOut } = useAuth()
-  const visibleItems = ITEMS.filter((item) => canSeeNavDomain(currentMembership?.roleKey, item.domain))
+  const visibleItems = ITEMS.filter((item) => canSeeNavDomain(currentMembership?.permissionKeys, item.domain))
   // HIGH-ROI UX PASS 01, Priority 3: a live, tenant-scoped count next to
   // "Pending Payments" -- previously a plain list row indistinguishable
   // from a low-urgency item like Cash Shift despite being a

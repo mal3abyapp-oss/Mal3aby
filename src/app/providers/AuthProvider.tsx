@@ -52,9 +52,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     // has_permission()/user_club_ids() are separately keyed on this
     // session's own auth.uid() -- but the read-leak and the misleading
     // "you are Club Owner here" UI state are real bugs on their own).
+    // STAFF ACCESS CONTROL & CUSTOM ROLES (2026-08-25): a membership now
+    // has EITHER roles (system role) OR club_roles (custom role) set --
+    // the previous `.filter(row => row.clubs && row.roles)` silently
+    // dropped every custom-role membership from the whole app (club
+    // switcher, nav, everything), since `roles` is null by design for
+    // those rows. Embed both and require only `clubs` plus one of the
+    // two role relations.
     const { data, error } = await supabase
       .from('club_memberships')
-      .select('id, club_id, status, clubs(name, name_ar), roles(key, name, name_ar)')
+      .select(
+        'id, club_id, status, clubs(name, name_ar), roles(key, name, name_ar), club_roles(id, name_en, name_ar)',
+      )
       .eq('status', 'active')
       .eq('user_id', uid)
 
@@ -63,17 +72,37 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       return
     }
 
+    // Real, server-computed permission keys per club this user belongs
+    // to -- this is what nav visibility and route guards must key off
+    // of (see navigation.ts), since a custom role has no roleKey a
+    // hand-maintained map could ever recognize. One RPC call per
+    // distinct club (never per-row inside a render loop).
+    const clubIds = Array.from(new Set(data.map((row) => row.club_id)))
+    const permissionsByClub = new Map<string, string[]>()
+    await Promise.all(
+      clubIds.map(async (clubId) => {
+        const { data: keys } = await supabase.rpc('caller_permission_keys', { p_club_id: clubId })
+        permissionsByClub.set(clubId, (keys ?? []).map((k: { key: string } | string) => (typeof k === 'string' ? k : k.key)))
+      }),
+    )
+
     const allRows: ActiveMembership[] = data
-      .filter((row) => row.clubs && row.roles)
-      .map((row) => ({
-        membershipId: row.id,
-        clubId: row.club_id,
-        clubName: (row.clubs as unknown as { name: string }).name,
-        clubNameAr: (row.clubs as unknown as { name_ar: string }).name_ar,
-        roleKey: (row.roles as unknown as { key: string }).key,
-        roleName: (row.roles as unknown as { name: string }).name,
-        roleNameAr: (row.roles as unknown as { name_ar: string }).name_ar,
-      }))
+      .filter((row) => row.clubs && (row.roles || row.club_roles))
+      .map((row) => {
+        const systemRole = row.roles as unknown as { key: string; name: string; name_ar: string } | null
+        const customRole = row.club_roles as unknown as { id: string; name_en: string; name_ar: string } | null
+        return {
+          membershipId: row.id,
+          clubId: row.club_id,
+          clubName: (row.clubs as unknown as { name: string }).name,
+          clubNameAr: (row.clubs as unknown as { name_ar: string }).name_ar,
+          roleKey: systemRole?.key ?? null,
+          roleName: systemRole?.name ?? customRole?.name_en ?? '',
+          roleNameAr: systemRole?.name_ar ?? customRole?.name_ar ?? '',
+          customRoleId: customRole?.id ?? null,
+          permissionKeys: permissionsByClub.get(row.club_id) ?? [],
+        }
+      })
 
     // isPlatformOwner is tracked independently of the deduped list below --
     // never let it depend on which row "won" a same-club collision.

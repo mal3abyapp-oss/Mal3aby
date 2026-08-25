@@ -143,10 +143,10 @@ export function AppLayout() {
   const visibleNavSections = navSections
     .map((section) => ({
       ...section,
-      items: section.items.filter((item) => canSeeNavDomain(currentMembership?.roleKey, item.domain)),
+      items: section.items.filter((item) => canSeeNavDomain(currentMembership?.permissionKeys, item.domain)),
     }))
     .filter((section) => section.items.length > 0)
-  const visibleMobileNavItems = mobileNavItems.filter((item) => canSeeNavDomain(currentMembership?.roleKey, item.domain))
+  const visibleMobileNavItems = mobileNavItems.filter((item) => canSeeNavDomain(currentMembership?.permissionKeys, item.domain))
 
   return (
     <div className="flex min-h-screen bg-page-bg">

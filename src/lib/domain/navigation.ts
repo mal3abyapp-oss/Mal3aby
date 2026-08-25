@@ -1,24 +1,27 @@
-// Shared role-based navigation visibility -- IA restructuring (Phase 3,
-// shared navigation foundation). Confirmed gap in
-// MAL3ABY_INFORMATION_ARCHITECTURE_AUDIT.md: AppLayout's own code
-// comment documented this as an intended, never-implemented Phase 2
-// task -- every staff role saw all 9 sidebar items regardless of
-// whether their permissions let them act on that screen (RLS always
-// prevented any actual data leak; this was a UX-clarity gap, not a
-// security gap -- a coach or scanner account saw "الموظفون"/"التقارير"
-// links they could never meaningfully use).
+// Shared permission-based navigation visibility.
 //
-// This does NOT introduce a new permission-fetching round trip --
-// `currentMembership.roleKey` is already available client-side (see
-// src/lib/domain/membership.ts) and is exactly what every existing
-// per-screen role check (isManager/isCoach/etc.) already keys off of.
-// The mapping below mirrors the real role_permissions matrix (live
-// database, enumerated during the audit) at the granularity that
-// matters for nav visibility -- a role sees a nav item if it holds at
-// least one permission relevant to that item's domain.
+// STAFF ACCESS CONTROL & CUSTOM ROLES (2026-08-25): rewritten from a
+// hand-maintained roleKey -> nav-domain map to a real permission-key
+// derivation. The old map (kept working correctly for the 9 system
+// roles throughout its life, see git history) had two structural
+// problems this phase's own acceptance test would have caught
+// immediately: (1) it could not represent a custom role at all -- a
+// custom role has no roleKey, so canSeeNavDomain(undefined, ...)'s
+// "unrecognized role -> permissive" fallback made every custom role see
+// every nav item regardless of its actual permission set (fail OPEN,
+// the exact "hidden button, not real security" pattern this phase
+// exists to eliminate); (2) it was a manually-maintained mirror of the
+// live role_permissions table, documented in its own prior header
+// comment as able to silently drift out of sync.
 //
-// Matches the role-navigation summary in
-// MAL3ABY_INFORMATION_ARCHITECTURE.md §6 exactly.
+// Both are fixed by keying nav visibility directly off
+// ActiveMembership.permissionKeys (real, server-computed via
+// caller_permission_keys(), see AuthProvider) instead of roleKey. A
+// role -- system or custom -- sees a nav domain if it holds at least
+// one of that domain's representative permission keys. This is still a
+// CLIENT-SIDE UX convenience only, same as before -- RLS/RPC
+// has_permission() checks remain the real security boundary
+// (RequireNavDomain's own header comment, unchanged).
 
 export type NavDomain =
   | 'today'
@@ -33,68 +36,48 @@ export type NavDomain =
   | 'scan'
 
 /**
- * Role -> set of nav domains that role should see. `club_owner` is
- * deliberately not listed -- it always sees everything (matches every
- * existing owner-only conditional elsewhere in the app, e.g.
- * TodayPage's isOwner).
+ * Domain -> the permission key(s) that make that domain relevant to
+ * show in the nav. A domain is visible if the caller holds ANY ONE of
+ * its listed keys (matches how the previous role map worked: a role
+ * saw a domain if it had "at least one permission relevant to that
+ * item's domain"). Derived directly from the real permission catalog
+ * (docs/CURRENT_AUTHORIZATION_MODEL.md Section 2), not invented.
  */
-// Master IA/UX audit (permission-model drift-risk phase): this map is a
-// hand-maintained mirror of the live role_permissions table, so it can
-// silently drift out of sync as permissions are added/changed in the DB
-// without anyone updating this file (a real maintenance-drift risk, not
-// a live security bug -- RLS remains the actual authorization boundary,
-// this only controls nav-item visibility). A live comparison against
-// role_permissions (via SQL, not guessed) found 4 confirmed cases where
-// a role had real, relevant DB permissions for a domain that was
-// nonetheless hidden from its nav -- fixed below. No case was found of
-// a domain granted with zero backing permissions.
-const ROLE_NAV_DOMAINS: Record<string, ReadonlySet<NavDomain>> = {
-  club_owner: new Set<NavDomain>([
-    'today', 'bookings', 'customers', 'academy', 'finance', 'reports', 'whatsapp', 'staff', 'settings', 'scan',
-  ]),
-  club_manager: new Set<NavDomain>([
-    'today', 'bookings', 'customers', 'academy', 'finance', 'reports', 'whatsapp', 'staff', 'settings', 'scan',
-  ]),
-  // branch_manager holds branch.update + field.update/view (confirmed
-  // live) -- exactly what the 'settings' domain gates (/app/fields,
-  // /app/settings) -- but 'settings' was withheld entirely.
-  branch_manager: new Set<NavDomain>([
-    'today', 'bookings', 'customers', 'academy', 'finance', 'reports', 'whatsapp', 'settings', 'scan',
-  ]),
-  // receptionist holds enrollment.view + player.create/view +
-  // subscription.view (confirmed live) -- three distinct academy-domain
-  // permission families including a real create right -- but 'academy'
-  // was withheld entirely.
-  receptionist: new Set<NavDomain>([
-    'today', 'bookings', 'customers', 'finance', 'academy', 'scan',
-  ]),
-  // accountant holds enrollment.view + player.view + subscription.view
-  // (confirmed live) -- the full breadth of what 'academy' exposes,
-  // plausibly needed for billing/reconciliation context -- but 'academy'
-  // was withheld entirely. (booking.view alone was judged too weak a
-  // signal to also add 'bookings' here -- single view-only permission,
-  // not central to this role's workflow -- left as-is.)
-  accountant: new Set<NavDomain>([
-    'today', 'customers', 'finance', 'reports', 'academy',
-  ]),
-  // academy_manager holds invoice.create + invoice.view (confirmed
-  // live) -- invoice.create is a real write capability squarely in the
-  // 'finance' domain -- but 'finance' was withheld entirely.
-  academy_manager: new Set<NavDomain>([
-    'today', 'academy', 'customers', 'reports', 'finance',
-  ]),
-  coach: new Set<NavDomain>([
-    'today', 'academy', 'scan',
-  ]),
-  scanner: new Set<NavDomain>([
-    'scan',
-  ]),
+const NAV_DOMAIN_PERMISSIONS: Record<Exclude<NavDomain, 'today'>, readonly string[]> = {
+  bookings: ['booking.view', 'booking.create'],
+  customers: ['customer.view', 'customer.create'],
+  academy: [
+    'enrollment.view', 'enrollment.create', 'academy.group.manage', 'academy.program.manage',
+    'session.view', 'attendance.view', 'attendance.mark',
+  ],
+  finance: ['payment.view', 'payment.create', 'invoice.view', 'invoice.create', 'payment.refund'],
+  reports: ['report.view'],
+  whatsapp: ['manage_whatsapp_connection'],
+  staff: ['staff.view', 'staff.create', 'staff.update', 'roles.view', 'roles.manage'],
+  settings: ['club.update', 'branch.create', 'branch.update', 'field.create', 'field.update', 'pricing.update'],
+  scan: ['qr.scan', 'qr.checkin.confirm'],
 }
 
-/** Roles with no explicit entry (should not normally happen -- platform_owner never reaches AppLayout) see everything, matching the pre-existing behavior as a safe fallback rather than hiding nav for an unrecognized role. */
-export function canSeeNavDomain(roleKey: string | undefined, domain: NavDomain): boolean {
-  if (!roleKey) return true
-  const allowed = ROLE_NAV_DOMAINS[roleKey]
-  if (!allowed) return true
-  return allowed.has(domain)
+/**
+ * `today` (the operational dashboard) has no permission gate of its own
+ * -- every active member of a club sees it, matching the pre-existing
+ * behavior (it was in every role's set in the old map, including
+ * scanner/coach) and TodayPage's own internal role-conditional sections
+ * for anything more specific.
+ *
+ * club_owner is not special-cased here (unlike the old map, which
+ * hard-coded it to "always sees everything") -- system-role seeding
+ * grants club_owner every permission key that exists (confirmed:
+ * role_permissions has a row for club_owner × every permission), so it
+ * naturally satisfies every domain's check without a special case. This
+ * removes a second, redundant source of truth for "owner sees
+ * everything" -- if that seeding assumption is ever wrong, this
+ * function will now honestly reflect it instead of silently
+ * overriding it.
+ */
+export function canSeeNavDomain(permissionKeys: readonly string[] | undefined, domain: NavDomain): boolean {
+  if (domain === 'today') return true
+  if (!permissionKeys || permissionKeys.length === 0) return false
+  const required = NAV_DOMAIN_PERMISSIONS[domain]
+  return required.some((key) => permissionKeys.includes(key))
 }
