@@ -39,12 +39,36 @@ interface MyCustomerRecord {
   clubs: { name_ar: string } | null
 }
 
+interface PortalCustomerRpcRow {
+  customer_id: string
+  club_id: string
+  club_name_ar: string | null
+  full_name: string | null
+  mobile_display: string | null
+  email: string | null
+  whatsapp: string | null
+}
+
+// PORTAL CROSS-PERSONA AUTHORIZATION VULNERABILITY FIX (HIGH, 2026-08-25):
+// this used to query `customers` with zero filter, relying on RLS alone
+// -- for a staff member's Portal session, customers_select_club_staff
+// silently returned every customer record in their club instead of just
+// their own linked one(s). Now uses get_my_portal_customers(), the one
+// SECURITY DEFINER RPC that checks customers.user_id = auth.uid()
+// directly and never delegates to RLS's OR-combined policy set (see
+// PortalClubProvider.tsx for the full rationale).
 async function fetchMyCustomerRecords(): Promise<MyCustomerRecord[]> {
-  const { data, error } = await supabase
-    .from('customers')
-    .select('id, full_name, mobile_display, email, whatsapp, club_id, clubs(name_ar)')
+  const { data, error } = await supabase.rpc('get_my_portal_customers')
   if (error) throw error
-  return (data ?? []) as unknown as MyCustomerRecord[]
+  return ((data ?? []) as PortalCustomerRpcRow[]).map((r) => ({
+    id: r.customer_id,
+    full_name: r.full_name ?? '',
+    mobile_display: r.mobile_display,
+    email: r.email,
+    whatsapp: r.whatsapp,
+    club_id: r.club_id,
+    clubs: r.club_name_ar ? { name_ar: r.club_name_ar } : null,
+  }))
 }
 
 async function fetchClubCountry(clubId: string): Promise<CountryCode | null> {

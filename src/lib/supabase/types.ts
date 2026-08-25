@@ -5486,6 +5486,19 @@ export type Database = {
           total: number
         }[]
       }
+      get_my_portal_customers: {
+        Args: never
+        Returns: {
+          club_id: string
+          club_name: string
+          club_name_ar: string
+          customer_id: string
+          email: string
+          full_name: string
+          mobile_display: string
+          whatsapp: string
+        }[]
+      }
       get_official_receipts_report: {
         Args: {
           p_branch_id?: string

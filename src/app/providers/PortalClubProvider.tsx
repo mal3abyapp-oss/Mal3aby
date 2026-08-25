@@ -9,15 +9,7 @@ import { useAuth } from './AuthProvider'
 // customers row per club since 20260823050000_customer_portal_zero_cost_
 // activation.sql widened customers_user_id_unique to
 // UNIQUE(club_id, user_id) -- but nothing on the frontend ever tracked
-// "which of my linked clubs am I currently looking at". PortalBookingsPage/
-// PortalPaymentsPage/PortalQrPage each queried bookings/invoices with NO
-// club filter at all, relying on RLS alone to return every row across
-// every linked club merged into one flat list -- not a security leak
-// (RLS still only returns rows this auth.uid() genuinely owns), but
-// materially wrong/confusing UX for a customer linked to more than one
-// club: Club A and Club B bookings would appear interleaved with no
-// indication which club owned which row, and there was no way to view
-// just one club's data.
+// "which of my linked clubs am I currently looking at".
 //
 // This mirrors AuthProvider's own memberships/currentClubId pattern
 // (same shape: load all rows for auth.uid(), dedupe, pick one as
@@ -31,6 +23,27 @@ import { useAuth } from './AuthProvider'
 // pure portal customer, and this provider's customerMemberships stays
 // empty for pure staff, so mounting both unconditionally on every
 // session is cheap and never conflates the two.
+//
+// PORTAL CROSS-PERSONA AUTHORIZATION VULNERABILITY FIX (HIGH, confirmed
+// live in production, 2026-08-25): this used to query `customers` with
+// ZERO filter, on the assumption that customers_self_service_select RLS
+// (user_id = auth.uid()) was the only applicable policy -- wrong for any
+// account that is ALSO staff somewhere, since Postgres OR-combines
+// customers_select_club_staff into the same query, silently returning
+// the entire club's customer roster to a staff member's Portal session.
+// Proven live via a real authenticated REST call using a real
+// staff+portal dual-context session's own JWT (no impersonation): the
+// old unfiltered query returned dozens of unrelated customers.
+//
+// Fixed by moving identity resolution entirely server-side into
+// get_my_portal_customers() -- a SECURITY DEFINER RPC that checks
+// customers.user_id = auth.uid() directly in its own SQL body, never
+// delegating to RLS's OR-combined policy set and never consulting
+// has_permission()/user_club_ids() at all. This is now the ONLY source
+// of "which customer records does this session own" anywhere in the
+// Portal -- every other Portal screen must filter by customer_id IN
+// (activeCustomerId / customerMemberships[].customerId), an explicit
+// ownership-proven allowlist, never re-query `customers` directly.
 
 export interface PortalCustomerMembership {
   customerId: string
@@ -53,32 +66,27 @@ const PortalClubContext = createContext<PortalClubContextValue | undefined>(unde
 
 const ACTIVE_CLUB_STORAGE_KEY = 'mala3by.portal.activeClubId'
 
-interface CustomerRow {
-  id: string
+interface PortalCustomerRpcRow {
+  customer_id: string
   club_id: string
-  clubs: { name: string; name_ar: string } | null
+  club_name: string | null
+  club_name_ar: string | null
 }
 
 async function fetchMyCustomerMemberships(): Promise<PortalCustomerMembership[]> {
-  // No .single()/.maybeSingle()/.limit(1) -- deliberately fetches every
-  // customers row RLS returns for this auth.uid(), across every club.
-  // customers_select_self_service (RLS) already scopes this to
-  // "customer_id where user_id = auth.uid()" -- no additional filter
-  // needed or safe to add here (adding a club_id filter would be the
-  // exact single-club assumption this provider exists to remove).
-  const { data, error } = await supabase.from('customers').select('id, club_id, clubs(name, name_ar)')
+  const { data, error } = await supabase.rpc('get_my_portal_customers')
   if (error) throw error
-  const rows = (data ?? []) as unknown as CustomerRow[]
+  const rows = (data ?? []) as PortalCustomerRpcRow[]
   // A customer can hold at most one linked row per club (customers_club_
   // user_id_unique), so no same-club dedup is needed here the way
   // AuthProvider dedupes club_memberships (which can have >1 row per
   // club for different reasons) -- each row is already guaranteed to be
   // a distinct club.
   return rows.map((r) => ({
-    customerId: r.id,
+    customerId: r.customer_id,
     clubId: r.club_id,
-    clubName: r.clubs?.name ?? null,
-    clubNameAr: r.clubs?.name_ar ?? null,
+    clubName: r.club_name,
+    clubNameAr: r.club_name_ar,
   }))
 }
 

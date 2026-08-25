@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next'
 import { supabase } from '@/lib/supabase/client'
 import { PageHeader } from '@/components/ui/page-header'
 import { StatusBadge } from '@/components/ui/status-badge'
+import { usePortalClub } from '@/app/providers/PortalClubProvider'
 
 // Gate 3 — My Academies / My Children: shows every player linked to
 // this account as a guardian (via guardian_links), each with their
@@ -20,11 +21,24 @@ interface PortalPlayer {
   }[]
 }
 
-async function fetchMyPlayers(): Promise<PortalPlayer[]> {
-  // RLS (guardian_links_self_service_select) already scopes this to
-  // exactly the guardian_links rows for the caller's own linked
-  // customer record(s) -- no extra filter needed here.
-  const { data: links, error: linksError } = await supabase.from('guardian_links').select('player_id')
+// PORTAL CROSS-PERSONA AUTHORIZATION VULNERABILITY FIX (HIGH, 2026-08-25):
+// this used to query `guardian_links` with zero filter, relying on RLS
+// alone (guardian_links_self_service_select) -- for a staff member's
+// Portal session, guardian_links_select_club_staff (customer.view on the
+// customer's own club) is ALSO an applicable SELECT policy and
+// OR-combines with it, so this returned every guardian_link in that
+// club, not just the caller's own. Proven live via a real authenticated
+// REST call (8 real unrelated guardian_links, exposing real players'
+// enrollment data, returned to a Portal session with no linked customer
+// at all). Now filters explicitly by customer_id IN (this account's own
+// customer ids, sourced exclusively from get_my_portal_customers()) --
+// an ownership-proven allowlist, not an ambient RLS assumption.
+async function fetchMyPlayers(ownedCustomerIds: string[]): Promise<PortalPlayer[]> {
+  if (ownedCustomerIds.length === 0) return []
+  const { data: links, error: linksError } = await supabase
+    .from('guardian_links')
+    .select('player_id')
+    .in('customer_id', ownedCustomerIds)
   if (linksError) throw linksError
 
   const playerIds = [...new Set((links ?? []).map((l) => l.player_id))]
@@ -40,7 +54,13 @@ async function fetchMyPlayers(): Promise<PortalPlayer[]> {
 
 export function PortalAcademyPage() {
   const { t } = useTranslation()
-  const { data: players = [], isLoading, error } = useQuery({ queryKey: ['portal', 'my-players'], queryFn: fetchMyPlayers })
+  const { customerMemberships, isLoading: clubLoading } = usePortalClub()
+  const ownedCustomerIds = customerMemberships.map((m) => m.customerId)
+  const { data: players = [], isLoading, error } = useQuery({
+    queryKey: ['portal', 'my-players', ownedCustomerIds],
+    queryFn: () => fetchMyPlayers(ownedCustomerIds),
+    enabled: !clubLoading,
+  })
 
   const SUB_STATUS_LABELS: Record<string, string> = {
     pending: t('academy.subscriptionStatusLabels.pending'),

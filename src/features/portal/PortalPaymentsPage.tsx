@@ -54,15 +54,24 @@ interface PaymentMethodOption {
   referenceRequired: boolean
 }
 
-// Multi-Club E2E audit (2026-08-24): now club-scoped -- see the same
-// note on PortalBookingsPage.fetchMyBookings. A club_id-required
-// signature so this can never silently regress back to a
-// merged-everything query.
-async function fetchMyInvoices(clubId: string): Promise<InvoiceRow[]> {
+// Multi-Club E2E audit (2026-08-24): scoped per-club so a customer
+// linked to more than one club doesn't see every club's invoices
+// interleaved.
+//
+// PORTAL CROSS-PERSONA AUTHORIZATION VULNERABILITY FIX (HIGH, 2026-08-25):
+// the original `.eq('club_id', clubId)` filter alone was NOT sufficient
+// -- invoices_select_club_staff RLS is ALSO club_id-scoped, so a staff
+// member's Portal session received every customer's invoices in that
+// club. Proven live via a real authenticated REST call (5 real
+// unrelated invoices, real amounts, returned to a Portal session with no
+// linked customer at all). Now filters by `customer_id`, sourced
+// exclusively from get_my_portal_customers() -- see the same rationale
+// on PortalBookingsPage.fetchMyBookings.
+async function fetchMyInvoices(customerId: string): Promise<InvoiceRow[]> {
   const { data, error } = await supabase
     .from('invoices')
     .select('id, invoice_number, total, status, issued_at')
-    .eq('club_id', clubId)
+    .eq('customer_id', customerId)
     .order('created_at', { ascending: false })
     .limit(30)
   if (error) throw error
@@ -226,12 +235,12 @@ export function PortalPaymentsPage() {
   // ?invoiceId= can legitimately belong to another linked club now that
   // this query is club-scoped.
   const [wrongClubInvoiceId, setWrongClubInvoiceId] = useState<string | null>(null)
-  const { activeClubId, isLoading: clubLoading, customerMemberships, setActiveClubId } = usePortalClub()
+  const { activeCustomerId, isLoading: clubLoading, customerMemberships, setActiveClubId } = usePortalClub()
 
   const { data: invoices = [], isLoading } = useQuery({
-    queryKey: ['portal', 'my-invoices', activeClubId],
-    queryFn: () => fetchMyInvoices(activeClubId!),
-    enabled: !!activeClubId,
+    queryKey: ['portal', 'my-invoices', activeCustomerId],
+    queryFn: () => fetchMyInvoices(activeCustomerId!),
+    enabled: !!activeCustomerId,
   })
 
   useEffect(() => {

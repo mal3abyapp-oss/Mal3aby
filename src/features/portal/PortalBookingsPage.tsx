@@ -27,19 +27,27 @@ interface PortalBooking {
   clubs: { name_ar: string; timezone: string } | null
 }
 
-// Multi-Club E2E audit (2026-08-24): now club-scoped -- previously
-// queried with no club filter at all, so a customer linked to more than
-// one club saw every club's bookings interleaved in one list with no
-// way to tell them apart. p_club_id is required (not optional) so a
-// caller can never accidentally fall back to the old merged-everything
-// behavior. RLS still independently enforces that only rows this
-// customer legitimately owns are ever returned; this filter is a UX
-// scoping concern, not the security boundary.
-async function fetchMyBookings(clubId: string): Promise<PortalBooking[]> {
+// Multi-Club E2E audit (2026-08-24): scoped per-club so a customer
+// linked to more than one club doesn't see every club's bookings
+// interleaved with no way to tell them apart.
+//
+// PORTAL CROSS-PERSONA AUTHORIZATION VULNERABILITY FIX (HIGH, 2026-08-25):
+// the original `.eq('club_id', clubId)` filter alone was NOT sufficient
+// -- bookings_select_club_staff RLS is ALSO club_id-scoped, so a staff
+// member's Portal session (same club they're staff on) received every
+// customer's bookings in that club, not just their own. Proven live via
+// a real authenticated REST call. Now filters by `customer_id`, sourced
+// exclusively from get_my_portal_customers() (an explicit,
+// ownership-proven id, never re-derived from club membership or RLS
+// alone) -- this is safe even though bookings_select_club_staff can
+// still independently apply, because the WHERE clause itself no longer
+// depends on RLS to narrow the result; customer_id already identifies
+// exactly one owned row.
+async function fetchMyBookings(customerId: string): Promise<PortalBooking[]> {
   const { data, error } = await supabase
     .from('bookings')
     .select('id, start_at, end_at, status, total_price, invoice_id, club_id, fields(name, branch_id, branches(name)), clubs(name_ar, timezone)')
-    .eq('club_id', clubId)
+    .eq('customer_id', customerId)
     .order('start_at', { ascending: false })
     .limit(50)
   if (error) throw error
@@ -60,11 +68,11 @@ async function fetchOutstandingByInvoice(invoiceIds: string[]): Promise<Map<stri
 
 export function PortalBookingsPage() {
   const { t } = useTranslation()
-  const { activeClubId, isLoading: clubLoading } = usePortalClub()
+  const { activeCustomerId, isLoading: clubLoading } = usePortalClub()
   const { data: bookings = [], isLoading } = useQuery({
-    queryKey: ['portal', 'my-bookings', activeClubId],
-    queryFn: () => fetchMyBookings(activeClubId!),
-    enabled: !!activeClubId,
+    queryKey: ['portal', 'my-bookings', activeCustomerId],
+    queryFn: () => fetchMyBookings(activeCustomerId!),
+    enabled: !!activeCustomerId,
   })
 
   const invoiceIds = bookings.map((b) => b.invoice_id).filter((id): id is string => !!id)

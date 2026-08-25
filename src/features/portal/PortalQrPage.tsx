@@ -20,19 +20,24 @@ interface UpcomingBooking {
   fields: { name: string } | null
 }
 
-// Multi-Club E2E audit (2026-08-24): now club-scoped -- same rationale
-// as PortalBookingsPage/PortalPaymentsPage. Without this, a customer
-// linked to two clubs could pick a Club B booking from the selector
-// while the page's own header context implies Club A, and the QR itself
-// would still be correct (ensure_booking_qr resolves club_id from the
-// booking row, not from any ambient "current club" state) but the UX
-// would be actively misleading about which club they were checking in
-// at.
-async function fetchUpcomingBookings(clubId: string): Promise<UpcomingBooking[]> {
+// Multi-Club E2E audit (2026-08-24): scoped per-club so a customer
+// linked to two clubs doesn't get an actively misleading QR/booking
+// selector (ensure_booking_qr resolves club_id from the booking row
+// itself, so the QR content was always correct -- this is a UX
+// scoping concern for the selector, not the security boundary).
+//
+// PORTAL CROSS-PERSONA AUTHORIZATION VULNERABILITY FIX (HIGH, 2026-08-25):
+// the original `.eq('club_id', clubId)` filter alone was NOT sufficient
+// -- bookings_select_club_staff RLS is ALSO club_id-scoped, so a staff
+// member's Portal session would have seen every upcoming booking in
+// that club, not just their own (same class of bug proven live on
+// PortalBookingsPage/PortalPaymentsPage). Now filters by `customer_id`,
+// sourced exclusively from get_my_portal_customers().
+async function fetchUpcomingBookings(customerId: string): Promise<UpcomingBooking[]> {
   const { data, error } = await supabase
     .from('bookings')
     .select('id, start_at, fields(name)')
-    .eq('club_id', clubId)
+    .eq('customer_id', customerId)
     .in('status', ['confirmed', 'pending_payment'])
     .gte('start_at', new Date().toISOString())
     .order('start_at')
@@ -44,11 +49,11 @@ async function fetchUpcomingBookings(clubId: string): Promise<UpcomingBooking[]>
 export function PortalQrPage() {
   const { t } = useTranslation()
   const { locale } = useDirection()
-  const { activeClubId, isLoading: clubLoading } = usePortalClub()
+  const { activeCustomerId, isLoading: clubLoading } = usePortalClub()
   const { data: bookings = [], isLoading } = useQuery({
-    queryKey: ['portal', 'qr-bookings', activeClubId],
-    queryFn: () => fetchUpcomingBookings(activeClubId!),
-    enabled: !!activeClubId,
+    queryKey: ['portal', 'qr-bookings', activeCustomerId],
+    queryFn: () => fetchUpcomingBookings(activeCustomerId!),
+    enabled: !!activeCustomerId,
   })
   const [selectedId, setSelectedId] = useState<string>('')
   const [qrDataUrl, setQrDataUrl] = useState<string | null>(null)
