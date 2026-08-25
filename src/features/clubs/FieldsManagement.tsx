@@ -144,7 +144,12 @@ export function FieldsManagement() {
   const queryClient = useQueryClient()
   const [createDialogOpen, setCreateDialogOpen] = useState(false)
   const [fieldName, setFieldName] = useState('')
-  const [fieldSport, setFieldSport] = useState('football')
+  // PERSONA COUNCIL AUDIT (2026-08-25) -- Club Owner persona finding:
+  // this pre-filled the sport input with the raw English word "football"
+  // -- a real leak into an otherwise all-Arabic form (sport is free text
+  // here by design, not a fixed enum, so there's no translation map to
+  // apply; a blank default is the honest fix, not a translated guess).
+  const [fieldSport, setFieldSport] = useState('')
   const [fieldBranchId, setFieldBranchId] = useState('')
   const [manageField, setManageField] = useState<FieldRow | null>(null)
   const [manageTab, setManageTab] = useState<'details' | 'hours' | 'pricing'>('details')
@@ -327,7 +332,7 @@ export function FieldsManagement() {
                   </SelectContent>
                 </Select>
               </div>
-              <Button type="submit" disabled={createFieldMutation.isPending || !fieldBranchId}>
+              <Button type="submit" disabled={createFieldMutation.isPending || !fieldBranchId || !fieldSport.trim() || !fieldName.trim()}>
                 {createFieldMutation.isPending ? t('clubs.fieldsManagement.adding') : t('clubs.fieldsManagement.add')}
               </Button>
               <p className="text-xs text-text-secondary">

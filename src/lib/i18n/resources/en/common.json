@@ -414,6 +414,15 @@
         "allStatuses": "All statuses",
         "access": "Subscription status",
         "allAccess": "All subscription states",
+        "reason": "Reason",
+        "allReasons": "All reasons",
+        "reasonLabels": {
+          "no_subscription": "No subscription",
+          "admin_suspended": "Administratively suspended",
+          "in_grace": "In grace period",
+          "expired": "Subscription expired",
+          "active": "Active subscription"
+        },
         "clear": "Clear filters"
       },
       "emptyTitle": "No clubs yet",

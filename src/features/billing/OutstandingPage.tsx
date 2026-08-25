@@ -92,6 +92,25 @@ export function OutstandingPage() {
     return true
   })
 
+  // PERSONA COUNCIL AUDIT (2026-08-25) -- Club Owner persona finding,
+  // confirmed live against production data: invoices.due_date is NULL on
+  // every single issued invoice (0 of 106 checked) -- create_booking_
+  // internal()'s own INSERT INTO invoices never sets it, and no other
+  // invoice-creation path does either. This isn't a display bug; the
+  // underlying due-date data genuinely does not exist yet anywhere in
+  // this product. Rather than invent a due-date/payment-terms policy
+  // unilaterally (a real business decision this task's own constraints
+  // say not to make without direction), this page now detects that case
+  // and degrades honestly: hides the two filter options and the Due Date
+  // column that can never produce a result, and replaces the
+  // permanently-misleading generic "Due" badge (every row looked
+  // identical regardless of age) with a neutral "outstanding" badge that
+  // doesn't imply urgency information the product doesn't actually have.
+  // The moment due_date starts being populated (a real product decision,
+  // out of this audit's scope), this reverts to the original behavior
+  // automatically -- no future code change needed here.
+  const hasAnyDueDate = invoices.some((inv) => inv.dueDate !== null)
+
   function handleExport() {
     const csv = toCsv(filtered, [
       t('billing.outstandingPage.csvHeader.invoiceNumber'),
@@ -146,12 +165,16 @@ export function OutstandingPage() {
     },
     { key: 'total', header: t('billing.outstandingPage.table.total'), render: (r) => <MoneyDisplay amount={r.total} size="sm" /> },
     { key: 'outstanding', header: t('billing.outstandingPage.table.outstanding'), render: (r) => <MoneyDisplay amount={r.outstanding ?? 0} size="sm" tone="danger" /> },
-    { key: 'due', header: t('billing.outstandingPage.table.due'), render: (r) => (r.dueDate ? new Date(r.dueDate).toLocaleDateString(locale === 'en' ? 'en-US' : 'ar-EG') : '—') },
+    ...(hasAnyDueDate
+      ? [{ key: 'due', header: t('billing.outstandingPage.table.due'), render: (r: InvoiceRow) => (r.dueDate ? new Date(r.dueDate).toLocaleDateString(locale === 'en' ? 'en-US' : 'ar-EG') : '—') } as DataTableColumn<InvoiceRow>]
+      : []),
     {
       key: 'status',
       header: t('billing.outstandingPage.table.status'),
       render: (r) =>
-        (r.daysOverdue ?? 0) > 0 ? (
+        !hasAnyDueDate ? (
+          <StatusBadge tone="warning" label={t('billing.outstandingPage.due')} />
+        ) : (r.daysOverdue ?? 0) > 0 ? (
           <StatusBadge tone="danger" label={t('billing.outstandingPage.overdueDays', { days: r.daysOverdue })} />
         ) : (
           <StatusBadge tone="warning" label={t('billing.outstandingPage.due')} />
@@ -171,16 +194,18 @@ export function OutstandingPage() {
         }
       />
 
-      <div className="mb-4 w-48">
-        <Select value={filter} onValueChange={(v) => setFilter(v as FilterKey)}>
-          <SelectTrigger><SelectValue /></SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">{t('billing.outstandingPage.filterAll')}</SelectItem>
-            <SelectItem value="due_today">{t('billing.outstandingPage.filterDueToday')}</SelectItem>
-            <SelectItem value="overdue">{t('billing.outstandingPage.filterOverdue')}</SelectItem>
-          </SelectContent>
-        </Select>
-      </div>
+      {hasAnyDueDate && (
+        <div className="mb-4 w-48">
+          <Select value={filter} onValueChange={(v) => setFilter(v as FilterKey)}>
+            <SelectTrigger><SelectValue /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">{t('billing.outstandingPage.filterAll')}</SelectItem>
+              <SelectItem value="due_today">{t('billing.outstandingPage.filterDueToday')}</SelectItem>
+              <SelectItem value="overdue">{t('billing.outstandingPage.filterOverdue')}</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+      )}
 
       <DataTable
         columns={columns}

@@ -1,9 +1,15 @@
 import { Navigate, Outlet, useLocation } from 'react-router-dom'
-import type { ReactNode } from 'react'
+import { lazy, Suspense, type ReactNode } from 'react'
 import { useTranslation } from 'react-i18next'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useAuth } from '@/app/providers/AuthProvider'
 import { canSeeNavDomain, type NavDomain } from '@/lib/domain/navigation'
 import { Button } from '@/components/ui/button'
+import { supabase } from '@/lib/supabase/client'
+
+const ClaimAccountPageLazy = lazy(() =>
+  import('@/features/portal/ClaimAccountPage').then((m) => ({ default: m.ClaimAccountPage })),
+)
 
 // Guards /app and /platform. Client-side redirect only — the real security
 // boundary is always RLS on the server (docs/SECURITY_ANTI_FRAUD.md); this
@@ -89,6 +95,59 @@ export function RequirePortalAuth() {
   }
 
   return <Outlet />
+}
+
+// PERSONA COUNCIL AUDIT (2026-08-25) — Customer persona, P0 finding: this
+// guard closes the "claim-gate bypass" dead end. The claim-vs-dashboard
+// check used to live ONLY inline in PortalRoot, on the bare /portal index
+// route — router.tsx's own prior comment on the sibling routes ("this
+// route bypasses that gate entirely since reaching it at all requires
+// RequirePortalAuth, which already implies a linked customer record
+// exists") was simply false: RequirePortalAuth only checks session
+// existence, never customer linkage. A real, live-reproduced account with
+// a valid session but zero customers.user_id link got a DIFFERENT,
+// misleading "empty" screen on every /portal/* sub-route (bookings: "no
+// bookings yet", academy: "no players linked", profile: "no data linked
+// to your account") with no path back to the one screen that would have
+// explained why and offered the fix — a genuine dead end, not merely an
+// empty state.
+//
+// This guard now wraps the WHOLE /portal subtree (every child of
+// PortalLayout, index route included) so the claim gate is structurally
+// impossible to bypass via a different sub-route, bookmark, deep link, or
+// the bottom nav. Uses the same get_my_portal_customers() RPC as
+// PortalClubProvider/PortalRoot -- SECURITY DEFINER, checks
+// customers.user_id = auth.uid() directly, never RLS's OR-combined
+// policy set (see the cross-persona authorization fix). This is a
+// client-side UX guard only, same disclosure as every guard in this file
+// -- RLS already independently enforces that an unlinked session can
+// never read another customer's data regardless of this guard.
+export function RequirePortalCustomer({ children }: { children: ReactNode }) {
+  const queryClient = useQueryClient()
+  const { data: linkedCount, isLoading } = useQuery({
+    queryKey: ['portal', 'linked-customer-count'],
+    queryFn: async () => {
+      const { data, error } = await supabase.rpc('get_my_portal_customers')
+      if (error) throw error
+      return (data ?? []).length
+    },
+  })
+
+  if (isLoading) return null
+
+  if (!linkedCount || linkedCount === 0) {
+    return (
+      <Suspense fallback={null}>
+        <ClaimAccountPageLazy
+          onClaimed={() => {
+            void queryClient.invalidateQueries({ queryKey: ['portal'] })
+          }}
+        />
+      </Suspense>
+    )
+  }
+
+  return children
 }
 
 // Guards /platform specifically — requires the platform_owner role on at

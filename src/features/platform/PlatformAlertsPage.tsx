@@ -6,6 +6,7 @@ import { PageHeader } from '@/components/ui/page-header'
 import { EmptyState } from '@/components/ui/empty-state'
 import { StatusBadge } from '@/components/ui/status-badge'
 import { Card, CardContent } from '@/components/ui/card'
+import { Skeleton } from '@/components/ui/skeleton'
 import { AlertTriangle, Clock, Sparkles, XCircle } from 'lucide-react'
 import { isSubscriptionExpiringSoon } from './labels'
 
@@ -92,7 +93,19 @@ export function PlatformAlertsPage() {
   return (
     <div>
       <PageHeader title={t('platform.alertsPage.title')} description={t('platform.alertsPage.description')} />
-      {isLoading ? null : alerts.length === 0 ? (
+      {isLoading ? (
+        // PERSONA COUNCIL AUDIT (2026-08-25) -- Platform Owner persona
+        // finding: this rendered nothing at all during load, the only
+        // screen in the platform console without a skeleton, reading as
+        // "did my click even register" for a moment on a slower
+        // connection. Matches the row-skeleton density other
+        // card-list screens in this app already use.
+        <div className="flex flex-col gap-2">
+          {[1, 2, 3].map((i) => (
+            <Skeleton key={i} className="h-16 w-full" />
+          ))}
+        </div>
+      ) : alerts.length === 0 ? (
         <EmptyState title={t('platform.alertsPage.emptyTitle')} />
       ) : (
         <div className="flex flex-col gap-2">

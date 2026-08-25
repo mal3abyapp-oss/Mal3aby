@@ -414,6 +414,15 @@
         "allStatuses": "كل الحالات",
         "access": "حالة الاشتراك",
         "allAccess": "كل حالات الاشتراك",
+        "reason": "السبب",
+        "allReasons": "كل الأسباب",
+        "reasonLabels": {
+          "no_subscription": "بدون اشتراك",
+          "admin_suspended": "موقوف إداريًا",
+          "in_grace": "في فترة السماح",
+          "expired": "الاشتراك منتهٍ",
+          "active": "اشتراك نشط"
+        },
         "clear": "إزالة الفلاتر"
       },
       "emptyTitle": "لا توجد أندية بعد",
@@ -479,6 +488,7 @@
       "description": "جميع أصحاب الأندية المسجّلين على المنصة، وربط كل مالك بناديه",
       "platformOwnersHeading": "أصحاب صلاحية المنصة (Platform Owner)",
       "alsoClubOwnerOf": "يملك أيضًا {{count}} نادٍ",
+      "alsoClubOwnerOf_plural": "يملك أيضًا {{count}} أندية",
       "cards": {
         "uniqueOwners": "إجمالي أصحاب الأندية",
         "totalMemberships": "إجمالي عضويات الملكية",

@@ -56,6 +56,54 @@ export const ACTION_LABELS: Record<string, string> = {
   platform_reactivate_club: 'إعادة تفعيل نادٍ',
   extend_grace_period: 'تمديد فترة السماح',
   unpublish_plan: 'إلغاء نشر خطة',
+  change_platform_plan: 'تغيير خطة النادي',
+
+  // PERSONA COUNCIL AUDIT (2026-08-25) -- Club Owner persona finding:
+  // actionLabel()'s own documented fallback ("table[action] ?? action")
+  // means any action missing from this map renders as a raw machine
+  // string in the Arabic UI -- live-confirmed against every distinct
+  // action value actually present in production audit_logs (this file's
+  // own header comment says "24 actions... grepped, not guessed" at the
+  // time it was written; production now has 69). Filling the gap with
+  // every action found live that wasn't already mapped above.
+  'academy_membership.updated': 'تعديل عضوية أكاديمية',
+  'booking.hold_expired': 'انتهاء مهلة حجز مؤقت',
+  'booking.reschedule': 'إعادة جدولة حجز',
+  'club_booking_policy.update': 'تعديل سياسة الحجز',
+  'club.public_booking_enabled.set': 'تفعيل/إيقاف الحجز العام',
+  'club.public_slug.set': 'تعديل رابط الحجز العام',
+  'customer.phone_changed': 'تعديل رقم هاتف عميل',
+  'customer.public_booking_name_mismatch': 'تعارض اسم في حجز عام',
+  'employee_cash_liability.reversed': 'إلغاء التزام نقدي على موظف',
+  'employee_cash_liability.settled': 'تسوية التزام نقدي على موظف',
+  'employee_cash_liability.shortage_created': 'تسجيل عجز نقدي على موظف',
+  'government_compliance.enabled': 'تفعيل الالتزام الحكومي',
+  'government_compliance.policy_changed': 'تعديل سياسة الالتزام الحكومي',
+  'guardian_link.create': 'ربط ولي أمر بلاعب',
+  'guardian_link.set_primary': 'تعيين ولي أمر أساسي',
+  'invoice.restored_after_incorrect_void': 'استرجاع فاتورة بعد إلغاء خاطئ',
+  'invoice.void_on_booking_cancel_retroactive_reconciliation': 'تسوية فاتورة بأثر رجعي عند إلغاء حجز',
+  'invoice.voided_on_booking_cancellation': 'إلغاء فاتورة تلقائيًا عند إلغاء حجز',
+  'official_collection_receipt.corrected': 'تصحيح إيصال تحصيل رسمي',
+  'official_collection_receipt.created': 'إصدار إيصال تحصيل رسمي',
+  'official_collection_receipt.reversed': 'عكس إيصال تحصيل رسمي',
+  'payment_method.updated': 'تعديل طريقة دفع',
+  'payment_proof.approve': 'الموافقة على إثبات دفع',
+  'payment_proof.upload': 'رفع إثبات دفع',
+  'player.create': 'إضافة لاعب',
+  'player.update': 'تعديل بيانات لاعب',
+  'portal.account_activated': 'تفعيل حساب بوابة العميل',
+  'portal.invite_created': 'إنشاء دعوة بوابة عميل',
+  'staff.branch_scope.set': 'تعديل نطاق فروع موظف',
+  'staff.cash_custody.set': 'تعديل صلاحية العهدة النقدية',
+  'staff.invited': 'دعوة موظف',
+  'staff.reactivated': 'إعادة تفعيل موظف',
+  'staff.role_changed': 'تغيير دور موظف',
+  'staff.suspended': 'إيقاف موظف',
+  'whatsapp_consent.declined': 'رفض موافقة واتساب',
+  'whatsapp_consent.re_recorded_after_revoke': 'تسجيل موافقة واتساب مجددًا',
+  'whatsapp_consent.recorded': 'تسجيل موافقة واتساب',
+  'whatsapp.message.retry': 'إعادة محاولة إرسال رسالة واتساب',
 }
 
 export const ENTITY_LABELS: Record<string, string> = {
@@ -80,6 +128,23 @@ export const ENTITY_LABELS: Record<string, string> = {
   clubs: 'نادٍ',
   platform_subscriptions: 'اشتراك المنصة',
   platform_plans: 'خطة',
+
+  // PERSONA COUNCIL AUDIT (2026-08-25) -- same real coverage gap as
+  // ACTION_LABELS: entityLabel() falls back to the raw value for
+  // anything missing here. Filling the gap with every entity_type found
+  // live that wasn't already mapped above.
+  academy_membership: 'عضوية أكاديمية',
+  club: 'نادٍ',
+  club_booking_policy: 'سياسة الحجز',
+  club_membership: 'عضوية نادٍ',
+  employee_cash_liability: 'التزام نقدي على موظف',
+  government_collection_policy: 'سياسة التحصيل الحكومي',
+  guardian_links: 'ربط ولي أمر',
+  notification_queue: 'قائمة إشعارات',
+  official_collection_receipt: 'إيصال تحصيل رسمي',
+  payment_method_config: 'طريقة دفع',
+  payment_proof: 'إثبات دفع',
+  players: 'لاعب',
 }
 
 // English mirror of ACTION_LABELS above -- same keys, same order, kept as
@@ -122,6 +187,48 @@ export const ACTION_LABELS_EN: Record<string, string> = {
   platform_reactivate_club: 'Reactivate club',
   extend_grace_period: 'Extend grace period',
   unpublish_plan: 'Unpublish plan',
+  change_platform_plan: "Change club's plan",
+
+  // PERSONA COUNCIL AUDIT (2026-08-25) -- same coverage gap fix as
+  // ACTION_LABELS above, English mirror.
+  'academy_membership.updated': 'Update academy membership',
+  'booking.hold_expired': 'Temporary booking hold expired',
+  'booking.reschedule': 'Reschedule booking',
+  'club_booking_policy.update': 'Update booking policy',
+  'club.public_booking_enabled.set': 'Toggle public booking',
+  'club.public_slug.set': 'Change public booking link',
+  'customer.phone_changed': 'Change customer phone',
+  'customer.public_booking_name_mismatch': 'Name mismatch on public booking',
+  'employee_cash_liability.reversed': 'Reverse staff cash liability',
+  'employee_cash_liability.settled': 'Settle staff cash liability',
+  'employee_cash_liability.shortage_created': 'Record staff cash shortage',
+  'government_compliance.enabled': 'Enable government compliance',
+  'government_compliance.policy_changed': 'Change government compliance policy',
+  'guardian_link.create': 'Link guardian to player',
+  'guardian_link.set_primary': 'Set primary guardian',
+  'invoice.restored_after_incorrect_void': 'Restore invoice after incorrect void',
+  'invoice.void_on_booking_cancel_retroactive_reconciliation': 'Retroactively reconcile invoice on booking cancellation',
+  'invoice.voided_on_booking_cancellation': 'Auto-void invoice on booking cancellation',
+  'official_collection_receipt.corrected': 'Correct official receipt',
+  'official_collection_receipt.created': 'Issue official receipt',
+  'official_collection_receipt.reversed': 'Reverse official receipt',
+  'payment_method.updated': 'Update payment method',
+  'payment_proof.approve': 'Approve payment proof',
+  'payment_proof.upload': 'Upload payment proof',
+  'player.create': 'Add player',
+  'player.update': 'Update player',
+  'portal.account_activated': 'Activate customer portal account',
+  'portal.invite_created': 'Create portal invite',
+  'staff.branch_scope.set': 'Change staff branch scope',
+  'staff.cash_custody.set': 'Change cash custody permission',
+  'staff.invited': 'Invite staff member',
+  'staff.reactivated': 'Reactivate staff member',
+  'staff.role_changed': 'Change staff role',
+  'staff.suspended': 'Suspend staff member',
+  'whatsapp_consent.declined': 'Decline WhatsApp consent',
+  'whatsapp_consent.re_recorded_after_revoke': 'Re-record WhatsApp consent',
+  'whatsapp_consent.recorded': 'Record WhatsApp consent',
+  'whatsapp.message.retry': 'Retry WhatsApp message',
 }
 
 export const ENTITY_LABELS_EN: Record<string, string> = {
@@ -146,6 +253,21 @@ export const ENTITY_LABELS_EN: Record<string, string> = {
   clubs: 'Club',
   platform_subscriptions: 'Platform subscription',
   platform_plans: 'Plan',
+
+  // PERSONA COUNCIL AUDIT (2026-08-25) -- same coverage gap fix as
+  // ENTITY_LABELS above, English mirror.
+  academy_membership: 'Academy membership',
+  club: 'Club',
+  club_booking_policy: 'Booking policy',
+  club_membership: 'Club membership',
+  employee_cash_liability: 'Staff cash liability',
+  government_collection_policy: 'Government collection policy',
+  guardian_links: 'Guardian link',
+  notification_queue: 'Notification queue',
+  official_collection_receipt: 'Official receipt',
+  payment_method_config: 'Payment method',
+  payment_proof: 'Payment proof',
+  players: 'Player',
 }
 
 /** Looks up a label, falling back to the raw value if genuinely unmapped -- never throws, matches the existing safe-fallback convention used throughout the app's other label maps. Defaults to 'ar' so any caller that hasn't been updated yet keeps its previous behavior. */

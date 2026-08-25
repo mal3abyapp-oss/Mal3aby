@@ -190,6 +190,24 @@ export function PlatformClubsPage() {
             <SelectItem value="blocked">{ACCESS_LABEL.blocked}</SelectItem>
           </SelectContent>
         </Select>
+        {/* PERSONA COUNCIL AUDIT (2026-08-25) -- Platform Owner persona
+            finding: reasonFilter was already read from and applied
+            against the URL param (see the ?reason= deep links from
+            PlatformOverviewPage's exception cards above), but had no
+            UI control here at all -- reachable only via a deep link,
+            never discoverable by a Platform Owner browsing this page
+            directly. */}
+        <Select value={reasonFilter} onValueChange={(v) => updateParam('reason', v)}>
+          <SelectTrigger className="w-48"><SelectValue placeholder={t('platform.clubsPage.filters.reason')} /></SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">{t('platform.clubsPage.filters.allReasons')}</SelectItem>
+            <SelectItem value="no_subscription">{t('platform.clubsPage.filters.reasonLabels.no_subscription')}</SelectItem>
+            <SelectItem value="admin_suspended">{t('platform.clubsPage.filters.reasonLabels.admin_suspended')}</SelectItem>
+            <SelectItem value="in_grace">{t('platform.clubsPage.filters.reasonLabels.in_grace')}</SelectItem>
+            <SelectItem value="expired">{t('platform.clubsPage.filters.reasonLabels.expired')}</SelectItem>
+            <SelectItem value="active">{t('platform.clubsPage.filters.reasonLabels.active')}</SelectItem>
+          </SelectContent>
+        </Select>
         {hasActiveFilters && (
           <Button variant="outline" size="sm" onClick={() => setSearchParams({})}>
             {t('platform.clubsPage.filters.clear')}

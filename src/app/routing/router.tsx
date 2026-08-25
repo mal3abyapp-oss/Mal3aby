@@ -4,7 +4,7 @@ import { PublicLayout } from '@/app/layouts/PublicLayout'
 import { AppLayout } from '@/app/layouts/AppLayout'
 import { PlatformLayout } from '@/app/layouts/PlatformLayout'
 import { PortalLayout } from '@/app/layouts/PortalLayout'
-import { RequireAuth, RequireNavDomain, RequirePlatformOwner, RequirePortalAuth } from '@/app/routing/RequireAuth'
+import { RequireAuth, RequireNavDomain, RequirePlatformOwner, RequirePortalAuth, RequirePortalCustomer } from '@/app/routing/RequireAuth'
 import { RedirectWithSearch } from '@/app/routing/RedirectWithSearch'
 import { RouteLoadingFallback } from '@/app/routing/RouteLoadingFallback'
 
@@ -291,23 +291,25 @@ export const router = createBrowserRouter([
         path: '/portal',
         element: <PortalLayout />,
         children: [
-          { index: true, element: <PortalRoot /> },
-          // IA restructuring (Phase 10): "حجوزاتي" only ever rendered
-          // inline at the claim-gated index route (via PortalRoot) --
-          // confirmed in the audit as a real gap: no direct, bookmarkable
-          // /portal/bookings URL existed even though the sidebar nav item
-          // pointed conceptually at "my bookings" as its own section, not
-          // just "whatever the index happens to show". Deep links from
-          // QR/payments cross-links (added this phase) need a stable
-          // target independent of the claim-gate logic living in
-          // PortalRoot -- this route bypasses that gate entirely since
-          // reaching it at all requires RequirePortalAuth, which already
-          // implies a linked customer record exists.
-          { path: 'bookings', element: <PortalBookingsPage /> },
-          { path: 'academy', element: <PortalAcademyPage /> },
-          { path: 'payments', element: <PortalPaymentsPage /> },
-          { path: 'qr', element: <PortalQrPage /> },
-          { path: 'profile', element: <PortalProfilePage /> },
+          // PERSONA COUNCIL AUDIT (2026-08-25) -- Customer persona P0 fix:
+          // every child route (index included) is now wrapped in
+          // RequirePortalCustomer, closing the "claim-gate bypass" -- a
+          // real, live-reproduced account with a session but no linked
+          // customer record used to get a DIFFERENT, misleading "empty"
+          // screen on each sub-route instead of the claim prompt, with no
+          // path back to it. The prior comment on the sibling routes here
+          // (removed) claimed reaching them "already implies a linked
+          // customer record exists" -- that was false; RequirePortalAuth
+          // only checks session existence. IA restructuring (Phase 10)'s
+          // original reasoning for a direct, bookmarkable /portal/bookings
+          // URL still holds -- this just closes the gap that reasoning
+          // introduced.
+          { index: true, element: <RequirePortalCustomer><PortalRoot /></RequirePortalCustomer> },
+          { path: 'bookings', element: <RequirePortalCustomer><PortalBookingsPage /></RequirePortalCustomer> },
+          { path: 'academy', element: <RequirePortalCustomer><PortalAcademyPage /></RequirePortalCustomer> },
+          { path: 'payments', element: <RequirePortalCustomer><PortalPaymentsPage /></RequirePortalCustomer> },
+          { path: 'qr', element: <RequirePortalCustomer><PortalQrPage /></RequirePortalCustomer> },
+          { path: 'profile', element: <RequirePortalCustomer><PortalProfilePage /></RequirePortalCustomer> },
         ],
       },
     ],

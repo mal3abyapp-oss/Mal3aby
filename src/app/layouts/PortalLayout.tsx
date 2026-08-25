@@ -24,11 +24,13 @@ interface NavItem {
 // IA restructuring (Phase 10): "حجوزاتي" now points at a real, stable
 // /portal/bookings route instead of the claim-gated index (/portal) --
 // confirmed in the audit that no direct URL for "my bookings" existed
-// independent of PortalRoot's claim-gate check. The index route still
-// exists and still renders the same page for a first-time visit
-// (RequirePortalAuth guarantees the gate has already resolved by the
-// time any nav click is even possible), so this is a pure improvement,
-// not a behavior change for existing users.
+// independent of PortalRoot's claim-gate check. Every one of these nav
+// targets (and the index route itself) is now individually wrapped in
+// RequirePortalCustomer (see router.tsx / RequireAuth.tsx) -- PERSONA
+// COUNCIL AUDIT (2026-08-25) found and closed the gap this comment used
+// to describe incorrectly: an unlinked account tapping any of these nav
+// items previously got a misleading "empty" screen instead of the claim
+// prompt, with this nav bar itself offering no way back to it.
 const navItems: NavItem[] = [
   { to: '/portal/bookings', labelKey: 'portal.nav.bookings', icon: CalendarDays },
   { to: '/portal/academy', labelKey: 'portal.nav.academy', icon: GraduationCap },
