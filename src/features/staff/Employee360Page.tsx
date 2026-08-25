@@ -67,7 +67,12 @@ interface Summary {
 }
 
 interface AccessProfile {
-  role: { id: string; key: string; name: string; name_ar: string }
+  // STAFF ACCESS CONTROL & CUSTOM ROLES (2026-08-26): role.key is now
+  // nullable and role.is_custom distinguishes a system role from a
+  // custom club_role (get_staff_access_profile_custom_role_support
+  // migration) -- found and fixed this same round while live-testing
+  // this exact screen's role-change dropdown.
+  role: { id: string; key: string | null; name: string; name_ar: string; is_custom: boolean }
   permissions: { key: string; description: string }[]
   assigned_branches: { id: string; name: string }[]
   all_club_branches: { id: string; name: string }[]
@@ -110,6 +115,22 @@ async function fetchAccess(clubId: string, membershipId: string) {
   const { data, error } = await supabase.rpc('get_staff_access_profile', { p_club_id: clubId, p_membership_id: membershipId })
   if (error) throw error
   return data as unknown as AccessProfile
+}
+// STAFF ACCESS CONTROL & CUSTOM ROLES (2026-08-26): found via this
+// phase's own live visual QA -- the role-change dropdown only ever
+// listed the 7 system roles, with no way to change an EXISTING
+// employee's role to a custom one (StaffPage.tsx's invite dialog
+// already supported this; this screen's separate role-change control
+// did not). Same fetch pattern as StaffPage.tsx's fetchActiveCustomRoles.
+async function fetchActiveCustomRolesForEmployee(clubId: string) {
+  const { data, error } = await supabase
+    .from('club_roles')
+    .select('id, name_ar, name_en')
+    .eq('club_id', clubId)
+    .eq('is_active', true)
+    .order('name_ar')
+  if (error) throw error
+  return (data ?? []).map((r) => ({ id: r.id, nameAr: r.name_ar, nameEn: r.name_en }))
 }
 async function fetchShifts(clubId: string, membershipId: string) {
   const { data, error } = await supabase.rpc('get_staff_shift_history', { p_club_id: clubId, p_membership_id: membershipId, p_limit: 20, p_offset: 0 })
@@ -466,9 +487,20 @@ function AccessTab({
   const [roleValue, setRoleValue] = useState<string | null>(null)
   const [branchSelection, setBranchSelection] = useState<string[] | null>(null)
 
+  const { data: customRoleOptions = [] } = useQuery({
+    queryKey: ['employee360-assignable-custom-roles', clubId],
+    queryFn: () => fetchActiveCustomRolesForEmployee(clubId),
+  })
+
   const roleMutation = useMutation({
-    mutationFn: async (roleKey: string) => {
-      const { error: rpcError } = await supabase.rpc('set_staff_role', { p_club_id: clubId, p_membership_id: membershipId, p_role_key: roleKey })
+    mutationFn: async (selection: string) => {
+      const isCustom = selection.startsWith('custom:')
+      const { error: rpcError } = await supabase.rpc('set_staff_role', {
+        p_club_id: clubId,
+        p_membership_id: membershipId,
+        p_role_key: isCustom ? undefined : selection,
+        p_custom_role_id: isCustom ? selection.slice('custom:'.length) : undefined,
+      })
       if (rpcError) throw rpcError
     },
     onSuccess: () => { setError(null); setRoleValue(null); onChanged() },
@@ -496,10 +528,18 @@ function AccessTab({
           <KeyRound className="size-4 text-text-secondary" />
           <p className="text-sm font-medium text-text-secondary">{t('staff.roleLabel')}</p>
         </div>
-        <Select value={roleValue ?? access.role.key} onValueChange={(v) => { setRoleValue(v); roleMutation.mutate(v) }}>
+        <Select
+          value={roleValue ?? (access.role.is_custom ? `custom:${access.role.id}` : access.role.key ?? '')}
+          onValueChange={(v) => { setRoleValue(v); roleMutation.mutate(v) }}
+        >
           <SelectTrigger className="max-w-xs"><SelectValue /></SelectTrigger>
           <SelectContent>
             {ROLE_KEYS.map((k) => <SelectItem key={k} value={k}>{t(`staff.roles.${k}`)}</SelectItem>)}
+            {customRoleOptions.map((r) => (
+              <SelectItem key={r.id} value={`custom:${r.id}`}>
+                {t('staff.customRoleOption', { name: r.nameAr })}
+              </SelectItem>
+            ))}
           </SelectContent>
         </Select>
       </div>
