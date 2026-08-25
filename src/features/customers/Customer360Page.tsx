@@ -31,7 +31,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog'
 import { useOfficialReceipt, OfficialCollectionReceiptFields } from '@/components/ui/official-collection-receipt-fields'
-import { PAYMENT_METHOD_LABELS, PAYMENT_STATUS_LABELS, PAYMENT_STATUS_TONE, formatMoney, type PaymentStatus } from '@/lib/domain/billing'
+import { PAYMENT_METHOD_LABELS, PAYMENT_STATUS_LABELS, PAYMENT_STATUS_TONE, formatMoney, fetchPaymentInvoiceIds, type PaymentStatus } from '@/lib/domain/billing'
 import { BOOKING_STATUS_LABELS, BOOKING_STATUS_TONE } from '@/lib/domain/booking'
 import { actionLabel } from '@/lib/domain/audit'
 import { ArrowLeft, Wallet, Calendar, GraduationCap, MessageCircle, AlertTriangle } from 'lucide-react'
@@ -172,6 +172,13 @@ export function Customer360Page() {
     queryKey: ['customer-360-financial', currentClubId, customerId],
     queryFn: () => fetchFinancial(currentClubId!, customerId!),
     enabled: !!currentClubId && !!customerId && activeTab === 'financial',
+  })
+
+  const paymentIdsKey = (financial?.payments.rows ?? []).map((p) => p.id).join(',')
+  const { data: paymentInvoiceIds } = useQuery({
+    queryKey: ['customer-360-payment-invoice-ids', paymentIdsKey],
+    queryFn: () => fetchPaymentInvoiceIds((financial?.payments.rows ?? []).map((p) => p.id)),
+    enabled: !!financial && financial.payments.rows.length > 0,
   })
 
   const { data: comms } = useQuery({
@@ -387,6 +394,17 @@ export function Customer360Page() {
                 { key: 'date', header: t('common.date', { defaultValue: 'Date' }), render: (b: BookingRow) => <span className="tabular-nums"><bdi>{new Date(b.start_at).toLocaleString(locale === 'en' ? 'en-US' : 'ar-EG', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}</bdi></span> },
                 { key: 'status', header: t('common.status', { defaultValue: 'Status' }), render: (b: BookingRow) => <StatusBadge tone={BOOKING_STATUS_TONE[b.status] ?? 'neutral'} label={t(`bookings.statusLabels.${b.status}`, { defaultValue: BOOKING_STATUS_LABELS[b.status] ?? b.status })} /> },
                 { key: 'total', header: t('common.total', { defaultValue: 'Total' }), render: (b: BookingRow) => <MoneyDisplay amount={b.total_price} size="sm" /> },
+                {
+                  key: 'actions', header: '', render: (b: BookingRow) => b.invoice_id ? (
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      onClick={() => navigate(`/app/finance/payments?invoice=${b.invoice_id}`)}
+                    >
+                      {t('customers.detail.viewInvoice', { defaultValue: 'View invoice' })}
+                    </Button>
+                  ) : null,
+                },
               ] as DataTableColumn<BookingRow>[]}
               rows={bookings?.rows ?? []}
               rowKey={(b) => b.id}
@@ -442,7 +460,16 @@ export function Customer360Page() {
               <p className="mb-2 text-sm font-medium text-text-secondary">{t('customers.detail.invoices')}</p>
               <DataTable
                 columns={[
-                  { key: 'invoice', header: t('customers.detail.invoices'), render: (i: LedgerRow) => <span className="tabular-nums text-accent-foreground"><bdi>{i.invoice_number}</bdi></span> },
+                  {
+                    key: 'invoice', header: t('customers.detail.invoices'), render: (i: LedgerRow) => (
+                      <button
+                        className="tabular-nums text-accent-foreground hover:underline"
+                        onClick={() => navigate(`/app/finance/payments?invoice=${i.invoice_id}`)}
+                      >
+                        <bdi>{i.invoice_number}</bdi>
+                      </button>
+                    ),
+                  },
                   { key: 'source', header: t('customers.detail.source', { defaultValue: 'Source' }), render: (i: LedgerRow) => t(`customers.detail.sourceLabels.${i.source}`, { defaultValue: i.source }) },
                   { key: 'total', header: t('common.total', { defaultValue: 'Total' }), render: (i: LedgerRow) => <MoneyDisplay amount={i.total} size="sm" /> },
                   { key: 'status', header: t('common.status', { defaultValue: 'Status' }), render: (i: LedgerRow) => <StatusBadge tone={PAYMENT_STATUS_TONE[i.payment_status] ?? 'neutral'} label={t(`secureBooking.paymentStatusLabels.${i.payment_status}`, { defaultValue: PAYMENT_STATUS_LABELS[i.payment_status] ?? i.payment_status })} /> },
@@ -463,7 +490,18 @@ export function Customer360Page() {
               <DataTable
                 columns={[
                   { key: 'date', header: t('common.date', { defaultValue: 'Date' }), render: (p: PaymentHistoryRow) => <span className="tabular-nums"><bdi>{new Date(p.received_at).toLocaleDateString(locale === 'en' ? 'en-US' : 'ar-EG')}</bdi></span> },
-                  { key: 'amount', header: t('common.total', { defaultValue: 'Amount' }), render: (p: PaymentHistoryRow) => <MoneyDisplay amount={p.amount} size="sm" /> },
+                  {
+                    key: 'amount', header: t('common.total', { defaultValue: 'Amount' }), render: (p: PaymentHistoryRow) => {
+                      const invoiceId = paymentInvoiceIds?.get(p.id)
+                      return invoiceId ? (
+                        <button onClick={() => navigate(`/app/finance/payments?invoice=${invoiceId}`)} className="hover:underline">
+                          <MoneyDisplay amount={p.amount} size="sm" />
+                        </button>
+                      ) : (
+                        <MoneyDisplay amount={p.amount} size="sm" />
+                      )
+                    },
+                  },
                   { key: 'method', header: t('common.method', { defaultValue: 'Method' }), render: (p: PaymentHistoryRow) => t(`common.paymentMethodLabels.${p.method}`, { defaultValue: PAYMENT_METHOD_LABELS[p.method] ?? p.method }) },
                   { key: 'receipt', header: t('customers.detail.officialReceipt', { defaultValue: 'Official receipt' }), render: (p: PaymentHistoryRow) => p.official_receipt_serial ? <span className="tabular-nums"><bdi>{p.official_receipt_serial}</bdi></span> : '—' },
                   { key: 'by', header: t('customers.detail.receivedBy', { defaultValue: 'Received by' }), render: (p: PaymentHistoryRow) => p.received_by_name ?? '—' },

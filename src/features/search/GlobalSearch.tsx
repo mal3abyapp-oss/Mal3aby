@@ -76,7 +76,7 @@ export function GlobalSearch() {
                     <button
                       key={c.id}
                       className="block w-full rounded px-2 py-1.5 text-start hover:bg-muted/50"
-                      onClick={() => navigate('/app/customers')}
+                      onClick={() => navigate(`/app/customers/${c.id}`)}
                     >
                       {c.full_name} {c.mobile_display ? `· ${c.mobile_display}` : ''}
                     </button>
@@ -90,7 +90,7 @@ export function GlobalSearch() {
                     <button
                       key={p.id}
                       className="block w-full rounded px-2 py-1.5 text-start hover:bg-muted/50"
-                      onClick={() => navigate('/app/academy')}
+                      onClick={() => navigate(`/app/academy/players/${p.id}`)}
                     >
                       {p.full_name}
                     </button>
@@ -104,7 +104,7 @@ export function GlobalSearch() {
                     <button
                       key={i.id}
                       className="block w-full rounded px-2 py-1.5 text-start hover:bg-muted/50"
-                      onClick={() => navigate('/app/billing')}
+                      onClick={() => navigate(`/app/finance/invoices?invoice=${i.id}`)}
                     >
                       {i.invoice_number}
                     </button>

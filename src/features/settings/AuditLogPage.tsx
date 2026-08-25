@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useQuery } from '@tanstack/react-query'
+import { useNavigate } from 'react-router-dom'
 import { supabase } from '@/lib/supabase/client'
 import { useAuth } from '@/app/providers/AuthProvider'
 import { PageHeader } from '@/components/ui/page-header'
@@ -30,6 +31,34 @@ import { useDirection } from '@/app/providers/DirectionProvider'
 // (previously showing these values completely raw -- see
 // MAL3ABY_INFORMATION_ARCHITECTURE_AUDIT.md) share the exact same
 // vocabulary instead of a second, independently-maintained map.
+
+// Reports + Invoices + Universal Entity Drill-Down audit: entity_id
+// was fetched into every row but never rendered or linked anywhere --
+// a real gap since audit_logs is exactly the screen a suspicious owner
+// reads closely and wants to jump straight to the record in question.
+// entity_type values are inconsistent across migrations (singular AND
+// plural forms exist for the same table -- confirmed live via
+// `select distinct entity_type from audit_logs`), so both forms are
+// mapped. Only entity types with an existing, real detail
+// route/deep-link are made clickable -- everything else (cash_shift,
+// club_membership, payment_method_config, etc.) has no canonical
+// detail view to link to and is correctly left as plain text rather
+// than a link to nowhere.
+function auditEntityLink(entityType: string, entityId: string | null): string | null {
+  if (!entityId) return null
+  switch (entityType) {
+    case 'invoice':
+    case 'invoices':
+      return `/app/finance/payments?invoice=${entityId}`
+    case 'booking':
+    case 'bookings':
+      return `/app/bookings?booking=${entityId}`
+    case 'customer':
+      return `/app/customers/${entityId}`
+    default:
+      return null
+  }
+}
 
 function describeAuditLog(
   r: AuditLogRow,
@@ -132,6 +161,7 @@ export function AuditLogSection() {
   const { t } = useTranslation()
   const { currentClubId } = useAuth()
   const { locale } = useDirection()
+  const navigate = useNavigate()
   const [search, setSearch] = useState('')
   const [selected, setSelected] = useState<AuditLogRow | null>(null)
 
@@ -158,6 +188,24 @@ export function AuditLogSection() {
     },
     { key: 'actor', header: t('auditLog.columns.actor'), render: (r) => r.actorName ?? '—' },
     { key: 'reason', header: t('auditLog.columns.reason'), render: (r) => r.reason ?? '—' },
+    {
+      key: 'record',
+      header: '',
+      render: (r) => {
+        const link = auditEntityLink(r.entityType, r.entityId)
+        return link ? (
+          <button
+            className="text-xs text-accent-foreground hover:underline"
+            onClick={(e) => {
+              e.stopPropagation()
+              navigate(link)
+            }}
+          >
+            {t('auditLog.viewRecord', { defaultValue: 'View record' })}
+          </button>
+        ) : null
+      },
+    },
   ]
 
   return (

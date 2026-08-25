@@ -109,6 +109,21 @@ async function fetchAttendanceHistory(playerId: string): Promise<AttendanceRow[]
   return data ?? []
 }
 
+// Reports + Invoices + Universal Entity Drill-Down audit: get_player_360_
+// summary's current_membership only carries subscription_id, not
+// invoice_id -- "Collect payment" was navigating to
+// /app/finance/payments?invoice=<subscription_id>, a wrong-entity-type
+// bug (BillingPage's fetchInvoiceDetail does .eq('id', invoiceId)
+// against the invoices table, so a subscription id there never
+// matches any row -- the dialog silently opened empty). Same
+// single-column lookup pattern already established for
+// BookingDetailSheet's fetchInvoiceNumber, not a new RPC.
+async function fetchSubscriptionInvoiceId(subscriptionId: string): Promise<string | null> {
+  const { data, error } = await supabase.from('subscriptions').select('invoice_id').eq('id', subscriptionId).single()
+  if (error) return null
+  return data?.invoice_id ?? null
+}
+
 export function Player360Page() {
   const { playerId } = useParams<{ playerId: string }>()
   const navigate = useNavigate()
@@ -125,6 +140,13 @@ export function Player360Page() {
     queryFn: () => fetchPlayerSummary(currentClubId!, playerId!),
     enabled: !!currentClubId && !!playerId,
     retry: false,
+  })
+
+  const currentSubscriptionId = summary?.current_membership?.subscription_id
+  const { data: currentInvoiceId } = useQuery({
+    queryKey: ['subscription-invoice-id', currentSubscriptionId],
+    queryFn: () => fetchSubscriptionInvoiceId(currentSubscriptionId!),
+    enabled: !!currentSubscriptionId,
   })
 
   const { data: subscriptions } = useQuery({
@@ -301,8 +323,8 @@ export function Player360Page() {
             {summary.financial && (
               <div className="flex items-center justify-between rounded-lg border border-border p-4">
                 <StatusBadge tone={PAYMENT_STATUS_TONE[summary.financial.payment_status] ?? 'neutral'} label={t(`secureBooking.paymentStatusLabels.${summary.financial.payment_status}`, { defaultValue: PAYMENT_STATUS_LABELS[summary.financial.payment_status] ?? summary.financial.payment_status })} />
-                {summary.financial.outstanding > 0 && (
-                  <Button size="sm" onClick={() => navigate(`/app/finance/payments?invoice=${summary.current_membership?.subscription_id ?? ''}`)}>
+                {summary.financial.outstanding > 0 && currentInvoiceId && (
+                  <Button size="sm" onClick={() => navigate(`/app/finance/invoices?invoice=${currentInvoiceId}`)}>
                     {t('academy.players.collectPayment', { defaultValue: 'Collect payment' })}
                   </Button>
                 )}

@@ -67,7 +67,7 @@ async function fetchAttentionItems(clubId: string, t: TFunction, locale: 'ar' | 
       .limit(10),
     supabase
       .from('subscriptions')
-      .select('id, end_date, enrollment_id, enrollments(players(full_name))')
+      .select('id, end_date, enrollment_id, enrollments(players(id, full_name))')
       .eq('club_id', clubId)
       .eq('status', 'active')
       .gte('end_date', today)
@@ -106,7 +106,7 @@ async function fetchAttentionItems(clubId: string, t: TFunction, locale: 'ar' | 
       kind: 'unpaid',
       label: t('dashboard.attentionNeeded.unpaidBooking', { name }),
       detail: t('dashboard.attentionNeeded.amountEgp', { amount: outstanding.toFixed(0) }),
-      to: '/app/bookings',
+      to: `/app/bookings?booking=${b.id}`,
     })
   }
 
@@ -117,18 +117,18 @@ async function fetchAttentionItems(clubId: string, t: TFunction, locale: 'ar' | 
       kind: 'starting-soon',
       label: t('dashboard.attentionNeeded.startingSoon', { name }),
       detail: new Date(b.start_at).toLocaleTimeString(locale === 'en' ? 'en-US' : 'ar-EG', { hour: '2-digit', minute: '2-digit' }),
-      to: '/app/bookings',
+      to: `/app/bookings?booking=${b.id}`,
     })
   }
 
   for (const s of expiringRes.data ?? []) {
-    const playerName = (s.enrollments as unknown as { players: { full_name: string } | null } | null)?.players?.full_name ?? '—'
+    const player = (s.enrollments as unknown as { players: { id: string; full_name: string } | null } | null)?.players
     items.push({
       id: `expiring-${s.id}`,
       kind: 'expiring-subscription',
-      label: t('dashboard.attentionNeeded.expiringSubscription', { name: playerName }),
+      label: t('dashboard.attentionNeeded.expiringSubscription', { name: player?.full_name ?? '—' }),
       detail: s.end_date,
-      to: '/app/academy',
+      to: player?.id ? `/app/academy/players/${player.id}` : '/app/academy',
     })
   }
 

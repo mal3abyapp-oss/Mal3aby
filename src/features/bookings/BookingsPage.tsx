@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
 import { useSearchParams } from 'react-router-dom'
@@ -120,6 +120,40 @@ async function fetchBookingsForDay(clubId: string, date: string, timezone: strin
   }))
 }
 
+// Reports + Invoices + Universal Entity Drill-Down audit: BookingsPage
+// only ever loaded bookings scoped to the currently-selected calendar
+// day (fetchBookingsForDay), so there was no way to deep-link to a
+// specific booking from elsewhere in the app (Official Receipts
+// report, Customer 360, etc.) if that booking wasn't on today's date.
+// This fetches one booking by id, independent of the date filter --
+// same shape as fetchBookingsForDay's single-row mapping, reused by
+// the ?booking= deep-link handler below.
+async function fetchBookingById(clubId: string, bookingId: string): Promise<BookingRow | null> {
+  const { data, error } = await supabase
+    .from('bookings')
+    .select('id, field_id, branch_id, customer_id, start_at, end_at, status, total_price, discount_amount, booking_series_id, invoice_id, notes, customers(full_name, mobile_display)')
+    .eq('club_id', clubId)
+    .eq('id', bookingId)
+    .maybeSingle()
+  if (error || !data) return null
+  return {
+    id: data.id,
+    fieldId: data.field_id,
+    branchId: data.branch_id,
+    customerId: data.customer_id,
+    customerName: (data.customers as unknown as { full_name: string; mobile_display: string | null } | null)?.full_name ?? '—',
+    customerMobile: (data.customers as unknown as { full_name: string; mobile_display: string | null } | null)?.mobile_display ?? null,
+    startAt: data.start_at,
+    endAt: data.end_at,
+    status: data.status,
+    totalPrice: Number(data.total_price),
+    discountAmount: Number(data.discount_amount),
+    bookingSeriesId: data.booking_series_id,
+    invoiceId: data.invoice_id,
+    notes: data.notes,
+  }
+}
+
 async function fetchBlocksForDay(clubId: string, date: string, timezone: string) {
   const dayStart = toInstant(date, '00:00', timezone)
   const dayEnd = toInstant(date, '23:59:59', timezone)
@@ -198,7 +232,34 @@ export function BookingsPage() {
   })
   const preselectedCustomer = preselectedCustomerRow ? { id: preselectedCustomerRow.id, name: preselectedCustomerRow.full_name } : null
 
+  // Reports + Invoices + Universal Entity Drill-Down audit: ?booking=
+  // deep-link -- fetch the target booking by id (any date), then jump
+  // the calendar to its day and auto-open its detail sheet. Consumed
+  // once per distinct id (guarded by the ref below) so the user can
+  // still close the sheet and keep browsing without it reopening.
+  const deepLinkBookingId = searchParams.get('booking')
+  const { data: deepLinkBooking } = useQuery({
+    queryKey: ['booking-deep-link', currentClubId, deepLinkBookingId],
+    queryFn: () => fetchBookingById(currentClubId!, deepLinkBookingId!),
+    enabled: !!currentClubId && !!deepLinkBookingId,
+  })
+  const consumedDeepLinkRef = useRef<string | null>(null)
+
   const { data: clubTimezone } = useClubTimezone(currentClubId)
+
+  useEffect(() => {
+    if (!deepLinkBooking || !clubTimezone || !deepLinkBookingId) return
+    if (consumedDeepLinkRef.current === deepLinkBookingId) return
+    consumedDeepLinkRef.current = deepLinkBookingId
+    setDate(fromInstant(deepLinkBooking.startAt, clubTimezone).date)
+    setSelectedFieldId(deepLinkBooking.fieldId)
+    setSelectedBooking(deepLinkBooking)
+    const next = new URLSearchParams(searchParams)
+    next.delete('booking')
+    setSearchParams(next, { replace: true })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [deepLinkBooking, clubTimezone, deepLinkBookingId])
+
   const { data: branches = [] } = useQuery({ queryKey: ['branches-for-bookings', currentClubId], queryFn: () => fetchBranches(currentClubId!), enabled: !!currentClubId })
   const { data: fields = [] } = useQuery({ queryKey: ['fields-for-bookings', currentClubId, branchId], queryFn: () => fetchFields(currentClubId!, branchId), enabled: !!currentClubId })
   const { data: bookings = [], isLoading } = useQuery({

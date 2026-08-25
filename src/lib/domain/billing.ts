@@ -124,3 +124,28 @@ export async function fetchInvoicePaymentSummaries(invoiceIds: string[]): Promis
   }
   return map
 }
+
+// Reports + Invoices + Universal Entity Drill-Down audit: several
+// screens (Customer 360's payment history, the Reconciliation report)
+// have a real payment_id but no invoice_id in their RPC's return shape
+// (get_customer_financial_account, get_financial_reconciliation_report),
+// so a payment row had no way to reach its own invoice. Rather than
+// widen either RPC (this codebase's own standing caution around
+// RPC-body edits -- see BookingDetailSheet's fetchInvoiceNumber for the
+// same reasoning), batch-resolve payment_id -> invoice_id via
+// payment_allocations, the same table BillingPage's fetchInvoicePayments
+// already joins through for the reverse direction. Shared here rather
+// than duplicated per screen.
+export async function fetchPaymentInvoiceIds(paymentIds: string[]): Promise<Map<string, string>> {
+  const map = new Map<string, string>()
+  if (paymentIds.length === 0) return map
+  const { data, error } = await supabase
+    .from('payment_allocations')
+    .select('payment_id, invoice_id')
+    .in('payment_id', paymentIds)
+  if (error) return map
+  for (const row of data ?? []) {
+    if (!map.has(row.payment_id)) map.set(row.payment_id, row.invoice_id)
+  }
+  return map
+}

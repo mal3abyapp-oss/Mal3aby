@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useQuery } from '@tanstack/react-query'
+import { useNavigate, Link } from 'react-router-dom'
 import { supabase } from '@/lib/supabase/client'
 import { useAuth } from '@/app/providers/AuthProvider'
 import { useDirection } from '@/app/providers/DirectionProvider'
@@ -75,6 +76,7 @@ export function OutstandingPage() {
   const { currentClubId } = useAuth()
   const { t } = useTranslation()
   const { locale } = useDirection()
+  const navigate = useNavigate()
   const [filter, setFilter] = useState<FilterKey>('all')
 
   const { data: invoices = [], isLoading } = useQuery({
@@ -111,8 +113,37 @@ export function OutstandingPage() {
   }
 
   const columns: DataTableColumn<InvoiceRow>[] = [
-    { key: 'number', header: t('billing.outstandingPage.table.invoiceNumber'), render: (r) => r.invoiceNumber },
-    { key: 'customer', header: t('billing.outstandingPage.table.customer'), render: (r) => r.customerName },
+    {
+      key: 'number',
+      header: t('billing.outstandingPage.table.invoiceNumber'),
+      render: (r) => (
+        <button
+          className="text-accent-foreground hover:underline"
+          onClick={(e) => {
+            e.stopPropagation()
+            navigate(`/app/finance/payments?invoice=${r.id}`)
+          }}
+        >
+          <bdi>{r.invoiceNumber}</bdi>
+        </button>
+      ),
+    },
+    {
+      key: 'customer',
+      header: t('billing.outstandingPage.table.customer'),
+      render: (r) =>
+        r.customerId ? (
+          <Link
+            to={`/app/customers/${r.customerId}`}
+            className="text-accent-foreground hover:underline"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {r.customerName}
+          </Link>
+        ) : (
+          r.customerName
+        ),
+    },
     { key: 'total', header: t('billing.outstandingPage.table.total'), render: (r) => <MoneyDisplay amount={r.total} size="sm" /> },
     { key: 'outstanding', header: t('billing.outstandingPage.table.outstanding'), render: (r) => <MoneyDisplay amount={r.outstanding ?? 0} size="sm" tone="danger" /> },
     { key: 'due', header: t('billing.outstandingPage.table.due'), render: (r) => (r.dueDate ? new Date(r.dueDate).toLocaleDateString(locale === 'en' ? 'en-US' : 'ar-EG') : '—') },

@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { cn } from '@/lib/utils'
@@ -21,8 +21,16 @@ export function FinanceInvoicesPage() {
   const { t } = useTranslation()
   const [searchParams] = useSearchParams()
   const [subTab, setSubTab] = useState<SubTab>(
-    searchParams.get('tab') === 'official-receipts' ? 'official-receipts' : 'invoices',
+    searchParams.get('invoice') ? 'invoices' : searchParams.get('tab') === 'official-receipts' ? 'official-receipts' : 'invoices',
   )
+
+  // Reports + Invoices + Universal Entity Drill-Down audit: same fix as
+  // FinancePaymentsPage -- ?invoice= (BillingPage's deep-link param)
+  // must always resolve to the 'invoices' sub-tab, including when it
+  // appears while this page is already mounted on 'official-receipts'.
+  useEffect(() => {
+    if (searchParams.get('invoice')) setSubTab('invoices')
+  }, [searchParams])
 
   const tabs: { key: SubTab; labelKey: string }[] = [
     { key: 'invoices', labelKey: 'finance.invoices.tabInvoices' },

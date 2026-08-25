@@ -15,8 +15,14 @@ import { ReportsNav } from './components/ReportsNav'
 
 // Master IA/UX audit (Reports decomposition phase): extracted from
 // ReportsPage.tsx's CustomerReportTab. Drill-down added: each top-
-// spender row links to /app/customers?q=<name> (CustomersPage now
-// reads a ?q= search param on mount) instead of a dead-end list row.
+// spender row links directly to Customer 360 (/app/customers/:id).
+//
+// Reports + Invoices + Universal Entity Drill-Down audit: previously
+// linked via /app/customers?q=<name> (name-search) even though
+// customer_id was already present in the row -- ambiguous with
+// duplicate/similar names and one extra click. customer_id is the
+// real primary key everywhere else in the app (CustomersPage,
+// BillingPage, BookingDetailSheet, etc.), so this now matches.
 interface CustomerReport {
   new_customers: number
   top_customers: { customer_id: string; customer_name: string; total_spend: number; booking_count: number }[]
@@ -64,7 +70,7 @@ export function ReportCustomersPage() {
             <ul className="flex flex-col gap-1">
               {data.top_customers.map((c) => (
                 <li key={c.customer_id} className="flex items-center justify-between rounded-md border border-border p-2 text-sm">
-                  <Link to={`/app/customers?q=${encodeURIComponent(c.customer_name)}`} className="font-medium text-accent-foreground hover:underline">
+                  <Link to={`/app/customers/${c.customer_id}`} className="font-medium text-accent-foreground hover:underline">
                     {c.customer_name}
                   </Link>
                   <span>{formatMoney(c.total_spend, 'EGP', locale)} — {t('reports.customers.bookingCountSuffix', { count: c.booking_count })}</span>

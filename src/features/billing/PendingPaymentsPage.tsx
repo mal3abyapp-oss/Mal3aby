@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
+import { useNavigate } from 'react-router-dom'
 import { supabase } from '@/lib/supabase/client'
 import { useAuth } from '@/app/providers/AuthProvider'
 import { useDirection } from '@/app/providers/DirectionProvider'
@@ -74,6 +75,7 @@ export function PendingPaymentsPage() {
   const { t } = useTranslation()
   const { currentClubId } = useAuth()
   const { locale } = useDirection()
+  const navigate = useNavigate()
   const queryClient = useQueryClient()
   const [previewProof, setPreviewProof] = useState<ProofRow | null>(null)
   const [previewUrl, setPreviewUrl] = useState<string | null>(null)
@@ -155,6 +157,9 @@ export function PendingPaymentsPage() {
                   <p className="text-xs text-text-secondary">{formatDate(p.uploadedAt, locale as SupportedLocale, 'Africa/Cairo', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}</p>
                 </div>
                 <div className="flex items-center gap-2">
+                  <Button size="sm" variant="ghost" onClick={() => navigate(`/app/finance/payments?invoice=${p.invoiceId}`)}>
+                    {t('billing.pendingPayments.viewInvoice', { defaultValue: 'View invoice' })}
+                  </Button>
                   <Button size="sm" variant="outline" onClick={() => openPreview(p)}>
                     {p.mimeType === 'application/pdf' ? <FileText className="me-1 size-4" /> : <ImageIcon className="me-1 size-4" />}
                     {t('billing.pendingPayments.viewReceipt')}

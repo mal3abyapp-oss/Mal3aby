@@ -24,6 +24,8 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
+import { ErrorState } from '@/components/ui/error-state'
+import { Skeleton } from '@/components/ui/skeleton'
 import {
   PAYMENT_METHOD_LABELS,
   PAYMENT_STATUS_LABELS,
@@ -263,13 +265,37 @@ export function BillingPage() {
   const { t } = useTranslation()
   const { locale } = useDirection()
   const queryClient = useQueryClient()
-  const [searchParams] = useSearchParams()
+  const [searchParams, setSearchParams] = useSearchParams()
   // Master IA/UX audit (Club Side Booking 360 phase): BookingDetailSheet
   // showed the outstanding balance read-only with no way to reach the
   // actual invoice on BillingPage -- same minimal ?param= deep-link
   // pattern already used for Reports' customer search cross-link
   // (CustomersPage's ?q=), not new infrastructure.
-  const [selectedInvoiceId, setSelectedInvoiceId] = useState<string | null>(() => searchParams.get('invoice'))
+  //
+  // Reports + Invoices + Universal Entity Drill-Down audit: this state
+  // was previously initialized ONCE from the URL (useState(() => ...))
+  // and never written back -- opening an invoice via the table's own
+  // row click (setSelectedInvoiceId directly) never updated the URL,
+  // so refresh/new-tab/copy-link on an invoice opened that way lost
+  // it entirely, and navigating between two different ?invoice=
+  // deep-links while already mounted on this page silently did
+  // nothing (stale initial state). selectedInvoiceId is now derived
+  // directly from the URL (the single source of truth) and every
+  // "open"/"close" action goes through setSearchParams, so every
+  // entry point -- row click, deep link, or a link from another
+  // screen -- behaves identically and is always refresh-safe.
+  const selectedInvoiceId = searchParams.get('invoice')
+  const setSelectedInvoiceId = (invoiceId: string | null) => {
+    setSearchParams(
+      (prev) => {
+        const next = new URLSearchParams(prev)
+        if (invoiceId) next.set('invoice', invoiceId)
+        else next.delete('invoice')
+        return next
+      },
+      { replace: !invoiceId },
+    )
+  }
   const [printSize, setPrintSize] = useState<'a4' | '80mm'>('a4')
   const [refundPaymentId, setRefundPaymentId] = useState<string | null>(null)
   const [refundAmount, setRefundAmount] = useState('')
@@ -329,10 +355,25 @@ export function BillingPage() {
     onError: (error) => setFormError(translateSupabaseError(error, t('billing.reviewClaim.genericError'))),
   })
 
-  const { data: detail } = useQuery({
+  // Reports + Invoices + Universal Entity Drill-Down audit: this
+  // query's isLoading/isError were previously discarded -- the Dialog
+  // was `open={!!selectedInvoiceId}` with `{detail && (...)}` for its
+  // whole body, so a deep link to an invoid id that's genuinely
+  // missing, or that RLS correctly filters out because it belongs to
+  // a different club (.single() throws "no rows" either way), opened
+  // a Dialog with an empty header and no content at all -- silent
+  // failure, not the ErrorState this codebase uses everywhere else.
+  const {
+    data: detail,
+    isLoading: isDetailLoading,
+    isError: isDetailError,
+    error: detailError,
+    refetch: refetchDetail,
+  } = useQuery({
     queryKey: ['invoice-detail', selectedInvoiceId],
     queryFn: () => fetchInvoiceDetail(selectedInvoiceId!),
     enabled: !!selectedInvoiceId,
+    retry: false,
   })
 
   const { data: payments = [] } = useQuery({
@@ -609,7 +650,15 @@ export function BillingPage() {
             {pendingClaims.map((c) => (
               <div key={c.id} className="flex flex-col gap-2 rounded-md border border-border bg-surface p-3 text-sm md:flex-row md:items-center md:justify-between">
                 <div>
-                  <p className="font-medium">{c.customerName} — <bdi>{c.invoiceNumber}</bdi></p>
+                  <p className="font-medium">
+                    {c.customerName} —{' '}
+                    <button
+                      className="text-accent-foreground hover:underline"
+                      onClick={() => setSelectedInvoiceId(c.invoiceId)}
+                    >
+                      <bdi>{c.invoiceNumber}</bdi>
+                    </button>
+                  </p>
                   <p className="text-xs text-text-secondary">
                     {c.methodName ?? '—'} — <MoneyDisplay amount={c.claimedAmount} size="sm" />
                     {c.reference && ` — ${t('billing.pendingClaims.reference', { reference: c.reference })}`}
@@ -683,8 +732,20 @@ export function BillingPage() {
       <Dialog open={!!selectedInvoiceId} onOpenChange={(open) => !open && setSelectedInvoiceId(null)}>
         <DialogContent className="max-w-2xl">
           <DialogHeader>
-            <DialogTitle>{t('billing.detail.invoicePrefix')} <bdi>{detail?.invoice_number}</bdi></DialogTitle>
+            <DialogTitle>
+              {detail ? <>{t('billing.detail.invoicePrefix')} <bdi>{detail.invoice_number}</bdi></> : t('billing.detail.invoicePrefix')}
+            </DialogTitle>
           </DialogHeader>
+          {isDetailLoading && (
+            <div className="flex flex-col gap-3">
+              <Skeleton className="h-6 w-2/3" />
+              <Skeleton className="h-4 w-1/2" />
+              <Skeleton className="h-24 w-full" />
+            </div>
+          )}
+          {isDetailError && (
+            <ErrorState message={translateSupabaseError(detailError, t('billing.detail.notFound'))} onRetry={() => void refetchDetail()} />
+          )}
           {detail && (
             <div className="flex flex-col gap-4">
               <div

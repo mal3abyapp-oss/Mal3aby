@@ -1756,6 +1756,8 @@
     },
     "detail": {
       "invoicePrefix": "Invoice #",
+      "loading": "Loading invoice...",
+      "notFound": "This invoice could not be found. It may not exist, or it belongs to a different club you don't have access to.",
       "verifyQrAlt": "Invoice verification code",
       "verifyQrHint": "Scan this code to verify the invoice and payment status.",
       "itemHeader": "Item",

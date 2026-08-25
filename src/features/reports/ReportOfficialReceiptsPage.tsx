@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useQuery } from '@tanstack/react-query'
+import { useNavigate } from 'react-router-dom'
 import { PageHeader } from '@/components/ui/page-header'
 import { StatCard } from '@/components/ui/stat-card'
 import { StatusBadge } from '@/components/ui/status-badge'
@@ -60,6 +61,7 @@ export function ReportOfficialReceiptsContent() {
   const { t } = useTranslation()
   const { locale } = useDirection()
   const { currentClubId } = useAuth()
+  const navigate = useNavigate()
   const { startDate, setStartDate, endDate, setEndDate } = useDateRange()
   const [serialSearch, setSerialSearch] = useState('')
 
@@ -191,7 +193,18 @@ export function ReportOfficialReceiptsContent() {
                       <p className="text-xs text-status-danger">{t('reports.officialReceipts.reversalReasonPrefix')} {r.reversal_reason}</p>
                     )}
                   </div>
-                  <span className="font-medium">{formatMoney(r.receipt_amount, 'EGP', locale)}</span>
+                  <div className="flex items-center gap-3">
+                    <span className="font-medium">{formatMoney(r.receipt_amount, 'EGP', locale)}</span>
+                    {r.booking_id && (
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => navigate(`/app/bookings?booking=${r.booking_id}`)}
+                      >
+                        {t('reports.officialReceipts.viewBooking', { defaultValue: 'View booking' })}
+                      </Button>
+                    )}
+                  </div>
                 </div>
               ))}
             </div>

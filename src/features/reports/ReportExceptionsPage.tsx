@@ -1,4 +1,5 @@
 import { useTranslation } from 'react-i18next'
+import { useNavigate } from 'react-router-dom'
 import { PageHeader } from '@/components/ui/page-header'
 import { Button } from '@/components/ui/button'
 import { StatCard } from '@/components/ui/stat-card'
@@ -45,6 +46,7 @@ interface FinancialExceptionsReport {
 export function ReportExceptionsContent() {
   const { t } = useTranslation()
   const { locale } = useDirection()
+  const navigate = useNavigate()
   const { startDate, setStartDate, endDate, setEndDate } = useDateRange()
   const { data, isLoading, isError, error, refetch } = useDateRangeReport<FinancialExceptionsReport>('get_financial_exceptions_report', startDate, endDate)
   const dateLocale = locale === 'en' ? 'en-US' : 'ar-EG'
@@ -104,13 +106,18 @@ export function ReportExceptionsContent() {
                 <ul className="flex flex-col gap-1">
                   {data.discounts.map((d) => (
                     <li key={d.booking_id} className="rounded-md border border-border p-2 text-sm">
-                      <div className="flex justify-between">
-                        <span className="font-medium">{d.customer_name ?? '—'}</span>
-                        <span className="tabular-nums text-status-warning">-{formatMoney(d.discount_amount, 'EGP', locale)}</span>
-                      </div>
-                      <p className="text-xs text-text-secondary">
-                        <bdi>{d.invoice_number ?? '—'}</bdi> — {t('reports.exceptions.appliedBy', { name: d.applied_by })} — {new Date(d.created_at).toLocaleDateString(dateLocale)}
-                      </p>
+                      <button
+                        className="flex w-full flex-col text-start hover:bg-muted/50"
+                        onClick={() => navigate(`/app/bookings?booking=${d.booking_id}`)}
+                      >
+                        <div className="flex justify-between">
+                          <span className="font-medium text-accent-foreground">{d.customer_name ?? '—'}</span>
+                          <span className="tabular-nums text-status-warning">-{formatMoney(d.discount_amount, 'EGP', locale)}</span>
+                        </div>
+                        <p className="text-xs text-text-secondary">
+                          <bdi>{d.invoice_number ?? '—'}</bdi> — {t('reports.exceptions.appliedBy', { name: d.applied_by })} — {new Date(d.created_at).toLocaleDateString(dateLocale)}
+                        </p>
+                      </button>
                     </li>
                   ))}
                 </ul>

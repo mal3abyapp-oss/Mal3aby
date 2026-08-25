@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { cn } from '@/lib/utils'
@@ -27,13 +27,32 @@ type SubTab = 'all' | 'outstanding' | 'pending-proofs'
 export function FinancePaymentsPage() {
   const { t } = useTranslation()
   const [searchParams] = useSearchParams()
+  // Reports + Invoices + Universal Entity Drill-Down audit: ?invoice=
+  // (BillingPage's deep-link param, set by OutstandingPage's now-
+  // clickable invoice number, Customer 360, Booking Detail, Academy,
+  // Global Search, etc.) always means "open this invoice", which only
+  // BillingPage's 'all' sub-tab reads -- without this, a deep link
+  // fired while OutstandingPage/PendingPaymentsPage happened to be the
+  // resolved initial tab would silently land on the wrong sub-tab and
+  // never open the invoice at all.
   const initialTab: SubTab =
-    searchParams.get('tab') === 'pending-proofs'
-      ? 'pending-proofs'
-      : searchParams.get('status')
-        ? 'outstanding'
-        : 'all'
+    searchParams.get('invoice')
+      ? 'all'
+      : searchParams.get('tab') === 'pending-proofs'
+        ? 'pending-proofs'
+        : searchParams.get('status')
+          ? 'outstanding'
+          : 'all'
   const [subTab, setSubTab] = useState<SubTab>(initialTab)
+
+  // Re-derive when ?invoice= appears while this page is already
+  // mounted (e.g. clicking an invoice number from the Outstanding
+  // sub-tab, which doesn't unmount FinancePaymentsPage) -- without
+  // this, the initial useState value never updates and the 'all'
+  // sub-tab (where BillingPage actually reads ?invoice=) never opens.
+  useEffect(() => {
+    if (searchParams.get('invoice')) setSubTab('all')
+  }, [searchParams])
 
   const tabs: { key: SubTab; labelKey: string }[] = [
     { key: 'all', labelKey: 'finance.payments.tabAll' },

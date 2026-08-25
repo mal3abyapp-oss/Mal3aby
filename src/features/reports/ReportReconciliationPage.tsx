@@ -1,9 +1,11 @@
 import { useTranslation } from 'react-i18next'
+import { useQuery } from '@tanstack/react-query'
+import { useNavigate } from 'react-router-dom'
 import { PageHeader } from '@/components/ui/page-header'
 import { StatCard } from '@/components/ui/stat-card'
 import { StatusBadge } from '@/components/ui/status-badge'
 import { ErrorState } from '@/components/ui/error-state'
-import { formatMoney } from '@/lib/domain/billing'
+import { formatMoney, fetchPaymentInvoiceIds } from '@/lib/domain/billing'
 import { translateSupabaseError } from '@/lib/errors'
 import { useDirection } from '@/app/providers/DirectionProvider'
 import { Scale, AlertTriangle, CheckCircle2 } from 'lucide-react'
@@ -30,8 +32,16 @@ interface ReconciliationReport {
 export function ReportReconciliationContent() {
   const { t } = useTranslation()
   const { locale } = useDirection()
+  const navigate = useNavigate()
   const { startDate, setStartDate, endDate, setEndDate } = useDateRange()
   const { data, isLoading, isError, error, refetch } = useDateRangeReport<ReconciliationReport>('get_financial_reconciliation_report', startDate, endDate)
+
+  const paymentIds = data?.unreceipted_required_payments.map((p) => p.payment_id) ?? []
+  const { data: paymentInvoiceIds } = useQuery({
+    queryKey: ['reconciliation-payment-invoice-ids', paymentIds.join(',')],
+    queryFn: () => fetchPaymentInvoiceIds(paymentIds),
+    enabled: paymentIds.length > 0,
+  })
 
   const hasExceptions = !!data && (data.unreceipted_required_payments.length > 0 || data.total_shortage > 0)
 
@@ -79,17 +89,34 @@ export function ReportReconciliationContent() {
               <p className="text-sm text-text-secondary">{t('reports.noData')}</p>
             ) : (
               <ul className="flex flex-col gap-1">
-                {data.unreceipted_required_payments.map((p) => (
-                  <li key={p.payment_id} className="flex items-center justify-between rounded-md border border-status-danger/30 bg-status-danger/5 p-2 text-sm">
-                    <span>
-                      {formatMoney(p.amount, 'EGP', locale)} — {t(`common.paymentMethodLabels.${p.method}`, { defaultValue: p.method })}
-                    </span>
-                    <span className="flex items-center gap-2">
-                      <span className="text-xs text-text-secondary tabular-nums">{new Date(p.received_at).toLocaleString(locale === 'en' ? 'en-US' : 'ar-EG')}</span>
-                      <StatusBadge tone="danger" label={t('reports.reconciliation.missingReceipt')} />
-                    </span>
-                  </li>
-                ))}
+                {data.unreceipted_required_payments.map((p) => {
+                  const invoiceId = paymentInvoiceIds?.get(p.payment_id)
+                  const content = (
+                    <>
+                      <span>
+                        {formatMoney(p.amount, 'EGP', locale)} — {t(`common.paymentMethodLabels.${p.method}`, { defaultValue: p.method })}
+                      </span>
+                      <span className="flex items-center gap-2">
+                        <span className="text-xs text-text-secondary tabular-nums">{new Date(p.received_at).toLocaleString(locale === 'en' ? 'en-US' : 'ar-EG')}</span>
+                        <StatusBadge tone="danger" label={t('reports.reconciliation.missingReceipt')} />
+                      </span>
+                    </>
+                  )
+                  return invoiceId ? (
+                    <li key={p.payment_id}>
+                      <button
+                        className="flex w-full items-center justify-between rounded-md border border-status-danger/30 bg-status-danger/5 p-2 text-sm hover:bg-status-danger/10"
+                        onClick={() => navigate(`/app/finance/payments?invoice=${invoiceId}`)}
+                      >
+                        {content}
+                      </button>
+                    </li>
+                  ) : (
+                    <li key={p.payment_id} className="flex items-center justify-between rounded-md border border-status-danger/30 bg-status-danger/5 p-2 text-sm">
+                      {content}
+                    </li>
+                  )
+                })}
               </ul>
             )}
           </div>
