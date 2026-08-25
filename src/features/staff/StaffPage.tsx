@@ -7,6 +7,7 @@ import { useAuth } from '@/app/providers/AuthProvider'
 import { PageHeader } from '@/components/ui/page-header'
 import { DataTable, type DataTableColumn } from '@/components/ui/data-table'
 import { StatusBadge } from '@/components/ui/status-badge'
+import { MoneyDisplay } from '@/components/ui/money-display'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import {
@@ -89,6 +90,23 @@ async function fetchStaff(clubId: string): Promise<StaffRow[]> {
     for (const p of profiles ?? []) profileByUserId.set(p.user_id, p.full_name)
   }
 
+  // FINAL PRODUCT COMPLETENESS ROUND (2026-08-25) -- Club Owner
+  // persona: batched in one extra query for the whole list (same
+  // pattern as the profiles batch above), never per-row.
+  const liabilityByUserId = new Map<string, number>()
+  if (userIds.length > 0) {
+    const { data: liabilities, error: liabilitiesError } = await supabase
+      .from('employee_cash_liabilities')
+      .select('employee_id, outstanding')
+      .eq('club_id', clubId)
+      .eq('status', 'outstanding')
+      .in('employee_id', userIds)
+    if (liabilitiesError) throw liabilitiesError
+    for (const l of liabilities ?? []) {
+      liabilityByUserId.set(l.employee_id, (liabilityByUserId.get(l.employee_id) ?? 0) + Number(l.outstanding))
+    }
+  }
+
   return (data ?? []).map((row) => {
     const roles = row.roles as unknown as { key: string; name_ar: string } | null
     const branchRows = (row.membership_branches ?? []) as unknown as Array<{
@@ -103,6 +121,7 @@ async function fetchStaff(clubId: string): Promise<StaffRow[]> {
       status: row.status,
       branchNames: branchRows.map((b) => b.branches?.name).filter((n): n is string => !!n),
       hasCashCustody: row.has_cash_custody,
+      outstandingLiability: liabilityByUserId.get(row.user_id) ?? 0,
     }
   })
 }
@@ -231,6 +250,17 @@ export function StaffPage() {
           {r.hasCashCustody ? t('staff.custodyEnabled') : t('staff.custodyDisabled')}
         </Button>
       ),
+    },
+    {
+      // FINAL PRODUCT COMPLETENESS ROUND (2026-08-25) -- Club Owner
+      // persona, explicit question: "هل هناك مبالغ بعهدته؟" -- real,
+      // existing employee_cash_liabilities data, batched once for the
+      // whole list. Only shown when non-zero (matches this app's own
+      // exception-first convention elsewhere) rather than a permanent
+      // "0 EGP" column for staff who never carry cash.
+      key: 'liability',
+      header: t('staff.columns.outstandingLiability'),
+      render: (r) => (r.outstandingLiability > 0 ? <MoneyDisplay amount={r.outstandingLiability} size="sm" tone="danger" /> : '—'),
     },
     {
       key: 'actions',

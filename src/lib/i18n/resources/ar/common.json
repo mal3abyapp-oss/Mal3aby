@@ -408,6 +408,7 @@
       "columns": {
         "club": "النادي",
         "code": "الكود",
+        "createdAt": "تاريخ الانضمام",
         "adminStatus": "الحالة الإدارية",
         "subscriptionStatus": "حالة الاشتراك"
       },
@@ -593,6 +594,7 @@
       },
       "revenueColumns": {
         "month": "الشهر",
+        "club": "النادي",
         "method": "طريقة الدفع",
         "amount": "المبلغ"
       },
@@ -2632,7 +2634,8 @@
       "role": "الدور",
       "branchScope": "نطاق الفروع",
       "status": "الحالة",
-      "cashCustody": "عهدة نقدية"
+      "cashCustody": "عهدة نقدية",
+      "outstandingLiability": "المديونية المستحقة"
     },
     "notLoggedInYet": "لم يسجّل الدخول بعد",
     "allBranches": "كل الفروع",

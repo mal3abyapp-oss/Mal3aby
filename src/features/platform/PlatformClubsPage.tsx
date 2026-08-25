@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { Link, useSearchParams } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
+import { useDirection } from '@/app/providers/DirectionProvider'
 import { supabase } from '@/lib/supabase/client'
 import { PageHeader } from '@/components/ui/page-header'
 import { DataTable, type DataTableColumn } from '@/components/ui/data-table'
@@ -112,6 +113,7 @@ async function fetchClubs(offset: number): Promise<{ rows: ClubRow[]; hasMore: b
 
 export function PlatformClubsPage() {
   const { t } = useTranslation()
+  const { locale } = useDirection()
   const [pages, setPages] = useState(1)
   const [searchParams, setSearchParams] = useSearchParams()
   const [search, setSearch] = useState('')
@@ -184,6 +186,17 @@ export function PlatformClubsPage() {
       ),
     },
     { key: 'code', header: t('platform.clubsPage.columns.code'), render: (c) => <bdi>{c.club_code}</bdi> },
+    {
+      // FINAL PRODUCT COMPLETENESS ROUND (2026-08-25) -- Platform Owner
+      // persona, explicit question: "متى طلب الانضمام" (when did this
+      // club join). created_at was already fetched (used by the
+      // createdFilter=this_month filter) but never rendered as a
+      // column -- a Platform Owner scanning this list for a new signup
+      // had no join-date visible without opening each club individually.
+      key: 'createdAt',
+      header: t('platform.clubsPage.columns.createdAt'),
+      render: (c) => <bdi>{new Date(c.created_at).toLocaleDateString(locale === 'en' ? 'en-US' : 'ar-EG')}</bdi>,
+    },
     {
       key: 'status',
       header: t('platform.clubsPage.columns.adminStatus'),

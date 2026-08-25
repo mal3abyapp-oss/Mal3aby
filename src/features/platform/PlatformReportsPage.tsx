@@ -58,6 +58,8 @@ interface RevenueRow {
   month: string
   method: string
   amount: number
+  clubId: string | null
+  clubName: string | null
 }
 
 interface RevenueMonthTotal {
@@ -66,19 +68,37 @@ interface RevenueMonthTotal {
   total: number
 }
 
+// FINAL PRODUCT COMPLETENESS ROUND (2026-08-25) -- Platform Owner
+// persona: the earlier persona council report found this tab had "no
+// club_id in its query" and no per-club drill-down. Confirmed live
+// against the real schema that platform_payments genuinely has no
+// club_id column, but it does carry platform_invoice_id, and
+// platform_invoices genuinely has club_id -- a real, safe join, not an
+// invented one. No new financial subsystem, no accounting-semantics
+// change: same rows, same amounts, same reversed_at filter as before,
+// just with club identity attached via the join Postgres/PostgREST
+// already supports for a real FK. (Production currently has 0 real
+// platform_payments rows -- this fix is correct-by-construction for
+// when real platform billing starts, not something that changes
+// today's empty state.)
 async function fetchRevenueReport(locale: 'ar' | 'en'): Promise<{ rows: RevenueRow[]; monthlyTotals: RevenueMonthTotal[] }> {
   const { data, error } = await supabase
     .from('platform_payments')
-    .select('amount, method, recorded_at')
+    .select('amount, method, recorded_at, platform_invoices(club_id, clubs(name_ar))')
     .is('reversed_at', null)
     .order('recorded_at', { ascending: false })
   if (error) throw error
 
-  const rows = (data ?? []).map((r) => ({
-    month: new Date(r.recorded_at).toLocaleDateString(locale === 'en' ? 'en-US' : 'ar-EG', { year: 'numeric', month: 'long' }),
-    method: r.method,
-    amount: Number(r.amount),
-  }))
+  const rows = (data ?? []).map((r) => {
+    const invoice = r.platform_invoices as unknown as { club_id: string; clubs: { name_ar: string } | null } | null
+    return {
+      month: new Date(r.recorded_at).toLocaleDateString(locale === 'en' ? 'en-US' : 'ar-EG', { year: 'numeric', month: 'long' }),
+      method: r.method,
+      amount: Number(r.amount),
+      clubId: invoice?.club_id ?? null,
+      clubName: invoice?.clubs?.name_ar ?? null,
+    }
+  })
 
   // Phase G directive (G1): the Revenue tab showed raw per-payment rows
   // with no actual monthly aggregate, despite implying one -- a real gap
@@ -211,6 +231,18 @@ export function PlatformReportsPage() {
 
   const revenueColumns: DataTableColumn<RevenueRow>[] = [
     { key: 'month', header: t('platform.reportsPage.revenueColumns.month'), render: (r) => r.month },
+    {
+      key: 'club',
+      header: t('platform.reportsPage.revenueColumns.club'),
+      render: (r) =>
+        r.clubId ? (
+          <Link to={`/platform/clubs/${r.clubId}`} className="text-accent-foreground hover:underline">
+            {r.clubName ?? r.clubId}
+          </Link>
+        ) : (
+          '—'
+        ),
+    },
     { key: 'method', header: t('platform.reportsPage.revenueColumns.method'), render: (r) => t(`common.paymentMethodLabels.${r.method}`, { defaultValue: r.method }) },
     { key: 'amount', header: t('platform.reportsPage.revenueColumns.amount'), render: (r) => <MoneyDisplay amount={r.amount} size="sm" /> },
   ]

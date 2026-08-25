@@ -408,6 +408,7 @@
       "columns": {
         "club": "Club",
         "code": "Code",
+        "createdAt": "Joined",
         "adminStatus": "Administrative status",
         "subscriptionStatus": "Subscription status"
       },
@@ -593,6 +594,7 @@
       },
       "revenueColumns": {
         "month": "Month",
+        "club": "Club",
         "method": "Payment method",
         "amount": "Amount"
       },
@@ -2628,7 +2630,8 @@
       "role": "Role",
       "branchScope": "Branch scope",
       "status": "Status",
-      "cashCustody": "Cash custody"
+      "cashCustody": "Cash custody",
+      "outstandingLiability": "Outstanding liability"
     },
     "notLoggedInYet": "Hasn't logged in yet",
     "allBranches": "All branches",
