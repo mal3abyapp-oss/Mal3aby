@@ -6,6 +6,13 @@ export interface StaffRow {
   fullName: string | null
   roleKey: string
   roleNameAr: string
+  // STAFF ACCESS CONTROL & CUSTOM ROLES (2026-08-25): true when this
+  // membership's role is a club-owned custom role (roleKey is '' in
+  // that case) rather than one of the 9 fixed system roles -- the
+  // staff-list role column needs this to render roleNameAr directly
+  // instead of looking up a i18n `staff.roles.<key>` translation that
+  // will never exist for a club-specific name.
+  isCustomRole: boolean
   status: string
   branchNames: string[] // empty = all branches (zero rows in membership_branches)
   // Phase D (D1): explicit per-person cash-handling authorization,

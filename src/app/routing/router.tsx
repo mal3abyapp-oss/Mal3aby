@@ -57,6 +57,7 @@ const ReportAcademyPage = lazy(() => import('@/features/reports/ReportAcademyPag
 const ReportCustomersPage = lazy(() => import('@/features/reports/ReportCustomersPage').then((m) => ({ default: m.ReportCustomersPage })))
 const StaffPage = lazy(() => import('@/features/staff/StaffPage').then((m) => ({ default: m.StaffPage })))
 const Employee360Page = lazy(() => import('@/features/staff/Employee360Page').then((m) => ({ default: m.Employee360Page })))
+const RolesPage = lazy(() => import('@/features/staff/RolesPage').then((m) => ({ default: m.RolesPage })))
 const SettingsPage = lazy(() => import('@/features/settings/SettingsPage').then((m) => ({ default: m.SettingsPage })))
 const BranchesFieldsPage = lazy(() => import('@/features/clubs/BranchesFieldsPage').then((m) => ({ default: m.BranchesFieldsPage })))
 const AuditLogPage = lazy(() => import('@/features/settings/AuditLogPage').then((m) => ({ default: m.AuditLogPage })))
@@ -249,6 +250,14 @@ export const router = createBrowserRouter([
           // bookmarks rather than a dead route.
           { path: 'club', element: <Navigate to="/app/settings" replace /> },
           { path: 'staff', element: <RequireNavDomain domain="staff"><StaffPage /></RequireNavDomain> },
+          // STAFF ACCESS CONTROL & CUSTOM ROLES (2026-08-25): static
+          // "staff/roles" route, same reason it sits above the dynamic
+          // :membershipId route below -- must not be shadowed by it.
+          // roles.view is checked again inside RolesPage's own RPCs
+          // (list_club_roles/get_club_role_permissions) -- this
+          // RequireNavDomain is UX-only, same disclosure as every guard
+          // in this file.
+          { path: 'staff/roles', element: <RequireNavDomain domain="staff"><RolesPage /></RequireNavDomain> },
           // Staff 360 directive: one Employee 360 profile route, same
           // pattern as Customer 360 -- static "staff" list route above
           // this, so the dynamic :membershipId route below never

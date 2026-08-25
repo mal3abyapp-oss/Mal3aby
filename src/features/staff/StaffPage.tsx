@@ -1,5 +1,5 @@
 import { useState, type FormEvent } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, Link } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '@/lib/supabase/client'
@@ -7,6 +7,7 @@ import { useAuth } from '@/app/providers/AuthProvider'
 import { PageHeader } from '@/components/ui/page-header'
 import { DataTable, type DataTableColumn } from '@/components/ui/data-table'
 import { StatusBadge } from '@/components/ui/status-badge'
+import { Badge } from '@/components/ui/badge'
 import { MoneyDisplay } from '@/components/ui/money-display'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -57,6 +58,27 @@ async function fetchBranches(clubId: string): Promise<BranchOption[]> {
   return data ?? []
 }
 
+// STAFF ACCESS CONTROL & CUSTOM ROLES (2026-08-25): active custom
+// roles for this club, so the invite dialog can offer them alongside
+// the fixed system-role list. Only fetched while the dialog is open
+// (same lazy-load pattern as fetchBranches above).
+interface CustomRoleOption {
+  id: string
+  nameAr: string
+  nameEn: string
+}
+
+async function fetchActiveCustomRoles(clubId: string): Promise<CustomRoleOption[]> {
+  const { data, error } = await supabase
+    .from('club_roles')
+    .select('id, name_ar, name_en')
+    .eq('club_id', clubId)
+    .eq('is_active', true)
+    .order('name_ar')
+  if (error) throw error
+  return (data ?? []).map((r) => ({ id: r.id, nameAr: r.name_ar, nameEn: r.name_en }))
+}
+
 // V1 Critical Fix Pass (2026-08-16): fetchStaff previously left-embedded
 // `profiles` on the same select() as `roles`/`membership_branches`. A
 // membership whose user has no profiles row yet (pre-trigger test data,
@@ -69,10 +91,14 @@ async function fetchBranches(clubId: string): Promise<BranchOption[]> {
 // client-side so a missing profile can never hide a real membership row,
 // and show a clear placeholder instead of a bare dash.
 async function fetchStaff(clubId: string): Promise<StaffRow[]> {
+  // STAFF ACCESS CONTROL & CUSTOM ROLES (2026-08-25): a membership now
+  // has EITHER `roles` OR `club_roles` set -- embedding only `roles`
+  // silently showed a blank role for every custom-role staff member
+  // (roles?.key ?? '' resolved to '', with no fallback).
   const { data, error } = await supabase
     .from('club_memberships')
     .select(
-      'id, user_id, status, has_cash_custody, roles(key, name_ar), membership_branches(branches(name))',
+      'id, user_id, status, has_cash_custody, roles(key, name_ar), club_roles(id, name_ar), membership_branches(branches(name))',
     )
     .eq('club_id', clubId)
     .order('created_at', { ascending: false })
@@ -109,6 +135,7 @@ async function fetchStaff(clubId: string): Promise<StaffRow[]> {
 
   return (data ?? []).map((row) => {
     const roles = row.roles as unknown as { key: string; name_ar: string } | null
+    const customRole = row.club_roles as unknown as { id: string; name_ar: string } | null
     const branchRows = (row.membership_branches ?? []) as unknown as Array<{
       branches: { name: string } | null
     }>
@@ -117,7 +144,8 @@ async function fetchStaff(clubId: string): Promise<StaffRow[]> {
       userId: row.user_id,
       fullName: profileByUserId.get(row.user_id) ?? null,
       roleKey: roles?.key ?? '',
-      roleNameAr: roles?.name_ar ?? '',
+      roleNameAr: roles?.name_ar ?? customRole?.name_ar ?? '',
+      isCustomRole: !!customRole,
       status: row.status,
       branchNames: branchRows.map((b) => b.branches?.name).filter((n): n is string => !!n),
       hasCashCustody: row.has_cash_custody,
@@ -133,7 +161,13 @@ export function StaffPage() {
   const queryClient = useQueryClient()
   const [dialogOpen, setDialogOpen] = useState(false)
   const [email, setEmail] = useState('')
-  const [roleKey, setRoleKey] = useState('receptionist')
+  // STAFF ACCESS CONTROL & CUSTOM ROLES (2026-08-25): "roleSelection" is
+  // either a system-role key (e.g. "receptionist") or "custom:<uuid>" --
+  // a single <Select> covering both lists rather than a second control,
+  // matching the phase directive's own request for the invite flow to
+  // offer custom roles "alongside" the existing ones, not as a
+  // secondary step.
+  const [roleSelection, setRoleSelection] = useState('receptionist')
   const [allBranches, setAllBranches] = useState(false)
   const [selectedBranchIds, setSelectedBranchIds] = useState<string[]>([])
   const [formError, setFormError] = useState<string | null>(null)
@@ -148,13 +182,20 @@ export function StaffPage() {
     queryFn: () => fetchBranches(currentClubId!),
     enabled: !!currentClubId && dialogOpen,
   })
+  const { data: customRoles = [] } = useQuery({
+    queryKey: ['staff-assignable-custom-roles', currentClubId],
+    queryFn: () => fetchActiveCustomRoles(currentClubId!),
+    enabled: !!currentClubId && dialogOpen,
+  })
 
   const inviteMutation = useMutation({
     mutationFn: async () => {
+      const isCustom = roleSelection.startsWith('custom:')
       const { error } = await supabase.rpc('invite_staff_member', {
         p_club_id: currentClubId as string,
         p_email: email,
-        p_role_key: roleKey,
+        p_role_key: isCustom ? null : roleSelection,
+        p_custom_role_id: isCustom ? roleSelection.slice('custom:'.length) : null,
         p_branch_ids: allBranches ? [] : selectedBranchIds,
       })
       if (error) throw error
@@ -162,7 +203,7 @@ export function StaffPage() {
     onSuccess: () => {
       setDialogOpen(false)
       setEmail('')
-      setRoleKey('receptionist')
+      setRoleSelection('receptionist')
       setAllBranches(false)
       setSelectedBranchIds([])
       setFormError(null)
@@ -221,7 +262,19 @@ export function StaffPage() {
         </button>
       ),
     },
-    { key: 'role', header: t('staff.columns.role'), render: (r) => t(`staff.roles.${r.roleKey}`, { defaultValue: r.roleNameAr }) },
+    {
+      key: 'role',
+      header: t('staff.columns.role'),
+      render: (r) =>
+        r.isCustomRole ? (
+          <span className="inline-flex items-center gap-1">
+            {r.roleNameAr}
+            <Badge variant="outline" className="text-[10px]">{t('staff.customRoleBadge')}</Badge>
+          </span>
+        ) : (
+          t(`staff.roles.${r.roleKey}`, { defaultValue: r.roleNameAr })
+        ),
+    },
     {
       key: 'branches',
       header: t('staff.columns.branchScope'),
@@ -308,7 +361,7 @@ export function StaffPage() {
                 </div>
                 <div className="flex flex-col gap-1.5">
                   <label className="text-sm font-medium text-text-secondary">{t('staff.roleLabel')}</label>
-                  <Select value={roleKey} onValueChange={setRoleKey}>
+                  <Select value={roleSelection} onValueChange={setRoleSelection}>
                     <SelectTrigger>
                       <SelectValue />
                     </SelectTrigger>
@@ -318,8 +371,16 @@ export function StaffPage() {
                           {t(r.labelKey)}
                         </SelectItem>
                       ))}
+                      {customRoles.map((r) => (
+                        <SelectItem key={r.id} value={`custom:${r.id}`}>
+                          {t('staff.customRoleOption', { name: r.nameAr })}
+                        </SelectItem>
+                      ))}
                     </SelectContent>
                   </Select>
+                  <Link to="/app/staff/roles" className="text-xs text-accent-foreground hover:underline">
+                    {t('staff.manageRolesLink')}
+                  </Link>
                 </div>
                 <fieldset className="flex flex-col gap-2 rounded-md border border-border p-3">
                   <legend className="px-1 text-sm font-medium text-text-secondary">{t('staff.branchScopeLabel')}</legend>
