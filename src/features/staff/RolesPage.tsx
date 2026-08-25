@@ -358,12 +358,21 @@ function RoleEditorDialog({
 
   return (
     <Dialog open onOpenChange={(open) => { if (!open) onClose() }}>
-      <DialogContent className="max-h-[90vh] max-w-4xl overflow-y-auto">
+      <DialogContent className="max-h-[90vh] w-full max-w-4xl overflow-y-auto">
         <DialogHeader>
           <DialogTitle>{isEditing ? t('roles.editRole') : t('roles.createRole')}</DialogTitle>
         </DialogHeader>
 
-        <div className="flex flex-col gap-4">
+        {/* STAFF ACCESS CONTROL & CUSTOM ROLES (2026-08-26) -- found via
+            this phase's own live mobile visual QA at 375px: DialogContent
+            is `display: grid`, and a flex-column child with no explicit
+            width constraint sized to its own content's intrinsic width
+            (659px measured live) instead of shrinking to the grid cell,
+            forcing the WHOLE dialog to scroll horizontally even though
+            the outer page never did. min-w-0 is the standard fix for a
+            flex/grid child that must shrink below its content's natural
+            width. */}
+        <div className="flex min-w-0 flex-col gap-4">
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <div className="flex flex-col gap-1.5">
               <label className="text-sm font-medium text-text-secondary">{t('roles.nameArLabel')}</label>
