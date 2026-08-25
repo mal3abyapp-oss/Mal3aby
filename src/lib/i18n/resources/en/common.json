@@ -1758,6 +1758,8 @@
       "invoicePrefix": "Invoice #",
       "loading": "Loading invoice...",
       "notFound": "This invoice could not be found. It may not exist, or it belongs to a different club you don't have access to.",
+      "wrongClub": "This invoice belongs to another club linked to your account ({{clubName}}). Switch to that club to view it.",
+      "switchClub": "Switch club and open invoice",
       "verifyQrAlt": "Invoice verification code",
       "verifyQrHint": "Scan this code to verify the invoice and payment status.",
       "itemHeader": "Item",
@@ -2266,6 +2268,8 @@
       "listTitle": "Receipt log",
       "enteredByPrefix": "by",
       "reversalReasonPrefix": "Reversal reason:",
+      "viewInvoice": "View invoice",
+      "viewBooking": "View booking",
       "statusLabels": {
         "active": "Active",
         "reversed": "Reversed"

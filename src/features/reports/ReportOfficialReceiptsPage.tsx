@@ -39,6 +39,7 @@ interface ReceiptRow {
   customer_name: string | null
   entered_by_name: string | null
   booking_id: string | null
+  invoice_id: string | null
   reversed_at: string | null
   reversal_reason: string | null
 }
@@ -195,13 +196,22 @@ export function ReportOfficialReceiptsContent() {
                   </div>
                   <div className="flex items-center gap-3">
                     <span className="font-medium">{formatMoney(r.receipt_amount, 'EGP', locale)}</span>
+                    {r.invoice_id && (
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => navigate(`/app/finance/payments?invoice=${r.invoice_id}`)}
+                      >
+                        {t('reports.officialReceipts.viewInvoice')}
+                      </Button>
+                    )}
                     {r.booking_id && (
                       <Button
                         size="sm"
                         variant="ghost"
                         onClick={() => navigate(`/app/bookings?booking=${r.booking_id}`)}
                       >
-                        {t('reports.officialReceipts.viewBooking', { defaultValue: 'View booking' })}
+                        {t('reports.officialReceipts.viewBooking')}
                       </Button>
                     )}
                   </div>

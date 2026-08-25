@@ -34,7 +34,7 @@ import {
   fetchInvoicePaymentSummaries,
   type PaymentStatus,
 } from '@/lib/domain/billing'
-import { Trash2 } from 'lucide-react'
+import { Trash2, AlertTriangle } from 'lucide-react'
 import { useOfficialReceipt, OfficialCollectionReceiptFields, translateReceiptError, type OfficialReceiptState } from '@/components/ui/official-collection-receipt-fields'
 import { translateSupabaseError } from '@/lib/errors'
 import { useDirection } from '@/app/providers/DirectionProvider'
@@ -261,7 +261,7 @@ function SplitLineReceipt({
 }
 
 export function BillingPage() {
-  const { currentClubId } = useAuth()
+  const { currentClubId, memberships, setCurrentClubId } = useAuth()
   const { t } = useTranslation()
   const { locale } = useDirection()
   const queryClient = useQueryClient()
@@ -375,6 +375,19 @@ export function BillingPage() {
     enabled: !!selectedInvoiceId,
     retry: false,
   })
+
+  // Multi-club UX fix (see the render branch below for the full
+  // rationale): a resolved `detail` whose club_id differs from the
+  // currently-active club means this is a real OTHER membership the
+  // account holds, not a foreign tenant (a true foreign club never
+  // reaches this point -- RLS already zeroes those out into
+  // isDetailError above). Resolve the display name from `memberships`
+  // (already loaded, no extra query) rather than re-fetching it.
+  const wrongClubMembership =
+    detail && detail.club_id && detail.club_id !== currentClubId
+      ? memberships.find((m) => m.clubId === detail.club_id)
+      : undefined
+  const wrongClubName = wrongClubMembership ? (locale === 'en' ? wrongClubMembership.clubName : wrongClubMembership.clubNameAr) : undefined
 
   const { data: payments = [] } = useQuery({
     queryKey: ['invoice-payments', selectedInvoiceId],
@@ -746,7 +759,31 @@ export function BillingPage() {
           {isDetailError && (
             <ErrorState message={translateSupabaseError(detailError, t('billing.detail.notFound'))} onRetry={() => void refetchDetail()} />
           )}
-          {detail && (
+          {/* Multi-club UX fix: RLS resolves this invoice by id alone (no
+              active-club filter -- see fetchInvoiceDetail above), so a
+              deep link to an invoice belonging to a DIFFERENT club this
+              account also has membership in used to render successfully,
+              but with every other club-scoped element on the page (nav,
+              switcher, sibling queries keyed on currentClubId) still
+              showing the WRONG club's context around it -- a real,
+              silent cross-club data-framing bug, not merely "RLS allows
+              it so it's fine". A genuinely foreign club (no membership at
+              all) can never reach this branch: RLS already returns zero
+              rows for it, which is the isDetailError branch above, not
+              this one -- so this never weakens the frozen Security
+              Baseline's tenant isolation, it only fixes the UI framing
+              for an invoice the account legitimately has access to under
+              a different membership. */}
+          {detail && wrongClubName && (
+            <div className="flex flex-col items-center justify-center gap-3 py-12 text-center">
+              <AlertTriangle className="size-10 text-status-danger" aria-hidden="true" />
+              <p className="font-medium text-text-primary">{t('billing.detail.wrongClub', { clubName: wrongClubName })}</p>
+              <Button variant="outline" size="sm" onClick={() => setCurrentClubId(detail.club_id as string)}>
+                {t('billing.detail.switchClub')}
+              </Button>
+            </div>
+          )}
+          {detail && !wrongClubName && (
             <div className="flex flex-col gap-4">
               <div
                 data-print-size={printSize}

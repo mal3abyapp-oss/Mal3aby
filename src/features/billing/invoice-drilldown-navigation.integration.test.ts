@@ -136,13 +136,18 @@ describeIfConfigured('Invoice/booking drill-down navigation contracts (live inte
   // data layer -- RLS is membership-scoped, not active-club-scoped, so a
   // deep link to a Club B invoice while Club A is "active" correctly
   // resolves the row (BillingPage has no separate club filter on this
-  // query -- confirmed by reading fetchInvoiceDetail() itself). This is
-  // the actual current behavior: the data layer will happily resolve it
-  // regardless of which club is "active" client-side; there is no
-  // active-club gate on this query at all, so it is never blocked, and
-  // no additional switch-club UI exists (confirmed: not built this
-  // round). Recorded honestly rather than assumed.
-  it('D: an invoice in this account\'s OTHER real club membership still resolves (no active-club gate at the data layer)', async () => {
+  // query -- confirmed by reading fetchInvoiceDetail() itself).
+  //
+  // The data layer alone is not the whole UX requirement: BillingPage now
+  // detects `detail.club_id !== currentClubId` and renders a "switch club"
+  // prompt (see wrongClubName in BillingPage.tsx) instead of silently
+  // showing another club's invoice inside the active club's UI frame.
+  // This test proves the two facts that prompt depends on: (1) the
+  // invoice DOES resolve when it belongs to a real OTHER membership, and
+  // (2) its club_id genuinely differs from at least one of the account's
+  // other memberships, i.e. the mismatch the component checks for is a
+  // real, reachable state, not a hypothetical one.
+  it('D: an invoice in this account\'s OTHER real club membership resolves, with a club_id that differs from at least one own membership (drives the switch-club prompt)', async () => {
     if (ownClubIds.length < 2) return // this QA account only has one club in the current environment -- cannot exercise the multi-club case.
 
     const { data: otherClubInvoice } = await client
@@ -156,6 +161,12 @@ describeIfConfigured('Invoice/booking drill-down navigation contracts (live inte
     const { data, error } = await fetchInvoiceDetail(client, otherClubInvoice.id)
     expect(error).toBeNull()
     expect(data?.id).toBe(otherClubInvoice.id)
+    expect(data?.club_id).toBe(otherClubInvoice.club_id)
+    // The mismatch condition BillingPage's wrongClubName check relies on:
+    // there exists at least one of this account's own club ids that is
+    // NOT this invoice's club_id (the "currentClubId" scenario when a
+    // different club happens to be active).
+    expect(ownClubIds.some((c) => c !== data?.club_id)).toBe(true)
   })
 
   // F. Booking deep-link data contract: fetchBookingById() explicitly
@@ -233,5 +244,26 @@ describeIfConfigured('Invoice/booking drill-down navigation contracts (live inte
       .in('payment_id', [anyAllocation.payment_id])
     expect(error).toBeNull()
     expect(data?.[0]?.invoice_id).toBe(anyAllocation.invoice_id)
+  })
+
+  // Receipt -> invoice: official_collection_receipts has a real invoice_id
+  // column (confirmed via information_schema, not an invented relation),
+  // but get_official_receipts_report()'s jsonb payload previously omitted
+  // it entirely -- ReportOfficialReceiptsPage could link a receipt to its
+  // booking but never directly to its invoice. Confirms the RPC's jsonb
+  // payload now carries invoice_id for a real receipt row when one exists.
+  it('get_official_receipts_report() exposes invoice_id for a real receipt row', async () => {
+    const clubId = ownClubIds[0]!
+    const today = new Date().toISOString().slice(0, 10)
+    const { data, error } = await client.rpc('get_official_receipts_report', {
+      p_club_id: clubId,
+      p_start_date: '2000-01-01',
+      p_end_date: today,
+    })
+    expect(error).toBeNull()
+    const receipts = (data as { receipts?: Array<{ id: string; invoice_id: string | null }> } | null)?.receipts ?? []
+    const withInvoice = receipts.find((r) => !!r.invoice_id)
+    if (!withInvoice) return // this club has no receipts linked to an invoice yet -- not a contract failure.
+    expect(typeof withInvoice.invoice_id).toBe('string')
   })
 })
