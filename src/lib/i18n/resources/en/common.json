@@ -265,6 +265,7 @@
       },
       "identityCard": {
         "title": "Club identity",
+        "flaggedDuplicate": "This club's name closely matched an existing one at signup.",
         "createdAt": "Created",
         "phone": "Phone",
         "email": "Email",
@@ -412,6 +413,7 @@
       },
       "searchPlaceholder": "Search by name or code",
       "loadError": "Could not load clubs.",
+      "flaggedDuplicate": "Possible duplicate",
       "filters": {
         "status": "Administrative status",
         "allStatuses": "All statuses",
@@ -426,6 +428,7 @@
           "expired": "Subscription expired",
           "active": "Active subscription"
         },
+        "flaggedOnly": "Possible duplicates only",
         "clear": "Clear filters"
       },
       "emptyTitle": "No clubs yet",
@@ -476,6 +479,10 @@
       "whatsappFailures": {
         "title": "Failed WhatsApp messages (7d)",
         "description": "Total failed send attempts across all clubs"
+      },
+      "flaggedDuplicateClubs": {
+        "title": "Possible duplicate club signups",
+        "description": "A new club's name closely matched an existing one at signup — review before it's mistaken for spam or a genuine duplicate"
       },
       "pendingUpgradeRequests": {
         "title": "Upgrade requests awaiting review",
@@ -872,6 +879,8 @@
     "loggingIn": "Logging in...",
     "forgotPassword": "Forgot your password?",
     "createNewAccount": "Create a new account",
+    "customerHint": "Booked a field or joined an academy before?",
+    "customerHintLink": "Go to your customer account",
     "emailLabel": "Email",
     "passwordLabel": "Password",
     "fullNameLabel": "Full name",
@@ -1472,6 +1481,7 @@
     "bookingRef": "Booking #",
     "whatsappHint": "Check WhatsApp for your secure booking details link and entry code.",
     "accountAwarenessNote": "Since you shared your email, you can use it to access a self-service account later to view your bookings.",
+    "accountAwarenessLink": "Sign in now",
     "today": "Today",
     "todayContactBadge": "Contact to book",
     "todayContactExplainer": "Same-day booking isn't available online for this club -- pick an available time below and contact the club directly to book it.",
@@ -2656,6 +2666,12 @@
       "currentShift": "Current shift",
       "noOpenShift": "No open shift",
       "outstandingLiability": "Outstanding liability",
+      "activitySummary": "Activity this month",
+      "bookingsCreated": "Bookings created",
+      "paymentsCollected": "Payments collected",
+      "amountCollected": "Amount collected",
+      "attendanceMarked": "Attendance marked",
+      "activityAllTime": "All-time: {{bookings}} bookings, {{payments}} payments ({{amount}}), {{attendance}} attendance, {{receipts}} official receipts.",
       "lastActivitySection": "Recent activity",
       "lastShift": "Last shift",
       "lastCollection": "Last collection",
@@ -2783,6 +2799,7 @@
       "startFreeTrial": "Start your free trial",
       "login": "Log in",
       "trialBadge": "7 days free · No credit card required",
+      "customerLink": "Already a customer of a club? Sign in to see your bookings, payments, and QR code",
       "featuresTitle": "Core features",
       "features": {
         "bookings": "Bookings",

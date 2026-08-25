@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import type { CountryCode } from 'libphonenumber-js'
-import { useParams, useSearchParams } from 'react-router-dom'
+import { useParams, useSearchParams, Link } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
 import { supabase } from '@/lib/supabase/client'
@@ -830,9 +830,21 @@ export function PublicClubBookingPage() {
                 moment they'd care most, that providing an email (above,
                 still optional) is what would let them access that portal
                 later. Only shown when an email was actually provided this
-                time, since that's the precondition for future access. */}
+                time, since that's the precondition for future access.
+                FINAL PRODUCT COMPLETENESS ROUND (2026-08-25) -- Customer
+                persona: this note was informational text only, with no
+                actual link -- a customer who wanted to act on it had
+                nowhere to click. /login is the safe target (its own
+                post-auth logic already correctly routes a linked customer
+                to /portal, unchanged here; an unlinked one lands on the
+                portal's claim screen, also already correct). */}
             {customerEmail.trim() && (
-              <p className="text-center text-xs text-text-secondary">{t('publicBooking.accountAwarenessNote')}</p>
+              <p className="text-center text-xs text-text-secondary">
+                {t('publicBooking.accountAwarenessNote')}{' '}
+                <Link to="/login" className="text-accent-foreground hover:underline">
+                  {t('publicBooking.accountAwarenessLink')}
+                </Link>
+              </p>
             )}
           </div>
         )}

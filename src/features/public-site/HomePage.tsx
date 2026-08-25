@@ -48,6 +48,23 @@ export function HomePage() {
             </Button>
           </div>
           <p className="mt-3 text-sm text-white/50">{t('publicSite.home.trialBadge')}</p>
+          {/* FINAL PRODUCT COMPLETENESS ROUND (2026-08-25) -- Customer
+              persona finding: this hero's two CTAs are both club-owner
+              framed ("start free trial" / plain "login") -- a real
+              customer visiting mal3aby.app has zero cue the customer
+              portal exists at all, confirmed live in an earlier round
+              of this audit. Deliberately a quiet text link, not a third
+              prominent button -- the hero's job is still selling the
+              product to a club owner; this just makes the existing,
+              already-correct /login -> /portal routing (see LoginPage's
+              own post-auth logic, unchanged here) discoverable for the
+              much smaller number of visitors who are actually a
+              customer of an existing club. */}
+          <p className="mt-2 text-sm">
+            <Link to="/login" className="text-white/60 hover:text-white hover:underline">
+              {t('publicSite.home.customerLink')}
+            </Link>
+          </p>
         </div>
       </section>
 

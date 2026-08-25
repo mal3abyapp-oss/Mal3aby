@@ -177,6 +177,22 @@ export function LoginPage() {
           </form>
         </CardContent>
       </Card>
+      {/* FINAL PRODUCT COMPLETENESS ROUND (2026-08-25) -- Customer
+          persona: this page's own copy only ever framed "create new
+          account" as club creation (-> /signup, the club-owner wizard),
+          with zero cue that the exact same login form also correctly
+          routes an existing customer to their portal (LoginPage's own
+          post-auth logic already does this, unchanged by this fix --
+          this is purely discoverability, not a routing change, so it
+          carries none of the risk of touching that logic). A real
+          customer landing here (a WhatsApp link expired, or they typed
+          the URL) had no way to know this page was even for them. */}
+      <p className="mt-4 text-center text-sm text-text-secondary">
+        {t('auth.customerHint')}{' '}
+        <Link to="/portal" className="text-accent-foreground hover:underline">
+          {t('auth.customerHintLink')}
+        </Link>
+      </p>
     </div>
   )
 }

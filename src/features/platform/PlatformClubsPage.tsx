@@ -52,12 +52,32 @@ interface ClubRow {
   created_at: string
   access: string
   reason: string
+  flaggedDuplicate: boolean
+  flaggedDuplicateReason: string | null
 }
 
+// FINAL PRODUCT COMPLETENESS ROUND (2026-08-25) -- Platform Owner
+// persona: complete_new_club_onboarding() has flagged real, computed
+// duplicate-name signups since before this audit (flagged_duplicate/
+// flagged_duplicate_reason, set at signup time -- see that RPC's own
+// body) -- but no screen anywhere in the platform console ever
+// selected or rendered those columns. Investigated the signup flow
+// first, per the explicit "don't build new architecture" constraint:
+// clubs.status is a hard 3-value enum (active/suspended/closed, no
+// "pending" state exists or is added here) and a new club is
+// deliberately created 'active' immediately (the self-serve trial
+// model this platform is built on) -- changing either of those is a
+// real architecture change this round is not authorized to make.
+// flagged_duplicate is the one real, already-computed "needs review"
+// signal that was simply never surfaced -- fixed by making it visible
+// here and on the Overview exception cards (see PlatformOverviewPage),
+// with the existing suspend/reactivate actions (already fully built on
+// Club Detail) as the real accept/reject mechanism -- no new RPC, no
+// new enum value, no new workflow.
 async function fetchClubs(offset: number): Promise<{ rows: ClubRow[]; hasMore: boolean }> {
   const { data: clubs, error } = await supabase
     .from('clubs')
-    .select('id, name_ar, club_code, status, created_at')
+    .select('id, name_ar, club_code, status, created_at, flagged_duplicate, flagged_duplicate_reason')
     .order('created_at', { ascending: false })
     .range(offset, offset + PAGE_SIZE - 1)
 
@@ -75,10 +95,16 @@ async function fetchClubs(offset: number): Promise<{ rows: ClubRow[]; hasMore: b
       : { data: [] as { club_id: string; access: string; reason: string }[], error: null }
   if (accessError) throw accessError
   const accessByClub = new Map((accessRows ?? []).map((r) => [r.club_id, { access: r.access, reason: r.reason }]))
-  const withAccess = clubs.map((c) => ({
-    ...c,
+  const withAccess: ClubRow[] = clubs.map((c) => ({
+    id: c.id,
+    name_ar: c.name_ar,
+    club_code: c.club_code,
+    status: c.status,
+    created_at: c.created_at,
     access: accessByClub.get(c.id)?.access ?? 'blocked',
     reason: accessByClub.get(c.id)?.reason ?? 'no_subscription',
+    flaggedDuplicate: c.flagged_duplicate ?? false,
+    flaggedDuplicateReason: c.flagged_duplicate_reason,
   }))
 
   return { rows: withAccess, hasMore: clubs.length === PAGE_SIZE }
@@ -112,6 +138,13 @@ export function PlatformClubsPage() {
   })
   const allClubs = data?.rows ?? []
 
+  // FINAL PRODUCT COMPLETENESS ROUND (2026-08-25): flaggedOnly reads the
+  // same ?flagged=1 deep-link pattern as the other filters (see
+  // PlatformOverviewPage's new exception card), a plain boolean rather
+  // than extending the existing filter-union types since this is a
+  // single yes/no signal, not another multi-value dimension.
+  const flaggedOnly = searchParams.get('flagged') === '1'
+
   const clubs = useMemo(() => {
     const monthStart = new Date()
     monthStart.setDate(1)
@@ -123,19 +156,31 @@ export function PlatformClubsPage() {
       if (accessFilter !== 'all' && c.access !== accessFilter) return false
       if (reasonFilter !== 'all' && c.reason !== reasonFilter) return false
       if (createdFilter === 'this_month' && new Date(c.created_at) < monthStart) return false
+      if (flaggedOnly && !c.flaggedDuplicate) return false
       if (q && !c.name_ar.toLowerCase().includes(q) && !c.club_code.toLowerCase().includes(q)) return false
       return true
     })
-  }, [allClubs, statusFilter, accessFilter, reasonFilter, createdFilter, search])
+  }, [allClubs, statusFilter, accessFilter, reasonFilter, createdFilter, flaggedOnly, search])
 
   const columns: DataTableColumn<ClubRow>[] = [
     {
       key: 'name',
       header: t('platform.clubsPage.columns.club'),
       render: (c) => (
-        <Link to={`/platform/clubs/${c.id}`} className="font-medium text-accent-foreground hover:underline">
-          {c.name_ar}
-        </Link>
+        <div className="flex items-center gap-2">
+          <Link to={`/platform/clubs/${c.id}`} className="font-medium text-accent-foreground hover:underline">
+            {c.name_ar}
+          </Link>
+          {/* FINAL PRODUCT COMPLETENESS ROUND (2026-08-25) -- Platform
+              Owner persona: flagged_duplicate has been computed at
+              every signup since before this audit and was never
+              surfaced anywhere -- this is the real "needs review"
+              signal a Platform Owner needs to keep control over new
+              signups without a new approval workflow/architecture. */}
+          {c.flaggedDuplicate && (
+            <StatusBadge tone="warning" label={t('platform.clubsPage.flaggedDuplicate')} />
+          )}
+        </div>
       ),
     },
     { key: 'code', header: t('platform.clubsPage.columns.code'), render: (c) => <bdi>{c.club_code}</bdi> },
@@ -161,7 +206,7 @@ export function PlatformClubsPage() {
     },
   ]
 
-  const hasActiveFilters = statusFilter !== 'all' || accessFilter !== 'all' || reasonFilter !== 'all' || createdFilter !== 'all'
+  const hasActiveFilters = statusFilter !== 'all' || accessFilter !== 'all' || reasonFilter !== 'all' || createdFilter !== 'all' || flaggedOnly
 
   return (
     <div>
@@ -223,6 +268,13 @@ export function PlatformClubsPage() {
             <SelectItem value="active">{t('platform.clubsPage.filters.reasonLabels.active')}</SelectItem>
           </SelectContent>
         </Select>
+        <Button
+          variant={flaggedOnly ? 'default' : 'outline'}
+          size="sm"
+          onClick={() => updateParam('flagged', flaggedOnly ? 'all' : '1')}
+        >
+          {t('platform.clubsPage.filters.flaggedOnly')}
+        </Button>
         {hasActiveFilters && (
           <Button variant="outline" size="sm" onClick={() => setSearchParams({})}>
             {t('platform.clubsPage.filters.clear')}

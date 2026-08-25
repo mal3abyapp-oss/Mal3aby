@@ -12,6 +12,7 @@ import { Input } from '@/components/ui/input'
 import { StatCard } from '@/components/ui/stat-card'
 import { StatusBadge } from '@/components/ui/status-badge'
 import { MoneyDisplay } from '@/components/ui/money-display'
+import { formatMoney } from '@/lib/domain/billing'
 import { DataTable, type DataTableColumn } from '@/components/ui/data-table'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import {
@@ -38,6 +39,18 @@ import { Wallet, Wrench, Banknote, Activity, ArrowLeft, KeyRound } from 'lucide-
 
 type TabKey = 'overview' | 'access' | 'shifts' | 'financial' | 'activity'
 
+interface ActivityCounts {
+  bookings_created_total: number
+  bookings_created_this_month: number
+  payments_collected_total: number
+  payments_collected_amount_total: number
+  payments_collected_this_month: number
+  payments_collected_amount_this_month: number
+  attendance_marked_total: number
+  attendance_marked_this_month: number
+  official_receipts_issued_total: number
+}
+
 interface Summary {
   membership: {
     id: string; user_id: string; full_name: string | null; email: string | null
@@ -50,6 +63,7 @@ interface Summary {
   last_shift: { id: string; closed_at: string | null; branch_name: string } | null
   last_collection: { id: string; amount: number; received_at: string } | null
   last_activity_at: string | null
+  activity_counts: ActivityCounts
 }
 
 interface AccessProfile {
@@ -262,6 +276,46 @@ export function Employee360Page() {
 
         <TabsContent value="overview">
           <div className="mt-4 flex flex-col gap-4">
+            {/* FINAL PRODUCT COMPLETENESS ROUND (2026-08-25) -- Club
+                Owner persona: "how do I know who's working, what did
+                they accomplish, is anything tied to them?" -- built
+                entirely from get_staff_360_summary()'s new
+                activity_counts, itself computed from real, existing FK
+                columns (bookings.created_by, payments.received_by,
+                attendance.marked_by, official_collection_receipts.
+                entered_by) -- never a new tracking system, never a
+                fabricated metric. A staff member with zero real
+                activity in a category shows 0, not an estimate. */}
+            <div className="rounded-lg border border-border p-4">
+              <p className="mb-2 text-sm font-medium text-text-secondary">{t('staff.detail.activitySummary')}</p>
+              <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+                <StatCard
+                  label={t('staff.detail.bookingsCreated')}
+                  value={String(summary.activity_counts.bookings_created_this_month)}
+                />
+                <StatCard
+                  label={t('staff.detail.paymentsCollected')}
+                  value={String(summary.activity_counts.payments_collected_this_month)}
+                />
+                <StatCard
+                  label={t('staff.detail.amountCollected')}
+                  value={formatMoney(summary.activity_counts.payments_collected_amount_this_month, 'EGP', locale)}
+                />
+                <StatCard
+                  label={t('staff.detail.attendanceMarked')}
+                  value={String(summary.activity_counts.attendance_marked_this_month)}
+                />
+              </div>
+              <p className="mt-3 text-xs text-text-secondary">
+                {t('staff.detail.activityAllTime', {
+                  bookings: summary.activity_counts.bookings_created_total,
+                  payments: summary.activity_counts.payments_collected_total,
+                  amount: formatMoney(summary.activity_counts.payments_collected_amount_total, 'EGP', locale),
+                  attendance: summary.activity_counts.attendance_marked_total,
+                  receipts: summary.activity_counts.official_receipts_issued_total,
+                })}
+              </p>
+            </div>
             <div className="rounded-lg border border-border p-4">
               <p className="mb-2 text-sm font-medium text-text-secondary">{t('staff.detail.lastActivitySection', { defaultValue: 'Recent activity' })}</p>
               <div className="grid grid-cols-1 gap-3 text-sm sm:grid-cols-2">

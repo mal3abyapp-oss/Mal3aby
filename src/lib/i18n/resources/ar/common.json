@@ -265,6 +265,7 @@
       },
       "identityCard": {
         "title": "بيانات النادي",
+        "flaggedDuplicate": "اسم هذا النادي كان مشابهًا جدًا لنادٍ موجود عند التسجيل.",
         "createdAt": "تاريخ الإنشاء",
         "phone": "الهاتف",
         "email": "البريد الإلكتروني",
@@ -412,6 +413,7 @@
       },
       "searchPlaceholder": "بحث بالاسم أو الكود",
       "loadError": "تعذّر تحميل الأندية.",
+      "flaggedDuplicate": "تكرار محتمل",
       "filters": {
         "status": "الحالة الإدارية",
         "allStatuses": "كل الحالات",
@@ -426,6 +428,7 @@
           "expired": "الاشتراك منتهٍ",
           "active": "اشتراك نشط"
         },
+        "flaggedOnly": "التكرارات المحتملة فقط",
         "clear": "إزالة الفلاتر"
       },
       "emptyTitle": "لا توجد أندية بعد",
@@ -476,6 +479,10 @@
       "whatsappFailures": {
         "title": "رسائل واتساب فاشلة (7 أيام)",
         "description": "إجمالي محاولات الإرسال الفاشلة عبر كل الأندية"
+      },
+      "flaggedDuplicateClubs": {
+        "title": "أندية محتملة التكرار",
+        "description": "اسم نادٍ جديد كان مشابهًا جدًا لاسم نادٍ موجود عند التسجيل — راجعه قبل أن يُعتبر تكرارًا أو محاولة احتيال"
       },
       "pendingUpgradeRequests": {
         "title": "طلبات ترقية بانتظار المراجعة",
@@ -872,6 +879,8 @@
     "loggingIn": "جارٍ الدخول...",
     "forgotPassword": "نسيت كلمة المرور؟",
     "createNewAccount": "إنشاء حساب جديد",
+    "customerHint": "حجزت ملعبًا أو اشتركت في أكاديمية من قبل؟",
+    "customerHintLink": "اذهب إلى حساب العميل الخاص بك",
     "emailLabel": "البريد الإلكتروني",
     "passwordLabel": "كلمة المرور",
     "fullNameLabel": "الاسم الكامل",
@@ -1472,6 +1481,7 @@
     "bookingRef": "رقم الحجز",
     "whatsappHint": "تحقق من واتساب للحصول على رابط تفاصيل الحجز الآمن ورمز الحضور.",
     "accountAwarenessNote": "بما أنك شاركت بريدك الإلكتروني، يمكنك استخدامه لاحقًا للوصول إلى حساب ذاتي لعرض حجوزاتك.",
+    "accountAwarenessLink": "سجّل الدخول الآن",
     "today": "اليوم",
     "todayContactBadge": "تواصل للحجز",
     "todayContactExplainer": "الحجز الفوري اليوم غير متاح أونلاين لهذا النادي — اختر وقتًا متاحًا أدناه وتواصل مع النادي مباشرة لتأكيد الحجز.",
@@ -2660,6 +2670,12 @@
       "currentShift": "الوردية الحالية",
       "noOpenShift": "لا توجد وردية مفتوحة",
       "outstandingLiability": "المديونية المستحقة",
+      "activitySummary": "النشاط هذا الشهر",
+      "bookingsCreated": "حجوزات تم إنشاؤها",
+      "paymentsCollected": "دفعات تم تحصيلها",
+      "amountCollected": "المبلغ المحصَّل",
+      "attendanceMarked": "حضور تم تسجيله",
+      "activityAllTime": "منذ البداية: {{bookings}} حجز، {{payments}} دفعة ({{amount}})، {{attendance}} تسجيل حضور، {{receipts}} إيصال رسمي.",
       "lastActivitySection": "آخر نشاط",
       "lastShift": "آخر وردية",
       "lastCollection": "آخر تحصيل",
@@ -2785,6 +2801,7 @@
       "startFreeTrial": "ابدأ تجربتك المجانية",
       "login": "تسجيل الدخول",
       "trialBadge": "7 أيام مجانًا · بدون بطاقة بنكية",
+      "customerLink": "عميل بالفعل في أحد الأندية؟ سجّل الدخول لرؤية حجوزاتك ومدفوعاتك ورمز QR الخاص بك",
       "featuresTitle": "المزايا الأساسية",
       "features": {
         "bookings": "الحجوزات",

@@ -607,6 +607,18 @@ export function PlatformClubDetailPage() {
             <CardTitle className="text-base">{t('platform.clubDetailPage.identityCard.title')}</CardTitle>
           </CardHeader>
           <CardContent className="flex flex-col gap-1.5 text-sm">
+            {/* FINAL PRODUCT COMPLETENESS ROUND (2026-08-25) -- Platform
+                Owner persona: club.flagged_duplicate/flagged_duplicate_
+                reason were already fetched via this page's own
+                select('*') and never rendered -- surfacing the exact
+                reason here alongside the suspend action already in this
+                page's Actions panel is the real accept/reject mechanism
+                for a signup the Overview exception card flagged. */}
+            {club?.flagged_duplicate && (
+              <p className="rounded-md bg-status-warning/10 px-2 py-1.5 text-status-warning">
+                {club.flagged_duplicate_reason ?? t('platform.clubDetailPage.identityCard.flaggedDuplicate')}
+              </p>
+            )}
             <div className="flex justify-between"><span className="text-text-secondary">{t('platform.clubDetailPage.identityCard.createdAt')}</span><bdi>{club ? new Date(club.created_at).toLocaleDateString(locale === 'en' ? 'en-US' : 'ar-EG') : '—'}</bdi></div>
             <div className="flex justify-between">
               <span className="text-text-secondary">{t('platform.clubDetailPage.identityCard.phone')}</span>

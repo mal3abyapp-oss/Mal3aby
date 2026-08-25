@@ -29,6 +29,7 @@ interface OverviewData {
   newLeads: number
   whatsappDisconnectedCount: number
   whatsappFailuresCount: number
+  flaggedDuplicateClubs: number
 }
 
 async function fetchOverview(): Promise<OverviewData> {
@@ -40,7 +41,7 @@ async function fetchOverview(): Promise<OverviewData> {
     { count: newLeads, error: leadsError },
     { data: whatsappHealth, error: whatsappError },
   ] = await Promise.all([
-    supabase.from('clubs').select('id, status, created_at'),
+    supabase.from('clubs').select('id, status, created_at, flagged_duplicate'),
     supabase
       .from('platform_subscriptions')
       .select('id, club_id, subscription_kind, lifecycle_status, end_at')
@@ -84,6 +85,15 @@ async function fetchOverview(): Promise<OverviewData> {
   // the landing dashboard.
   const adminSuspendedClubs = clubs?.filter((c) => c.status === 'suspended').length ?? 0
   const newClubsThisMonth = clubs?.filter((c) => new Date(c.created_at) >= monthStart).length ?? 0
+  // FINAL PRODUCT COMPLETENESS ROUND (2026-08-25) -- Platform Owner
+  // persona: complete_new_club_onboarding() has computed flagged_
+  // duplicate at signup time since before this audit; only status
+  // filter (active/suspended/closed) was ever counted here, so a real
+  // "needs review" signal was invisible from the landing dashboard.
+  // Still counts ACTIVE flagged clubs only -- a club a Platform Owner
+  // already suspended for this reason shouldn't keep showing as a live
+  // exception.
+  const flaggedDuplicateClubs = clubs?.filter((c) => c.flagged_duplicate && c.status === 'active').length ?? 0
 
   const trialCount = subs?.filter((s) => s.subscription_kind === 'trial').length ?? 0
   // Master IA/UX audit (Platform Owner phase): was a flat 7-day window
@@ -137,6 +147,7 @@ async function fetchOverview(): Promise<OverviewData> {
     newLeads: newLeads ?? 0,
     whatsappDisconnectedCount,
     whatsappFailuresCount,
+    flaggedDuplicateClubs,
   }
 }
 
@@ -206,7 +217,8 @@ export function PlatformOverviewPage() {
           (data?.newLeads ?? 0) > 0 ||
           (data?.noSubscriptionClubs ?? 0) > 0 ||
           (data?.whatsappDisconnectedCount ?? 0) > 0 ||
-          (data?.whatsappFailuresCount ?? 0) > 0) && (
+          (data?.whatsappFailuresCount ?? 0) > 0 ||
+          (data?.flaggedDuplicateClubs ?? 0) > 0) && (
         <div className="mt-4 grid grid-cols-1 gap-4 md:grid-cols-2">
           {/* Phase E directive: the single largest operational gap the
               audit found -- zero WhatsApp visibility platform-wide.
@@ -235,6 +247,28 @@ export function PlatformOverviewPage() {
                     <p className="text-sm text-text-secondary">{t('platform.overviewPage.whatsappFailures.description')}</p>
                   </div>
                   <span className="text-2xl font-semibold text-warning">{data?.whatsappFailuresCount}</span>
+                </CardContent>
+              </Card>
+            </Link>
+          )}
+          {/* FINAL PRODUCT COMPLETENESS ROUND (2026-08-25) -- Platform
+              Owner persona: complete_new_club_onboarding() computes
+              flagged_duplicate at every signup (a real, existing
+              signal) but no screen ever surfaced it -- a new club goes
+              fully active immediately (the platform's own self-serve
+              trial model, unchanged here), so this exception card plus
+              the existing suspend action on Club Detail is the real
+              accept/reject mechanism this persona needs, without a new
+              approval-workflow architecture or a new club-status value. */}
+          {(data?.flaggedDuplicateClubs ?? 0) > 0 && (
+            <Link to="/platform/clubs?flagged=1" className="block">
+              <Card className="border-warning/40 bg-warning/5 transition-colors hover:bg-warning/10">
+                <CardContent className="flex items-center justify-between p-4">
+                  <div>
+                    <p className="font-medium text-text-primary">{t('platform.overviewPage.flaggedDuplicateClubs.title')}</p>
+                    <p className="text-sm text-text-secondary">{t('platform.overviewPage.flaggedDuplicateClubs.description')}</p>
+                  </div>
+                  <span className="text-2xl font-semibold text-warning">{data?.flaggedDuplicateClubs}</span>
                 </CardContent>
               </Card>
             </Link>
