@@ -545,7 +545,19 @@ function AccessTab({
               <ul className="flex flex-col gap-1">
                 {groupPerms.map((p) => (
                   <li key={p.key} className="flex items-center justify-between text-sm">
-                    <span className="text-text-secondary">{p.description}</span>
+                    {/* STAFF ACCESS CONTROL & CUSTOM ROLES (2026-08-26) --
+                        was rendering p.description directly, the raw
+                        English permissions.description DB column, inside
+                        an otherwise all-Arabic screen (found during this
+                        phase's own live visual QA of this exact tab).
+                        Uses the same real permissions.<key>.label i18n
+                        keys RolesPage.tsx's Role Editor already
+                        established this phase, falling back to the raw
+                        description only for a genuinely unmapped key
+                        (never throws, matches this project's own
+                        actionLabel()/entityLabel() safety-net
+                        convention). */}
+                    <span className="text-text-secondary">{t(`permissions.${p.key}.label`, { defaultValue: p.description })}</span>
                     <StatusBadge tone="success" label={t('staff.detail.enabled', { defaultValue: 'Enabled' })} />
                   </li>
                 ))}

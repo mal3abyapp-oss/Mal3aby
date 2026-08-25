@@ -35,3 +35,7 @@ coverage/
 
 # Scratch/QA scripts and credential fixtures -- never committed
 .codex-temp/
+
+# Temporary QA session files (never commit)
+qa_session_temp.json
+qa_signin_temp.mjs
