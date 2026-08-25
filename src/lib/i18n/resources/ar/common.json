@@ -1770,7 +1770,8 @@
       "paid": "المدفوع",
       "outstanding": "المتبقي",
       "status": "الحالة",
-      "emptyTitle": "لا توجد فواتير"
+      "emptyTitle": "لا توجد فواتير",
+      "showingCappedResults": "تُعرض أحدث 50 فاتورة فقط. ضيّق النطاق الزمني أو الحالة أعلاه لرؤية غيرها."
     },
     "detail": {
       "invoicePrefix": "فاتورة رقم",
@@ -2075,6 +2076,7 @@
       "noBookingsYet": "لا يوجد حجوزات بعد.",
       "invoices": "الفواتير",
       "noInvoicesYet": "لا توجد فواتير بعد.",
+      "showingOfTotal": "عرض {{shown}} من {{total}}",
       "remaining": "متبقي {{amount}}",
       "notFound": "العميل غير موجود",
       "quarantinedNotice": "هذا العميل مُصنّف كحالة تكرار محتملة وينتظر المراجعة.",

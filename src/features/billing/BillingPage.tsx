@@ -740,6 +740,20 @@ export function BillingPage() {
         )}
       </div>
 
+      {/* PERSONA COUNCIL AUDIT (2026-08-25) -- Club Owner persona
+          finding: fetchInvoices() has always had a hard .limit(50) (see
+          Phase G's own comment above), and this list had no indication
+          when that cap was actually reached -- a club with more than 50
+          invoices matching the current filters silently showed only the
+          most recent 50 with no way to tell "this is everything" from
+          "this is truncated". invoices.length === 50 is the honest
+          signal available without a real pagination system (a bigger
+          change than this narrow fix warrants) -- when it fires, points
+          the owner at the date/status filters already on this page
+          (Phase G's own mitigation) as the way to narrow down further. */}
+      {invoices.length === 50 && (
+        <p className="mb-2 text-xs text-text-secondary">{t('billing.table.showingCappedResults')}</p>
+      )}
       <DataTable columns={columns} rows={invoices} rowKey={(r) => r.id} isLoading={isLoading} emptyTitle={t('billing.table.emptyTitle')} />
 
       <Dialog open={!!selectedInvoiceId} onOpenChange={(open) => !open && setSelectedInvoiceId(null)}>

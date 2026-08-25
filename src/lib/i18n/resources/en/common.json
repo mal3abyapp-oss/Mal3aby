@@ -1770,7 +1770,8 @@
       "paid": "Paid",
       "outstanding": "Outstanding",
       "status": "Status",
-      "emptyTitle": "No invoices"
+      "emptyTitle": "No invoices",
+      "showingCappedResults": "Showing the most recent 50 invoices. Narrow the date range or status above to see others."
     },
     "detail": {
       "invoicePrefix": "Invoice #",
@@ -2075,6 +2076,7 @@
       "noBookingsYet": "No bookings yet.",
       "invoices": "Invoices",
       "noInvoicesYet": "No invoices yet.",
+      "showingOfTotal": "Showing {{shown}} of {{total}}",
       "remaining": "{{amount}} remaining",
       "notFound": "Customer not found",
       "quarantinedNotice": "This customer is flagged as a likely duplicate and is pending review.",

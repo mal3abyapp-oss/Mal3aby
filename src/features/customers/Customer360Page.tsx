@@ -457,7 +457,21 @@ export function Customer360Page() {
             )}
 
             <div>
-              <p className="mb-2 text-sm font-medium text-text-secondary">{t('customers.detail.invoices')}</p>
+              <div className="mb-2 flex items-baseline justify-between">
+                <p className="text-sm font-medium text-text-secondary">{t('customers.detail.invoices')}</p>
+                {/* PERSONA COUNCIL AUDIT (2026-08-25) -- Club Owner
+                    persona finding: this table (and Payment history
+                    below) already fetches total_count from
+                    get_customer_financial_account() but never displayed
+                    it -- fetches only the first 20 rows (p_limit: 20)
+                    with no indication a customer with more history was
+                    being silently truncated. */}
+                {financial && financial.ledger.total_count > financial.ledger.rows.length && (
+                  <p className="text-xs text-text-secondary">
+                    {t('customers.detail.showingOfTotal', { shown: financial.ledger.rows.length, total: financial.ledger.total_count })}
+                  </p>
+                )}
+              </div>
               <DataTable
                 columns={[
                   {
@@ -486,7 +500,14 @@ export function Customer360Page() {
             </div>
 
             <div>
-              <p className="mb-2 text-sm font-medium text-text-secondary">{t('customers.detail.paymentHistory', { defaultValue: 'Payment history' })}</p>
+              <div className="mb-2 flex items-baseline justify-between">
+                <p className="text-sm font-medium text-text-secondary">{t('customers.detail.paymentHistory', { defaultValue: 'Payment history' })}</p>
+                {financial && financial.payments.total_count > financial.payments.rows.length && (
+                  <p className="text-xs text-text-secondary">
+                    {t('customers.detail.showingOfTotal', { shown: financial.payments.rows.length, total: financial.payments.total_count })}
+                  </p>
+                )}
+              </div>
               <DataTable
                 columns={[
                   { key: 'date', header: t('common.date', { defaultValue: 'Date' }), render: (p: PaymentHistoryRow) => <span className="tabular-nums"><bdi>{new Date(p.received_at).toLocaleDateString(locale === 'en' ? 'en-US' : 'ar-EG')}</bdi></span> },
