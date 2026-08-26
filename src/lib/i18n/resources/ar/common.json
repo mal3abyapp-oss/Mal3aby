@@ -2924,7 +2924,19 @@
     },
     "customRoleOption": "مخصص: {{name}}",
     "manageRolesLink": "إدارة الأدوار",
-    "customRoleBadge": "مخصص"
+    "customRoleBadge": "مخصص",
+    "modeExisting": "حساب موجود",
+    "modeNew": "إنشاء حساب جديد",
+    "fullNameLabel": "الاسم الكامل",
+    "existingAccountHint": "يجب أن يكون لدى الشخص حساب على Mal3aby بهذا البريد الإلكتروني بالفعل.",
+    "noAccountFoundSwitchHint": "لا يوجد حساب بهذا البريد الإلكتروني. يمكنك التبديل إلى \"إنشاء حساب جديد\" لإضافته بدلاً من ذلك.",
+    "accountExistsSwitchHint": "يوجد حساب بالفعل بهذا البريد الإلكتروني. يمكنك التبديل إلى \"حساب موجود\" لربطه بهذا النادي.",
+    "statusInvitePending": "دعوة قيد الانتظار",
+    "resendInvite": "إعادة إرسال الدعوة",
+    "cancelInvite": "إلغاء الدعوة",
+    "resendInviteError": "تعذّرت إعادة إرسال الدعوة.",
+    "setupLinkTitle": "رابط إعداد الحساب",
+    "setupLinkHint": "شارك هذا الرابط لمرة واحدة مع الموظف ليتمكن من تعيين كلمة المرور وتسجيل الدخول. لم يتم إرساله تلقائيًا إلى أي مكان."
   },
   "scanner": {
     "title": "مسح QR",
@@ -3599,27 +3611,93 @@
     }
   },
   "platformPermissions": {
-    "platform.club.view": { "label": "عرض الأندية", "description": "رؤية قائمة كل الأندية على المنصة وتفاصيلها" },
-    "platform.club.manage": { "label": "إدارة الأندية", "description": "تعديل الإعدادات الإدارية على مستوى النادي" },
-    "platform.club.suspend": { "label": "تعليق/إعادة تفعيل الأندية", "description": "تعليق وصول نادٍ أو إعادة تفعيله" },
-    "platform.support.start_view": { "label": "بدء وضع مدير المنصة (عرض فقط)", "description": "فتح أي نادٍ في وضع دعم للقراءة فقط" },
-    "platform.support.start_manage": { "label": "بدء وضع مدير المنصة (إدارة كاملة)", "description": "فتح أي نادٍ في وضع دعم بإدارة كاملة" },
-    "platform.staff.view": { "label": "عرض موظفي المنصة", "description": "رؤية قائمة موظفي المنصة" },
-    "platform.staff.create": { "label": "إضافة موظفي منصة", "description": "إنشاء حساب موظف منصة جديد" },
-    "platform.staff.update": { "label": "تعديل موظفي المنصة", "description": "تغيير بريد موظف أو إعادة تعيين كلمة مروره" },
-    "platform.staff.disable": { "label": "تعطيل موظفي المنصة", "description": "إزالة وصول موظف منصة إلى لوحة التحكم" },
-    "platform.staff.role.assign": { "label": "إسناد أدوار المنصة", "description": "تغيير الدور الذي يحمله موظف" },
-    "platform.role.view": { "label": "عرض أدوار المنصة", "description": "رؤية الأدوار الأساسية والمخصصة وصلاحياتها" },
-    "platform.role.create": { "label": "إنشاء أدوار منصة", "description": "إنشاء دور منصة مخصص جديد" },
-    "platform.role.update": { "label": "تعديل أدوار المنصة", "description": "تعديل دور منصة مخصص موجود" },
-    "platform.role.delete": { "label": "حذف أدوار المنصة", "description": "حذف دور منصة مخصص" },
-    "platform.permission.manage": { "label": "إدارة صلاحيات المنصة", "description": "تحكم كامل في كتالوج صلاحيات المنصة" },
-    "platform.finance.view": { "label": "عرض الشؤون المالية للمنصة", "description": "رؤية سجلات الفوترة والاشتراكات على مستوى المنصة" },
-    "platform.finance.manage": { "label": "إدارة الشؤون المالية للمنصة", "description": "تسجيل أو عكس مدفوعات على مستوى المنصة" },
-    "platform.subscription.view": { "label": "عرض اشتراكات الأندية", "description": "رؤية حالة اشتراك أي نادٍ في المنصة" },
-    "platform.subscription.manage": { "label": "إدارة اشتراكات الأندية", "description": "تغيير اشتراك/خطة نادٍ ما" },
-    "platform.audit.view": { "label": "عرض سجل تدقيق المنصة", "description": "رؤية سجل التدقيق الكامل على مستوى المنصة" },
-    "platform.settings.view": { "label": "عرض إعدادات المنصة", "description": "رؤية الإعدادات العامة للمنصة" },
-    "platform.settings.manage": { "label": "إدارة إعدادات المنصة", "description": "تغيير الإعدادات العامة للمنصة" }
+    "platform.club.view": {
+      "label": "عرض الأندية",
+      "description": "رؤية قائمة كل الأندية على المنصة وتفاصيلها"
+    },
+    "platform.club.manage": {
+      "label": "إدارة الأندية",
+      "description": "تعديل الإعدادات الإدارية على مستوى النادي"
+    },
+    "platform.club.suspend": {
+      "label": "تعليق/إعادة تفعيل الأندية",
+      "description": "تعليق وصول نادٍ أو إعادة تفعيله"
+    },
+    "platform.support.start_view": {
+      "label": "بدء وضع مدير المنصة (عرض فقط)",
+      "description": "فتح أي نادٍ في وضع دعم للقراءة فقط"
+    },
+    "platform.support.start_manage": {
+      "label": "بدء وضع مدير المنصة (إدارة كاملة)",
+      "description": "فتح أي نادٍ في وضع دعم بإدارة كاملة"
+    },
+    "platform.staff.view": {
+      "label": "عرض موظفي المنصة",
+      "description": "رؤية قائمة موظفي المنصة"
+    },
+    "platform.staff.create": {
+      "label": "إضافة موظفي منصة",
+      "description": "إنشاء حساب موظف منصة جديد"
+    },
+    "platform.staff.update": {
+      "label": "تعديل موظفي المنصة",
+      "description": "تغيير بريد موظف أو إعادة تعيين كلمة مروره"
+    },
+    "platform.staff.disable": {
+      "label": "تعطيل موظفي المنصة",
+      "description": "إزالة وصول موظف منصة إلى لوحة التحكم"
+    },
+    "platform.staff.role.assign": {
+      "label": "إسناد أدوار المنصة",
+      "description": "تغيير الدور الذي يحمله موظف"
+    },
+    "platform.role.view": {
+      "label": "عرض أدوار المنصة",
+      "description": "رؤية الأدوار الأساسية والمخصصة وصلاحياتها"
+    },
+    "platform.role.create": {
+      "label": "إنشاء أدوار منصة",
+      "description": "إنشاء دور منصة مخصص جديد"
+    },
+    "platform.role.update": {
+      "label": "تعديل أدوار المنصة",
+      "description": "تعديل دور منصة مخصص موجود"
+    },
+    "platform.role.delete": {
+      "label": "حذف أدوار المنصة",
+      "description": "حذف دور منصة مخصص"
+    },
+    "platform.permission.manage": {
+      "label": "إدارة صلاحيات المنصة",
+      "description": "تحكم كامل في كتالوج صلاحيات المنصة"
+    },
+    "platform.finance.view": {
+      "label": "عرض الشؤون المالية للمنصة",
+      "description": "رؤية سجلات الفوترة والاشتراكات على مستوى المنصة"
+    },
+    "platform.finance.manage": {
+      "label": "إدارة الشؤون المالية للمنصة",
+      "description": "تسجيل أو عكس مدفوعات على مستوى المنصة"
+    },
+    "platform.subscription.view": {
+      "label": "عرض اشتراكات الأندية",
+      "description": "رؤية حالة اشتراك أي نادٍ في المنصة"
+    },
+    "platform.subscription.manage": {
+      "label": "إدارة اشتراكات الأندية",
+      "description": "تغيير اشتراك/خطة نادٍ ما"
+    },
+    "platform.audit.view": {
+      "label": "عرض سجل تدقيق المنصة",
+      "description": "رؤية سجل التدقيق الكامل على مستوى المنصة"
+    },
+    "platform.settings.view": {
+      "label": "عرض إعدادات المنصة",
+      "description": "رؤية الإعدادات العامة للمنصة"
+    },
+    "platform.settings.manage": {
+      "label": "إدارة إعدادات المنصة",
+      "description": "تغيير الإعدادات العامة للمنصة"
+    }
   }
 }

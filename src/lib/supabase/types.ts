@@ -5656,6 +5656,10 @@ export type Database = {
         Args: { p_reason: string; p_subscription_id: string }
         Returns: undefined
       }
+      cancel_staff_invite: {
+        Args: { p_membership_id: string }
+        Returns: undefined
+      }
       cancel_subscription: {
         Args: { p_reason: string; p_subscription_id: string }
         Returns: undefined
@@ -5815,6 +5819,17 @@ export type Database = {
           p_name_ar: string
           p_name_en: string
           p_permission_keys: string[]
+        }
+        Returns: string
+      }
+      create_club_staff_membership_service: {
+        Args: {
+          p_actor_id: string
+          p_branch_ids?: string[]
+          p_club_id: string
+          p_custom_role_id?: string
+          p_role_key?: string
+          p_user_id: string
         }
         Returns: string
       }
@@ -6819,6 +6834,10 @@ export type Database = {
         Args: { p_club_id: string; p_key: string }
         Returns: boolean
       }
+      has_permission_as: {
+        Args: { p_club_id: string; p_key: string; p_user_id: string }
+        Returns: boolean
+      }
       has_platform_permission: { Args: { p_key: string }; Returns: boolean }
       has_platform_permission_as: {
         Args: { p_key: string; p_user_id: string }
@@ -6998,6 +7017,10 @@ export type Database = {
       }
       mark_booking_no_show: {
         Args: { p_booking_id: string; p_reason?: string }
+        Returns: undefined
+      }
+      mark_staff_invite_resent: {
+        Args: { p_membership_id: string }
         Returns: undefined
       }
       mint_invoice_token_for_booking_qr: {

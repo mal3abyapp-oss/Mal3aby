@@ -25,13 +25,21 @@ import {
   DialogTitle,
   DialogTrigger,
 } from '@/components/ui/dialog'
+import { translateSupabaseError } from '@/lib/errors'
 import type { StaffRow } from '@/lib/domain/staff'
 
-// Phase 3 — Staff & Permissions Management.
-// "Invite" only attaches an EXISTING auth.users account to this club (via
-// invite_staff_member RPC) — there is no invitation-token/signup-by-email
-// mechanism in the approved schema (club_memberships.user_id is a hard FK
-// to auth.users). The person must already have a Mal3aby account.
+// CLUB STAFF ONBOARDING (2026-08-26) -- directive Section 20/21: the
+// "Add Staff" dialog previously had only ONE mode, requiring the person
+// to already hold a Mal3aby account (invite_staff_member RPC raises
+// "no account found for that email -- the person must sign up first"
+// otherwise -- a real, confirmed operational gap, not speculative). Now
+// two explicit, first-class modes:
+//   A. Existing Account -- unchanged invite_staff_member() flow.
+//   B. Create New Account -- new club-staff-admin Edge Function 'create'
+//      action (Admin API account creation, service-role-only
+//      create_club_staff_membership_service() RPC, never exposed to the
+//      browser directly -- same discipline as platform-staff-admin).
+type AddStaffMode = 'existing' | 'new'
 const ASSIGNABLE_ROLES = [
   { key: 'club_manager', labelKey: 'staff.roles.club_manager' },
   { key: 'branch_manager', labelKey: 'staff.roles.branch_manager' },
@@ -66,6 +74,19 @@ interface CustomRoleOption {
   id: string
   nameAr: string
   nameEn: string
+}
+
+async function invokeClubStaffAdmin<T>(action: string, body: Record<string, unknown>): Promise<T> {
+  const { data, error } = await supabase.functions.invoke<T & { error?: string; message?: string }>('club-staff-admin', {
+    body: { action, ...body },
+  })
+  if (error) throw error
+  if (data && 'error' in data && data.error) {
+    const err = new Error(data.message ?? data.error) as Error & { code?: string }
+    err.code = data.error
+    throw err
+  }
+  return data as T
 }
 
 async function fetchActiveCustomRoles(clubId: string): Promise<CustomRoleOption[]> {
@@ -160,7 +181,9 @@ export function StaffPage() {
   const { currentClubId } = useAuth()
   const queryClient = useQueryClient()
   const [dialogOpen, setDialogOpen] = useState(false)
+  const [addMode, setAddMode] = useState<AddStaffMode>('existing')
   const [email, setEmail] = useState('')
+  const [fullName, setFullName] = useState('')
   // STAFF ACCESS CONTROL & CUSTOM ROLES (2026-08-25): "roleSelection" is
   // either a system-role key (e.g. "receptionist") or "custom:<uuid>" --
   // a single <Select> covering both lists rather than a second control,
@@ -171,6 +194,7 @@ export function StaffPage() {
   const [allBranches, setAllBranches] = useState(false)
   const [selectedBranchIds, setSelectedBranchIds] = useState<string[]>([])
   const [formError, setFormError] = useState<string | null>(null)
+  const [setupLink, setSetupLink] = useState<string | null>(null)
 
   const { data: staff = [], isLoading } = useQuery({
     queryKey: ['staff', currentClubId],
@@ -188,6 +212,18 @@ export function StaffPage() {
     enabled: !!currentClubId && dialogOpen,
   })
 
+  function resetAddDialog() {
+    setDialogOpen(false)
+    setAddMode('existing')
+    setEmail('')
+    setFullName('')
+    setRoleSelection('receptionist')
+    setAllBranches(false)
+    setSelectedBranchIds([])
+    setFormError(null)
+    void queryClient.invalidateQueries({ queryKey: ['staff', currentClubId] })
+  }
+
   const inviteMutation = useMutation({
     mutationFn: async () => {
       const isCustom = roleSelection.startsWith('custom:')
@@ -200,18 +236,68 @@ export function StaffPage() {
       })
       if (error) throw error
     },
-    onSuccess: () => {
-      setDialogOpen(false)
-      setEmail('')
-      setRoleSelection('receptionist')
-      setAllBranches(false)
-      setSelectedBranchIds([])
-      setFormError(null)
-      void queryClient.invalidateQueries({ queryKey: ['staff', currentClubId] })
+    onSuccess: resetAddDialog,
+    onError: (err: { message?: string } | null) => {
+      // Directive Section 26 -- the underlying RPC error IS the safe,
+      // specific "no account found" case here (never a raw Auth/DB
+      // error), so it's fine to detect it and offer switching modes
+      // instead of always showing the generic message.
+      if (err?.message?.includes('no account found for that email')) {
+        setFormError(t('staff.noAccountFoundSwitchHint'))
+      } else {
+        setFormError(t('staff.inviteError'))
+      }
     },
-    onError: () => {
-      // Never surface the raw RPC error string to the user.
-      setFormError(t('staff.inviteError'))
+  })
+
+  const createAccountMutation = useMutation({
+    mutationFn: async () => {
+      const isCustom = roleSelection.startsWith('custom:')
+      return invokeClubStaffAdmin<{ setup_link: string | null }>('create', {
+        club_id: currentClubId,
+        email,
+        full_name: fullName.trim() || undefined,
+        role_key: isCustom ? undefined : roleSelection,
+        custom_role_id: isCustom ? roleSelection.slice('custom:'.length) : undefined,
+        branch_ids: allBranches ? [] : selectedBranchIds,
+      })
+    },
+    onSuccess: (data) => {
+      resetAddDialog()
+      if (data.setup_link) setSetupLink(data.setup_link)
+    },
+    onError: (err: (Error & { code?: string }) | null) => {
+      if (err?.code === 'account_exists') {
+        setFormError(t('staff.accountExistsSwitchHint'))
+      } else {
+        setFormError(translateSupabaseError(err, t('staff.inviteError')))
+      }
+    },
+  })
+
+  const resendInviteMutation = useMutation({
+    mutationFn: async (row: StaffRow) => {
+      const { error } = await supabase.rpc('mark_staff_invite_resent', { p_membership_id: row.membershipId })
+      if (error) throw error
+      return invokeClubStaffAdmin<{ reset_link: string | null }>('reset_password', {
+        club_id: currentClubId,
+        target_user_id: row.userId,
+        target_membership_id: row.membershipId,
+      })
+    },
+    onSuccess: (data) => {
+      if (data.reset_link) setSetupLink(data.reset_link)
+    },
+    onError: (err) => setFormError(translateSupabaseError(err, t('staff.resendInviteError'))),
+  })
+
+  const cancelInviteMutation = useMutation({
+    mutationFn: async (membershipId: string) => {
+      const { error } = await supabase.rpc('cancel_staff_invite', { p_membership_id: membershipId })
+      if (error) throw error
+    },
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ['staff', currentClubId] })
     },
   })
 
@@ -242,15 +328,21 @@ export function StaffPage() {
     },
   })
 
-  function handleInviteSubmit(e: FormEvent) {
+  function handleAddSubmit(e: FormEvent) {
     e.preventDefault()
     setFormError(null)
     if (!allBranches && selectedBranchIds.length === 0) {
       setFormError(t('staff.branchRequired'))
       return
     }
-    inviteMutation.mutate()
+    if (addMode === 'existing') {
+      inviteMutation.mutate()
+    } else {
+      createAccountMutation.mutate()
+    }
   }
+
+  const isAddSubmitting = inviteMutation.isPending || createAccountMutation.isPending
 
   const columns: DataTableColumn<StaffRow>[] = [
     {
@@ -283,12 +375,13 @@ export function StaffPage() {
     {
       key: 'status',
       header: t('staff.columns.status'),
-      render: (r) =>
-        r.status === 'active' ? (
-          <StatusBadge tone="success" label={t('staff.statusActive')} />
-        ) : (
-          <StatusBadge tone="neutral" label={t('staff.statusInactive')} />
-        ),
+      render: (r) => {
+        if (r.status === 'active') return <StatusBadge tone="success" label={t('staff.statusActive')} />
+        // CLUB STAFF ONBOARDING (2026-08-26) -- directive Section 30:
+        // an 'invited' membership must never read as fully active.
+        if (r.status === 'invited') return <StatusBadge tone="warning" label={t('staff.statusInvitePending')} />
+        return <StatusBadge tone="neutral" label={t('staff.statusInactive')} />
+      },
     },
     {
       key: 'cashCustody',
@@ -318,17 +411,43 @@ export function StaffPage() {
     {
       key: 'actions',
       header: '',
-      render: (r) =>
-        r.status === 'active' ? (
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => deactivateMutation.mutate(r.membershipId)}
-            disabled={deactivateMutation.isPending}
-          >
-            {t('staff.deactivate')}
-          </Button>
-        ) : null,
+      render: (r) => {
+        if (r.status === 'active') {
+          return (
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => deactivateMutation.mutate(r.membershipId)}
+              disabled={deactivateMutation.isPending}
+            >
+              {t('staff.deactivate')}
+            </Button>
+          )
+        }
+        if (r.status === 'invited') {
+          return (
+            <div className="flex flex-wrap gap-2">
+              <Button
+                variant="ghost"
+                size="sm"
+                disabled={resendInviteMutation.isPending}
+                onClick={() => { setFormError(null); resendInviteMutation.mutate(r) }}
+              >
+                {t('staff.resendInvite')}
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                disabled={cancelInviteMutation.isPending}
+                onClick={() => cancelInviteMutation.mutate(r.membershipId)}
+              >
+                {t('staff.cancelInvite')}
+              </Button>
+            </div>
+          )
+        }
+        return null
+      },
     },
   ]
 
@@ -363,7 +482,43 @@ export function StaffPage() {
               <DialogHeader>
                 <DialogTitle>{t('staff.addStaff')}</DialogTitle>
               </DialogHeader>
-              <form onSubmit={handleInviteSubmit} className="flex flex-col gap-4">
+              {/* CLUB STAFF ONBOARDING (2026-08-26) -- directive Section
+                  21: two explicit, mutually exclusive modes rather than
+                  one flow that fails silently for a brand-new employee. */}
+              <div className="flex rounded-md border border-border p-1" role="tablist">
+                <button
+                  type="button"
+                  role="tab"
+                  aria-selected={addMode === 'existing'}
+                  onClick={() => { setAddMode('existing'); setFormError(null) }}
+                  className={`flex-1 rounded-sm px-3 py-1.5 text-sm font-medium transition-colors ${addMode === 'existing' ? 'bg-accent text-accent-foreground' : 'text-text-secondary hover:bg-surface-hover'}`}
+                >
+                  {t('staff.modeExisting')}
+                </button>
+                <button
+                  type="button"
+                  role="tab"
+                  aria-selected={addMode === 'new'}
+                  onClick={() => { setAddMode('new'); setFormError(null) }}
+                  className={`flex-1 rounded-sm px-3 py-1.5 text-sm font-medium transition-colors ${addMode === 'new' ? 'bg-accent text-accent-foreground' : 'text-text-secondary hover:bg-surface-hover'}`}
+                >
+                  {t('staff.modeNew')}
+                </button>
+              </div>
+              <form onSubmit={handleAddSubmit} className="flex flex-col gap-4">
+                {addMode === 'new' && (
+                  <div className="flex flex-col gap-1.5">
+                    <label htmlFor="staff-full-name" className="text-sm font-medium text-text-secondary">
+                      {t('staff.fullNameLabel')}
+                    </label>
+                    <Input
+                      id="staff-full-name"
+                      required
+                      value={fullName}
+                      onChange={(e) => setFullName(e.target.value)}
+                    />
+                  </div>
+                )}
                 <div className="flex flex-col gap-1.5">
                   <label htmlFor="staff-email" className="text-sm font-medium text-text-secondary">
                     {t('staff.emailLabel')}
@@ -372,9 +527,13 @@ export function StaffPage() {
                     id="staff-email"
                     type="email"
                     required
+                    dir="ltr"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
                   />
+                  {addMode === 'existing' && (
+                    <p className="text-xs text-text-secondary">{t('staff.existingAccountHint')}</p>
+                  )}
                 </div>
                 <div className="flex flex-col gap-1.5">
                   <label className="text-sm font-medium text-text-secondary">{t('staff.roleLabel')}</label>
@@ -432,8 +591,8 @@ export function StaffPage() {
                     {formError}
                   </p>
                 )}
-                <Button type="submit" disabled={inviteMutation.isPending}>
-                  {inviteMutation.isPending ? t('staff.adding') : t('staff.addStaff')}
+                <Button type="submit" disabled={isAddSubmitting}>
+                  {isAddSubmitting ? t('staff.adding') : t('staff.addStaff')}
                 </Button>
               </form>
             </DialogContent>
@@ -441,6 +600,23 @@ export function StaffPage() {
           </>
         }
       />
+
+      {setupLink && (
+        <Dialog open onOpenChange={(open) => { if (!open) setSetupLink(null) }}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>{t('staff.setupLinkTitle')}</DialogTitle>
+            </DialogHeader>
+            <div className="flex flex-col gap-3">
+              <p className="text-sm text-text-secondary">{t('staff.setupLinkHint')}</p>
+              <Input readOnly dir="ltr" value={setupLink} onFocus={(e) => e.target.select()} />
+              <div className="flex justify-end">
+                <Button onClick={() => setSetupLink(null)}>{t('common.close', { defaultValue: t('common.cancel') })}</Button>
+              </div>
+            </div>
+          </DialogContent>
+        </Dialog>
+      )}
 
       <DataTable
         columns={columns}

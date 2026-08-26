@@ -2916,7 +2916,19 @@
     },
     "customRoleOption": "Custom: {{name}}",
     "manageRolesLink": "Manage roles",
-    "customRoleBadge": "Custom"
+    "customRoleBadge": "Custom",
+    "modeExisting": "Existing account",
+    "modeNew": "Create new account",
+    "fullNameLabel": "Full name",
+    "existingAccountHint": "The person must already have a Mal3aby account with this email.",
+    "noAccountFoundSwitchHint": "No account found with that email. Switch to \"Create new account\" to onboard them instead.",
+    "accountExistsSwitchHint": "An account already exists with this email. Switch to \"Existing account\" to link it to this club.",
+    "statusInvitePending": "Invite pending",
+    "resendInvite": "Resend invite",
+    "cancelInvite": "Cancel invite",
+    "resendInviteError": "Couldn't resend the invite.",
+    "setupLinkTitle": "Account setup link",
+    "setupLinkHint": "Share this one-time link with the employee so they can set their password and sign in. It has not been sent anywhere automatically."
   },
   "scanner": {
     "title": "Scan QR",
@@ -3602,27 +3614,93 @@
     }
   },
   "platformPermissions": {
-    "platform.club.view": { "label": "View clubs", "description": "See the list of every club on the platform and its details" },
-    "platform.club.manage": { "label": "Manage clubs", "description": "Edit club-level administrative configuration" },
-    "platform.club.suspend": { "label": "Suspend/reactivate clubs", "description": "Suspend a club's access or reactivate it" },
-    "platform.support.start_view": { "label": "Start Master Admin (view only)", "description": "Open any club in read-only Master Admin support mode" },
-    "platform.support.start_manage": { "label": "Start Master Admin (full management)", "description": "Open any club in full-management Master Admin support mode" },
-    "platform.staff.view": { "label": "View platform staff", "description": "See the list of platform employees" },
-    "platform.staff.create": { "label": "Add platform staff", "description": "Create a new platform employee account" },
-    "platform.staff.update": { "label": "Edit platform staff", "description": "Change a platform employee's email or reset their password" },
-    "platform.staff.disable": { "label": "Deactivate platform staff", "description": "Remove a platform employee's console access" },
-    "platform.staff.role.assign": { "label": "Assign platform roles", "description": "Change which platform role an employee holds" },
-    "platform.role.view": { "label": "View platform roles", "description": "See system and custom platform roles and their permissions" },
-    "platform.role.create": { "label": "Create platform roles", "description": "Create a new custom platform role" },
-    "platform.role.update": { "label": "Edit platform roles", "description": "Edit an existing custom platform role" },
-    "platform.role.delete": { "label": "Delete platform roles", "description": "Delete a custom platform role" },
-    "platform.permission.manage": { "label": "Manage platform permissions", "description": "Full control over the platform permission catalog" },
-    "platform.finance.view": { "label": "View platform finance", "description": "See platform-level billing and subscription records" },
-    "platform.finance.manage": { "label": "Manage platform finance", "description": "Record or reverse platform-level payments" },
-    "platform.subscription.view": { "label": "View club subscriptions", "description": "See any club's platform subscription status" },
-    "platform.subscription.manage": { "label": "Manage club subscriptions", "description": "Change a club's platform subscription/plan" },
-    "platform.audit.view": { "label": "View platform audit log", "description": "See the full platform-level audit trail" },
-    "platform.settings.view": { "label": "View platform settings", "description": "See global platform configuration" },
-    "platform.settings.manage": { "label": "Manage platform settings", "description": "Change global platform configuration" }
+    "platform.club.view": {
+      "label": "View clubs",
+      "description": "See the list of every club on the platform and its details"
+    },
+    "platform.club.manage": {
+      "label": "Manage clubs",
+      "description": "Edit club-level administrative configuration"
+    },
+    "platform.club.suspend": {
+      "label": "Suspend/reactivate clubs",
+      "description": "Suspend a club's access or reactivate it"
+    },
+    "platform.support.start_view": {
+      "label": "Start Master Admin (view only)",
+      "description": "Open any club in read-only Master Admin support mode"
+    },
+    "platform.support.start_manage": {
+      "label": "Start Master Admin (full management)",
+      "description": "Open any club in full-management Master Admin support mode"
+    },
+    "platform.staff.view": {
+      "label": "View platform staff",
+      "description": "See the list of platform employees"
+    },
+    "platform.staff.create": {
+      "label": "Add platform staff",
+      "description": "Create a new platform employee account"
+    },
+    "platform.staff.update": {
+      "label": "Edit platform staff",
+      "description": "Change a platform employee's email or reset their password"
+    },
+    "platform.staff.disable": {
+      "label": "Deactivate platform staff",
+      "description": "Remove a platform employee's console access"
+    },
+    "platform.staff.role.assign": {
+      "label": "Assign platform roles",
+      "description": "Change which platform role an employee holds"
+    },
+    "platform.role.view": {
+      "label": "View platform roles",
+      "description": "See system and custom platform roles and their permissions"
+    },
+    "platform.role.create": {
+      "label": "Create platform roles",
+      "description": "Create a new custom platform role"
+    },
+    "platform.role.update": {
+      "label": "Edit platform roles",
+      "description": "Edit an existing custom platform role"
+    },
+    "platform.role.delete": {
+      "label": "Delete platform roles",
+      "description": "Delete a custom platform role"
+    },
+    "platform.permission.manage": {
+      "label": "Manage platform permissions",
+      "description": "Full control over the platform permission catalog"
+    },
+    "platform.finance.view": {
+      "label": "View platform finance",
+      "description": "See platform-level billing and subscription records"
+    },
+    "platform.finance.manage": {
+      "label": "Manage platform finance",
+      "description": "Record or reverse platform-level payments"
+    },
+    "platform.subscription.view": {
+      "label": "View club subscriptions",
+      "description": "See any club's platform subscription status"
+    },
+    "platform.subscription.manage": {
+      "label": "Manage club subscriptions",
+      "description": "Change a club's platform subscription/plan"
+    },
+    "platform.audit.view": {
+      "label": "View platform audit log",
+      "description": "See the full platform-level audit trail"
+    },
+    "platform.settings.view": {
+      "label": "View platform settings",
+      "description": "See global platform configuration"
+    },
+    "platform.settings.manage": {
+      "label": "Manage platform settings",
+      "description": "Change global platform configuration"
+    }
   }
 }
