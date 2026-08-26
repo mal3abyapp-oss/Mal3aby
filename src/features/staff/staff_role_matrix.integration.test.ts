@@ -359,6 +359,32 @@ describeIfConfigured('Staff role matrix (real login, live integration)', () => {
       expect(error).toBeTruthy()
       expect(error!.message.toLowerCase()).toContain('liability not found or you do not have permission to settle it')
     })
+
+    // CASH LIABILITY PERMISSIONS -- FINAL CLOSURE regression guard:
+    // get_employee_liability_report() was gated on report.view alone,
+    // which let ANY report.view holder (e.g. academy_manager) read
+    // liability data despite lacking cash.liability.view -- fixed to
+    // require BOTH. Reception holds neither report.view nor
+    // cash.liability.view, so this also proves the dedicated gate
+    // rejects a caller missing both, not just one.
+    it('Reception directly calling get_employee_liability_report is rejected server-side (report.view alone is not enough for liability data)', async () => {
+      const { error } = await clients.reception.rpc('get_employee_liability_report', {
+        p_club_id: CLUB_ID,
+        p_start_date: '2026-01-01',
+        p_end_date: '2026-12-31',
+      })
+      expect(error).toBeTruthy()
+      expect(error!.message.toLowerCase()).toContain('not authorized')
+    })
+
+    it('Accountant CAN call get_employee_liability_report (holds both report.view and cash.liability.view)', async () => {
+      const { error } = await clients.accountant.rpc('get_employee_liability_report', {
+        p_club_id: CLUB_ID,
+        p_start_date: '2026-01-01',
+        p_end_date: '2026-12-31',
+      })
+      expect(error).toBeFalsy()
+    })
   })
 
   // ---- DIRECT URL / RPC ACCESS (not relying on hidden buttons) ---------
