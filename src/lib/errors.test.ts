@@ -81,3 +81,55 @@ describe('translateSupabaseError — cash shift + government receipt rules', () 
     expect(translateSupabaseError(shiftError, 'FALLBACK')).not.toBe(translateSupabaseError(receiptError, 'FALLBACK'))
   })
 })
+
+// CASH CUSTODY & SHIFT LIFECYCLE AUDIT (2026-08-26): open_cash_shift()/
+// close_cash_shift()'s own raise exception text was never mapped --
+// found live via CashShiftPage.tsx's onError handler, which always
+// fell through to a generic "something went wrong" message with no
+// indication of why opening/closing a shift failed.
+describe('translateSupabaseError — cash shift open/close lifecycle rules', () => {
+  beforeEach(async () => {
+    await i18n.changeLanguage('ar')
+  })
+  afterEach(async () => {
+    await i18n.changeLanguage('ar')
+  })
+
+  it('translates the branch-already-has-an-open-shift RPC error', () => {
+    const error = { message: 'a cash shift is already open for this branch' }
+    const result = translateSupabaseError(error, 'FALLBACK')
+    expect(result).not.toBe('FALLBACK')
+    expect(result).toContain('وردية نقدية مفتوحة بالفعل')
+  })
+
+  it('translates the negative-opening-float RPC error', () => {
+    const error = { message: 'opening float cannot be negative' }
+    const result = translateSupabaseError(error, 'FALLBACK')
+    expect(result).toContain('لا يمكن أن يكون سالبًا')
+  })
+
+  it('translates the negative-closing-count RPC error', () => {
+    const error = { message: 'closing count cannot be negative' }
+    const result = translateSupabaseError(error, 'FALLBACK')
+    expect(result).toContain('لا يمكن أن يكون سالبًا')
+  })
+
+  it('translates the double-close RPC error', () => {
+    const error = { message: 'this shift is already closed' }
+    const result = translateSupabaseError(error, 'FALLBACK')
+    expect(result).toContain('مغلقة بالفعل')
+  })
+
+  it('translates the shift-not-found-or-unauthorized RPC error (English)', async () => {
+    await i18n.changeLanguage('en')
+    const error = { message: 'shift not found or you do not have permission to close it' }
+    const result = translateSupabaseError(error, 'FALLBACK')
+    expect(result).toBe("The shift wasn't found, or you don't have permission to close it.")
+  })
+
+  it('does not confuse negative-opening-float with negative-closing-count (distinct messages)', () => {
+    const openError = { message: 'opening float cannot be negative' }
+    const closeError = { message: 'closing count cannot be negative' }
+    expect(translateSupabaseError(openError, 'FALLBACK')).not.toBe(translateSupabaseError(closeError, 'FALLBACK'))
+  })
+})

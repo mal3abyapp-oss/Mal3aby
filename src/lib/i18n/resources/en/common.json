@@ -2004,7 +2004,10 @@
         "notesPlaceholder": "Reason for the difference, if any",
         "confirmClose": "Confirm close",
         "cancel": "Cancel",
-        "closeShift": "Close shift"
+        "closeShift": "Close shift",
+        "previewBalanced": "The drawer is balanced — no shortage or overage will be recorded.",
+        "previewShortage": "A shortage of {{amount}} will be recorded against this employee.",
+        "previewOverage": "A cash overage of {{amount}} will be recorded for this employee."
       },
       "newShiftCard": {
         "heading": "Open new shift",

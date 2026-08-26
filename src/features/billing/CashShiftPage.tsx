@@ -420,6 +420,35 @@ export function CashShiftPage() {
                       <Input type="number" value={closingCount} onChange={(e) => setClosingCount(e.target.value)} placeholder="0.00" />
                       <label className="text-sm font-medium">{t('billing.cashShift.openShiftCard.notesLabel')}</label>
                       <Input value={closingNotes} onChange={(e) => setClosingNotes(e.target.value)} placeholder={t('billing.cashShift.openShiftCard.notesPlaceholder')} />
+                      {/* CASH CUSTODY & SHIFT LIFECYCLE AUDIT (2026-08-26):
+                          before this, the dialog showed Expected but
+                          never previewed the RESULT of the count the
+                          user was about to submit -- confirm before you
+                          commit, matching the pattern already
+                          established in the liability Settle dialog.
+                          Purely a client-side preview; close_cash_shift()
+                          itself remains the sole source of truth for the
+                          actual variance/liability outcome. */}
+                      {closingCount !== '' && !Number.isNaN(Number(closingCount)) && Number(closingCount) >= 0 && (() => {
+                        const previewVariance = Number(closingCount) - liveStatus.expected_cash
+                        if (previewVariance === 0) {
+                          return (
+                            <p className="text-sm text-status-success">{t('billing.cashShift.openShiftCard.previewBalanced')}</p>
+                          )
+                        }
+                        if (previewVariance < 0) {
+                          return (
+                            <p className="text-sm text-status-danger">
+                              {t('billing.cashShift.openShiftCard.previewShortage', { amount: formatMoney(Math.abs(previewVariance), 'EGP', locale) })}
+                            </p>
+                          )
+                        }
+                        return (
+                          <p className="text-sm text-status-info">
+                            {t('billing.cashShift.openShiftCard.previewOverage', { amount: formatMoney(previewVariance, 'EGP', locale) })}
+                          </p>
+                        )
+                      })()}
                       <div className="flex gap-2">
                         <Button size="sm" onClick={() => closeMutation.mutate()} disabled={closeMutation.isPending}>
                           {t('billing.cashShift.openShiftCard.confirmClose')}

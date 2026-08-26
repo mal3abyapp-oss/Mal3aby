@@ -77,6 +77,10 @@ export const ACTION_LABELS: Record<string, string> = {
   'employee_cash_liability.reversed': 'إلغاء التزام نقدي على موظف',
   'employee_cash_liability.settled': 'تسوية التزام نقدي على موظف',
   'employee_cash_liability.shortage_created': 'تسجيل عجز نقدي على موظف',
+  // CASH CUSTODY & SHIFT LIFECYCLE audit (2026-08-26) -- found live,
+  // no label existed for this action (close_cash_shift() writes it for
+  // an overage close) -- it was rendering as the raw machine string.
+  'employee_cash_liability.overage_recorded': 'تسجيل زيادة نقدية لدى موظف',
   'government_compliance.enabled': 'تفعيل الالتزام الحكومي',
   'government_compliance.policy_changed': 'تعديل سياسة الالتزام الحكومي',
   'guardian_link.create': 'ربط ولي أمر بلاعب',
@@ -202,6 +206,7 @@ export const ACTION_LABELS_EN: Record<string, string> = {
   'employee_cash_liability.reversed': 'Reverse staff cash liability',
   'employee_cash_liability.settled': 'Settle staff cash liability',
   'employee_cash_liability.shortage_created': 'Record staff cash shortage',
+  'employee_cash_liability.overage_recorded': 'Record staff cash overage',
   'government_compliance.enabled': 'Enable government compliance',
   'government_compliance.policy_changed': 'Change government compliance policy',
   'guardian_link.create': 'Link guardian to player',

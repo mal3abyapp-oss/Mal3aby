@@ -82,6 +82,19 @@ const MESSAGE_RULES: Array<[RegExp, string, string]> = [
   [/you cannot settle your own liability/i, 'لا يمكنك سداد عجزك النقدي الخاص بك — اطلب من موظف آخر مخوّل تسجيل هذا السداد.', "You can't settle your own cash shortage — ask another authorized staff member to record this payment."],
   [/settlement amount \(.*\) exceeds the outstanding balance/i, 'هذا المبلغ أكبر من المتبقي على هذا العجز.', 'That amount is more than what\'s still owed on this shortage.'],
   [/this liability is already fully settled/i, 'تم سداد هذا العجز بالكامل من قبل.', 'This shortage has already been fully settled.'],
+  // CASH CUSTODY & SHIFT LIFECYCLE AUDIT (2026-08-26): open_cash_shift()/
+  // close_cash_shift()'s own raise exception text was never mapped --
+  // found live: every one of these fell through to the generic
+  // "something went wrong" fallback in CashShiftPage.tsx, giving staff
+  // no indication of why opening/closing a shift failed (e.g. someone
+  // else already has a shift open on this branch).
+  [/a cash shift is already open for this branch/i, 'توجد وردية نقدية مفتوحة بالفعل على هذا الفرع — يجب إغلاقها أولًا.', 'A cash shift is already open for this branch — it must be closed first.'],
+  [/opening float cannot be negative/i, 'المبلغ الافتتاحي لا يمكن أن يكون سالبًا.', 'The opening amount cannot be negative.'],
+  [/closing count cannot be negative/i, 'المبلغ الفعلي عند الإغلاق لا يمكن أن يكون سالبًا.', 'The actual closing amount cannot be negative.'],
+  [/this shift is already closed/i, 'هذه الوردية مغلقة بالفعل.', 'This shift is already closed.'],
+  [/shift not found or you do not have permission to close it/i, 'الوردية غير موجودة أو لا تملك صلاحية إغلاقها.', "The shift wasn't found, or you don't have permission to close it."],
+  [/branch not found in this club/i, 'الفرع غير موجود في هذا النادي.', 'The branch was not found in this club.'],
+  [/this employee has an open cash shift -- close it before/i, 'هذا الموظف لديه وردية نقدية مفتوحة — يجب إغلاقها أولًا.', 'This employee has an open cash shift — it must be closed first.'],
 ]
 
 const CODE_RULES: Record<string, [string, string]> = {

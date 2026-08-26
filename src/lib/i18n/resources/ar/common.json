@@ -2004,7 +2004,10 @@
         "notesPlaceholder": "سبب الفرق إن وجد",
         "confirmClose": "تأكيد الإغلاق",
         "cancel": "إلغاء",
-        "closeShift": "إغلاق الوردية"
+        "closeShift": "إغلاق الوردية",
+        "previewBalanced": "الدرج متوازن — لن يتم تسجيل أي عجز أو زيادة.",
+        "previewShortage": "سيتم تسجيل عجز بقيمة {{amount}} على الموظف.",
+        "previewOverage": "سيتم تسجيل زيادة نقدية بقيمة {{amount}} لدى الموظف."
       },
       "newShiftCard": {
         "heading": "فتح وردية جديدة",
