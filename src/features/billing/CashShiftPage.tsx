@@ -127,6 +127,7 @@ async function fetchOpenShiftAges(clubId: string): Promise<OpenShiftAgeRow[]> {
 interface ShiftLiabilityRow {
   id: string
   cash_shift_id: string
+  employee_id: string
   kind: 'shortage' | 'overage'
   original_amount: number
   outstanding: number
@@ -137,7 +138,7 @@ async function fetchLiabilitiesByShift(shiftIds: string[]): Promise<Map<string, 
   if (shiftIds.length === 0) return new Map()
   const { data, error } = await supabase
     .from('employee_cash_liabilities')
-    .select('id, cash_shift_id, kind, original_amount, outstanding, status')
+    .select('id, cash_shift_id, employee_id, kind, original_amount, outstanding, status')
     .in('cash_shift_id', shiftIds)
   if (error) throw error
   const map = new Map<string, ShiftLiabilityRow>()
@@ -145,6 +146,7 @@ async function fetchLiabilitiesByShift(shiftIds: string[]): Promise<Map<string, 
     map.set(row.cash_shift_id, {
       id: row.id,
       cash_shift_id: row.cash_shift_id,
+      employee_id: row.employee_id,
       kind: row.kind as 'shortage' | 'overage',
       original_amount: Number(row.original_amount),
       outstanding: Number(row.outstanding),
@@ -156,9 +158,20 @@ async function fetchLiabilitiesByShift(shiftIds: string[]): Promise<Map<string, 
 
 export function CashShiftPage() {
   const { t } = useTranslation()
-  const { currentClubId } = useAuth()
+  const { currentClubId, currentMembership, session } = useAuth()
   const { locale } = useDirection()
   const queryClient = useQueryClient()
+  // CASH CUSTODY & SHIFT LIFECYCLE AUDIT (2026-08-26): this Settle
+  // button had NO client-side gate at all -- not on cash.liability.
+  // settle, and not on the self-settlement rule already established
+  // and enforced server-side (Employee360Page.tsx and
+  // ReportEmployeeLiabilityPage.tsx both already hide their own Settle
+  // buttons the same way; this screen was simply never wired to match).
+  // The server remains the real control either way -- confirmed live,
+  // attempting it here was already correctly rejected -- this is a UX
+  // consistency fix, not a security fix.
+  const canSettleLiability = (currentMembership?.permissionKeys ?? []).includes('cash.liability.settle')
+  const currentUserId = session?.user?.id ?? null
   const [selectedBranchId, setSelectedBranchId] = useState<string>('')
   const [openingFloat, setOpeningFloat] = useState('')
   const [closingCount, setClosingCount] = useState('')
@@ -322,19 +335,22 @@ export function CashShiftPage() {
         if (liability.status === 'settled') {
           return <StatusBadge tone="success" label={t('billing.cashShift.liability.settled')} />
         }
+        const isOwnLiability = !!currentUserId && currentUserId === liability.employee_id
         return (
           <div className="flex items-center gap-2">
             <span className="text-status-danger text-xs tabular-nums">
               {t('billing.cashShift.liability.outstanding', { amount: formatMoney(liability.outstanding, 'EGP', locale) })}
             </span>
-            <Button
-              size="sm"
-              variant="outline"
-              className="h-6 px-2 text-xs"
-              onClick={() => { setSettlingLiabilityId(liability.id); setSettleAmount(liability.outstanding.toFixed(2)) }}
-            >
-              {t('billing.cashShift.liability.settle')}
-            </Button>
+            {canSettleLiability && !isOwnLiability && (
+              <Button
+                size="sm"
+                variant="outline"
+                className="h-6 px-2 text-xs"
+                onClick={() => { setSettlingLiabilityId(liability.id); setSettleAmount(liability.outstanding.toFixed(2)) }}
+              >
+                {t('billing.cashShift.liability.settle')}
+              </Button>
+            )}
           </div>
         )
       },
