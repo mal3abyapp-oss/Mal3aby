@@ -3805,6 +3805,78 @@ export type Database = {
           },
         ]
       }
+      platform_owner_pinned_clubs: {
+        Row: {
+          club_id: string
+          id: string
+          pinned_at: string
+          platform_admin_user_id: string
+        }
+        Insert: {
+          club_id: string
+          id?: string
+          pinned_at?: string
+          platform_admin_user_id: string
+        }
+        Update: {
+          club_id?: string
+          id?: string
+          pinned_at?: string
+          platform_admin_user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "platform_owner_pinned_clubs_club_id_fkey"
+            columns: ["club_id"]
+            isOneToOne: false
+            referencedRelation: "clubs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "platform_owner_pinned_clubs_club_id_fkey"
+            columns: ["club_id"]
+            isOneToOne: false
+            referencedRelation: "commercial_entitlements_usage"
+            referencedColumns: ["club_id"]
+          },
+        ]
+      }
+      platform_owner_recent_clubs: {
+        Row: {
+          club_id: string
+          id: string
+          last_accessed_at: string
+          platform_admin_user_id: string
+        }
+        Insert: {
+          club_id: string
+          id?: string
+          last_accessed_at?: string
+          platform_admin_user_id: string
+        }
+        Update: {
+          club_id?: string
+          id?: string
+          last_accessed_at?: string
+          platform_admin_user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "platform_owner_recent_clubs_club_id_fkey"
+            columns: ["club_id"]
+            isOneToOne: false
+            referencedRelation: "clubs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "platform_owner_recent_clubs_club_id_fkey"
+            columns: ["club_id"]
+            isOneToOne: false
+            referencedRelation: "commercial_entitlements_usage"
+            referencedColumns: ["club_id"]
+          },
+        ]
+      }
       platform_payments: {
         Row: {
           amount: number
@@ -6908,6 +6980,15 @@ export type Database = {
           updated_at: string
         }[]
       }
+      list_pinned_platform_clubs: {
+        Args: never
+        Returns: {
+          club_code: string
+          club_id: string
+          club_name: string
+          pinned_at: string
+        }[]
+      }
       list_platform_roles: {
         Args: never
         Returns: {
@@ -6937,6 +7018,15 @@ export type Database = {
           role_name_en: string
           status: string
           user_id: string
+        }[]
+      }
+      list_recent_platform_clubs: {
+        Args: { p_limit?: number }
+        Returns: {
+          club_code: string
+          club_id: string
+          club_name: string
+          last_accessed_at: string
         }[]
       }
       log_own_password_changed: { Args: never; Returns: undefined }
@@ -7058,6 +7148,7 @@ export type Database = {
         Args: { p_permission_keys: string[] }
         Returns: boolean
       }
+      pin_platform_club: { Args: { p_club_id: string }; Returns: undefined }
       platform_reactivate_club: {
         Args: { p_club_id: string }
         Returns: undefined
@@ -7187,6 +7278,10 @@ export type Database = {
           official_receipt_id: string
           payment_id: string
         }[]
+      }
+      record_platform_club_access: {
+        Args: { p_club_id: string }
+        Returns: undefined
       }
       record_platform_payment: {
         Args: {
@@ -7341,6 +7436,32 @@ export type Database = {
         Args: { p_approve: boolean; p_reason?: string; p_request_id: string }
         Returns: undefined
       }
+      search_platform_clubs: {
+        Args: {
+          p_access?: string
+          p_flagged_only?: boolean
+          p_limit?: number
+          p_offset?: number
+          p_reason?: string
+          p_search?: string
+          p_status?: string
+        }
+        Returns: {
+          access: string
+          club_code: string
+          club_country: string
+          club_id: string
+          club_name: string
+          club_status: string
+          created_at: string
+          flagged_duplicate: boolean
+          owner_emails: string[]
+          owner_names: string[]
+          owner_phones: string[]
+          reason: string
+          total_count: number
+        }[]
+      }
       sell_club_membership: {
         Args: {
           p_branch_id: string
@@ -7454,6 +7575,7 @@ export type Database = {
         Args: { p_guardian_link_id: string }
         Returns: undefined
       }
+      unpin_platform_club: { Args: { p_club_id: string }; Returns: undefined }
       unquarantine_customer: {
         Args: { p_club_id: string; p_customer_id: string }
         Returns: undefined

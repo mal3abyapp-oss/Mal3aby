@@ -415,7 +415,8 @@
         "code": "الكود",
         "createdAt": "تاريخ الانضمام",
         "adminStatus": "الحالة الإدارية",
-        "subscriptionStatus": "حالة الاشتراك"
+        "subscriptionStatus": "حالة الاشتراك",
+        "owner": "المالك"
       },
       "searchPlaceholder": "بحث بالاسم أو الكود",
       "loadError": "تعذّر تحميل الأندية.",
@@ -439,7 +440,15 @@
       },
       "emptyTitle": "لا توجد أندية بعد",
       "loadingMore": "جارٍ التحميل...",
-      "loadMore": "تحميل المزيد"
+      "loadMore": "تحميل المزيد",
+      "pin": "تثبيت النادي",
+      "unpin": "إلغاء تثبيت النادي",
+      "pinnedClubs": "الأندية المثبتة",
+      "recentClubs": "تمت إدارتها مؤخرًا",
+      "resultCount": "{{count}} نادٍ",
+      "prevPage": "السابق",
+      "nextPage": "التالي",
+      "pageOf": "صفحة {{page}} من {{total}}"
     },
     "leadsPage": {
       "title": "طلبات التواصل",

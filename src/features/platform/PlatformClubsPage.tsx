@@ -1,8 +1,7 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
-import { useDirection } from '@/app/providers/DirectionProvider'
 import { useAuth } from '@/app/providers/AuthProvider'
 import { supabase } from '@/lib/supabase/client'
 import { PageHeader } from '@/components/ui/page-header'
@@ -26,155 +25,160 @@ import {
 import { CLUB_STATUS_LABELS, ACCESS_TONE, ACCESS_LABEL } from '@/features/platform/labels'
 import { ErrorState } from '@/components/ui/error-state'
 import { translateSupabaseError } from '@/lib/errors'
+import { Star, StarOff } from 'lucide-react'
 
-// Master IA/UX audit (Platform Owner phase, Audit 5): a hard `.limit(100)`
-// silently dropped any club beyond the 100th with zero indication a cutoff
-// happened -- a real data-loss-from-view risk once the platform grows past
-// this number, not just today. Fixed with simple offset-based "load more"
-// pagination rather than a full page-number component, since no shared
-// pagination primitive exists in this codebase yet (DataTable is
-// deliberately bounded/dumb per its own header comment) and this screen's
-// flat, most-recent-first list shape doesn't need page jumping.
-const PAGE_SIZE = 100
+// PLATFORM CLUB SELECTOR FOR LARGE SCALE (2026-08-26) -- the platform
+// may hold hundreds/thousands of clubs. The previous implementation
+// (Master IA/UX audit, Platform Owner phase, Audit 5) already fixed the
+// original hard .limit(100) into real server-side .range() pagination,
+// but every filter (status/access/reason/flagged) and ALL search
+// (name/code only, never owner name/email/phone) still ran client-side
+// against an ever-growing in-memory accumulation across "load more"
+// clicks -- exactly the "giant dropdown" class of problem this
+// directive names, just one level removed from a literal <select>.
+// Replaced with a single server-side search_platform_clubs() RPC
+// (search across club name/code + owner name/email/phone, all filters
+// pushed to the database, real LIMIT/OFFSET pagination with a real
+// total_count) plus Recent/Pinned clubs for fast repeat access.
+const PAGE_SIZE = 25
 
-// Platform Owner Phase B directive (B1/B2): Overview's StatCards used to
-// all link here with zero filter, landing on the exact same undifferentiated
-// list regardless of which card was clicked -- a real dead-end confirmed by
-// the live audit. This screen now reads `status`/`access`/`reason`/`created`
-// query params (a stable, documented contract Overview's cards write to)
-// and applies them client-side after the batched access fetch -- club count
-// is small enough today that a second RPC round-trip per filter isn't
-// justified, and this keeps the single get_platform_clubs_access() call
-// as the only access-resolving round trip per page, consistent with the
-// N+1 fix from Phase A.
 type StatusFilter = 'all' | 'active' | 'suspended' | 'closed'
 type AccessFilter = 'all' | 'full' | 'grace' | 'blocked'
 type ReasonFilter = 'all' | 'no_subscription' | 'admin_suspended' | 'in_grace' | 'expired' | 'active'
-type CreatedFilter = 'all' | 'this_month'
 
 interface ClubRow {
   id: string
   name_ar: string
   club_code: string
+  club_country: string | null
   status: string
   created_at: string
   access: string
   reason: string
   flaggedDuplicate: boolean
-  flaggedDuplicateReason: string | null
+  ownerNames: string[]
+  ownerEmails: string[]
+  ownerPhones: string[]
 }
 
-// FINAL PRODUCT COMPLETENESS ROUND (2026-08-25) -- Platform Owner
-// persona: complete_new_club_onboarding() has flagged real, computed
-// duplicate-name signups since before this audit (flagged_duplicate/
-// flagged_duplicate_reason, set at signup time -- see that RPC's own
-// body) -- but no screen anywhere in the platform console ever
-// selected or rendered those columns. Investigated the signup flow
-// first, per the explicit "don't build new architecture" constraint:
-// clubs.status is a hard 3-value enum (active/suspended/closed, no
-// "pending" state exists or is added here) and a new club is
-// deliberately created 'active' immediately (the self-serve trial
-// model this platform is built on) -- changing either of those is a
-// real architecture change this round is not authorized to make.
-// flagged_duplicate is the one real, already-computed "needs review"
-// signal that was simply never surfaced -- fixed by making it visible
-// here and on the Overview exception cards (see PlatformOverviewPage),
-// with the existing suspend/reactivate actions (already fully built on
-// Club Detail) as the real accept/reject mechanism -- no new RPC, no
-// new enum value, no new workflow.
-async function fetchClubs(offset: number): Promise<{ rows: ClubRow[]; hasMore: boolean }> {
-  const { data: clubs, error } = await supabase
-    .from('clubs')
-    .select('id, name_ar, club_code, status, created_at, flagged_duplicate, flagged_duplicate_reason')
-    .order('created_at', { ascending: false })
-    .range(offset, offset + PAGE_SIZE - 1)
-
+async function searchClubs(params: {
+  search: string
+  status: StatusFilter
+  access: AccessFilter
+  reason: ReasonFilter
+  flaggedOnly: boolean
+  page: number
+}): Promise<{ rows: ClubRow[]; totalCount: number }> {
+  const { data, error } = await supabase.rpc('search_platform_clubs', {
+    p_search: params.search.trim() || undefined,
+    p_status: params.status === 'all' ? undefined : params.status,
+    p_access: params.access === 'all' ? undefined : params.access,
+    p_reason: params.reason === 'all' ? undefined : params.reason,
+    p_flagged_only: params.flaggedOnly,
+    p_limit: PAGE_SIZE,
+    p_offset: params.page * PAGE_SIZE,
+  })
   if (error) throw error
-  if (!clubs) return { rows: [], hasMore: false }
-
-  // Phase A directive (A3): this used to call get_club_platform_access()
-  // once PER CLUB via Promise.all, re-run in full on every "load more"
-  // click -- cost grew with total pages loaded, not just the newest page.
-  // Batched into a single RPC call per page instead.
-  const clubIds = clubs.map((c) => c.id)
-  const { data: accessRows, error: accessError } =
-    clubIds.length > 0
-      ? await supabase.rpc('get_platform_clubs_access', { p_club_ids: clubIds })
-      : { data: [] as { club_id: string; access: string; reason: string }[], error: null }
-  if (accessError) throw accessError
-  const accessByClub = new Map((accessRows ?? []).map((r) => [r.club_id, { access: r.access, reason: r.reason }]))
-  const withAccess: ClubRow[] = clubs.map((c) => ({
-    id: c.id,
-    name_ar: c.name_ar,
-    club_code: c.club_code,
-    status: c.status,
-    created_at: c.created_at,
-    access: accessByClub.get(c.id)?.access ?? 'blocked',
-    reason: accessByClub.get(c.id)?.reason ?? 'no_subscription',
-    flaggedDuplicate: c.flagged_duplicate ?? false,
-    flaggedDuplicateReason: c.flagged_duplicate_reason,
+  const rows: ClubRow[] = (data ?? []).map((r) => ({
+    id: r.club_id,
+    name_ar: r.club_name,
+    club_code: r.club_code,
+    club_country: r.club_country,
+    status: r.club_status,
+    created_at: r.created_at,
+    access: r.access,
+    reason: r.reason,
+    flaggedDuplicate: r.flagged_duplicate,
+    ownerNames: r.owner_names ?? [],
+    ownerEmails: r.owner_emails ?? [],
+    ownerPhones: r.owner_phones ?? [],
   }))
+  return { rows, totalCount: Number((data as unknown as { total_count?: number }[])?.[0]?.total_count ?? 0) }
+}
 
-  return { rows: withAccess, hasMore: clubs.length === PAGE_SIZE }
+interface QuickClubOption {
+  club_id: string
+  club_name: string
+  club_code: string
+}
+
+async function fetchRecentClubs(): Promise<QuickClubOption[]> {
+  const { data, error } = await supabase.rpc('list_recent_platform_clubs', { p_limit: 8 })
+  if (error) throw error
+  return (data ?? []).map((r) => ({ club_id: r.club_id, club_name: r.club_name, club_code: r.club_code }))
+}
+
+async function fetchPinnedClubs(): Promise<QuickClubOption[]> {
+  const { data, error } = await supabase.rpc('list_pinned_platform_clubs')
+  if (error) throw error
+  return (data ?? []).map((r) => ({ club_id: r.club_id, club_name: r.club_name, club_code: r.club_code }))
 }
 
 export function PlatformClubsPage() {
   const { t } = useTranslation()
-  const { locale } = useDirection()
-  const [pages, setPages] = useState(1)
+  const queryClient = useQueryClient()
+  const [page, setPage] = useState(0)
   const [searchParams, setSearchParams] = useSearchParams()
-  const [search, setSearch] = useState('')
-  // MASTER ADMIN / PLATFORM SUPPORT CONTEXT: which club the "Open as
-  // Master Admin" confirmation dialog is currently open for -- null when
-  // closed. Kept as the row itself (not just an id) so the dialog can
-  // show the club's real name without a second lookup.
-  const [openingClub, setOpeningClub] = useState<ClubRow | null>(null)
+  const [searchInput, setSearchInput] = useState('')
+  const [debouncedSearch, setDebouncedSearch] = useState('')
+  const [openingClub, setOpeningClub] = useState<{ id: string; name_ar: string } | null>(null)
+  const [pinnedIds, setPinnedIds] = useState<Set<string>>(new Set())
+
+  // Debounce search input -- avoid firing a server round trip on every
+  // keystroke against a platform that may hold thousands of clubs.
+  useEffect(() => {
+    const timer = setTimeout(() => setDebouncedSearch(searchInput), 300)
+    return () => clearTimeout(timer)
+  }, [searchInput])
+
+  useEffect(() => { setPage(0) }, [debouncedSearch])
 
   const statusFilter = (searchParams.get('status') as StatusFilter) || 'all'
   const accessFilter = (searchParams.get('access') as AccessFilter) || 'all'
   const reasonFilter = (searchParams.get('reason') as ReasonFilter) || 'all'
-  const createdFilter = (searchParams.get('created') as CreatedFilter) || 'all'
+  const flaggedOnly = searchParams.get('flagged') === '1'
 
   function updateParam(key: string, value: string) {
     const next = new URLSearchParams(searchParams)
     if (value === 'all') next.delete(key)
     else next.set(key, value)
     setSearchParams(next)
+    setPage(0)
   }
 
   const { data, isLoading, isFetching, isError, error, refetch } = useQuery({
-    queryKey: ['platform-clubs', pages],
-    queryFn: async () => {
-      const results = await Promise.all(Array.from({ length: pages }, (_, i) => fetchClubs(i * PAGE_SIZE)))
-      const lastPage = results.at(-1)
-      return { rows: results.flatMap((r) => r.rows), hasMore: lastPage?.hasMore ?? false }
+    queryKey: ['platform-clubs-search', debouncedSearch, statusFilter, accessFilter, reasonFilter, flaggedOnly, page],
+    queryFn: () => searchClubs({ search: debouncedSearch, status: statusFilter, access: accessFilter, reason: reasonFilter, flaggedOnly, page }),
+    placeholderData: (prev) => prev,
+  })
+  const clubs = data?.rows ?? []
+  const totalCount = data?.totalCount ?? 0
+  const totalPages = Math.max(1, Math.ceil(totalCount / PAGE_SIZE))
+
+  const { data: recentClubs = [] } = useQuery({
+    queryKey: ['platform-clubs-recent'],
+    queryFn: fetchRecentClubs,
+  })
+  const { data: pinnedClubsList = [], refetch: refetchPinned } = useQuery({
+    queryKey: ['platform-clubs-pinned'],
+    queryFn: fetchPinnedClubs,
+  })
+  useEffect(() => {
+    setPinnedIds(new Set(pinnedClubsList.map((c) => c.club_id)))
+  }, [pinnedClubsList])
+
+  const pinMutation = useMutation({
+    mutationFn: async ({ clubId, pinned }: { clubId: string; pinned: boolean }) => {
+      const { error: err } = pinned
+        ? await supabase.rpc('unpin_platform_club', { p_club_id: clubId })
+        : await supabase.rpc('pin_platform_club', { p_club_id: clubId })
+      if (err) throw err
+    },
+    onSuccess: () => {
+      void refetchPinned()
+      void queryClient.invalidateQueries({ queryKey: ['platform-clubs-pinned'] })
     },
   })
-  const allClubs = data?.rows ?? []
-
-  // FINAL PRODUCT COMPLETENESS ROUND (2026-08-25): flaggedOnly reads the
-  // same ?flagged=1 deep-link pattern as the other filters (see
-  // PlatformOverviewPage's new exception card), a plain boolean rather
-  // than extending the existing filter-union types since this is a
-  // single yes/no signal, not another multi-value dimension.
-  const flaggedOnly = searchParams.get('flagged') === '1'
-
-  const clubs = useMemo(() => {
-    const monthStart = new Date()
-    monthStart.setDate(1)
-    monthStart.setHours(0, 0, 0, 0)
-    const q = search.trim().toLowerCase()
-
-    return allClubs.filter((c) => {
-      if (statusFilter !== 'all' && c.status !== statusFilter) return false
-      if (accessFilter !== 'all' && c.access !== accessFilter) return false
-      if (reasonFilter !== 'all' && c.reason !== reasonFilter) return false
-      if (createdFilter === 'this_month' && new Date(c.created_at) < monthStart) return false
-      if (flaggedOnly && !c.flaggedDuplicate) return false
-      if (q && !c.name_ar.toLowerCase().includes(q) && !c.club_code.toLowerCase().includes(q)) return false
-      return true
-    })
-  }, [allClubs, statusFilter, accessFilter, reasonFilter, createdFilter, flaggedOnly, search])
 
   const columns: DataTableColumn<ClubRow>[] = [
     {
@@ -182,15 +186,17 @@ export function PlatformClubsPage() {
       header: t('platform.clubsPage.columns.club'),
       render: (c) => (
         <div className="flex items-center gap-2">
+          <button
+            onClick={() => pinMutation.mutate({ clubId: c.id, pinned: pinnedIds.has(c.id) })}
+            className="text-text-secondary hover:text-accent-foreground"
+            aria-label={pinnedIds.has(c.id) ? t('platform.clubsPage.unpin') : t('platform.clubsPage.pin')}
+            title={pinnedIds.has(c.id) ? t('platform.clubsPage.unpin') : t('platform.clubsPage.pin')}
+          >
+            {pinnedIds.has(c.id) ? <Star className="size-4 fill-current" /> : <StarOff className="size-4" />}
+          </button>
           <Link to={`/platform/clubs/${c.id}`} className="font-medium text-accent-foreground hover:underline">
             {c.name_ar}
           </Link>
-          {/* FINAL PRODUCT COMPLETENESS ROUND (2026-08-25) -- Platform
-              Owner persona: flagged_duplicate has been computed at
-              every signup since before this audit and was never
-              surfaced anywhere -- this is the real "needs review"
-              signal a Platform Owner needs to keep control over new
-              signups without a new approval workflow/architecture. */}
           {c.flaggedDuplicate && (
             <StatusBadge tone="warning" label={t('platform.clubsPage.flaggedDuplicate')} />
           )}
@@ -199,15 +205,24 @@ export function PlatformClubsPage() {
     },
     { key: 'code', header: t('platform.clubsPage.columns.code'), render: (c) => <bdi>{c.club_code}</bdi> },
     {
-      // FINAL PRODUCT COMPLETENESS ROUND (2026-08-25) -- Platform Owner
-      // persona, explicit question: "متى طلب الانضمام" (when did this
-      // club join). created_at was already fetched (used by the
-      // createdFilter=this_month filter) but never rendered as a
-      // column -- a Platform Owner scanning this list for a new signup
-      // had no join-date visible without opening each club individually.
+      // PLATFORM CLUB SELECTOR (2026-08-26) -- Mandatory search field
+      // "Owner name" / "Owner email" now needs to be visibly matched
+      // somewhere in the row, not just searchable -- otherwise a
+      // Platform Owner searching by owner email has no way to confirm
+      // WHICH result matched.
+      key: 'owner',
+      header: t('platform.clubsPage.columns.owner'),
+      render: (c) => (
+        <div className="flex flex-col text-sm">
+          <span>{c.ownerNames[0] ?? '—'}</span>
+          {c.ownerEmails[0] && <span className="text-xs text-text-secondary" dir="ltr">{c.ownerEmails[0]}</span>}
+        </div>
+      ),
+    },
+    {
       key: 'createdAt',
       header: t('platform.clubsPage.columns.createdAt'),
-      render: (c) => <bdi>{new Date(c.created_at).toLocaleDateString(locale === 'en' ? 'en-US' : 'ar-EG')}</bdi>,
+      render: (c) => <bdi>{new Date(c.created_at).toLocaleDateString()}</bdi>,
     },
     {
       key: 'status',
@@ -230,31 +245,22 @@ export function PlatformClubsPage() {
       ),
     },
     {
-      // MASTER ADMIN / PLATFORM SUPPORT CONTEXT (2026-08-26) -- directive
-      // Section 18/4: the platform Clubs table needs a real "Open as
-      // Master Admin" action per row, not just a link into the read-only
-      // Club Detail console.
       key: 'masterAdminActions',
       header: '',
       render: (c) => (
-        <Button variant="outline" size="sm" onClick={() => setOpeningClub(c)}>
+        <Button variant="outline" size="sm" onClick={() => setOpeningClub({ id: c.id, name_ar: c.name_ar })}>
           {t('masterAdmin.openAction')}
         </Button>
       ),
     },
   ]
 
-  const hasActiveFilters = statusFilter !== 'all' || accessFilter !== 'all' || reasonFilter !== 'all' || createdFilter !== 'all' || flaggedOnly
+  const hasActiveFilters = statusFilter !== 'all' || accessFilter !== 'all' || reasonFilter !== 'all' || flaggedOnly
 
   return (
     <div>
       <PageHeader title={t('platform.clubsPage.title')} description={t('platform.clubsPage.description')} />
 
-      {/* PERSONA COUNCIL AUDIT (2026-08-25) -- Platform Owner persona,
-          same silent-read-error pattern as PlatformOverviewPage: a real
-          query failure here previously rendered an empty list with no
-          indication it was a failure rather than a genuinely empty
-          platform. */}
       {isError && (
         <ErrorState
           message={translateSupabaseError(error, t('platform.clubsPage.loadError', { defaultValue: 'Could not load clubs.' }))}
@@ -263,11 +269,53 @@ export function PlatformClubsPage() {
         />
       )}
 
+      {/* PLATFORM CLUB SELECTOR (2026-08-26) -- "Recent Clubs" and
+          "Pinned/Favorite Clubs" for fast repeat access, per the
+          directive. Only rendered when non-empty -- no permanent empty
+          shelf taking up space for a Platform Owner who hasn't used
+          either yet. */}
+      {(pinnedClubsList.length > 0 || recentClubs.length > 0) && (
+        <div className="mb-4 flex flex-col gap-3">
+          {pinnedClubsList.length > 0 && (
+            <div>
+              <p className="mb-1.5 text-xs font-semibold text-text-secondary">{t('platform.clubsPage.pinnedClubs')}</p>
+              <div className="flex flex-wrap gap-2">
+                {pinnedClubsList.map((c) => (
+                  <Link
+                    key={c.club_id}
+                    to={`/platform/clubs/${c.club_id}`}
+                    className="rounded-full border border-border bg-surface px-3 py-1 text-xs font-medium hover:border-accent-foreground"
+                  >
+                    {c.club_name}
+                  </Link>
+                ))}
+              </div>
+            </div>
+          )}
+          {recentClubs.length > 0 && (
+            <div>
+              <p className="mb-1.5 text-xs font-semibold text-text-secondary">{t('platform.clubsPage.recentClubs')}</p>
+              <div className="flex flex-wrap gap-2">
+                {recentClubs.map((c) => (
+                  <Link
+                    key={c.club_id}
+                    to={`/platform/clubs/${c.club_id}`}
+                    className="rounded-full border border-border bg-surface px-3 py-1 text-xs font-medium hover:border-accent-foreground"
+                  >
+                    {c.club_name}
+                  </Link>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
       <div className="mb-4 flex flex-wrap gap-3">
         <Input
           placeholder={t('platform.clubsPage.searchPlaceholder')}
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
+          value={searchInput}
+          onChange={(e) => setSearchInput(e.target.value)}
           className="max-w-xs"
         />
         <Select value={statusFilter} onValueChange={(v) => updateParam('status', v)}>
@@ -288,13 +336,6 @@ export function PlatformClubsPage() {
             <SelectItem value="blocked">{ACCESS_LABEL.blocked}</SelectItem>
           </SelectContent>
         </Select>
-        {/* PERSONA COUNCIL AUDIT (2026-08-25) -- Platform Owner persona
-            finding: reasonFilter was already read from and applied
-            against the URL param (see the ?reason= deep links from
-            PlatformOverviewPage's exception cards above), but had no
-            UI control here at all -- reachable only via a deep link,
-            never discoverable by a Platform Owner browsing this page
-            directly. */}
         <Select value={reasonFilter} onValueChange={(v) => updateParam('reason', v)}>
           <SelectTrigger className="w-48"><SelectValue placeholder={t('platform.clubsPage.filters.reason')} /></SelectTrigger>
           <SelectContent>
@@ -327,11 +368,19 @@ export function PlatformClubsPage() {
         isLoading={isLoading}
         emptyTitle={t('platform.clubsPage.emptyTitle')}
       />
-      {data?.hasMore && (
-        <div className="mt-4 flex justify-center">
-          <Button variant="outline" onClick={() => setPages((p) => p + 1)} disabled={isFetching}>
-            {isFetching ? t('platform.clubsPage.loadingMore') : t('platform.clubsPage.loadMore')}
-          </Button>
+
+      {totalCount > 0 && (
+        <div className="mt-4 flex items-center justify-between text-sm text-text-secondary">
+          <span>{t('platform.clubsPage.resultCount', { count: totalCount })}</span>
+          <div className="flex items-center gap-2">
+            <Button variant="outline" size="sm" disabled={page === 0 || isFetching} onClick={() => setPage((p) => p - 1)}>
+              {t('platform.clubsPage.prevPage')}
+            </Button>
+            <span>{t('platform.clubsPage.pageOf', { page: page + 1, total: totalPages })}</span>
+            <Button variant="outline" size="sm" disabled={page + 1 >= totalPages || isFetching} onClick={() => setPage((p) => p + 1)}>
+              {t('platform.clubsPage.nextPage')}
+            </Button>
+          </div>
         </div>
       )}
 
@@ -351,7 +400,7 @@ export function PlatformClubsPage() {
 // normal /app shell -- which will now resolve currentClubId to this
 // club because of AuthProvider's own support-session override, and show
 // the persistent MasterAdminBanner on every page from here on.
-function OpenAsMasterAdminDialog({ club, onClose }: { club: ClubRow; onClose: () => void }) {
+function OpenAsMasterAdminDialog({ club, onClose }: { club: { id: string; name_ar: string }; onClose: () => void }) {
   const { t } = useTranslation()
   const navigate = useNavigate()
   const queryClient = useQueryClient()
@@ -363,6 +412,7 @@ function OpenAsMasterAdminDialog({ club, onClose }: { club: ClubRow; onClose: ()
     mutationFn: () => startSupportSession(club.id, mode, reason.trim() || undefined),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ['app-subscription-summary'] })
+      void queryClient.invalidateQueries({ queryKey: ['platform-clubs-recent'] })
       navigate('/app', { replace: true })
     },
   })
