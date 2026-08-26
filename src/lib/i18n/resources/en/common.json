@@ -693,6 +693,7 @@
     "back": "Back",
     "next": "Next",
     "previous": "Previous",
+    "pageOfTotal": "{{page}} / {{total}}",
     "yes": "Yes",
     "no": "No",
     "today": "Today",
@@ -709,6 +710,8 @@
     "currency": "EGP",
     "method": "Method",
     "optional": "optional",
+    "renew": "Renew",
+    "viewInvoice": "View invoice",
     "paymentMethodLabels": {
       "cash": "Cash",
       "card": "Card",

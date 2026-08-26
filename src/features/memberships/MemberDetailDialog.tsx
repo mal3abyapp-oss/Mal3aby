@@ -178,7 +178,7 @@ export function MemberDetailDialog({
 
             <div className="flex flex-wrap gap-2 border-t border-border pt-3">
               {canRenew && canRenewThis && (
-                <Button size="sm" onClick={() => setRenewOpen(true)}>{t('common.renew', { defaultValue: 'Renew' })}</Button>
+                <Button size="sm" onClick={() => setRenewOpen(true)}>{t('common.renew')}</Button>
               )}
               {canFreeze && detail.effective_status === 'active' && (
                 planFlags?.allow_freeze ? (
@@ -202,7 +202,7 @@ export function MemberDetailDialog({
               <Button size="sm" variant="outline" onClick={() => setCardOpen(true)}>{t('clubMemberships.detail.viewCard')}</Button>
               {detail.invoice_id && (
                 <Button size="sm" variant="ghost" onClick={() => navigate(`/app/finance/payments?invoice=${detail.invoice_id}`)}>
-                  {t('customers.detail.viewInvoice', { defaultValue: 'View invoice' })}
+                  {t('common.viewInvoice')}
                 </Button>
               )}
             </div>
@@ -349,7 +349,7 @@ function RenewMembershipDialog({
   return (
     <Dialog open onOpenChange={(open) => !open && onClose()}>
       <DialogContent>
-        <DialogHeader><DialogTitle>{t('common.renew', { defaultValue: 'Renew' })}</DialogTitle></DialogHeader>
+        <DialogHeader><DialogTitle>{t('common.renew')}</DialogTitle></DialogHeader>
         <div className="flex flex-col gap-3">
           {currentPlan && !currentPlan.allow_renewal && (
             <p className="text-sm text-status-danger">{t('clubMemberships.detail.errors.renewalNotAllowed')}</p>

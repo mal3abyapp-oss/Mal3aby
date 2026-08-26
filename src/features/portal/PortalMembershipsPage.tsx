@@ -149,7 +149,7 @@ export function PortalMembershipsPage() {
           <Button size="sm" variant="outline" onClick={() => setCardMembership(m)}>{t('clubMemberships.detail.viewCard')}</Button>
           {canRenew && (
             <Button size="sm" disabled={renewMutation.isPending} onClick={() => renewMutation.mutate(m.membership_subscription_id)}>
-              {renewMutation.isPending ? t('academy.enrollments.enrolling') : t('common.renew', { defaultValue: 'Renew' })}
+              {renewMutation.isPending ? t('academy.enrollments.enrolling') : t('common.renew')}
             </Button>
           )}
         </div>

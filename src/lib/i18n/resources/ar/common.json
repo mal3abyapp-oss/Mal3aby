@@ -693,6 +693,7 @@
     "back": "رجوع",
     "next": "التالي",
     "previous": "السابق",
+    "pageOfTotal": "{{page}} / {{total}}",
     "yes": "نعم",
     "no": "لا",
     "today": "اليوم",
@@ -709,6 +710,8 @@
     "currency": "ج.م",
     "method": "طريقة الدفع",
     "optional": "اختياري",
+    "renew": "تجديد",
+    "viewInvoice": "عرض الفاتورة",
     "paymentMethodLabels": {
       "cash": "نقدًا",
       "card": "بطاقة",

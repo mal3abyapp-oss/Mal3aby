@@ -142,7 +142,7 @@ export function MembersSection() {
       {totalPages > 1 && (
         <div className="flex items-center justify-between text-sm text-text-secondary">
           <Button size="sm" variant="outline" disabled={page <= 1} onClick={() => setPage((p) => p - 1)}>{t('common.previous', { defaultValue: 'Previous' })}</Button>
-          <span>{t('common.pageOfTotal', { page, total: totalPages, defaultValue: `${page} / ${totalPages}` })}</span>
+          <span>{t('common.pageOfTotal', { page, total: totalPages })}</span>
           <Button size="sm" variant="outline" disabled={page >= totalPages} onClick={() => setPage((p) => p + 1)}>{t('common.next', { defaultValue: 'Next' })}</Button>
         </div>
       )}
