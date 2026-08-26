@@ -160,6 +160,49 @@ export function RequirePortalCustomer({ children }: { children: ReactNode }) {
   return children
 }
 
+// COMMERCIAL MODULE (2026-08-26) -- guards every /app/shop/* route.
+// canSeeNavDomain('shop', ...) (RequireNavDomain, already applied at
+// the route level) only checks the shop.view PERMISSION -- a
+// completely separate concern from whether the Shop module is actually
+// entitled+active for THIS club (COMMERCIAL_DOMAIN_ARCHITECTURE.md
+// Section 3's two-level model). A staff member could hold shop.view
+// yet the club owner never turned Shop on, or the platform never
+// entitled it -- this guard is what shows the real "not available"
+// state instead of an empty/broken product list. Same disclosure as
+// every guard in this file: RLS/RPC's own _shop_module_active() check
+// inside every write RPC remains the real security boundary; this is
+// UX only.
+function RequireShopModule({ children }: { children: ReactNode }) {
+  const { currentClubId } = useAuth()
+  const { t } = useTranslation()
+  const { data, isLoading } = useQuery({
+    queryKey: ['shop-module-state', currentClubId],
+    queryFn: async () => {
+      const { data, error } = await supabase.rpc('get_club_modules', { p_club_id: currentClubId as string })
+      if (error) throw error
+      return (data ?? []).find((m) => m.module_key === 'shop') ?? null
+    },
+    enabled: !!currentClubId,
+  })
+
+  if (isLoading) return null
+
+  if (!data || !data.entitled || !data.active) {
+    return (
+      <div className="flex min-h-[60vh] flex-col items-center justify-center gap-2 p-6 text-center">
+        <p className="text-lg font-medium text-text-primary">{t('shop.moduleNotActive.title')}</p>
+        <p className="max-w-sm text-sm text-text-secondary">
+          {!data || !data.entitled ? t('shop.moduleNotActive.notEntitled') : t('shop.moduleNotActive.notActivated')}
+        </p>
+      </div>
+    )
+  }
+
+  return children
+}
+
+export { RequireShopModule }
+
 // Guards /platform specifically — requires the platform_owner role on at
 // least one active membership. Real enforcement is still server-side
 // (public.is_platform_owner() SECURITY DEFINER + RLS policies); this only

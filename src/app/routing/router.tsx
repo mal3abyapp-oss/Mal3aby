@@ -37,6 +37,12 @@ const CustomersPage = lazy(() => import('@/features/customers/CustomersPage').th
 const Customer360Page = lazy(() => import('@/features/customers/Customer360Page').then((m) => ({ default: m.Customer360Page })))
 const CustomerDuplicatesPage = lazy(() => import('@/features/customers/CustomerDuplicatesPage').then((m) => ({ default: m.CustomerDuplicatesPage })))
 const SubscriptionPage = lazy(() => import('@/features/billing/SubscriptionPage').then((m) => ({ default: m.SubscriptionPage })))
+const ShopLayout = lazy(() => import('@/features/shop/ShopLayout').then((m) => ({ default: m.ShopLayout })))
+const ShopPOSPage = lazy(() => import('@/features/shop/ShopPOSPage').then((m) => ({ default: m.ShopPOSPage })))
+const ShopProductsPage = lazy(() => import('@/features/shop/ShopProductsPage').then((m) => ({ default: m.ShopProductsPage })))
+const ShopInventoryPage = lazy(() => import('@/features/shop/ShopInventoryPage').then((m) => ({ default: m.ShopInventoryPage })))
+const ShopSalesPage = lazy(() => import('@/features/shop/ShopSalesPage').then((m) => ({ default: m.ShopSalesPage })))
+const ShopSettingsPage = lazy(() => import('@/features/shop/ShopSettingsPage').then((m) => ({ default: m.ShopSettingsPage })))
 const FinanceLayout = lazy(() => import('@/features/finance/FinanceLayout').then((m) => ({ default: m.FinanceLayout })))
 const FinanceOverviewPage = lazy(() => import('@/features/finance/FinanceOverviewPage').then((m) => ({ default: m.FinanceOverviewPage })))
 const FinancePaymentsPage = lazy(() => import('@/features/finance/FinancePaymentsPage').then((m) => ({ default: m.FinancePaymentsPage })))
@@ -221,6 +227,21 @@ export const router = createBrowserRouter([
           // preserved via RedirectWithSearch so no existing bookmark or
           // in-app link breaks (directive section 32: "test invoice
           // deep link, booking payment link, customer payment link").
+          // COMMERCIAL MODULE (2026-08-26) -- ShopLayout renders the
+          // shared sub-nav + RequireShopModule (module-active gate,
+          // separate from the shop.view permission gate applied here at
+          // the domain level, matching every other item's pattern).
+          {
+            path: 'shop',
+            element: <RequireNavDomain domain="shop"><ShopLayout /></RequireNavDomain>,
+            children: [
+              { index: true, element: <ShopPOSPage /> },
+              { path: 'products', element: <ShopProductsPage /> },
+              { path: 'inventory', element: <ShopInventoryPage /> },
+              { path: 'sales', element: <ShopSalesPage /> },
+              { path: 'settings', element: <ShopSettingsPage /> },
+            ],
+          },
           { path: 'billing', element: <RedirectWithSearch to="/app/finance/payments" /> },
           { path: 'cash-shift', element: <RedirectWithSearch to="/app/finance/cash" /> },
           { path: 'outstanding', element: <RedirectWithSearch to="/app/finance/payments" /> },

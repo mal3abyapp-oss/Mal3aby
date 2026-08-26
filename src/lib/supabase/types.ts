@@ -6439,11 +6439,11 @@ export type Database = {
       adjust_shop_stock: {
         Args: {
           p_location_id: string
-          p_movement_type: string
+          p_movement_type?: string
           p_product_id: string
-          p_quantity: number
-          p_reason: string
-          p_variant_id: string
+          p_quantity?: number
+          p_reason?: string
+          p_variant_id?: string
         }
         Returns: string
       }
@@ -6833,14 +6833,14 @@ export type Database = {
       create_shop_product: {
         Args: {
           p_barcode?: string
-          p_base_price: number
-          p_category_id: string
+          p_base_price?: number
+          p_category_id?: string
           p_club_id: string
-          p_description: string
-          p_has_variants: boolean
+          p_description?: string
+          p_has_variants?: boolean
           p_image_url?: string
           p_name_ar: string
-          p_name_en: string
+          p_name_en?: string
           p_reorder_level?: number
           p_sku?: string
         }
@@ -6849,10 +6849,10 @@ export type Database = {
       create_shop_product_variant: {
         Args: {
           p_barcode?: string
-          p_color: string
+          p_color?: string
           p_price_override?: number
           p_product_id: string
-          p_size: string
+          p_size?: string
           p_sku?: string
         }
         Returns: string
@@ -8172,10 +8172,10 @@ export type Database = {
           p_location_id: string
           p_notes?: string
           p_product_id: string
-          p_quantity: number
+          p_quantity?: number
           p_supplier_id?: string
           p_unit_cost?: number
-          p_variant_id: string
+          p_variant_id?: string
         }
         Returns: string
       }
@@ -8531,9 +8531,9 @@ export type Database = {
           p_dest_location_id: string
           p_notes?: string
           p_product_id: string
-          p_quantity: number
+          p_quantity?: number
           p_source_location_id: string
-          p_variant_id: string
+          p_variant_id?: string
         }
         Returns: string
       }
@@ -8739,17 +8739,17 @@ export type Database = {
       }
       update_shop_product: {
         Args: {
-          p_barcode: string
-          p_base_price: number
-          p_category_id: string
-          p_description: string
-          p_image_url: string
+          p_barcode?: string
+          p_base_price?: number
+          p_category_id?: string
+          p_description?: string
+          p_image_url?: string
           p_name_ar: string
-          p_name_en: string
+          p_name_en?: string
           p_product_id: string
-          p_reorder_level: number
-          p_sku: string
-          p_status: string
+          p_reorder_level?: number
+          p_sku?: string
+          p_status?: string
         }
         Returns: undefined
       }

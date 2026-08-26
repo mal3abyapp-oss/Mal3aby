@@ -49,7 +49,8 @@
     "settings": "الإعدادات",
     "more": "المزيد",
     "scan": "مسح",
-    "logout": "تسجيل الخروج"
+    "logout": "تسجيل الخروج",
+    "shop": "المتجر"
   },
   "portal": {
     "nav": {
@@ -753,7 +754,8 @@
       "bank_transfer": "تحويل بنكي",
       "wallet": "محفظة إلكترونية",
       "other": "أخرى"
-    }
+    },
+    "change": "تغيير"
   },
   "bookings": {
     "statusLabels": {
@@ -3707,6 +3709,177 @@
     "platform.settings.manage": {
       "label": "إدارة إعدادات المنصة",
       "description": "تغيير الإعدادات العامة للمنصة"
+    }
+  },
+  "shop": {
+    "nav": {
+      "pos": "بيع",
+      "products": "المنتجات",
+      "inventory": "المخزون",
+      "sales": "المبيعات والمرتجعات",
+      "settings": "الإعدادات"
+    },
+    "moduleNotActive": {
+      "title": "المتجر غير متاح بعد",
+      "notEntitled": "خطة هذا النادي لا تشمل وحدة المتجر بعد. تواصل مع الدعم لتفعيلها.",
+      "notActivated": "تم إتاحة وحدة المتجر لهذا النادي لكنها لم تُفعَّل بعد. فعّلها من إعدادات المتجر."
+    },
+    "pos": {
+      "title": "بيع",
+      "description": "سجّل عملية بيع منتج لعميل",
+      "searchProducts": "ابحث عن منتج",
+      "noProducts": "لا توجد منتجات",
+      "chooseVariant": "اختر نوعًا لـ {{name}}",
+      "noVariants": "لا توجد أنواع متاحة",
+      "defaultVariant": "قياسي",
+      "locationLabel": "البيع من",
+      "locationPlaceholder": "اختر موقعًا",
+      "customerLabel": "العميل",
+      "searchCustomer": "ابحث بالاسم أو رقم الهاتف",
+      "subtotal": "الإجمالي",
+      "paymentMethodLabel": "طريقة الدفع",
+      "methodCash": "نقدًا",
+      "methodCard": "بطاقة",
+      "methodBankTransfer": "تحويل بنكي",
+      "methodWallet": "محفظة إلكترونية",
+      "completeSale": "إتمام البيع",
+      "completing": "جاري الإتمام...",
+      "saleCompleted": "تم إتمام البيع",
+      "saleError": "تعذّر إتمام عملية البيع.",
+      "cartEmpty": "السلة فارغة",
+      "locationRequired": "اختر مكان البيع.",
+      "customerRequired": "اختر عميلًا."
+    },
+    "products": {
+      "title": "المنتجات",
+      "description": "إدارة المنتجات التي يبيعها ناديك",
+      "searchPlaceholder": "ابحث عن منتج",
+      "addProduct": "إضافة منتج",
+      "creating": "جاري الإنشاء...",
+      "createError": "تعذّر إنشاء المنتج.",
+      "saving": "جاري الحفظ...",
+      "saveError": "تعذّر حفظ المنتج.",
+      "nameArLabel": "الاسم (بالعربية)",
+      "nameEnLabel": "الاسم (بالإنجليزية)",
+      "categoryLabel": "الفئة",
+      "categoryPlaceholder": "اختر فئة",
+      "priceLabel": "السعر",
+      "hasVariantsLabel": "هذا المنتج له أنواع (مقاس/لون)",
+      "skuLabel": "رمز المنتج (SKU)",
+      "barcodeLabel": "الباركود",
+      "statusActive": "نشط",
+      "statusArchived": "مؤرشف",
+      "manageVariants": "إدارة الأنواع",
+      "variantsFor": "أنواع — {{name}}",
+      "sizeLabel": "المقاس",
+      "colorLabel": "اللون",
+      "addVariant": "إضافة نوع",
+      "noVariantsYet": "لا توجد أنواع بعد",
+      "variantCreateError": "تعذّرت إضافة النوع.",
+      "emptyTitle": "لا توجد منتجات بعد",
+      "emptyDescription": "أضِف أول منتج لبدء البيع",
+      "columns": {
+        "name": "الاسم",
+        "category": "الفئة",
+        "price": "السعر",
+        "sku": "الرمز",
+        "status": "الحالة"
+      }
+    },
+    "inventory": {
+      "title": "المخزون",
+      "description": "أرصدة المخزون، الاستلام، التحويلات، والتسويات",
+      "receiveStock": "استلام مخزون",
+      "receiving": "جاري الاستلام...",
+      "receiveError": "تعذّر استلام المخزون.",
+      "transferStock": "تحويل مخزون",
+      "transferring": "جاري التحويل...",
+      "transferError": "تعذّر تحويل المخزون.",
+      "adjustStock": "تسوية مخزون",
+      "adjusting": "جاري التسوية...",
+      "adjustError": "تعذّرت تسوية المخزون.",
+      "lowStockOnly": "المخزون المنخفض فقط",
+      "locationLabel": "الموقع",
+      "locationPlaceholder": "اختر موقعًا",
+      "sourceLocationLabel": "من",
+      "destLocationLabel": "إلى",
+      "productLabel": "المنتج",
+      "productPlaceholder": "اختر منتجًا",
+      "variantLabel": "النوع",
+      "variantPlaceholder": "اختر نوعًا",
+      "quantityLabel": "الكمية",
+      "unitCostLabel": "تكلفة الوحدة (اختياري)",
+      "notesLabel": "ملاحظات (اختياري)",
+      "reasonLabel": "السبب",
+      "adjustmentTypeLabel": "نوع التسوية",
+      "movementTypes": {
+        "opening_balance": "رصيد افتتاحي",
+        "purchase_receipt": "تم الاستلام",
+        "sale": "تم البيع",
+        "sale_return": "تم الإرجاع",
+        "transfer_out": "تحويل صادر",
+        "transfer_in": "تحويل وارد",
+        "adjustment_in": "تسوية (زيادة)",
+        "adjustment_out": "تسوية (نقصان)",
+        "damage": "تالف",
+        "loss": "فاقد",
+        "stock_count_adjustment": "تسوية جرد"
+      },
+      "emptyBalancesTitle": "لا يوجد مخزون بعد",
+      "emptyMovementsTitle": "لا توجد حركات بعد",
+      "movementHistory": "سجل الحركات",
+      "columns": {
+        "date": "التاريخ",
+        "product": "المنتج",
+        "location": "الموقع",
+        "onHand": "المتاح",
+        "movementType": "النوع",
+        "quantity": "الكمية",
+        "reason": "السبب"
+      }
+    },
+    "sales": {
+      "title": "المبيعات والمرتجعات",
+      "description": "سجل المبيعات والمرتجعات",
+      "emptyTitle": "لا توجد مبيعات بعد",
+      "emptyDescription": "ستظهر المبيعات المكتملة هنا",
+      "processReturn": "معالجة إرجاع",
+      "processing": "جاري المعالجة...",
+      "returnError": "تعذّرت معالجة الإرجاع.",
+      "returnNoLinesError": "أدخل كمية لإرجاعها لعنصر واحد على الأقل.",
+      "returnDialogTitle": "إرجاع — فاتورة {{invoice}}",
+      "remainingReturnable": "{{count}} قابل للإرجاع",
+      "restockLabel": "إعادة العناصر إلى المخزون",
+      "refundAmountLabel": "مبلغ الاسترداد (اختياري)",
+      "reasonLabel": "السبب",
+      "columns": {
+        "invoice": "الفاتورة",
+        "customer": "العميل",
+        "total": "الإجمالي",
+        "status": "الحالة",
+        "date": "التاريخ"
+      },
+      "status": {
+        "draft": "مسودة",
+        "completed": "مكتمل",
+        "cancelled": "ملغي",
+        "partially_returned": "مرتجع جزئيًا",
+        "returned": "مرتجع"
+      }
+    },
+    "settings": {
+      "title": "إعدادات المتجر",
+      "description": "مواقع المخزون وإعدادات المتجر",
+      "locationsTitle": "مواقع المخزون",
+      "locationNamePlaceholder": "اسم الموقع",
+      "addLocation": "إضافة موقع",
+      "locationCreateError": "تعذّرت إضافة الموقع.",
+      "noLocationsYet": "لا توجد مواقع بعد — أضِف مستودعًا أو استخدم موقع فرع",
+      "locationsHint": "مواقع الفروع تُنشأ تلقائيًا؛ أضِف مستودعًا هنا إذا احتجت إليه.",
+      "locationKind": {
+        "branch": "فرع",
+        "warehouse": "مستودع"
+      }
     }
   }
 }

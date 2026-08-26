@@ -49,7 +49,8 @@
     "settings": "Settings",
     "more": "More",
     "scan": "Scan",
-    "logout": "Log out"
+    "logout": "Log out",
+    "shop": "Shop"
   },
   "portal": {
     "nav": {
@@ -753,7 +754,8 @@
       "bank_transfer": "Bank transfer",
       "wallet": "E-wallet",
       "other": "Other"
-    }
+    },
+    "change": "Change"
   },
   "bookings": {
     "statusLabels": {
@@ -3710,6 +3712,177 @@
     "platform.settings.manage": {
       "label": "Manage platform settings",
       "description": "Change global platform configuration"
+    }
+  },
+  "shop": {
+    "nav": {
+      "pos": "Sell",
+      "products": "Products",
+      "inventory": "Inventory",
+      "sales": "Sales & Returns",
+      "settings": "Settings"
+    },
+    "moduleNotActive": {
+      "title": "Shop isn't available yet",
+      "notEntitled": "This club's plan doesn't include the Shop module yet. Contact support to enable it.",
+      "notActivated": "The Shop module has been unlocked for this club but hasn't been turned on yet. Turn it on from Shop settings."
+    },
+    "pos": {
+      "title": "Sell",
+      "description": "Ring up a product sale for a customer",
+      "searchProducts": "Search products",
+      "noProducts": "No products found",
+      "chooseVariant": "Choose a variant for {{name}}",
+      "noVariants": "No variants available",
+      "defaultVariant": "Standard",
+      "locationLabel": "Selling from",
+      "locationPlaceholder": "Choose a location",
+      "customerLabel": "Customer",
+      "searchCustomer": "Search by name or phone",
+      "subtotal": "Subtotal",
+      "paymentMethodLabel": "Payment method",
+      "methodCash": "Cash",
+      "methodCard": "Card",
+      "methodBankTransfer": "Bank transfer",
+      "methodWallet": "Wallet",
+      "completeSale": "Complete sale",
+      "completing": "Completing...",
+      "saleCompleted": "Sale completed",
+      "saleError": "Couldn't complete the sale.",
+      "cartEmpty": "Cart is empty",
+      "locationRequired": "Choose where you're selling from.",
+      "customerRequired": "Choose a customer."
+    },
+    "products": {
+      "title": "Products",
+      "description": "Manage the products your club sells",
+      "searchPlaceholder": "Search products",
+      "addProduct": "Add product",
+      "creating": "Creating...",
+      "createError": "Couldn't create the product.",
+      "saving": "Saving...",
+      "saveError": "Couldn't save the product.",
+      "nameArLabel": "Name (Arabic)",
+      "nameEnLabel": "Name (English)",
+      "categoryLabel": "Category",
+      "categoryPlaceholder": "Choose a category",
+      "priceLabel": "Price",
+      "hasVariantsLabel": "This product has variants (size/color)",
+      "skuLabel": "SKU",
+      "barcodeLabel": "Barcode",
+      "statusActive": "Active",
+      "statusArchived": "Archived",
+      "manageVariants": "Manage variants",
+      "variantsFor": "Variants — {{name}}",
+      "sizeLabel": "Size",
+      "colorLabel": "Color",
+      "addVariant": "Add variant",
+      "noVariantsYet": "No variants yet",
+      "variantCreateError": "Couldn't add the variant.",
+      "emptyTitle": "No products yet",
+      "emptyDescription": "Add your first product to start selling",
+      "columns": {
+        "name": "Name",
+        "category": "Category",
+        "price": "Price",
+        "sku": "SKU",
+        "status": "Status"
+      }
+    },
+    "inventory": {
+      "title": "Inventory",
+      "description": "Stock balances, receiving, transfers, and adjustments",
+      "receiveStock": "Receive stock",
+      "receiving": "Receiving...",
+      "receiveError": "Couldn't receive stock.",
+      "transferStock": "Transfer stock",
+      "transferring": "Transferring...",
+      "transferError": "Couldn't transfer stock.",
+      "adjustStock": "Adjust stock",
+      "adjusting": "Adjusting...",
+      "adjustError": "Couldn't adjust stock.",
+      "lowStockOnly": "Low stock only",
+      "locationLabel": "Location",
+      "locationPlaceholder": "Choose a location",
+      "sourceLocationLabel": "From",
+      "destLocationLabel": "To",
+      "productLabel": "Product",
+      "productPlaceholder": "Choose a product",
+      "variantLabel": "Variant",
+      "variantPlaceholder": "Choose a variant",
+      "quantityLabel": "Quantity",
+      "unitCostLabel": "Unit cost (optional)",
+      "notesLabel": "Notes (optional)",
+      "reasonLabel": "Reason",
+      "adjustmentTypeLabel": "Adjustment type",
+      "movementTypes": {
+        "opening_balance": "Opening balance",
+        "purchase_receipt": "Received",
+        "sale": "Sold",
+        "sale_return": "Returned",
+        "transfer_out": "Transferred out",
+        "transfer_in": "Transferred in",
+        "adjustment_in": "Adjustment (increase)",
+        "adjustment_out": "Adjustment (decrease)",
+        "damage": "Damaged",
+        "loss": "Lost",
+        "stock_count_adjustment": "Stock count adjustment"
+      },
+      "emptyBalancesTitle": "No stock yet",
+      "emptyMovementsTitle": "No movements yet",
+      "movementHistory": "Movement history",
+      "columns": {
+        "date": "Date",
+        "product": "Product",
+        "location": "Location",
+        "onHand": "On hand",
+        "movementType": "Type",
+        "quantity": "Qty",
+        "reason": "Reason"
+      }
+    },
+    "sales": {
+      "title": "Sales & Returns",
+      "description": "Sale history and returns",
+      "emptyTitle": "No sales yet",
+      "emptyDescription": "Completed sales will appear here",
+      "processReturn": "Process return",
+      "processing": "Processing...",
+      "returnError": "Couldn't process the return.",
+      "returnNoLinesError": "Enter a quantity to return for at least one item.",
+      "returnDialogTitle": "Return — invoice {{invoice}}",
+      "remainingReturnable": "{{count}} returnable",
+      "restockLabel": "Return items to stock",
+      "refundAmountLabel": "Refund amount (optional)",
+      "reasonLabel": "Reason",
+      "columns": {
+        "invoice": "Invoice",
+        "customer": "Customer",
+        "total": "Total",
+        "status": "Status",
+        "date": "Date"
+      },
+      "status": {
+        "draft": "Draft",
+        "completed": "Completed",
+        "cancelled": "Cancelled",
+        "partially_returned": "Partially returned",
+        "returned": "Returned"
+      }
+    },
+    "settings": {
+      "title": "Shop settings",
+      "description": "Inventory locations and shop configuration",
+      "locationsTitle": "Inventory locations",
+      "locationNamePlaceholder": "Location name",
+      "addLocation": "Add location",
+      "locationCreateError": "Couldn't add the location.",
+      "noLocationsYet": "No locations yet — add a warehouse or use a branch location",
+      "locationsHint": "Branch locations are set up automatically; add a warehouse here if you need one.",
+      "locationKind": {
+        "branch": "Branch",
+        "warehouse": "Warehouse"
+      }
     }
   }
 }

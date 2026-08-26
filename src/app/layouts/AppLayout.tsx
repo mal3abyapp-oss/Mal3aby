@@ -28,6 +28,7 @@ import {
   Building2,
   ShieldCheck,
   IdCard,
+  ShoppingCart,
 } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 
@@ -80,6 +81,14 @@ const navSections: NavSection[] = [
       // never nested under Academy (directive Section 96/111).
       { to: '/app/memberships', labelKey: 'nav.memberships', icon: IdCard, domain: 'memberships' },
       { to: '/app/customers', labelKey: 'nav.customers', icon: Users, domain: 'customers' },
+      // COMMERCIAL MODULE (2026-08-26) -- shop.view alone gates nav
+      // visibility here (matching every other item's pattern); whether
+      // the module is actually entitled+active for this club is a
+      // separate check handled by RequireShopModule at the route level
+      // (shows a friendly "not available" state rather than a 404/blank
+      // page if a permission-holder clicks through before the club
+      // owner or platform has turned it on).
+      { to: '/app/shop', labelKey: 'nav.shop', icon: ShoppingCart, domain: 'shop' },
       { to: '/app/finance', labelKey: 'nav.finance', icon: Receipt, domain: 'finance' },
     ],
   },

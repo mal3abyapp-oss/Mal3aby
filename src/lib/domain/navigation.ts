@@ -29,6 +29,7 @@ export type NavDomain =
   | 'customers'
   | 'academy'
   | 'memberships'
+  | 'shop'
   | 'finance'
   | 'reports'
   | 'whatsapp'
@@ -58,6 +59,13 @@ const NAV_DOMAIN_PERMISSIONS: Record<Exclude<NavDomain, 'today'>, readonly strin
     'club_membership.plan.view', 'club_membership.view', 'club_membership.create',
     'club_membership.renew', 'club_membership.freeze', 'club_membership.cancel',
   ],
+  // COMMERCIAL MODULE (2026-08-26) -- shop.view alone gates nav
+  // visibility; whether the module itself is entitled+active for this
+  // club is a SEPARATE check (RequireShopModule, RequireAuth.tsx) --
+  // permission and module-activation are two independent gates by
+  // design (COMMERCIAL_DOMAIN_ARCHITECTURE.md Section 3), not
+  // conflated into one.
+  shop: ['shop.view'],
   finance: ['payment.view', 'payment.create', 'invoice.view', 'invoice.create', 'payment.refund'],
   reports: ['report.view'],
   whatsapp: ['manage_whatsapp_connection'],
