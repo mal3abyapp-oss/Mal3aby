@@ -2339,7 +2339,16 @@
         "clubMembership": "Club Memberships",
         "financial": "Financial Account",
         "whatsapp": "WhatsApp & Communication",
-        "activity": "Activity & Audit"
+        "activity": "Activity & Audit",
+        "products": "Products"
+      },
+      "noProductsYet": "No product purchases yet",
+      "productsColumns": {
+        "product": "Product",
+        "quantity": "Qty",
+        "total": "Total",
+        "returnState": "Return",
+        "returnedCount": "{{count}} returned"
       }
     },
     "duplicates": {

@@ -2343,7 +2343,16 @@
         "clubMembership": "عضويات النادي",
         "financial": "الحساب المالي",
         "whatsapp": "واتساب والتواصل",
-        "activity": "النشاط والتدقيق"
+        "activity": "النشاط والتدقيق",
+        "products": "المنتجات"
+      },
+      "noProductsYet": "لا توجد مشتريات منتجات بعد",
+      "productsColumns": {
+        "product": "المنتج",
+        "quantity": "الكمية",
+        "total": "الإجمالي",
+        "returnState": "الإرجاع",
+        "returnedCount": "تم إرجاع {{count}}"
       }
     },
     "duplicates": {

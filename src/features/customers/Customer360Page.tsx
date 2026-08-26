@@ -48,7 +48,7 @@ import { ArrowLeft, Wallet, Calendar, GraduationCap, MessageCircle, AlertTriangl
 // siblings -- never a snapshot field on the customer row itself (the
 // directive's explicit "UI TOTAL = DB AGGREGATION" requirement).
 
-type TabKey = 'overview' | 'bookings' | 'academy' | 'clubMembership' | 'financial' | 'whatsapp' | 'activity'
+type TabKey = 'overview' | 'bookings' | 'academy' | 'clubMembership' | 'products' | 'financial' | 'whatsapp' | 'activity'
 
 interface Summary {
   customer: {
@@ -74,6 +74,26 @@ async function fetchBookings(clubId: string, customerId: string) {
   const { data, error } = await supabase.rpc('get_customer_bookings', { p_club_id: clubId, p_customer_id: customerId, p_limit: 20, p_offset: 0 })
   if (error) throw error
   return data as unknown as { rows: BookingRow[]; total_count: number }
+}
+
+// COMMERCIAL MODULE ARCHITECTURE (2026-08-26) -- directive Section
+// 19/57: Products purchased, reusing the canonical customer identity
+// -- no second Shop-specific customer profile, same pattern as every
+// other tab on this page.
+interface ShopPurchaseRow {
+  sale_id: string; invoice_id: string; invoice_number: string; sale_status: string
+  product_name_ar: string; variant_label: string | null; quantity: number
+  unit_price: number; line_total: number; returned_quantity: number; created_at: string
+}
+async function fetchShopPurchases(clubId: string, customerId: string): Promise<ShopPurchaseRow[]> {
+  const { data, error } = await supabase.rpc('get_customer_shop_purchases', { p_club_id: clubId, p_customer_id: customerId })
+  if (error) throw error
+  return (data ?? []).map((r) => ({
+    sale_id: r.sale_id, invoice_id: r.invoice_id, invoice_number: r.invoice_number, sale_status: r.sale_status,
+    product_name_ar: r.product_name_ar, variant_label: r.variant_label, quantity: Number(r.quantity),
+    unit_price: Number(r.unit_price), line_total: Number(r.line_total), returned_quantity: Number(r.returned_quantity),
+    created_at: r.created_at,
+  }))
 }
 
 interface PlayerRow {
@@ -204,6 +224,12 @@ export function Customer360Page() {
     queryKey: ['customer-360-club-memberships', currentClubId, customerId],
     queryFn: () => fetchClubMemberships(currentClubId!, customerId!),
     enabled: !!currentClubId && !!customerId && activeTab === 'clubMembership',
+  })
+
+  const { data: shopPurchases } = useQuery({
+    queryKey: ['customer-360-shop-purchases', currentClubId, customerId],
+    queryFn: () => fetchShopPurchases(currentClubId!, customerId!),
+    enabled: !!currentClubId && !!customerId && activeTab === 'products',
   })
 
   const { data: financial } = useQuery({
@@ -350,6 +376,7 @@ export function Customer360Page() {
           <TabsTrigger value="bookings">{t('customers.detail.tabs.bookings', { defaultValue: 'Bookings' })}</TabsTrigger>
           <TabsTrigger value="academy">{t('customers.detail.tabs.academy', { defaultValue: 'Academy & Players' })}</TabsTrigger>
           <TabsTrigger value="clubMembership">{t('customers.detail.tabs.clubMembership')}</TabsTrigger>
+          <TabsTrigger value="products">{t('customers.detail.tabs.products')}</TabsTrigger>
           <TabsTrigger value="financial">{t('customers.detail.tabs.financial', { defaultValue: 'Financial Account' })}</TabsTrigger>
           <TabsTrigger value="whatsapp">{t('customers.detail.tabs.whatsapp', { defaultValue: 'WhatsApp & Communication' })}</TabsTrigger>
           <TabsTrigger value="activity">{t('customers.detail.tabs.activity', { defaultValue: 'Activity & Audit' })}</TabsTrigger>
@@ -511,6 +538,38 @@ export function Customer360Page() {
               rowKey={(m) => m.membership_subscription_id}
               emptyTitle={t('clubMemberships.members.emptyTitle')}
               emptyDescription={t('clubMemberships.members.emptyDescription')}
+            />
+          </div>
+        </TabsContent>
+
+        <TabsContent value="products">
+          <div className="mt-4">
+            <DataTable
+              columns={[
+                {
+                  key: 'product', header: t('customers.detail.productsColumns.product'),
+                  render: (r: ShopPurchaseRow) => r.product_name_ar + (r.variant_label ? ` (${r.variant_label})` : ''),
+                },
+                { key: 'quantity', header: t('customers.detail.productsColumns.quantity'), render: (r: ShopPurchaseRow) => r.quantity },
+                { key: 'total', header: t('customers.detail.productsColumns.total'), render: (r: ShopPurchaseRow) => <MoneyDisplay amount={r.line_total} size="sm" /> },
+                {
+                  key: 'returnState', header: t('customers.detail.productsColumns.returnState'),
+                  render: (r: ShopPurchaseRow) => r.returned_quantity > 0
+                    ? <StatusBadge tone="warning" label={t('customers.detail.productsColumns.returnedCount', { count: r.returned_quantity })} />
+                    : '—',
+                },
+                { key: 'date', header: t('common.date', { defaultValue: 'Date' }), render: (r: ShopPurchaseRow) => <span className="tabular-nums"><bdi>{new Date(r.created_at).toLocaleDateString(locale === 'en' ? 'en-US' : 'ar-EG')}</bdi></span> },
+                {
+                  key: 'actions', header: '', render: (r: ShopPurchaseRow) => (
+                    <Button size="sm" variant="ghost" onClick={() => navigate(`/app/finance/payments?invoice=${r.invoice_id}`)}>
+                      {t('customers.detail.viewInvoice', { defaultValue: 'View invoice' })}
+                    </Button>
+                  ),
+                },
+              ] as DataTableColumn<ShopPurchaseRow>[]}
+              rows={shopPurchases ?? []}
+              rowKey={(r) => `${r.sale_id}-${r.product_name_ar}-${r.variant_label}`}
+              emptyTitle={t('customers.detail.noProductsYet')}
             />
           </div>
         </TabsContent>

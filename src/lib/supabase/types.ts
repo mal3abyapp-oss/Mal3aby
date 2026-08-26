@@ -7136,6 +7136,22 @@ export type Database = {
           status: string
         }[]
       }
+      get_customer_shop_purchases: {
+        Args: { p_club_id: string; p_customer_id: string }
+        Returns: {
+          created_at: string
+          invoice_id: string
+          invoice_number: string
+          line_total: number
+          product_name_ar: string
+          quantity: number
+          returned_quantity: number
+          sale_id: string
+          sale_status: string
+          unit_price: number
+          variant_label: string
+        }[]
+      }
       get_effective_government_policy: {
         Args: { p_branch_id?: string; p_club_id: string; p_field_id?: string }
         Returns: {
