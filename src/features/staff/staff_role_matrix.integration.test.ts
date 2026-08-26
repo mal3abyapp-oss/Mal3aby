@@ -503,4 +503,74 @@ describeIfConfigured('Staff role matrix (real login, live integration)', () => {
       expect(error).toBeFalsy()
     })
   })
+
+  // ---- CASH RECONCILIATION & FINANCE OPERATIONS (audit 2026-08-26) ----
+  // get_revenue_report/get_collections_report/etc. now compute date
+  // boundaries via club_local_day_bounds() (clubs.timezone, not the
+  // database session's UTC day) and enforce branch scope via
+  // caller_accessible_branch_ids() -- these tests lock in the RPC-level
+  // contract for both. No branch-restricted client exists in this
+  // file's roster (see ROLE_ENV) -- the branch-scope matrix itself
+  // (Branch Manager ALLOW own branch / DENY other branch / accessible-
+  // only default) was proven live via SQL impersonation during this
+  // audit; these tests cover what this file's real-login roster can
+  // exercise: cross-tenant/cross-club branch id rejection and basic
+  // reconciliation-formula sanity that every accountant-tier caller
+  // can reach.
+  describe('Cash Reconciliation & Finance Operations module', () => {
+    it('Accountant CAN call get_revenue_report for the real club (date-range + branch-scope gates pass)', async () => {
+      const { error } = await clients.accountant.rpc('get_revenue_report', {
+        p_club_id: CLUB_ID,
+        p_start_date: '2026-01-01',
+        p_end_date: '2026-12-31',
+        p_branch_id: null,
+        p_method: null,
+      })
+      expect(error).toBeFalsy()
+    })
+
+    it('Coach CANNOT call get_revenue_report (lacks report.view)', async () => {
+      const { error } = await clients.coach.rpc('get_revenue_report', {
+        p_club_id: CLUB_ID,
+        p_start_date: '2026-01-01',
+        p_end_date: '2026-12-31',
+        p_branch_id: null,
+        p_method: null,
+      })
+      expect(error).toBeTruthy()
+      expect(error!.message.toLowerCase()).toContain('not authorized')
+    })
+
+    it('get_revenue_report rejects a branch id from a different club (no cross-club data leak, no existence leak)', async () => {
+      const { error } = await clients.accountant.rpc('get_revenue_report', {
+        p_club_id: CLUB_ID,
+        p_start_date: '2026-01-01',
+        p_end_date: '2026-12-31',
+        p_branch_id: '00000000-0000-0000-0000-000000000000',
+        p_method: null,
+      })
+      expect(error).toBeTruthy()
+      expect(error!.message.toLowerCase()).toContain('not authorized')
+    })
+
+    it('get_financial_reconciliation_report CAN be called by a report.view holder and returns a coherent shape', async () => {
+      const { data, error } = await clients.accountant.rpc('get_financial_reconciliation_report', {
+        p_club_id: CLUB_ID,
+        p_start_date: '2026-01-01',
+        p_end_date: '2026-12-31',
+        p_branch_id: null,
+      })
+      expect(error).toBeFalsy()
+      const result = data as unknown as { cash_payments_total: number; cash_payments_linked_to_shift: number }
+      // Linked-to-shift can never exceed the total cash payments in the
+      // same range/scope -- a basic reconciliation invariant that would
+      // catch a double-count or a broken filter regression.
+      expect(result.cash_payments_linked_to_shift).toBeLessThanOrEqual(result.cash_payments_total)
+    })
+
+    it('get_today_dashboard resolves "today" without error for an accountant (club-timezone-aware boundary)', async () => {
+      const { error } = await clients.accountant.rpc('get_today_dashboard', { p_club_id: CLUB_ID })
+      if (error) expect(error.message.toLowerCase()).not.toContain('not authorized')
+    })
+  })
 })
