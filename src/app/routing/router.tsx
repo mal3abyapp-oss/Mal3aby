@@ -84,6 +84,9 @@ const PlatformReportsPage = lazy(() => import('@/features/platform/PlatformRepor
 const PlatformAlertsPage = lazy(() => import('@/features/platform/PlatformAlertsPage').then((m) => ({ default: m.PlatformAlertsPage })))
 const PlatformAuditPage = lazy(() => import('@/features/platform/PlatformAuditPage').then((m) => ({ default: m.PlatformAuditPage })))
 const PlatformSettingsPage = lazy(() => import('@/features/platform/PlatformSettingsPage').then((m) => ({ default: m.PlatformSettingsPage })))
+// PLATFORM STAFF + PLATFORM ROLES & PERMISSIONS (2026-08-26)
+const PlatformStaffPage = lazy(() => import('@/features/platform/PlatformStaffPage').then((m) => ({ default: m.PlatformStaffPage })))
+const PlatformRolesPage = lazy(() => import('@/features/platform/PlatformRolesPage').then((m) => ({ default: m.PlatformRolesPage })))
 
 // Small, always-needed public/marketing/auth pages -- eagerly imported.
 // Splitting these would add request round-trips to the very first thing
@@ -356,6 +359,8 @@ export const router = createBrowserRouter([
           { path: 'reports', element: <PlatformReportsPage /> },
           { path: 'alerts', element: <PlatformAlertsPage /> },
           { path: 'audit', element: <PlatformAuditPage /> },
+          { path: 'staff', element: <PlatformStaffPage /> },
+          { path: 'roles', element: <PlatformRolesPage /> },
           { path: 'settings', element: <PlatformSettingsPage /> },
         ],
       },

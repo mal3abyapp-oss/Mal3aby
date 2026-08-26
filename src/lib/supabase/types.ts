@@ -3684,6 +3684,69 @@ export type Database = {
         }
         Relationships: []
       }
+      platform_custom_role_permissions: {
+        Row: {
+          platform_custom_role_id: string
+          platform_permission_id: string
+        }
+        Insert: {
+          platform_custom_role_id: string
+          platform_permission_id: string
+        }
+        Update: {
+          platform_custom_role_id?: string
+          platform_permission_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "platform_custom_role_permissions_platform_custom_role_id_fkey"
+            columns: ["platform_custom_role_id"]
+            isOneToOne: false
+            referencedRelation: "platform_custom_roles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "platform_custom_role_permissions_platform_permission_id_fkey"
+            columns: ["platform_permission_id"]
+            isOneToOne: false
+            referencedRelation: "platform_permissions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      platform_custom_roles: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          description: string | null
+          id: string
+          is_active: boolean
+          name_ar: string
+          name_en: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          id?: string
+          is_active?: boolean
+          name_ar: string
+          name_en: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          id?: string
+          is_active?: boolean
+          name_ar?: string
+          name_en?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       platform_invoices: {
         Row: {
           amount: number
@@ -3789,6 +3852,24 @@ export type Database = {
           },
         ]
       }
+      platform_permissions: {
+        Row: {
+          group_key: string
+          id: string
+          key: string
+        }
+        Insert: {
+          group_key: string
+          id?: string
+          key: string
+        }
+        Update: {
+          group_key?: string
+          id?: string
+          key?: string
+        }
+        Relationships: []
+      }
       platform_plans: {
         Row: {
           billing_interval: string
@@ -3846,6 +3927,60 @@ export type Database = {
         }
         Relationships: []
       }
+      platform_role_permissions: {
+        Row: {
+          platform_permission_id: string
+          platform_role_id: string
+        }
+        Insert: {
+          platform_permission_id: string
+          platform_role_id: string
+        }
+        Update: {
+          platform_permission_id?: string
+          platform_role_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "platform_role_permissions_platform_permission_id_fkey"
+            columns: ["platform_permission_id"]
+            isOneToOne: false
+            referencedRelation: "platform_permissions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "platform_role_permissions_platform_role_id_fkey"
+            columns: ["platform_role_id"]
+            isOneToOne: false
+            referencedRelation: "platform_roles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      platform_roles: {
+        Row: {
+          id: string
+          is_system: boolean
+          key: string
+          name_ar: string
+          name_en: string
+        }
+        Insert: {
+          id?: string
+          is_system?: boolean
+          key: string
+          name_ar: string
+          name_en: string
+        }
+        Update: {
+          id?: string
+          is_system?: boolean
+          key?: string
+          name_ar?: string
+          name_en?: string
+        }
+        Relationships: []
+      }
       platform_settings: {
         Row: {
           default_trial_days: number
@@ -3872,6 +4007,54 @@ export type Database = {
           updated_at?: string | null
         }
         Relationships: []
+      }
+      platform_staff_memberships: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          id: string
+          platform_custom_role_id: string | null
+          platform_role_id: string | null
+          status: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          platform_custom_role_id?: string | null
+          platform_role_id?: string | null
+          status?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          platform_custom_role_id?: string | null
+          platform_role_id?: string | null
+          status?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "platform_staff_memberships_platform_custom_role_id_fkey"
+            columns: ["platform_custom_role_id"]
+            isOneToOne: false
+            referencedRelation: "platform_custom_roles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "platform_staff_memberships_platform_role_id_fkey"
+            columns: ["platform_role_id"]
+            isOneToOne: false
+            referencedRelation: "platform_roles"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       platform_subscriptions: {
         Row: {
@@ -5456,6 +5639,7 @@ export type Database = {
         Returns: string[]
       }
       caller_permission_keys: { Args: { p_club_id: string }; Returns: string[] }
+      caller_platform_permission_keys: { Args: never; Returns: string[] }
       cancel_booking: {
         Args: { p_booking_id: string; p_reason: string }
         Returns: undefined
@@ -5583,6 +5767,7 @@ export type Database = {
         }
         Returns: string
       }
+      count_active_platform_owners: { Args: never; Returns: number }
       create_booking: {
         Args: {
           p_customer_id: string
@@ -5724,6 +5909,15 @@ export type Database = {
           isSetofReturn: false
         }
       }
+      create_platform_custom_role: {
+        Args: {
+          p_description: string
+          p_name_ar: string
+          p_name_en: string
+          p_permission_keys: string[]
+        }
+        Returns: string
+      }
       create_platform_subscription: {
         Args: {
           p_club_id: string
@@ -5792,11 +5986,19 @@ export type Database = {
         Args: { p_amount: number; p_payment_id: string; p_reason: string }
         Returns: string
       }
+      deactivate_platform_staff: {
+        Args: { p_membership_id: string }
+        Returns: undefined
+      }
       deactivate_staff_member: {
         Args: { p_membership_id: string }
         Returns: undefined
       }
       delete_club_role: { Args: { p_club_role_id: string }; Returns: undefined }
+      delete_platform_custom_role: {
+        Args: { p_role_id: string }
+        Returns: undefined
+      }
       disconnect_whatsapp: { Args: { p_club_id: string }; Returns: undefined }
       email_worker_claim_next_batch: {
         Args: { p_limit?: number }
@@ -6373,6 +6575,10 @@ export type Database = {
           user_id: string
         }[]
       }
+      get_platform_role_permissions: {
+        Args: { p_role_id: string }
+        Returns: string[]
+      }
       get_platform_whatsapp_health: {
         Args: never
         Returns: {
@@ -6613,6 +6819,11 @@ export type Database = {
         Args: { p_club_id: string; p_key: string }
         Returns: boolean
       }
+      has_platform_permission: { Args: { p_key: string }; Returns: boolean }
+      has_platform_permission_as: {
+        Args: { p_key: string; p_user_id: string }
+        Returns: boolean
+      }
       has_platform_support_access: {
         Args: { p_club_id: string; p_require_manage?: boolean }
         Returns: boolean
@@ -6676,6 +6887,37 @@ export type Database = {
           name_en: string
           permission_count: number
           updated_at: string
+        }[]
+      }
+      list_platform_roles: {
+        Args: never
+        Returns: {
+          created_at: string
+          description: string
+          employee_count: number
+          id: string
+          is_active: boolean
+          is_system: boolean
+          name_ar: string
+          name_en: string
+          permission_count: number
+          updated_at: string
+        }[]
+      }
+      list_platform_staff: {
+        Args: never
+        Returns: {
+          created_at: string
+          email: string
+          full_name: string
+          is_custom_role: boolean
+          membership_id: string
+          platform_role_id: string
+          platform_role_key: string
+          role_name_ar: string
+          role_name_en: string
+          status: string
+          user_id: string
         }[]
       }
       log_own_password_changed: { Args: never; Returns: undefined }
@@ -7126,6 +7368,14 @@ export type Database = {
         Args: { p_is_public: boolean; p_plan_id: string }
         Returns: undefined
       }
+      set_platform_staff_role: {
+        Args: {
+          p_membership_id: string
+          p_platform_custom_role_id?: string
+          p_platform_role_id?: string
+        }
+        Returns: undefined
+      }
       set_primary_guardian: {
         Args: { p_customer_id: string; p_player_id: string }
         Returns: undefined
@@ -7311,6 +7561,17 @@ export type Database = {
           p_platform_email: string
           p_platform_phone: string
           p_platform_phone_e164?: string
+        }
+        Returns: undefined
+      }
+      update_platform_custom_role: {
+        Args: {
+          p_description: string
+          p_is_active: boolean
+          p_name_ar: string
+          p_name_en: string
+          p_permission_keys: string[]
+          p_role_id: string
         }
         Returns: undefined
       }

@@ -21,6 +21,8 @@ import {
   Settings,
   Menu,
   LogOut,
+  UserCog,
+  KeyRound,
 } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 
@@ -77,6 +79,17 @@ const navSections: NavSection[] = [
       { to: '/platform/alerts', labelKey: 'platform.nav.alerts', icon: Bell },
       { to: '/platform/trials', labelKey: 'platform.nav.trials', icon: Award },
       { to: '/platform/audit', labelKey: 'platform.nav.auditLog', icon: ShieldCheck },
+    ],
+  },
+  // PLATFORM STAFF + PLATFORM ROLES & PERMISSIONS (2026-08-26) -- a
+  // genuine SECOND authorization domain from Club Staff/Roles (directive
+  // Section 1: "Do not mix club roles with platform roles"), so it gets
+  // its own nav section rather than being folded into an existing one.
+  {
+    titleKey: 'platform.nav.sectionStaffAccess',
+    items: [
+      { to: '/platform/staff', labelKey: 'platform.nav.platformStaff', icon: UserCog },
+      { to: '/platform/roles', labelKey: 'platform.nav.platformRoles', icon: KeyRound },
     ],
   },
   {
