@@ -1,0 +1,88 @@
+-- COMMERCIAL MODULE ARCHITECTURE, continued -- category/product create
+-- RPCs. Direct table INSERT/UPDATE has no RLS policy for these tables
+-- (see shop_catalog_schema.sql) -- these RPCs are the only write path,
+-- each entitlement+permission+tenant gated.
+
+create or replace function public.create_shop_category(p_club_id uuid, p_name_ar text, p_name_en text default null)
+returns uuid
+language plpgsql
+security definer
+set search_path to 'public', 'pg_temp'
+as $$
+declare
+  v_id uuid;
+begin
+  if not (p_club_id in (select public.user_club_ids()) and public.has_permission('shop.product.manage', p_club_id)
+          or public.has_platform_support_access(p_club_id, true)) then
+    raise exception 'not authorized';
+  end if;
+  if not public._shop_module_active(p_club_id) then
+    raise exception 'the shop module is not active for this club';
+  end if;
+  if p_name_ar is null or trim(p_name_ar) = '' then
+    raise exception 'a category name is required';
+  end if;
+
+  insert into public.shop_categories (club_id, name_ar, name_en, created_by)
+  values (p_club_id, p_name_ar, p_name_en, auth.uid())
+  returning id into v_id;
+
+  perform public.write_audit_log(p_club_id, 'shop_category.created', 'shop_category', v_id, null, jsonb_build_object('name_ar', p_name_ar), null);
+  return v_id;
+end;
+$$;
+
+revoke all on function public.create_shop_category(uuid, text, text) from public;
+revoke all on function public.create_shop_category(uuid, text, text) from anon;
+grant execute on function public.create_shop_category(uuid, text, text) to authenticated;
+
+create or replace function public.create_shop_product(
+  p_club_id uuid,
+  p_name_ar text,
+  p_name_en text,
+  p_category_id uuid,
+  p_description text,
+  p_base_price numeric,
+  p_has_variants boolean,
+  p_sku text default null,
+  p_barcode text default null,
+  p_image_url text default null,
+  p_reorder_level integer default null
+)
+returns uuid
+language plpgsql
+security definer
+set search_path to 'public', 'pg_temp'
+as $$
+declare
+  v_id uuid;
+begin
+  if not (p_club_id in (select public.user_club_ids()) and public.has_permission('shop.product.manage', p_club_id)
+          or public.has_platform_support_access(p_club_id, true)) then
+    raise exception 'not authorized';
+  end if;
+  if not public._shop_module_active(p_club_id) then
+    raise exception 'the shop module is not active for this club';
+  end if;
+  if p_name_ar is null or trim(p_name_ar) = '' then
+    raise exception 'a product name is required';
+  end if;
+  if p_base_price < 0 then
+    raise exception 'price cannot be negative';
+  end if;
+  if p_category_id is not null and not exists (select 1 from public.shop_categories where id = p_category_id and club_id = p_club_id) then
+    raise exception 'category does not belong to this club';
+  end if;
+
+  insert into public.shop_products (club_id, category_id, name_ar, name_en, description, base_price, has_variants, sku, barcode, image_url, reorder_level, created_by)
+  values (p_club_id, p_category_id, p_name_ar, p_name_en, p_description, p_base_price, p_has_variants, nullif(p_sku, ''), nullif(p_barcode, ''), p_image_url, p_reorder_level, auth.uid())
+  returning id into v_id;
+
+  perform public.write_audit_log(p_club_id, 'product.created', 'shop_product', v_id, null, jsonb_build_object('name_ar', p_name_ar, 'base_price', p_base_price), null);
+  return v_id;
+end;
+$$;
+
+revoke all on function public.create_shop_product(uuid, text, text, uuid, text, numeric, boolean, text, text, text, integer) from public;
+revoke all on function public.create_shop_product(uuid, text, text, uuid, text, numeric, boolean, text, text, text, integer) from anon;
+grant execute on function public.create_shop_product(uuid, text, text, uuid, text, numeric, boolean, text, text, text, integer) to authenticated;

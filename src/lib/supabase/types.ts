@@ -1037,6 +1037,51 @@ export type Database = {
           },
         ]
       }
+      club_modules: {
+        Row: {
+          active: boolean
+          club_id: string
+          entitled: boolean
+          id: string
+          module_key: string
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          active?: boolean
+          club_id: string
+          entitled?: boolean
+          id?: string
+          module_key: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          active?: boolean
+          club_id?: string
+          entitled?: boolean
+          id?: string
+          module_key?: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "club_modules_club_id_fkey"
+            columns: ["club_id"]
+            isOneToOne: false
+            referencedRelation: "clubs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "club_modules_club_id_fkey"
+            columns: ["club_id"]
+            isOneToOne: false
+            referencedRelation: "commercial_entitlements_usage"
+            referencedColumns: ["club_id"]
+          },
+        ]
+      }
       club_role_permissions: {
         Row: {
           club_role_id: string
@@ -4843,6 +4888,686 @@ export type Database = {
           },
         ]
       }
+      shop_categories: {
+        Row: {
+          club_id: string
+          created_at: string
+          created_by: string | null
+          id: string
+          name_ar: string
+          name_en: string | null
+          status: string
+        }
+        Insert: {
+          club_id: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          name_ar: string
+          name_en?: string | null
+          status?: string
+        }
+        Update: {
+          club_id?: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          name_ar?: string
+          name_en?: string | null
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "shop_categories_club_id_fkey"
+            columns: ["club_id"]
+            isOneToOne: false
+            referencedRelation: "clubs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "shop_categories_club_id_fkey"
+            columns: ["club_id"]
+            isOneToOne: false
+            referencedRelation: "commercial_entitlements_usage"
+            referencedColumns: ["club_id"]
+          },
+        ]
+      }
+      shop_inventory_balances: {
+        Row: {
+          club_id: string
+          id: string
+          location_id: string
+          on_hand: number
+          product_id: string
+          updated_at: string
+          variant_id: string | null
+        }
+        Insert: {
+          club_id: string
+          id?: string
+          location_id: string
+          on_hand?: number
+          product_id: string
+          updated_at?: string
+          variant_id?: string | null
+        }
+        Update: {
+          club_id?: string
+          id?: string
+          location_id?: string
+          on_hand?: number
+          product_id?: string
+          updated_at?: string
+          variant_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "shop_inventory_balances_club_id_fkey"
+            columns: ["club_id"]
+            isOneToOne: false
+            referencedRelation: "clubs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "shop_inventory_balances_club_id_fkey"
+            columns: ["club_id"]
+            isOneToOne: false
+            referencedRelation: "commercial_entitlements_usage"
+            referencedColumns: ["club_id"]
+          },
+          {
+            foreignKeyName: "shop_inventory_balances_location_id_fkey"
+            columns: ["location_id"]
+            isOneToOne: false
+            referencedRelation: "shop_inventory_locations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "shop_inventory_balances_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "shop_products"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "shop_inventory_balances_variant_id_fkey"
+            columns: ["variant_id"]
+            isOneToOne: false
+            referencedRelation: "shop_product_variants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      shop_inventory_locations: {
+        Row: {
+          branch_id: string | null
+          club_id: string
+          created_at: string
+          created_by: string | null
+          id: string
+          kind: string
+          name: string
+          status: string
+        }
+        Insert: {
+          branch_id?: string | null
+          club_id: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          kind: string
+          name: string
+          status?: string
+        }
+        Update: {
+          branch_id?: string | null
+          club_id?: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          kind?: string
+          name?: string
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "shop_inventory_locations_branch_id_fkey"
+            columns: ["branch_id"]
+            isOneToOne: true
+            referencedRelation: "branches"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "shop_inventory_locations_club_id_fkey"
+            columns: ["club_id"]
+            isOneToOne: false
+            referencedRelation: "clubs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "shop_inventory_locations_club_id_fkey"
+            columns: ["club_id"]
+            isOneToOne: false
+            referencedRelation: "commercial_entitlements_usage"
+            referencedColumns: ["club_id"]
+          },
+        ]
+      }
+      shop_inventory_movements: {
+        Row: {
+          actor_id: string | null
+          club_id: string
+          created_at: string
+          id: string
+          location_id: string
+          movement_type: string
+          product_id: string
+          quantity: number
+          reason: string | null
+          reference_id: string | null
+          reference_type: string | null
+          unit_cost: number | null
+          variant_id: string | null
+        }
+        Insert: {
+          actor_id?: string | null
+          club_id: string
+          created_at?: string
+          id?: string
+          location_id: string
+          movement_type: string
+          product_id: string
+          quantity: number
+          reason?: string | null
+          reference_id?: string | null
+          reference_type?: string | null
+          unit_cost?: number | null
+          variant_id?: string | null
+        }
+        Update: {
+          actor_id?: string | null
+          club_id?: string
+          created_at?: string
+          id?: string
+          location_id?: string
+          movement_type?: string
+          product_id?: string
+          quantity?: number
+          reason?: string | null
+          reference_id?: string | null
+          reference_type?: string | null
+          unit_cost?: number | null
+          variant_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "shop_inventory_movements_club_id_fkey"
+            columns: ["club_id"]
+            isOneToOne: false
+            referencedRelation: "clubs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "shop_inventory_movements_club_id_fkey"
+            columns: ["club_id"]
+            isOneToOne: false
+            referencedRelation: "commercial_entitlements_usage"
+            referencedColumns: ["club_id"]
+          },
+          {
+            foreignKeyName: "shop_inventory_movements_location_id_fkey"
+            columns: ["location_id"]
+            isOneToOne: false
+            referencedRelation: "shop_inventory_locations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "shop_inventory_movements_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "shop_products"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "shop_inventory_movements_variant_id_fkey"
+            columns: ["variant_id"]
+            isOneToOne: false
+            referencedRelation: "shop_product_variants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      shop_product_variants: {
+        Row: {
+          barcode: string | null
+          club_id: string
+          color: string | null
+          created_at: string
+          id: string
+          price_override: number | null
+          product_id: string
+          size: string | null
+          sku: string | null
+          status: string
+        }
+        Insert: {
+          barcode?: string | null
+          club_id: string
+          color?: string | null
+          created_at?: string
+          id?: string
+          price_override?: number | null
+          product_id: string
+          size?: string | null
+          sku?: string | null
+          status?: string
+        }
+        Update: {
+          barcode?: string | null
+          club_id?: string
+          color?: string | null
+          created_at?: string
+          id?: string
+          price_override?: number | null
+          product_id?: string
+          size?: string | null
+          sku?: string | null
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "shop_product_variants_club_id_fkey"
+            columns: ["club_id"]
+            isOneToOne: false
+            referencedRelation: "clubs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "shop_product_variants_club_id_fkey"
+            columns: ["club_id"]
+            isOneToOne: false
+            referencedRelation: "commercial_entitlements_usage"
+            referencedColumns: ["club_id"]
+          },
+          {
+            foreignKeyName: "shop_product_variants_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "shop_products"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      shop_products: {
+        Row: {
+          barcode: string | null
+          base_price: number
+          category_id: string | null
+          club_id: string
+          created_at: string
+          created_by: string | null
+          description: string | null
+          has_variants: boolean
+          id: string
+          image_url: string | null
+          name_ar: string
+          name_en: string | null
+          reorder_level: number | null
+          sku: string | null
+          status: string
+          updated_at: string | null
+        }
+        Insert: {
+          barcode?: string | null
+          base_price: number
+          category_id?: string | null
+          club_id: string
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          has_variants?: boolean
+          id?: string
+          image_url?: string | null
+          name_ar: string
+          name_en?: string | null
+          reorder_level?: number | null
+          sku?: string | null
+          status?: string
+          updated_at?: string | null
+        }
+        Update: {
+          barcode?: string | null
+          base_price?: number
+          category_id?: string | null
+          club_id?: string
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          has_variants?: boolean
+          id?: string
+          image_url?: string | null
+          name_ar?: string
+          name_en?: string | null
+          reorder_level?: number | null
+          sku?: string | null
+          status?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "shop_products_category_id_fkey"
+            columns: ["category_id"]
+            isOneToOne: false
+            referencedRelation: "shop_categories"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "shop_products_club_id_fkey"
+            columns: ["club_id"]
+            isOneToOne: false
+            referencedRelation: "clubs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "shop_products_club_id_fkey"
+            columns: ["club_id"]
+            isOneToOne: false
+            referencedRelation: "commercial_entitlements_usage"
+            referencedColumns: ["club_id"]
+          },
+        ]
+      }
+      shop_sale_items: {
+        Row: {
+          id: string
+          invoice_item_id: string | null
+          line_total: number
+          product_id: string
+          quantity: number
+          returned_quantity: number
+          sale_id: string
+          unit_price: number
+          variant_id: string | null
+        }
+        Insert: {
+          id?: string
+          invoice_item_id?: string | null
+          line_total: number
+          product_id: string
+          quantity: number
+          returned_quantity?: number
+          sale_id: string
+          unit_price: number
+          variant_id?: string | null
+        }
+        Update: {
+          id?: string
+          invoice_item_id?: string | null
+          line_total?: number
+          product_id?: string
+          quantity?: number
+          returned_quantity?: number
+          sale_id?: string
+          unit_price?: number
+          variant_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "shop_sale_items_invoice_item_id_fkey"
+            columns: ["invoice_item_id"]
+            isOneToOne: false
+            referencedRelation: "invoice_items"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "shop_sale_items_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "shop_products"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "shop_sale_items_sale_id_fkey"
+            columns: ["sale_id"]
+            isOneToOne: false
+            referencedRelation: "shop_sales"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "shop_sale_items_variant_id_fkey"
+            columns: ["variant_id"]
+            isOneToOne: false
+            referencedRelation: "shop_product_variants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      shop_sale_return_items: {
+        Row: {
+          id: string
+          quantity: number
+          return_id: string
+          sale_item_id: string
+        }
+        Insert: {
+          id?: string
+          quantity: number
+          return_id: string
+          sale_item_id: string
+        }
+        Update: {
+          id?: string
+          quantity?: number
+          return_id?: string
+          sale_item_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "shop_sale_return_items_return_id_fkey"
+            columns: ["return_id"]
+            isOneToOne: false
+            referencedRelation: "shop_sale_returns"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "shop_sale_return_items_sale_item_id_fkey"
+            columns: ["sale_item_id"]
+            isOneToOne: false
+            referencedRelation: "shop_sale_items"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      shop_sale_returns: {
+        Row: {
+          club_id: string
+          created_at: string
+          id: string
+          processed_by: string | null
+          reason: string
+          refund_payment_id: string | null
+          restock: boolean
+          sale_id: string
+        }
+        Insert: {
+          club_id: string
+          created_at?: string
+          id?: string
+          processed_by?: string | null
+          reason: string
+          refund_payment_id?: string | null
+          restock?: boolean
+          sale_id: string
+        }
+        Update: {
+          club_id?: string
+          created_at?: string
+          id?: string
+          processed_by?: string | null
+          reason?: string
+          refund_payment_id?: string | null
+          restock?: boolean
+          sale_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "shop_sale_returns_club_id_fkey"
+            columns: ["club_id"]
+            isOneToOne: false
+            referencedRelation: "clubs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "shop_sale_returns_club_id_fkey"
+            columns: ["club_id"]
+            isOneToOne: false
+            referencedRelation: "commercial_entitlements_usage"
+            referencedColumns: ["club_id"]
+          },
+          {
+            foreignKeyName: "shop_sale_returns_refund_payment_id_fkey"
+            columns: ["refund_payment_id"]
+            isOneToOne: false
+            referencedRelation: "refunds"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "shop_sale_returns_sale_id_fkey"
+            columns: ["sale_id"]
+            isOneToOne: false
+            referencedRelation: "shop_sales"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      shop_sales: {
+        Row: {
+          club_id: string
+          created_at: string
+          customer_id: string | null
+          id: string
+          invoice_id: string | null
+          location_id: string
+          sold_by: string | null
+          status: string
+        }
+        Insert: {
+          club_id: string
+          created_at?: string
+          customer_id?: string | null
+          id?: string
+          invoice_id?: string | null
+          location_id: string
+          sold_by?: string | null
+          status?: string
+        }
+        Update: {
+          club_id?: string
+          created_at?: string
+          customer_id?: string | null
+          id?: string
+          invoice_id?: string | null
+          location_id?: string
+          sold_by?: string | null
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "shop_sales_club_id_fkey"
+            columns: ["club_id"]
+            isOneToOne: false
+            referencedRelation: "clubs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "shop_sales_club_id_fkey"
+            columns: ["club_id"]
+            isOneToOne: false
+            referencedRelation: "commercial_entitlements_usage"
+            referencedColumns: ["club_id"]
+          },
+          {
+            foreignKeyName: "shop_sales_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "customers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "shop_sales_invoice_id_fkey"
+            columns: ["invoice_id"]
+            isOneToOne: false
+            referencedRelation: "invoices"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "shop_sales_invoice_id_fkey"
+            columns: ["invoice_id"]
+            isOneToOne: false
+            referencedRelation: "outstanding_invoices"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "shop_sales_location_id_fkey"
+            columns: ["location_id"]
+            isOneToOne: false
+            referencedRelation: "shop_inventory_locations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      shop_suppliers: {
+        Row: {
+          club_id: string
+          created_at: string
+          created_by: string | null
+          email: string | null
+          id: string
+          is_active: boolean
+          name: string
+          notes: string | null
+          phone: string | null
+        }
+        Insert: {
+          club_id: string
+          created_at?: string
+          created_by?: string | null
+          email?: string | null
+          id?: string
+          is_active?: boolean
+          name: string
+          notes?: string | null
+          phone?: string | null
+        }
+        Update: {
+          club_id?: string
+          created_at?: string
+          created_by?: string | null
+          email?: string | null
+          id?: string
+          is_active?: boolean
+          name?: string
+          notes?: string | null
+          phone?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "shop_suppliers_club_id_fkey"
+            columns: ["club_id"]
+            isOneToOne: false
+            referencedRelation: "clubs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "shop_suppliers_club_id_fkey"
+            columns: ["club_id"]
+            isOneToOne: false
+            referencedRelation: "commercial_entitlements_usage"
+            referencedColumns: ["club_id"]
+          },
+        ]
+      }
       subscription_freezes: {
         Row: {
           club_id: string
@@ -5622,6 +6347,22 @@ export type Database = {
         Args: { p_explicit?: boolean; p_subscription_id: string }
         Returns: boolean
       }
+      _apply_shop_inventory_movement_internal: {
+        Args: {
+          p_actor_id: string
+          p_direction: string
+          p_location_id: string
+          p_movement_type: string
+          p_product_id: string
+          p_quantity: number
+          p_reason?: string
+          p_reference_id?: string
+          p_reference_type?: string
+          p_unit_cost?: number
+          p_variant_id: string
+        }
+        Returns: string
+      }
       _create_booking_internal: {
         Args: {
           p_booking_series_id: string
@@ -5686,6 +6427,7 @@ export type Database = {
         Args: { p_club_id: string }
         Returns: string
       }
+      _shop_module_active: { Args: { p_club_id: string }; Returns: boolean }
       activate_subscription_if_due: {
         Args: { p_subscription_id: string }
         Returns: boolean
@@ -5693,6 +6435,17 @@ export type Database = {
       adjust_employee_cash_liability: {
         Args: { p_amount: number; p_liability_id: string; p_reason: string }
         Returns: Json
+      }
+      adjust_shop_stock: {
+        Args: {
+          p_location_id: string
+          p_movement_type: string
+          p_product_id: string
+          p_quantity: number
+          p_reason: string
+          p_variant_id: string
+        }
+        Returns: string
       }
       approve_payment_proof: {
         Args: { p_payment_method?: string; p_proof_id: string }
@@ -6073,6 +6826,49 @@ export type Database = {
         Args: { p_amount: number; p_payment_id: string; p_reason: string }
         Returns: string
       }
+      create_shop_category: {
+        Args: { p_club_id: string; p_name_ar: string; p_name_en?: string }
+        Returns: string
+      }
+      create_shop_product: {
+        Args: {
+          p_barcode?: string
+          p_base_price: number
+          p_category_id: string
+          p_club_id: string
+          p_description: string
+          p_has_variants: boolean
+          p_image_url?: string
+          p_name_ar: string
+          p_name_en: string
+          p_reorder_level?: number
+          p_sku?: string
+        }
+        Returns: string
+      }
+      create_shop_product_variant: {
+        Args: {
+          p_barcode?: string
+          p_color: string
+          p_price_override?: number
+          p_product_id: string
+          p_size: string
+          p_sku?: string
+        }
+        Returns: string
+      }
+      create_shop_sale: {
+        Args: {
+          p_club_id: string
+          p_customer_id: string
+          p_idempotency_key?: string
+          p_items: Json
+          p_location_id: string
+          p_payment_method: string
+          p_payment_reference?: string
+        }
+        Returns: string
+      }
       deactivate_platform_staff: {
         Args: { p_membership_id: string }
         Returns: undefined
@@ -6248,6 +7044,15 @@ export type Database = {
       get_club_membership_report: {
         Args: { p_club_id: string; p_end_date: string; p_start_date: string }
         Returns: Json
+      }
+      get_club_modules: {
+        Args: { p_club_id: string }
+        Returns: {
+          active: boolean
+          entitled: boolean
+          module_key: string
+          updated_at: string
+        }[]
       }
       get_club_platform_access: { Args: { p_club_id: string }; Returns: string }
       get_club_role_permissions: {
@@ -6808,6 +7613,35 @@ export type Database = {
         }
         Returns: Json
       }
+      get_shop_inventory_balances: {
+        Args: {
+          p_club_id: string
+          p_location_id?: string
+          p_low_stock_only?: boolean
+        }
+        Returns: {
+          location_id: string
+          location_name: string
+          on_hand: number
+          product_id: string
+          product_name_ar: string
+          reorder_level: number
+          variant_id: string
+          variant_label: string
+        }[]
+      }
+      get_shop_sale_detail: {
+        Args: { p_sale_id: string }
+        Returns: {
+          item_id: string
+          line_total: number
+          product_name_ar: string
+          quantity: number
+          returned_quantity: number
+          unit_price: number
+          variant_label: string
+        }[]
+      }
       get_staff_360_summary: {
         Args: { p_club_id: string; p_membership_id: string }
         Returns: Json
@@ -7029,6 +7863,101 @@ export type Database = {
           last_accessed_at: string
         }[]
       }
+      list_shop_categories: {
+        Args: { p_club_id: string }
+        Returns: {
+          category_id: string
+          name_ar: string
+          name_en: string
+          status: string
+        }[]
+      }
+      list_shop_inventory_locations: {
+        Args: { p_club_id: string }
+        Returns: {
+          branch_id: string
+          kind: string
+          location_id: string
+          name: string
+          status: string
+        }[]
+      }
+      list_shop_inventory_movements: {
+        Args: {
+          p_club_id: string
+          p_limit?: number
+          p_location_id?: string
+          p_offset?: number
+          p_product_id?: string
+        }
+        Returns: {
+          actor_id: string
+          created_at: string
+          location_name: string
+          movement_id: string
+          movement_type: string
+          product_name_ar: string
+          quantity: number
+          reason: string
+          reference_id: string
+          reference_type: string
+          unit_cost: number
+          variant_label: string
+        }[]
+      }
+      list_shop_product_variants: {
+        Args: { p_product_id: string }
+        Returns: {
+          barcode: string
+          color: string
+          price_override: number
+          size: string
+          sku: string
+          status: string
+          variant_id: string
+        }[]
+      }
+      list_shop_products: {
+        Args: {
+          p_category_id?: string
+          p_club_id: string
+          p_search?: string
+          p_status?: string
+        }
+        Returns: {
+          barcode: string
+          base_price: number
+          category_id: string
+          category_name_ar: string
+          created_at: string
+          description: string
+          has_variants: boolean
+          image_url: string
+          name_ar: string
+          name_en: string
+          product_id: string
+          reorder_level: number
+          sku: string
+          status: string
+        }[]
+      }
+      list_shop_sales: {
+        Args: {
+          p_club_id: string
+          p_limit?: number
+          p_offset?: number
+          p_status?: string
+        }
+        Returns: {
+          created_at: string
+          customer_name: string
+          invoice_number: string
+          sale_id: string
+          sold_by_name: string
+          status: string
+          total: number
+        }[]
+      }
       log_own_password_changed: { Args: never; Returns: undefined }
       log_password_reset_event: {
         Args: { p_kind: string; p_target_user_id?: string }
@@ -7238,6 +8167,18 @@ export type Database = {
         Args: { p_membership_id: string }
         Returns: undefined
       }
+      receive_shop_stock: {
+        Args: {
+          p_location_id: string
+          p_notes?: string
+          p_product_id: string
+          p_quantity: number
+          p_supplier_id?: string
+          p_unit_cost?: number
+          p_variant_id: string
+        }
+        Returns: string
+      }
       record_payment: {
         Args: {
           p_amount: number
@@ -7420,6 +8361,16 @@ export type Database = {
         Args: { p_queue_id: string }
         Returns: undefined
       }
+      return_shop_sale: {
+        Args: {
+          p_lines: Json
+          p_reason?: string
+          p_refund_amount?: number
+          p_restock: boolean
+          p_sale_id: string
+        }
+        Returns: string
+      }
       reverse_employee_cash_liability: {
         Args: { p_liability_id: string; p_reason: string }
         Returns: Json
@@ -7496,6 +8447,14 @@ export type Database = {
         }
         Returns: undefined
       }
+      set_club_module_active: {
+        Args: { p_active: boolean; p_club_id: string; p_module_key: string }
+        Returns: undefined
+      }
+      set_club_module_entitlement: {
+        Args: { p_club_id: string; p_entitled: boolean; p_module_key: string }
+        Returns: undefined
+      }
       set_club_public_booking_enabled: {
         Args: { p_club_id: string; p_enabled: boolean }
         Returns: undefined
@@ -7566,6 +8525,17 @@ export type Database = {
       start_whatsapp_pairing: {
         Args: { p_club_id: string }
         Returns: undefined
+      }
+      transfer_shop_stock: {
+        Args: {
+          p_dest_location_id: string
+          p_notes?: string
+          p_product_id: string
+          p_quantity: number
+          p_source_location_id: string
+          p_variant_id: string
+        }
+        Returns: string
       }
       unfreeze_subscription: {
         Args: { p_reason?: string; p_subscription_id: string }
@@ -7764,6 +8734,22 @@ export type Database = {
           p_medical_notes?: string
           p_player_id: string
           p_status?: string
+        }
+        Returns: undefined
+      }
+      update_shop_product: {
+        Args: {
+          p_barcode: string
+          p_base_price: number
+          p_category_id: string
+          p_description: string
+          p_image_url: string
+          p_name_ar: string
+          p_name_en: string
+          p_product_id: string
+          p_reorder_level: number
+          p_sku: string
+          p_status: string
         }
         Returns: undefined
       }
