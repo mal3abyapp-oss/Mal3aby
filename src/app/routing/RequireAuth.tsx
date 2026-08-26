@@ -51,7 +51,7 @@ export function RequireAuth() {
 // boundary, proven separately in dual-identity-email-isolation.
 // integration.test.ts).
 export function RequireNavDomain({ domain, children }: { domain: NavDomain; children: ReactNode }) {
-  const { loading, currentMembership, memberships, signOut } = useAuth()
+  const { loading, currentMembership, memberships, signOut, supportSession } = useAuth()
   const { t } = useTranslation()
 
   if (loading) return null
@@ -61,7 +61,17 @@ export function RequireNavDomain({ domain, children }: { domain: NavDomain; chil
   // route into. Render an explicit terminal state instead of computing
   // a redirect target that can point back at the very route currently
   // rendering it.
-  if (memberships.length === 0) {
+  //
+  // MASTER ADMIN / PLATFORM SUPPORT CONTEXT: a platform_owner (or, once
+  // Platform Staff exists, any platform employee) can legitimately have
+  // ZERO real club_memberships rows of their own -- that is the clean,
+  // correct shape for a pure platform-side account, not an error state.
+  // `memberships` here is only ever the platform_owner's OWN real
+  // club_memberships rows (AuthProvider never mixes support-session
+  // state into it) -- an active supportSession must bypass this
+  // "no club access" terminal state entirely, since currentMembership is
+  // already correctly synthesized for the supported club in that case.
+  if (memberships.length === 0 && !supportSession) {
     return (
       <div className="flex min-h-screen flex-col items-center justify-center gap-4 p-6 text-center">
         <p className="max-w-sm text-text-secondary">{t('routing.noClubAccess')}</p>

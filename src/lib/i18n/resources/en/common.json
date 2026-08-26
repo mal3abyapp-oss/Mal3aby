@@ -678,6 +678,29 @@
     "noClubAccess": "This account has no club staff access. If you're a customer, use the customer portal instead. If you believe this is a mistake, contact your club owner.",
     "signOut": "Sign out"
   },
+  "masterAdmin": {
+    "banner": {
+      "title": "MASTER ADMIN MODE",
+      "managing": "You are managing: {{club}}",
+      "modeView": "View only",
+      "modeManage": "Full management",
+      "exit": "Exit Admin Mode",
+      "exiting": "Exiting..."
+    },
+    "openDialog": {
+      "title": "Open \"{{club}}\" as Master Admin",
+      "modeLabel": "Access mode",
+      "modeView": "View only — inspect without changing anything",
+      "modeManage": "Full management — make changes on behalf of this club",
+      "reasonLabel": "Support reason (optional)",
+      "reasonPlaceholder": "e.g. Fix role permissions, resolve a booking issue...",
+      "cancel": "Cancel",
+      "open": "Open club",
+      "opening": "Opening...",
+      "error": "Couldn't open this club. Please try again."
+    },
+    "openAction": "Open as Master Admin"
+  },
   "common": {
     "save": "Save",
     "cancel": "Cancel",

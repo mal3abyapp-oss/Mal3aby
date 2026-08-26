@@ -1,8 +1,9 @@
 import { useMemo, useState } from 'react'
-import { useQuery } from '@tanstack/react-query'
-import { Link, useSearchParams } from 'react-router-dom'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { useDirection } from '@/app/providers/DirectionProvider'
+import { useAuth } from '@/app/providers/AuthProvider'
 import { supabase } from '@/lib/supabase/client'
 import { PageHeader } from '@/components/ui/page-header'
 import { DataTable, type DataTableColumn } from '@/components/ui/data-table'
@@ -16,6 +17,12 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog'
 import { CLUB_STATUS_LABELS, ACCESS_TONE, ACCESS_LABEL } from '@/features/platform/labels'
 import { ErrorState } from '@/components/ui/error-state'
 import { translateSupabaseError } from '@/lib/errors'
@@ -117,6 +124,11 @@ export function PlatformClubsPage() {
   const [pages, setPages] = useState(1)
   const [searchParams, setSearchParams] = useSearchParams()
   const [search, setSearch] = useState('')
+  // MASTER ADMIN / PLATFORM SUPPORT CONTEXT: which club the "Open as
+  // Master Admin" confirmation dialog is currently open for -- null when
+  // closed. Kept as the row itself (not just an id) so the dialog can
+  // show the club's real name without a second lookup.
+  const [openingClub, setOpeningClub] = useState<ClubRow | null>(null)
 
   const statusFilter = (searchParams.get('status') as StatusFilter) || 'all'
   const accessFilter = (searchParams.get('access') as AccessFilter) || 'all'
@@ -217,6 +229,19 @@ export function PlatformClubsPage() {
         />
       ),
     },
+    {
+      // MASTER ADMIN / PLATFORM SUPPORT CONTEXT (2026-08-26) -- directive
+      // Section 18/4: the platform Clubs table needs a real "Open as
+      // Master Admin" action per row, not just a link into the read-only
+      // Club Detail console.
+      key: 'masterAdminActions',
+      header: '',
+      render: (c) => (
+        <Button variant="outline" size="sm" onClick={() => setOpeningClub(c)}>
+          {t('masterAdmin.openAction')}
+        </Button>
+      ),
+    },
   ]
 
   const hasActiveFilters = statusFilter !== 'all' || accessFilter !== 'all' || reasonFilter !== 'all' || createdFilter !== 'all' || flaggedOnly
@@ -309,6 +334,74 @@ export function PlatformClubsPage() {
           </Button>
         </div>
       )}
+
+      {openingClub && (
+        <OpenAsMasterAdminDialog club={openingClub} onClose={() => setOpeningClub(null)} />
+      )}
     </div>
+  )
+}
+
+// MASTER ADMIN / PLATFORM SUPPORT CONTEXT -- explicit mode selection
+// (View / Manage, default View per directive Section 5) and an optional
+// support reason, requested only ONCE here at session start (directive
+// Section 14: never re-prompt on every subsequent click once the session
+// is active). On confirm, calls the real start_platform_support_session
+// RPC via AuthProvider's startSupportSession(), then navigates into the
+// normal /app shell -- which will now resolve currentClubId to this
+// club because of AuthProvider's own support-session override, and show
+// the persistent MasterAdminBanner on every page from here on.
+function OpenAsMasterAdminDialog({ club, onClose }: { club: ClubRow; onClose: () => void }) {
+  const { t } = useTranslation()
+  const navigate = useNavigate()
+  const queryClient = useQueryClient()
+  const { startSupportSession } = useAuth()
+  const [mode, setMode] = useState<'view' | 'manage'>('view')
+  const [reason, setReason] = useState('')
+
+  const openMutation = useMutation({
+    mutationFn: () => startSupportSession(club.id, mode, reason.trim() || undefined),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ['app-subscription-summary'] })
+      navigate('/app', { replace: true })
+    },
+  })
+
+  return (
+    <Dialog open onOpenChange={(open) => { if (!open) onClose() }}>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>{t('masterAdmin.openDialog.title', { club: club.name_ar })}</DialogTitle>
+        </DialogHeader>
+        <div className="flex flex-col gap-4">
+          <div className="flex flex-col gap-1.5">
+            <label className="text-sm font-medium text-text-secondary">{t('masterAdmin.openDialog.modeLabel')}</label>
+            <div className="flex flex-col gap-2">
+              <label className="flex items-start gap-2 rounded-md border border-border p-2.5 text-sm has-[:checked]:border-accent-foreground has-[:checked]:bg-accent/5">
+                <input type="radio" name="support-mode" className="mt-0.5" checked={mode === 'view'} onChange={() => setMode('view')} />
+                {t('masterAdmin.openDialog.modeView')}
+              </label>
+              <label className="flex items-start gap-2 rounded-md border border-border p-2.5 text-sm has-[:checked]:border-accent-foreground has-[:checked]:bg-accent/5">
+                <input type="radio" name="support-mode" className="mt-0.5" checked={mode === 'manage'} onChange={() => setMode('manage')} />
+                {t('masterAdmin.openDialog.modeManage')}
+              </label>
+            </div>
+          </div>
+          <div className="flex flex-col gap-1.5">
+            <label className="text-sm font-medium text-text-secondary">{t('masterAdmin.openDialog.reasonLabel')}</label>
+            <Input value={reason} onChange={(e) => setReason(e.target.value)} placeholder={t('masterAdmin.openDialog.reasonPlaceholder')} />
+          </div>
+          {openMutation.isError && (
+            <p role="alert" className="text-sm text-status-danger">{t('masterAdmin.openDialog.error')}</p>
+          )}
+          <div className="flex justify-end gap-2">
+            <Button variant="outline" onClick={onClose}>{t('masterAdmin.openDialog.cancel')}</Button>
+            <Button disabled={openMutation.isPending} onClick={() => openMutation.mutate()}>
+              {openMutation.isPending ? t('masterAdmin.openDialog.opening') : t('masterAdmin.openDialog.open')}
+            </Button>
+          </div>
+        </div>
+      </DialogContent>
+    </Dialog>
   )
 }

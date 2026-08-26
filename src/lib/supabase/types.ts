@@ -130,6 +130,7 @@ export type Database = {
       }
       audit_logs: {
         Row: {
+          acting_as_platform_admin: boolean
           action: string
           actor_id: string | null
           after: Json | null
@@ -141,8 +142,10 @@ export type Database = {
           entity_type: string
           id: string
           reason: string | null
+          support_session_id: string | null
         }
         Insert: {
+          acting_as_platform_admin?: boolean
           action: string
           actor_id?: string | null
           after?: Json | null
@@ -154,8 +157,10 @@ export type Database = {
           entity_type: string
           id?: string
           reason?: string | null
+          support_session_id?: string | null
         }
         Update: {
+          acting_as_platform_admin?: boolean
           action?: string
           actor_id?: string | null
           after?: Json | null
@@ -167,6 +172,7 @@ export type Database = {
           entity_type?: string
           id?: string
           reason?: string | null
+          support_session_id?: string | null
         }
         Relationships: [
           {
@@ -189,6 +195,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "commercial_entitlements_usage"
             referencedColumns: ["club_id"]
+          },
+          {
+            foreignKeyName: "audit_logs_support_session_id_fkey"
+            columns: ["support_session_id"]
+            isOneToOne: false
+            referencedRelation: "platform_support_sessions"
+            referencedColumns: ["id"]
           },
         ]
       }
@@ -3961,6 +3974,57 @@ export type Database = {
           },
         ]
       }
+      platform_support_sessions: {
+        Row: {
+          club_id: string
+          created_at: string
+          ended_at: string | null
+          expires_at: string
+          id: string
+          mode: string
+          platform_owner_id: string
+          reason: string | null
+          started_at: string
+        }
+        Insert: {
+          club_id: string
+          created_at?: string
+          ended_at?: string | null
+          expires_at?: string
+          id?: string
+          mode: string
+          platform_owner_id: string
+          reason?: string | null
+          started_at?: string
+        }
+        Update: {
+          club_id?: string
+          created_at?: string
+          ended_at?: string | null
+          expires_at?: string
+          id?: string
+          mode?: string
+          platform_owner_id?: string
+          reason?: string | null
+          started_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "platform_support_sessions_club_id_fkey"
+            columns: ["club_id"]
+            isOneToOne: false
+            referencedRelation: "clubs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "platform_support_sessions_club_id_fkey"
+            columns: ["club_id"]
+            isOneToOne: false
+            referencedRelation: "commercial_entitlements_usage"
+            referencedColumns: ["club_id"]
+          },
+        ]
+      }
       players: {
         Row: {
           club_id: string
@@ -5769,6 +5833,7 @@ export type Database = {
         }
         Returns: string
       }
+      end_platform_support_session: { Args: never; Returns: undefined }
       enqueue_notification: {
         Args: {
           p_channel: string
@@ -6062,6 +6127,18 @@ export type Database = {
           payment_status: string
           refunded: number
           total: number
+        }[]
+      }
+      get_my_active_support_session: {
+        Args: never
+        Returns: {
+          club_id: string
+          club_name_ar: string
+          expires_at: string
+          id: string
+          mode: string
+          reason: string
+          started_at: string
         }[]
       }
       get_my_portal_academy: {
@@ -6534,6 +6611,10 @@ export type Database = {
       }
       has_permission: {
         Args: { p_club_id: string; p_key: string }
+        Returns: boolean
+      }
+      has_platform_support_access: {
+        Args: { p_club_id: string; p_require_manage?: boolean }
         Returns: boolean
       }
       invite_staff_member: {
@@ -7084,6 +7165,10 @@ export type Database = {
         Args: { p_amount: number; p_gateway: string; p_invoice_id: string }
         Returns: string
       }
+      start_platform_support_session: {
+        Args: { p_club_id: string; p_mode: string; p_reason?: string }
+        Returns: string
+      }
       start_whatsapp_pairing: {
         Args: { p_club_id: string }
         Returns: undefined
@@ -7497,6 +7582,18 @@ export type Database = {
         Returns: undefined
       }
       write_audit_log: {
+        Args: {
+          p_action: string
+          p_after: Json
+          p_before: Json
+          p_club_id: string
+          p_entity_id: string
+          p_entity_type: string
+          p_reason: string
+        }
+        Returns: undefined
+      }
+      write_audit_log_as_support: {
         Args: {
           p_action: string
           p_after: Json

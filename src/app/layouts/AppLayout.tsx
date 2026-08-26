@@ -1,5 +1,5 @@
-import { Suspense } from 'react'
-import { NavLink, Outlet } from 'react-router-dom'
+import { Suspense, useEffect } from 'react'
+import { NavLink, Outlet, useLocation } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
 import { cn } from '@/lib/utils'
@@ -9,6 +9,7 @@ import { supabase } from '@/lib/supabase/client'
 import { GlobalSearch } from '@/features/search/GlobalSearch'
 import { QuickActionsPalette } from '@/features/dashboard/QuickActionsPalette'
 import { LanguageSwitcher } from '@/components/ui/language-switcher'
+import { MasterAdminBanner } from '@/components/ui/master-admin-banner'
 import { canSeeNavDomain, type NavDomain } from '@/lib/domain/navigation'
 import { usePendingPaymentsCount } from '@/features/billing/usePendingPaymentsCount'
 import {
@@ -126,8 +127,20 @@ async function fetchSubscriptionSummary(clubId: string) {
 
 export function AppLayout() {
   const { t, i18n } = useTranslation()
-  const { memberships, currentMembership, currentClubId, setCurrentClubId, signOut } = useAuth()
+  const { memberships, currentMembership, currentClubId, setCurrentClubId, signOut, supportSession, refreshSupportSession } = useAuth()
   const isEnglish = i18n.language === 'en'
+  const location = useLocation()
+
+  // MASTER ADMIN / PLATFORM SUPPORT CONTEXT: re-verify against the
+  // server on every route change while support mode is active, so a
+  // session that expired (or was ended in another tab) mid-use never
+  // leaves a stale "you have access" banner/state -- directive Section
+  // 15's "never trust localStorage alone" applies continuously, not just
+  // at mount.
+  useEffect(() => {
+    if (supportSession) void refreshSupportSession()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [location.pathname])
   const { data: subSummary } = useQuery({
     queryKey: ['app-subscription-summary', currentClubId],
     queryFn: () => fetchSubscriptionSummary(currentClubId!),
@@ -153,7 +166,16 @@ export function AppLayout() {
   const visibleMobileNavItems = mobileNavItems.filter((item) => canSeeNavDomain(currentMembership?.permissionKeys, item.domain))
 
   return (
-    <div className="flex min-h-screen bg-page-bg">
+    <div className="flex min-h-screen flex-col bg-page-bg">
+      {/* MASTER ADMIN / PLATFORM SUPPORT CONTEXT: full-width, above
+          everything else -- directive Section 4/19 requires this banner
+          to be persistent across every /app page and never mistakable
+          for a normal club session. Placed above the sidebar+content
+          row (not inside `main`) so it can never scroll out of view
+          alongside page content and never competes with the sidebar's
+          own fixed width. */}
+      <MasterAdminBanner />
+      <div className="flex min-h-0 flex-1">
       {/* Desktop sidebar */}
       <aside className="hidden w-60 shrink-0 border-e border-border bg-dark-base text-white md:flex md:flex-col">
         <div className="px-4 py-5 text-lg font-bold">ملعبي | Mal3aby</div>
@@ -306,6 +328,7 @@ export function AppLayout() {
             </NavLink>
           ))}
         </nav>
+      </div>
       </div>
     </div>
   )
