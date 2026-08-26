@@ -5384,6 +5384,7 @@ export type Database = {
           club_id: string
           created_at: string
           id: string
+          idempotency_key: string | null
           processed_by: string | null
           reason: string
           refund_payment_id: string | null
@@ -5394,6 +5395,7 @@ export type Database = {
           club_id: string
           created_at?: string
           id?: string
+          idempotency_key?: string | null
           processed_by?: string | null
           reason: string
           refund_payment_id?: string | null
@@ -5404,6 +5406,7 @@ export type Database = {
           club_id?: string
           created_at?: string
           id?: string
+          idempotency_key?: string | null
           processed_by?: string | null
           reason?: string
           refund_payment_id?: string | null
@@ -7630,6 +7633,15 @@ export type Database = {
           variant_label: string
         }[]
       }
+      get_shop_inventory_summary: {
+        Args: { p_club_id: string }
+        Returns: {
+          active_products: number
+          low_stock_count: number
+          out_of_stock_count: number
+          total_on_hand: number
+        }[]
+      }
       get_shop_sale_detail: {
         Args: { p_sale_id: string }
         Returns: {
@@ -7640,6 +7652,21 @@ export type Database = {
           returned_quantity: number
           unit_price: number
           variant_label: string
+        }[]
+      }
+      get_shop_top_products: {
+        Args: {
+          p_club_id: string
+          p_end_date?: string
+          p_limit?: number
+          p_start_date?: string
+        }
+        Returns: {
+          product_id: string
+          product_name_ar: string
+          revenue: number
+          units_returned: number
+          units_sold: number
         }[]
       }
       get_staff_360_summary: {
@@ -8361,16 +8388,28 @@ export type Database = {
         Args: { p_queue_id: string }
         Returns: undefined
       }
-      return_shop_sale: {
-        Args: {
-          p_lines: Json
-          p_reason?: string
-          p_refund_amount?: number
-          p_restock: boolean
-          p_sale_id: string
-        }
-        Returns: string
-      }
+      return_shop_sale:
+        | {
+            Args: {
+              p_lines: Json
+              p_reason?: string
+              p_refund_amount?: number
+              p_restock: boolean
+              p_sale_id: string
+            }
+            Returns: string
+          }
+        | {
+            Args: {
+              p_idempotency_key?: string
+              p_lines: Json
+              p_reason?: string
+              p_refund_amount?: number
+              p_restock: boolean
+              p_sale_id: string
+            }
+            Returns: string
+          }
       reverse_employee_cash_liability: {
         Args: { p_liability_id: string; p_reason: string }
         Returns: Json

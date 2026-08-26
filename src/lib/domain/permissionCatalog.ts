@@ -19,6 +19,8 @@ export type PermissionGroupKey =
   | 'customers'
   | 'academy'
   | 'memberships'
+  | 'shop'
+  | 'inventory'
   | 'finance'
   | 'cash'
   | 'reports'
@@ -114,6 +116,32 @@ export const PERMISSION_GROUPS: PermissionGroup[] = [
       { key: 'club_membership.freeze', requires: ['club_membership.view'] },
       { key: 'club_membership.cancel', sensitive: true, requires: ['club_membership.view'] },
       { key: 'club_membership.verify' },
+    ],
+  },
+  {
+    // COMMERCIAL MODULE ARCHITECTURE (2026-08-26) -- Shop and Inventory
+    // are two distinct groups (directive Section 6's own instruction:
+    // "Group clearly: Store / Shop, Inventory") even though both live
+    // under the same /app/shop module -- selling and stock-keeping are
+    // different jobs with different defaults (a receptionist sells but
+    // never adjusts stock, confirmed by the seeded default matrix).
+    key: 'shop',
+    permissions: [
+      { key: 'shop.view' },
+      { key: 'shop.product.manage', requires: ['shop.view'] },
+      { key: 'shop.sale.create', requires: ['shop.view'] },
+      { key: 'shop.sale.refund', sensitive: true, requires: ['shop.view'] },
+    ],
+  },
+  {
+    key: 'inventory',
+    permissions: [
+      { key: 'inventory.view' },
+      { key: 'inventory.receive', requires: ['inventory.view'] },
+      { key: 'inventory.adjust', sensitive: true, requires: ['inventory.view'] },
+      { key: 'inventory.transfer', requires: ['inventory.view'] },
+      { key: 'inventory.count', requires: ['inventory.view'] },
+      { key: 'inventory.cost.view', sensitive: true, requires: ['inventory.view'] },
     ],
   },
   {

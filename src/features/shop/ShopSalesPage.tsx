@@ -125,6 +125,9 @@ function ReturnDialog({ sale, onClose }: { sale: SaleRow; onClose: () => void })
         p_restock: restock,
         p_refund_amount: refundAmount ? Number(refundAmount) : undefined,
         p_reason: reason,
+        // Real double-click/network-retry protection (directive
+        // Section 16) -- a fresh key per genuine submit attempt.
+        p_idempotency_key: crypto.randomUUID(),
       })
       if (err) throw err
     },

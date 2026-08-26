@@ -4,7 +4,7 @@ import { PublicLayout } from '@/app/layouts/PublicLayout'
 import { AppLayout } from '@/app/layouts/AppLayout'
 import { PlatformLayout } from '@/app/layouts/PlatformLayout'
 import { PortalLayout } from '@/app/layouts/PortalLayout'
-import { RequireAuth, RequireNavDomain, RequirePlatformOwner, RequirePortalAuth, RequirePortalCustomer } from '@/app/routing/RequireAuth'
+import { RequireAuth, RequireNavDomain, RequirePlatformOwner, RequirePortalAuth, RequirePortalCustomer, RequireShopModule } from '@/app/routing/RequireAuth'
 import { RedirectWithSearch } from '@/app/routing/RedirectWithSearch'
 import { RouteLoadingFallback } from '@/app/routing/RouteLoadingFallback'
 
@@ -43,6 +43,7 @@ const ShopProductsPage = lazy(() => import('@/features/shop/ShopProductsPage').t
 const ShopInventoryPage = lazy(() => import('@/features/shop/ShopInventoryPage').then((m) => ({ default: m.ShopInventoryPage })))
 const ShopSalesPage = lazy(() => import('@/features/shop/ShopSalesPage').then((m) => ({ default: m.ShopSalesPage })))
 const ShopSettingsPage = lazy(() => import('@/features/shop/ShopSettingsPage').then((m) => ({ default: m.ShopSettingsPage })))
+const ReportShopPage = lazy(() => import('@/features/reports/ReportShopPage').then((m) => ({ default: m.ReportShopPage })))
 const FinanceLayout = lazy(() => import('@/features/finance/FinanceLayout').then((m) => ({ default: m.FinanceLayout })))
 const FinanceOverviewPage = lazy(() => import('@/features/finance/FinanceOverviewPage').then((m) => ({ default: m.FinanceOverviewPage })))
 const FinancePaymentsPage = lazy(() => import('@/features/finance/FinancePaymentsPage').then((m) => ({ default: m.FinancePaymentsPage })))
@@ -271,6 +272,12 @@ export const router = createBrowserRouter([
           { path: 'reports/employee-liability', element: <RequireNavDomain domain="reports"><ReportEmployeeLiabilityPage /></RequireNavDomain> },
           { path: 'reports/academy', element: <RequireNavDomain domain="reports"><ReportAcademyPage /></RequireNavDomain> },
           { path: 'reports/customers', element: <RequireNavDomain domain="reports"><ReportCustomersPage /></RequireNavDomain> },
+          // COMMERCIAL MODULE ARCHITECTURE (2026-08-26) -- gated on
+          // BOTH 'reports' (report.view) and shop being a real module
+          // (RequireShopModule) -- a club without Shop entitled/active
+          // should not see a Shop report at all, matching the
+          // directive's own "not merely add features" scoping.
+          { path: 'reports/shop', element: <RequireNavDomain domain="reports"><RequireShopModule><ReportShopPage /></RequireShopModule></RequireNavDomain> },
           // P1-7: /app/club's content moved into the new Settings hub
           // originally, then further split in the IA restructuring
           // (Phase 5) -- kept as a redirect for any stale links/

@@ -1027,6 +1027,13 @@ export function PlatformClubDetailPage() {
           <TabsTrigger value="invoices">{t('platform.clubDetailPage.tabs.invoices')}</TabsTrigger>
           <TabsTrigger value="requests">{t('platform.clubDetailPage.tabs.requests')}</TabsTrigger>
           <TabsTrigger value="audit">{t('platform.clubDetailPage.tabs.audit')}</TabsTrigger>
+          {/* COMMERCIAL MODULE ARCHITECTURE (2026-08-26) -- directive
+              Section 76/123: Platform Owner needs a real UI to control
+              per-club module entitlement (Fields/Academy/Shop), not just
+              the RPC. A new tab here, not a separate route -- this
+              screen is already the single "everything about this club"
+              surface (this file's own header comment). */}
+          <TabsTrigger value="modules">{t('platform.clubDetailPage.tabs.modules')}</TabsTrigger>
         </TabsList>
         <TabsContent value="history">
           <DataTable
@@ -1081,6 +1088,9 @@ export function PlatformClubDetailPage() {
             rowKey={(a) => a.id}
             emptyTitle={t('platform.clubDetailPage.auditEmptyTitle')}
           />
+        </TabsContent>
+        <TabsContent value="modules">
+          {clubId && <ModulesPanel clubId={clubId} />}
         </TabsContent>
       </Tabs>
 
@@ -1198,6 +1208,81 @@ export function PlatformClubDetailPage() {
           </div>
         </DialogContent>
       </Dialog>
+    </div>
+  )
+}
+
+// COMMERCIAL MODULE ARCHITECTURE (2026-08-26) -- Platform Owner's real
+// module-entitlement UI (directive Section 76/2/123). Deliberately
+// shows only "Entitled" (platform-controlled, what this panel writes)
+// -- never a raw "Active" toggle here -- "Active" is the CLUB OWNER'S
+// own decision (ShopSettingsPage/RequireShopModule), a genuinely
+// separate concern per the two-level model
+// (COMMERCIAL_DOMAIN_ARCHITECTURE.md Section 3). Showing Active
+// read-only here (not editable) keeps that boundary honest instead of
+// letting a platform admin silently flip a club's own operational
+// on/off switch.
+interface ModuleRow {
+  moduleKey: string
+  entitled: boolean
+  active: boolean
+}
+
+const MODULE_LABELS: Record<string, string> = {
+  fields: 'platform.clubDetailPage.modules.fields',
+  academy: 'platform.clubDetailPage.modules.academy',
+  shop: 'platform.clubDetailPage.modules.shop',
+}
+
+async function fetchModules(clubId: string): Promise<ModuleRow[]> {
+  const { data, error } = await supabase.rpc('get_club_modules', { p_club_id: clubId })
+  if (error) throw error
+  return (data ?? []).map((r) => ({ moduleKey: r.module_key, entitled: r.entitled, active: r.active }))
+}
+
+function ModulesPanel({ clubId }: { clubId: string }) {
+  const { t } = useTranslation()
+  const queryClient = useQueryClient()
+
+  const { data: modules = [], isLoading } = useQuery({
+    queryKey: ['platform-club-modules', clubId],
+    queryFn: () => fetchModules(clubId),
+  })
+
+  const toggleMutation = useMutation({
+    mutationFn: async ({ moduleKey, entitled }: { moduleKey: string; entitled: boolean }) => {
+      const { error } = await supabase.rpc('set_club_module_entitlement', { p_club_id: clubId, p_module_key: moduleKey, p_entitled: entitled })
+      if (error) throw error
+    },
+    onSuccess: () => void queryClient.invalidateQueries({ queryKey: ['platform-club-modules', clubId] }),
+  })
+
+  if (isLoading) return null
+
+  return (
+    <div className="flex flex-col gap-3">
+      <p className="text-sm text-text-secondary">{t('platform.clubDetailPage.modulesHint')}</p>
+      {modules.map((m) => (
+        <div key={m.moduleKey} className="flex items-center justify-between rounded-md border border-border p-3">
+          <div>
+            <p className="font-medium">{t(MODULE_LABELS[m.moduleKey] ?? m.moduleKey)}</p>
+            <div className="mt-1 flex gap-2">
+              <StatusBadge tone={m.entitled ? 'success' : 'neutral'} label={m.entitled ? t('platform.clubDetailPage.modulesEntitled') : t('platform.clubDetailPage.modulesNotEntitled')} />
+              {m.entitled && (
+                <StatusBadge tone={m.active ? 'success' : 'warning'} label={m.active ? t('platform.clubDetailPage.modulesActive') : t('platform.clubDetailPage.modulesNotActivated')} />
+              )}
+            </div>
+          </div>
+          <Button
+            variant={m.entitled ? 'outline' : 'default'}
+            size="sm"
+            disabled={toggleMutation.isPending}
+            onClick={() => toggleMutation.mutate({ moduleKey: m.moduleKey, entitled: !m.entitled })}
+          >
+            {m.entitled ? t('platform.clubDetailPage.modulesDisable') : t('platform.clubDetailPage.modulesEnable')}
+          </Button>
+        </div>
+      ))}
     </div>
   )
 }

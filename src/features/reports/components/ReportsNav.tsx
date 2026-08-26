@@ -8,6 +8,7 @@ import {
   GraduationCap,
   Users,
   BarChart3,
+  ShoppingCart,
 } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 
@@ -52,6 +53,7 @@ const REPORT_NAV_ITEMS: ReportNavItem[] = [
   { to: '/app/finance/reports', labelKey: 'reports.nav.financialReports', icon: BarChart3 },
   { to: '/app/reports/academy', labelKey: 'reports.nav.academy', icon: GraduationCap },
   { to: '/app/reports/customers', labelKey: 'reports.nav.customers', icon: Users },
+  { to: '/app/reports/shop', labelKey: 'reports.nav.shop', icon: ShoppingCart },
 ]
 
 // Dead-end nav fix: router.tsx still registers 6 standalone financial

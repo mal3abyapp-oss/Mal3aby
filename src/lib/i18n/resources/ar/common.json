@@ -351,7 +351,8 @@
         "history": "سجل الاشتراكات",
         "invoices": "الفواتير والمدفوعات",
         "requests": "طلبات الترقية",
-        "audit": "سجل التدقيق"
+        "audit": "سجل التدقيق",
+        "modules": "الوحدات"
       },
       "historyColumns": {
         "kind": "النوع",
@@ -406,7 +407,19 @@
         "referenceLabel": "المرجع / ملاحظة (اختياري)",
         "referencePlaceholder": "رقم الحوالة أو أي ملاحظة",
         "confirm": "تأكيد الدفعة"
-      }
+      },
+      "modules": {
+        "fields": "الملاعب والحجوزات",
+        "academy": "الأكاديمية",
+        "shop": "المتجر"
+      },
+      "modulesHint": "إيقاف وحدة لا يحذف سجلها أبدًا — يحتفظ النادي بكل ما لديه بالفعل، فقط لا يمكنه إنشاء أي شيء جديد في هذه الوحدة حتى تعيد تفعيلها.",
+      "modulesEntitled": "متاحة",
+      "modulesNotEntitled": "غير متاحة",
+      "modulesActive": "مفعّلة",
+      "modulesNotActivated": "لم يفعّلها النادي بعد",
+      "modulesEnable": "إتاحة",
+      "modulesDisable": "إيقاف الإتاحة"
     },
     "clubsPage": {
       "title": "الأندية",
@@ -2450,7 +2463,8 @@
       "financialReports": "التقارير المالية",
       "sectionAcademyCustomers": "الأكاديمية والعملاء",
       "academy": "الأكاديمية",
-      "customers": "العملاء"
+      "customers": "العملاء",
+      "shop": "المتجر"
     },
     "title": "التقارير",
     "loading": "جارٍ التحميل...",
@@ -2667,6 +2681,22 @@
       "totalRefunds": "إجمالي المستردات",
       "csvHeader": {
         "date": "التاريخ",
+        "revenue": "الإيرادات"
+      }
+    },
+    "shop": {
+      "title": "تقرير المتجر",
+      "description": "أفضل المنتجات، الوحدات المباعة، ونظرة عامة على المخزون",
+      "activeProducts": "المنتجات النشطة",
+      "totalOnHand": "إجمالي الوحدات المتاحة",
+      "lowStock": "مخزون منخفض",
+      "outOfStock": "نفد المخزون",
+      "topProducts": "أفضل المنتجات",
+      "emptyTitle": "لا توجد مبيعات بعد",
+      "columns": {
+        "product": "المنتج",
+        "unitsSold": "الوحدات المباعة",
+        "unitsReturned": "الوحدات المرتجعة",
         "revenue": "الإيرادات"
       }
     }
@@ -3283,7 +3313,9 @@
       "staff": "الموظفون",
       "branches": "الفروع والملاعب",
       "settings": "الإعدادات",
-      "audit": "سجل النشاط"
+      "audit": "سجل النشاط",
+      "shop": "المتجر",
+      "inventory": "المخزون"
     }
   },
   "permissions": {
@@ -3542,6 +3574,46 @@
     "manage_whatsapp_connection": {
       "label": "إدارة اتصال واتساب",
       "description": "ربط أو فصل حساب واتساب الخاص بالنادي"
+    },
+    "shop.view": {
+      "label": "عرض المتجر",
+      "description": "الاطلاع على المنتجات والمبيعات والمرتجعات"
+    },
+    "shop.product.manage": {
+      "label": "إدارة المنتجات",
+      "description": "إنشاء وتعديل وأرشفة المنتجات والأنواع"
+    },
+    "shop.sale.create": {
+      "label": "بيع المنتجات",
+      "description": "تسجيل عمليات بيع المنتجات في نقطة البيع"
+    },
+    "shop.sale.refund": {
+      "label": "معالجة المرتجعات والاسترداد",
+      "description": "إرجاع المنتجات واسترداد قيمة مبيعات المتجر"
+    },
+    "inventory.view": {
+      "label": "عرض المخزون",
+      "description": "الاطلاع على أرصدة المخزون وسجل الحركات"
+    },
+    "inventory.receive": {
+      "label": "استلام مخزون",
+      "description": "تسجيل وصول مخزون جديد إلى موقع"
+    },
+    "inventory.adjust": {
+      "label": "تسوية المخزون",
+      "description": "تسجيل تسويات المخزون والتالف والفاقد"
+    },
+    "inventory.transfer": {
+      "label": "تحويل المخزون",
+      "description": "نقل المخزون بين المواقع"
+    },
+    "inventory.count": {
+      "label": "إجراء جرد المخزون",
+      "description": "تنفيذ وتأكيد عمليات الجرد الفعلي للمخزون"
+    },
+    "inventory.cost.view": {
+      "label": "عرض تكلفة المنتج",
+      "description": "الاطلاع على بيانات تكلفة وهامش ربح المنتج"
     }
   },
   "platformStaff": {

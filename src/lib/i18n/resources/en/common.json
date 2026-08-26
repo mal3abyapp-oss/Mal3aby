@@ -351,7 +351,8 @@
         "history": "Subscription history",
         "invoices": "Invoices & payments",
         "requests": "Upgrade requests",
-        "audit": "Audit log"
+        "audit": "Audit log",
+        "modules": "Modules"
       },
       "historyColumns": {
         "kind": "Type",
@@ -406,7 +407,19 @@
         "referenceLabel": "Reference / note (optional)",
         "referencePlaceholder": "Transfer number or any note",
         "confirm": "Confirm payment"
-      }
+      },
+      "modules": {
+        "fields": "Fields & Bookings",
+        "academy": "Academy",
+        "shop": "Shop"
+      },
+      "modulesHint": "Turning a module off never deletes its history — the club keeps everything it already has, it just can't create anything new in that module until you turn it back on.",
+      "modulesEntitled": "Entitled",
+      "modulesNotEntitled": "Not entitled",
+      "modulesActive": "Active",
+      "modulesNotActivated": "Not activated by club yet",
+      "modulesEnable": "Enable",
+      "modulesDisable": "Disable"
     },
     "clubsPage": {
       "title": "Clubs",
@@ -2442,7 +2455,8 @@
       "financialReports": "Financial reports",
       "sectionAcademyCustomers": "Academy & Customers",
       "academy": "Academy",
-      "customers": "Customers"
+      "customers": "Customers",
+      "shop": "Shop"
     },
     "title": "Reports",
     "loading": "Loading...",
@@ -2659,6 +2673,22 @@
       "totalRefunds": "Total refunds",
       "csvHeader": {
         "date": "Date",
+        "revenue": "Revenue"
+      }
+    },
+    "shop": {
+      "title": "Shop report",
+      "description": "Top products, units sold, and inventory overview",
+      "activeProducts": "Active products",
+      "totalOnHand": "Total units on hand",
+      "lowStock": "Low stock",
+      "outOfStock": "Out of stock",
+      "topProducts": "Top products",
+      "emptyTitle": "No sales yet",
+      "columns": {
+        "product": "Product",
+        "unitsSold": "Units sold",
+        "unitsReturned": "Units returned",
         "revenue": "Revenue"
       }
     }
@@ -3286,7 +3316,9 @@
       "staff": "Staff",
       "branches": "Branches & Fields",
       "settings": "Settings",
-      "audit": "Activity log"
+      "audit": "Activity log",
+      "shop": "Store / Shop",
+      "inventory": "Inventory"
     }
   },
   "permissions": {
@@ -3545,6 +3577,46 @@
     "manage_whatsapp_connection": {
       "label": "Manage WhatsApp connection",
       "description": "Connect or disconnect the club's WhatsApp account"
+    },
+    "shop.view": {
+      "label": "View shop",
+      "description": "See products, sales, and returns"
+    },
+    "shop.product.manage": {
+      "label": "Manage products",
+      "description": "Create, edit, and archive products and variants"
+    },
+    "shop.sale.create": {
+      "label": "Sell products",
+      "description": "Ring up product sales at the point of sale"
+    },
+    "shop.sale.refund": {
+      "label": "Process returns & refunds",
+      "description": "Return products and refund shop sales"
+    },
+    "inventory.view": {
+      "label": "View inventory",
+      "description": "See stock balances and movement history"
+    },
+    "inventory.receive": {
+      "label": "Receive stock",
+      "description": "Record new stock arriving into a location"
+    },
+    "inventory.adjust": {
+      "label": "Adjust stock",
+      "description": "Record stock adjustments, damage, and loss"
+    },
+    "inventory.transfer": {
+      "label": "Transfer stock",
+      "description": "Move stock between locations"
+    },
+    "inventory.count": {
+      "label": "Run stock counts",
+      "description": "Perform and confirm physical inventory counts"
+    },
+    "inventory.cost.view": {
+      "label": "View product cost",
+      "description": "See product cost and margin data"
     }
   },
   "platformStaff": {

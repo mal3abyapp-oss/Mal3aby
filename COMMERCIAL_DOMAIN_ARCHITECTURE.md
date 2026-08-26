@@ -273,7 +273,42 @@ its own ledger. This is the concrete mechanism that prevents the
 double-counting directive Section 48 warns about — there is
 structurally only one place money is summed.
 
-## 10. What this phase does NOT implement (explicitly deferred, not silently dropped)
+## 10. Bugs found by adversarial testing and fixed (documented honestly)
+
+Two real, live-reproduced defects were found by a dedicated adversarial
+security/reconciliation pass (not code review alone) and fixed the same
+session, before either could compound further in production:
+
+- **Critical: `shop_inventory_balances` silently duplicated rows for
+  every non-variant product.** The original `UNIQUE (location_id,
+  product_id, variant_id)` constraint relies on SQL's own NULL-equality
+  semantics, where two NULLs never conflict — so `ON CONFLICT (...) DO
+  NOTHING` never fired for `variant_id IS NULL` (the majority case: any
+  product with `has_variants = false`), and `_apply_shop_inventory_movement_internal`
+  inserted a fresh zero-balance row on every single movement instead of
+  reusing the existing one. Confirmed already corrupting two real
+  products (7 and 9 duplicate rows) before the fix. Repaired by
+  consolidating every duplicate group (`sum(on_hand)` across the
+  group — independently verified against the movement ledger's own
+  running total before trusting it) into one row, replacing the broken
+  constraint with a real expression index on
+  `coalesce(variant_id, <sentinel-uuid>)`, and updating the lookup/
+  upsert logic to match the same expression. Live-reverified after the
+  fix: a fresh sequence of movements on the same product now correctly
+  stays at exactly one balance row.
+- **Medium: `return_shop_sale()` had no idempotency protection.** A
+  double-click or network retry on an in-progress return could
+  silently double-process — the only existing guard
+  (`returned_quantity <= quantity`) prevents *over*-return, not a
+  legitimate-looking repeat of an already-completed partial return.
+  Fixed by adding an optional `p_idempotency_key`, mirroring
+  `payments.idempotency_key`'s own established `(club_id, key)` partial
+  unique pattern exactly — a retried call with the same key now returns
+  the original return's id instead of creating a second one. The
+  frontend (`ShopSalesPage.tsx`) now always passes a fresh
+  `crypto.randomUUID()` per genuine submit.
+
+## 11. What this phase does NOT implement (explicitly deferred, not silently dropped)
 
 - Stock reservation (`reserved`/`available` split) — no current
   consumer; column-compatible to add later.
