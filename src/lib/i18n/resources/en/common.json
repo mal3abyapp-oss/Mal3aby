@@ -3868,7 +3868,9 @@
         "price": "Price",
         "sku": "SKU",
         "status": "Status"
-      }
+      },
+      "archiveVariant": "Archive",
+      "reactivateVariant": "Reactivate"
     },
     "inventory": {
       "title": "Inventory",

@@ -3865,7 +3865,9 @@
         "price": "السعر",
         "sku": "الرمز",
         "status": "الحالة"
-      }
+      },
+      "archiveVariant": "أرشفة",
+      "reactivateVariant": "إعادة تفعيل"
     },
     "inventory": {
       "title": "المخزون",

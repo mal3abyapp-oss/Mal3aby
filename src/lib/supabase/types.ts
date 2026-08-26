@@ -8808,6 +8808,18 @@ export type Database = {
         }
         Returns: undefined
       }
+      update_shop_product_variant: {
+        Args: {
+          p_barcode?: string
+          p_color?: string
+          p_price_override?: number
+          p_size?: string
+          p_sku?: string
+          p_status?: string
+          p_variant_id: string
+        }
+        Returns: undefined
+      }
       upsert_customer: {
         Args: {
           p_club_id: string

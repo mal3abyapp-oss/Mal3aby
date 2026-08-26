@@ -342,6 +342,30 @@ function VariantsDialog({ product, onClose }: { product: ProductRow; onClose: ()
     onError: (err) => setError(translateSupabaseError(err, t('shop.products.variantCreateError'))),
   })
 
+  // COMMERCIAL MODULE ARCHITECTURE (2026-08-26) -- directive Section 8:
+  // variant lifecycle. Archiving (not deleting) an inactive variant
+  // keeps its historical sale/inventory rows intact -- create_shop_sale()
+  // already independently filters status='active' on variants server-
+  // side, so this is real enforcement, not just a UI hide.
+  const toggleArchiveMutation = useMutation({
+    mutationFn: async (v: VariantRow) => {
+      const { error: err } = await supabase.rpc('update_shop_product_variant', {
+        p_variant_id: v.variantId,
+        p_size: v.size ?? undefined,
+        p_color: v.color ?? undefined,
+        p_sku: v.sku ?? undefined,
+        p_barcode: undefined,
+        p_price_override: v.priceOverride ?? undefined,
+        p_status: v.status === 'active' ? 'archived' : 'active',
+      })
+      if (err) throw err
+    },
+    onSuccess: () => {
+      void refetch()
+      void queryClient.invalidateQueries({ queryKey: ['shop-pos-variants', product.productId] })
+    },
+  })
+
   return (
     <Dialog open onOpenChange={(open) => { if (!open) onClose() }}>
       <DialogContent>
@@ -350,8 +374,16 @@ function VariantsDialog({ product, onClose }: { product: ProductRow; onClose: ()
           <div className="flex flex-col gap-2">
             {variants.map((v) => (
               <div key={v.variantId} className="flex items-center justify-between rounded-md border border-border p-2 text-sm">
-                <span>{[v.size, v.color].filter(Boolean).join(' / ') || t('shop.pos.defaultVariant')}</span>
-                {v.priceOverride !== null && <MoneyDisplay amount={v.priceOverride} size="sm" />}
+                <div className="flex items-center gap-2">
+                  <span>{[v.size, v.color].filter(Boolean).join(' / ') || t('shop.pos.defaultVariant')}</span>
+                  <StatusBadge tone={v.status === 'active' ? 'success' : 'neutral'} label={v.status === 'active' ? t('shop.products.statusActive') : t('shop.products.statusArchived')} />
+                </div>
+                <div className="flex items-center gap-2">
+                  {v.priceOverride !== null && <MoneyDisplay amount={v.priceOverride} size="sm" />}
+                  <Button variant="ghost" size="sm" disabled={toggleArchiveMutation.isPending} onClick={() => toggleArchiveMutation.mutate(v)}>
+                    {v.status === 'active' ? t('shop.products.archiveVariant') : t('shop.products.reactivateVariant')}
+                  </Button>
+                </div>
               </div>
             ))}
             {variants.length === 0 && <p className="text-sm text-text-secondary">{t('shop.products.noVariantsYet')}</p>}
