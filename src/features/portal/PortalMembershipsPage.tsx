@@ -149,7 +149,7 @@ export function PortalMembershipsPage() {
           <Button size="sm" variant="outline" onClick={() => setCardMembership(m)}>{t('clubMemberships.detail.viewCard')}</Button>
           {canRenew && (
             <Button size="sm" disabled={renewMutation.isPending} onClick={() => renewMutation.mutate(m.membership_subscription_id)}>
-              {renewMutation.isPending ? t('academy.enrollments.enrolling') : t('common.renew')}
+              {renewMutation.isPending ? t('clubMemberships.portal.purchasing') : t('common.renew')}
             </Button>
           )}
         </div>
@@ -296,9 +296,9 @@ function BrowsePlansDialog({ clubId, onClose, onPurchased }: { clubId: string; o
 
   const purchaseMutation = useMutation({
     mutationFn: async () => {
-      if (!plan) throw new Error(t('clubMemberships.sell.errors.planRequired'))
+      if (!plan) throw new Error(t('clubMemberships.portal.purchasePlanRequired'))
       const resolvedBranchId = plan.branch_scope === 'selected_branches' ? branchId : (branchId || allowedBranches[0]?.id)
-      if (!resolvedBranchId) throw new Error(t('clubMemberships.sell.errors.branchRequired'))
+      if (!resolvedBranchId) throw new Error(t('clubMemberships.portal.purchaseBranchRequired'))
       const { data, error: rpcError } = await supabase.rpc('purchase_club_membership_self_service', {
         p_club_id: clubId,
         p_plan_id: plan.plan_id,
@@ -313,7 +313,7 @@ function BrowsePlansDialog({ clubId, onClose, onPurchased }: { clubId: string; o
       onPurchased()
       if (row?.invoice_id) window.location.assign(`/portal/payments?invoiceId=${row.invoice_id}`)
     },
-    onError: (err) => setError(translateSupabaseError(err, t('clubMemberships.sell.errors.sellError'))),
+    onError: (err) => setError(translateSupabaseError(err, t('clubMemberships.portal.purchaseError'))),
   })
 
   const needsBranchChoice = plan?.branch_scope === 'selected_branches'
@@ -372,7 +372,7 @@ function BrowsePlansDialog({ clubId, onClose, onPurchased }: { clubId: string; o
               {error && <p role="alert" className="text-sm text-status-danger">{error}</p>}
 
               <Button disabled={!canSubmit || purchaseMutation.isPending} onClick={() => purchaseMutation.mutate()}>
-                {purchaseMutation.isPending ? t('academy.enrollments.enrolling') : t('clubMemberships.sell.submit')}
+                {purchaseMutation.isPending ? t('clubMemberships.portal.purchasing') : t('clubMemberships.portal.purchaseSubmit')}
               </Button>
             </>
           )}
