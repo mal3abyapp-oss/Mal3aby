@@ -337,11 +337,28 @@ export function StaffPage() {
       <PageHeader
         title={t('staff.title')}
         description={t('staff.description')}
+        // AUTH ACCESS HOTFIX (2026-08-26): Roles & Permissions was fully
+        // built (RolesPage.tsx, route /app/staff/roles, correct
+        // RequireNavDomain="staff" guard already allowing any staff-
+        // domain-visible user through) but had exactly ONE entry point in
+        // the whole app -- a small text link buried inside the "Add
+        // Staff" invite dialog's role dropdown, only ever seen by someone
+        // already mid-invite. A club owner just wanting to review/edit
+        // roles had no discoverable path and no reason to know the direct
+        // URL. This adds a real, top-level "Manage roles" button next to
+        // "Add Staff" on the Staff page itself -- the existing invite-
+        // dialog link is left in place unchanged (still useful mid-invite,
+        // now simply a second path to the same already-correct page,
+        // never a duplicate ROUTE or component).
         actions={
-          <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-            <DialogTrigger asChild>
-              <Button>{t('staff.addStaff')}</Button>
-            </DialogTrigger>
+          <>
+            <Button variant="outline" asChild>
+              <Link to="/app/staff/roles">{t('staff.manageRolesLink')}</Link>
+            </Button>
+            <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+              <DialogTrigger asChild>
+                <Button>{t('staff.addStaff')}</Button>
+              </DialogTrigger>
             <DialogContent>
               <DialogHeader>
                 <DialogTitle>{t('staff.addStaff')}</DialogTitle>
@@ -420,7 +437,8 @@ export function StaffPage() {
                 </Button>
               </form>
             </DialogContent>
-          </Dialog>
+            </Dialog>
+          </>
         }
       />
 
