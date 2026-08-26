@@ -2715,6 +2715,7 @@
       "settleConfirm": "Confirm payment of {{amount}}",
       "settleSuccessFull": "Shortage fully settled.",
       "settleSuccessPartial": "Payment recorded -- {{amount}} still outstanding.",
+      "cannotSettleOwnLiabilityHint": "You cannot settle your own liability. Grant an authorized employee the settle-liability permission, or use another authorized admin account.",
       "noLiabilitiesYet": "No liabilities yet",
       "notFoundOrDenied": "This employee couldn't be found, or you don't have access to view them.",
       "reference": "Reference",
@@ -3211,6 +3212,14 @@
     "payment.methods.manage": {
       "label": "Manage payment methods",
       "description": "Create, edit, or disable payment methods"
+    },
+    "cash.liability.view": {
+      "label": "View cash liability",
+      "description": "See employee cash shortage totals, the liability list, and settlement history"
+    },
+    "cash.liability.settle": {
+      "label": "Settle cash liability",
+      "description": "Allows recording partial or full settlement of employee cash liabilities."
     },
     "report.view": {
       "label": "View reports",

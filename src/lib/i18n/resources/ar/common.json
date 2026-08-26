@@ -2719,6 +2719,7 @@
       "settleConfirm": "تأكيد سداد {{amount}}",
       "settleSuccessFull": "تم سداد العجز بالكامل.",
       "settleSuccessPartial": "تم تسجيل السداد -- ما زال {{amount}} مستحقًا.",
+      "cannotSettleOwnLiabilityHint": "لا يمكنك تسوية عجزك بنفسك. امنح موظفًا مخولًا صلاحية تسوية عجز العهدة أو استخدم حسابًا إداريًا مخولًا آخر.",
       "noLiabilitiesYet": "لا توجد مديونيات بعد",
       "notFoundOrDenied": "تعذّر العثور على هذا الموظف، أو لا تملك صلاحية عرضه.",
       "reference": "المرجع",
@@ -3204,6 +3205,14 @@
     "payment.methods.manage": {
       "label": "إدارة طرق الدفع",
       "description": "إنشاء أو تعديل أو تعطيل طرق الدفع"
+    },
+    "cash.liability.view": {
+      "label": "عرض عجز العهدة",
+      "description": "رؤية إجمالي عجز العهدة للموظفين، وقائمة العُهد، وسجل التسويات"
+    },
+    "cash.liability.settle": {
+      "label": "تسوية عجز العهدة",
+      "description": "يسمح بتسجيل سداد جزئي أو كامل لعجز العهدة المستحق على الموظفين."
     },
     "report.view": {
       "label": "عرض التقارير",

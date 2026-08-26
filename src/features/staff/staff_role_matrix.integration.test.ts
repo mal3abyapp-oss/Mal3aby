@@ -292,6 +292,75 @@ describeIfConfigured('Staff role matrix (real login, live integration)', () => {
     })
   })
 
+  // ---- CASH LIABILITY (DEDICATED CASH LIABILITY PERMISSIONS, 2026-08-26) --
+  // has_permission() is a pure, side-effect-free read -- safe to call
+  // directly for a precise view/settle matrix without needing a real
+  // liability fixture. The settle_employee_cash_liability() calls below
+  // use a deliberately nonexistent liability id: for a caller WITHOUT
+  // cash.liability.settle, the RPC's own query already excludes every
+  // row (has_permission(...) is part of the WHERE clause), so a random
+  // id and a real-but-forbidden id produce the identical generic
+  // rejection -- proving the authorization branch without depending on
+  // any specific production data.
+  describe('Cash Liability module (dedicated permissions, not payment.create)', () => {
+    it('Club Manager (owner client): view ALLOW, settle DENY', async () => {
+      const { data: viewPerm } = await clients.owner.rpc('has_permission', { p_key: 'cash.liability.view', p_club_id: CLUB_ID })
+      const { data: settlePerm } = await clients.owner.rpc('has_permission', { p_key: 'cash.liability.settle', p_club_id: CLUB_ID })
+      expect(viewPerm).toBe(true)
+      expect(settlePerm).toBe(false)
+    })
+
+    it('Accountant: view ALLOW, settle ALLOW', async () => {
+      const { data: viewPerm } = await clients.accountant.rpc('has_permission', { p_key: 'cash.liability.view', p_club_id: CLUB_ID })
+      const { data: settlePerm } = await clients.accountant.rpc('has_permission', { p_key: 'cash.liability.settle', p_club_id: CLUB_ID })
+      expect(viewPerm).toBe(true)
+      expect(settlePerm).toBe(true)
+    })
+
+    it('Reception: view DENY, settle DENY (the regression this phase fixes -- previously rode on payment.create)', async () => {
+      const { data: viewPerm } = await clients.reception.rpc('has_permission', { p_key: 'cash.liability.view', p_club_id: CLUB_ID })
+      const { data: settlePerm } = await clients.reception.rpc('has_permission', { p_key: 'cash.liability.settle', p_club_id: CLUB_ID })
+      expect(viewPerm).toBe(false)
+      expect(settlePerm).toBe(false)
+    })
+
+    it('Coach: view DENY, settle DENY', async () => {
+      const { data: viewPerm } = await clients.coach.rpc('has_permission', { p_key: 'cash.liability.view', p_club_id: CLUB_ID })
+      const { data: settlePerm } = await clients.coach.rpc('has_permission', { p_key: 'cash.liability.settle', p_club_id: CLUB_ID })
+      expect(viewPerm).toBe(false)
+      expect(settlePerm).toBe(false)
+    })
+
+    it('Scanner: view DENY, settle DENY', async () => {
+      const { data: viewPerm } = await clients.scanner.rpc('has_permission', { p_key: 'cash.liability.view', p_club_id: CLUB_ID })
+      const { data: settlePerm } = await clients.scanner.rpc('has_permission', { p_key: 'cash.liability.settle', p_club_id: CLUB_ID })
+      expect(viewPerm).toBe(false)
+      expect(settlePerm).toBe(false)
+    })
+
+    it('Reception directly calling settle_employee_cash_liability is rejected server-side (regression guard: this used to succeed via payment.create)', async () => {
+      const { error } = await clients.reception.rpc('settle_employee_cash_liability', {
+        p_liability_id: '00000000-0000-0000-0000-000000000000',
+        p_amount: 1,
+        p_reason: 'role-matrix-negative-test',
+        p_idempotency_key: null,
+      })
+      expect(error).toBeTruthy()
+      expect(error!.message.toLowerCase()).toContain('liability not found or you do not have permission to settle it')
+    })
+
+    it('Club Manager (owner client, view-only) directly calling settle_employee_cash_liability is rejected server-side', async () => {
+      const { error } = await clients.owner.rpc('settle_employee_cash_liability', {
+        p_liability_id: '00000000-0000-0000-0000-000000000000',
+        p_amount: 1,
+        p_reason: 'role-matrix-negative-test',
+        p_idempotency_key: null,
+      })
+      expect(error).toBeTruthy()
+      expect(error!.message.toLowerCase()).toContain('liability not found or you do not have permission to settle it')
+    })
+  })
+
   // ---- DIRECT URL / RPC ACCESS (not relying on hidden buttons) ---------
   describe('Direct RPC access bypassing any UI button-hiding', () => {
     it('Scanner directly calling record_payment is rejected server-side, not just hidden in UI', async () => {

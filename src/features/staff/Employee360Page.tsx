@@ -154,10 +154,28 @@ export function Employee360Page() {
   const navigate = useNavigate()
   const { t } = useTranslation()
   const { locale } = useDirection()
-  const { currentClubId } = useAuth()
+  const { currentClubId, currentMembership, session } = useAuth()
   const queryClient = useQueryClient()
   const [activeTab, setActiveTab] = useState<TabKey>('overview')
   const [settleLiability, setSettleLiability] = useState<LiabilityRow | null>(null)
+
+  // DEDICATED CASH LIABILITY PERMISSIONS (2026-08-26): least-privilege
+  // gate, derived from the caller's real permission set only -- never a
+  // role-name check (roleKey === 'accountant' is explicitly forbidden by
+  // the phase directive). canManageStaff gates the two tabs whose RPCs
+  // (get_staff_access_profile, get_staff_shift_history) remain
+  // staff.update-only; canViewLiability gates the Financial tab, whose
+  // RPC now also accepts cash.liability.view (see the
+  // dedicated_cash_liability_permissions migration) so an Accountant can
+  // reach it without staff.update. canSettleLiability gates the Settle
+  // button itself -- this is a UX courtesy on top of, never a
+  // substitute for, the server's own cash.liability.settle gate on
+  // settle_employee_cash_liability().
+  const callerPermissions = new Set(currentMembership?.permissionKeys ?? [])
+  const canManageStaff = callerPermissions.has('staff.update')
+  const canViewLiability = canManageStaff || callerPermissions.has('cash.liability.view')
+  const canSettleLiability = callerPermissions.has('cash.liability.settle')
+  const currentUserId = session?.user?.id ?? null
 
   const { data: summary, isLoading, isError } = useQuery({
     queryKey: ['staff-360-summary', currentClubId, membershipId],
@@ -168,17 +186,17 @@ export function Employee360Page() {
   const { data: access } = useQuery({
     queryKey: ['staff-360-access', currentClubId, membershipId],
     queryFn: () => fetchAccess(currentClubId!, membershipId!),
-    enabled: !!currentClubId && !!membershipId && activeTab === 'access',
+    enabled: !!currentClubId && !!membershipId && activeTab === 'access' && canManageStaff,
   })
   const { data: shifts } = useQuery({
     queryKey: ['staff-360-shifts', currentClubId, membershipId],
     queryFn: () => fetchShifts(currentClubId!, membershipId!),
-    enabled: !!currentClubId && !!membershipId && activeTab === 'shifts',
+    enabled: !!currentClubId && !!membershipId && activeTab === 'shifts' && canManageStaff,
   })
   const { data: financial } = useQuery({
     queryKey: ['staff-360-financial', currentClubId, membershipId],
     queryFn: () => fetchFinancial(currentClubId!, membershipId!),
-    enabled: !!currentClubId && !!membershipId && activeTab === 'financial',
+    enabled: !!currentClubId && !!membershipId && activeTab === 'financial' && canViewLiability,
   })
   const { data: activity } = useQuery({
     queryKey: ['staff-360-activity', currentClubId, membershipId],
@@ -239,6 +257,11 @@ export function Employee360Page() {
   }
 
   const m = summary.membership
+  // Anti-Fraud (preserved, not new): the server's own self-settlement
+  // guard on settle_employee_cash_liability is the real control -- this
+  // is a UX courtesy so the viewer never sees a Settle button that will
+  // always be rejected on their own profile.
+  const isOwnProfile = !!currentUserId && currentUserId === m.user_id
 
   return (
     <div className="flex flex-col gap-4">
@@ -290,9 +313,17 @@ export function Employee360Page() {
       <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as TabKey)}>
         <TabsList>
           <TabsTrigger value="overview">{t('staff.detail.tabs.overview', { defaultValue: 'Overview' })}</TabsTrigger>
-          <TabsTrigger value="access">{t('staff.detail.tabs.access', { defaultValue: 'Access & Permissions' })}</TabsTrigger>
-          <TabsTrigger value="shifts">{t('staff.detail.tabs.shifts', { defaultValue: 'Cash Shifts & Custody' })}</TabsTrigger>
-          <TabsTrigger value="financial">{t('staff.detail.tabs.financial', { defaultValue: 'Financial Account' })}</TabsTrigger>
+          {/* DEDICATED CASH LIABILITY PERMISSIONS (2026-08-26): Access
+              and Shifts stay staff.update-only (their RPCs,
+              get_staff_access_profile / get_staff_shift_history, were
+              deliberately NOT widened -- role/permission and cash-shift
+              management are genuinely outside "viewing a liability").
+              Hidden rather than merely disabled so an Accountant's
+              Employee 360 reads as a finance-scoped view, not a
+              staff-management screen with grayed-out tabs. */}
+          {canManageStaff && <TabsTrigger value="access">{t('staff.detail.tabs.access', { defaultValue: 'Access & Permissions' })}</TabsTrigger>}
+          {canManageStaff && <TabsTrigger value="shifts">{t('staff.detail.tabs.shifts', { defaultValue: 'Cash Shifts & Custody' })}</TabsTrigger>}
+          {canViewLiability && <TabsTrigger value="financial">{t('staff.detail.tabs.financial', { defaultValue: 'Financial Account' })}</TabsTrigger>}
           <TabsTrigger value="activity">{t('staff.detail.tabs.activity', { defaultValue: 'Activity & Audit' })}</TabsTrigger>
         </TabsList>
 
@@ -364,10 +395,13 @@ export function Employee360Page() {
           </div>
         </TabsContent>
 
-        <TabsContent value="access">
-          <AccessTab clubId={currentClubId!} membershipId={membershipId!} access={access} onChanged={invalidateAll} />
-        </TabsContent>
+        {canManageStaff && (
+          <TabsContent value="access">
+            <AccessTab clubId={currentClubId!} membershipId={membershipId!} access={access} onChanged={invalidateAll} />
+          </TabsContent>
+        )}
 
+        {canManageStaff && (
         <TabsContent value="shifts">
           <div className="mt-4 flex flex-col gap-4">
             <div className="flex items-center justify-between rounded-lg border border-border p-4">
@@ -407,7 +441,9 @@ export function Employee360Page() {
             />
           </div>
         </TabsContent>
+        )}
 
+        {canViewLiability && (
         <TabsContent value="financial">
           <div className="mt-4 flex flex-col gap-4">
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
@@ -424,7 +460,17 @@ export function Employee360Page() {
                 { key: 'outstanding', header: t('staff.detail.outstanding', { defaultValue: 'Outstanding' }), render: (r: LiabilityRow) => <MoneyDisplay amount={r.outstanding} tone={r.outstanding > 0 ? 'danger' : 'default'} size="sm" /> },
                 { key: 'status', header: t('common.status', { defaultValue: 'Status' }), render: (r: LiabilityRow) => <StatusBadge tone={r.status === 'settled' ? 'success' : 'warning'} label={r.status === 'settled' ? t('staff.detail.settledStatus', { defaultValue: 'Settled' }) : t('staff.detail.outstandingStatus', { defaultValue: 'Outstanding' })} /> },
                 {
-                  key: 'actions', header: '', render: (r: LiabilityRow) => r.outstanding > 0 ? (
+                  // DEDICATED CASH LIABILITY PERMISSIONS (2026-08-26):
+                  // the Settle button now follows cash.liability.settle
+                  // -- previously it followed nothing at all (only
+                  // outstanding > 0, a pure data-state check with no
+                  // authorization behind it whatsoever). Also hidden on
+                  // the viewer's own profile as a UX courtesy for the
+                  // Anti-Fraud self-settlement guard -- the real
+                  // enforcement is server-side (settle_employee_cash_
+                  // liability rejects it unconditionally, even for a
+                  // Club Owner).
+                  key: 'actions', header: '', render: (r: LiabilityRow) => (r.outstanding > 0 && canSettleLiability && !isOwnProfile) ? (
                     <Button size="sm" variant="outline" onClick={() => setSettleLiability(r)}>{t('staff.detail.settle', { defaultValue: 'Settle' })}</Button>
                   ) : null,
                 },
@@ -433,8 +479,16 @@ export function Employee360Page() {
               rowKey={(r) => r.id}
               emptyTitle={t('staff.detail.noLiabilitiesYet', { defaultValue: 'No liabilities yet' })}
             />
+            {isOwnProfile && (financial?.liabilities.rows.some((r) => r.outstanding > 0)) && (
+              <p className="text-xs text-text-secondary">
+                {t('staff.detail.cannotSettleOwnLiabilityHint', {
+                  defaultValue: 'You cannot settle your own liability. Grant an authorized employee the settle-liability permission, or use another authorized admin account.',
+                })}
+              </p>
+            )}
           </div>
         </TabsContent>
+        )}
 
         <TabsContent value="activity">
           <div className="mt-4">

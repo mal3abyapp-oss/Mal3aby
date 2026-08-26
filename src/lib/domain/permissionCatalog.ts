@@ -30,7 +30,19 @@ export interface PermissionDef {
   key: string
   /** True for a permission whose grant deserves a visible "sensitive" marker in the Role Editor (Section 6 of the phase directive). */
   sensitive?: boolean
-  /** Other permission keys this one requires to be coherent (Section 5) -- enforced in the UI AND re-validated server-side is out of scope for a client hint; the server never trusts this list, it only guides the checkbox UI. */
+  /**
+   * Other permission keys this one requires to be coherent (Section 5).
+   * For most pairs this is a client-side UX hint only -- the server
+   * does not re-derive or enforce it (an "incoherent but non-escalating"
+   * role, e.g. booking.update without booking.view, is unusual but not
+   * unsafe). cash.liability.settle is the one exception: its dependency
+   * on cash.liability.view is also enforced server-side, in
+   * create_club_role()/update_club_role() via
+   * permission_set_violates_dependency() (see the
+   * permission_dependency_enforcement migration) -- a role with settle
+   * but not view cannot be saved even by a direct RPC call, not just
+   * blocked in this UI.
+   */
   requires?: string[]
 }
 
@@ -102,8 +114,17 @@ export const PERMISSION_GROUPS: PermissionGroup[] = [
       // Cash custody itself is a per-person flag (has_cash_custody),
       // not a permissions-table row -- deliberately not listed here
       // (see StaffPage.tsx's existing custody toggle, unaffected by
-      // this phase). Employee liability visibility rides on
-      // staff.view/report.view, already covered elsewhere.
+      // this phase).
+      //
+      // DEDICATED CASH LIABILITY PERMISSIONS (2026-08-26): employee
+      // shortage/liability visibility and settlement used to ride on
+      // staff.update or payment.create (an indirect substitute) -- now
+      // dedicated, narrower permissions. cash.liability.settle is a
+      // Sensitive Permission (can move real money-equivalent state) and
+      // requires cash.liability.view, enforced both here and
+      // server-side (see the `requires` doc comment above).
+      { key: 'cash.liability.view' },
+      { key: 'cash.liability.settle', sensitive: true, requires: ['cash.liability.view'] },
     ],
   },
   {
