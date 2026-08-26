@@ -69,6 +69,32 @@ async function fetchRolePermissions(roleId: string): Promise<string[]> {
   return (data ?? []).map((row) => (typeof row === 'string' ? row : (row as { key: string }).key))
 }
 
+// ROLES ACCESS HOTFIX (2026-08-26): the directive's own explicit
+// requirement -- a Protected system role must not "leave the user
+// wondering why clicking does nothing" -- was violated: system-role
+// names rendered as a `disabled` button with zero explanation, and the
+// actions column rendered nothing at all for them. This reads a system
+// role's real, live permission set for read-only display -- NOT via
+// get_club_role_permissions (which only ever joins club_roles/
+// club_role_permissions, so it structurally returns empty for a system
+// role's id from the separate global `roles` table), but via a direct
+// select against role_permissions/roles/permissions. Confirmed live via
+// RLS-impersonation as a real staff account before writing this: all
+// three tables already carry a deliberately global, non-tenant-scoped
+// "select_all_authenticated" RLS policy (role->permission mappings are
+// the same platform-wide default catalog for every club, not per-club
+// secret data) -- this was a pure frontend gap, zero backend change.
+async function fetchSystemRolePermissions(roleId: string): Promise<string[]> {
+  const { data, error } = await supabase
+    .from('role_permissions')
+    .select('permissions(key)')
+    .eq('role_id', roleId)
+  if (error) throw error
+  return (data ?? [])
+    .map((row) => (row.permissions as unknown as { key: string } | null)?.key)
+    .filter((key): key is string => !!key)
+}
+
 export function RolesPage() {
   const { t, i18n } = useTranslation()
   const { currentClubId, currentMembership } = useAuth()
@@ -79,6 +105,10 @@ export function RolesPage() {
   const [editingRoleId, setEditingRoleId] = useState<string | null>(null)
   const [copyingRole, setCopyingRole] = useState<RoleRow | null>(null)
   const [copyName, setCopyName] = useState({ ar: '', en: '' })
+  // ROLES ACCESS HOTFIX: a protected system role now opens a read-only
+  // view instead of doing nothing when clicked -- see
+  // SystemRoleViewDialog below.
+  const [viewingSystemRole, setViewingSystemRole] = useState<RoleRow | null>(null)
 
   const { data: roles = [], isLoading } = useQuery({
     queryKey: ['club-roles', currentClubId],
@@ -131,10 +161,13 @@ export function RolesPage() {
         <button
           className="text-accent-foreground hover:underline"
           onClick={() => {
-            setEditingRoleId(r.isSystem ? null : r.id)
-            if (!r.isSystem) setEditorOpen(true)
+            if (r.isSystem) {
+              setViewingSystemRole(r)
+            } else {
+              setEditingRoleId(r.id)
+              setEditorOpen(true)
+            }
           }}
-          disabled={r.isSystem}
         >
           {locale === 'en' ? r.nameEn : r.nameAr}
         </button>
@@ -165,7 +198,25 @@ export function RolesPage() {
       key: 'actions',
       header: '',
       render: (r) =>
-        r.isSystem ? null : (
+        // ROLES ACCESS HOTFIX: a bare `null` here left the directive's
+        // own explicit requirement violated -- "the user must not be
+        // left wondering why clicking does nothing". A system role's
+        // permissions are fixed by this app's architecture (its
+        // employee-safety/entitlement matrix is defined once, platform-
+        // wide, not per-club) -- this makes that explicit instead of
+        // silent, and still gives the owner a real action: view its
+        // permissions read-only, or copy it as the starting point for a
+        // new, fully editable custom role.
+        r.isSystem ? (
+          <div className="flex items-center gap-2">
+            <Button variant="ghost" size="sm" onClick={() => setViewingSystemRole(r)}>
+              {t('roles.view')}
+            </Button>
+            <Button variant="ghost" size="sm" onClick={() => { setCopyingRole(r); setCopyName({ ar: '', en: '' }) }}>
+              {t('roles.copy')}
+            </Button>
+          </div>
+        ) : (
           <div className="flex gap-2">
             <Button variant="ghost" size="sm" onClick={() => { setEditingRoleId(r.id); setEditorOpen(true) }}>
               {t('roles.edit')}
@@ -244,7 +295,98 @@ export function RolesPage() {
           </form>
         </DialogContent>
       </Dialog>
+
+      {viewingSystemRole && (
+        <SystemRoleViewDialog
+          role={viewingSystemRole}
+          locale={locale}
+          onClose={() => setViewingSystemRole(null)}
+          onCopy={() => {
+            setCopyingRole(viewingSystemRole)
+            setCopyName({ ar: '', en: '' })
+            setViewingSystemRole(null)
+          }}
+        />
+      )}
     </div>
+  )
+}
+
+// ROLES ACCESS HOTFIX: read-only view for a protected system role --
+// shows its real, live permission set (grouped exactly like the
+// editable Role Editor, for a familiar, consistent shape) plus a clear,
+// explicit explanation of why it can't be edited here, with "Copy" as
+// the concrete next step for an owner who wants a similar but
+// customizable role.
+function SystemRoleViewDialog({
+  role,
+  locale,
+  onClose,
+  onCopy,
+}: {
+  role: RoleRow
+  locale: string
+  onClose: () => void
+  onCopy: () => void
+}) {
+  const { t } = useTranslation()
+  const { data: permissionKeys = [], isLoading } = useQuery({
+    queryKey: ['system-role-permissions', role.id],
+    queryFn: () => fetchSystemRolePermissions(role.id),
+  })
+  const selected = useMemo(() => new Set(permissionKeys), [permissionKeys])
+  const name = locale === 'en' ? role.nameEn : role.nameAr
+
+  return (
+    <Dialog open onOpenChange={(open) => { if (!open) onClose() }}>
+      <DialogContent className="max-h-[85vh] w-full max-w-2xl overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle>{t('roles.systemRoleViewTitle', { name })}</DialogTitle>
+        </DialogHeader>
+        <div className="flex flex-col gap-4">
+          <div className="rounded-md border border-border bg-muted/30 p-3 text-sm text-text-secondary">
+            {t('roles.systemRoleViewExplanation')}
+          </div>
+
+          {isLoading ? (
+            <p className="text-sm text-text-secondary">{t('common.loading')}</p>
+          ) : (
+            <div className="flex flex-col gap-3">
+              {PERMISSION_GROUPS.filter((g) => g.permissions.some((p) => selected.has(p.key))).map((g) => (
+                <div key={g.key} className="rounded-md border border-border p-3">
+                  <h3 className="mb-2 text-sm font-semibold">{t(`roles.groups.${g.key}`)}</h3>
+                  <ul className="flex flex-col gap-1.5">
+                    {g.permissions.filter((p) => selected.has(p.key)).map((p) => (
+                      <li key={p.key} className="flex items-center gap-1.5 text-sm text-text-secondary">
+                        <span className="size-1.5 shrink-0 rounded-full bg-accent-foreground" />
+                        {t(`permissions.${p.key}.label`)}
+                        {p.sensitive && (
+                          <Badge variant="destructive" className="text-[10px]">
+                            {t('roles.sensitive')}
+                          </Badge>
+                        )}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              ))}
+              {selected.size === 0 && (
+                <p className="text-sm text-text-secondary">{t('roles.groupEmpty')}</p>
+              )}
+            </div>
+          )}
+
+          <p className="text-xs text-text-secondary">{t('roles.systemRoleViewCopyHint')}</p>
+
+          <div className="flex justify-end gap-2">
+            <Button variant="outline" onClick={onClose}>
+              {t('common.cancel')}
+            </Button>
+            <Button onClick={onCopy}>{t('roles.copy')}</Button>
+          </div>
+        </div>
+      </DialogContent>
+    </Dialog>
   )
 }
 
