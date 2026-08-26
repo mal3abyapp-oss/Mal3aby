@@ -39,6 +39,24 @@ reasoning:
 
 ## Fixed during this session (not risks — resolved defects, documented for continuity)
 
+- **Critical**: `return_shop_sale` had a live `anon`/`PUBLIC` EXECUTE
+  grant leak. Adding `p_idempotency_key` to its signature made
+  Postgres treat it as a genuinely new function identity, applying
+  Postgres's own default EXECUTE-to-PUBLIC grant on creation — and
+  the idempotency migration's own `create or replace function` block
+  never included the explicit revoke/grant statements every other
+  Shop RPC migration in this session correctly included. Caught by
+  this session's own final grant-hygiene sweep (the same audit this
+  project runs after every signature change, per its own migration
+  history precedent) before any exploitation was possible. Also found
+  an orphaned old 5-argument overload left behind from the same
+  signature change, itself still carrying its own stale PUBLIC/anon
+  grants. Fixed in two migrations: dropped the orphaned overload, then
+  explicitly revoked `public`/`anon` and granted `authenticated` only
+  on the current signature. Live-reverified: `anon` role now gets
+  `permission denied for function` (denied at the grant layer, not
+  merely the internal permission check), while a real authenticated
+  club owner call still succeeds identically to before.
 - **Critical**: `shop_inventory_balances` NULL-variant uniqueness bug
   — found by adversarial testing, already corrupting live data,
   fixed and live-reverified. See INVENTORY_INVARIANTS.md Section 5.

@@ -1,0 +1,32 @@
+-- CRITICAL GRANT-HYGIENE BUG (2026-08-26) -- found by a final grant-
+-- hygiene audit pass (the same class of check this project runs
+-- after every signature change -- see its own migration history:
+-- drop_orphaned_create_public_booking_9arg_overload,
+-- drop_orphaned_activate_subscription_overload,
+-- drop_orphaned_source_validity_2arg_overload, etc). The idempotency
+-- fix (return_shop_sale_idempotency migration) added a new
+-- p_idempotency_key parameter via `create or replace function`, but
+-- because the parameter LIST changed (not just a default value), this
+-- created a genuinely NEW function signature/overload rather than
+-- replacing the original -- the original 5-argument
+-- return_shop_sale(uuid, jsonb, boolean, numeric, text) was left
+-- behind as a live, callable, ORPHANED overload with its original
+-- REVOKE-then-GRANT-to-authenticated-only grants intact from its OWN
+-- creation migration... except that migration never anticipated a
+-- second overload existing, so PostgreSQL's default EXECUTE-to-PUBLIC
+-- grant on a newly created function (the standard Postgres default
+-- for every new function, unless explicitly revoked) was never
+-- explicitly revoked a second time for this specific new-old-orphan
+-- state. Confirmed live via has_function_privilege(): the 5-arg
+-- overload had EXECUTE granted to both `public` and `anon`.
+--
+-- This orphaned overload also lacks the idempotency-key column write
+-- and the dual-audit v_via_support logic entirely -- calling it
+-- (even from an authorized session) would silently bypass both fixes.
+--
+-- Fixed by dropping the orphaned 5-arg overload outright. The current
+-- 6-arg signature (with p_idempotency_key uuid default null) remains
+-- the only return_shop_sale -- a caller omitting the new parameter
+-- still works identically (it has a default), so no frontend call site
+-- needs to change.
+drop function if exists public.return_shop_sale(uuid, jsonb, boolean, numeric, text);

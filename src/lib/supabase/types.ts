@@ -8404,28 +8404,17 @@ export type Database = {
         Args: { p_queue_id: string }
         Returns: undefined
       }
-      return_shop_sale:
-        | {
-            Args: {
-              p_lines: Json
-              p_reason?: string
-              p_refund_amount?: number
-              p_restock: boolean
-              p_sale_id: string
-            }
-            Returns: string
-          }
-        | {
-            Args: {
-              p_idempotency_key?: string
-              p_lines: Json
-              p_reason?: string
-              p_refund_amount?: number
-              p_restock: boolean
-              p_sale_id: string
-            }
-            Returns: string
-          }
+      return_shop_sale: {
+        Args: {
+          p_idempotency_key?: string
+          p_lines: Json
+          p_reason?: string
+          p_refund_amount?: number
+          p_restock: boolean
+          p_sale_id: string
+        }
+        Returns: string
+      }
       reverse_employee_cash_liability: {
         Args: { p_liability_id: string; p_reason: string }
         Returns: Json
