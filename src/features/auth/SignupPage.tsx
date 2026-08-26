@@ -48,7 +48,9 @@ export function SignupPage() {
   }
 
   return (
-    <div className="mx-auto flex min-h-[70vh] max-w-sm items-center justify-center px-4 py-12">
+    // AUTH RESPONSIVE LAYOUT HOTFIX (2026-08-26): see ForgotPasswordPage.tsx's
+    // identical fix comment -- same row/column flex-axis bug, same fix.
+    <div className="mx-auto flex min-h-[70vh] w-full max-w-md flex-col justify-center px-4 py-12">
       <Card className="w-full">
         <CardHeader>
           <CardTitle className="text-center text-xl">{t('auth.signup')}</CardTitle>

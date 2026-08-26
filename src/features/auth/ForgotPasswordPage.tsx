@@ -41,7 +41,18 @@ export function ForgotPasswordPage() {
   }
 
   return (
-    <div className="mx-auto flex min-h-[70vh] max-w-sm items-center justify-center px-4 py-12">
+    // AUTH RESPONSIVE LAYOUT HOTFIX (2026-08-26): the outer wrapper was
+    // `flex` (row-direction by default) with `justify-center` -- on the
+    // main axis that centers a flex item at its shrink-to-fit content
+    // size rather than stretching it, so the Card's own `w-full` had
+    // nothing to stretch against and the whole form collapsed to ~115px-
+    // wide inputs inside a ~164px card at desktop widths (confirmed live
+    // at 1366x768). `flex-col` fixes the axis mismatch; `max-w-sm` moved
+    // off the row wrapper and onto the Card itself (mirrors the already-
+    // correct ClaimAccountPage.tsx/ActivateAccountPage.tsx pattern) so
+    // the card gets a real, professional 384-448px desktop width instead
+    // of inheriting a shrunk flex-item size.
+    <div className="mx-auto flex min-h-[70vh] w-full max-w-md flex-col justify-center px-4 py-12">
       <Card className="w-full">
         <CardHeader>
           <CardTitle className="text-center text-xl">{t('auth.forgotPasswordPage.title')}</CardTitle>
