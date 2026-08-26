@@ -108,6 +108,20 @@ export const ACTION_LABELS: Record<string, string> = {
   'whatsapp_consent.re_recorded_after_revoke': 'تسجيل موافقة واتساب مجددًا',
   'whatsapp_consent.recorded': 'تسجيل موافقة واتساب',
   'whatsapp.message.retry': 'إعادة محاولة إرسال رسالة واتساب',
+
+  // CLUB MEMBERSHIPS domain (2026-08-26) -- action strings written by
+  // sell_club_membership/renew_club_membership/freeze_club_membership/
+  // resume_club_membership/cancel_club_membership and the plan CRUD RPCs.
+  'club_membership_plan.created': 'إنشاء خطة عضوية',
+  'club_membership_plan.updated': 'تعديل خطة عضوية',
+  'club_membership_plan.archived': 'أرشفة خطة عضوية',
+  'club_membership_plan.restored': 'استرجاع خطة عضوية',
+  'club_membership.created': 'إنشاء عضوية نادٍ',
+  'club_membership.activated': 'تفعيل عضوية نادٍ',
+  'club_membership.renewed': 'تجديد عضوية نادٍ',
+  'club_membership.frozen': 'تجميد عضوية نادٍ',
+  'club_membership.resumed': 'استئناف عضوية نادٍ',
+  'club_membership.cancelled': 'إلغاء عضوية نادٍ',
 }
 
 export const ENTITY_LABELS: Record<string, string> = {
@@ -141,6 +155,8 @@ export const ENTITY_LABELS: Record<string, string> = {
   club: 'نادٍ',
   club_booking_policy: 'سياسة الحجز',
   club_membership: 'عضوية نادٍ',
+  club_membership_plan: 'خطة عضوية نادٍ',
+  club_membership_subscription: 'عضوية نادٍ',
   employee_cash_liability: 'التزام نقدي على موظف',
   government_collection_policy: 'سياسة التحصيل الحكومي',
   guardian_links: 'ربط ولي أمر',
@@ -234,6 +250,18 @@ export const ACTION_LABELS_EN: Record<string, string> = {
   'whatsapp_consent.re_recorded_after_revoke': 'Re-record WhatsApp consent',
   'whatsapp_consent.recorded': 'Record WhatsApp consent',
   'whatsapp.message.retry': 'Retry WhatsApp message',
+
+  // CLUB MEMBERSHIPS domain (2026-08-26), English mirror.
+  'club_membership_plan.created': 'Create membership plan',
+  'club_membership_plan.updated': 'Update membership plan',
+  'club_membership_plan.archived': 'Archive membership plan',
+  'club_membership_plan.restored': 'Restore membership plan',
+  'club_membership.created': 'Create club membership',
+  'club_membership.activated': 'Activate club membership',
+  'club_membership.renewed': 'Renew club membership',
+  'club_membership.frozen': 'Freeze club membership',
+  'club_membership.resumed': 'Resume club membership',
+  'club_membership.cancelled': 'Cancel club membership',
 }
 
 export const ENTITY_LABELS_EN: Record<string, string> = {
@@ -265,6 +293,8 @@ export const ENTITY_LABELS_EN: Record<string, string> = {
   club: 'Club',
   club_booking_policy: 'Booking policy',
   club_membership: 'Club membership',
+  club_membership_plan: 'Club membership plan',
+  club_membership_subscription: 'Club membership',
   employee_cash_liability: 'Staff cash liability',
   government_collection_policy: 'Government collection policy',
   guardian_links: 'Guardian link',

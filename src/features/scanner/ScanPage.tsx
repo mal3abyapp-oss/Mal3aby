@@ -22,6 +22,12 @@ type ValidateResult = {
   display_photo_url: string | null
   display_subtitle: string | null
   subscription_status: string | null
+  // Club Memberships QR integration: the machine-readable code behind
+  // `result`, needed to distinguish MEMBERSHIP_EXPIRED from
+  // MEMBERSHIP_FROZEN from MEMBERSHIP_CANCELLED etc. (all collapse to
+  // result='invalid' otherwise). Present on every qr_validate response,
+  // only actually branched on for reference_type === 'club_membership'.
+  diagnostic_code: string | null
   // P0 CHECK-IN FINANCIAL ELIGIBILITY HOTFIX (2026-08-23): qr_validate
   // now returns the real outstanding amount whenever result is
   // 'payment_required' (0 otherwise) -- QR CREDENTIAL VALIDITY and
@@ -65,12 +71,53 @@ const OUTCOME_LABEL_KEYS: Record<string, string> = {
   payment_required: 'scanner.outcomes.payment_required',
 }
 
+// Club Memberships QR integration: qr_validate's `result` field alone
+// ('success'/'invalid'/'permission_denied'/...) is not granular enough
+// for a club_membership scan -- an EXPIRED, FROZEN, CANCELLED, and
+// NOT_STARTED membership all come back as the generic result='invalid'.
+// The real distinction lives in `diagnostic_code`
+// ('MEMBERSHIP_EXPIRED'/'MEMBERSHIP_FROZEN'/'MEMBERSHIP_CANCELLED'/
+// 'MEMBERSHIP_NOT_STARTED'/'MEMBERSHIP_NO_MEMBERSHIP'/
+// 'MEMBERSHIP_VERIFY_NOT_GRANTED'/'SUCCESS'), so this scanner branches on
+// diagnostic_code specifically when reference_type === 'club_membership'
+// (see outcomeKey below) rather than reusing the generic result-keyed
+// maps above for this reference type.
+const MEMBERSHIP_DIAGNOSTIC_TONES: Record<string, 'success' | 'danger' | 'warning'> = {
+  SUCCESS: 'success',
+  MEMBERSHIP_EXPIRED: 'danger',
+  MEMBERSHIP_FROZEN: 'warning',
+  MEMBERSHIP_CANCELLED: 'danger',
+  MEMBERSHIP_NOT_STARTED: 'warning',
+  MEMBERSHIP_NO_MEMBERSHIP: 'danger',
+  MEMBERSHIP_VERIFY_NOT_GRANTED: 'danger',
+}
+
+const MEMBERSHIP_DIAGNOSTIC_LABEL_KEYS: Record<string, string> = {
+  SUCCESS: 'scanner.outcomes.success',
+  MEMBERSHIP_EXPIRED: 'scanner.membershipOutcomes.expired',
+  MEMBERSHIP_FROZEN: 'scanner.membershipOutcomes.frozen',
+  MEMBERSHIP_CANCELLED: 'scanner.membershipOutcomes.cancelled',
+  MEMBERSHIP_NOT_STARTED: 'scanner.membershipOutcomes.notStarted',
+  MEMBERSHIP_NO_MEMBERSHIP: 'scanner.membershipOutcomes.noMembership',
+  MEMBERSHIP_VERIFY_NOT_GRANTED: 'scanner.outcomes.permission_denied',
+}
+
 const SUBSCRIPTION_STATUS_LABEL_KEYS: Record<string, string> = {
   pending: 'scanner.subscriptionStatus.pending',
   active: 'scanner.subscriptionStatus.active',
   frozen: 'scanner.subscriptionStatus.frozen',
   expired: 'scanner.subscriptionStatus.expired',
   cancelled: 'scanner.subscriptionStatus.cancelled',
+  // Club Memberships domain -- UPPERCASE, distinct from academy's
+  // lowercase convention above (qr_validate's own club_membership
+  // branch returns subscription_status in uppercase). Kept alongside the
+  // lowercase academy keys rather than merged, since both are read from
+  // the same `subscription_status` field keyed only by reference_type.
+  ACTIVE: 'scanner.subscriptionStatus.active',
+  FROZEN: 'scanner.subscriptionStatus.frozen',
+  EXPIRED: 'scanner.subscriptionStatus.expired',
+  CANCELLED: 'scanner.subscriptionStatus.cancelled',
+  NOT_STARTED: 'scanner.subscriptionStatus.notStarted',
 }
 
 interface OpenSession {
@@ -143,7 +190,7 @@ export function ScanPage() {
       setValidated({
         result: 'invalid', credential_id: null, reference_type: null, reference_id: null, club_id: null,
         display_name: null, display_photo_url: null, display_subtitle: null, subscription_status: null,
-        amount_due: null,
+        diagnostic_code: null, amount_due: null,
       })
       return
     }
@@ -187,10 +234,22 @@ export function ScanPage() {
     setScanning(true)
   }
 
+  // Club Memberships: qr_validate scanning IS the terminal verify action
+  // for this reference_type -- there is no separate "confirm" RPC, so
+  // confirmResult never applies here, and the generic result-keyed maps
+  // are not granular enough (EXPIRED/FROZEN/CANCELLED/NOT_STARTED all
+  // collapse to result='invalid'). Branch on diagnostic_code instead,
+  // only for this one reference_type.
+  const isClubMembershipScan = !confirmResult && validated?.reference_type === 'club_membership'
   const outcomeKey = confirmResult ?? validated?.result ?? null
-  const outcome = outcomeKey
-    ? { label: t(OUTCOME_LABEL_KEYS[outcomeKey] ?? outcomeKey), tone: OUTCOME_TONES[outcomeKey] ?? 'danger' }
-    : null
+  const outcome = isClubMembershipScan && validated?.diagnostic_code
+    ? {
+        label: t(MEMBERSHIP_DIAGNOSTIC_LABEL_KEYS[validated.diagnostic_code] ?? validated.diagnostic_code),
+        tone: MEMBERSHIP_DIAGNOSTIC_TONES[validated.diagnostic_code] ?? 'danger',
+      }
+    : outcomeKey
+      ? { label: t(OUTCOME_LABEL_KEYS[outcomeKey] ?? outcomeKey), tone: OUTCOME_TONES[outcomeKey] ?? 'danger' }
+      : null
 
   return (
     <div className="flex min-h-screen flex-col bg-dark-base text-white">
@@ -242,7 +301,7 @@ export function ScanPage() {
               <p className="text-lg font-bold">{validated.display_name}</p>
               {validated.display_subtitle && <p className="text-sm text-white/60">{validated.display_subtitle}</p>}
               {validated.subscription_status && (
-                <span className={`rounded-full px-3 py-1 text-xs font-medium ${validated.subscription_status === 'active' ? 'bg-status-success/20 text-status-success' : 'bg-status-danger/20 text-status-danger'}`}>
+                <span className={`rounded-full px-3 py-1 text-xs font-medium ${validated.subscription_status === 'active' || validated.subscription_status === 'ACTIVE' ? 'bg-status-success/20 text-status-success' : 'bg-status-danger/20 text-status-danger'}`}>
                   {t('scanner.subscriptionPrefix')} {t(SUBSCRIPTION_STATUS_LABEL_KEYS[validated.subscription_status] ?? validated.subscription_status)}
                 </span>
               )}

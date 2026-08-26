@@ -33,7 +33,10 @@ import {
 import { useOfficialReceipt, OfficialCollectionReceiptFields } from '@/components/ui/official-collection-receipt-fields'
 import { PAYMENT_METHOD_LABELS, PAYMENT_STATUS_LABELS, PAYMENT_STATUS_TONE, formatMoney, fetchPaymentInvoiceIds, type PaymentStatus } from '@/lib/domain/billing'
 import { BOOKING_STATUS_LABELS, BOOKING_STATUS_TONE } from '@/lib/domain/booking'
+import { CLUB_MEMBERSHIP_STATUS_TONE } from '@/lib/domain/clubMembership'
 import { actionLabel } from '@/lib/domain/audit'
+import { MemberDetailDialog } from '@/features/memberships/MemberDetailDialog'
+import { SellMembershipWizard } from '@/features/memberships/SellMembershipWizard'
 import { ArrowLeft, Wallet, Calendar, GraduationCap, MessageCircle, AlertTriangle } from 'lucide-react'
 
 // Customer 360 directive: "ONE CUSTOMER, ONE SOURCE OF TRUTH." Replaces
@@ -45,7 +48,7 @@ import { ArrowLeft, Wallet, Calendar, GraduationCap, MessageCircle, AlertTriangl
 // siblings -- never a snapshot field on the customer row itself (the
 // directive's explicit "UI TOTAL = DB AGGREGATION" requirement).
 
-type TabKey = 'overview' | 'bookings' | 'academy' | 'financial' | 'whatsapp' | 'activity'
+type TabKey = 'overview' | 'bookings' | 'academy' | 'clubMembership' | 'financial' | 'whatsapp' | 'activity'
 
 interface Summary {
   customer: {
@@ -82,6 +85,32 @@ async function fetchAcademyPlayers(clubId: string, customerId: string) {
   const { data, error } = await supabase.rpc('get_customer_academy_players', { p_club_id: clubId, p_customer_id: customerId })
   if (error) throw error
   return (data ?? []) as unknown as PlayerRow[]
+}
+
+interface ClubMembershipRow {
+  membership_subscription_id: string
+  membership_number: string
+  plan_id: string
+  plan_name_ar_snapshot: string
+  plan_name_en_snapshot: string
+  price_snapshot: number
+  status: string
+  effective_status: string
+  start_date: string
+  end_date: string
+  effective_end_date: string
+  days_remaining: number
+  branch_name: string
+  invoice_id: string | null
+  created_at: string
+  cancelled_at: string | null
+  cancel_reason: string | null
+  outstanding: number
+}
+async function fetchClubMemberships(clubId: string, customerId: string) {
+  const { data, error } = await supabase.rpc('get_customer_club_memberships', { p_club_id: clubId, p_customer_id: customerId })
+  if (error) throw error
+  return (data ?? []) as unknown as ClubMembershipRow[]
 }
 
 interface LedgerRow { invoice_id: string; invoice_number: string; issued_at: string | null; status: string; total: number; paid: number; outstanding: number; payment_status: PaymentStatus; source: string }
@@ -142,13 +171,16 @@ export function Customer360Page() {
   const navigate = useNavigate()
   const { t } = useTranslation()
   const { locale } = useDirection()
-  const { currentClubId } = useAuth()
+  const { currentClubId, currentMembership } = useAuth()
   const queryClient = useQueryClient()
   const [activeTab, setActiveTab] = useState<TabKey>('overview')
   const [editOpen, setEditOpen] = useState(false)
   const [collectOpen, setCollectOpen] = useState(false)
   const [collectInvoice, setCollectInvoice] = useState<LedgerRow | null>(null)
   const [addPlayerOpen, setAddPlayerOpen] = useState(false)
+  const [sellMembershipOpen, setSellMembershipOpen] = useState(false)
+  const [selectedMembershipId, setSelectedMembershipId] = useState<string | null>(null)
+  const canCreateMembership = (currentMembership?.permissionKeys ?? []).includes('club_membership.create')
 
   const { data: summary, isLoading: summaryLoading } = useQuery({
     queryKey: ['customer-360-summary', currentClubId, customerId],
@@ -166,6 +198,12 @@ export function Customer360Page() {
     queryKey: ['customer-360-academy', currentClubId, customerId],
     queryFn: () => fetchAcademyPlayers(currentClubId!, customerId!),
     enabled: !!currentClubId && !!customerId && activeTab === 'academy',
+  })
+
+  const { data: clubMemberships } = useQuery({
+    queryKey: ['customer-360-club-memberships', currentClubId, customerId],
+    queryFn: () => fetchClubMemberships(currentClubId!, customerId!),
+    enabled: !!currentClubId && !!customerId && activeTab === 'clubMembership',
   })
 
   const { data: financial } = useQuery({
@@ -238,6 +276,7 @@ export function Customer360Page() {
     void queryClient.invalidateQueries({ queryKey: ['customer-360-summary', currentClubId, customerId] })
     void queryClient.invalidateQueries({ queryKey: ['customer-360-financial', currentClubId, customerId] })
     void queryClient.invalidateQueries({ queryKey: ['customer-360-academy', currentClubId, customerId] })
+    void queryClient.invalidateQueries({ queryKey: ['customer-360-club-memberships', currentClubId, customerId] })
   }
 
   if (summaryLoading) {
@@ -310,6 +349,7 @@ export function Customer360Page() {
           <TabsTrigger value="overview">{t('customers.detail.tabs.overview', { defaultValue: 'Overview' })}</TabsTrigger>
           <TabsTrigger value="bookings">{t('customers.detail.tabs.bookings', { defaultValue: 'Bookings' })}</TabsTrigger>
           <TabsTrigger value="academy">{t('customers.detail.tabs.academy', { defaultValue: 'Academy & Players' })}</TabsTrigger>
+          <TabsTrigger value="clubMembership">{t('customers.detail.tabs.clubMembership')}</TabsTrigger>
           <TabsTrigger value="financial">{t('customers.detail.tabs.financial', { defaultValue: 'Financial Account' })}</TabsTrigger>
           <TabsTrigger value="whatsapp">{t('customers.detail.tabs.whatsapp', { defaultValue: 'WhatsApp & Communication' })}</TabsTrigger>
           <TabsTrigger value="activity">{t('customers.detail.tabs.activity', { defaultValue: 'Activity & Audit' })}</TabsTrigger>
@@ -441,6 +481,36 @@ export function Customer360Page() {
               rowKey={(p) => p.player_id}
               emptyTitle={t('academy.players.emptyTitle')}
               emptyDescription={t('academy.players.emptyDescription')}
+            />
+          </div>
+        </TabsContent>
+
+        <TabsContent value="clubMembership">
+          <div className="mt-4 flex flex-col gap-3">
+            {canCreateMembership && (
+              <div className="flex justify-end">
+                <Button size="sm" onClick={() => setSellMembershipOpen(true)}>{t('clubMemberships.sell.title')}</Button>
+              </div>
+            )}
+            <DataTable
+              columns={[
+                {
+                  key: 'number', header: t('clubMemberships.membershipNumber'), render: (m: ClubMembershipRow) => (
+                    <button className="tabular-nums text-accent-foreground hover:underline" onClick={() => setSelectedMembershipId(m.membership_subscription_id)}>
+                      <bdi>{m.membership_number}</bdi>
+                    </button>
+                  ),
+                },
+                { key: 'plan', header: t('clubMemberships.membershipPlan'), render: (m: ClubMembershipRow) => locale === 'en' ? m.plan_name_en_snapshot : m.plan_name_ar_snapshot },
+                { key: 'branch', header: t('clubMemberships.branch'), render: (m: ClubMembershipRow) => m.branch_name },
+                { key: 'expiry', header: t('clubMemberships.expiryDate'), render: (m: ClubMembershipRow) => <span className="tabular-nums">{m.effective_end_date}</span> },
+                { key: 'status', header: t('common.status', { defaultValue: 'Status' }), render: (m: ClubMembershipRow) => <StatusBadge tone={CLUB_MEMBERSHIP_STATUS_TONE[m.effective_status] ?? 'neutral'} label={t(`clubMemberships.statusLabels.${m.effective_status}`, { defaultValue: m.effective_status })} /> },
+                { key: 'outstanding', header: t('customers.outstanding'), render: (m: ClubMembershipRow) => m.outstanding > 0 ? <MoneyDisplay amount={m.outstanding} tone="danger" size="sm" /> : <span className="text-status-success">—</span> },
+              ] as DataTableColumn<ClubMembershipRow>[]}
+              rows={clubMemberships ?? []}
+              rowKey={(m) => m.membership_subscription_id}
+              emptyTitle={t('clubMemberships.members.emptyTitle')}
+              emptyDescription={t('clubMemberships.members.emptyDescription')}
             />
           </div>
         </TabsContent>
@@ -628,6 +698,22 @@ export function Customer360Page() {
           customerId={c.id}
           onClose={() => setAddPlayerOpen(false)}
           onAdded={() => { setAddPlayerOpen(false); invalidateAll() }}
+        />
+      )}
+
+      {sellMembershipOpen && (
+        <SellMembershipWizard
+          initialCustomer={{ id: c.id, fullName: c.full_name, mobileDisplay: c.mobile_display }}
+          onClose={() => setSellMembershipOpen(false)}
+          onSold={() => { setSellMembershipOpen(false); invalidateAll() }}
+        />
+      )}
+
+      {selectedMembershipId && (
+        <MemberDetailDialog
+          membershipId={selectedMembershipId}
+          onClose={() => setSelectedMembershipId(null)}
+          onChanged={invalidateAll}
         />
       )}
     </div>

@@ -18,6 +18,7 @@ export type PermissionGroupKey =
   | 'bookings'
   | 'customers'
   | 'academy'
+  | 'memberships'
   | 'finance'
   | 'cash'
   | 'reports'
@@ -92,6 +93,27 @@ export const PERMISSION_GROUPS: PermissionGroup[] = [
       { key: 'subscription.create', requires: ['subscription.view'] },
       { key: 'subscription.update', requires: ['subscription.view'] },
       { key: 'subscription.freeze.create', requires: ['subscription.update'] },
+    ],
+  },
+  {
+    key: 'memberships',
+    permissions: [
+      // CLUB MEMBERSHIPS domain (2026-08-26) -- an independent commercial
+      // domain (NOT academy enrollment, NOT the platform SaaS
+      // subscription). club_membership.verify deliberately has NO
+      // `requires` -- a Scanner-only role must be able to hold verify
+      // without ever being granted view (directive Section 47/50).
+      // plan.manage and cancel are Sensitive: plan.manage changes what
+      // customers can buy club-wide; cancel stops an active paid
+      // entitlement immediately.
+      { key: 'club_membership.plan.view' },
+      { key: 'club_membership.plan.manage', sensitive: true, requires: ['club_membership.plan.view'] },
+      { key: 'club_membership.view' },
+      { key: 'club_membership.create', requires: ['club_membership.view'] },
+      { key: 'club_membership.renew', requires: ['club_membership.view'] },
+      { key: 'club_membership.freeze', requires: ['club_membership.view'] },
+      { key: 'club_membership.cancel', sensitive: true, requires: ['club_membership.view'] },
+      { key: 'club_membership.verify' },
     ],
   },
   {

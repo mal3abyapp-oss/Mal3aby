@@ -615,6 +615,350 @@ export type Database = {
           },
         ]
       }
+      club_membership_freezes: {
+        Row: {
+          club_id: string
+          created_at: string
+          created_by: string | null
+          end_date: string
+          id: string
+          membership_subscription_id: string
+          reason: string | null
+          start_date: string
+        }
+        Insert: {
+          club_id: string
+          created_at?: string
+          created_by?: string | null
+          end_date: string
+          id?: string
+          membership_subscription_id: string
+          reason?: string | null
+          start_date: string
+        }
+        Update: {
+          club_id?: string
+          created_at?: string
+          created_by?: string | null
+          end_date?: string
+          id?: string
+          membership_subscription_id?: string
+          reason?: string | null
+          start_date?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "club_membership_freezes_club_id_fkey"
+            columns: ["club_id"]
+            isOneToOne: false
+            referencedRelation: "clubs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "club_membership_freezes_club_id_fkey"
+            columns: ["club_id"]
+            isOneToOne: false
+            referencedRelation: "commercial_entitlements_usage"
+            referencedColumns: ["club_id"]
+          },
+          {
+            foreignKeyName: "club_membership_freezes_membership_subscription_id_fkey"
+            columns: ["membership_subscription_id"]
+            isOneToOne: false
+            referencedRelation: "club_membership_subscriptions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      club_membership_number_sequences: {
+        Row: {
+          club_id: string
+          last_number: number
+        }
+        Insert: {
+          club_id: string
+          last_number?: number
+        }
+        Update: {
+          club_id?: string
+          last_number?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "club_membership_number_sequences_club_id_fkey"
+            columns: ["club_id"]
+            isOneToOne: true
+            referencedRelation: "clubs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "club_membership_number_sequences_club_id_fkey"
+            columns: ["club_id"]
+            isOneToOne: true
+            referencedRelation: "commercial_entitlements_usage"
+            referencedColumns: ["club_id"]
+          },
+        ]
+      }
+      club_membership_plan_branches: {
+        Row: {
+          branch_id: string
+          id: string
+          plan_id: string
+        }
+        Insert: {
+          branch_id: string
+          id?: string
+          plan_id: string
+        }
+        Update: {
+          branch_id?: string
+          id?: string
+          plan_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "club_membership_plan_branches_branch_id_fkey"
+            columns: ["branch_id"]
+            isOneToOne: false
+            referencedRelation: "branches"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "club_membership_plan_branches_plan_id_fkey"
+            columns: ["plan_id"]
+            isOneToOne: false
+            referencedRelation: "club_membership_plans"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      club_membership_plans: {
+        Row: {
+          allow_freeze: boolean
+          allow_renewal: boolean
+          archived_at: string | null
+          branch_scope: string
+          club_id: string
+          created_at: string
+          created_by: string | null
+          description: string | null
+          duration_unit: string
+          duration_value: number
+          id: string
+          is_active: boolean
+          is_public: boolean
+          max_freeze_days_per_period: number | null
+          name_ar: string
+          name_en: string
+          price: number
+          sort_order: number
+          updated_at: string | null
+        }
+        Insert: {
+          allow_freeze?: boolean
+          allow_renewal?: boolean
+          archived_at?: string | null
+          branch_scope?: string
+          club_id: string
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          duration_unit: string
+          duration_value: number
+          id?: string
+          is_active?: boolean
+          is_public?: boolean
+          max_freeze_days_per_period?: number | null
+          name_ar: string
+          name_en: string
+          price: number
+          sort_order?: number
+          updated_at?: string | null
+        }
+        Update: {
+          allow_freeze?: boolean
+          allow_renewal?: boolean
+          archived_at?: string | null
+          branch_scope?: string
+          club_id?: string
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          duration_unit?: string
+          duration_value?: number
+          id?: string
+          is_active?: boolean
+          is_public?: boolean
+          max_freeze_days_per_period?: number | null
+          name_ar?: string
+          name_en?: string
+          price?: number
+          sort_order?: number
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "club_membership_plans_club_id_fkey"
+            columns: ["club_id"]
+            isOneToOne: false
+            referencedRelation: "clubs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "club_membership_plans_club_id_fkey"
+            columns: ["club_id"]
+            isOneToOne: false
+            referencedRelation: "commercial_entitlements_usage"
+            referencedColumns: ["club_id"]
+          },
+        ]
+      }
+      club_membership_sale_keys: {
+        Row: {
+          created_at: string
+          idempotency_key: string
+          membership_subscription_id: string
+        }
+        Insert: {
+          created_at?: string
+          idempotency_key: string
+          membership_subscription_id: string
+        }
+        Update: {
+          created_at?: string
+          idempotency_key?: string
+          membership_subscription_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "club_membership_sale_keys_membership_subscription_id_fkey"
+            columns: ["membership_subscription_id"]
+            isOneToOne: false
+            referencedRelation: "club_membership_subscriptions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      club_membership_subscriptions: {
+        Row: {
+          branch_id: string
+          cancel_reason: string | null
+          cancelled_at: string | null
+          cancelled_by: string | null
+          club_id: string
+          created_at: string
+          created_by: string | null
+          customer_id: string
+          duration_unit_snapshot: string
+          duration_value_snapshot: number
+          end_date: string
+          id: string
+          invoice_id: string | null
+          membership_number: string
+          plan_id: string
+          plan_name_ar_snapshot: string
+          plan_name_en_snapshot: string
+          price_snapshot: number
+          start_date: string
+          status: string
+        }
+        Insert: {
+          branch_id: string
+          cancel_reason?: string | null
+          cancelled_at?: string | null
+          cancelled_by?: string | null
+          club_id: string
+          created_at?: string
+          created_by?: string | null
+          customer_id: string
+          duration_unit_snapshot: string
+          duration_value_snapshot: number
+          end_date: string
+          id?: string
+          invoice_id?: string | null
+          membership_number: string
+          plan_id: string
+          plan_name_ar_snapshot: string
+          plan_name_en_snapshot: string
+          price_snapshot: number
+          start_date: string
+          status?: string
+        }
+        Update: {
+          branch_id?: string
+          cancel_reason?: string | null
+          cancelled_at?: string | null
+          cancelled_by?: string | null
+          club_id?: string
+          created_at?: string
+          created_by?: string | null
+          customer_id?: string
+          duration_unit_snapshot?: string
+          duration_value_snapshot?: number
+          end_date?: string
+          id?: string
+          invoice_id?: string | null
+          membership_number?: string
+          plan_id?: string
+          plan_name_ar_snapshot?: string
+          plan_name_en_snapshot?: string
+          price_snapshot?: number
+          start_date?: string
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "club_membership_subscriptions_branch_id_fkey"
+            columns: ["branch_id"]
+            isOneToOne: false
+            referencedRelation: "branches"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "club_membership_subscriptions_club_id_fkey"
+            columns: ["club_id"]
+            isOneToOne: false
+            referencedRelation: "clubs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "club_membership_subscriptions_club_id_fkey"
+            columns: ["club_id"]
+            isOneToOne: false
+            referencedRelation: "commercial_entitlements_usage"
+            referencedColumns: ["club_id"]
+          },
+          {
+            foreignKeyName: "club_membership_subscriptions_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "customers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "club_membership_subscriptions_invoice_id_fkey"
+            columns: ["invoice_id"]
+            isOneToOne: false
+            referencedRelation: "invoices"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "club_membership_subscriptions_invoice_id_fkey"
+            columns: ["invoice_id"]
+            isOneToOne: false
+            referencedRelation: "outstanding_invoices"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "club_membership_subscriptions_plan_id_fkey"
+            columns: ["plan_id"]
+            isOneToOne: false
+            referencedRelation: "club_membership_plans"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       club_memberships: {
         Row: {
           club_id: string
@@ -3279,6 +3623,36 @@ export type Database = {
           },
         ]
       }
+      permission_dependencies: {
+        Row: {
+          permission_key: string
+          requires_key: string
+        }
+        Insert: {
+          permission_key: string
+          requires_key: string
+        }
+        Update: {
+          permission_key?: string
+          requires_key?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "permission_dependencies_permission_key_fkey"
+            columns: ["permission_key"]
+            isOneToOne: false
+            referencedRelation: "permissions"
+            referencedColumns: ["key"]
+          },
+          {
+            foreignKeyName: "permission_dependencies_requires_key_fkey"
+            columns: ["requires_key"]
+            isOneToOne: false
+            referencedRelation: "permissions"
+            referencedColumns: ["key"]
+          },
+        ]
+      }
       permissions: {
         Row: {
           description: string | null
@@ -4921,6 +5295,10 @@ export type Database = {
       }
     }
     Functions: {
+      _activate_club_membership_if_due_internal: {
+        Args: { p_membership_subscription_id: string }
+        Returns: boolean
+      }
       _activate_subscription_if_due_internal: {
         Args: { p_explicit?: boolean; p_subscription_id: string }
         Returns: boolean
@@ -4985,6 +5363,10 @@ export type Database = {
           raw_token: string
         }[]
       }
+      _next_club_membership_number_internal: {
+        Args: { p_club_id: string }
+        Returns: string
+      }
       activate_subscription_if_due: {
         Args: { p_subscription_id: string }
         Returns: boolean
@@ -4997,13 +5379,25 @@ export type Database = {
         Args: { p_payment_method?: string; p_proof_id: string }
         Returns: string
       }
+      archive_club_membership_plan: {
+        Args: { p_plan_id: string }
+        Returns: undefined
+      }
       archive_field_pricing_rules: {
         Args: { p_field_id: string; p_reason?: string; p_rule_ids: string[] }
         Returns: undefined
       }
+      caller_accessible_branch_ids: {
+        Args: { p_club_id: string }
+        Returns: string[]
+      }
       caller_permission_keys: { Args: { p_club_id: string }; Returns: string[] }
       cancel_booking: {
         Args: { p_booking_id: string; p_reason: string }
+        Returns: undefined
+      }
+      cancel_club_membership: {
+        Args: { p_membership_subscription_id: string; p_reason: string }
         Returns: undefined
       }
       cancel_pending_whatsapp_for_booking: {
@@ -5059,6 +5453,13 @@ export type Database = {
       close_cash_shift: {
         Args: { p_closing_count: number; p_notes?: string; p_shift_id: string }
         Returns: Json
+      }
+      club_local_day_bounds: {
+        Args: { p_club_id: string; p_date: string }
+        Returns: {
+          day_end: string
+          day_start: string
+        }[]
       }
       club_would_lose_last_owner: {
         Args: { p_club_id: string; p_excluding_membership_id: string }
@@ -5135,6 +5536,26 @@ export type Database = {
           p_receipt_series?: string
           p_record_payment?: boolean
           p_start_at: string
+        }
+        Returns: string
+      }
+      create_club_membership_plan: {
+        Args: {
+          p_allow_freeze?: boolean
+          p_allow_renewal?: boolean
+          p_branch_ids?: string[]
+          p_branch_scope?: string
+          p_club_id: string
+          p_description: string
+          p_duration_unit: string
+          p_duration_value: number
+          p_is_active?: boolean
+          p_is_public?: boolean
+          p_max_freeze_days_per_period?: number
+          p_name_ar: string
+          p_name_en: string
+          p_price: number
+          p_sort_order?: number
         }
         Returns: string
       }
@@ -5371,6 +5792,10 @@ export type Database = {
         Returns: string
       }
       ensure_booking_qr: { Args: { p_booking_id: string }; Returns: string }
+      ensure_customer_membership_qr: {
+        Args: { p_customer_id: string }
+        Returns: string
+      }
       ensure_invoice_qr: { Args: { p_invoice_id: string }; Returns: string }
       ensure_player_qr: { Args: { p_player_id: string }; Returns: string }
       expire_due_academy_subscriptions: { Args: never; Returns: number }
@@ -5391,6 +5816,15 @@ export type Database = {
           id: string
           mobile_display: string
         }[]
+      }
+      freeze_club_membership: {
+        Args: {
+          p_end_date: string
+          p_membership_subscription_id: string
+          p_reason?: string
+          p_start_date: string
+        }
+        Returns: string
       }
       freeze_subscription: {
         Args: {
@@ -5440,6 +5874,27 @@ export type Database = {
         }
         Returns: Json
       }
+      get_club_membership_detail: {
+        Args: { p_membership_subscription_id: string }
+        Returns: Json
+      }
+      get_club_membership_effective_end_date: {
+        Args: { p_membership_subscription_id: string }
+        Returns: string
+      }
+      get_club_membership_effective_status: {
+        Args: {
+          p_effective_end_date: string
+          p_start_date: string
+          p_status: string
+          p_today: string
+        }
+        Returns: string
+      }
+      get_club_membership_report: {
+        Args: { p_club_id: string; p_end_date: string; p_start_date: string }
+        Returns: Json
+      }
       get_club_platform_access: { Args: { p_club_id: string }; Returns: string }
       get_club_role_permissions: {
         Args: { p_club_role_id: string }
@@ -5482,6 +5937,10 @@ export type Database = {
           p_limit?: number
           p_offset?: number
         }
+        Returns: Json
+      }
+      get_customer_club_memberships: {
+        Args: { p_club_id: string; p_customer_id: string }
         Returns: Json
       }
       get_customer_communications: {
@@ -5635,6 +6094,25 @@ export type Database = {
           start_at: string
           status: string
           total_price: number
+        }[]
+      }
+      get_my_portal_club_memberships: {
+        Args: never
+        Returns: {
+          allow_renewal: boolean
+          branch_name: string
+          club_id: string
+          club_name: string
+          club_name_ar: string
+          effective_end_date: string
+          effective_status: string
+          end_date: string
+          membership_number: string
+          membership_subscription_id: string
+          plan_name_ar: string
+          plan_name_en: string
+          start_date: string
+          status: string
         }[]
       }
       get_my_portal_customers: {
@@ -5887,6 +6365,10 @@ export type Database = {
           same_day_online_booking_enabled: boolean
         }[]
       }
+      get_public_club_membership_plans: {
+        Args: { p_club_id: string }
+        Returns: Json
+      }
       get_public_club_subscription_access: {
         Args: { p_club_id: string }
         Returns: string
@@ -6083,6 +6565,23 @@ export type Database = {
         }
         Returns: string
       }
+      list_club_membership_plans: {
+        Args: { p_club_id: string; p_include_archived?: boolean }
+        Returns: Json
+      }
+      list_club_membership_subscriptions: {
+        Args: {
+          p_branch_id?: string
+          p_club_id: string
+          p_expiring_within_days?: number
+          p_page?: number
+          p_page_size?: number
+          p_plan_id?: string
+          p_search?: string
+          p_status?: string
+        }
+        Returns: Json
+      }
       list_club_roles: {
         Args: { p_club_id: string }
         Returns: {
@@ -6209,6 +6708,10 @@ export type Database = {
         Args: { p_club_id: string; p_permission_keys: string[] }
         Returns: boolean
       }
+      permission_set_violates_dependency: {
+        Args: { p_permission_keys: string[] }
+        Returns: boolean
+      }
       platform_reactivate_club: {
         Args: { p_club_id: string }
         Returns: undefined
@@ -6216,6 +6719,20 @@ export type Database = {
       platform_suspend_club: {
         Args: { p_club_id: string; p_reason: string }
         Returns: undefined
+      }
+      purchase_club_membership_self_service: {
+        Args: {
+          p_branch_id: string
+          p_club_id: string
+          p_idempotency_key?: string
+          p_plan_id: string
+          p_start_date: string
+        }
+        Returns: {
+          invoice_id: string
+          membership_number: string
+          membership_subscription_id: string
+        }[]
       }
       qr_confirm_checkin: {
         Args: { p_token: string }
@@ -6373,6 +6890,31 @@ export type Database = {
           subscription_id: string
         }[]
       }
+      renew_club_membership: {
+        Args: {
+          p_discount?: number
+          p_idempotency_key?: string
+          p_membership_subscription_id: string
+          p_plan_id?: string
+          p_start_date?: string
+        }
+        Returns: {
+          invoice_id: string
+          membership_number: string
+          membership_subscription_id: string
+        }[]
+      }
+      renew_club_membership_self_service: {
+        Args: {
+          p_idempotency_key?: string
+          p_membership_subscription_id: string
+        }
+        Returns: {
+          invoice_id: string
+          membership_number: string
+          membership_subscription_id: string
+        }[]
+      }
       renew_platform_subscription: {
         Args: { p_plan_id?: string; p_previous_subscription_id: string }
         Returns: string
@@ -6425,6 +6967,14 @@ export type Database = {
         }
         Returns: number
       }
+      restore_club_membership_plan: {
+        Args: { p_plan_id: string }
+        Returns: undefined
+      }
+      resume_club_membership: {
+        Args: { p_membership_subscription_id: string; p_reason?: string }
+        Returns: undefined
+      }
       retry_failed_whatsapp_message: {
         Args: { p_queue_id: string }
         Returns: undefined
@@ -6444,6 +6994,22 @@ export type Database = {
       review_customer_photo_request: {
         Args: { p_approve: boolean; p_reason?: string; p_request_id: string }
         Returns: undefined
+      }
+      sell_club_membership: {
+        Args: {
+          p_branch_id: string
+          p_club_id: string
+          p_customer_id: string
+          p_discount?: number
+          p_idempotency_key?: string
+          p_plan_id: string
+          p_start_date: string
+        }
+        Returns: {
+          invoice_id: string
+          membership_number: string
+          membership_subscription_id: string
+        }[]
       }
       send_portal_invite: {
         Args: { p_customer_id: string }
@@ -6567,6 +7133,26 @@ export type Database = {
           isOneToOne: true
           isSetofReturn: false
         }
+      }
+      update_club_membership_plan: {
+        Args: {
+          p_allow_freeze: boolean
+          p_allow_renewal: boolean
+          p_branch_ids?: string[]
+          p_branch_scope: string
+          p_description: string
+          p_duration_unit: string
+          p_duration_value: number
+          p_is_active: boolean
+          p_is_public: boolean
+          p_max_freeze_days_per_period: number
+          p_name_ar: string
+          p_name_en: string
+          p_plan_id: string
+          p_price: number
+          p_sort_order?: number
+        }
+        Returns: undefined
       }
       update_club_role: {
         Args: {

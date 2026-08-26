@@ -32,6 +32,7 @@
     "today": "اليوم",
     "bookings": "الحجوزات",
     "academy": "الأكاديمية",
+    "memberships": "عضويات النادي",
     "customers": "العملاء",
     "billing": "الفواتير والمدفوعات",
     "outstanding": "المستحقات",
@@ -54,6 +55,7 @@
     "nav": {
       "bookings": "حجوزاتي",
       "academy": "أكاديميتي",
+      "memberships": "عضوياتي",
       "payments": "مدفوعاتي",
       "qr": "رمزي",
       "profile": "حسابي"
@@ -1399,6 +1401,154 @@
       "full_payment": "عند السداد الكامل"
     }
   },
+  "clubMemberships": {
+    "title": "عضويات النادي",
+    "description": "خطط العضوية، الأعضاء، والتجديدات",
+    "membership": "العضوية",
+    "membershipPlan": "خطة العضوية",
+    "membershipNumber": "رقم العضوية",
+    "startDate": "تاريخ البداية",
+    "expiryDate": "تاريخ الانتهاء",
+    "branch": "الفرع",
+    "daysRemaining": "متبقٍ {{count}} يوم",
+    "daysRemaining_zero": "لا توجد أيام متبقية",
+    "daysRemaining_two": "متبقٍ يومان",
+    "daysRemaining_few": "متبقٍ {{count}} أيام",
+    "daysRemaining_many": "متبقٍ {{count}} يومًا",
+    "daysRemaining_other": "متبقٍ {{count}} يوم",
+    "validUntil": "صالحة حتى {{date}}",
+    "qrAlt": "رمز QR الخاص بالعضوية",
+    "qrHint": "أظهر رمز QR هذا عند الدخول",
+    "qrError": "تعذّر إنشاء رمز QR.",
+    "generatingQr": "جارٍ إنشاء رمز QR...",
+    "tabs": {
+      "overview": "نظرة عامة",
+      "plans": "الخطط",
+      "members": "الأعضاء",
+      "expiring": "قريبة الانتهاء"
+    },
+    "statusLabels": {
+      "pending_payment": "بانتظار الدفع",
+      "scheduled": "مجدولة",
+      "active": "نشطة",
+      "frozen": "مجمّدة",
+      "expired": "منتهية",
+      "cancelled": "ملغاة"
+    },
+    "durationUnits": {
+      "day": "يوم/أيام",
+      "month": "شهر/أشهر",
+      "year": "سنة/سنوات"
+    },
+    "overview": {
+      "totalActive": "الأعضاء النشطون",
+      "scheduled": "مجدولة",
+      "frozen": "مجمّدة",
+      "expiringSoon": "تنتهي خلال 7 أيام",
+      "viewExpiringLink": "عرض العضويات قريبة الانتهاء"
+    },
+    "plans": {
+      "create": "خطة جديدة",
+      "createTitle": "خطة عضوية جديدة",
+      "editTitle": "تعديل خطة العضوية",
+      "showArchived": "عرض الخطط المؤرشفة",
+      "nameAr": "الاسم (عربي)",
+      "nameEn": "الاسم (إنجليزي)",
+      "description": "الوصف",
+      "price": "السعر",
+      "durationValue": "المدة",
+      "durationUnit": "الوحدة",
+      "branchScope": "متاحة في",
+      "allBranches": "كل الفروع",
+      "selectedBranches": "فروع محددة",
+      "noBranches": "لا توجد فروع نشطة.",
+      "isActive": "نشطة (متاحة للبيع الجديد)",
+      "isPublic": "عامة (تظهر في بوابة العميل)",
+      "allowRenewal": "السماح بالتجديد",
+      "allowFreeze": "السماح بالتجميد",
+      "maxFreezeDays": "الحد الأقصى لأيام التجميد لكل فترة",
+      "maxFreezeDaysUnlimited": "غير محدود",
+      "archive": "أرشفة",
+      "restore": "استرجاع",
+      "archived": "مؤرشفة",
+      "active": "نشطة",
+      "inactive": "غير نشطة",
+      "emptyTitle": "لا توجد خطط عضوية بعد",
+      "emptyDescription": "أنشئ أول خطة عضوية لبدء بيع عضويات النادي.",
+      "columns": {
+        "name": "الخطة",
+        "price": "السعر",
+        "duration": "المدة",
+        "branches": "الفروع",
+        "members": "الأعضاء",
+        "status": "الحالة"
+      },
+      "errors": {
+        "branchRequired": "اختر فرعًا واحدًا على الأقل.",
+        "saveError": "تعذّر حفظ هذه الخطة."
+      }
+    },
+    "members": {
+      "searchPlaceholder": "ابحث بالاسم أو الجوال أو رقم العضوية...",
+      "allStatuses": "كل الحالات",
+      "emptyTitle": "لا توجد عضويات نادٍ بعد",
+      "emptyDescription": "بيع عضوية لتظهر هنا."
+    },
+    "expiring": {
+      "emptyTitle": "لا توجد عضويات قريبة الانتهاء",
+      "emptyDescription": "ستظهر هنا العضويات النشطة التي تنتهي خلال 7 أيام."
+    },
+    "sell": {
+      "title": "بيع عضوية",
+      "submit": "بيع العضوية",
+      "planPrice": "سعر الخطة",
+      "renewalStartHint": "اتركه فارغًا لبدء التجديد فور انتهاء الفترة الحالية",
+      "errors": {
+        "customerRequired": "اختر عميلاً أولاً.",
+        "planRequired": "اختر خطة أولاً.",
+        "branchRequired": "اختر فرعًا أولاً.",
+        "sellError": "تعذّر إتمام عملية البيع."
+      }
+    },
+    "detail": {
+      "price": "السعر",
+      "cancelledNotice": "تم إلغاء هذه العضوية.",
+      "freezeAction": "تجميد العضوية",
+      "resumeAction": "استئناف العضوية",
+      "cancelAction": "إلغاء العضوية",
+      "confirmCancel": "تأكيد الإلغاء",
+      "viewCard": "عرض البطاقة / QR",
+      "freezeNotAllowedTooltip": "هذه الخطة لا تسمح بالتجميد",
+      "cancelReasonLabel": "سبب الإلغاء (مطلوب)",
+      "cancelReasonPlaceholder": "لماذا يتم إلغاء هذه العضوية؟",
+      "freezeHistory": "سجل التجميد",
+      "freezeRange": "الفترة",
+      "freezeDays": "الأيام",
+      "freezeReason": "السبب",
+      "noFreezes": "لا يوجد سجل تجميد",
+      "renewalHistory": "سجل التجديد",
+      "noRenewalHistory": "لا يوجد سجل تجديد",
+      "goToPaymentsHint": "الذهاب إلى المدفوعات",
+      "errors": {
+        "reasonRequired": "سبب الإلغاء مطلوب.",
+        "cancelError": "تعذّر إلغاء هذه العضوية.",
+        "renewError": "تعذّر تجديد هذه العضوية.",
+        "renewalNotAllowed": "هذه الخطة لا تسمح بالتجديد.",
+        "freezeError": "تعذّر تجميد هذه العضوية.",
+        "resumeError": "تعذّر استئناف هذه العضوية."
+      }
+    },
+    "portal": {
+      "title": "عضوياتي",
+      "description": "عضويات النادي الخاصة بك، الحالية والسابقة",
+      "buyMembership": "شراء عضوية",
+      "emptyTitle": "لا توجد لديك عضويات نادٍ بعد.",
+      "current": "الحالية",
+      "upcoming": "القادمة",
+      "past": "السابقة",
+      "noPlansAvailable": "لا توجد خطط عضوية متاحة للشراء حاليًا."
+    }
+  },
   "activate": {
     "brand": "ملعبي",
     "loading": "جارٍ التحميل...",
@@ -2132,6 +2282,7 @@
         "overview": "نظرة عامة",
         "bookings": "الحجوزات",
         "academy": "الأكاديمية واللاعبون",
+        "clubMembership": "عضويات النادي",
         "financial": "الحساب المالي",
         "whatsapp": "واتساب والتواصل",
         "activity": "النشاط والتدقيق"
@@ -2162,6 +2313,7 @@
       "createFirstBooking": "أنشئ أول حجز"
     },
     "more": {
+      "membershipsDesc": "خطط عضوية النادي والأعضاء والتجديدات",
       "customersDesc": "البحث عن العملاء وإدارة بياناتهم",
       "billingDesc": "سجل الفواتير والمدفوعات والمستحقات",
       "outstandingDesc": "الفواتير غير المسددة بالكامل",
@@ -2765,6 +2917,13 @@
       "subscription_inactive": "الاشتراك غير نشط",
       "payment_required": "لا يمكن تسجيل الحضور — يوجد مبلغ مستحق"
     },
+    "membershipOutcomes": {
+      "expired": "العضوية منتهية",
+      "frozen": "العضوية مجمّدة",
+      "cancelled": "العضوية ملغاة",
+      "notStarted": "العضوية لم تبدأ بعد",
+      "noMembership": "لا توجد عضوية نادٍ"
+    },
     "paymentRequiredAmount": "المبلغ المستحق: {{amount}}. يجب إتمام السداد قبل تسجيل الحضور.",
     "collectPayment": "تحصيل الدفعة",
     "subscriptionStatus": {
@@ -2772,7 +2931,8 @@
       "active": "نشط",
       "frozen": "مجمّد",
       "expired": "منتهي",
-      "cancelled": "ملغي"
+      "cancelled": "ملغي",
+      "notStarted": "لم تبدأ بعد"
     }
   },
   "search": {
@@ -3055,6 +3215,7 @@
       "bookings": "الحجوزات",
       "customers": "العملاء",
       "academy": "الأكاديمية",
+      "memberships": "عضويات النادي",
       "finance": "المالية",
       "cash": "التحصيل والعهدة",
       "reports": "التقارير",
@@ -3208,6 +3369,38 @@
     "payment.methods.manage": {
       "label": "إدارة طرق الدفع",
       "description": "إنشاء أو تعديل أو تعطيل طرق الدفع"
+    },
+    "club_membership.plan.view": {
+      "label": "عرض خطط العضوية",
+      "description": "رؤية كتالوج خطط عضوية النادي وأسعارها ومددها"
+    },
+    "club_membership.plan.manage": {
+      "label": "إدارة خطط العضوية",
+      "description": "إنشاء أو تعديل أو أرشفة خطط عضوية النادي"
+    },
+    "club_membership.view": {
+      "label": "عرض عضويات النادي",
+      "description": "رؤية عضويات النادي للعملاء وسجلها الكامل"
+    },
+    "club_membership.create": {
+      "label": "بيع عضويات النادي",
+      "description": "بيع عضوية نادي جديدة لعميل"
+    },
+    "club_membership.renew": {
+      "label": "تجديد عضويات النادي",
+      "description": "تجديد عضوية نادي قائمة"
+    },
+    "club_membership.freeze": {
+      "label": "تجميد/استئناف عضويات النادي",
+      "description": "تجميد عضوية نادي نشطة، أو استئناف عضوية مجمّدة"
+    },
+    "club_membership.cancel": {
+      "label": "إلغاء عضويات النادي",
+      "description": "إلغاء عضوية نادي، مما يوقف الاستحقاق فورًا"
+    },
+    "club_membership.verify": {
+      "label": "التحقق من رمز QR للعضوية",
+      "description": "مسح والتحقق من رمز QR الخاص بعضوية النادي عند الدخول"
     },
     "cash.liability.view": {
       "label": "عرض عجز العهدة",

@@ -2,7 +2,7 @@ import { Link } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { PageHeader } from '@/components/ui/page-header'
 import { Card, CardContent } from '@/components/ui/card'
-import { Users, Receipt, BarChart3, UserCog, Settings, ChevronRight, Building2, ShieldCheck, MessageCircle, LogOut } from 'lucide-react'
+import { Users, Receipt, BarChart3, UserCog, Settings, ChevronRight, Building2, ShieldCheck, MessageCircle, LogOut, IdCard } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 import { useAuth } from '@/app/providers/AuthProvider'
 import { canSeeNavDomain, type NavDomain } from '@/lib/domain/navigation'
@@ -52,6 +52,7 @@ interface MoreItem {
 }
 
 const ITEMS: MoreItem[] = [
+  { to: '/app/memberships', labelKey: 'nav.memberships', descriptionKey: 'dashboard.more.membershipsDesc', icon: IdCard, domain: 'memberships' },
   { to: '/app/customers', labelKey: 'nav.customers', descriptionKey: 'dashboard.more.customersDesc', icon: Users, domain: 'customers' },
   { to: '/app/finance', labelKey: 'nav.finance', descriptionKey: 'dashboard.more.financeDesc', icon: Receipt, domain: 'finance' },
   { to: '/app/reports', labelKey: 'nav.reports', descriptionKey: 'dashboard.more.reportsDesc', icon: BarChart3, domain: 'reports' },

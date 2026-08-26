@@ -32,6 +32,7 @@
     "today": "Today",
     "bookings": "Bookings",
     "academy": "Academy",
+    "memberships": "Club Memberships",
     "customers": "Customers",
     "billing": "Billing & Payments",
     "outstanding": "Outstanding",
@@ -54,6 +55,7 @@
     "nav": {
       "bookings": "My Bookings",
       "academy": "My Academy",
+      "memberships": "My Memberships",
       "payments": "My Payments",
       "qr": "My QR",
       "profile": "My Account"
@@ -1399,6 +1401,150 @@
       "full_payment": "On full payment"
     }
   },
+  "clubMemberships": {
+    "title": "Club Memberships",
+    "description": "Membership plans, members, and renewals",
+    "membership": "Membership",
+    "membershipPlan": "Membership Plan",
+    "membershipNumber": "Membership Number",
+    "startDate": "Start Date",
+    "expiryDate": "Expiry Date",
+    "branch": "Branch",
+    "daysRemaining": "{{count}} day remaining",
+    "daysRemaining_other": "{{count}} days remaining",
+    "validUntil": "Valid until {{date}}",
+    "qrAlt": "Membership QR code",
+    "qrHint": "Present this QR code at the entrance",
+    "qrError": "Couldn't generate the QR code.",
+    "generatingQr": "Generating QR code...",
+    "tabs": {
+      "overview": "Overview",
+      "plans": "Plans",
+      "members": "Members",
+      "expiring": "Expiring Soon"
+    },
+    "statusLabels": {
+      "pending_payment": "Awaiting payment",
+      "scheduled": "Scheduled",
+      "active": "Active",
+      "frozen": "Frozen",
+      "expired": "Expired",
+      "cancelled": "Cancelled"
+    },
+    "durationUnits": {
+      "day": "day(s)",
+      "month": "month(s)",
+      "year": "year(s)"
+    },
+    "overview": {
+      "totalActive": "Active members",
+      "scheduled": "Scheduled",
+      "frozen": "Frozen",
+      "expiringSoon": "Expiring in 7 days",
+      "viewExpiringLink": "View expiring memberships"
+    },
+    "plans": {
+      "create": "New plan",
+      "createTitle": "New membership plan",
+      "editTitle": "Edit membership plan",
+      "showArchived": "Show archived plans",
+      "nameAr": "Name (Arabic)",
+      "nameEn": "Name (English)",
+      "description": "Description",
+      "price": "Price",
+      "durationValue": "Duration",
+      "durationUnit": "Unit",
+      "branchScope": "Available at",
+      "allBranches": "All branches",
+      "selectedBranches": "Selected branches",
+      "noBranches": "No active branches found.",
+      "isActive": "Active (available for new sales)",
+      "isPublic": "Public (visible in the customer portal)",
+      "allowRenewal": "Allow renewal",
+      "allowFreeze": "Allow freeze",
+      "maxFreezeDays": "Maximum freeze days per period",
+      "maxFreezeDaysUnlimited": "Unlimited",
+      "archive": "Archive",
+      "restore": "Restore",
+      "archived": "Archived",
+      "active": "Active",
+      "inactive": "Inactive",
+      "emptyTitle": "No membership plans yet",
+      "emptyDescription": "Create your first membership plan to start selling club memberships.",
+      "columns": {
+        "name": "Plan",
+        "price": "Price",
+        "duration": "Duration",
+        "branches": "Branches",
+        "members": "Members",
+        "status": "Status"
+      },
+      "errors": {
+        "branchRequired": "Select at least one branch.",
+        "saveError": "Couldn't save this plan."
+      }
+    },
+    "members": {
+      "searchPlaceholder": "Search by name, mobile, or membership number...",
+      "allStatuses": "All statuses",
+      "emptyTitle": "No club memberships yet",
+      "emptyDescription": "Sell a membership to see it listed here."
+    },
+    "expiring": {
+      "emptyTitle": "No memberships expiring soon",
+      "emptyDescription": "Active memberships expiring within 7 days will appear here."
+    },
+    "sell": {
+      "title": "Sell membership",
+      "submit": "Sell membership",
+      "planPrice": "Plan price",
+      "renewalStartHint": "Leave blank to start right after the current period ends",
+      "errors": {
+        "customerRequired": "Choose a customer first.",
+        "planRequired": "Choose a plan first.",
+        "branchRequired": "Choose a branch first.",
+        "sellError": "Couldn't complete this sale."
+      }
+    },
+    "detail": {
+      "price": "Price",
+      "cancelledNotice": "This membership was cancelled.",
+      "freezeAction": "Freeze membership",
+      "resumeAction": "Resume membership",
+      "cancelAction": "Cancel membership",
+      "confirmCancel": "Confirm cancellation",
+      "viewCard": "View card / QR",
+      "freezeNotAllowedTooltip": "This plan doesn't allow freezing",
+      "cancelReasonLabel": "Cancellation reason (required)",
+      "cancelReasonPlaceholder": "Why is this membership being cancelled?",
+      "freezeHistory": "Freeze history",
+      "freezeRange": "Period",
+      "freezeDays": "Days",
+      "freezeReason": "Reason",
+      "noFreezes": "No freezes recorded",
+      "renewalHistory": "Renewal history",
+      "noRenewalHistory": "No renewal history",
+      "goToPaymentsHint": "Go to Payments",
+      "errors": {
+        "reasonRequired": "A cancellation reason is required.",
+        "cancelError": "Couldn't cancel this membership.",
+        "renewError": "Couldn't renew this membership.",
+        "renewalNotAllowed": "This plan doesn't allow renewal.",
+        "freezeError": "Couldn't freeze this membership.",
+        "resumeError": "Couldn't resume this membership."
+      }
+    },
+    "portal": {
+      "title": "My Memberships",
+      "description": "Your club memberships, current and past",
+      "buyMembership": "Buy a membership",
+      "emptyTitle": "You don't have any club memberships yet.",
+      "current": "Current",
+      "upcoming": "Upcoming",
+      "past": "Past",
+      "noPlansAvailable": "No membership plans are available for purchase right now."
+    }
+  },
   "activate": {
     "brand": "Mal3aby",
     "loading": "Loading...",
@@ -2132,6 +2278,7 @@
         "overview": "Overview",
         "bookings": "Bookings",
         "academy": "Academy & Players",
+        "clubMembership": "Club Memberships",
         "financial": "Financial Account",
         "whatsapp": "WhatsApp & Communication",
         "activity": "Activity & Audit"
@@ -2162,6 +2309,7 @@
       "createFirstBooking": "Create your first booking"
     },
     "more": {
+      "membershipsDesc": "Club membership plans, members, and renewals",
       "customersDesc": "Search for customers and manage their data",
       "billingDesc": "Invoice, payment, and outstanding records",
       "outstandingDesc": "Invoices not yet fully paid",
@@ -2761,6 +2909,13 @@
       "subscription_inactive": "Subscription isn't active",
       "payment_required": "Check-in denied — outstanding balance"
     },
+    "membershipOutcomes": {
+      "expired": "Membership expired",
+      "frozen": "Membership frozen",
+      "cancelled": "Membership cancelled",
+      "notStarted": "Membership not started yet",
+      "noMembership": "No club membership found"
+    },
     "paymentRequiredAmount": "Amount due: {{amount}}. Payment must be completed before check-in.",
     "collectPayment": "Collect payment",
     "subscriptionStatus": {
@@ -2768,7 +2923,8 @@
       "active": "Active",
       "frozen": "Frozen",
       "expired": "Expired",
-      "cancelled": "Cancelled"
+      "cancelled": "Cancelled",
+      "notStarted": "Not started yet"
     }
   },
   "search": {
@@ -3062,6 +3218,7 @@
       "bookings": "Bookings",
       "customers": "Customers",
       "academy": "Academy",
+      "memberships": "Club Memberships",
       "finance": "Finance",
       "cash": "Collections & Custody",
       "reports": "Reports",
@@ -3215,6 +3372,38 @@
     "payment.methods.manage": {
       "label": "Manage payment methods",
       "description": "Create, edit, or disable payment methods"
+    },
+    "club_membership.plan.view": {
+      "label": "View membership plans",
+      "description": "See the club's membership plan catalog and its pricing/duration"
+    },
+    "club_membership.plan.manage": {
+      "label": "Manage membership plans",
+      "description": "Create, edit, or archive club membership plans"
+    },
+    "club_membership.view": {
+      "label": "View club memberships",
+      "description": "See customer club memberships and their full history"
+    },
+    "club_membership.create": {
+      "label": "Sell club memberships",
+      "description": "Sell a new club membership to a customer"
+    },
+    "club_membership.renew": {
+      "label": "Renew club memberships",
+      "description": "Renew an existing club membership"
+    },
+    "club_membership.freeze": {
+      "label": "Freeze/resume club memberships",
+      "description": "Freeze an active club membership, or resume one that is frozen"
+    },
+    "club_membership.cancel": {
+      "label": "Cancel club memberships",
+      "description": "Cancel a club membership, stopping its entitlement immediately"
+    },
+    "club_membership.verify": {
+      "label": "Verify club membership QR",
+      "description": "Scan and verify a club membership QR code at the entrance"
     },
     "cash.liability.view": {
       "label": "View cash liability",

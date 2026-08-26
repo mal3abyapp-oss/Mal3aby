@@ -28,6 +28,7 @@ export type NavDomain =
   | 'bookings'
   | 'customers'
   | 'academy'
+  | 'memberships'
   | 'finance'
   | 'reports'
   | 'whatsapp'
@@ -49,6 +50,13 @@ const NAV_DOMAIN_PERMISSIONS: Record<Exclude<NavDomain, 'today'>, readonly strin
   academy: [
     'enrollment.view', 'enrollment.create', 'academy.group.manage', 'academy.program.manage',
     'session.view', 'attendance.view', 'attendance.mark',
+  ],
+  // CLUB MEMBERSHIPS domain (2026-08-26) -- a genuine top-level main
+  // domain, deliberately never nested under academy (directive Section
+  // 96/111: Club Membership is NOT academy enrollment).
+  memberships: [
+    'club_membership.plan.view', 'club_membership.view', 'club_membership.create',
+    'club_membership.renew', 'club_membership.freeze', 'club_membership.cancel',
   ],
   finance: ['payment.view', 'payment.create', 'invoice.view', 'invoice.create', 'payment.refund'],
   reports: ['report.view'],

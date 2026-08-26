@@ -3,7 +3,7 @@ import { NavLink, Outlet } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { useAuth } from '@/app/providers/AuthProvider'
 import { PortalClubProvider, usePortalClub } from '@/app/providers/PortalClubProvider'
-import { CalendarDays, GraduationCap, Wallet, QrCode, User, LogOut } from 'lucide-react'
+import { CalendarDays, GraduationCap, IdCard, Wallet, QrCode, User, LogOut } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 import { LanguageSwitcher } from '@/components/ui/language-switcher'
 import { RouteLoadingFallback } from '@/app/routing/RouteLoadingFallback'
@@ -34,6 +34,7 @@ interface NavItem {
 const navItems: NavItem[] = [
   { to: '/portal/bookings', labelKey: 'portal.nav.bookings', icon: CalendarDays },
   { to: '/portal/academy', labelKey: 'portal.nav.academy', icon: GraduationCap },
+  { to: '/portal/memberships', labelKey: 'portal.nav.memberships', icon: IdCard },
   { to: '/portal/payments', labelKey: 'portal.nav.payments', icon: Wallet },
   { to: '/portal/qr', labelKey: 'portal.nav.qr', icon: QrCode },
   { to: '/portal/profile', labelKey: 'portal.nav.profile', icon: User },

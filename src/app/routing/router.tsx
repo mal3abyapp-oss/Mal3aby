@@ -31,6 +31,7 @@ const TodayPage = lazy(() => import('@/features/dashboard/TodayPage').then((m) =
 const MorePage = lazy(() => import('@/features/dashboard/MorePage').then((m) => ({ default: m.MorePage })))
 const BookingsPage = lazy(() => import('@/features/bookings/BookingsPage').then((m) => ({ default: m.BookingsPage })))
 const AcademyPage = lazy(() => import('@/features/academy/AcademyPage').then((m) => ({ default: m.AcademyPage })))
+const MembershipsPage = lazy(() => import('@/features/memberships/MembershipsPage').then((m) => ({ default: m.MembershipsPage })))
 const Player360Page = lazy(() => import('@/features/academy/Player360Page').then((m) => ({ default: m.Player360Page })))
 const CustomersPage = lazy(() => import('@/features/customers/CustomersPage').then((m) => ({ default: m.CustomersPage })))
 const Customer360Page = lazy(() => import('@/features/customers/Customer360Page').then((m) => ({ default: m.Customer360Page })))
@@ -67,6 +68,7 @@ const ScanPage = lazy(() => import('@/features/scanner/ScanPage').then((m) => ({
 const PortalRoot = lazy(() => import('@/features/portal/PortalRoot').then((m) => ({ default: m.PortalRoot })))
 const PortalBookingsPage = lazy(() => import('@/features/portal/PortalBookingsPage').then((m) => ({ default: m.PortalBookingsPage })))
 const PortalAcademyPage = lazy(() => import('@/features/portal/PortalAcademyPage').then((m) => ({ default: m.PortalAcademyPage })))
+const PortalMembershipsPage = lazy(() => import('@/features/portal/PortalMembershipsPage').then((m) => ({ default: m.PortalMembershipsPage })))
 const PortalQrPage = lazy(() => import('@/features/portal/PortalQrPage').then((m) => ({ default: m.PortalQrPage })))
 const PortalPaymentsPage = lazy(() => import('@/features/portal/PortalPaymentsPage').then((m) => ({ default: m.PortalPaymentsPage })))
 const PortalProfilePage = lazy(() => import('@/features/portal/PortalProfilePage').then((m) => ({ default: m.PortalProfilePage })))
@@ -173,6 +175,7 @@ export const router = createBrowserRouter([
           { index: true, element: <RequireNavDomain domain="today"><TodayPage /></RequireNavDomain> },
           { path: 'bookings', element: <RequireNavDomain domain="bookings"><BookingsPage /></RequireNavDomain> },
           { path: 'academy', element: <RequireNavDomain domain="academy"><AcademyPage /></RequireNavDomain> },
+          { path: 'memberships', element: <RequireNavDomain domain="memberships"><MembershipsPage /></RequireNavDomain> },
           // Academy Player/Guardian/Customer integrity closure: the
           // canonical Player 360 detail/edit page, same pattern as
           // Customer 360 (/app/customers/:customerId) and Staff 360
@@ -316,6 +319,7 @@ export const router = createBrowserRouter([
           { index: true, element: <RequirePortalCustomer><PortalRoot /></RequirePortalCustomer> },
           { path: 'bookings', element: <RequirePortalCustomer><PortalBookingsPage /></RequirePortalCustomer> },
           { path: 'academy', element: <RequirePortalCustomer><PortalAcademyPage /></RequirePortalCustomer> },
+          { path: 'memberships', element: <RequirePortalCustomer><PortalMembershipsPage /></RequirePortalCustomer> },
           { path: 'payments', element: <RequirePortalCustomer><PortalPaymentsPage /></RequirePortalCustomer> },
           { path: 'qr', element: <RequirePortalCustomer><PortalQrPage /></RequirePortalCustomer> },
           { path: 'profile', element: <RequirePortalCustomer><PortalProfilePage /></RequirePortalCustomer> },

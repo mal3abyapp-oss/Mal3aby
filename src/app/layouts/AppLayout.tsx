@@ -26,6 +26,7 @@ import {
   MessageCircle,
   Building2,
   ShieldCheck,
+  IdCard,
 } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 
@@ -74,6 +75,9 @@ const navSections: NavSection[] = [
       { to: '/app', labelKey: 'nav.today', icon: LayoutDashboard, domain: 'today' },
       { to: '/app/bookings', labelKey: 'nav.bookings', icon: CalendarDays, domain: 'bookings' },
       { to: '/app/academy', labelKey: 'nav.academy', icon: GraduationCap, domain: 'academy' },
+      // Club Memberships: a genuine top-level main domain, deliberately
+      // never nested under Academy (directive Section 96/111).
+      { to: '/app/memberships', labelKey: 'nav.memberships', icon: IdCard, domain: 'memberships' },
       { to: '/app/customers', labelKey: 'nav.customers', icon: Users, domain: 'customers' },
       { to: '/app/finance', labelKey: 'nav.finance', icon: Receipt, domain: 'finance' },
     ],
