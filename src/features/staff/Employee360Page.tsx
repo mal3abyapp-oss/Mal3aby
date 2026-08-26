@@ -12,6 +12,7 @@ import { Input } from '@/components/ui/input'
 import { StatCard } from '@/components/ui/stat-card'
 import { StatusBadge } from '@/components/ui/status-badge'
 import { MoneyDisplay } from '@/components/ui/money-display'
+import { actionLabel } from '@/lib/domain/audit'
 import { formatMoney } from '@/lib/domain/billing'
 import { DataTable, type DataTableColumn } from '@/components/ui/data-table'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
@@ -440,7 +441,16 @@ export function Employee360Page() {
             <DataTable
               columns={[
                 { key: 'date', header: t('common.date', { defaultValue: 'Date' }), render: (a) => <span className="tabular-nums"><bdi>{new Date(a.created_at).toLocaleString(locale === 'en' ? 'en-US' : 'ar-EG')}</bdi></span> },
-                { key: 'action', header: t('customers.detail.action', { defaultValue: 'Action' }), render: (a) => a.action },
+                {
+                  // EMPLOYEE CASH LIABILITY SETTLEMENT HOTFIX (2026-08-26):
+                  // was rendering the raw audit_logs.action machine code
+                  // directly (e.g. "employee_cash_liability.settled")
+                  // -- found live while verifying this exact feature's
+                  // own audit trail. actionLabel() already exists and is
+                  // used correctly elsewhere in the app; this screen had
+                  // simply never been wired to it.
+                  key: 'action', header: t('customers.detail.action', { defaultValue: 'Action' }), render: (a) => actionLabel(a.action, locale === 'en' ? 'en' : 'ar'),
+                },
                 {
                   key: 'entity', header: t('staff.detail.reference', { defaultValue: 'Reference' }), render: (a) => {
                     if (a.entity_type === 'customer') return <Link to={`/app/customers/${a.entity_id}`} className="text-accent-foreground hover:underline">{t('staff.detail.viewCustomer', { defaultValue: 'View customer' })}</Link>
@@ -617,16 +627,30 @@ function SettleLiabilityDialog({
   onClose: () => void
   onSettled: () => void
 }) {
-  const { t } = useTranslation()
+  const { t, i18n } = useTranslation()
+  const locale = i18n.language === 'en' ? 'en' : 'ar'
   const [amount, setAmount] = useState(() => liability.outstanding.toFixed(2))
   const [reason, setReason] = useState('')
   const [error, setError] = useState<string | null>(null)
+  const [successMessage, setSuccessMessage] = useState<string | null>(null)
   const idempotencyKeyRef = useRef<string | null>(null)
+
+  // EMPLOYEE CASH LIABILITY SETTLEMENT HOTFIX (2026-08-26): live
+  // "remaining after this payment" preview (Section 14 of the hotfix
+  // directive) -- computed client-side from the same real numbers the
+  // dialog already displays, purely for the confirm-before-you-commit
+  // preview; the server's own settle_employee_cash_liability() RPC is
+  // still the sole source of truth for the actual outcome.
+  const parsedAmount = Number(amount)
+  const isValidAmount = Number.isFinite(parsedAmount) && parsedAmount > 0
+  const exceedsOutstanding = isValidAmount && parsedAmount > liability.outstanding
+  const remainingAfter = isValidAmount && !exceedsOutstanding ? liability.outstanding - parsedAmount : null
+  const willFullyClose = remainingAfter !== null && remainingAfter <= 0
 
   const settleMutation = useMutation({
     mutationFn: async () => {
-      const parsedAmount = Number(amount)
-      if (!parsedAmount || parsedAmount <= 0) throw new Error(t('bookings.detail.invalidAmountError'))
+      if (!isValidAmount) throw new Error(t('bookings.detail.invalidAmountError'))
+      if (exceedsOutstanding) throw new Error(t('staff.detail.settleErrorOverpayment'))
       if (!idempotencyKeyRef.current) idempotencyKeyRef.current = crypto.randomUUID()
       const { error: rpcError } = await supabase.rpc('settle_employee_cash_liability', {
         p_liability_id: liability.id, p_amount: parsedAmount, p_reason: reason || undefined,
@@ -634,7 +658,18 @@ function SettleLiabilityDialog({
       })
       if (rpcError) throw rpcError
     },
-    onSuccess: onSettled,
+    onSuccess: () => {
+      // Section 16: show a clear success state before the dialog
+      // closes -- the query invalidation onSettled triggers is async,
+      // so a brief, honest confirmation here avoids the user wondering
+      // whether the click "took."
+      setSuccessMessage(
+        willFullyClose
+          ? t('staff.detail.settleSuccessFull')
+          : t('staff.detail.settleSuccessPartial', { amount: formatMoney(remainingAfter ?? 0, 'EGP', locale) }),
+      )
+      window.setTimeout(onSettled, 900)
+    },
     onError: (err) => setError(translateSupabaseError(err, t('staff.detail.settleError', { defaultValue: "Couldn't settle this liability." }))),
   })
 
@@ -643,15 +678,71 @@ function SettleLiabilityDialog({
       <DialogContent>
         <DialogHeader><DialogTitle>{t('staff.detail.settle', { defaultValue: 'Settle' })}</DialogTitle></DialogHeader>
         <div className="flex flex-col gap-3">
+          <div className="flex items-center justify-between rounded-lg border border-border p-3 text-sm">
+            <span className="text-text-secondary">{t('staff.detail.settleOriginalAmount')}</span>
+            <MoneyDisplay amount={liability.original_amount} size="sm" />
+          </div>
+          {liability.settled_amount > 0 && (
+            <div className="flex items-center justify-between rounded-lg border border-border p-3 text-sm">
+              <span className="text-text-secondary">{t('staff.detail.settlePreviouslySettled')}</span>
+              <MoneyDisplay amount={liability.settled_amount} size="sm" />
+            </div>
+          )}
           <div className="flex items-center justify-between rounded-lg border border-accent/30 bg-accent/5 p-3 text-sm">
             <span>{t('staff.detail.outstanding', { defaultValue: 'Outstanding' })}</span>
             <MoneyDisplay amount={liability.outstanding} tone="danger" size="sm" />
           </div>
-          <Input type="number" min={0} step="0.01" value={amount} onChange={(e) => setAmount(e.target.value)} />
-          <Input placeholder={t('staff.detail.reasonOptional', { defaultValue: 'Reason (optional)' })} value={reason} onChange={(e) => setReason(e.target.value)} />
+
+          <label className="flex flex-col gap-1.5 text-sm">
+            <span className="font-medium text-text-secondary">{t('staff.detail.settleAmountLabel')}</span>
+            <Input
+              type="number"
+              min={0}
+              max={liability.outstanding}
+              step="0.01"
+              value={amount}
+              onChange={(e) => setAmount(e.target.value)}
+              disabled={settleMutation.isPending || !!successMessage}
+            />
+          </label>
+          <Input
+            placeholder={t('staff.detail.reasonOptional', { defaultValue: 'Reason (optional)' })}
+            value={reason}
+            onChange={(e) => setReason(e.target.value)}
+            disabled={settleMutation.isPending || !!successMessage}
+          />
+
+          {/* Section 14: show the remaining-after preview and whether
+              this closes the shortage, BEFORE the user commits. */}
+          {isValidAmount && !exceedsOutstanding && !successMessage && (
+            <div className="flex flex-col gap-1 rounded-lg border border-border p-3 text-sm">
+              <div className="flex items-center justify-between">
+                <span className="text-text-secondary">{t('staff.detail.settleRemainingAfter')}</span>
+                <MoneyDisplay amount={remainingAfter ?? 0} size="sm" tone={willFullyClose ? 'default' : 'danger'} />
+              </div>
+              {willFullyClose && (
+                <p className="text-xs text-status-success">{t('staff.detail.settleWillClose')}</p>
+              )}
+            </div>
+          )}
+          {exceedsOutstanding && !successMessage && (
+            <p role="alert" className="text-sm text-status-danger">{t('staff.detail.settleErrorOverpayment')}</p>
+          )}
+
           {error && <p role="alert" className="text-sm text-status-danger">{error}</p>}
-          <Button disabled={settleMutation.isPending} onClick={() => settleMutation.mutate()}>
-            {settleMutation.isPending ? t('academy.enrollments.enrolling') : t('staff.detail.settle', { defaultValue: 'Settle' })}
+          {successMessage && <p role="status" className="text-sm text-status-success">{successMessage}</p>}
+
+          {/* Section 15: a specific, unambiguous confirm label instead
+              of a bare "Save" -- states exactly what pressing it does. */}
+          <Button
+            disabled={settleMutation.isPending || !isValidAmount || exceedsOutstanding || !!successMessage}
+            onClick={() => { setError(null); settleMutation.mutate() }}
+          >
+            {settleMutation.isPending
+              ? t('staff.detail.settling')
+              : isValidAmount && !exceedsOutstanding
+                ? t('staff.detail.settleConfirm', { amount: formatMoney(parsedAmount, 'EGP', locale) })
+                : t('staff.detail.settle', { defaultValue: 'Settle' })}
           </Button>
         </div>
       </DialogContent>

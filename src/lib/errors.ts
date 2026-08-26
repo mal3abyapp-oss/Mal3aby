@@ -72,6 +72,16 @@ const MESSAGE_RULES: Array<[RegExp, string, string]> = [
   [/receipt date cannot be in the future/i, 'تاريخ الإيصال لا يمكن أن يكون في المستقبل.', "The receipt date can't be in the future."],
   [/a receipt image is required/i, 'صورة الإيصال مطلوبة وفق سياسة الالتزام لهذا النادي/الملعب.', "A receipt image is required by this club/field's compliance policy."],
   [/booking time must be in the future/i, 'وقت الحجز يجب أن يكون في المستقبل.', 'The booking time must be in the future.'],
+  // EMPLOYEE CASH LIABILITY SETTLEMENT HOTFIX (2026-08-26): these three
+  // messages previously fell through to a generic "couldn't settle"
+  // fallback with no indication of WHY -- found live while reproducing
+  // the reported defect (a club_owner's own shortage genuinely cannot
+  // be self-settled, by design, and the UI gave no clue that was the
+  // reason). Matched against settle_employee_cash_liability()'s own
+  // exact raise exception text.
+  [/you cannot settle your own liability/i, 'لا يمكنك سداد عجزك النقدي الخاص بك — اطلب من موظف آخر مخوّل تسجيل هذا السداد.', "You can't settle your own cash shortage — ask another authorized staff member to record this payment."],
+  [/settlement amount \(.*\) exceeds the outstanding balance/i, 'هذا المبلغ أكبر من المتبقي على هذا العجز.', 'That amount is more than what\'s still owed on this shortage.'],
+  [/this liability is already fully settled/i, 'تم سداد هذا العجز بالكامل من قبل.', 'This shortage has already been fully settled.'],
 ]
 
 const CODE_RULES: Record<string, [string, string]> = {
