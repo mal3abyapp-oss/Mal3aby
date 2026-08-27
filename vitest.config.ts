@@ -3,6 +3,25 @@ import react from '@vitejs/plugin-react'
 import path from 'path'
 
 export default defineConfig({
+  // PRODUCTION MONITORING (Phase 3, 2026-08-28): src/lib/version.ts
+  // reads __MAL3ABY_BUILD_SHA__/__MAL3ABY_BUILD_TIME__, two compile-time
+  // constants vite.config.ts injects via ITS OWN `define` block for the
+  // real production build -- vitest.config.ts is a genuinely SEPARATE
+  // Vite config (confirmed: vitest reads this file, not vite.config.ts)
+  // and never inherited that block, so these constants were always
+  // undefined under a test run. This went unnoticed until now because
+  // nothing reachable from a component under test happened to import
+  // version.ts -- ErrorBoundary's new incident-id/build-SHA display
+  // (see src/components/ui/error-boundary.tsx) is the first thing that
+  // does, via src/lib/errorReporting.ts, which surfaced the gap via
+  // src/App.test.tsx (ReferenceError: __MAL3ABY_BUILD_SHA__ is not
+  // defined). Fixed at the actual source (this config), not worked
+  // around in the new files -- deterministic fixed strings are correct
+  // here since no test asserts on a real git SHA/timestamp.
+  define: {
+    __MAL3ABY_BUILD_SHA__: JSON.stringify('test'),
+    __MAL3ABY_BUILD_TIME__: JSON.stringify('1970-01-01T00:00:00.000Z'),
+  },
   plugins: [react()],
   resolve: {
     alias: {

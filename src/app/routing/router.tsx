@@ -62,6 +62,7 @@ const ReportPaymentMethodsPage = lazy(() => import('@/features/reports/ReportPay
 const ReportExceptionsPage = lazy(() => import('@/features/reports/ReportExceptionsPage').then((m) => ({ default: m.ReportExceptionsPage })))
 const ReportOfficialReceiptsPage = lazy(() => import('@/features/reports/ReportOfficialReceiptsPage').then((m) => ({ default: m.ReportOfficialReceiptsPage })))
 const ReportReconciliationPage = lazy(() => import('@/features/reports/ReportReconciliationPage').then((m) => ({ default: m.ReportReconciliationPage })))
+const ReportGatewayHealthPage = lazy(() => import('@/features/reports/ReportGatewayHealthPage').then((m) => ({ default: m.ReportGatewayHealthPage })))
 const ReportEmployeeLiabilityPage = lazy(() => import('@/features/reports/ReportEmployeeLiabilityPage').then((m) => ({ default: m.ReportEmployeeLiabilityPage })))
 const ReportAcademyPage = lazy(() => import('@/features/reports/ReportAcademyPage').then((m) => ({ default: m.ReportAcademyPage })))
 const ReportCustomersPage = lazy(() => import('@/features/reports/ReportCustomersPage').then((m) => ({ default: m.ReportCustomersPage })))
@@ -285,6 +286,7 @@ export const router = createBrowserRouter([
           { path: 'reports/exceptions', element: <RequireNavDomain domain="reports"><ReportExceptionsPage /></RequireNavDomain> },
           { path: 'reports/official-receipts', element: <RequireNavDomain domain="reports"><ReportOfficialReceiptsPage /></RequireNavDomain> },
           { path: 'reports/reconciliation', element: <RequireNavDomain domain="reports"><ReportReconciliationPage /></RequireNavDomain> },
+          { path: 'reports/gateway-health', element: <RequireNavDomain domain="reports"><ReportGatewayHealthPage /></RequireNavDomain> },
           { path: 'reports/employee-liability', element: <RequireNavDomain domain="reports"><ReportEmployeeLiabilityPage /></RequireNavDomain> },
           { path: 'reports/academy', element: <RequireNavDomain domain="reports"><ReportAcademyPage /></RequireNavDomain> },
           { path: 'reports/customers', element: <RequireNavDomain domain="reports"><ReportCustomersPage /></RequireNavDomain> },

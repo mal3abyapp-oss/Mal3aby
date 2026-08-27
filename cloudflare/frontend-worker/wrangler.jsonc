@@ -59,8 +59,37 @@
   // Ingests invocation logs, errors, and uncaught exceptions for up to
   // 7 days, queryable from the Cloudflare dashboard. Confirmed enabled
   // live post-deploy.
+  //
+  // PRODUCTION MONITORING (Phase 3, 2026-08-28): head_sampling_rate made
+  // explicit (was previously implicit-default). Current Cloudflare docs
+  // (developers.cloudflare.com/workers/wrangler/configuration/#observability,
+  // confirmed via search this session) document the default as already
+  // 1 (100% of requests logged) when unspecified -- this repo's traffic
+  // volume does not remotely approach the 5B-logs/day account limit, so
+  // there is no cost/volume reason to sample down. Set to 1 explicitly
+  // so the choice is deliberate and documented rather than an implicit
+  // default someone has to go re-derive from Cloudflare's docs later.
+  // `logs.invocation_logs` (the nested sub-key from the 2025 beta
+  // changelog) is intentionally NOT added -- current GA docs no longer
+  // show it as required; `enabled: true` alone is confirmed sufficient
+  // to turn on invocation logs, custom console.* logs, and uncaught-
+  // exception capture (same doc search). `traces` intentionally NOT
+  // enabled -- Workers Traces is a separate, newer surface (request-
+  // scoped binding-call spans) this SPA-plus-header-Worker has no real
+  // use for (it makes no D1/KV/Durable Object/service-binding calls
+  // Traces would usefully visualize); revisit if that changes.
+  //
+  // Tail Workers (a separate mechanism that would let a second Worker
+  // programmatically receive every log/exception from this one, e.g.
+  // to forward matched events somewhere) were investigated and found to
+  // require the Workers PAID plan (confirmed via Cloudflare docs:
+  // "Tail Workers are available to all customers on the Workers Paid
+  // and Enterprise tiers"). NOT built here -- see PRODUCTION_MONITORING.md
+  // for the full reasoning. Workers Logs itself (this config) remains
+  // fully free-tier and is the real, working capability in place.
   "observability": {
-    "enabled": true
+    "enabled": true,
+    "head_sampling_rate": 1
   },
 
   // Production domain, purchased and confirmed under this Cloudflare

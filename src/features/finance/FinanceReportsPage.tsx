@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { cn } from '@/lib/utils'
-import { Wallet, HandCoins, Banknote, ReceiptText, ShieldCheck, Scale, UserX } from 'lucide-react'
+import { Wallet, HandCoins, Banknote, ReceiptText, ShieldCheck, Scale, UserX, CreditCard } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 import { ReportRevenueContent } from '@/features/reports/ReportRevenuePage'
 import { ReportCollectionsContent } from '@/features/reports/ReportCollectionsPage'
@@ -10,6 +10,7 @@ import { ReportPaymentMethodsContent } from '@/features/reports/ReportPaymentMet
 import { ReportExceptionsContent } from '@/features/reports/ReportExceptionsPage'
 import { ReportOfficialReceiptsContent } from '@/features/reports/ReportOfficialReceiptsPage'
 import { ReportReconciliationContent } from '@/features/reports/ReportReconciliationPage'
+import { ReportGatewayHealthContent } from '@/features/reports/ReportGatewayHealthPage'
 import { ReportEmployeeLiabilityContent } from '@/features/reports/ReportEmployeeLiabilityPage'
 
 // Finance IA consolidation directive sections 27-28: "Financial Reports"
@@ -22,7 +23,14 @@ import { ReportEmployeeLiabilityContent } from '@/features/reports/ReportEmploye
 // report keeps its own unmodified content component (directive section
 // 29: "UI total must equal DB aggregation" -- unchanged fetch/render
 // logic means this holds automatically, already true of the originals).
-type ReportKey = 'revenue' | 'collections' | 'payment-methods' | 'exceptions' | 'official-receipts' | 'reconciliation' | 'employee-liability'
+//
+// PRODUCTION MONITORING (Phase 3, 2026-08-28): "Gateway health" added
+// as an eighth tab, same pattern as every other tab here -- it was the
+// one financial-report-shaped surface genuinely missing (gateway
+// reconciliation exceptions + webhook processing failures had no UI
+// consumer anywhere in the app; see ReportGatewayHealthPage.tsx's own
+// header comment for the full gap analysis).
+type ReportKey = 'revenue' | 'collections' | 'payment-methods' | 'exceptions' | 'official-receipts' | 'reconciliation' | 'gateway-health' | 'employee-liability'
 
 const REPORT_TABS: { key: ReportKey; labelKey: string; icon: LucideIcon }[] = [
   { key: 'revenue', labelKey: 'finance.reportsPage.revenue', icon: Wallet },
@@ -31,6 +39,7 @@ const REPORT_TABS: { key: ReportKey; labelKey: string; icon: LucideIcon }[] = [
   { key: 'exceptions', labelKey: 'finance.reportsPage.exceptions', icon: ReceiptText },
   { key: 'official-receipts', labelKey: 'finance.reportsPage.officialReceipts', icon: ShieldCheck },
   { key: 'reconciliation', labelKey: 'finance.reportsPage.reconciliation', icon: Scale },
+  { key: 'gateway-health', labelKey: 'finance.reportsPage.gatewayHealth', icon: CreditCard },
   { key: 'employee-liability', labelKey: 'finance.reportsPage.employeeLiability', icon: UserX },
 ]
 
@@ -102,6 +111,7 @@ export function FinanceReportsPage() {
       {reportKey === 'exceptions' && <ReportExceptionsContent />}
       {reportKey === 'official-receipts' && <ReportOfficialReceiptsContent />}
       {reportKey === 'reconciliation' && <ReportReconciliationContent />}
+      {reportKey === 'gateway-health' && <ReportGatewayHealthContent />}
       {reportKey === 'employee-liability' && <ReportEmployeeLiabilityContent />}
     </div>
   )

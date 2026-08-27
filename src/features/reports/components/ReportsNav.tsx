@@ -79,6 +79,7 @@ const LEGACY_FINANCIAL_REPORT_TABS: Record<string, string> = {
   '/app/reports/exceptions': 'exceptions',
   '/app/reports/official-receipts': 'official-receipts',
   '/app/reports/reconciliation': 'reconciliation',
+  '/app/reports/gateway-health': 'gateway-health',
 }
 
 export function ReportsNav() {

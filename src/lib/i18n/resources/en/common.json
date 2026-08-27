@@ -2512,6 +2512,7 @@
       "exceptions": "Financial exceptions",
       "officialReceipts": "Official Collection Receipts",
       "reconciliation": "Financial reconciliation",
+      "gatewayHealth": "Gateway health",
       "employeeLiability": "Employee liability",
       "financialReports": "Financial reports",
       "sectionAcademyCustomers": "Academy & Customers",
@@ -2539,6 +2540,25 @@
       "unlinkedCount": "{{count}} cash payment(s) not linked to any shift",
       "unreceiptedHeading": "Payments missing a required official receipt",
       "missingReceipt": "Missing receipt"
+    },
+    "gatewayHealth": {
+      "description": "Online payment gateway transactions cross-checked against Finance's own records, and webhook processing failures, in one place",
+      "noAccess": "You don't have permission to view gateway health",
+      "issuesFound": "Issues found below — review before treating this period's gateway activity as fully reconciled.",
+      "noIssues": "No gateway reconciliation exceptions or webhook processing failures found for this period.",
+      "totalTransactions": "Total transactions",
+      "succeeded": "Succeeded",
+      "failed": "Failed",
+      "pending": "Pending",
+      "exceptionsHeading": "Reconciliation exceptions",
+      "webhookFailuresHeading": "Webhook processing failures",
+      "viewInvoice": "View invoice",
+      "emptyIsExpected": "No online gateway transactions yet is expected while gateways are not connected with live credentials — this report will start showing real activity once a gateway goes live.",
+      "exceptionTypes": {
+        "succeeded_transaction_no_payment": "Succeeded transaction, no linked payment",
+        "payment_no_allocation": "Linked payment has no allocation",
+        "amount_mismatch_transaction_vs_payment": "Amount mismatch"
+      }
     },
     "employeeLiability": {
       "description": "Cash shortages and overages by employee, with settlement status",
@@ -3253,7 +3273,8 @@
   "errorBoundary": {
     "title": "An unexpected error occurred",
     "description": "Try reloading the page. If the problem persists, contact support.",
-    "reload": "Reload page"
+    "reload": "Reload page",
+    "incidentId": "Reference: {{id}}"
   },
   "errorState": {
     "defaultMessage": "An error occurred, please try again",
@@ -3323,6 +3344,7 @@
       "exceptions": "Exceptions",
       "officialReceipts": "Official receipts",
       "reconciliation": "Reconciliation",
+      "gatewayHealth": "Gateway health",
       "employeeLiability": "Employee liability"
     }
   },

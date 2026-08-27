@@ -2520,6 +2520,7 @@
       "exceptions": "الاستثناءات المالية",
       "officialReceipts": "إيصالات التحصيل الرسمية",
       "reconciliation": "المطابقة المالية",
+      "gatewayHealth": "سلامة بوابات الدفع",
       "employeeLiability": "مديونية الموظفين",
       "financialReports": "التقارير المالية",
       "sectionAcademyCustomers": "الأكاديمية والعملاء",
@@ -2547,6 +2548,25 @@
       "unlinkedCount": "{{count}} دفعة نقدية غير مرتبطة بأي وردية",
       "unreceiptedHeading": "مدفوعات تفتقد إيصالًا رسميًا مطلوبًا",
       "missingReceipt": "إيصال مفقود"
+    },
+    "gatewayHealth": {
+      "description": "معاملات بوابات الدفع الإلكتروني مقارنةً بسجلات المالية نفسها، وحالات فشل معالجة إشعارات الويب (webhooks)، في مكان واحد",
+      "noAccess": "ليس لديك صلاحية لعرض سلامة بوابات الدفع",
+      "issuesFound": "تم العثور على مشكلات أدناه — راجعها قبل اعتبار نشاط بوابات الدفع لهذه الفترة مُطابقًا بالكامل.",
+      "noIssues": "لا توجد استثناءات مطابقة أو حالات فشل في معالجة إشعارات الويب لهذه الفترة.",
+      "totalTransactions": "إجمالي المعاملات",
+      "succeeded": "ناجحة",
+      "failed": "فاشلة",
+      "pending": "معلّقة",
+      "exceptionsHeading": "استثناءات المطابقة",
+      "webhookFailuresHeading": "حالات فشل معالجة إشعارات الويب",
+      "viewInvoice": "عرض الفاتورة",
+      "emptyIsExpected": "عدم وجود معاملات بوابات دفع إلكتروني حتى الآن أمر متوقع طالما لم تُربط بوابات الدفع ببيانات اعتماد حقيقية — سيبدأ هذا التقرير بعرض نشاط حقيقي بمجرد تفعيل إحدى البوابات.",
+      "exceptionTypes": {
+        "succeeded_transaction_no_payment": "معاملة ناجحة بدون دفعة مرتبطة",
+        "payment_no_allocation": "دفعة مرتبطة بدون تخصيص",
+        "amount_mismatch_transaction_vs_payment": "عدم تطابق في المبلغ"
+      }
     },
     "employeeLiability": {
       "description": "العجز والزيادة النقدية حسب الموظف، مع حالة التسوية",
@@ -3250,7 +3270,8 @@
   "errorBoundary": {
     "title": "حدث خطأ غير متوقع",
     "description": "حاول إعادة تحميل الصفحة. إذا استمرت المشكلة، تواصل مع الدعم الفني.",
-    "reload": "إعادة تحميل الصفحة"
+    "reload": "إعادة تحميل الصفحة",
+    "incidentId": "رقم مرجعي: {{id}}"
   },
   "errorState": {
     "defaultMessage": "حدث خطأ، حاول مرة أخرى",
@@ -3320,6 +3341,7 @@
       "exceptions": "الاستثناءات",
       "officialReceipts": "الإيصالات الرسمية",
       "reconciliation": "المطابقة المالية",
+      "gatewayHealth": "سلامة بوابات الدفع",
       "employeeLiability": "مديونية الموظفين"
     }
   },
