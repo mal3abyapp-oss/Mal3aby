@@ -628,6 +628,94 @@ export type Database = {
           },
         ]
       }
+      club_gateway_connections: {
+        Row: {
+          club_id: string
+          created_at: string
+          enabled: boolean
+          environment: string
+          id: string
+          is_default: boolean
+          last_failure_at: string | null
+          last_success_at: string | null
+          last_verification_error: string | null
+          last_verified_at: string | null
+          last_webhook_at: string | null
+          last_webhook_error: string | null
+          provider_key: string
+          provider_merchant_ref: string | null
+          public_key: string | null
+          secret_vault_id: string | null
+          updated_at: string
+          updated_by: string | null
+          webhook_secret_vault_id: string | null
+        }
+        Insert: {
+          club_id: string
+          created_at?: string
+          enabled?: boolean
+          environment: string
+          id?: string
+          is_default?: boolean
+          last_failure_at?: string | null
+          last_success_at?: string | null
+          last_verification_error?: string | null
+          last_verified_at?: string | null
+          last_webhook_at?: string | null
+          last_webhook_error?: string | null
+          provider_key: string
+          provider_merchant_ref?: string | null
+          public_key?: string | null
+          secret_vault_id?: string | null
+          updated_at?: string
+          updated_by?: string | null
+          webhook_secret_vault_id?: string | null
+        }
+        Update: {
+          club_id?: string
+          created_at?: string
+          enabled?: boolean
+          environment?: string
+          id?: string
+          is_default?: boolean
+          last_failure_at?: string | null
+          last_success_at?: string | null
+          last_verification_error?: string | null
+          last_verified_at?: string | null
+          last_webhook_at?: string | null
+          last_webhook_error?: string | null
+          provider_key?: string
+          provider_merchant_ref?: string | null
+          public_key?: string | null
+          secret_vault_id?: string | null
+          updated_at?: string
+          updated_by?: string | null
+          webhook_secret_vault_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "club_gateway_connections_club_id_fkey"
+            columns: ["club_id"]
+            isOneToOne: false
+            referencedRelation: "clubs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "club_gateway_connections_club_id_fkey"
+            columns: ["club_id"]
+            isOneToOne: false
+            referencedRelation: "commercial_entitlements_usage"
+            referencedColumns: ["club_id"]
+          },
+          {
+            foreignKeyName: "club_gateway_connections_provider_key_fkey"
+            columns: ["provider_key"]
+            isOneToOne: false
+            referencedRelation: "payment_gateway_providers"
+            referencedColumns: ["key"]
+          },
+        ]
+      }
       club_membership_freezes: {
         Row: {
           club_id: string
@@ -3269,43 +3357,103 @@ export type Database = {
           },
         ]
       }
+      payment_gateway_providers: {
+        Row: {
+          created_at: string
+          display_name: string
+          key: string
+          status: string
+          supported_countries: string[]
+          supported_currencies: string[]
+          supports_live: boolean
+          supports_native_idempotency_key: boolean
+          supports_partial_refund: boolean
+          supports_sandbox: boolean
+        }
+        Insert: {
+          created_at?: string
+          display_name: string
+          key: string
+          status?: string
+          supported_countries?: string[]
+          supported_currencies?: string[]
+          supports_live?: boolean
+          supports_native_idempotency_key?: boolean
+          supports_partial_refund?: boolean
+          supports_sandbox?: boolean
+        }
+        Update: {
+          created_at?: string
+          display_name?: string
+          key?: string
+          status?: string
+          supported_countries?: string[]
+          supported_currencies?: string[]
+          supports_live?: boolean
+          supports_native_idempotency_key?: boolean
+          supports_partial_refund?: boolean
+          supports_sandbox?: boolean
+        }
+        Relationships: []
+      }
       payment_gateway_transactions: {
         Row: {
           amount: number
           club_id: string
+          connection_id: string | null
+          correlation_id: string
           created_at: string
+          currency: string
+          environment: string | null
           failure_reason: string | null
           gateway: string
           gateway_reference: string | null
           id: string
+          idempotency_key: string | null
           invoice_id: string
           payment_id: string | null
+          provider_raw_status: string | null
+          provider_session_ref: string | null
           status: string
           updated_at: string
         }
         Insert: {
           amount: number
           club_id: string
+          connection_id?: string | null
+          correlation_id?: string
           created_at?: string
+          currency?: string
+          environment?: string | null
           failure_reason?: string | null
           gateway: string
           gateway_reference?: string | null
           id?: string
+          idempotency_key?: string | null
           invoice_id: string
           payment_id?: string | null
+          provider_raw_status?: string | null
+          provider_session_ref?: string | null
           status?: string
           updated_at?: string
         }
         Update: {
           amount?: number
           club_id?: string
+          connection_id?: string | null
+          correlation_id?: string
           created_at?: string
+          currency?: string
+          environment?: string | null
           failure_reason?: string | null
           gateway?: string
           gateway_reference?: string | null
           id?: string
+          idempotency_key?: string | null
           invoice_id?: string
           payment_id?: string | null
+          provider_raw_status?: string | null
+          provider_session_ref?: string | null
           status?: string
           updated_at?: string
         }
@@ -3323,6 +3471,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "commercial_entitlements_usage"
             referencedColumns: ["club_id"]
+          },
+          {
+            foreignKeyName: "payment_gateway_transactions_connection_id_fkey"
+            columns: ["connection_id"]
+            isOneToOne: false
+            referencedRelation: "club_gateway_connections"
+            referencedColumns: ["id"]
           },
           {
             foreignKeyName: "payment_gateway_transactions_invoice_id_fkey"
@@ -3343,6 +3498,76 @@ export type Database = {
             columns: ["payment_id"]
             isOneToOne: false
             referencedRelation: "payments"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      payment_gateway_webhook_events: {
+        Row: {
+          amount_matched: boolean | null
+          connection_id: string | null
+          currency_matched: boolean | null
+          id: string
+          payload_hash: string
+          processed: boolean
+          processed_at: string | null
+          processing_error: string | null
+          provider_event_id: string | null
+          provider_key: string
+          received_at: string
+          signature_valid: boolean
+          transaction_id: string | null
+        }
+        Insert: {
+          amount_matched?: boolean | null
+          connection_id?: string | null
+          currency_matched?: boolean | null
+          id?: string
+          payload_hash: string
+          processed?: boolean
+          processed_at?: string | null
+          processing_error?: string | null
+          provider_event_id?: string | null
+          provider_key: string
+          received_at?: string
+          signature_valid: boolean
+          transaction_id?: string | null
+        }
+        Update: {
+          amount_matched?: boolean | null
+          connection_id?: string | null
+          currency_matched?: boolean | null
+          id?: string
+          payload_hash?: string
+          processed?: boolean
+          processed_at?: string | null
+          processing_error?: string | null
+          provider_event_id?: string | null
+          provider_key?: string
+          received_at?: string
+          signature_valid?: boolean
+          transaction_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "payment_gateway_webhook_events_connection_id_fkey"
+            columns: ["connection_id"]
+            isOneToOne: false
+            referencedRelation: "club_gateway_connections"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "payment_gateway_webhook_events_provider_key_fkey"
+            columns: ["provider_key"]
+            isOneToOne: false
+            referencedRelation: "payment_gateway_providers"
+            referencedColumns: ["key"]
+          },
+          {
+            foreignKeyName: "payment_gateway_webhook_events_transaction_id_fkey"
+            columns: ["transaction_id"]
+            isOneToOne: false
+            referencedRelation: "payment_gateway_transactions"
             referencedColumns: ["id"]
           },
         ]
@@ -6737,6 +6962,18 @@ export type Database = {
         }
         Returns: string
       }
+      connect_club_gateway: {
+        Args: {
+          p_club_id: string
+          p_environment: string
+          p_provider_key: string
+          p_provider_merchant_ref?: string
+          p_public_key?: string
+          p_secret?: string
+          p_webhook_secret?: string
+        }
+        Returns: string
+      }
       copy_club_role: {
         Args: {
           p_club_role_id: string
@@ -7042,6 +7279,10 @@ export type Database = {
       delete_club_role: { Args: { p_club_role_id: string }; Returns: undefined }
       delete_platform_custom_role: {
         Args: { p_role_id: string }
+        Returns: undefined
+      }
+      disconnect_club_gateway: {
+        Args: { p_connection_id: string }
         Returns: undefined
       }
       disconnect_whatsapp: { Args: { p_club_id: string }; Returns: undefined }
@@ -8010,6 +8251,27 @@ export type Database = {
         }
         Returns: string
       }
+      list_club_gateway_connections: {
+        Args: { p_club_id: string }
+        Returns: {
+          enabled: boolean
+          environment: string
+          has_secret: boolean
+          id: string
+          is_default: boolean
+          last_failure_at: string
+          last_success_at: string
+          last_verification_error: string
+          last_verified_at: string
+          last_webhook_at: string
+          last_webhook_error: string
+          provider_display_name: string
+          provider_key: string
+          provider_merchant_ref: string
+          public_key: string
+          updated_at: string
+        }[]
+      }
       list_club_membership_plans: {
         Args: { p_club_id: string; p_include_archived?: boolean }
         Returns: Json
@@ -8040,6 +8302,19 @@ export type Database = {
           name_en: string
           permission_count: number
           updated_at: string
+        }[]
+      }
+      list_payment_gateway_providers: {
+        Args: never
+        Returns: {
+          display_name: string
+          key: string
+          supported_countries: string[]
+          supported_currencies: string[]
+          supports_live: boolean
+          supports_native_idempotency_key: boolean
+          supports_partial_refund: boolean
+          supports_sandbox: boolean
         }[]
       }
       list_pinned_platform_clubs: {
@@ -8707,6 +8982,14 @@ export type Database = {
         }
         Returns: undefined
       }
+      set_club_gateway_default: {
+        Args: { p_connection_id: string }
+        Returns: undefined
+      }
+      set_club_gateway_enabled: {
+        Args: { p_connection_id: string; p_enabled: boolean }
+        Returns: undefined
+      }
       set_club_module_active: {
         Args: { p_active: boolean; p_club_id: string; p_module_key: string }
         Returns: undefined
@@ -8775,7 +9058,13 @@ export type Database = {
       }
       slugify: { Args: { p_text: string }; Returns: string }
       start_gateway_checkout: {
-        Args: { p_amount: number; p_gateway: string; p_invoice_id: string }
+        Args: {
+          p_amount: number
+          p_connection_id?: string
+          p_idempotency_key?: string
+          p_invoice_id: string
+          p_provider_key: string
+        }
         Returns: string
       }
       start_platform_support_session: {
