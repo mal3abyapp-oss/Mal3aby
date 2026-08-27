@@ -12,7 +12,7 @@ import { PlatformSubscriptionCard } from '@/features/clubs/PlatformSubscriptionC
 import { EntitlementsCard } from '@/features/clubs/EntitlementsCard'
 import { ActivationPolicySetting } from '@/features/academy/EnrollmentSection'
 import { PaymentMethodsCard } from '@/features/billing/PaymentMethodsCard'
-import { PaymentGatewaysCard } from '@/features/billing/PaymentGatewaysCard'
+import { PaymentGatewayConnectionsCard } from '@/features/billing/PaymentGatewayConnectionsCard'
 import { ChangePasswordCard } from '@/features/account/ChangePasswordCard'
 import { GovernmentComplianceCard } from '@/features/clubs/GovernmentComplianceCard'
 import { BUILD_SHA, BUILD_TIME } from '@/lib/version'
@@ -99,7 +99,7 @@ export function SettingsPage() {
         <h2 className="text-sm font-semibold text-text-secondary">{t('settings.paymentsSection')}</h2>
         <div className="grid min-w-0 gap-4 lg:grid-cols-2">
           <div className="min-w-0"><PaymentMethodsCard /></div>
-          <div className="min-w-0"><PaymentGatewaysCard /></div>
+          <div className="min-w-0"><PaymentGatewayConnectionsCard /></div>
         </div>
       </section>
 
