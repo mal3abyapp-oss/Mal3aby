@@ -306,17 +306,101 @@ remaining rows.
   remaining link this session's disposable-but-hand-signed test cannot
   stand in for.
 
-## Other providers (PayPal, Paymob, Kashier, Fawry) — not yet implemented
+## Paymob webhook verification (2026-08-27) — built this session
 
-Each provider in `PAYMENT_GATEWAY_PROVIDER_MATRIX.md` uses a
+Paymob's webhook model differs from Stripe's in three structural ways,
+each confirmed against Paymob's live documentation this session (see
+`PAYMENT_GATEWAY_PROVIDER_MATRIX.md` "Paymob update" section for
+source URLs):
+
+1. **Signature location**: the `hmac` value is a QUERY PARAMETER on the
+   callback URL (`?hmac=...`), never a request header. `paymob-gateway-webhook`
+   reads it via `new URL(req.url).searchParams.get('hmac')` before
+   touching the body at all.
+2. **What gets hashed**: NOT the raw request body bytes (unlike
+   Stripe's `timestamp.payload` scheme) — Paymob's own docs specify
+   concatenating the VALUES of 20 specific, fixed-order fields (listed
+   in full in `paymob-gateway-webhook`'s own header comment and in the
+   architecture doc). This means the raw body is still read as text
+   FIRST (for the `payload_hash` dedup key and to parse the JSON
+   safely once), but the HMAC computation itself operates on values
+   extracted from the parsed object, not the raw bytes — a genuine
+   per-provider difference in mechanism, not an inconsistency with the
+   Stripe function's own raw-body-first discipline.
+3. **No dedicated event id**: Stripe supplies `event.id`; Paymob's
+   transaction-processed callback has no equivalent field. Dedup is
+   therefore content-hash-based:
+   `payment_gateway_webhook_events(provider_key, payload_hash)` now has
+   a real UNIQUE index (added via
+   `20260827161918_paymob_webhook_events_payload_hash_dedup.sql` — the
+   column existed before this session but only had a non-unique index,
+   so nothing actually enforced atomic dedup at the database level for
+   any provider lacking an event id until this migration).
+
+**HMAC field order — CODE VERIFIED against Paymob's own worked
+example.** Reconstructing the concatenation from Paymob's documented
+key list (`amount_cents, created_at, currency, error_occured,
+has_parent_transaction, obj.id, integration_id, is_3d_secure, is_auth,
+is_capture, is_refunded, is_standalone_payment, is_voided, order.id,
+owner, pending, source_data.pan, source_data.sub_type,
+source_data.type, success`) reproduces Paymob's own published
+concatenated string byte-for-byte
+(`1000002024-06-13T11:33:44.592345EGPfalsefalse...cardtrue`). A second,
+independent hand-rolled RFC-2104 HMAC-SHA512 construction (not using
+Python's `hmac` module) was cross-checked against the module's own
+output and matched exactly, confirming the algorithm itself.
+
+**What's ACTUALLY been proven for Paymob (LIVE VERIFIED, this
+session)**: a disposable test connection (real `vault.create_secret()`
+entries, a real `club_gateway_connections` row on the pre-existing
+"Mala3by Verification Club") was created, and:
+- A hand-signed callback with the CORRECT HMAC (computed independently
+  in Python against the real vaulted secret, fetched by the Edge
+  Function via `get_vault_secret_service()`) was accepted — proving
+  the Edge Function's Web Crypto `HMAC-SHA512` computation matches an
+  independent reference implementation using a REAL secret round-tripped
+  through Vault, not just a hypothetical test vector.
+- The SAME payload with an incorrect HMAC was rejected (400) —
+  negative evidence, proving the check discriminates rather than
+  accepting everything.
+- A staged transaction's merchant_order_id was resolved in O(1) via
+  the direct UUID match against `payment_gateway_transactions.id`, and
+  a webhook claiming a matching amount correctly posted a real
+  `payments` row via the UNCHANGED `record_gateway_payment_service`.
+- A webhook claiming a DIFFERENT (mismatched) confirmed amount against
+  a second staged transaction was correctly rejected — the transaction
+  was marked `failed` with reason `"amount mismatch: staged=500
+  confirmed=1000"`, and no payment was posted — proving the existing
+  fail-closed protection works unchanged when exercised through the
+  new Paymob code path.
+- The identical valid payload replayed a second time returned
+  `duplicate:true` rather than reprocessing — the new
+  `payload_hash` unique index works end-to-end.
+- All test fixtures (connection, vault secrets, staged transactions,
+  the posted payment and its allocations/tokens, the disposable
+  invoice) were deleted afterward; a follow-up query confirmed zero
+  rows remain.
+
+**What remains CREDENTIAL-BLOCKED**: a genuine Paymob-originated
+callback (real merchant account, real HMAC secret issued by Paymob,
+real Unified Checkout transaction completed on Paymob's hosted page)
+has never been exercised — no real Paymob account exists for this
+project (confirmed: "محدش عندي حسابات"). The Refund endpoint's
+synchronous-success path (`paymob-create-refund`) was similarly never
+exercised end-to-end for the same reason, though its request shape was
+CONTRACT VERIFIED (see the architecture doc) via a real HTTP request
+to Paymob's live API with a garbage token, which returned a genuine
+`{"detail":"Invalid token."}` 401 rather than a 404 or validation
+error.
+
+## Other providers (PayPal, Kashier, Fawry) — not yet implemented
+
+Each remaining provider in `PAYMENT_GATEWAY_PROVIDER_MATRIX.md` uses a
 structurally different signature scheme:
 
 - **PayPal** — 5 headers (`PAYPAL-TRANSMISSION-*`, `PAYPAL-CERT-URL`,
   `PAYPAL-AUTH-ALGO`), RSA-SHA256, verifiable locally or via PayPal's
   own `verify-webhook-signature` API.
-- **Paymob** — HMAC-SHA512 over an ordered field concatenation (exact
-  field order needs re-confirmation against the live dashboard before
-  implementation — flagged as unconfirmed in the provider matrix).
 - **Kashier** — `x-kashier-signature` header, HMAC-SHA256 over
   alphabetically-sorted `signatureKeys` fields.
 - **Fawry** — `messageSignature` body field (not a header), SHA-256
@@ -325,5 +409,6 @@ structurally different signature scheme:
 Each needs its own dedicated Edge Function (the shared
 `record_gateway_payment_service` / `mark_gateway_transaction_failed_service`
 RPCs are provider-agnostic and already reusable by all of them — only
-the *verification* layer is provider-specific). None of these four are
-built in this phase.
+the *verification* layer is provider-specific, as demonstrated by the
+Paymob adapter reusing all four shared RPCs completely unchanged).
+None of these three are built in this phase.
