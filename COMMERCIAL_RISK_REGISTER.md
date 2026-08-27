@@ -30,12 +30,9 @@ reasoning:
   "fake profit" from an unreliable cost basis).
 - Automated reorder/purchasing beyond a lightweight `reorder_level`
   threshold field.
-- Physical Stock Count sessions (draft/in-progress/completed workflow
-  with system-vs-counted variance) — not built in this phase; the
-  existing `adjustment_in`/`adjustment_out`/`stock_count_adjustment`
-  movement types exist in the ledger's own type catalog so a future
-  Stock Count feature can slot in without a schema change, but no UI
-  or dedicated RPC exists yet.
+- ~~Physical Stock Count sessions~~ — **built in this closure phase.**
+  See INVENTORY_INVARIANTS.md Sections 10-11 and
+  COMMERCIAL_E2E_ACCEPTANCE.md for the full live-verified scenario.
 
 ## Fixed during this session (not risks — resolved defects, documented for continuity)
 
@@ -71,9 +68,52 @@ reasoning:
   NOT NULL` (a real, project-wide invariant). Corrected the same
   session, before the incorrect assumption ever reached a UI.
 
+- **Critical (round 2)**: `create_shop_sale`'s partial-payment migration
+  (adding `p_payment_amount`) hit the *identical* grant-leak class as
+  `return_shop_sale` earlier this session — a new parameter list means
+  a new function identity, and Postgres applies its own default
+  EXECUTE-to-PUBLIC grant on creation. Caught immediately this time by
+  checking grants right after the migration (before any live business
+  testing), rather than by a later audit sweep. Fixed identically: drop
+  the orphaned 7-arg overload, explicit revoke `public`/`anon` + grant
+  `authenticated` on the surviving 8-arg signature. This confirms the
+  grant-check-immediately-after-every-signature-change discipline is
+  now a load-bearing habit, not a one-off fix — it caught the same bug
+  class before any exploitation window this time.
+
+## Fixed during the TRUE FINAL CLOSURE regression sweep (pre-existing, not introduced this session)
+
+- **Critical, out-of-scope but found and fixed**: `permission_dependencies`
+  (created in an earlier phase of this same session,
+  `permission_dependency_enforcement` migration) had RLS disabled
+  entirely, with `anon` holding direct `SELECT`/`INSERT`/`UPDATE`/
+  `DELETE` grants — confirmed live (`set role anon; select count(*)
+  from permission_dependencies` returned all 13 rows with zero
+  authentication). Any unauthenticated caller could read, corrupt, or
+  delete the permission-dependency catalog other RPCs rely on for
+  server-side enforcement. Found during this closure's mandated
+  security-regression advisory sweep (Section 14 — "do not assume
+  earlier verification still covers changed functions", extended here
+  to a full-project advisory check, not just the functions touched this
+  session). Fixed: `enable`/`force row level security`, revoked all
+  direct grants from `public`/`anon`/`authenticated`, granted
+  `SELECT`-only to `authenticated` via an explicit policy (this is
+  migration-maintained reference data — no client, staff or platform,
+  ever needs to write to it directly). Live-reverified: `anon` now
+  denied (`permission denied for table permission_dependencies`),
+  `authenticated` still reads all 13 rows, and a real permission check
+  (`has_permission('booking.view', ...)`) still resolves correctly
+  post-fix — no regression.
+
 ## What was NOT tested this session (honest gap, not a known defect)
 
-- Multi-payment-method combinations on a single shop sale (this phase's
-  `create_shop_sale` accepts exactly one payment method per sale, by
-  design — a multi-payment shop sale was never a requirement and was
-  not built or tested).
+- Multi-payment across more than two installments on a single shop
+  sale (partial-at-creation + one later `record_payment()` call to
+  zero was tested; three or more installments was not, though nothing
+  in `record_payment()`'s logic is installment-count-limited — it
+  re-derives outstanding balance fresh on every call).
+- Multiple payment *methods* combined on a single sale remains
+  unbuilt — `create_shop_sale` still accepts exactly one method for the
+  amount paid at creation; a second installment via `record_payment()`
+  can use a different method than the first, which was not explicitly
+  exercised.

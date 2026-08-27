@@ -15,6 +15,11 @@
 | `inventory.count` | Run and confirm physical stock counts | `inventory.view` |
 | `inventory.cost.view` | View product cost/margin data | `inventory.view` |
 
+Stock Count (`start_shop_stock_count`/`record_shop_stock_count_line`/
+`complete_shop_stock_count`/`cancel_shop_stock_count`) gates on
+`inventory.count` exactly — no new permission key was introduced for
+this closure phase; live-verified.
+
 All 10 keys live in the existing `permissions` table (same table every
 other club-scoped permission uses — no second permission system) and
 are wired into the existing `permission_dependencies` table for

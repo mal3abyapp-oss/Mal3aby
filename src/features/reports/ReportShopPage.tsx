@@ -7,6 +7,7 @@ import { DataTable, type DataTableColumn } from '@/components/ui/data-table'
 import { StatCard } from '@/components/ui/stat-card'
 import { MoneyDisplay } from '@/components/ui/money-display'
 import { ReportsNav } from '@/features/reports/components/ReportsNav'
+import { ReportPrintButton, ReportPrintHeader } from '@/components/ui/report-print-header'
 import { Package, Boxes, AlertTriangle, XCircle } from 'lucide-react'
 
 // COMMERCIAL MODULE ARCHITECTURE (2026-08-26) -- directive Section 10:
@@ -77,18 +78,27 @@ export function ReportShopPage() {
 
   return (
     <div>
-      <ReportsNav />
-      <PageHeader title={t('reports.shop.title')} description={t('reports.shop.description')} />
-
-      <div className="mb-6 grid grid-cols-2 gap-3 sm:grid-cols-4">
-        <StatCard label={t('reports.shop.activeProducts')} value={summary?.activeProducts ?? 0} icon={Package} to="/app/shop/products" />
-        <StatCard label={t('reports.shop.totalOnHand')} value={summary?.totalOnHand ?? 0} icon={Boxes} to="/app/shop/inventory" />
-        <StatCard label={t('reports.shop.lowStock')} value={summary?.lowStockCount ?? 0} icon={AlertTriangle} tone={summary && summary.lowStockCount > 0 ? 'warning' : 'default'} to="/app/shop/inventory" />
-        <StatCard label={t('reports.shop.outOfStock')} value={summary?.outOfStockCount ?? 0} icon={XCircle} tone={summary && summary.outOfStockCount > 0 ? 'danger' : 'default'} to="/app/shop/inventory" />
+      <div className="print:hidden">
+        <ReportsNav />
+        <PageHeader
+          title={t('reports.shop.title')}
+          description={t('reports.shop.description')}
+          actions={<ReportPrintButton />}
+        />
       </div>
 
-      <h2 className="mb-2 text-lg font-semibold">{t('reports.shop.topProducts')}</h2>
-      <DataTable columns={columns} rows={topProducts} rowKey={(p) => p.productId} isLoading={loadingProducts} emptyTitle={t('reports.shop.emptyTitle')} />
+      <div className="print-target visible-for-print">
+        <ReportPrintHeader reportName={t('reports.shop.title')} />
+        <div className="mb-6 grid grid-cols-2 gap-3 sm:grid-cols-4">
+          <StatCard label={t('reports.shop.activeProducts')} value={summary?.activeProducts ?? 0} icon={Package} to="/app/shop/products" />
+          <StatCard label={t('reports.shop.totalOnHand')} value={summary?.totalOnHand ?? 0} icon={Boxes} to="/app/shop/inventory" />
+          <StatCard label={t('reports.shop.lowStock')} value={summary?.lowStockCount ?? 0} icon={AlertTriangle} tone={summary && summary.lowStockCount > 0 ? 'warning' : 'default'} to="/app/shop/inventory" />
+          <StatCard label={t('reports.shop.outOfStock')} value={summary?.outOfStockCount ?? 0} icon={XCircle} tone={summary && summary.outOfStockCount > 0 ? 'danger' : 'default'} to="/app/shop/inventory" />
+        </div>
+
+        <h2 className="mb-2 text-lg font-semibold">{t('reports.shop.topProducts')}</h2>
+        <DataTable columns={columns} rows={topProducts} rowKey={(p) => p.productId} isLoading={loadingProducts} emptyTitle={t('reports.shop.emptyTitle')} />
+      </div>
     </div>
   )
 }

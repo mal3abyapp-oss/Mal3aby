@@ -110,6 +110,8 @@ export function ShopPOSPage() {
   const [selectedCustomer, setSelectedCustomer] = useState<CustomerOption | null>(null)
   const [locationId, setLocationId] = useState('')
   const [paymentMethod, setPaymentMethod] = useState('cash')
+  const [partialPayment, setPartialPayment] = useState(false)
+  const [paymentAmountInput, setPaymentAmountInput] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [lastSetupNotice, setLastSetupNotice] = useState<string | null>(null)
 
@@ -178,6 +180,14 @@ export function ShopPOSPage() {
 
   const subtotal = cart.reduce((sum, l) => sum + l.displayPrice * l.quantity, 0)
 
+  // Partial payment (COMMERCIAL CLOSURE 2026-08-27): create_shop_sale's
+  // p_payment_amount defaults to the full subtotal when omitted --
+  // identical to prior behavior. Staff who opt into "pay partial" collect
+  // the remainder later via the invoice's normal payment flow (the same
+  // record_payment() engine every other invoice type already uses).
+  const paidAmount = partialPayment ? Number(paymentAmountInput || 0) : subtotal
+  const outstandingPreview = Math.max(subtotal - paidAmount, 0)
+
   const saleMutation = useMutation({
     mutationFn: async () => {
       const items = cart.map((l) => ({ product_id: l.productId, variant_id: l.variantId, quantity: l.quantity }))
@@ -189,6 +199,7 @@ export function ShopPOSPage() {
         p_payment_method: paymentMethod,
         p_payment_reference: undefined,
         p_idempotency_key: crypto.randomUUID(),
+        p_payment_amount: partialPayment ? paidAmount : undefined,
       })
       if (err) throw err
       return data
@@ -197,6 +208,8 @@ export function ShopPOSPage() {
       setCart([])
       setSelectedCustomer(null)
       setCustomerSearch('')
+      setPartialPayment(false)
+      setPaymentAmountInput('')
       setError(null)
       setLastSetupNotice(t('shop.pos.saleCompleted'))
       void queryClient.invalidateQueries({ queryKey: ['shop-inventory-balances'] })
@@ -209,6 +222,10 @@ export function ShopPOSPage() {
     if (!locationId) { setError(t('shop.pos.locationRequired')); return }
     if (!selectedCustomer) { setError(t('shop.pos.customerRequired')); return }
     if (cart.length === 0) { setError(t('shop.pos.cartEmpty')); return }
+    if (partialPayment && (paidAmount <= 0 || paidAmount >= subtotal)) {
+      setError(t('shop.pos.partialAmountInvalid'))
+      return
+    }
     saleMutation.mutate()
   }
 
@@ -329,6 +346,35 @@ export function ShopPOSPage() {
             <span className="text-sm font-medium">{t('shop.pos.subtotal')}</span>
             <MoneyDisplay amount={subtotal} size="md" />
           </div>
+
+          <div className="flex items-center justify-between">
+            <label htmlFor="shop-pos-partial-toggle" className="text-sm font-medium text-text-secondary">
+              {t('shop.pos.partialPaymentLabel')}
+            </label>
+            <input
+              id="shop-pos-partial-toggle"
+              type="checkbox"
+              checked={partialPayment}
+              onChange={(e) => { setPartialPayment(e.target.checked); setPaymentAmountInput('') }}
+              className="size-4"
+            />
+          </div>
+          {partialPayment && (
+            <div className="flex flex-col gap-1.5">
+              <label className="text-sm font-medium text-text-secondary">{t('shop.pos.paidNowLabel')}</label>
+              <Input
+                type="number"
+                min="0.01"
+                step="0.01"
+                max={subtotal || undefined}
+                value={paymentAmountInput}
+                onChange={(e) => setPaymentAmountInput(e.target.value)}
+              />
+              <p className="text-xs text-text-secondary">
+                {t('shop.pos.outstandingPreview', { amount: outstandingPreview.toFixed(2) })}
+              </p>
+            </div>
+          )}
 
           <div className="flex flex-col gap-1.5">
             <label className="text-sm font-medium text-text-secondary">{t('shop.pos.paymentMethodLabel')}</label>

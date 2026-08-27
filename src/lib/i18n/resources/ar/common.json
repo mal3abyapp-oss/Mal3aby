@@ -2013,7 +2013,11 @@
       "paymentsHeading": "المدفوعات",
       "noPayments": "لا توجد مدفوعات بعد.",
       "collectedBy": "حصّلها {{name}}",
-      "refund": "استرجاع"
+      "refund": "استرجاع",
+      "bookingQrAlt": "رمز التحقق من الحجز",
+      "bookingQrLabel": "رمز التحقق من الحجز",
+      "bookingRef": "رقم الحجز",
+      "bookingQrUnavailable": "رمز QR للحجز غير متاح لحالة الحجز الحالية."
     },
     "recordPayment": {
       "heading": "تسجيل دفعة",
@@ -2708,7 +2712,9 @@
         "unitsReturned": "الوحدات المرتجعة",
         "revenue": "الإيرادات"
       }
-    }
+    },
+    "print": "طباعة",
+    "generatedAt": "تم الإنشاء في"
   },
   "verifyInvoice": {
     "title": "التحقق من فاتورة",
@@ -3798,7 +3804,8 @@
       "products": "المنتجات",
       "inventory": "المخزون",
       "sales": "المبيعات والمرتجعات",
-      "settings": "الإعدادات"
+      "settings": "الإعدادات",
+      "stockCount": "جرد المخزون"
     },
     "moduleNotActive": {
       "title": "المتجر غير متاح بعد",
@@ -3829,7 +3836,11 @@
       "saleError": "تعذّر إتمام عملية البيع.",
       "cartEmpty": "السلة فارغة",
       "locationRequired": "اختر مكان البيع.",
-      "customerRequired": "اختر عميلًا."
+      "customerRequired": "اختر عميلًا.",
+      "partialPaymentLabel": "دفعة جزئية",
+      "paidNowLabel": "المبلغ المدفوع الآن",
+      "outstandingPreview": "الرصيد المتبقي: {{amount}}",
+      "partialAmountInvalid": "أدخل مبلغًا أكبر من 0 وأقل من الإجمالي."
     },
     "products": {
       "title": "المنتجات",
@@ -3962,6 +3973,46 @@
       "locationKind": {
         "branch": "فرع",
         "warehouse": "مستودع"
+      }
+    },
+    "stockCount": {
+      "title": "جرد المخزون",
+      "description": "قارن الكميات الفعلية بالكميات المسجلة في النظام ورحّل فروقات الجرد عبر سجل الحركة.",
+      "startNew": "بدء عملية جرد",
+      "starting": "جارٍ البدء...",
+      "startError": "تعذر بدء عملية الجرد.",
+      "locationLabel": "الموقع",
+      "notesLabel": "ملاحظات",
+      "continue": "متابعة",
+      "view": "عرض",
+      "emptyTitle": "لا توجد عمليات جرد بعد",
+      "addProductLabel": "إضافة منتج",
+      "addLine": "إضافة",
+      "noLines": "لا توجد عناصر بعد -- أضف منتجًا للجرد.",
+      "recordError": "تعذر حفظ الكمية المعدودة.",
+      "completeCount": "إنهاء الجرد",
+      "completing": "جارٍ الإنهاء...",
+      "completeError": "تعذر إنهاء عملية الجرد.",
+      "cancelCount": "إلغاء الجرد",
+      "cancelError": "تعذر إلغاء عملية الجرد.",
+      "columns": {
+        "location": "الموقع",
+        "status": "الحالة",
+        "items": "العناصر",
+        "variances": "الفروقات",
+        "started": "بدأت في"
+      },
+      "lineColumns": {
+        "product": "المنتج",
+        "system": "كمية النظام",
+        "counted": "الكمية المعدودة",
+        "variance": "الفرق"
+      },
+      "status": {
+        "draft": "مسودة",
+        "in_progress": "قيد التنفيذ",
+        "completed": "مكتملة",
+        "cancelled": "ملغاة"
       }
     }
   }

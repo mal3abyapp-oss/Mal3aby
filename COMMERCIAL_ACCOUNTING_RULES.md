@@ -22,21 +22,75 @@ final state: stock 9, `paid = 1000`, `refunded = 500`, net financial
 result = 500, with zero double-counting across `invoices`, `payments`,
 `invoice_items`, and `shop_sale_items`.
 
+## Payment model — partial/multi-payment (updated, see also INVENTORY_INVARIANTS.md)
+
+**Discovery finding**: `record_payment()` already implements a fully
+working partial/multi-payment engine — it computes the invoice's
+outstanding balance as `total - SUM(payment_allocations) +
+SUM(completed refunds)`, rejects any payment exceeding that balance,
+and only flips dependent state (e.g. auto-confirming a pending
+booking) once the outstanding balance reaches zero. This is real,
+pre-existing, and already exercised by bookings/academy/memberships.
+
+Per the explicit rule "if the existing Finance model already supports
+multi-payment, extend Shop to use it correctly — do not choose a
+restriction merely because the first implementation was easier",
+`create_shop_sale()` was extended (not replaced) with an optional
+`p_payment_amount` parameter:
+
+- Omitted (or equal to the subtotal): identical to the original
+  behavior — the sale is created fully paid in one step. Every
+  pre-existing caller (the POS frontend, prior QA) is unaffected.
+- A smaller positive amount: the sale is created with a partial
+  `payments`/`payment_allocations` row; the remaining balance is
+  collected later through the **existing, unmodified**
+  `record_payment()` RPC against the same shop-sale invoice — proven
+  live: `record_payment()` requires no special-casing to accept a
+  `shop_sale_item`-sourced invoice, and its own outstanding-balance and
+  overpayment guards apply identically.
+- `p_payment_amount > subtotal` or negative: denied server-side.
+
+No second payment engine was built. `payment_allocations` remains the
+single source of truth for how much of any invoice — booking, academy,
+membership, or shop — has been paid.
+
 ## Stock deduction timing
 
-**Chosen policy**: stock is deducted synchronously, inside the same
-transaction that creates the invoice and payment, at the moment a sale
-is marked `completed`. This phase does not implement an unpaid/
-pending-payment shop invoice — `create_shop_sale()` always creates an
-already-fully-paid sale (`p_payment_method` is required, and the
-inserted `payments` row amount equals the invoice subtotal exactly).
+**Chosen policy: deduct at sale creation, regardless of payment
+completeness.** Stock for every line item is deducted synchronously,
+inside the same transaction that creates the invoice, *before* any
+payment row is inserted — unconditionally, whether the sale is paid in
+full, partially, or (in principle) not at all at creation time.
 
-There is therefore no "stock reserved for an abandoned unpaid invoice"
-scenario to guard against in this phase. If a future phase adds an
-unpaid/invoice-first flow, stock reservation (the deferred
-`reserved`/`available` balance split, see COMMERCIAL_DOMAIN_ARCHITECTURE.md
-Section 10) would need to be implemented as an explicit, separately
-documented state — never silently inferred from invoice existence.
+Reasoning, not a default taken because it was easier:
+
+1. **Matches this project's own booking precedent.** `_create_booking_internal()`
+   reserves the field slot the moment a booking is created at
+   `pending_payment`, not at `confirmed` — the resource commitment
+   happens at creation, the payment state is tracked independently.
+2. **Matches physical retail reality.** A shop sale is not a
+   reservation of future goods; it is a record of goods that already
+   physically left the location. There is no "pending shop order"
+   concept in this phase — every `shop_sales` row is `status =
+   'completed'` from creation (see `shop_sales_status_check`). Deferred
+   payment is a receivable against a completed sale, not a hold on
+   unshipped inventory.
+3. **Prevents the two failure modes named explicitly in this
+   directive**: an abandoned unpaid invoice can never "permanently
+   consume stock forever with no sale" — because there is no unpaid
+   *pending* sale state to abandon; every sale is already completed and
+   the goods are (by definition of a shop sale) already gone. And a
+   paid sale can never lack a stock deduction, because deduction is
+   unconditional at creation, not contingent on `p_payment_amount`.
+
+Stock reservation (a `reserved`/`available` balance split for a
+genuine pending/unpaid *order* flow, as opposed to a completed sale
+with a receivable) remains explicitly out of scope — there is still no
+"pending shop order" concept for it to serve. If a future phase adds
+one, reservation must be built as its own explicit state, never
+silently inferred from invoice payment status. See
+INVENTORY_INVARIANTS.md for the live verification of this policy
+(partial-payment sale with immediate full stock deduction).
 
 ## Cash handling
 

@@ -2009,7 +2009,11 @@
       "paymentsHeading": "Payments",
       "noPayments": "No payments yet.",
       "collectedBy": "Collected by {{name}}",
-      "refund": "Refund"
+      "refund": "Refund",
+      "bookingQrAlt": "Booking verification QR",
+      "bookingQrLabel": "Booking Verification QR",
+      "bookingRef": "Booking Reference",
+      "bookingQrUnavailable": "Booking QR unavailable for this booking's current status."
     },
     "recordPayment": {
       "heading": "Record payment",
@@ -2700,7 +2704,9 @@
         "unitsReturned": "Units returned",
         "revenue": "Revenue"
       }
-    }
+    },
+    "print": "Print",
+    "generatedAt": "Generated at"
   },
   "verifyInvoice": {
     "title": "Verify invoice",
@@ -3801,7 +3807,8 @@
       "products": "Products",
       "inventory": "Inventory",
       "sales": "Sales & Returns",
-      "settings": "Settings"
+      "settings": "Settings",
+      "stockCount": "Stock Count"
     },
     "moduleNotActive": {
       "title": "Shop isn't available yet",
@@ -3832,7 +3839,11 @@
       "saleError": "Couldn't complete the sale.",
       "cartEmpty": "Cart is empty",
       "locationRequired": "Choose where you're selling from.",
-      "customerRequired": "Choose a customer."
+      "customerRequired": "Choose a customer.",
+      "partialPaymentLabel": "Partial payment",
+      "paidNowLabel": "Amount paid now",
+      "outstandingPreview": "Remaining balance: {{amount}}",
+      "partialAmountInvalid": "Enter an amount greater than 0 and less than the subtotal."
     },
     "products": {
       "title": "Products",
@@ -3965,6 +3976,46 @@
       "locationKind": {
         "branch": "Branch",
         "warehouse": "Warehouse"
+      }
+    },
+    "stockCount": {
+      "title": "Stock Count",
+      "description": "Reconcile physical inventory against system quantities and post variance adjustments through the movement ledger.",
+      "startNew": "Start Stock Count",
+      "starting": "Starting...",
+      "startError": "Could not start the stock count.",
+      "locationLabel": "Location",
+      "notesLabel": "Notes",
+      "continue": "Continue",
+      "view": "View",
+      "emptyTitle": "No stock counts yet",
+      "addProductLabel": "Add product",
+      "addLine": "Add",
+      "noLines": "No items yet -- add a product to count.",
+      "recordError": "Could not save the counted quantity.",
+      "completeCount": "Complete Count",
+      "completing": "Completing...",
+      "completeError": "Could not complete the stock count.",
+      "cancelCount": "Cancel Count",
+      "cancelError": "Could not cancel the stock count.",
+      "columns": {
+        "location": "Location",
+        "status": "Status",
+        "items": "Items",
+        "variances": "Variances",
+        "started": "Started"
+      },
+      "lineColumns": {
+        "product": "Product",
+        "system": "System Qty",
+        "counted": "Counted Qty",
+        "variance": "Variance"
+      },
+      "status": {
+        "draft": "Draft",
+        "in_progress": "In Progress",
+        "completed": "Completed",
+        "cancelled": "Cancelled"
       }
     }
   }

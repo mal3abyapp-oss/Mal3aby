@@ -100,6 +100,51 @@ run` (106/106 active tests passing throughout), and a secret scan
 re-run and confirmed clean after every migration/frontend batch in
 this build, not just once at the end.
 
+## Stock Count — LIVE E2E VERIFIED (TRUE FINAL CLOSURE addendum)
+
+Mandated scenario, reproduced exactly:
+
+| Step | Expected | Actual |
+|---|---|---|
+| Opening stock | 10 | 10 |
+| Count session 1: counted = 8 | variance -2, one `stock_count_adjustment` movement (qty 2, out), balance 8 | exact match |
+| Second completion attempt on the same session | idempotent: same id returned, no second movement, balance unchanged | exact match |
+| Count session 2: system 8, counted = 11 | variance +3, movement qty 3 (in), balance 11 | exact match |
+| Ledger reconciliation | `+10 -2 +3 = 11` | matches stored balance exactly |
+
+Additional invariants live-verified: cross-club completion denied
+(`not authorized`), cross-club/nonexistent location injection denied
+(`inventory location not found in this club`), a completed count
+cannot be cancelled (`a completed stock count cannot be cancelled`), a
+second concurrent open count on the same location is denied by both
+the application check and the underlying partial unique index
+(`a stock count is already open for this location`).
+
+## Shop payment model — partial/multi-payment — LIVE E2E VERIFIED (TRUE FINAL CLOSURE addendum)
+
+Discovery: `record_payment()` already implements outstanding-balance
+tracking and overpayment denial. `create_shop_sale` was extended (not
+replaced) with an optional `p_payment_amount`.
+
+| Test | Result |
+|---|---|
+| Sale of 2 units @ 100 (subtotal 200), `p_payment_amount = 120` | invoice total 200, paid 120, outstanding 80 |
+| Stock deducted at creation despite partial payment | balance dropped by the full 2 units immediately (11 → 9) |
+| Collect remaining 80 via unmodified `record_payment()` | outstanding → 0, stock unchanged (still 9) |
+| Attempt to overpay beyond outstanding (1 more) via `record_payment()` | DENIED — `payment amount (1) exceeds the invoice's outstanding balance (0.00)` |
+| `create_shop_sale` with `p_payment_amount` omitted (default) | paid == total exactly, identical to prior behavior — no regression |
+| `p_payment_amount` > subtotal at creation | DENIED — `payment amount (999) cannot exceed the sale subtotal (100.00)` |
+| `anon` role calling `create_shop_sale` directly | DENIED at the grant layer (`permission denied for function create_shop_sale`) |
+
+**Grant-leak found and fixed during this addendum** (same class as the
+earlier `return_shop_sale` leak): the new 8-arg `create_shop_sale`
+signature was created with Postgres's default PUBLIC/anon EXECUTE
+grant; caught immediately after the migration (before any live
+business testing) by the same grant-audit query used throughout this
+session, fixed by dropping the orphaned 7-arg overload and applying
+the explicit revoke/grant tail. Re-verified: exactly 1 overload, no
+public/anon exposure, authenticated-only.
+
 ## Migration parity
 
 Every migration's local filename matches its real applied

@@ -95,3 +95,59 @@ found or inactive`. Same for a variant.
 with the same key returns the original operation's id instead of
 creating a duplicate. Live-verified for both RPCs: identical key twice
 → one sale/return, one payment, one set of inventory movements.
+`create_shop_sale` also carries its own `shop_sales.idempotency_key`
+(unique per club) to correctly dedupe the zero-payment case, where a
+retried partial/unpaid sale would otherwise have no `payments` row to
+match on.
+
+## 10. Stock deduction is unconditional on payment completeness
+
+`create_shop_sale()` deducts stock for every line item in the same
+transaction that creates the invoice, before any `payments` row is
+inserted, and does so identically whether `p_payment_amount` equals the
+full subtotal, a smaller partial amount, or zero. Live-verified: a sale
+for 2 units at 100 each (subtotal 200) created with `p_payment_amount =
+120` immediately deducted the full 2 units from `shop_inventory_balances`
+(11 → 9) while `payment_allocations` correctly totaled only 120,
+outstanding 80. Collecting the remaining 80 via the existing
+`record_payment()` RPC (unmodified, reused as-is) brought outstanding
+to exactly 0 without any further inventory movement — confirming
+payment collection and stock deduction are correctly independent
+operations, never re-triggering each other. See
+COMMERCIAL_ACCOUNTING_RULES.md for the full policy reasoning.
+
+## 11. Stock Count posts through the canonical movement engine, never a direct balance write
+
+`complete_shop_stock_count()` computes `variance = counted_quantity -
+system_quantity` per line and, for every non-zero variance, calls
+`_apply_shop_inventory_movement_internal()` with `movement_type =
+'stock_count_adjustment'` and direction derived from the sign of the
+variance — the same choke point every other Shop write RPC uses.
+`shop_stock_count_items.system_quantity` is a point-in-time snapshot
+taken at `start_shop_stock_count()`, never a live-computed value, so a
+count session's variance is stable even if other movements occur
+against the same location in a separate, unrelated transaction before
+completion (the balance itself remains the authoritative current
+value; the snapshot only fixes what "system quantity at count time"
+meant for this session's variance/audit record).
+
+**Completion is idempotent and immutable**: the count row is locked
+(`for update`) at the start of `complete_shop_stock_count()`; if
+already `'completed'`, the function returns the same id without
+positing anything again (verified live: second completion call on an
+already-completed count leaves the movement count at exactly 1 and the
+balance unchanged). A `'completed'` count can never be cancelled
+(enforced both in `cancel_shop_stock_count()` and by `complete_shop_stock_count()`
+rejecting a `'cancelled'` count). Only one `draft`/`in_progress` count
+may exist per location at a time (partial unique index on
+`shop_stock_counts(location_id) WHERE status IN ('draft','in_progress')`),
+preventing two overlapping sessions from double-adjusting the same
+balance.
+
+Live-verified full mandated scenario: system 10 → counted 8 → variance
+-2 → one `stock_count_adjustment` movement of quantity 2 (direction
+'out') → balance 8; second completion attempt → same id returned, no
+second movement, balance still 8; second session system 8 → counted 11
+→ variance +3 → movement quantity 3 (direction 'in') → balance 11.
+Independently reconciled the full movement ledger by hand
+(`+10 -2 +3 = 11`) against the stored balance — exact match.

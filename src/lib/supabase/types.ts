@@ -5450,6 +5450,7 @@ export type Database = {
           created_at: string
           customer_id: string | null
           id: string
+          idempotency_key: string | null
           invoice_id: string | null
           location_id: string
           sold_by: string | null
@@ -5460,6 +5461,7 @@ export type Database = {
           created_at?: string
           customer_id?: string | null
           id?: string
+          idempotency_key?: string | null
           invoice_id?: string | null
           location_id: string
           sold_by?: string | null
@@ -5470,6 +5472,7 @@ export type Database = {
           created_at?: string
           customer_id?: string | null
           id?: string
+          idempotency_key?: string | null
           invoice_id?: string | null
           location_id?: string
           sold_by?: string | null
@@ -5513,6 +5516,153 @@ export type Database = {
           },
           {
             foreignKeyName: "shop_sales_location_id_fkey"
+            columns: ["location_id"]
+            isOneToOne: false
+            referencedRelation: "shop_inventory_locations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      shop_stock_count_items: {
+        Row: {
+          counted_at: string | null
+          counted_by: string | null
+          counted_quantity: number | null
+          created_at: string
+          id: string
+          movement_id: string | null
+          product_id: string
+          stock_count_id: string
+          system_quantity: number
+          variance: number | null
+          variant_id: string | null
+        }
+        Insert: {
+          counted_at?: string | null
+          counted_by?: string | null
+          counted_quantity?: number | null
+          created_at?: string
+          id?: string
+          movement_id?: string | null
+          product_id: string
+          stock_count_id: string
+          system_quantity: number
+          variance?: number | null
+          variant_id?: string | null
+        }
+        Update: {
+          counted_at?: string | null
+          counted_by?: string | null
+          counted_quantity?: number | null
+          created_at?: string
+          id?: string
+          movement_id?: string | null
+          product_id?: string
+          stock_count_id?: string
+          system_quantity?: number
+          variance?: number | null
+          variant_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "shop_stock_count_items_movement_id_fkey"
+            columns: ["movement_id"]
+            isOneToOne: false
+            referencedRelation: "shop_inventory_movements"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "shop_stock_count_items_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "shop_products"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "shop_stock_count_items_stock_count_id_fkey"
+            columns: ["stock_count_id"]
+            isOneToOne: false
+            referencedRelation: "shop_stock_counts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "shop_stock_count_items_variant_id_fkey"
+            columns: ["variant_id"]
+            isOneToOne: false
+            referencedRelation: "shop_product_variants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      shop_stock_counts: {
+        Row: {
+          cancelled_at: string | null
+          cancelled_by: string | null
+          club_id: string
+          completed_at: string | null
+          completed_by: string | null
+          created_at: string
+          created_by: string | null
+          id: string
+          idempotency_key: string | null
+          location_id: string
+          notes: string | null
+          started_at: string | null
+          started_by: string | null
+          status: string
+          updated_at: string | null
+        }
+        Insert: {
+          cancelled_at?: string | null
+          cancelled_by?: string | null
+          club_id: string
+          completed_at?: string | null
+          completed_by?: string | null
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          idempotency_key?: string | null
+          location_id: string
+          notes?: string | null
+          started_at?: string | null
+          started_by?: string | null
+          status?: string
+          updated_at?: string | null
+        }
+        Update: {
+          cancelled_at?: string | null
+          cancelled_by?: string | null
+          club_id?: string
+          completed_at?: string | null
+          completed_by?: string | null
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          idempotency_key?: string | null
+          location_id?: string
+          notes?: string | null
+          started_at?: string | null
+          started_by?: string | null
+          status?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "shop_stock_counts_club_id_fkey"
+            columns: ["club_id"]
+            isOneToOne: false
+            referencedRelation: "clubs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "shop_stock_counts_club_id_fkey"
+            columns: ["club_id"]
+            isOneToOne: false
+            referencedRelation: "commercial_entitlements_usage"
+            referencedColumns: ["club_id"]
+          },
+          {
+            foreignKeyName: "shop_stock_counts_location_id_fkey"
             columns: ["location_id"]
             isOneToOne: false
             referencedRelation: "shop_inventory_locations"
@@ -6484,6 +6634,10 @@ export type Database = {
         Args: { p_reason: string; p_subscription_id: string }
         Returns: undefined
       }
+      cancel_shop_stock_count: {
+        Args: { p_reason?: string; p_stock_count_id: string }
+        Returns: undefined
+      }
       cancel_staff_invite: {
         Args: { p_membership_id: string }
         Returns: undefined
@@ -6567,6 +6721,10 @@ export type Database = {
           club_id: string
           trial_granted: boolean
         }[]
+      }
+      complete_shop_stock_count: {
+        Args: { p_stock_count_id: string }
+        Returns: string
       }
       confirm_payment_reconciliation: {
         Args: {
@@ -6867,6 +7025,7 @@ export type Database = {
           p_idempotency_key?: string
           p_items: Json
           p_location_id: string
+          p_payment_amount?: number
           p_payment_method: string
           p_payment_reference?: string
         }
@@ -7670,6 +7829,32 @@ export type Database = {
           variant_label: string
         }[]
       }
+      get_shop_stock_count_detail: {
+        Args: { p_stock_count_id: string }
+        Returns: {
+          cancelled_at: string
+          cancelled_by: string
+          club_id: string
+          completed_at: string
+          completed_by: string
+          counted_quantity: number
+          id: string
+          item_id: string
+          location_id: string
+          location_name: string
+          movement_id: string
+          notes: string
+          product_id: string
+          product_name: string
+          started_at: string
+          started_by: string
+          status: string
+          system_quantity: number
+          variance: number
+          variant_id: string
+          variant_label: string
+        }[]
+      }
       get_shop_top_products: {
         Args: {
           p_club_id: string
@@ -8001,6 +8186,28 @@ export type Database = {
           total: number
         }[]
       }
+      list_shop_stock_counts: {
+        Args: {
+          p_club_id: string
+          p_limit?: number
+          p_location_id?: string
+          p_offset?: number
+          p_status?: string
+        }
+        Returns: {
+          completed_at: string
+          completed_by: string
+          id: string
+          item_count: number
+          location_id: string
+          location_name: string
+          notes: string
+          started_at: string
+          started_by: string
+          status: string
+          variance_item_count: number
+        }[]
+      }
       log_own_password_changed: { Args: never; Returns: undefined }
       log_password_reset_event: {
         Args: { p_kind: string; p_target_user_id?: string }
@@ -8273,6 +8480,15 @@ export type Database = {
           p_invoice_id: string
           p_method: string
           p_reference?: string
+        }
+        Returns: string
+      }
+      record_shop_stock_count_line: {
+        Args: {
+          p_counted_quantity?: number
+          p_product_id: string
+          p_stock_count_id: string
+          p_variant_id?: string
         }
         Returns: string
       }
@@ -8564,6 +8780,15 @@ export type Database = {
       }
       start_platform_support_session: {
         Args: { p_club_id: string; p_mode: string; p_reason?: string }
+        Returns: string
+      }
+      start_shop_stock_count: {
+        Args: {
+          p_club_id: string
+          p_idempotency_key?: string
+          p_location_id: string
+          p_notes?: string
+        }
         Returns: string
       }
       start_whatsapp_pairing: {

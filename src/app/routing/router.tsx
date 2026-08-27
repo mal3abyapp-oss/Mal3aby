@@ -41,6 +41,7 @@ const ShopLayout = lazy(() => import('@/features/shop/ShopLayout').then((m) => (
 const ShopPOSPage = lazy(() => import('@/features/shop/ShopPOSPage').then((m) => ({ default: m.ShopPOSPage })))
 const ShopProductsPage = lazy(() => import('@/features/shop/ShopProductsPage').then((m) => ({ default: m.ShopProductsPage })))
 const ShopInventoryPage = lazy(() => import('@/features/shop/ShopInventoryPage').then((m) => ({ default: m.ShopInventoryPage })))
+const ShopStockCountPage = lazy(() => import('@/features/shop/ShopStockCountPage').then((m) => ({ default: m.ShopStockCountPage })))
 const ShopSalesPage = lazy(() => import('@/features/shop/ShopSalesPage').then((m) => ({ default: m.ShopSalesPage })))
 const ShopSettingsPage = lazy(() => import('@/features/shop/ShopSettingsPage').then((m) => ({ default: m.ShopSettingsPage })))
 const ReportShopPage = lazy(() => import('@/features/reports/ReportShopPage').then((m) => ({ default: m.ReportShopPage })))
@@ -239,6 +240,7 @@ export const router = createBrowserRouter([
               { index: true, element: <ShopPOSPage /> },
               { path: 'products', element: <ShopProductsPage /> },
               { path: 'inventory', element: <ShopInventoryPage /> },
+              { path: 'stock-count', element: <ShopStockCountPage /> },
               { path: 'sales', element: <ShopSalesPage /> },
               { path: 'settings', element: <ShopSettingsPage /> },
             ],

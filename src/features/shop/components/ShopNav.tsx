@@ -1,7 +1,7 @@
 import { NavLink } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { cn } from '@/lib/utils'
-import { ShoppingCart, Package, Boxes, Undo2, Settings } from 'lucide-react'
+import { ShoppingCart, Package, Boxes, Undo2, Settings, ClipboardCheck } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 
 // COMMERCIAL MODULE (2026-08-26) -- mirrors FinanceNav's exact
@@ -18,6 +18,7 @@ const SHOP_NAV: ShopNavItem[] = [
   { to: '/app/shop', labelKey: 'shop.nav.pos', icon: ShoppingCart, end: true },
   { to: '/app/shop/products', labelKey: 'shop.nav.products', icon: Package },
   { to: '/app/shop/inventory', labelKey: 'shop.nav.inventory', icon: Boxes },
+  { to: '/app/shop/stock-count', labelKey: 'shop.nav.stockCount', icon: ClipboardCheck },
   { to: '/app/shop/sales', labelKey: 'shop.nav.sales', icon: Undo2 },
   { to: '/app/shop/settings', labelKey: 'shop.nav.settings', icon: Settings },
 ]

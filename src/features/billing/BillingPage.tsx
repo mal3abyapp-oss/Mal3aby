@@ -417,15 +417,42 @@ export function BillingPage() {
   // render (the RPC itself is idempotent-safe to call repeatedly, but
   // there's no reason to mint a fresh token + revoke the previous one
   // every time this query re-runs).
-  const { data: verifyQrDataUrl } = useQuery({
+  const { data: verifyQrResult } = useQuery({
     queryKey: ['invoice-verify-qr', selectedInvoiceId],
     queryFn: async () => {
       const { data: token, error } = await supabase.rpc('ensure_invoice_qr', { p_invoice_id: selectedInvoiceId! })
       if (error) throw error
       const url = `${window.location.origin}/verify/${token}`
-      return QRCode.toDataURL(url, { width: 120, margin: 1 })
+      return { token: token as string, dataUrl: await QRCode.toDataURL(url, { width: 120, margin: 1 }) }
     },
     enabled: !!selectedInvoiceId && detail?.status === 'issued',
+    staleTime: Infinity,
+  })
+  const verifyQrDataUrl = verifyQrResult?.dataUrl
+  const verifyQrToken = verifyQrResult?.token
+
+  // PRINTING & DOCUMENT OUTPUT (2026-08-27), Sections 11-16: the mandatory
+  // booking QR on a printed Field Booking invoice. Reuses the exact same
+  // canonical RPC VerifyInvoicePage.tsx already uses successfully
+  // (get_booking_qr_for_invoice_token) -- fed the SAME invoice verification
+  // token minted above (a valid possession-proof for this invoice), never a
+  // second parallel minting path. Server re-validates booking eligibility
+  // (cancelled/checked-in/not-eligible) on every fetch -- this UI never
+  // assumes eligibility client-side. Only shown for a Field Booking invoice
+  // (invoiceBookingScope present); never for Academy/Membership/Shop
+  // invoices, matching the directive's own scope ("mandatory QR requirement
+  // applies specifically to the individual booking invoice/confirmation").
+  const { data: bookingQr } = useQuery({
+    queryKey: ['invoice-booking-qr', selectedInvoiceId, verifyQrToken],
+    queryFn: async () => {
+      const { data, error } = await supabase.rpc('get_booking_qr_for_invoice_token', { p_invoice_token: verifyQrToken as string })
+      if (error) throw error
+      const row = data?.[0]
+      if (row?.status !== 'active' || !row.raw_token) return { status: row?.status ?? 'invalid_invoice_token', dataUrl: null, bookingRef: row?.booking_ref ?? null }
+      const dataUrl = await QRCode.toDataURL(row.raw_token, { width: 160, margin: 1 })
+      return { status: 'active' as const, dataUrl, bookingRef: row.booking_ref as string | null }
+    },
+    enabled: !!selectedInvoiceId && !!invoiceBookingScope && !!verifyQrToken,
     staleTime: Infinity,
   })
 
@@ -830,6 +857,30 @@ export function BillingPage() {
                       {t('billing.detail.verifyQrHint')}
                     </p>
                   </div>
+                )}
+                {/* Mandatory booking QR (PRINTING closure, Section 11) --
+                    only for a Field Booking invoice, only once the server
+                    confirms 'active' (booking not cancelled/checked-in/
+                    ineligible). Human-readable booking reference is always
+                    shown alongside it, per Section 16 -- the QR is never
+                    the sole way to identify the booking. */}
+                {invoiceBookingScope && bookingQr && bookingQr.status === 'active' && bookingQr.dataUrl && (
+                  <div className="mb-3 flex items-center gap-3 border-t border-border pt-3">
+                    <img src={bookingQr.dataUrl} alt={t('billing.detail.bookingQrAlt')} className="size-28" />
+                    <div>
+                      <p className="text-xs font-medium">{t('billing.detail.bookingQrLabel')}</p>
+                      {bookingQr.bookingRef && (
+                        <p className="text-xs text-text-secondary">
+                          {t('billing.detail.bookingRef')}: <bdi className="tabular-nums">{bookingQr.bookingRef}</bdi>
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                )}
+                {invoiceBookingScope && bookingQr && bookingQr.status !== 'active' && (
+                  <p className="mb-3 text-xs text-status-warning print:hidden">
+                    {t('billing.detail.bookingQrUnavailable', { defaultValue: 'Booking QR unavailable for this booking\'s current status.' })}
+                  </p>
                 )}
                 <table className="w-full text-start">
                   <thead>

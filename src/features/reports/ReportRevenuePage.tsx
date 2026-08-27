@@ -13,6 +13,7 @@ import { Wallet, Download } from 'lucide-react'
 import { useDateRange, useDateRangeReport } from './hooks/useDateRangeReport'
 import { DateRangeFilter } from './components/DateRangeFilter'
 import { ReportsNav } from './components/ReportsNav'
+import { ReportPrintButton, ReportPrintHeader } from '@/components/ui/report-print-header'
 
 // Master IA/UX audit (Reports decomposition phase): extracted from
 // ReportsPage.tsx's RevenueReportTab -- this is the "financial source"
@@ -51,10 +52,15 @@ export function ReportRevenueContent() {
     { p_method: method !== 'all' ? method : undefined },
   )
 
+  const filterSummary = `${t('reports.revenue.description')} — ${startDate} → ${endDate}${method !== 'all' ? ` — ${t(`billing.paymentMethods.underlyingMethodLabels.${method}`)}` : ''}`
+
   return (
     <div>
-      <DateRangeFilter startDate={startDate} endDate={endDate} onStart={setStartDate} onEnd={setEndDate} />
-      <div className="mb-4 w-48">
+      <div className="flex flex-wrap items-center justify-between gap-2 print:hidden">
+        <DateRangeFilter startDate={startDate} endDate={endDate} onStart={setStartDate} onEnd={setEndDate} />
+        {data && <ReportPrintButton />}
+      </div>
+      <div className="mb-4 w-48 print:hidden">
         <Select value={method} onValueChange={setMethod}>
           <SelectTrigger><SelectValue /></SelectTrigger>
           <SelectContent>
@@ -70,7 +76,8 @@ export function ReportRevenueContent() {
       {isLoading && <p className="text-sm text-text-secondary">{t('reports.loading')}</p>}
       {isError && <ErrorState message={translateSupabaseError(error, t('reports.loadError'))} onRetry={() => void refetch()} />}
       {data && (
-        <>
+        <div className="print-target visible-for-print">
+          <ReportPrintHeader reportName={t('reports.revenue.description')} filterSummary={filterSummary} />
           <div className="mb-6 grid grid-cols-2 gap-3 md:grid-cols-3">
             <StatCard label={t('reports.revenue.totalRevenue')} value={formatMoney(data.total_revenue, 'EGP', locale)} icon={Wallet} />
             <StatCard label={t('reports.revenue.totalRefunds')} value={formatMoney(data.refunds_total, 'EGP', locale)} tone="danger" />
@@ -98,6 +105,7 @@ export function ReportRevenueContent() {
                   <Button
                     size="sm"
                     variant="outline"
+                    className="print:hidden"
                     onClick={() =>
                       downloadCsv(
                         `revenue-${startDate}-${endDate}.csv`,
@@ -124,7 +132,7 @@ export function ReportRevenueContent() {
               )}
             </div>
           </div>
-        </>
+        </div>
       )}
     </div>
   )
@@ -134,8 +142,10 @@ export function ReportRevenuePage() {
   const { t } = useTranslation()
   return (
     <div>
-      <PageHeader title={t('reports.title')} description={t('reports.revenue.description')} />
-      <ReportsNav />
+      <div className="print:hidden">
+        <PageHeader title={t('reports.title')} description={t('reports.revenue.description')} />
+        <ReportsNav />
+      </div>
       <ReportRevenueContent />
     </div>
   )
