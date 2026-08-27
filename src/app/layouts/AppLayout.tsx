@@ -70,17 +70,25 @@ interface NavSection {
 // Club's own platform-subscription status is a different concern
 // (SaaS billing, not customer money) and keeps its own link, moved next
 // to Settings where account-status concerns live.
+// Sidebar reorder (2026-08-27, user-requested via Arabic chat directive
+// "عايز جوله اعاده ترتيب للسايد بار"): reordered by daily-usage
+// frequency rather than the previous build-order-derived sequence.
+// Section 1 = daily operations (Bookings/Shop moved up as the
+// highest-frequency screens; Customers follows since it's directly
+// tied to booking/sale flows; Academy+Memberships grouped together as
+// the same recurring-subscription management pattern; Finance last in
+// this section since it's a review/reconciliation activity, not a
+// repeated-many-times-a-day action like the items above it).
+// Section 2 = management/support (Reports+Staff promoted above
+// WhatsApp/Fields/Audit Log/Settings, which are lower-frequency or
+// purely administrative). No domain gating logic changed -- purely a
+// display-order change, same canSeeNavDomain() filtering as before.
 const navSections: NavSection[] = [
   {
     titleKey: null,
     items: [
       { to: '/app', labelKey: 'nav.today', icon: LayoutDashboard, domain: 'today' },
       { to: '/app/bookings', labelKey: 'nav.bookings', icon: CalendarDays, domain: 'bookings' },
-      { to: '/app/academy', labelKey: 'nav.academy', icon: GraduationCap, domain: 'academy' },
-      // Club Memberships: a genuine top-level main domain, deliberately
-      // never nested under Academy (directive Section 96/111).
-      { to: '/app/memberships', labelKey: 'nav.memberships', icon: IdCard, domain: 'memberships' },
-      { to: '/app/customers', labelKey: 'nav.customers', icon: Users, domain: 'customers' },
       // COMMERCIAL MODULE (2026-08-26) -- shop.view alone gates nav
       // visibility here (matching every other item's pattern); whether
       // the module is actually entitled+active for this club is a
@@ -89,6 +97,11 @@ const navSections: NavSection[] = [
       // page if a permission-holder clicks through before the club
       // owner or platform has turned it on).
       { to: '/app/shop', labelKey: 'nav.shop', icon: ShoppingCart, domain: 'shop' },
+      { to: '/app/customers', labelKey: 'nav.customers', icon: Users, domain: 'customers' },
+      { to: '/app/academy', labelKey: 'nav.academy', icon: GraduationCap, domain: 'academy' },
+      // Club Memberships: a genuine top-level main domain, deliberately
+      // never nested under Academy (directive Section 96/111).
+      { to: '/app/memberships', labelKey: 'nav.memberships', icon: IdCard, domain: 'memberships' },
       { to: '/app/finance', labelKey: 'nav.finance', icon: Receipt, domain: 'finance' },
     ],
   },
@@ -96,12 +109,6 @@ const navSections: NavSection[] = [
     titleKey: null,
     items: [
       { to: '/app/reports', labelKey: 'nav.reports', icon: BarChart3, domain: 'reports' },
-      // IA restructuring (Phase 8): WhatsApp promoted to an independent
-      // top-level sidebar item -- previously reachable only via
-      // Settings' "الإشعارات" section, now has a real nav presence
-      // matching the directive's "independent but connected module"
-      // instruction.
-      { to: '/app/whatsapp', labelKey: 'nav.whatsapp', icon: MessageCircle, domain: 'whatsapp' },
       { to: '/app/staff', labelKey: 'nav.staff', icon: UserCog, domain: 'staff' },
       // Master IA/UX audit (permission-model drift-risk phase): /app/fields
       // and /app/audit-log both already had real routes and a MorePage
@@ -110,6 +117,12 @@ const navSections: NavSection[] = [
       // same role. Added here with MorePage's own domain gating ('settings')
       // so desktop and mobile now agree on who sees them.
       { to: '/app/fields', labelKey: 'nav.fields', icon: Building2, domain: 'settings' },
+      // IA restructuring (Phase 8): WhatsApp promoted to an independent
+      // top-level sidebar item -- previously reachable only via
+      // Settings' "الإشعارات" section, now has a real nav presence
+      // matching the directive's "independent but connected module"
+      // instruction.
+      { to: '/app/whatsapp', labelKey: 'nav.whatsapp', icon: MessageCircle, domain: 'whatsapp' },
       { to: '/app/audit-log', labelKey: 'nav.auditLog', icon: ShieldCheck, domain: 'settings' },
       { to: '/app/settings', labelKey: 'nav.settings', icon: Settings, domain: 'settings' },
     ],
