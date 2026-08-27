@@ -263,6 +263,24 @@ function SplitLineReceipt({
 export function BillingPage() {
   const { currentClubId, memberships, setCurrentClubId, session } = useAuth()
   const { t } = useTranslation()
+  // LAUNCH READINESS AUDIT fix: "Collected Today" below used to compare
+  // dates via Date.prototype.toDateString(), which reads the BROWSER's
+  // local timezone, not the club's -- a real violation of this project's
+  // own established Time Model (docs/lib/i18n/config.ts: "always takes
+  // an explicit IANA timezone... never format a raw instant without
+  // one"). A staff member opening this page from a device set to a
+  // different timezone near a midnight boundary would see the wrong
+  // "today" collected total. Fetches the same clubs.timezone column
+  // already used the same way elsewhere (PortalBookingsPage.tsx).
+  const { data: clubTimezone } = useQuery({
+    queryKey: ['billing-club-timezone', currentClubId],
+    queryFn: async () => {
+      const { data } = await supabase.from('clubs').select('timezone').eq('id', currentClubId!).maybeSingle()
+      return data?.timezone ?? 'Africa/Cairo'
+    },
+    enabled: !!currentClubId,
+    staleTime: Infinity,
+  })
   const { locale } = useDirection()
   const queryClient = useQueryClient()
   const [searchParams, setSearchParams] = useSearchParams()
@@ -699,8 +717,14 @@ export function BillingPage() {
   ]
 
   const totalOutstanding = invoices.reduce((sum, r) => sum + r.outstanding, 0)
+  // Compares calendar dates in the CLUB's own timezone (not the browser's) --
+  // Intl.DateTimeFormat with an explicit timeZone renders the same
+  // yyyy-mm-dd for a given instant regardless of the viewer's own device
+  // zone, matching this project's Time Model.
+  const dayKeyFormatter = new Intl.DateTimeFormat('en-CA', { timeZone: clubTimezone ?? 'Africa/Cairo' })
+  const todayKey = dayKeyFormatter.format(new Date())
   const totalCollectedToday = invoices
-    .filter((r) => r.issuedAt && new Date(r.issuedAt).toDateString() === new Date().toDateString())
+    .filter((r) => r.issuedAt && dayKeyFormatter.format(new Date(r.issuedAt)) === todayKey)
     .reduce((sum, r) => sum + r.paid, 0)
   const partialCount = invoices.filter((r) => r.paid > 0 && r.outstanding > 0).length
   const owingCustomersCount = new Set(invoices.filter((r) => r.outstanding > 0).map((r) => r.customerName)).size

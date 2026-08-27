@@ -1,0 +1,18 @@
+-- LAUNCH READINESS AUDIT finding (MEDIUM): get_invoice_payment_summary
+-- is SECURITY INVOKER (not DEFINER) with no internal auth gate --
+-- relies entirely on RLS on invoices/payment_allocations/refunds,
+-- which correctly deny anon today (confirmed live), but this was a
+-- second, unwrapped door alongside the two legitimate SECURITY
+-- DEFINER wrappers that already do proper token-hash gating
+-- (verify_invoice_public, verify_booking_qr_public). Any future RLS
+-- regression on those three tables would otherwise turn this into a
+-- direct arbitrary-invoice-ID leak with no compensating control.
+--
+-- Safety verified before applying: both wrapper functions are owned
+-- by 'postgres' (same owner as this function), so a SECURITY DEFINER
+-- wrapper's internal call to this function is authorized via
+-- ownership, completely independent of any grant to anon/authenticated
+-- -- confirmed live: has_function_privilege('postgres', ...) = true
+-- after this revoke. authenticated (real staff/customer callers) is
+-- unaffected -- this revoke targets anon/public only.
+revoke execute on function public.get_invoice_payment_summary(uuid[]) from anon, public;

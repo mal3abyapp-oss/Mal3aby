@@ -73,15 +73,20 @@ export function PaymentGatewaysCard() {
 
   const saveMutation = useMutation({
     mutationFn: async ({ gateway, enabled, publicKey }: { gateway: GatewayName; enabled: boolean; publicKey: string | null }) => {
-      const { error } = await supabase.from('payment_gateway_configs').upsert(
-        {
-          club_id: currentClubId!,
-          gateway,
-          enabled,
-          public_key: publicKey,
-        },
-        { onConflict: 'club_id,gateway' },
-      )
+      // LAUNCH READINESS AUDIT fix: this used to be a direct client-side
+      // .upsert() against payment_gateway_configs, relying on the table's
+      // own RLS policy to authorize the write. Direct client write grants
+      // on this table were revoked (matching this project's RPC-only
+      // convention everywhere else) -- writes now go through this
+      // SECURITY DEFINER RPC, which enforces the identical authorization
+      // the RLS policy did (club membership + payment.methods.manage)
+      // plus never allows a client to set has_server_credentials.
+      const { error } = await supabase.rpc('upsert_payment_gateway_config', {
+        p_club_id: currentClubId!,
+        p_gateway: gateway,
+        p_enabled: enabled,
+        p_public_key: publicKey ?? undefined,
+      })
       if (error) throw error
     },
     onSuccess: () => {

@@ -9050,6 +9050,15 @@ export type Database = {
           was_existing: boolean
         }[]
       }
+      upsert_payment_gateway_config: {
+        Args: {
+          p_club_id: string
+          p_enabled: boolean
+          p_gateway: string
+          p_public_key?: string
+        }
+        Returns: undefined
+      }
       user_club_ids: { Args: never; Returns: string[] }
       user_has_branch_access: {
         Args: { p_branch_id: string; p_club_id: string }
