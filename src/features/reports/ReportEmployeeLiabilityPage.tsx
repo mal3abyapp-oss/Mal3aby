@@ -20,6 +20,7 @@ import { UserX } from 'lucide-react'
 import { useDateRange, useDateRangeReport } from './hooks/useDateRangeReport'
 import { DateRangeFilter } from './components/DateRangeFilter'
 import { ReportsNav } from './components/ReportsNav'
+import { ReportPrintButton, ReportPrintHeader } from '@/components/ui/report-print-header'
 
 // Phase F (F6): employee, shortage created, settled, outstanding,
 // shift, date -- exactly what the directive asks for. Reads
@@ -113,18 +114,24 @@ export function ReportEmployeeLiabilityContent() {
       key: 'actions',
       header: '',
       render: (r) => (r.kind === 'shortage' && r.outstanding > 0 && canSettle && r.employee_id !== currentUserId) ? (
-        <Button size="sm" variant="outline" onClick={() => setSettleRow(r)}>{t('staff.detail.settle', { defaultValue: 'Settle' })}</Button>
+        <Button size="sm" variant="outline" className="print:hidden" onClick={() => setSettleRow(r)}>{t('staff.detail.settle', { defaultValue: 'Settle' })}</Button>
       ) : null,
     },
   ]
 
+  const filterSummary = `${startDate} → ${endDate}`
+
   return (
     <div>
-      <DateRangeFilter startDate={startDate} endDate={endDate} onStart={setStartDate} onEnd={setEndDate} />
+      <div className="flex flex-wrap items-center justify-between gap-2 print:hidden">
+        <DateRangeFilter startDate={startDate} endDate={endDate} onStart={setStartDate} onEnd={setEndDate} />
+        {!isLoading && !isError && <ReportPrintButton />}
+      </div>
       {isLoading && <p className="text-sm text-text-secondary">{t('reports.loading')}</p>}
       {isError && <ErrorState message={translateSupabaseError(error, t('reports.loadError'))} onRetry={() => void refetch()} />}
       {!isLoading && !isError && (
-        <>
+        <div className="print-target visible-for-print">
+          <ReportPrintHeader reportName={t('reports.employeeLiability.description')} filterSummary={filterSummary} />
           <div className="mb-6 grid gap-4 md:grid-cols-2">
             <StatCard label={t('reports.employeeLiability.totalOutstanding')} value={formatMoney(totalOutstanding, 'EGP', locale)} icon={UserX} tone={totalOutstanding > 0 ? 'danger' : 'default'} />
             <StatCard label={t('reports.employeeLiability.totalSettled')} value={formatMoney(totalSettled, 'EGP', locale)} icon={UserX} />
@@ -136,7 +143,7 @@ export function ReportEmployeeLiabilityContent() {
             isLoading={isLoading}
             emptyTitle={t('reports.noData')}
           />
-        </>
+        </div>
       )}
       {settleRow && (
         <SettleReportLiabilityDialog
@@ -280,8 +287,10 @@ export function ReportEmployeeLiabilityPage() {
   const { t } = useTranslation()
   return (
     <div>
-      <PageHeader title={t('reports.title')} description={t('reports.employeeLiability.description')} />
-      <ReportsNav />
+      <div className="print:hidden">
+        <PageHeader title={t('reports.title')} description={t('reports.employeeLiability.description')} />
+        <ReportsNav />
+      </div>
       <ReportEmployeeLiabilityContent />
     </div>
   )

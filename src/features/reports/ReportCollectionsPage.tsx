@@ -11,6 +11,7 @@ import { HandCoins, Download } from 'lucide-react'
 import { useDateRange, useDateRangeReport } from './hooks/useDateRangeReport'
 import { DateRangeFilter } from './components/DateRangeFilter'
 import { ReportsNav } from './components/ReportsNav'
+import { ReportPrintButton, ReportPrintHeader } from '@/components/ui/report-print-header'
 
 // Master IA/UX audit (Reports decomposition phase): extracted from
 // ReportsPage.tsx's CollectionsReportTab. Same RPC (get_collections_report)
@@ -29,13 +30,19 @@ export function ReportCollectionsContent() {
   const { startDate, setStartDate, endDate, setEndDate } = useDateRange()
   const { data, isLoading, isError, error, refetch } = useDateRangeReport<CollectionsReport>('get_collections_report', startDate, endDate)
 
+  const filterSummary = `${startDate} → ${endDate}`
+
   return (
     <div>
-      <DateRangeFilter startDate={startDate} endDate={endDate} onStart={setStartDate} onEnd={setEndDate} />
+      <div className="flex flex-wrap items-center justify-between gap-2 print:hidden">
+        <DateRangeFilter startDate={startDate} endDate={endDate} onStart={setStartDate} onEnd={setEndDate} />
+        {data && <ReportPrintButton />}
+      </div>
       {isLoading && <p className="text-sm text-text-secondary">{t('reports.loading')}</p>}
       {isError && <ErrorState message={translateSupabaseError(error, t('reports.loadError'))} onRetry={() => void refetch()} />}
       {data && (
-        <>
+        <div className="print-target visible-for-print">
+          <ReportPrintHeader reportName={t('reports.collections.description')} filterSummary={filterSummary} />
           <div className="mb-6">
             <StatCard label={t('reports.collections.totalCollected')} value={formatMoney(data.total_collected, 'EGP', locale)} icon={HandCoins} />
           </div>
@@ -47,6 +54,7 @@ export function ReportCollectionsContent() {
                   <Button
                     size="sm"
                     variant="outline"
+                    className="print:hidden"
                     onClick={() =>
                       downloadCsv(
                         `collections-by-employee-${startDate}-${endDate}.csv`,
@@ -82,6 +90,7 @@ export function ReportCollectionsContent() {
                   <Button
                     size="sm"
                     variant="outline"
+                    className="print:hidden"
                     onClick={() =>
                       downloadCsv(
                         `collections-by-branch-${startDate}-${endDate}.csv`,
@@ -111,7 +120,7 @@ export function ReportCollectionsContent() {
               )}
             </div>
           </div>
-        </>
+        </div>
       )}
     </div>
   )
@@ -121,8 +130,10 @@ export function ReportCollectionsPage() {
   const { t } = useTranslation()
   return (
     <div>
-      <PageHeader title={t('reports.title')} description={t('reports.collections.description')} />
-      <ReportsNav />
+      <div className="print:hidden">
+        <PageHeader title={t('reports.title')} description={t('reports.collections.description')} />
+        <ReportsNav />
+      </div>
       <ReportCollectionsContent />
     </div>
   )

@@ -2013,7 +2013,9 @@
       "bookingQrAlt": "Booking verification QR",
       "bookingQrLabel": "Booking Verification QR",
       "bookingRef": "Booking Reference",
-      "bookingQrUnavailable": "Booking QR unavailable for this booking's current status."
+      "bookingQrUnavailable": "Booking QR unavailable for this booking's current status.",
+      "printReceipt": "Print Receipt",
+      "paymentReceiptTitle": "Payment Receipt"
     },
     "recordPayment": {
       "heading": "Record payment",
@@ -2049,7 +2051,8 @@
       "receiptCustomer": "Customer: {{name}}",
       "receiptOriginalMethod": "Original payment method: {{method}}",
       "receiptReason": "Reason: {{reason}}",
-      "receiptDate": "Date: {{date}}"
+      "receiptDate": "Date: {{date}}",
+      "receiptProcessedBy": "Processed by {{name}}"
     },
     "reviewClaim": {
       "genericError": "Couldn't review the payment claim."
@@ -3933,7 +3936,8 @@
         "movementType": "Type",
         "quantity": "Qty",
         "reason": "Reason"
-      }
+      },
+      "movementHistoryLimitNote": "Showing the most recent {{count}} movements."
     },
     "sales": {
       "title": "Sales & Returns",
@@ -3962,7 +3966,8 @@
         "cancelled": "Cancelled",
         "partially_returned": "Partially returned",
         "returned": "Returned"
-      }
+      },
+      "printLimitNote": "Showing the most recent {{count}} sales/returns."
     },
     "settings": {
       "title": "Shop settings",
@@ -4016,6 +4021,15 @@
         "in_progress": "In Progress",
         "completed": "Completed",
         "cancelled": "Cancelled"
+      },
+      "printStartedAt": "Started at",
+      "printCompletedAt": "Completed at",
+      "printStartedBy": "Started by",
+      "printCompletedBy": "Completed by",
+      "summary": {
+        "matched": "Matched",
+        "shortage": "Shortage",
+        "surplus": "Surplus"
       }
     }
   }

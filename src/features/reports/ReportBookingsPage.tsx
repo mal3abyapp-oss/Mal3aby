@@ -13,6 +13,7 @@ import { Download } from 'lucide-react'
 import { useDateRange, useDateRangeReport } from './hooks/useDateRangeReport'
 import { DateRangeFilter } from './components/DateRangeFilter'
 import { ReportsNav } from './components/ReportsNav'
+import { ReportPrintButton, ReportPrintHeader } from '@/components/ui/report-print-header'
 
 // Master IA/UX audit (Reports decomposition phase): extracted from
 // ReportsPage.tsx's BookingReportTab. Reused the CANONICAL
@@ -33,15 +34,23 @@ export function ReportBookingsPage() {
   const { startDate, setStartDate, endDate, setEndDate } = useDateRange()
   const { data, isLoading, isError, error, refetch } = useDateRangeReport<BookingReport>('get_booking_report', startDate, endDate)
 
+  const filterSummary = `${startDate} → ${endDate}`
+
   return (
     <div>
-      <PageHeader title={t('reports.title')} description={t('reports.bookings.description')} />
-      <ReportsNav />
-      <DateRangeFilter startDate={startDate} endDate={endDate} onStart={setStartDate} onEnd={setEndDate} />
+      <div className="print:hidden">
+        <PageHeader title={t('reports.title')} description={t('reports.bookings.description')} />
+        <ReportsNav />
+      </div>
+      <div className="flex flex-wrap items-center justify-between gap-2 print:hidden">
+        <DateRangeFilter startDate={startDate} endDate={endDate} onStart={setStartDate} onEnd={setEndDate} />
+        {data && <ReportPrintButton />}
+      </div>
       {isLoading && <p className="text-sm text-text-secondary">{t('reports.loading')}</p>}
       {isError && <ErrorState message={translateSupabaseError(error, t('reports.loadError'))} onRetry={() => void refetch()} />}
       {data && (
-        <>
+        <div className="print-target visible-for-print">
+          <ReportPrintHeader reportName={t('reports.bookings.description')} filterSummary={filterSummary} />
           <div className="mb-6 grid grid-cols-2 gap-3 md:grid-cols-3">
             <StatCard
               label={t('reports.bookings.cancellationRate')}
@@ -58,6 +67,7 @@ export function ReportBookingsPage() {
                   <Button
                     size="sm"
                     variant="outline"
+                    className="print:hidden"
                     onClick={() =>
                       downloadCsv(
                         `bookings-by-status-${startDate}-${endDate}.csv`,
@@ -86,7 +96,7 @@ export function ReportBookingsPage() {
                             dead end -- from a status breakdown row a
                             manager can jump straight to those bookings
                             on the operational calendar. */}
-                        <Button asChild size="sm" variant="ghost">
+                        <Button asChild size="sm" variant="ghost" className="print:hidden">
                           <Link to="/app/bookings">{t('reports.bookings.viewBookings')}</Link>
                         </Button>
                       </span>
@@ -111,7 +121,7 @@ export function ReportBookingsPage() {
               )}
             </div>
           </div>
-        </>
+        </div>
       )}
     </div>
   )

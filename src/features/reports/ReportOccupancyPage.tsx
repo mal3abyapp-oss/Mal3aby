@@ -9,6 +9,7 @@ import { Download } from 'lucide-react'
 import { useDateRange, useDateRangeReport } from './hooks/useDateRangeReport'
 import { DateRangeFilter } from './components/DateRangeFilter'
 import { ReportsNav } from './components/ReportsNav'
+import { ReportPrintButton, ReportPrintHeader } from '@/components/ui/report-print-header'
 
 // Master IA/UX audit (Reports decomposition phase): extracted from
 // ReportsPage.tsx's OccupancyReportTab.
@@ -21,19 +22,27 @@ export function ReportOccupancyPage() {
   const { startDate, setStartDate, endDate, setEndDate } = useDateRange()
   const { data, isLoading, isError, error, refetch } = useDateRangeReport<OccupancyReport>('get_field_occupancy_report', startDate, endDate)
 
+  const filterSummary = `${startDate} → ${endDate}`
+
   return (
     <div>
-      <PageHeader title={t('reports.title')} description={t('reports.occupancy.description')} />
-      <ReportsNav />
-      <DateRangeFilter startDate={startDate} endDate={endDate} onStart={setStartDate} onEnd={setEndDate} />
+      <div className="print:hidden">
+        <PageHeader title={t('reports.title')} description={t('reports.occupancy.description')} />
+        <ReportsNav />
+      </div>
+      <div className="flex flex-wrap items-center justify-between gap-2 print:hidden">
+        <DateRangeFilter startDate={startDate} endDate={endDate} onStart={setStartDate} onEnd={setEndDate} />
+        {data && data.by_field.length > 0 && <ReportPrintButton />}
+      </div>
       {isLoading && <p className="text-sm text-text-secondary">{t('reports.loading')}</p>}
       {isError && <ErrorState message={translateSupabaseError(error, t('reports.loadError'))} onRetry={() => void refetch()} />}
       {data && (
         data.by_field.length === 0 ? (
           <p className="text-sm text-text-secondary">{t('reports.occupancy.noFields')}</p>
         ) : (
-          <>
-            <div className="mb-2 flex justify-end">
+          <div className="print-target visible-for-print">
+            <ReportPrintHeader reportName={t('reports.occupancy.description')} filterSummary={filterSummary} />
+            <div className="mb-2 flex justify-end print:hidden">
               <Button
                 size="sm"
                 variant="outline"
@@ -56,14 +65,14 @@ export function ReportOccupancyPage() {
                     {t('reports.occupancy.hoursAndBookingsSuffix', { hours: f.booked_hours, count: f.booking_count })}
                     {/* Master IA/UX audit: link out to the field's own
                         management screen instead of a dead-end row. */}
-                    <Button asChild size="sm" variant="ghost">
+                    <Button asChild size="sm" variant="ghost" className="print:hidden">
                       <Link to="/app/fields">{t('reports.occupancy.manageField')}</Link>
                     </Button>
                   </span>
                 </li>
               ))}
             </ul>
-          </>
+          </div>
         )
       )}
     </div>

@@ -12,6 +12,7 @@ import { Download } from 'lucide-react'
 import { useDateRange, useDateRangeReport } from './hooks/useDateRangeReport'
 import { DateRangeFilter } from './components/DateRangeFilter'
 import { ReportsNav } from './components/ReportsNav'
+import { ReportPrintButton, ReportPrintHeader } from '@/components/ui/report-print-header'
 
 // Master IA/UX audit (Reports decomposition phase): extracted from
 // ReportsPage.tsx's FinancialExceptionsReportTab. Also reused by
@@ -51,13 +52,19 @@ export function ReportExceptionsContent() {
   const { data, isLoading, isError, error, refetch } = useDateRangeReport<FinancialExceptionsReport>('get_financial_exceptions_report', startDate, endDate)
   const dateLocale = locale === 'en' ? 'en-US' : 'ar-EG'
 
+  const filterSummary = `${startDate} → ${endDate}`
+
   return (
     <div>
-      <DateRangeFilter startDate={startDate} endDate={endDate} onStart={setStartDate} onEnd={setEndDate} />
+      <div className="flex flex-wrap items-center justify-between gap-2 print:hidden">
+        <DateRangeFilter startDate={startDate} endDate={endDate} onStart={setStartDate} onEnd={setEndDate} />
+        {data && <ReportPrintButton />}
+      </div>
       {isLoading && <p className="text-sm text-text-secondary">{t('reports.loading')}</p>}
       {isError && <ErrorState message={translateSupabaseError(error, t('reports.loadError'))} onRetry={() => void refetch()} />}
       {data && (
-        <>
+        <div className="print-target visible-for-print">
+          <ReportPrintHeader reportName={t('reports.exceptions.description')} filterSummary={filterSummary} />
           <div className="mb-6 grid grid-cols-2 gap-3 md:grid-cols-3">
             <StatCard label={t('reports.exceptions.totalDiscounts')} value={formatMoney(data.total_discounts, 'EGP', locale)} tone={data.total_discounts > 0 ? 'warning' : undefined} />
             <StatCard label={t('reports.exceptions.totalRefunds')} value={formatMoney(data.total_refunds, 'EGP', locale)} tone="danger" />
@@ -71,6 +78,7 @@ export function ReportExceptionsContent() {
                   <Button
                     size="sm"
                     variant="outline"
+                    className="print:hidden"
                     onClick={() =>
                       downloadCsv(
                         `discounts-${startDate}-${endDate}.csv`,
@@ -130,6 +138,7 @@ export function ReportExceptionsContent() {
                   <Button
                     size="sm"
                     variant="outline"
+                    className="print:hidden"
                     onClick={() =>
                       downloadCsv(
                         `refunds-${startDate}-${endDate}.csv`,
@@ -176,7 +185,7 @@ export function ReportExceptionsContent() {
               )}
             </div>
           </div>
-        </>
+        </div>
       )}
     </div>
   )
@@ -186,8 +195,10 @@ export function ReportExceptionsPage() {
   const { t } = useTranslation()
   return (
     <div>
-      <PageHeader title={t('reports.title')} description={t('reports.exceptions.description')} />
-      <ReportsNav />
+      <div className="print:hidden">
+        <PageHeader title={t('reports.title')} description={t('reports.exceptions.description')} />
+        <ReportsNav />
+      </div>
       <ReportExceptionsContent />
     </div>
   )

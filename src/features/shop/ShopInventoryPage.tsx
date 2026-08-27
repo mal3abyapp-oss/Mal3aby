@@ -21,6 +21,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog'
 import { translateSupabaseError } from '@/lib/errors'
+import { ReportPrintButton, ReportPrintHeader } from '@/components/ui/report-print-header'
 
 // COMMERCIAL MODULE (2026-08-26) -- Inventory dashboard: balances,
 // low-stock filter, receive/transfer/adjust actions, movement history
@@ -136,28 +137,40 @@ export function ShopInventoryPage() {
 
   return (
     <div>
-      <PageHeader
-        title={t('shop.inventory.title')}
-        description={t('shop.inventory.description')}
-        actions={
-          <>
-            <Button variant="outline" onClick={() => setReceiveOpen(true)}>{t('shop.inventory.receiveStock')}</Button>
-            <Button variant="outline" onClick={() => setTransferOpen(true)}>{t('shop.inventory.transferStock')}</Button>
-            <Button variant="outline" onClick={() => setAdjustOpen(true)}>{t('shop.inventory.adjustStock')}</Button>
-          </>
-        }
-      />
+      <div className="print:hidden">
+        <PageHeader
+          title={t('shop.inventory.title')}
+          description={t('shop.inventory.description')}
+          actions={
+            <>
+              <Button variant="outline" onClick={() => setReceiveOpen(true)}>{t('shop.inventory.receiveStock')}</Button>
+              <Button variant="outline" onClick={() => setTransferOpen(true)}>{t('shop.inventory.transferStock')}</Button>
+              <Button variant="outline" onClick={() => setAdjustOpen(true)}>{t('shop.inventory.adjustStock')}</Button>
+            </>
+          }
+        />
 
-      <div className="mb-4">
-        <Button variant={lowStockOnly ? 'default' : 'outline'} size="sm" onClick={() => setLowStockOnly((v) => !v)}>
-          {t('shop.inventory.lowStockOnly')}
-        </Button>
+        <div className="mb-4 flex items-center justify-between">
+          <Button variant={lowStockOnly ? 'default' : 'outline'} size="sm" onClick={() => setLowStockOnly((v) => !v)}>
+            {t('shop.inventory.lowStockOnly')}
+          </Button>
+          <ReportPrintButton />
+        </div>
       </div>
 
-      <DataTable columns={balanceColumns} rows={balances} rowKey={(b) => `${b.locationId}-${b.productId}-${b.variantId}`} isLoading={isLoading} emptyTitle={t('shop.inventory.emptyBalancesTitle')} />
+      <div className="print-target visible-for-print">
+        <ReportPrintHeader
+          reportName={t('shop.inventory.title')}
+          filterSummary={lowStockOnly ? t('shop.inventory.lowStockOnly') : undefined}
+        />
+        <DataTable columns={balanceColumns} rows={balances} rowKey={(b) => `${b.locationId}-${b.productId}-${b.variantId}`} isLoading={isLoading} emptyTitle={t('shop.inventory.emptyBalancesTitle')} />
 
-      <h2 className="mb-2 mt-6 text-lg font-semibold">{t('shop.inventory.movementHistory')}</h2>
-      <DataTable columns={movementColumns} rows={movements} rowKey={(m) => m.movementId} emptyTitle={t('shop.inventory.emptyMovementsTitle')} />
+        <h2 className="mb-2 mt-6 text-lg font-semibold">{t('shop.inventory.movementHistory')}</h2>
+        {/* Section 12: an explicit operational maximum, not a silent truncation --
+            list_shop_inventory_movements is called with p_limit: 50 above. */}
+        <p className="mb-2 text-xs text-text-secondary">{t('shop.inventory.movementHistoryLimitNote', { count: 50 })}</p>
+        <DataTable columns={movementColumns} rows={movements} rowKey={(m) => m.movementId} emptyTitle={t('shop.inventory.emptyMovementsTitle')} />
+      </div>
 
       {receiveOpen && <ReceiveStockDialog clubId={currentClubId as string} onClose={() => setReceiveOpen(false)} onDone={() => { setReceiveOpen(false); invalidate() }} />}
       {transferOpen && <TransferStockDialog clubId={currentClubId as string} onClose={() => setTransferOpen(false)} onDone={() => { setTransferOpen(false); invalidate() }} />}

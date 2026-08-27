@@ -18,6 +18,7 @@ import { ShieldCheck, Download, AlertTriangle } from 'lucide-react'
 import { useDateRange, useDateRangeReport } from './hooks/useDateRangeReport'
 import { DateRangeFilter } from './components/DateRangeFilter'
 import { ReportsNav } from './components/ReportsNav'
+import { ReportPrintButton, ReportPrintHeader } from '@/components/ui/report-print-header'
 
 // Government / Ministry Collection Compliance directive, sections 39-42:
 // "Official Collection Receipts" report, following the exact same
@@ -88,23 +89,28 @@ export function ReportOfficialReceiptsContent() {
     enabled: !!currentClubId,
   })
 
+  const filterSummary = `${startDate} → ${endDate}${serialSearch.trim() ? ` — ${t('reports.officialReceipts.searchSerialPlaceholder')}: ${serialSearch.trim()}` : ''}`
+
   return (
     <div>
-      <div className="mb-4 flex flex-wrap gap-3">
-        <DateRangeFilter startDate={startDate} endDate={endDate} onStart={setStartDate} onEnd={setEndDate} />
-        <Input
-          placeholder={t('reports.officialReceipts.searchSerialPlaceholder')}
-          value={serialSearch}
-          onChange={(e) => setSerialSearch(e.target.value)}
-          className="max-w-xs"
-        />
+      <div className="mb-4 flex flex-wrap items-center justify-between gap-3 print:hidden">
+        <div className="flex flex-wrap gap-3">
+          <DateRangeFilter startDate={startDate} endDate={endDate} onStart={setStartDate} onEnd={setEndDate} />
+          <Input
+            placeholder={t('reports.officialReceipts.searchSerialPlaceholder')}
+            value={serialSearch}
+            onChange={(e) => setSerialSearch(e.target.value)}
+            className="max-w-xs"
+          />
+        </div>
+        {data && <ReportPrintButton />}
       </div>
 
       {isLoading && <p className="text-sm text-text-secondary">{t('reports.loading')}</p>}
       {isError && <ErrorState message={translateSupabaseError(error, t('reports.loadError'))} onRetry={() => void refetch()} />}
 
       {exceptions && (exceptions.missing_receipt_payment_count > 0 || exceptions.reversed_awaiting_review_count > 0) && (
-        <div className="mb-6 flex flex-col gap-2 rounded-lg border border-status-warning/40 bg-status-warning/10 p-4">
+        <div className="mb-6 flex flex-col gap-2 rounded-lg border border-status-warning/40 bg-status-warning/10 p-4 print:hidden">
           <div className="flex items-center gap-2 font-medium">
             <AlertTriangle className="size-4 text-status-warning" />
             {t('reports.officialReceipts.exceptions.title')}
@@ -123,7 +129,8 @@ export function ReportOfficialReceiptsContent() {
       )}
 
       {data && (
-        <>
+        <div className="print-target visible-for-print">
+          <ReportPrintHeader reportName={t('reports.officialReceipts.description')} filterSummary={filterSummary} />
           <div className="mb-6 grid grid-cols-2 gap-3 md:grid-cols-4">
             <StatCard label={t('reports.officialReceipts.totalCount')} value={String(data.total_count)} icon={ShieldCheck} />
             <StatCard label={t('reports.officialReceipts.activeCount')} value={String(data.active_count)} />
@@ -140,6 +147,7 @@ export function ReportOfficialReceiptsContent() {
               <Button
                 size="sm"
                 variant="outline"
+                className="print:hidden"
                 onClick={() =>
                   downloadCsv(
                     `official-receipts-${startDate}-${endDate}.csv`,
@@ -200,6 +208,7 @@ export function ReportOfficialReceiptsContent() {
                       <Button
                         size="sm"
                         variant="ghost"
+                        className="print:hidden"
                         onClick={() => navigate(`/app/finance/payments?invoice=${r.invoice_id}`)}
                       >
                         {t('reports.officialReceipts.viewInvoice')}
@@ -209,6 +218,7 @@ export function ReportOfficialReceiptsContent() {
                       <Button
                         size="sm"
                         variant="ghost"
+                        className="print:hidden"
                         onClick={() => navigate(`/app/bookings?booking=${r.booking_id}`)}
                       >
                         {t('reports.officialReceipts.viewBooking')}
@@ -219,7 +229,7 @@ export function ReportOfficialReceiptsContent() {
               ))}
             </div>
           )}
-        </>
+        </div>
       )}
     </div>
   )
@@ -229,8 +239,10 @@ export function ReportOfficialReceiptsPage() {
   const { t } = useTranslation()
   return (
     <div>
-      <PageHeader title={t('reports.title')} description={t('reports.officialReceipts.description')} />
-      <ReportsNav />
+      <div className="print:hidden">
+        <PageHeader title={t('reports.title')} description={t('reports.officialReceipts.description')} />
+        <ReportsNav />
+      </div>
       <ReportOfficialReceiptsContent />
     </div>
   )

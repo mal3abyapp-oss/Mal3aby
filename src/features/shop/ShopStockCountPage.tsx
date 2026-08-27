@@ -22,6 +22,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog'
 import { translateSupabaseError } from '@/lib/errors'
+import { ReportPrintButton, ReportPrintHeader } from '@/components/ui/report-print-header'
 
 // COMMERCIAL MODULE / STOCK COUNT (2026-08-27) -- physical inventory
 // count sessions: Select Location -> Start -> record counted quantities
@@ -60,6 +61,10 @@ interface DetailData {
   id: string
   locationName: string
   status: string
+  startedAt: string | null
+  completedAt: string | null
+  startedByName: string | null
+  completedByName: string | null
   lines: DetailLine[]
 }
 
@@ -78,10 +83,26 @@ async function fetchDetail(stockCountId: string): Promise<DetailData> {
   if (error) throw error
   const rows = data ?? []
   const first = rows[0]
+
+  // Resolve started_by/completed_by (raw auth.users ids) to display names for
+  // the print header (Section 8: "Started by / Completed by" is mandatory on
+  // the printed document) -- same profiles lookup pattern BillingPage.tsx
+  // already uses for payment.received_by.
+  const actorIds = [first?.started_by, first?.completed_by].filter((id): id is string => !!id)
+  const namesById = new Map<string, string>()
+  if (actorIds.length > 0) {
+    const { data: profiles } = await supabase.from('profiles').select('user_id, full_name').in('user_id', actorIds)
+    for (const p of profiles ?? []) if (p.full_name) namesById.set(p.user_id, p.full_name)
+  }
+
   return {
     id: stockCountId,
     locationName: first?.location_name ?? '',
     status: first?.status ?? 'draft',
+    startedAt: first?.started_at ?? null,
+    completedAt: first?.completed_at ?? null,
+    startedByName: first?.started_by ? (namesById.get(first.started_by) ?? null) : null,
+    completedByName: first?.completed_by ? (namesById.get(first.completed_by) ?? null) : null,
     lines: rows
       .filter((r) => r.item_id)
       .map((r) => ({
@@ -316,6 +337,11 @@ function StockCountDetailDialog({ clubId, stockCountId, onClose, onChanged }: {
 
         {detail && (
           <div className="flex flex-col gap-4">
+            {detail.status === 'completed' && (
+              <div className="flex justify-end print:hidden">
+                <ReportPrintButton />
+              </div>
+            )}
             {isInProgress && (
               <div className="flex flex-wrap items-end gap-2 rounded-md border border-border p-3">
                 <div className="flex flex-1 flex-col gap-1.5">
@@ -349,61 +375,91 @@ function StockCountDetailDialog({ clubId, stockCountId, onClose, onChanged }: {
               </div>
             )}
 
-            <div className="overflow-x-auto">
-              <table className="w-full text-start text-sm">
-                <thead>
-                  <tr className="border-b border-border text-text-secondary">
-                    <th className="p-2 text-start font-medium">{t('shop.stockCount.lineColumns.product')}</th>
-                    <th className="p-2 text-start font-medium">{t('shop.stockCount.lineColumns.system')}</th>
-                    <th className="p-2 text-start font-medium">{t('shop.stockCount.lineColumns.counted')}</th>
-                    <th className="p-2 text-start font-medium">{t('shop.stockCount.lineColumns.variance')}</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {detail.lines.map((line) => {
-                    const draftValue = countedDrafts[line.itemId] ?? (line.countedQuantity !== null ? String(line.countedQuantity) : '')
-                    return (
-                      <tr key={line.itemId} className="border-b border-border last:border-0">
-                        <td className="p-2">{line.productName}{line.variantLabel ? ` (${line.variantLabel})` : ''}</td>
-                        <td className="p-2">{line.systemQuantity}</td>
-                        <td className="p-2">
-                          {isInProgress ? (
-                            <Input
-                              type="number"
-                              min="0"
-                              step="0.01"
-                              className="w-24"
-                              value={draftValue}
-                              onChange={(e) => setCountedDrafts((d) => ({ ...d, [line.itemId]: e.target.value }))}
-                              onBlur={() => {
-                                const raw = countedDrafts[line.itemId]
-                                if (raw === undefined || raw === '') return
-                                const parsed = Number(raw)
-                                if (Number.isNaN(parsed) || parsed === line.countedQuantity) return
-                                recordLineMutation.mutate({ productId: line.productId, variantId: line.variantId, counted: parsed })
-                              }}
-                            />
-                          ) : (
-                            line.countedQuantity ?? '—'
-                          )}
-                        </td>
-                        <td className="p-2">
-                          {line.variance === null ? (
-                            '—'
-                          ) : (
-                            <span className={line.variance !== 0 ? 'font-semibold text-status-warning' : ''}>
-                              {line.variance > 0 ? `+${line.variance}` : line.variance}
-                            </span>
-                          )}
-                        </td>
-                      </tr>
-                    )
-                  })}
-                  {detail.lines.length === 0 && (
-                    <tr><td colSpan={4} className="p-4 text-center text-text-secondary">{t('shop.stockCount.noLines')}</td></tr>
-                  )}
-                </tbody>
-              </table>
+            <div className={detail.status === 'completed' ? 'print-target visible-for-print' : ''}>
+              {detail.status === 'completed' && (
+                <ReportPrintHeader
+                  reportName={`${t('shop.stockCount.title')} — ${detail.locationName}`}
+                  filterSummary={[
+                    detail.startedAt ? `${t('shop.stockCount.printStartedAt')}: ${new Date(detail.startedAt).toLocaleString()}` : null,
+                    detail.completedAt ? `${t('shop.stockCount.printCompletedAt')}: ${new Date(detail.completedAt).toLocaleString()}` : null,
+                    detail.startedByName ? `${t('shop.stockCount.printStartedBy')}: ${detail.startedByName}` : null,
+                    detail.completedByName ? `${t('shop.stockCount.printCompletedBy')}: ${detail.completedByName}` : null,
+                  ].filter(Boolean).join(' — ')}
+                />
+              )}
+              <div className="overflow-x-auto">
+                <table className="w-full text-start text-sm">
+                  <thead>
+                    <tr className="border-b border-border text-text-secondary">
+                      <th className="p-2 text-start font-medium">{t('shop.stockCount.lineColumns.product')}</th>
+                      <th className="p-2 text-start font-medium">{t('shop.stockCount.lineColumns.system')}</th>
+                      <th className="p-2 text-start font-medium">{t('shop.stockCount.lineColumns.counted')}</th>
+                      <th className="p-2 text-start font-medium">{t('shop.stockCount.lineColumns.variance')}</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {detail.lines.map((line) => {
+                      const draftValue = countedDrafts[line.itemId] ?? (line.countedQuantity !== null ? String(line.countedQuantity) : '')
+                      return (
+                        <tr key={line.itemId} className="border-b border-border last:border-0">
+                          <td className="p-2">{line.productName}{line.variantLabel ? ` (${line.variantLabel})` : ''}</td>
+                          <td className="p-2">{line.systemQuantity}</td>
+                          <td className="p-2">
+                            {isInProgress ? (
+                              <Input
+                                type="number"
+                                min="0"
+                                step="0.01"
+                                className="w-24"
+                                value={draftValue}
+                                onChange={(e) => setCountedDrafts((d) => ({ ...d, [line.itemId]: e.target.value }))}
+                                onBlur={() => {
+                                  const raw = countedDrafts[line.itemId]
+                                  if (raw === undefined || raw === '') return
+                                  const parsed = Number(raw)
+                                  if (Number.isNaN(parsed) || parsed === line.countedQuantity) return
+                                  recordLineMutation.mutate({ productId: line.productId, variantId: line.variantId, counted: parsed })
+                                }}
+                              />
+                            ) : (
+                              line.countedQuantity ?? '—'
+                            )}
+                          </td>
+                          <td className="p-2">
+                            {line.variance === null ? (
+                              '—'
+                            ) : (
+                              <span className={line.variance !== 0 ? 'font-semibold text-status-warning' : ''}>
+                                {line.variance > 0 ? `+${line.variance}` : line.variance}
+                              </span>
+                            )}
+                          </td>
+                        </tr>
+                      )
+                    })}
+                    {detail.lines.length === 0 && (
+                      <tr><td colSpan={4} className="p-4 text-center text-text-secondary">{t('shop.stockCount.noLines')}</td></tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+
+              {detail.status === 'completed' && (
+                <div className="mt-4 grid grid-cols-3 gap-3 text-sm">
+                  <div className="rounded-md border border-border p-2 text-center">
+                    <p className="text-text-secondary">{t('shop.stockCount.summary.matched')}</p>
+                    <p className="text-lg font-semibold">{detail.lines.filter((l) => l.variance === 0).length}</p>
+                  </div>
+                  <div className="rounded-md border border-border p-2 text-center">
+                    <p className="text-text-secondary">{t('shop.stockCount.summary.shortage')}</p>
+                    <p className="text-lg font-semibold text-status-danger">{detail.lines.filter((l) => (l.variance ?? 0) < 0).length}</p>
+                  </div>
+                  <div className="rounded-md border border-border p-2 text-center">
+                    <p className="text-text-secondary">{t('shop.stockCount.summary.surplus')}</p>
+                    <p className="text-lg font-semibold text-status-success">{detail.lines.filter((l) => (l.variance ?? 0) > 0).length}</p>
+                  </div>
+                </div>
+              )}
             </div>
 
             {error && <p role="alert" className="text-sm text-status-danger">{error}</p>}

@@ -261,7 +261,7 @@ function SplitLineReceipt({
 }
 
 export function BillingPage() {
-  const { currentClubId, memberships, setCurrentClubId } = useAuth()
+  const { currentClubId, memberships, setCurrentClubId, session } = useAuth()
   const { t } = useTranslation()
   const { locale } = useDirection()
   const queryClient = useQueryClient()
@@ -587,8 +587,33 @@ export function BillingPage() {
     invoiceNumber: string
     customerName: string
     refundedAt: string
+    processedByName: string
   }
   const [refundReceipt, setRefundReceipt] = useState<RefundReceiptData | null>(null)
+
+  // PRINTING & DOCUMENT OUTPUT (2026-08-27), Section 4: a real printable
+  // Payment Receipt per payment -- reuses the invoice detail already
+  // loaded (invoice number, customer, outstanding), the same payments[]
+  // array already rendered on screen, and the same print-target/A4/80mm
+  // mechanism as the invoice and refund receipt. No second receipt
+  // ledger: this reads existing `payments`/`detail`/`paymentSummary`
+  // state, nothing new is fetched or computed.
+  const [printPaymentId, setPrintPaymentId] = useState<string | null>(null)
+  const printPayment = payments.find((p) => p.id === printPaymentId) ?? null
+
+  // PRINTING & DOCUMENT OUTPUT (2026-08-27), Section 5: "Processed by" is
+  // mandatory on the printed refund document -- the acting staff member is
+  // whoever holds this session, resolved once via the same profiles lookup
+  // pattern already used for payment.received_by elsewhere on this page.
+  const { data: currentUserName } = useQuery({
+    queryKey: ['current-user-display-name', session?.user?.id],
+    queryFn: async () => {
+      const { data } = await supabase.from('profiles').select('full_name').eq('user_id', session!.user.id).maybeSingle()
+      return data?.full_name ?? null
+    },
+    enabled: !!session?.user?.id,
+    staleTime: Infinity,
+  })
 
   const refundMutation = useMutation({
     mutationFn: async () => {
@@ -610,6 +635,7 @@ export function BillingPage() {
         invoiceNumber: detail?.invoice_number ?? '—',
         customerName: (detail?.customers as unknown as { full_name: string })?.full_name ?? '—',
         refundedAt: new Date().toISOString(),
+        processedByName: currentUserName ?? '—',
       })
       setRefundPaymentId(null)
       setRefundAmount('')
@@ -828,7 +854,7 @@ export function BillingPage() {
             <div className="flex flex-col gap-4">
               <div
                 data-print-size={printSize}
-                className={`print-target rounded-md border border-border p-4 text-sm print:border-0 ${refundReceipt ? '' : 'visible-for-print'}`}
+                className={`print-target rounded-md border border-border p-4 text-sm print:border-0 ${refundReceipt || printPaymentId ? '' : 'visible-for-print'}`}
               >
                 <div className="mb-3 flex justify-between">
                   <div>
@@ -962,13 +988,22 @@ export function BillingPage() {
                             </span>
                           )}
                         </span>
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          onClick={() => setRefundPaymentId(p.id)}
-                        >
-                          {t('billing.detail.refund')}
-                        </Button>
+                        <span className="flex items-center gap-1">
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            onClick={() => setPrintPaymentId(p.id)}
+                          >
+                            {t('billing.detail.printReceipt')}
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            onClick={() => setRefundPaymentId(p.id)}
+                          >
+                            {t('billing.detail.refund')}
+                          </Button>
+                        </span>
                       </li>
                     ))}
                   </ul>
@@ -1117,6 +1152,60 @@ export function BillingPage() {
         </DialogContent>
       </Dialog>
 
+      <Dialog open={!!printPaymentId} onOpenChange={(open) => !open && setPrintPaymentId(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>{t('billing.detail.paymentReceiptTitle')}</DialogTitle>
+          </DialogHeader>
+          {printPayment && detail && (
+            <div className="flex flex-col gap-3">
+              <div data-print-size={printSize} className="print-target visible-for-print rounded-md border border-border p-4 text-sm print:border-0">
+                <p className="mb-2 font-bold">{t('billing.detail.paymentReceiptTitle')}</p>
+                <div className="flex flex-col gap-1">
+                  <p>{t('billing.detail.invoicePrefix')} <bdi>{detail.invoice_number}</bdi></p>
+                  <p>{t('billing.refund.receiptCustomer', { name: (detail.customers as unknown as { full_name: string })?.full_name ?? '—' })}</p>
+                  <p>{t('billing.refund.receiptDate', { date: new Date(printPayment.receivedAt).toLocaleString(locale === 'en' ? 'en-US' : 'ar-EG') })}</p>
+                  <p>{t('billing.refund.receiptOriginalMethod', { method: t(`common.paymentMethodLabels.${printPayment.method}`, { defaultValue: PAYMENT_METHOD_LABELS[printPayment.method] ?? printPayment.method }) })}</p>
+                  {printPayment.receivedByName && (
+                    <p>{t('billing.detail.collectedBy', { name: printPayment.receivedByName })}</p>
+                  )}
+                  {printPayment.officialReceiptSerial && (
+                    <p>{t('governmentCompliance.title')}: <bdi className="tabular-nums">{printPayment.officialReceiptSerial}</bdi></p>
+                  )}
+                </div>
+                <div className="mt-3 flex flex-col items-end gap-1">
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs text-text-secondary">{t('billing.detail.paid')}</span>
+                    <MoneyDisplay amount={printPayment.amount} size="lg" tone="success" />
+                  </div>
+                  {paymentSummary && paymentSummary.outstanding > 0 && (
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs text-text-secondary">{t('billing.detail.outstanding')}</span>
+                      <MoneyDisplay amount={paymentSummary.outstanding} size="sm" tone="danger" />
+                    </div>
+                  )}
+                </div>
+              </div>
+              <div className="flex items-center gap-2 print:hidden">
+                <Select value={printSize} onValueChange={(v) => setPrintSize(v as 'a4' | '80mm')}>
+                  <SelectTrigger className="w-32"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="a4">A4</SelectItem>
+                    <SelectItem value="80mm">{t('billing.detail.receiptSize80mm')}</SelectItem>
+                  </SelectContent>
+                </Select>
+                <Button variant="outline" size="sm" className="w-fit" onClick={() => window.print()}>
+                  {t('billing.detail.print')}
+                </Button>
+                <Button variant="ghost" size="sm" className="w-fit" onClick={() => setPrintPaymentId(null)}>
+                  {t('common.close')}
+                </Button>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+
       <Dialog open={!!refundReceipt} onOpenChange={(open) => !open && setRefundReceipt(null)}>
         <DialogContent>
           <DialogHeader>
@@ -1132,6 +1221,7 @@ export function BillingPage() {
                   <p>{t('billing.refund.receiptOriginalMethod', { method: t(`common.paymentMethodLabels.${refundReceipt.method}`, { defaultValue: PAYMENT_METHOD_LABELS[refundReceipt.method] ?? refundReceipt.method }) })}</p>
                   <p>{t('billing.refund.receiptReason', { reason: refundReceipt.reason })}</p>
                   <p>{t('billing.refund.receiptDate', { date: new Date(refundReceipt.refundedAt).toLocaleString(locale === 'en' ? 'en-US' : 'ar-EG') })}</p>
+                  <p>{t('billing.refund.receiptProcessedBy', { name: refundReceipt.processedByName })}</p>
                 </div>
                 <div className="mt-3 flex justify-end">
                   <MoneyDisplay amount={refundReceipt.refundAmount} size="lg" tone="danger" />

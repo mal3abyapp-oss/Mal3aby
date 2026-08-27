@@ -11,6 +11,7 @@ import { GraduationCap } from 'lucide-react'
 import { useDateRange, useDateRangeReport } from './hooks/useDateRangeReport'
 import { DateRangeFilter } from './components/DateRangeFilter'
 import { ReportsNav } from './components/ReportsNav'
+import { ReportPrintButton, ReportPrintHeader } from '@/components/ui/report-print-header'
 
 // Master IA/UX audit (Reports decomposition phase): extracted from
 // ReportsPage.tsx's AcademyReportTab.
@@ -57,15 +58,23 @@ export function ReportAcademyPage() {
     enabled: subscriptionIds.length > 0,
   })
 
+  const filterSummary = `${startDate} → ${endDate}`
+
   return (
     <div>
-      <PageHeader title={t('reports.title')} description={t('reports.academy.description')} />
-      <ReportsNav />
-      <DateRangeFilter startDate={startDate} endDate={endDate} onStart={setStartDate} onEnd={setEndDate} />
+      <div className="print:hidden">
+        <PageHeader title={t('reports.title')} description={t('reports.academy.description')} />
+        <ReportsNav />
+      </div>
+      <div className="flex flex-wrap items-center justify-between gap-2 print:hidden">
+        <DateRangeFilter startDate={startDate} endDate={endDate} onStart={setStartDate} onEnd={setEndDate} />
+        {data && <ReportPrintButton />}
+      </div>
       {isLoading && <p className="text-sm text-text-secondary">{t('reports.loading')}</p>}
       {isError && <ErrorState message={translateSupabaseError(error, t('reports.loadError'))} onRetry={() => void refetch()} />}
       {data && (
-        <>
+        <div className="print-target visible-for-print">
+          <ReportPrintHeader reportName={t('reports.academy.description')} filterSummary={filterSummary} />
           <div className="mb-6 grid grid-cols-2 gap-3 md:grid-cols-3">
             <StatCard label={t('reports.academy.activeEnrollments')} value={data.active_enrollments} icon={GraduationCap} to="/app/academy" />
             <StatCard label={t('reports.academy.attendanceRate')} value={data.attendance_rate !== null ? `${data.attendance_rate}%` : '—'} />
@@ -91,7 +100,7 @@ export function ReportAcademyPage() {
                 <p className="font-medium">{t('reports.academy.expiringSubscriptions')}</p>
                 {/* Master IA/UX audit: link to the enrollment/renewal
                     workflow instead of a dead-end list. */}
-                <Button asChild size="sm" variant="ghost">
+                <Button asChild size="sm" variant="ghost" className="print:hidden">
                   <Link to="/app/academy">{t('reports.academy.manageSubscriptions')}</Link>
                 </Button>
               </div>
@@ -124,7 +133,7 @@ export function ReportAcademyPage() {
               )}
             </div>
           </div>
-        </>
+        </div>
       )}
     </div>
   )

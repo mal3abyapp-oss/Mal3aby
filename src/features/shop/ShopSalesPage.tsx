@@ -16,6 +16,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog'
 import { translateSupabaseError } from '@/lib/errors'
+import { ReportPrintButton, ReportPrintHeader } from '@/components/ui/report-print-header'
 
 // COMMERCIAL MODULE (2026-08-26) -- Sales history + Returns flow
 // (directive Section 43/44/64).
@@ -85,15 +86,21 @@ export function ShopSalesPage() {
       key: 'actions',
       header: '',
       render: (s) => (s.status === 'completed' || s.status === 'partially_returned') ? (
-        <Button variant="ghost" size="sm" onClick={() => setReturningSale(s)}>{t('shop.sales.processReturn')}</Button>
+        <Button variant="ghost" size="sm" className="print:hidden" onClick={() => setReturningSale(s)}>{t('shop.sales.processReturn')}</Button>
       ) : null,
     },
   ]
 
   return (
     <div>
-      <PageHeader title={t('shop.sales.title')} description={t('shop.sales.description')} />
-      <DataTable columns={columns} rows={sales} rowKey={(s) => s.saleId} isLoading={isLoading} emptyTitle={t('shop.sales.emptyTitle')} emptyDescription={t('shop.sales.emptyDescription')} />
+      <div className="print:hidden">
+        <PageHeader title={t('shop.sales.title')} description={t('shop.sales.description')} actions={sales.length > 0 ? <ReportPrintButton /> : undefined} />
+      </div>
+      <div className="print-target visible-for-print">
+        <ReportPrintHeader reportName={t('shop.sales.title')} />
+        <p className="mb-2 text-xs text-text-secondary print:block hidden">{t('shop.sales.printLimitNote', { count: 50 })}</p>
+        <DataTable columns={columns} rows={sales} rowKey={(s) => s.saleId} isLoading={isLoading} emptyTitle={t('shop.sales.emptyTitle')} emptyDescription={t('shop.sales.emptyDescription')} />
+      </div>
 
       {returningSale && (
         <ReturnDialog sale={returningSale} onClose={() => setReturningSale(null)} />

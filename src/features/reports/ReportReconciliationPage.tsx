@@ -12,6 +12,7 @@ import { Scale, AlertTriangle, CheckCircle2 } from 'lucide-react'
 import { useDateRange, useDateRangeReport } from './hooks/useDateRangeReport'
 import { DateRangeFilter } from './components/DateRangeFilter'
 import { ReportsNav } from './components/ReportsNav'
+import { ReportPrintButton, ReportPrintHeader } from '@/components/ui/report-print-header'
 
 // Phase F (F4/F5): the critical report -- cash payments vs cash shifts
 // vs government receipts, cross-checked, with exceptions surfaced
@@ -45,13 +46,19 @@ export function ReportReconciliationContent() {
 
   const hasExceptions = !!data && (data.unreceipted_required_payments.length > 0 || data.total_shortage > 0)
 
+  const filterSummary = `${startDate} → ${endDate}`
+
   return (
     <div>
-      <DateRangeFilter startDate={startDate} endDate={endDate} onStart={setStartDate} onEnd={setEndDate} />
+      <div className="flex flex-wrap items-center justify-between gap-2 print:hidden">
+        <DateRangeFilter startDate={startDate} endDate={endDate} onStart={setStartDate} onEnd={setEndDate} />
+        {data && <ReportPrintButton />}
+      </div>
       {isLoading && <p className="text-sm text-text-secondary">{t('reports.loading')}</p>}
       {isError && <ErrorState message={translateSupabaseError(error, t('reports.loadError'))} onRetry={() => void refetch()} />}
       {data && (
-        <>
+        <div className="print-target visible-for-print">
+          <ReportPrintHeader reportName={t('reports.reconciliation.description')} filterSummary={filterSummary} />
           {/* F5: exceptions surfaced clearly, not buried -- a clean
               reconciliation shows a positive confirmation, not silence. */}
           <div className={`mb-6 flex items-start gap-2 rounded-lg border p-3 text-sm ${hasExceptions ? 'border-status-danger/40 bg-status-danger/5 text-status-danger' : 'border-status-success/40 bg-status-success/5 text-status-success'}`}>
@@ -120,7 +127,7 @@ export function ReportReconciliationContent() {
               </ul>
             )}
           </div>
-        </>
+        </div>
       )}
     </div>
   )
@@ -130,8 +137,10 @@ export function ReportReconciliationPage() {
   const { t } = useTranslation()
   return (
     <div>
-      <PageHeader title={t('reports.title')} description={t('reports.reconciliation.description')} />
-      <ReportsNav />
+      <div className="print:hidden">
+        <PageHeader title={t('reports.title')} description={t('reports.reconciliation.description')} />
+        <ReportsNav />
+      </div>
       <ReportReconciliationContent />
     </div>
   )

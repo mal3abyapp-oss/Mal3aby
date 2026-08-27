@@ -2017,7 +2017,9 @@
       "bookingQrAlt": "رمز التحقق من الحجز",
       "bookingQrLabel": "رمز التحقق من الحجز",
       "bookingRef": "رقم الحجز",
-      "bookingQrUnavailable": "رمز QR للحجز غير متاح لحالة الحجز الحالية."
+      "bookingQrUnavailable": "رمز QR للحجز غير متاح لحالة الحجز الحالية.",
+      "printReceipt": "طباعة الإيصال",
+      "paymentReceiptTitle": "إيصال دفع"
     },
     "recordPayment": {
       "heading": "تسجيل دفعة",
@@ -2053,7 +2055,8 @@
       "receiptCustomer": "العميل: {{name}}",
       "receiptOriginalMethod": "طريقة الدفع الأصلية: {{method}}",
       "receiptReason": "السبب: {{reason}}",
-      "receiptDate": "التاريخ: {{date}}"
+      "receiptDate": "التاريخ: {{date}}",
+      "receiptProcessedBy": "تمت المعالجة بواسطة {{name}}"
     },
     "reviewClaim": {
       "genericError": "تعذّر مراجعة طلب الدفع."
@@ -3930,7 +3933,8 @@
         "movementType": "النوع",
         "quantity": "الكمية",
         "reason": "السبب"
-      }
+      },
+      "movementHistoryLimitNote": "يعرض آخر {{count}} حركة."
     },
     "sales": {
       "title": "المبيعات والمرتجعات",
@@ -3959,7 +3963,8 @@
         "cancelled": "ملغي",
         "partially_returned": "مرتجع جزئيًا",
         "returned": "مرتجع"
-      }
+      },
+      "printLimitNote": "يعرض آخر {{count}} عملية بيع/إرجاع."
     },
     "settings": {
       "title": "إعدادات المتجر",
@@ -4013,6 +4018,15 @@
         "in_progress": "قيد التنفيذ",
         "completed": "مكتملة",
         "cancelled": "ملغاة"
+      },
+      "printStartedAt": "بدأ في",
+      "printCompletedAt": "اكتمل في",
+      "printStartedBy": "بدأه",
+      "printCompletedBy": "أنهاه",
+      "summary": {
+        "matched": "مطابق",
+        "shortage": "عجز",
+        "surplus": "زيادة"
       }
     }
   }

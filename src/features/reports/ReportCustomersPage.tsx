@@ -12,6 +12,7 @@ import { Users, Download } from 'lucide-react'
 import { useDateRange, useDateRangeReport } from './hooks/useDateRangeReport'
 import { DateRangeFilter } from './components/DateRangeFilter'
 import { ReportsNav } from './components/ReportsNav'
+import { ReportPrintButton, ReportPrintHeader } from '@/components/ui/report-print-header'
 
 // Master IA/UX audit (Reports decomposition phase): extracted from
 // ReportsPage.tsx's CustomerReportTab. Drill-down added: each top-
@@ -34,15 +35,23 @@ export function ReportCustomersPage() {
   const { startDate, setStartDate, endDate, setEndDate } = useDateRange()
   const { data, isLoading, isError, error, refetch } = useDateRangeReport<CustomerReport>('get_customer_activity_report', startDate, endDate)
 
+  const filterSummary = `${startDate} → ${endDate}`
+
   return (
     <div>
-      <PageHeader title={t('reports.title')} description={t('reports.customers.description')} />
-      <ReportsNav />
-      <DateRangeFilter startDate={startDate} endDate={endDate} onStart={setStartDate} onEnd={setEndDate} />
+      <div className="print:hidden">
+        <PageHeader title={t('reports.title')} description={t('reports.customers.description')} />
+        <ReportsNav />
+      </div>
+      <div className="flex flex-wrap items-center justify-between gap-2 print:hidden">
+        <DateRangeFilter startDate={startDate} endDate={endDate} onStart={setStartDate} onEnd={setEndDate} />
+        {data && <ReportPrintButton />}
+      </div>
       {isLoading && <p className="text-sm text-text-secondary">{t('reports.loading')}</p>}
       {isError && <ErrorState message={translateSupabaseError(error, t('reports.loadError'))} onRetry={() => void refetch()} />}
       {data && (
-        <>
+        <div className="print-target visible-for-print">
+          <ReportPrintHeader reportName={t('reports.customers.description')} filterSummary={filterSummary} />
           <div className="mb-6">
             <StatCard label={t('reports.customers.newCustomers')} value={data.new_customers} icon={Users} to="/app/customers" />
           </div>
@@ -52,6 +61,7 @@ export function ReportCustomersPage() {
               <Button
                 size="sm"
                 variant="outline"
+                className="print:hidden"
                 onClick={() =>
                   downloadCsv(
                     `customers-${startDate}-${endDate}.csv`,
@@ -78,7 +88,7 @@ export function ReportCustomersPage() {
               ))}
             </ul>
           )}
-        </>
+        </div>
       )}
     </div>
   )
