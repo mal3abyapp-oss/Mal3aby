@@ -670,16 +670,96 @@ this session). The Refund endpoint's synchronous-success path
 (`fawry-create-refund`) was similarly never exercised end-to-end for
 the same reason.
 
-## Other provider (PayPal) — not yet implemented
+## PayPal webhook verification (2026-08-27) — fifth and final provider, built this session
 
-PayPal uses a structurally different signature scheme from all four
-providers built this phase: 5 headers (`PAYPAL-TRANSMISSION-*`,
-`PAYPAL-CERT-URL`, `PAYPAL-AUTH-ALGO`), RSA-SHA256, verifiable locally
-or via PayPal's own `verify-webhook-signature` API.
+`paypal-gateway-webhook` (verify_jwt=false) uses a structurally
+different verification model from all four providers built earlier
+this phase: instead of computing an HMAC locally and comparing it,
+PayPal requires calling PayPal's own `POST /v1/notifications/
+verify-webhook-signature` API with the 5 request headers
+(`PAYPAL-TRANSMISSION-ID`, `PAYPAL-TRANSMISSION-TIME`,
+`PAYPAL-CERT-URL`, `PAYPAL-AUTH-ALGO`, `PAYPAL-TRANSMISSION-SIG`) plus
+the connection's own `webhook_id` and the parsed event body, then
+checking `verification_status === 'SUCCESS'` on the response.
 
-It needs its own dedicated Edge Function (the shared
-`record_gateway_payment_service` / `mark_gateway_transaction_failed_service`
-RPCs are provider-agnostic and already reusable by it — only the
-*verification* layer is provider-specific, as demonstrated by the
-Paymob, Kashier, and Fawry adapters all reusing every shared RPC
-completely unchanged). Not built in this phase.
+### Why API-based verification, not local RSA/cert-chain verification
+
+PayPal also documents a local verification path (fetch `cert_url`,
+validate the certificate chain, verify the RSA-SHA256 signature over
+`transmission_id|transmission_time|webhook_id|crc32(body)`). This was
+deliberately NOT chosen. Local verification requires an Edge Function
+to correctly implement certificate chain validation, expiry checking,
+and revocation handling — a materially larger and more failure-prone
+trust surface than delegating that entire job back to the one party
+who already has to get it right for their own production traffic
+(PayPal itself). The API-based path costs one extra HTTP round trip
+per webhook delivery; that cost is accepted in exchange for not
+re-implementing certificate validation inside a Deno Edge Function.
+
+### The critical trap this scheme has, and how the deployed function avoids it
+
+**PayPal's `verify-webhook-signature` endpoint returns HTTP 200 even
+when `verification_status` is `"FAILURE"`.** A naive implementation
+that checks `response.ok` (or any HTTP-status-based branch) would
+treat every unverified webhook as verified — a complete authentication
+bypass. `paypal-gateway-webhook` never checks `verifyResponse.ok` for
+this decision; it parses the body and explicitly compares
+`verifyBody?.verification_status !== 'SUCCESS'` before trusting
+anything. This is flagged in the function's own source as "the single
+most security-critical line in this function."
+
+A second, related discipline: `webhook_event` in the verify call must
+be the SAME parsed object PayPal actually sent, posted back
+byte-identical — not reconstructed or re-serialized from extracted
+fields (unlike, e.g., Fawry's signature, which is built from
+individually-extracted field values). The deployed function parses the
+raw body once (`JSON.parse(rawBody)`) and reuses that exact object.
+
+### Candidate resolution and dedup — same discipline as the other four
+
+Same priority-ordered candidate pattern as Paymob/Kashier/Fawry: an
+UNVERIFIED read of `custom_id` (from either the order-shaped or
+capture-shaped resource) narrows candidates first, falling back to
+`provider_session_ref` match, falling back to trying every enabled
+PayPal connection — the unverified data is used only to pick which
+connection's `webhook_id` + credentials to attempt
+`verify-webhook-signature` with, never to make a trust decision by
+itself. A wrong `webhook_id` simply fails PayPal's own verification;
+it cannot forge a pass. Dedup uses PayPal's own outer-envelope `id`
+field via the EXISTING `(provider_key, provider_event_id)` unique
+index — PayPal, unlike Paymob/Fawry, has a genuine per-event id, so no
+payload-hash fallback dedup was needed and no new migration was
+required.
+
+### Capture triggering lives in this function, not in checkout-session creation or the return page
+
+On a verified `CHECKOUT.ORDER.APPROVED` event, this function calls
+PayPal's Capture API server-to-server, reusing the SAME OAuth access
+token its own `verify-webhook-signature` call already fetched (no
+redundant second token round trip). This call does not itself post a
+payment — only a later, independently verified `PAYMENT.CAPTURE.
+COMPLETED` event does that. See PAYMENT_GATEWAY_PROVIDER_MATRIX.md's
+"PayPal update" section, "Capture timing", for the full design
+reasoning.
+
+### What's ACTUALLY been proven (honest evidence tier)
+
+- CONTRACT TEST VERIFIED: the real PayPal OAuth token endpoint rejects
+  garbage credentials with the documented `invalid_client` shape.
+- LIVE VERIFIED: the deployed `paypal-gateway-webhook` rejects a
+  request missing the 5 transmission headers (400, before contacting
+  PayPal) and correctly reports no matching connection when none
+  exists.
+- LIVE VERIFIED: `paypal-create-checkout-session` and
+  `paypal-create-refund` both return a real 401 without a bearer
+  token, confirming `verify_jwt=true` is enforced.
+- CREDENTIAL-BLOCKED, disclosed honestly: the full success path (a
+  real signature that passes `verify-webhook-signature`, duplicate
+  delivery convergence, amount-mismatch rejection) cannot be
+  constructed without a real PayPal sandbox app with a registered
+  webhook subscription — there is no way to fabricate a signature that
+  passes PayPal's own real verification call, and this project has no
+  PayPal connection configured yet. This is a genuinely different, and
+  strictly harder to locally test, evidence ceiling than the other
+  four providers, whose HMAC schemes could be reproduced locally
+  without a live account.

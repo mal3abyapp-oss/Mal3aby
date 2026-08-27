@@ -1,12 +1,13 @@
-# Payment Gateway Architecture — Stripe, Paymob, Kashier & Fawry Adapters (end-to-end)
+# Payment Gateway Architecture — Stripe, Paymob, Kashier, Fawry & PayPal Adapters (end-to-end)
 
 Phase 2 (Multi-Gateway Online Payments), consolidated 2026-08-27,
 extended 2026-08-27 with the Paymob adapter, extended again 2026-08-27
 with the Kashier adapter, extended again 2026-08-27 with the Fawry
-adapter (the fourth and, per the standing directive's own scope, final
-provider built this phase — PayPal remains unbuilt). This document is
-the single map of the full Stripe, Paymob, Kashier, and Fawry flows
-across all their pieces; the individual docs
+adapter, extended again 2026-08-27 with the PayPal adapter — the
+fifth and final provider from the original directive's scope. All 5
+providers are now built. This document is the single map of the full
+Stripe, Paymob, Kashier, Fawry, and PayPal flows across all their
+pieces; the individual docs
 (`PAYMENT_GATEWAY_PROVIDER_MATRIX.md`, `PAYMENT_GATEWAY_WEBHOOK_MODEL.md`,
 `PAYMENT_GATEWAY_RECONCILIATION.md`) carry the detailed evidence for
 their own pieces.
@@ -510,7 +511,7 @@ Staff issues a refund on a card payment
 | No new migration needed (`fawry` already in the `gateway` CHECK constraint from a prior session's provider-catalog work; existing `(provider_key, payload_hash) WHERE provider_event_id IS NULL` unique index reused for dedup) | CODE VERIFIED by direct schema inspection before writing any code — confirmed the task brief's own anticipation that this might already be resolved |
 | Grant hygiene (`get_vault_secret_service` service_role-only, `payment_gateway_webhook_events` authenticated-SELECT-only) | LIVE VERIFIED — queried `has_function_privilege` directly; unchanged from the Stripe/Paymob/Kashier baseline since no new grants were introduced; `get_advisors` security scan run after deployment shows zero Fawry-related findings |
 | Genuine Fawry-originated webhook delivery, genuine Fawry-hosted checkout completion | CREDENTIAL-BLOCKED — no real Fawry merchant account exists for this project, and none can be obtained quickly (manual registration, ~2 business days) |
-| Other provider (PayPal) | Not built this phase — architecture documented in `PAYMENT_GATEWAY_PROVIDER_MATRIX.md` |
+| Fifth provider (PayPal) | Now built — see "The PayPal flow" and its own evidence-level summary below |
 
 ### What a future session needs to reach SANDBOX VERIFIED for Fawry
 
@@ -543,7 +544,7 @@ other failure mode.
 | `create_gateway_refund_service` invariants (same-provider, refundable-balance, idempotency) | CODE VERIFIED by inspection against `create_refund()`'s own proven shape; not independently live-exercised with a real refund this session |
 | `gateway_reconciliation_report` | LIVE VERIFIED grant matrix; join logic CODE VERIFIED by inspection, not exercised against a hand-broken exception fixture |
 | Genuine Stripe-originated webhook delivery, genuine Stripe-hosted checkout completion | CREDENTIAL-BLOCKED — no real Stripe account exists for this project (confirmed: "محدش عندي حسابات") |
-| Other providers | Paymob, Kashier, and Fawry now built (see their own sections above); PayPal not built this phase — architecture documented in `PAYMENT_GATEWAY_PROVIDER_MATRIX.md` |
+| Other providers | Paymob, Kashier, Fawry, and PayPal now built (see their own sections above/below) |
 
 ## What a future session needs to reach SANDBOX VERIFIED
 
@@ -554,3 +555,123 @@ genuinely completed test-mode Checkout Session or the Stripe CLI's
 `stripe trigger`/`stripe listen --forward-to` tooling to generate a
 real Stripe-signed delivery against the deployed
 `stripe-gateway-webhook` function.
+
+## The PayPal flow (2026-08-27) — fifth and final provider
+
+Three new Edge Functions, purely additive — no new migration was
+needed (`payment_gateway_providers` already had an active `paypal`
+row, `club_gateway_connections.provider_key` and the
+`payment_gateway_transactions_gateway_check` CHECK constraint both
+already allowed `'paypal'`, confirmed live before writing any code).
+
+1. **`paypal-create-checkout-session`** (verify_jwt=true) — same
+   authorization pattern as the other four: client supplies only
+   `transaction_id`, everything about amount/currency/invoice is
+   re-fetched server-side and re-authorized via
+   `get_gateway_transaction_status()` through the caller's own JWT.
+   Fetches a PayPal OAuth access token (Basic auth of
+   `client_id:client_secret`, `grant_type=client_credentials`), creates
+   a real Orders API v2 order with `purchase_units[0].custom_id` set
+   to the Mal3aby transaction id, a `PayPal-Request-Id` idempotency
+   header, and `experience_context.return_url/cancel_url` pointing at
+   `GatewayReturnPage.tsx`. Persists PayPal's order id onto
+   `provider_session_ref`. Extracts the `rel:"approve"`/`"payer-action"`
+   link and returns it as `checkout_url`, failing closed if neither
+   relation is present.
+
+2. **`paypal-gateway-webhook`** (verify_jwt=false) — see
+   `PAYMENT_GATEWAY_WEBHOOK_MODEL.md`'s "PayPal webhook verification"
+   section for the full verification-scheme writeup (API-based
+   `verify-webhook-signature`, the HTTP-200-on-failure trap, and why
+   local RSA/cert-chain verification was rejected). Also the ONLY one
+   of the five webhooks that triggers a provider-side side effect
+   (the Capture API call) as part of its own processing — on a
+   verified `CHECKOUT.ORDER.APPROVED` event, not on `PAYMENT.CAPTURE.
+   COMPLETED`, which is the event that actually calls
+   `record_gateway_payment_service`. This two-step split (approve
+   triggers capture; capture completion posts the payment) is
+   structurally unique to PayPal among the five providers and is the
+   reason `GatewayReturnPage.tsx` needed no changes at all — it was
+   already correctly built to never be authoritative for any provider,
+   PayPal included.
+
+3. **`paypal-create-refund`** (verify_jwt=true) — same authorization
+   pattern as the other four (`has_permission('payment.refund',
+   club_id)` re-checked via the caller's own JWT, same-provider guard,
+   refundable-balance check). Calls PayPal's real Captures Refund API
+   against the CAPTURE id (not the order id — a wiring detail that
+   trips up a naive implementation, since checkout-session-creation
+   only ever sees the order id). PayPal returns its own refund id
+   directly in the response, so this adapter uses the simpler
+   Stripe/Paymob/Kashier pattern (no `deterministicUuidFromString`
+   workaround was needed, unlike Fawry, whose response lacked a
+   distinct refund-operation reference).
+
+### Credential mapping (see PAYMENT_GATEWAY_PROVIDER_MATRIX.md for full reasoning)
+
+| Column | Holds |
+|---|---|
+| `public_key` | PayPal Client ID (not treated as sensitive by PayPal itself) |
+| `secret_vault_id` | PayPal Client Secret (used for OAuth by all three functions) |
+| `provider_merchant_ref` | PayPal Webhook ID (required by `verify-webhook-signature`) |
+| `webhook_secret_vault_id` | Unused — PayPal verification is API-based, not a local HMAC secret |
+
+## Evidence-level summary — PayPal adapter (2026-08-27)
+
+| Piece | Evidence level |
+|---|---|
+| OAuth2 token endpoint, Orders API v2 create/capture, Captures Refund API request/response shapes | OFFICIAL DOC VERIFIED, cross-checked across developer.paypal.com and docs.paypal.ai mirrors |
+| Refund window corrected from an earlier ~45-day figure to the documented 180 days (`REFUND_NOT_ALLOWED_AFTER_180_DAYS`) | OFFICIAL DOC VERIFIED — the 45-day figure was traced to `PayPal-Request-Id` idempotency-key retention, an unrelated mechanism |
+| OAuth token endpoint rejects invalid credentials | CONTRACT TEST VERIFIED — a real request with garbage Basic-auth credentials against `https://api-m.sandbox.paypal.com/v1/oauth2/token` returned real HTTP 401 `{"error":"invalid_client","error_description":"Client Authentication failed"}` |
+| `paypal-gateway-webhook` rejects a request missing the 5 required transmission headers, before contacting PayPal | LIVE VERIFIED — real HTTP 400 against the deployed function |
+| `paypal-gateway-webhook` candidate resolution correctly reports no match when no PayPal connection exists | LIVE VERIFIED against the deployed function (genuinely true: this project has zero PayPal connections configured) |
+| `verify_jwt=true` gate on `paypal-create-checkout-session` and `paypal-create-refund` | LIVE VERIFIED — real 401 (`UNAUTHORIZED_NO_AUTH_HEADER`) from both with no Authorization header |
+| `verification_status` explicit-field-check discipline (never inferring verification from HTTP 200) | CODE VERIFIED by inspection — this is the load-bearing security property of the whole webhook and is implemented as an explicit `!== 'SUCCESS'` check, never `response.ok` |
+| `record_gateway_payment_service`, `mark_gateway_transaction_failed_service`, `create_gateway_refund_service`, `get_gateway_transaction_status` reused as-is for PayPal | CODE VERIFIED — all four already provider-agnostic; confirmed no PayPal-specific change was needed or made |
+| No new migration needed (`paypal` already active in `payment_gateway_providers`, already legal in `club_gateway_connections.provider_key` and the `gateway` CHECK constraint; existing `(provider_key, provider_event_id)` unique index reused for dedup) | CODE VERIFIED by direct live schema inspection before writing any code |
+| Deployed function content matches source exactly | LIVE VERIFIED — each of the three functions' deployed content was fetched back via `get_edge_function` and confirmed byte-identical to the source file |
+| Grant hygiene | LIVE VERIFIED — `get_advisors` security scan run after deployment shows zero PayPal-related findings (expected: no schema/RLS changes were made, purely additive Edge Functions) |
+| Genuine PayPal-originated webhook delivery, genuine PayPal-hosted checkout completion, duplicate-delivery idempotency, amount-mismatch rejection | CREDENTIAL-BLOCKED — no real PayPal sandbox app with a registered webhook subscription exists for this project, and unlike the other four providers' HMAC schemes, there is no way to locally fabricate a signature that passes PayPal's own real `verify-webhook-signature` API. A disposable `club_gateway_connections` test row was considered and rejected as a workaround (see PAYMENT_GATEWAY_PROVIDER_MATRIX.md's "PayPal update" section for why) |
+
+### What a future session needs to reach SANDBOX VERIFIED for PayPal
+
+A real PayPal Developer sandbox app (free, self-service — unlike
+Fawry, no manual registration lead time), its Client ID and Client
+Secret, a webhook subscription registered against the deployed
+`paypal-gateway-webhook` URL to obtain a real `webhook_id`, connected
+via `connect_club_gateway(...)` to a real test club, then a genuinely
+completed sandbox Orders API checkout (order create → buyer approves
+via PayPal's sandbox UI → real `CHECKOUT.ORDER.APPROVED` delivery →
+real capture trigger → real `PAYMENT.CAPTURE.COMPLETED` delivery) to
+exercise the full path end-to-end for the first time.
+
+## Five-provider evidence summary (2026-08-27) — closing this phase
+
+All 5 providers from the original Phase 2 directive (Stripe, Paymob,
+Kashier, Fawry, PayPal) now have real Edge Function implementations
+committed. This table is the single honest reference point for where
+each stands, going into the next phase of work (Club Owner Gateway UI,
+the mandated security attack matrix).
+
+| Provider | Checkout session creation | Webhook verification scheme | Refund flow | Highest evidence tier reached | What's CREDENTIAL-BLOCKED |
+|---|---|---|---|---|---|
+| **Stripe** | `stripe-create-checkout-session` — Checkout Sessions API | `Stripe-Signature` header, HMAC-SHA256, locally verifiable | `stripe-create-refund` — synchronous Refunds API | LIVE VERIFIED (hand-signed test event against the real deployed webhook produced a real payment; duplicate/amount-mismatch rejection both LIVE VERIFIED) | Genuine Stripe-originated delivery, genuine hosted checkout completion — no real Stripe account exists for this project |
+| **Paymob** | `paymob-create-checkout-session` — Intentions API | HMAC-SHA512 over 20 fixed-order fields, locally verifiable | `paymob-create-refund` — Void/Refund API | LIVE VERIFIED (same pattern as Stripe: hand-signed test callback, duplicate and amount-mismatch rejection all confirmed against the real deployed function) | Genuine Paymob-originated delivery, genuine hosted checkout completion — no real Paymob merchant account exists |
+| **Kashier** | `kashier-create-checkout-session` — Payment Sessions API v3, two-vault-slot credential mapping | `x-kashier-signature` header, HMAC-SHA256 over sorted query-string, locally verifiable | `kashier-create-refund` — synchronous Orders REFUND operation | CONTRACT VERIFIED (live-routed real endpoint; end-to-end success CREDENTIAL-BLOCKED) | Real end-to-end refund/webhook success — no real Kashier merchant account exists |
+| **Fawry** | `fawry-create-checkout-session` — Express Checkout Link | `messageSignature` body field, SHA-256 over 8 concatenated fields, locally verifiable | `fawry-create-refund` — synchronous Refund API, deterministic-UUID idempotency workaround (no provider-issued refund id) | LIVE VERIFIED (hand-signed test notification against the real deployed webhook produced a real payment; duplicate/amount-mismatch rejection both LIVE VERIFIED) | Genuine Fawry-originated delivery, genuine hosted checkout completion — no real Fawry merchant account exists (manual registration required, ~2 business days) |
+| **PayPal** | `paypal-create-checkout-session` — Orders API v2, two-step create+capture, capture triggered from the webhook (never the return page) | 5-header RSA-SHA256 scheme, verified via PayPal's own `verify-webhook-signature` API (never locally) — HTTP 200 returned even on verification failure, explicitly guarded against | `paypal-create-refund` — synchronous Captures Refund API, PayPal's own refund id used directly | CONTRACT TEST VERIFIED (real OAuth rejection) + LIVE VERIFIED (deployed functions' own input validation, auth gates, and content-match all confirmed against real infrastructure) | The entire signature-verified webhook path — no real PayPal sandbox app with a registered webhook subscription exists, and (unlike the other four) there is no way to locally fabricate a passing signature |
+
+**Honest bottom line**: Stripe, Paymob, and Fawry have each reached
+LIVE VERIFIED for their webhook payment-posting path via a
+hand-constructed, locally-signable test delivery against the real
+deployed function. Kashier and PayPal have not — Kashier because a
+genuine end-to-end refund success could not be constructed without a
+live merchant account, and PayPal because its verification scheme is
+API-based against PayPal's own servers with no local signing shortcut
+available at all. Every one of the 5 adapters is CODE VERIFIED and
+OFFICIAL DOC VERIFIED for its request/response shapes, and every one
+correctly enforces its `verify_jwt` gate and reuses the same
+provider-agnostic posting/refund/failure RPCs without modification.
+None of the 5 has been exercised against a genuine real-world
+provider-hosted checkout completion — that requires real merchant
+accounts this project does not have, for any of the five providers.

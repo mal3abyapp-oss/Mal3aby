@@ -519,6 +519,160 @@ own examples).
   in the adapter code for a future live-mode connection to re-confirm
   first.
 
+## PayPal update (2026-08-27) — fifth and final adapter of this directive, built this session
+
+OFFICIAL DOC VERIFIED, cross-checked across developer.paypal.com and
+docs.paypal.ai mirrors.
+
+### OAuth2 + Orders API v2 — the core request/response shape
+
+- `POST https://api-m.sandbox.paypal.com/v1/oauth2/token` (sandbox) /
+  `https://api-m.paypal.com/v1/oauth2/token` (live) — Basic auth of
+  `client_id:client_secret`, body `grant_type=client_credentials`,
+  response `{access_token, token_type:"Bearer", expires_in, scope,
+  app_id, nonce}`. CONTRACT VERIFIED this session: a real request with
+  garbage Basic-auth credentials against the real sandbox endpoint
+  returned `401 {"error":"invalid_client","error_description":"Client
+  Authentication failed"}` — confirms the endpoint, grant type, and
+  error shape.
+- `POST /v2/checkout/orders` — `purchase_units[].amount.
+  {currency_code,value}`, `purchase_units[].custom_id`,
+  `payment_source.paypal.experience_context.{return_url,cancel_url}`.
+  Response: `id`, `status`
+  (`CREATED|SAVED|APPROVED|VOIDED|COMPLETED|PAYER_ACTION_REQUIRED`),
+  `links[]` with `rel:"approve"` (or `"payer-action"` on newer
+  responses) as the customer redirect.
+- `POST /v2/checkout/orders/{id}/capture` — explicit second step,
+  structurally distinct from every other adapter's direct
+  create-and-confirm flow. See "Capture timing" below for how Mal3aby
+  sequences this.
+
+### Capture timing — design decision, and why
+
+PayPal's checkout flow is genuinely two-step: (1) create an order, get
+an approve link; (2) the customer approves on PayPal's own site; (3)
+Mal3aby must call the separate Capture API to actually complete the
+payment. This adapter triggers the capture call from
+**`paypal-gateway-webhook` on receipt of a verified `CHECKOUT.ORDER.
+APPROVED` event** — never from the client-facing return page, and
+never as a client-triggered call. Reasoning: `CHECKOUT.ORDER.APPROVED`
+is a standard webhook event PayPal fires server-to-server the moment
+the buyer completes approval, independent of whether the buyer's
+browser ever successfully redirects back to Mal3aby — this keeps with
+the project's hard rule that a redirect landing page is never
+authoritative for payment state. The capture call itself does **not**
+post a payment; only a *subsequent*, independently verified `PAYMENT.
+CAPTURE.COMPLETED` event calls `record_gateway_payment_service`. The
+capture call carries its own `PayPal-Request-Id` for idempotency, and
+an `ORDER_ALREADY_CAPTURED` response from a redelivered
+`CHECKOUT.ORDER.APPROVED` event (PayPal webhooks are at-least-once) is
+treated as a benign no-op, not a failure.
+
+### Webhook verification — API-based `verify-webhook-signature`, not local RSA/cert-chain
+
+`POST /v1/notifications/verify-webhook-signature`, body
+`{transmission_id, transmission_time, cert_url, auth_algo,
+transmission_sig, webhook_id, webhook_event}`, response
+`{verification_status:"SUCCESS"|"FAILURE"}`. The 5 headers PayPal
+sends on every real delivery: `PAYPAL-TRANSMISSION-ID`,
+`PAYPAL-TRANSMISSION-TIME`, `PAYPAL-CERT-URL`, `PAYPAL-AUTH-ALGO`,
+`PAYPAL-TRANSMISSION-SIG`. See PAYMENT_GATEWAY_WEBHOOK_MODEL.md for the
+full reasoning on choosing the API-based path over local
+certificate-chain verification.
+
+**Security-load-bearing finding**: PayPal returns **HTTP 200 even when
+verification fails** — the deployed `paypal-gateway-webhook` explicitly
+checks `verification_status === 'SUCCESS'` on the parsed response
+body and never infers verification from the HTTP status code alone.
+`webhook_event` must be posted back byte-identical to the parsed body
+Mal3aby received — the deployed function passes the same parsed
+`payload` object through, never reconstructing/re-serializing it.
+
+### Refund window — CORRECTED to 180 days
+
+PayPal's own documented constraint is `REFUND_NOT_ALLOWED_AFTER_180_
+DAYS`. An earlier secondary-sourced summary (see the comparison table
+row prior to this session) stated ~45 days — that figure actually
+describes `PayPal-Request-Id` idempotency-key *retention*, a wholly
+separate mechanism, not the refund eligibility window. Corrected
+throughout this document and in `paypal-create-refund`'s own header
+comment.
+
+### Credential mapping — two genuinely different-sensitivity values
+
+- `public_key` = PayPal Client ID (not secret; PayPal routinely shows
+  it in its own dashboard UI, and OAuth still requires the secret
+  alongside it) — mirrors Stripe's publishable-key placement.
+- `secret_vault_id` = PayPal Client Secret (used for OAuth Basic auth
+  by all three PayPal functions).
+- `provider_merchant_ref` = PayPal Webhook ID (the id PayPal assigns
+  when the club owner registers a webhook subscription in their own
+  PayPal app dashboard; required by `verify-webhook-signature`).
+  Confirmed via live schema inspection this session that this column
+  carries no doc comment restricting its meaning — reused exactly as
+  Fawry reuses it for `merchantCode`.
+- `webhook_secret_vault_id` = unused for PayPal (left null) — PayPal
+  verification is API-based against a `webhook_id`, not a
+  locally-held HMAC secret, so there is no second "secret" value that
+  belongs in this slot.
+
+### `custom_id` vs `invoice_id` — correlation field choice
+
+`purchase_units[0].custom_id` (not `invoice_id`) is set to the Mal3aby
+transaction id. PayPal copies `custom_id` from the purchase unit onto
+the resulting Capture resource (confirmed on the Captures resource
+schema), so both order-shaped (`CHECKOUT.ORDER.APPROVED`) and
+capture-shaped (`PAYMENT.CAPTURE.*`) webhook events expose it at a
+stable, predictable path. `invoice_id` was considered and rejected: it
+carries stricter PayPal-side uniqueness/format expectations across the
+merchant account that are unnecessary overhead here.
+
+### Native idempotency
+
+PayPal is one of only two of Mal3aby's five providers (alongside
+Stripe) with genuine native idempotency support
+(`payment_gateway_providers.paypal.supports_native_idempotency_key =
+true`, confirmed live). `PayPal-Request-Id` is sent on the Orders
+create call (keyed off the Mal3aby transaction id), the capture call
+(keyed off the order id), and the refund call (keyed off capture id +
+amount) — in addition to, not instead of, Mal3aby's own
+`idempotency_key` mechanism.
+
+### What genuinely could not be tested (CREDENTIAL-BLOCKED, disclosed honestly)
+
+Unlike the other four adapters, whose HMAC schemes could be locally
+reproduced and tested end-to-end without real credentials, PayPal's
+webhook trust model calls PayPal's own real `verify-webhook-signature`
+API — there is no way to construct a request that passes that check
+without a real PayPal-issued signature from a real registered webhook
+subscription. This session therefore has:
+
+- CONTRACT TEST VERIFIED: the real OAuth token endpoint correctly
+  rejects garbage credentials (see above).
+- LIVE VERIFIED: the deployed `paypal-gateway-webhook` correctly
+  rejects a request missing the 5 transmission headers (HTTP 400,
+  before ever attempting to contact PayPal) and correctly reports "no
+  matching gateway connection" when no PayPal connection exists yet
+  in this project (there is genuinely none configured).
+- LIVE VERIFIED: the deployed `paypal-create-checkout-session` and
+  `paypal-create-refund` both return a real HTTP 401 when called
+  without an `Authorization` bearer token, confirming `verify_jwt=true`
+  is actually enforced by the platform gateway.
+- CREDENTIAL-BLOCKED: the full success path (real order creation, real
+  buyer approval, real capture, real `verify-webhook-signature` pass,
+  duplicate-delivery idempotency, amount-mismatch rejection) requires
+  a real PayPal sandbox app with a registered webhook subscription and
+  real Client ID/Secret/webhook_id — none of which exist in this
+  project yet. Building a disposable `club_gateway_connections` test
+  row was considered and rejected: `connect_club_gateway()` requires a
+  real authenticated caller context this session does not have, and
+  writing directly into `club_gateway_connections` via `execute_sql`
+  would bypass that table's own intentional no-direct-write design
+  (verified live: it carries no INSERT/UPDATE/DELETE grant for any
+  role, all writes are RPC-gated) rather than exercising a path a real
+  caller could ever take. This is a genuine, disclosed ceiling, not a
+  gap papered over with a fake-passing test.
+
 ## Critical business-model fact (affects which providers are viable per club)
 
 **Stripe does not support Egypt as an account country** — a club would
@@ -541,7 +695,7 @@ real, provider-enforced constraint, not just a UI preference.
 | Provider | API version | Hosted checkout | Webhook signature | Idempotency key | EGP support | Refund model | Sandbox |
 |---|---|---|---|---|---|---|---|
 | **Stripe** | Dated release (e.g. `2026-08-26`), header-overridable | Checkout Sessions (hosted/embedded/Elements) | `Stripe-Signature` header, HMAC-SHA256 over `timestamp.payload` | Native `Idempotency-Key` header, 24h window | Not in documented currency list; Egypt not a supported account country | Full/partial via Refunds API; sync object + async `refund.*` webhook confirmation | Same base URL, `sk_test_`/`pk_test_` keys, instant self-service |
-| **PayPal** | Orders API v2 | Orders API + approve link / JS SDK buttons | 5 headers (`PAYPAL-TRANSMISSION-*`, `PAYPAL-CERT-URL`, `PAYPAL-AUTH-ALGO`), RSA-SHA256, verifiable locally or via `verify-webhook-signature` | Native `PayPal-Request-Id` header, ~45-day retention for refunds | EGP absent from documented currency list | `POST /v2/payments/captures/{id}/refund`; partial/time-limit specifics not fully confirmed from fetched docs | Distinct host `api-m.sandbox.paypal.com`, self-service sandbox accounts |
+| **PayPal** | Orders API v2 | Orders API + approve link (`rel: "approve"`/`"payer-action"`) | 5 headers (`PAYPAL-TRANSMISSION-*`, `PAYPAL-CERT-URL`, `PAYPAL-AUTH-ALGO`), RSA-SHA256, verified via the API-based `verify-webhook-signature` endpoint (see "PayPal update" section below for why API-based over local cert-chain verification) | Native `PayPal-Request-Id` header on both Orders create and Captures refund calls | EGP absent from documented currency list; supports USD/EUR/GBP | `POST /v2/payments/captures/{capture_id}/refund`, `{amount:{value,currency_code},note_to_payer}`, returns `{id,status}` directly — CORRECTED 2026-08-27: refund eligibility window is **180 days** (`REFUND_NOT_ALLOWED_AFTER_180_DAYS`), not the ~45-day figure this row previously stated (that 45-day figure actually described `PayPal-Request-Id` idempotency-key *retention*, an unrelated mechanism, not the refund window) | Distinct host `api-m.sandbox.paypal.com`, self-service sandbox accounts |
 | **Paymob** | Intentions API (v1), `POST /v1/intention/` | Unified Checkout (redirect, `{region}.checkout.paymob.com`) / Pixel (embedded) via `client_secret` + `public_key` | HMAC-SHA512 over 20 fixed-order field VALUES (documented list, not generic lexicographic sort — see "Paymob update" section above), dashboard-issued HMAC secret, hex lowercase, sent as `hmac` query param — CONFIRMED against Paymob's own worked example (2026-08-27) | Not documented — dedup via merchant `special_reference` (echoed as `order.merchant_order_id` in the callback, not a top-level field) | Yes — core EGP gateway | `POST /api/acceptance/void_refund/refund`, `{transaction_id, amount_cents}` body, `Token` auth header — CONFIRMED 2026-08-27 | Same base URL (`accept.paymob.com`) for sandbox and live — mode is entirely determined by which secret/public key pair and Integration ID(s) are used — CONFIRMED 2026-08-27 |
 | **Kashier** | No global version string; `v3` in the Payment Sessions endpoint path | Payment Sessions (`POST /v3/payment/sessions`, `sessionUrl` returned directly) | `x-kashier-signature` header, HMAC-SHA256 over an RFC 3986 query-string of alphabetically-sorted `signatureKeys` fields (`key=value&...`, not bare concatenation), keyed by the **Payment API Key** — CONFIRMED against Kashier's own published code sample and cross-checked byte-for-byte with an independent Python implementation (2026-08-27) | Kashier's own `transactionId` field is a genuine per-callback event id — dedup via the EXISTING `(provider_key, provider_event_id)` unique index, no new migration needed | Yes — EGP native; also USD/EUR/GBP (secondary-sourced) | `PUT {fep.kashier.io}/orders/:orderId/` (`apiOperation: REFUND`); synchronous JSON response — CONTRACT VERIFIED live-routed, real end-to-end success CREDENTIAL-BLOCKED (see "Kashier update" section) | Distinct `test-` prefixed base URL PER SUBDOMAIN (3 separate subdomain families: sessions, legacy iframe, refunds) + separate Payment-API-Key/Secret-Key pairs per environment — CONFIRMED code-example-level 2026-08-27 |
 | **Fawry (FawryPay)** | No unified version; per-endpoint (e.g. Notification V2) | Express Checkout Link (`POST .../payments/charge`, server-to-server, returns a redirect URL) — CONFIRMED genuinely server-to-server, not a JS widget, via verbatim-quoted doc text 2026-08-27 | `messageSignature` BODY field (not a header, not a query param — CONFIRMED), SHA-256 over `fawryRefNumber+merchantRefNum+paymentAmount(2dp)+orderAmount(2dp)+orderStatus+paymentMethod+paymentRefrenceNumber+secureKey` — CONFIRMED via Fawry's own docs AND independently cross-checked against the real open-source `fawry-api/fawry` Ruby gem's source 2026-08-27; genuinely DIFFERENT field set from the outbound charge signature (`merchantCode+merchantRefNum+customerProfileId+returnUrl+itemId+quantity+price...+secureKey`) | No dedicated per-event id (`fawryRefNumber` is stable across multiple status-change notifications for the same order, unlike a true event id) — dedup via the EXISTING `(provider_key, payload_hash) WHERE provider_event_id IS NULL` index, same mechanism as Paymob, no new migration needed | Yes — EGP-only in every documented example | Full/partial via `POST /payments/refund`, `{merchantCode, referenceNumber, refundAmount, reason, signature}` — CODE VERIFIED path/fields against 3 independent sources 2026-08-27; auth-capture-uncaptured constraint N/A (adapter does not use the separate auth/capture API) | Staging domain (`atfawry.fawrystaging.com`) exists and IS directly reachable/documentable, but **credentials require manual merchant registration (~2 business days), not instant signup** — re-confirmed live 2026-08-27, unchanged |
@@ -589,3 +743,9 @@ real, provider-enforced constraint, not just a UI preference.
   both describe retry-until-200 behavior. Webhook idempotency
   (Section 40 of the directive) must be enforced entirely on Mal3aby's
   side for every provider, not assumed from any provider's own claims.
+- As of 2026-08-27, all 5 adapters this table documents (Stripe,
+  Paymob, Kashier, Fawry, PayPal) have real Edge Function
+  implementations committed — this table is no longer research-only.
+  See PAYMENT_GATEWAY_ARCHITECTURE.md's closing "Five-provider
+  evidence summary" section for the honest, side-by-side evidence-tier
+  status of each.
