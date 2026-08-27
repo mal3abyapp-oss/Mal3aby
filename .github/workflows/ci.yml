@@ -131,3 +131,66 @@ jobs:
           done
           if [ "$bad" -eq 1 ]; then exit 1; fi
           echo "New migration filenames OK"
+
+  e2e-public:
+    # Phase 4 (Staging + Automated E2E): runs only the ZERO-CREDENTIAL
+    # Playwright suites (public pages, auth route guards, responsive
+    # viewport checks — see E2E_TEST_STRATEGY.md). Deliberately does NOT
+    # run e2e/staff/** or e2e/portal/** here -- those need a real minted
+    # QA session (SUPABASE_SERVICE_ROLE_KEY as a CI secret, see
+    # e2e/setup/mint-qa-sessions.ts), which is the same class of decision
+    # this workflow's own "Unit tests" step already defers to the repo
+    # owner for the Vitest integration suites' QA credentials -- not
+    # silently skipped without disclosure, just not wired as a hard gate
+    # without an explicit secret being added first.
+    runs-on: ubuntu-latest
+    needs: build-and-test
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install Playwright Chromium
+        run: npx playwright install --with-deps chromium
+
+      - name: Run zero-credential E2E suites
+        run: npm run test:e2e -- --project=chromium-desktop e2e/public e2e/auth e2e/responsive
+        env:
+          # The real project URL + anon/publishable key -- NOT secrets by
+          # Supabase's own design (see .env.example: "NEVER put the
+          # service_role key here", implying the anon key is the one
+          # that's meant to ship to a browser) and already present,
+          # unencrypted, in this repo's shipped JS bundle on
+          # mal3aby.app -- so hardcoding them here (rather than
+          # requiring a repo secret that doesn't yet exist, confirmed
+          # via `gh secret list`: only CLOUDFLARE_API_TOKEN is set) adds
+          # no real exposure. These E2E suites genuinely need the real
+          # backend (they assert on real /verify, /qr, /activate token
+          # resolution behavior) -- the placeholder values the "Unit
+          # tests" step above uses would make every one of these tests
+          # fail against a nonexistent host.
+          VITE_SUPABASE_URL: https://gxkrtlvpjwxhcqdisyob.supabase.co
+          VITE_SUPABASE_ANON_KEY: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imd4a3J0bHZwand4aGNxZGlzeW9iIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODY3NTY5MDcsImV4cCI6MjEwMjMzMjkwN30.NAZm2_nrFXvAIWh_LVOInn_QTvJQ7vXp6oyjEdKxKV8
+
+      - name: Upload Playwright report on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: playwright-report/
+          retention-days: 14
+
+        # Authenticated suites (e2e/staff/**, e2e/portal/**) intentionally
+        # NOT run here -- see E2E_TEST_STRATEGY.md "CI wiring". To
+        # activate them: add SUPABASE_SERVICE_ROLE_KEY as a repository
+        # secret, add an `npm run e2e:setup` step before `npm run
+        # test:e2e` (with that secret in its env), and drop the
+        # `e2e/public e2e/auth e2e/responsive` path filter above.

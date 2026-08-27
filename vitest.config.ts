@@ -61,6 +61,17 @@ export default defineConfig({
       // with its own tsx-based self-test runner (src/templates.test.ts,
       // plain node:assert, no describe/it blocks), not vitest.
       'cloudflare/**',
+      // Phase 4 (Staging + Automated E2E): e2e/**/*.spec.ts files are
+      // Playwright specs, run via `npm run test:e2e` (playwright.config.ts),
+      // never vitest -- confirmed live this phase: without this
+      // exclusion, vitest's default include glob picks them up (a
+      // .spec.ts file matches its pattern) and every file fails with
+      // "Playwright Test did not expect test.describe() to be called
+      // here" (Playwright's test.describe() requires its own runner
+      // context, which vitest does not provide) -- same class of
+      // cross-runner collision as whatsapp-connector/cloudflare above,
+      // just discovered via .spec.ts rather than .test.ts naming.
+      'e2e/**',
       '.claude/worktrees/**',
       // Same class of problem as whatsapp-connector/ above -- QA scratch
       // scripts and any subproject fixtures a session drops here are not

@@ -39,3 +39,14 @@ coverage/
 # Temporary QA session files (never commit)
 qa_session_temp.json
 qa_signin_temp.mjs
+
+# Playwright E2E (Phase 4) -- test artifacts and minted real Supabase
+# Auth sessions (access/refresh tokens) for the QA fixture accounts.
+# Sessions are disposable, re-minted via `npm run e2e:setup`, and must
+# never be committed -- see e2e/setup/mint-qa-sessions.ts and
+# E2E_TEST_STRATEGY.md.
+/e2e/.auth-state/
+/test-results/
+/playwright-report/
+/blob-report/
+/playwright/.cache/
