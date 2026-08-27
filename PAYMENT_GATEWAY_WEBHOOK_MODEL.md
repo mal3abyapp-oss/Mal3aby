@@ -523,20 +523,163 @@ PATTERN-INFERRED from the consistent `test-` prefix convention seen
 everywhere else on this provider, not independently doc-confirmed this
 session.
 
-## Other providers (PayPal, Fawry) — not yet implemented
+## Fawry webhook verification (2026-08-27) — built this session
 
-Each remaining provider in `PAYMENT_GATEWAY_PROVIDER_MATRIX.md` uses a
-structurally different signature scheme:
+Fawry's webhook model (Server-to-Server Notification V2) differs from
+all three other providers in its signature MECHANISM, while sharing
+Paymob's content-hash dedup shape. Each finding below was confirmed
+against Fawry's live documentation this session (see
+`PAYMENT_GATEWAY_PROVIDER_MATRIX.md` "Fawry update" section for source
+URLs and the verbatim real, open-source `fawry-api/fawry` Ruby gem
+source this was cross-checked against):
 
-- **PayPal** — 5 headers (`PAYPAL-TRANSMISSION-*`, `PAYPAL-CERT-URL`,
-  `PAYPAL-AUTH-ALGO`), RSA-SHA256, verifiable locally or via PayPal's
-  own `verify-webhook-signature` API.
-- **Fawry** — `messageSignature` body field (not a header), SHA-256
-  over a fixed field concatenation.
+1. **Signature location**: `messageSignature` is a BODY FIELD on the
+   notification payload itself — no dedicated header (unlike Stripe's
+   `Stripe-Signature` and Kashier's `x-kashier-signature`), no query
+   parameter (unlike Paymob's `hmac`). A fourth, distinct location
+   among the four providers built this phase.
+2. **What gets hashed**: NOT HMAC at all — a plain, keyed-by-
+   concatenation SHA-256 (`hashlib.sha256`/`Digest::SHA256`, not
+   `hmac.new`/`OpenSSL::HMAC`) over 7 documented notification fields
+   plus the secure key appended at the end:
+   `fawryRefNumber + merchantRefNum + paymentAmount(2dp) +
+   orderAmount(2dp) + orderStatus + paymentMethod +
+   paymentRefrenceNumber + secureKey`. `fawry-gateway-webhook` reads
+   the raw body as text first (for the `payload_hash` dedup key and to
+   parse the JSON safely once), then computes the hash over VALUES
+   extracted from the parsed object — same "extract fields from the
+   parsed payload, not raw bytes" discipline as Paymob's and Kashier's
+   own webhooks.
+3. **GENUINELY DIFFERENT field set from the OUTBOUND charge-request
+   signature** (`merchantCode + merchantRefNum + customerProfileId +
+   returnUrl + chargeItems... + secureKey`) — confirmed precisely, not
+   assumed to match, exactly as the task brief asked. Fawry is the
+   first of the four providers built this phase where the SAME secret
+   is genuinely used with two DIFFERENT field-concatenation formulas
+   depending on direction (Stripe/Kashier/Paymob's outbound calls use
+   entirely different auth mechanisms — an API key header — not a
+   signature at all, so this particular "two different signature
+   formulas, one secret" shape is new to Fawry specifically).
+4. **No dedicated event id, like Paymob**: Fawry's `fawryRefNumber` is
+   STABLE across multiple notifications for the SAME order as its
+   status changes (e.g. a PAID notification and a later REFUNDED
+   notification for the same order carry the SAME `fawryRefNumber`) —
+   using it as a "provider_event_id" would wrongly collapse two
+   genuinely different events into one. Dedup is therefore
+   content-hash-based, reusing the EXISTING
+   `payment_gateway_webhook_events_provider_payload_unique` index
+   (`UNIQUE (provider_key, payload_hash) WHERE provider_event_id IS
+   NULL`, added for Paymob in
+   `20260827161918_paymob_webhook_events_payload_hash_dedup.sql`) — NO
+   NEW MIGRATION NEEDED, confirmed by direct schema inspection before
+   writing any code, resolving the task brief's own anticipation of
+   this possibility.
+5. **Field-name inconsistency, disclosed**: different Fawry doc
+   pages/examples spell the merchant reference field inconsistently
+   (`merchantRefNum` in the signature formula's own prose,
+   `merchantRefNumber` in one fetched JSON example). The webhook reads
+   BOTH spellings defensively for transaction LOOKUP, but the
+   SIGNATURE computation always uses `merchantRefNum` specifically —
+   matching the verbatim, unambiguous Ruby gem source rather than doc
+   prose. If Fawry's real payload uses the other spelling for the
+   signed field, verification fails closed (rejects) rather than
+   silently accepting a wrongly-keyed signature.
 
-Each needs its own dedicated Edge Function (the shared
+**HMAC-free SHA-256 construction — OFFICIAL DOC VERIFIED + CODE
+VERIFIED against a real, independent third-party open-source Ruby
+gem's verbatim source** (`fawry-api/fawry`, `lib/fawry/fawry_callback.rb`,
+fetched from GitHub raw content this session):
+```ruby
+def signature
+  Digest::SHA256.hexdigest("#{callback_params[:fawryRefNumber]}#{callback_params[:merchantRefNum]}"\
+                           "#{format('%<paymentAmount>.2f', paymentAmount: callback_params[:paymentAmount])}"\
+                           "#{format('%<orderAmount>.2f', orderAmount: callback_params[:orderAmount])}"\
+                           "#{callback_params[:orderStatus]}#{callback_params[:paymentMethod]}"\
+                           "#{callback_params[:paymentRefrenceNumber]}#{fawry_secure_key}")
+end
+```
+An independent Python reference implementation (`hashlib.sha256`, no
+`hmac` module involved — Fawry's own scheme is not HMAC) was built
+from this exact formula and Fawry's own doc prose (which agree
+exactly), then used to hand-sign a real test notification.
+
+**What's ACTUALLY been proven for Fawry (LIVE VERIFIED, this
+session)**: a disposable test connection (a real `vault.create_secret()`
+entry, a real `club_gateway_connections` row on the pre-existing "Mala3by
+Verification Club") was created, and:
+- A hand-signed notification with the CORRECT signature (computed
+  independently in Python against the real vaulted secret, fetched by
+  the Edge Function via `get_vault_secret_service()`) was accepted —
+  proving the Edge Function's Web Crypto SHA-256 computation matches
+  an independent reference implementation using a REAL secret
+  round-tripped through Vault, not just a hypothetical test vector.
+  The transaction's `merchantRefNum` was resolved in O(1) via the
+  direct UUID match against `payment_gateway_transactions.id`, and
+  correctly posted a real `payments` row (`method='card'`, amount
+  250.50) via the UNCHANGED `record_gateway_payment_service`, with
+  `provider_session_ref` correctly overwritten to Fawry's real
+  `fawryRefNumber`.
+- The IDENTICAL valid payload replayed a second time returned
+  `duplicate:true` rather than reprocessing — the EXISTING
+  `(provider_key, payload_hash) WHERE provider_event_id IS NULL`
+  unique index works end-to-end for Fawry, with no new migration.
+- The SAME payload shape with an INCORRECT signature was rejected
+  (400) — negative evidence, proving the check discriminates rather
+  than accepting everything. A request with NO `messageSignature`
+  field at all was also rejected (400).
+- A notification claiming a DIFFERENT (mismatched) confirmed amount
+  (999) against a second staged transaction (staged at 300.00) was
+  correctly rejected — `payment_id: null` returned, the transaction
+  was marked `failed` with reason `"amount mismatch: staged=300.00
+  confirmed=999"`, and no payment was posted — proving the existing
+  fail-closed protection works unchanged when exercised through the
+  new Fawry code path.
+- `verify_jwt=true` was LIVE VERIFIED on both
+  `fawry-create-checkout-session` and `fawry-create-refund` via a real
+  401 (`UNAUTHORIZED_NO_AUTH_HEADER`) with no Authorization header.
+- All test fixtures (connection, vault secret, both staged
+  transactions, the posted payment and its allocation, the webhook
+  event rows) were deleted afterward; a follow-up query confirmed zero
+  rows remain and both borrowed invoices' outstanding balances were
+  restored to their pre-test values (500.00 and 400.00 respectively,
+  both `issued`, zero allocated).
+
+**What remains genuinely NOT ATTEMPTED (not CREDENTIAL-BLOCKED in the
+same sense as the other three)**: unlike Stripe/Paymob/Kashier, where a
+CONTRACT VERIFIED test (a real request to the provider's live API with
+a garbage key, confirming an auth-specific error) was successfully
+performed, no such test was attempted against Fawry's real
+`payments/charge`/`payments/refund` endpoints this session. Reasoning
+disclosed in full in `PAYMENT_GATEWAY_PROVIDER_MATRIX.md` "What
+genuinely could not be tested": Fawry's endpoints require a `signature`
+field computed from a secure key that, without a real merchant
+account, can only ever be fake — and whether Fawry's real API responds
+to a garbage-signed request with a clean, useful auth-specific error
+(like Paymob's/Kashier's own contract tests found) or some other
+failure mode was not established, so no CONTRACT VERIFIED claim is
+made. This is a real, disclosed gap for a future session with either
+real or garbage-but-registered credentials to close.
+
+**What remains CREDENTIAL-BLOCKED**: a genuine Fawry-originated
+notification (real merchant account, real Secure Hash Key issued by
+Fawry, real Express Checkout Link transaction completed on Fawry's
+hosted page) has never been exercised — no real Fawry account exists
+for this project, and Fawry specifically cannot issue one quickly even
+if requested (manual registration, ~2 business days, re-confirmed live
+this session). The Refund endpoint's synchronous-success path
+(`fawry-create-refund`) was similarly never exercised end-to-end for
+the same reason.
+
+## Other provider (PayPal) — not yet implemented
+
+PayPal uses a structurally different signature scheme from all four
+providers built this phase: 5 headers (`PAYPAL-TRANSMISSION-*`,
+`PAYPAL-CERT-URL`, `PAYPAL-AUTH-ALGO`), RSA-SHA256, verifiable locally
+or via PayPal's own `verify-webhook-signature` API.
+
+It needs its own dedicated Edge Function (the shared
 `record_gateway_payment_service` / `mark_gateway_transaction_failed_service`
-RPCs are provider-agnostic and already reusable by all of them — only
-the *verification* layer is provider-specific, as demonstrated by both
-the Paymob and Kashier adapters reusing all four shared RPCs completely
-unchanged). Neither of these two is built in this phase.
+RPCs are provider-agnostic and already reusable by it — only the
+*verification* layer is provider-specific, as demonstrated by the
+Paymob, Kashier, and Fawry adapters all reusing every shared RPC
+completely unchanged). Not built in this phase.

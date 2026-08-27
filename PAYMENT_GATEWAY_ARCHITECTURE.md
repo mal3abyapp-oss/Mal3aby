@@ -1,26 +1,44 @@
-# Payment Gateway Architecture — Stripe, Paymob & Kashier Adapters (end-to-end)
+# Payment Gateway Architecture — Stripe, Paymob, Kashier & Fawry Adapters (end-to-end)
 
 Phase 2 (Multi-Gateway Online Payments), consolidated 2026-08-27,
 extended 2026-08-27 with the Paymob adapter, extended again 2026-08-27
-with the Kashier adapter. This document is the single map of the full
-Stripe, Paymob, and Kashier flows across all their pieces; the
-individual docs (`PAYMENT_GATEWAY_PROVIDER_MATRIX.md`,
-`PAYMENT_GATEWAY_WEBHOOK_MODEL.md`, `PAYMENT_GATEWAY_RECONCILIATION.md`)
-carry the detailed evidence for their own pieces.
+with the Kashier adapter, extended again 2026-08-27 with the Fawry
+adapter (the fourth and, per the standing directive's own scope, final
+provider built this phase — PayPal remains unbuilt). This document is
+the single map of the full Stripe, Paymob, Kashier, and Fawry flows
+across all their pieces; the individual docs
+(`PAYMENT_GATEWAY_PROVIDER_MATRIX.md`, `PAYMENT_GATEWAY_WEBHOOK_MODEL.md`,
+`PAYMENT_GATEWAY_RECONCILIATION.md`) carry the detailed evidence for
+their own pieces.
 
-All three adapters share the SAME underlying schema
+All four adapters share the SAME underlying schema
 (`club_gateway_connections`, `payment_gateway_transactions`,
 `payment_gateway_webhook_events`) and the SAME provider-agnostic
 service-role RPCs (`record_gateway_payment_service`,
 `mark_gateway_transaction_failed_service`,
 `create_gateway_refund_service`, `get_gateway_transaction_status`) —
-none of those needed any Paymob- or Kashier-specific change; only the
-provider-specific Edge Functions differ (Stripe's HMAC-SHA256
+none of those needed any Paymob-, Kashier-, or Fawry-specific change;
+only the provider-specific Edge Functions differ (Stripe's HMAC-SHA256
 header-based webhook signature vs. Paymob's HMAC-SHA512
 query-param/field-concatenation scheme vs. Kashier's HMAC-SHA256
-header-based-but-query-string-encoded scheme; Stripe's and Kashier's
-checkout URLs returned directly by the API vs. Paymob's hosted-checkout
-URL constructed client-side from a public key + client_secret).
+header-based-but-query-string-encoded scheme vs. Fawry's SHA-256
+body-field scheme over a differently-ordered field set for its outbound
+vs. inbound directions; Stripe's and Kashier's checkout URLs returned
+directly by the API vs. Paymob's hosted-checkout URL constructed
+client-side from a public key + client_secret vs. Fawry's own
+directly-returned redirect URL, whose exact response field name is a
+disclosed, genuine documentation gap — see the Fawry section below).
+
+**Fawry's evidence ceiling is deliberately lower than the other three
+adapters'.** No self-service sandbox exists for this provider (manual
+merchant registration, ~2 business days, re-confirmed live this
+session) — every Fawry claim below is OFFICIAL DOC VERIFIED and/or CODE
+VERIFIED (including live tests of THIS PROJECT'S OWN deployed webhook
+function using a hand-signed test vector cross-checked against an
+independent Python implementation and a real third-party open-source
+Ruby gem), never SANDBOX VERIFIED or LIVE-VERIFIED-against-Fawry's-own-
+infrastructure. This is disclosed explicitly throughout, not glossed
+over.
 
 ## Constraints this design honors throughout
 
@@ -201,7 +219,7 @@ Staff issues a refund on a card payment
 | Grant hygiene on the new dedup index / `get_vault_secret_service` reuse | LIVE VERIFIED — queried `information_schema` directly; `service_role`-only on the vault RPC, `authenticated`-SELECT-only (RLS-gated) on the webhook events table, unchanged from the Stripe baseline |
 | Cross-tenant / grant checks on new service-role RPCs | N/A — no new service-role RPCs were created for Paymob; all reused Stripe's existing, already-tested RPCs unchanged |
 | Genuine Paymob-originated webhook delivery, genuine Paymob-hosted checkout completion | CREDENTIAL-BLOCKED — no real Paymob merchant account exists for this project (confirmed: "محدش عندي حسابات") |
-| Other 3 providers (PayPal, Kashier, Fawry) | Kashier now built (see below); PayPal and Fawry not built this phase — architecture documented in `PAYMENT_GATEWAY_PROVIDER_MATRIX.md` |
+| Other 3 providers (PayPal, Kashier, Fawry) | Kashier and Fawry now built (see below); PayPal not built this phase — architecture documented in `PAYMENT_GATEWAY_PROVIDER_MATRIX.md` |
 
 ### What a future session needs to reach SANDBOX VERIFIED for Paymob
 
@@ -345,7 +363,7 @@ Staff issues a refund on a card payment
 | No new migration needed (`kashier` already in the `gateway` CHECK constraint; existing `(provider_key, provider_event_id)` unique index reused for dedup) | CODE VERIFIED by direct schema inspection before writing any migration — confirmed the task brief's own anticipation that Kashier's dedicated event id might make a new payload-hash migration unnecessary |
 | Grant hygiene (`get_vault_secret_service` service_role-only, `payment_gateway_webhook_events` authenticated-SELECT-only) | LIVE VERIFIED — queried `information_schema`/`has_function_privilege` directly; unchanged from the Stripe/Paymob baseline since no new grants were introduced |
 | Genuine Kashier-originated webhook delivery, genuine Kashier-hosted checkout completion | CREDENTIAL-BLOCKED — no real Kashier merchant account exists for this project |
-| Other 2 providers (PayPal, Fawry) | Not built this phase — architecture documented in `PAYMENT_GATEWAY_PROVIDER_MATRIX.md` |
+| Other providers (PayPal, Fawry) | Fawry now built (see below); PayPal not built this phase — architecture documented in `PAYMENT_GATEWAY_PROVIDER_MATRIX.md` |
 
 ### What a future session needs to reach SANDBOX VERIFIED for Kashier
 
@@ -360,6 +378,154 @@ Kashier-signed webhook delivery against the deployed
 `kashier-gateway-webhook` function. A real refund attempt against a
 real Kashier order would also resolve the one remaining open question
 (the "Routing key is missing" contract-test finding above).
+
+## The Fawry flow (2026-08-27)
+
+```
+Club Owner connects Fawry
+  connect_club_gateway() [authenticated, payment.methods.manage]
+    → writes club_gateway_connections row
+    → provider_merchant_ref = Fawry Merchant Code
+    → secret_vault_id       = Fawry Secure Hash Key (the ONE secret
+      Fawry uses for every purpose -- charge signing, refund signing,
+      notification verification -- same single-secret shape as Paymob,
+      unlike Kashier's genuine two-key split)
+
+Staff/customer initiates payment on an issued invoice
+  start_gateway_checkout() [authenticated, invoice.view]  -- UNCHANGED, provider-agnostic
+
+Client calls fawry-create-checkout-session { transaction_id }
+  [Edge Function, verify_jwt=true]
+    → re-derives authorization via get_gateway_transaction_status() (same as the other three)
+    → reads connection.secret_vault_id via get_vault_secret_service()
+    → POST {base_url}/payments/charge -- Fawry's "Express Checkout
+      Link" product: a genuine SERVER-TO-SERVER call (CONFIRMED via
+      verbatim-quoted doc text, not Fawry's separate client-side
+      "Checkout Button" JS-widget product), amount as a major-unit
+      decimal (NOT cents), chargeItems=[{itemId, quantity, price}],
+      merchantRefNum=transaction_id, returnUrl, orderWebHookUrl,
+      signature (SHA-256 over merchantCode+merchantRefNum+
+      customerProfileId(or "")+returnUrl+itemId+qty+price(2dp)+secureKey
+      -- a DIFFERENT field set from the inbound notification signature,
+      confirmed precisely)
+    → UPDATE payment_gateway_transactions.provider_session_ref = best-effort referenceNumber (if present on this response)
+    → returns { checkout_url } -- accepts EITHER nextAction.redirectUrl
+      OR a plain redirectUrl (GENUINE, DISCLOSED DOC GAP: the exact
+      response field name for this specific endpoint was never shown
+      in Fawry's own fetched docs -- fails closed if neither shape is
+      present, never guesses)
+
+Customer completes (or cancels) checkout on Fawry's hosted page
+  → Fawry redirects to returnUrl (GatewayReturnPage, read-only, unchanged)
+
+Fawry delivers the Server-to-Server Notification V2 (asynchronous)
+  fawry-gateway-webhook [Edge Function, verify_jwt=false]
+    → reads the `messageSignature` BODY FIELD (no header, no query
+      param, unlike all three other providers each using a different
+      mechanism) and the raw body as text
+    → resolves candidate connection(s): merchantRefNum/merchantRefNumber
+      (= the Mal3aby transaction_id itself, O(1) DIRECT match -- same
+      strength as Paymob's/Kashier's/Stripe's own merchant-reference
+      patterns; BOTH spellings read defensively for lookup, though the
+      SIGNATURE always uses merchantRefNum specifically, per the
+      verbatim third-party Ruby gem source) → provider_session_ref
+      (fawryRefNumber) → O(N) fallback (defensive only)
+    → verifies SHA-256 over fawryRefNumber+merchantRefNum+
+      paymentAmount(2dp)+orderAmount(2dp)+orderStatus+paymentMethod+
+      paymentRefrenceNumber+secureKey -- OFFICIAL DOC VERIFIED AND
+      CODE VERIFIED against a real third-party open-source Ruby gem's
+      verbatim signature-building source, independently agreeing with
+      Fawry's own docs
+    → dedups via payment_gateway_webhook_events using the EXISTING
+      (provider_key, payload_hash) WHERE provider_event_id IS NULL
+      unique index -- Fawry's fawryRefNumber is STABLE across multiple
+      notifications for the same order (not a genuine per-event id),
+      same shape as Paymob -- NO NEW MIGRATION NEEDED, confirmed by
+      direct schema inspection before writing any code
+    → orderStatus REFUNDED/PARTIAL_REFUNDED → acknowledged, never
+      re-posted as a payment
+    → orderStatus NEW → acknowledged, still in-flight, no state change
+    → orderStatus PAID → record_gateway_payment_service() [service_role-only,
+      UNCHANGED from the other three] -- also overwrites
+      provider_session_ref with Fawry's REAL fawryRefNumber, which the
+      refund endpoint requires
+    → orderStatus CANCELED/EXPIRED/FAILED → mark_gateway_transaction_failed_service()
+    → any other/unrecognized orderStatus → acknowledged only, fails
+      closed on ambiguity
+
+Staff issues a refund on a card payment
+  fawry-create-refund { payment_id, amount, reason } [Edge Function, verify_jwt=true]
+    → re-derives authorization: has_permission('payment.refund', club_id) -- same as the other three
+    → FAIL-CLOSED GUARD: refuses if provider_session_ref is not yet
+      set (i.e. the webhook's success handler has not yet overwritten
+      it with the real fawryRefNumber)
+    → POST {base_url}/payments/refund
+      { merchantCode, referenceNumber: fawryRefNumber, refundAmount,
+        reason, signature } (SHA-256 over merchantCode+referenceNumber+
+      refundAmount(2dp)+reason+secureKey -- CODE VERIFIED against the
+      same third-party Ruby gem's refund_request.rb) -- synchronous,
+      per Fawry's own docs -- same design as the other three adapters'
+      synchronous-first pattern
+    → on statusCode:200 → posts canonical refund SYNCHRONOUSLY via
+      create_gateway_refund_service() [service_role-only, UNCHANGED --
+      already provider-agnostic, no Fawry-specific change needed].
+      GENUINE ADAPTATION, DISCLOSED: Fawry's documented refund response
+      carries no distinct refund-operation reference of its own (unlike
+      Paymob's/Kashier's own new-transaction-id), so the idempotency
+      key is derived from the ORIGINAL Fawry transaction reference +
+      the refund amount instead
+```
+
+### Fawry vs. the other three: what genuinely differs
+
+| Aspect | Stripe | Paymob | Kashier | Fawry |
+|---|---|---|---|---|
+| Checkout URL | Returned directly by the API | Constructed client-side from public key + client_secret | Returned directly by the API (`sessionUrl`) | Returned directly by the API (exact field name a disclosed doc gap — accepts `nextAction.redirectUrl` or plain `redirectUrl`) |
+| Webhook signature location | `Stripe-Signature` HEADER | `hmac` QUERY PARAMETER | `x-kashier-signature` HEADER | `messageSignature` BODY FIELD (a fourth, distinct mechanism) |
+| Webhook signature scheme | HMAC-SHA256 over raw body bytes | HMAC-SHA512 over 20 documented field VALUES (bare concatenation) | HMAC-SHA256 over an RFC 3986 query-string of `signatureKeys` fields | SHA-256 (no HMAC — a plain, keyed-by-concatenation hash) over 7 documented fields + secureKey, DIFFERENT field set from the outbound charge signature |
+| Webhook dedup key | `event.id` | content hash of the payload (no event id) | `transactionId` (a genuine per-callback event id, like Stripe) | content hash of the payload (`fawryRefNumber` is stable across multiple status-change notifications, not a genuine event id — same shape as Paymob) |
+| Merchant-reference echo | `metadata.mal3aby_transaction_id` / `client_reference_id` | `special_reference` → `order.merchant_order_id` | `order` (request) → `merchantOrderId` (webhook) | `merchantRefNum` (request) → `merchantRefNum`/`merchantRefNumber` (webhook, spelling inconsistent across Fawry's own docs — read defensively) |
+| Amount units | Integer minor units (with zero-decimal currency exceptions) | Integer minor units (`amount_cents`) always | Decimal STRING in major units (e.g. `"100.00"`) | Major-unit decimal, 2dp (e.g. `580.55`) — same convention family as Kashier, not Paymob |
+| Refund identifier | Stripe PaymentIntent id | Paymob's own numeric transaction id (distinct from the Intention id) | Kashier's own order id (`kashierOrderId`) | Fawry's own `fawryRefNumber`, handed off via the webhook exactly like the other two |
+| Number of distinct provider secrets | One (`sk_...`) + one webhook secret | One secret key serves every purpose | TWO genuinely distinct keys | ONE secure key serves every purpose (charge signing, refund signing, notification verification) — same single-secret shape as Paymob |
+| Sandbox vs. live | Same host, `sk_test_`/`sk_live_` prefix | Same host, key-prefix-driven | DIFFERENT HOST per environment, THREE subdomain families | DIFFERENT HOST per environment (`atfawry.fawrystaging.com` vs `www.atfawry.com`), ONE host family — live host CODE VERIFIED but not independently pinged this session |
+| Self-service sandbox | Yes, instant | Yes, instant | Yes, instant | **NO — manual merchant registration, ~2 business days, re-confirmed live this session** |
+
+## Evidence-level summary — Fawry adapter (2026-08-27)
+
+| Piece | Evidence level |
+|---|---|
+| Which of Fawry's (at least) three payment products fits Mal3aby's architecture (Express Checkout Link, a genuine server-to-server redirect flow) vs. the two rejected alternatives (raw-card charge — PCI scope Mal3aby cannot take on; PAYATFAWRY — a kiosk/reference-number flow, not real-time online) | OFFICIAL DOC VERIFIED via verbatim-quoted live doc text, cross-checked against a real third-party integration guide and the real open-source `fawry-api/fawry` Ruby gem, which itself implements the (rejected-for-Mal3aby) raw-card/reference-number server API, giving independent confirmation these are genuinely different products, not assumption |
+| Outbound charge-request signature (7-field concatenation incl. sorted chargeItems) | OFFICIAL DOC VERIFIED (verbatim-quoted live doc text, re-fetched specifically to avoid paraphrase risk) |
+| Inbound notification signature (8-field concatenation, DIFFERENT field set from outbound) | OFFICIAL DOC VERIFIED + CODE VERIFIED (Fawry's own "Get Payment Status V2" doc page AND a real, independent third-party open-source Ruby gem's verbatim source agree exactly) |
+| Refund signature (5-field concatenation) | OFFICIAL DOC VERIFIED + CODE VERIFIED against the same third-party Ruby gem, cross-confirmed by a third independent source (a dev.to integration guide) landing on the identical endpoint path |
+| Base URLs (sandbox/live) | CODE VERIFIED against the real open-source Ruby gem's `connection.rb`, cross-confirmed against Fawry's own refund-endpoint doc page's real example URL; the LIVE host specifically was not independently pinged this session |
+| Webhook HMAC verification, end-to-end payment posting | LIVE VERIFIED — a hand-signed test notification (built from an independent Python SHA-256 reference implementation) against the real deployed `fawry-gateway-webhook` function and a real Supabase Vault secret produced a real `payments` row (`method='card'`, amount 250.50), one `payment_allocations` row, `provider_session_ref` correctly overwritten to Fawry's real `fawryRefNumber`; confirmed by direct query afterward |
+| Webhook signature REJECTION (negative evidence) | LIVE VERIFIED — an incorrect signature and a request missing `messageSignature` entirely were both rejected (400) against the same real connection/secret |
+| Duplicate webhook idempotency | LIVE VERIFIED — the identical signed payload replayed against the live function returned `duplicate:true`; a direct count confirmed exactly one webhook event row, one payment, one allocation |
+| Amount-mismatch fail-closed rejection | LIVE VERIFIED — a webhook claiming a different confirmed amount (999) than the staged transaction (300.00) was rejected; `payment_id: null` returned, transaction durably marked `failed` with `failure_reason = 'amount mismatch: staged=300.00 confirmed=999'`, zero payments posted |
+| `record_gateway_payment_service`, `mark_gateway_transaction_failed_service`, `create_gateway_refund_service`, `get_gateway_transaction_status` reused as-is for Fawry | CODE VERIFIED (all four already provider-agnostic; confirmed no Fawry-specific change was needed or made) |
+| `verify_jwt=true` gate on the two authenticated functions | LIVE VERIFIED — real 401 (`UNAUTHORIZED_NO_AUTH_HEADER`) from both `fawry-create-checkout-session` and `fawry-create-refund` with no Authorization header |
+| Charge/Refund API request-shape correctness against Fawry's REAL live API (no real credentials) | **NOT ATTEMPTED**, disclosed honestly rather than force-labeled — see `PAYMENT_GATEWAY_PROVIDER_MATRIX.md` "What genuinely could not be tested" for the specific reasoning (a garbage-secured request's failure mode against Fawry's real API was not confirmed in research, so a CONTRACT VERIFIED label was not claimed rather than guessed at) |
+| No new migration needed (`fawry` already in the `gateway` CHECK constraint from a prior session's provider-catalog work; existing `(provider_key, payload_hash) WHERE provider_event_id IS NULL` unique index reused for dedup) | CODE VERIFIED by direct schema inspection before writing any code — confirmed the task brief's own anticipation that this might already be resolved |
+| Grant hygiene (`get_vault_secret_service` service_role-only, `payment_gateway_webhook_events` authenticated-SELECT-only) | LIVE VERIFIED — queried `has_function_privilege` directly; unchanged from the Stripe/Paymob/Kashier baseline since no new grants were introduced; `get_advisors` security scan run after deployment shows zero Fawry-related findings |
+| Genuine Fawry-originated webhook delivery, genuine Fawry-hosted checkout completion | CREDENTIAL-BLOCKED — no real Fawry merchant account exists for this project, and none can be obtained quickly (manual registration, ~2 business days) |
+| Other provider (PayPal) | Not built this phase — architecture documented in `PAYMENT_GATEWAY_PROVIDER_MATRIX.md` |
+
+### What a future session needs to reach SANDBOX VERIFIED for Fawry
+
+A real Fawry merchant account (requires manual registration with
+Fawry, ~2 business days per their own docs — this cannot be
+shortcut), its Merchant Code and Secure Hash Key, connected via
+`connect_club_gateway(...)` to a real test club, then a genuinely
+completed test-mode Express Checkout Link transaction to generate a
+real Fawry-signed Notification V2 delivery against the deployed
+`fawry-gateway-webhook` function. This would also resolve the two
+genuine open questions disclosed in this session's research: the exact
+response field name for the checkout-session-creation redirect URL,
+and whether a real Fawry API rejects a garbage-signed request with a
+generic auth-error (making a CONTRACT VERIFIED test possible) or some
+other failure mode.
 
 ## Evidence-level summary (honest, per the project's taxonomy)
 
@@ -377,7 +543,7 @@ real Kashier order would also resolve the one remaining open question
 | `create_gateway_refund_service` invariants (same-provider, refundable-balance, idempotency) | CODE VERIFIED by inspection against `create_refund()`'s own proven shape; not independently live-exercised with a real refund this session |
 | `gateway_reconciliation_report` | LIVE VERIFIED grant matrix; join logic CODE VERIFIED by inspection, not exercised against a hand-broken exception fixture |
 | Genuine Stripe-originated webhook delivery, genuine Stripe-hosted checkout completion | CREDENTIAL-BLOCKED — no real Stripe account exists for this project (confirmed: "محدش عندي حسابات") |
-| Other providers | Paymob and Kashier now built (see their own sections above); PayPal and Fawry not built this phase — architecture documented in `PAYMENT_GATEWAY_PROVIDER_MATRIX.md` |
+| Other providers | Paymob, Kashier, and Fawry now built (see their own sections above); PayPal not built this phase — architecture documented in `PAYMENT_GATEWAY_PROVIDER_MATRIX.md` |
 
 ## What a future session needs to reach SANDBOX VERIFIED
 

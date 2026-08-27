@@ -257,6 +257,268 @@ All test fixtures were deleted afterward; a follow-up query confirmed
 zero rows remain and both borrowed invoices' outstanding balances were
 restored to their pre-test values.
 
+## Fawry update (2026-08-27) — researched and built this session, lower evidence ceiling by design
+
+Fawry has NO self-service sandbox (re-confirmed live this session at
+`developer.fawrystaging.com/docs/get-started`: "our team is working on
+your request and will be contacting you within a maximum of two days"
+— unchanged from the prior finding). This means the adapter below is
+built entirely from OFFICIAL DOC VERIFIED + CODE VERIFIED evidence — no
+CONTRACT VERIFIED test against Fawry's real live API was attempted for
+the charge/refund endpoints (see "What genuinely could not be tested"
+below for exactly why, including one endpoint that WAS reachable).
+
+### Fawry has (at least) THREE structurally different payment products — this matters
+
+Research this session (`developer.fawrystaging.com`, a REAL, directly
+`WebFetch`-able documentation portal — unlike Paymob/Kashier's JS SPAs,
+no in-app-search workaround was needed) surfaced a genuine architectural
+fork the task brief anticipated but could not resolve in advance:
+
+1. **Server-to-server raw-card charge API** (`POST
+   {base}/ECommerceWeb/Fawry/payments/charge` with
+   `paymentMethod: "CARD"`, `cardNumber`/`cardExpiryYear`/
+   `cardExpiryMonth`/`cvv` in the REQUEST body) — REJECTED for Mal3aby's
+   use outright: Fawry's own docs state plainly that collecting raw
+   card data this way requires the merchant to be PCI-DSS compliant
+   ("In order to collect raw card payment details, your application
+   has to be fully PCI compliant"). Mal3aby never handles raw card
+   data (a hard project constraint) — this path was never a candidate.
+2. **`PAYATFAWRY` reference-number charge** (same endpoint, different
+   `paymentMethod` value) — returns a `referenceNumber` the customer
+   pays later at a physical Fawry retail/kiosk point; genuinely NOT a
+   real-time online redirect flow, confirmed via a real documented
+   example response (`orderStatus: "PENDING"`, no redirect URL of any
+   kind). This is the "kiosk/cash-voucher" shape the task brief
+   explicitly flagged as a possibility — it is real, but it is not
+   what Mal3aby's online-gateway architecture needs, and is NOT what
+   this adapter implements.
+3. **Express Checkout Link** (`developer.fawrystaging.com/docs/express-checkout/fawrypay-hosted-checkout`)
+   — CONFIRMED, via VERBATIM quoted sentences re-fetched from the live
+   page this session (not paraphrase — quoted directly): *"trigger
+   FawryPay API below with the Charge Request, Fawry will respond with
+   a redirect URL to redirect your customer to"* and *"Whenever you
+   call FawryPay Express Checkout Link API, Fawry will respond to you
+   with the redirect URL that you have to redirect your customer to."*
+   This is a genuine SERVER-TO-SERVER call-and-get-a-redirect-URL flow
+   — the SAME shape as Stripe's and Kashier's checkout-session
+   creation, NOT a client-side JS widget. **This is the flow the
+   adapter implements.** It is distinct from Fawry's separate
+   "Checkout Button" product (`self-hosted-checkout` doc page), which
+   IS a client-side `<script>`/`FawryPay.checkout(...)` JS SDK embed —
+   confirmed as genuinely different by that page's own explicit
+   `FawryPay.checkout(buildChargeRequest(), configuration)` call and
+   "import our FawryPay JavaScript and CSS libraries into the header
+   of your checkout page" instruction, which Express Checkout Link's
+   own page never mentions. Mal3aby's adapter uses Express Checkout
+   Link specifically because it needs zero Fawry JS embedded in
+   Mal3aby's own frontend, matching the Stripe/Paymob/Kashier pattern
+   of "backend calls provider, gets a URL, frontend redirects to it."
+
+**Genuine, disclosed documentation gap**: the exact JSON field name
+inside the Express Checkout Link's charge-request RESPONSE that holds
+the redirect URL is NOT shown in any code block on the fetched
+Express-Checkout-Link doc page (multiple direct re-fetches this
+session, including a verbatim-quote-only pass, confirm no response
+JSON example is present on that specific page — the page shows the
+REQUEST shape and the POST-REDIRECT-BACK response shape in detail, but
+not the initial trigger-call's own response). The adapter code
+therefore accepts EITHER of the two field shapes documented elsewhere
+in Fawry's own docs for a redirect-producing charge response
+(`nextAction.redirectUrl` — CONFIRMED verbatim on the separate 3DS
+card-charge doc page, `create-payment-3ds-apis`, real example:
+`{"type":"ChargeResponse","nextAction":{"type":"THREE_D_SECURE","redirectUrl":"https://atfawry.fawrystaging.com/atfawry/plugin/3ds/7104048097"},"statusCode":200,...}`
+— and a plain top-level `redirectUrl`, in case Express Checkout Link's
+own response omits the `nextAction` nesting), and fails closed with an
+explicit, honest error if NEITHER shape is present in the response
+body — rather than guessing a field name and silently sending a
+customer to `undefined`. This is flagged explicitly in
+`fawry-create-checkout-session/index.ts`'s own header comment as the
+first thing a future session with real credentials must confirm.
+
+### The outbound Charge Request signature (Mal3aby → Fawry) — OFFICIAL DOC VERIFIED
+
+Confirmed via a verbatim-quote-only re-fetch of the live
+`fawrypay-hosted-checkout` doc page this session: *"concatenate the
+following elements on the same order and hash the result using
+SHA-256: merchantCode + merchantRefNum + customerProfileId (if exists,
+otherwise insert "") + returnUrl + itemId + quantity + Price (in two
+decimal format like '10.00') + Secure hash key"*, with multi-item
+carts sorted by `itemId` and each item's `itemId+quantity+price`
+concatenated in that per-item order before moving to the next item.
+**This is a DIFFERENT field set from the raw-charge API's own signature**
+(`merchantCode + merchantRefNum + customerProfileId + paymentMethod +
+amount + secureKey`, confirmed via the `fawry-api/fawry` open-source
+Ruby gem's `charge_request.rb` — see below) — genuine, confirmed
+structural proof that Express Checkout Link and the raw charge API are
+different request shapes with different signing rules, not the same
+request with a cosmetic field added. Mal3aby's own invoice-payment
+flow always sends exactly ONE `chargeItems` entry (the invoice's own
+transaction id and amount), so the multi-item sort-by-itemId rule is
+implemented for correctness but is not exercised by any current
+Mal3aby call site.
+
+### The inbound Notification/Callback signature (Fawry → Mal3aby) — OFFICIAL DOC VERIFIED + CODE VERIFIED against real third-party source
+
+Confirmed via TWO independent sources agreeing exactly: (1) Fawry's own
+"Get Payment Status V2" doc page, and (2) the real, MIT-style
+open-source `fawry-api/fawry` Ruby gem's `lib/fawry/fawry_callback.rb`
+(fetched verbatim from GitHub raw content this session — genuine
+third-party production code, not Fawry's own docs, giving true
+independent cross-confirmation of the same field list):
+
+```ruby
+def signature
+  Digest::SHA256.hexdigest("#{callback_params[:fawryRefNumber]}#{callback_params[:merchantRefNum]}"\
+                           "#{format('%<paymentAmount>.2f', paymentAmount: callback_params[:paymentAmount])}"\
+                           "#{format('%<orderAmount>.2f', orderAmount: callback_params[:orderAmount])}"\
+                           "#{callback_params[:orderStatus]}#{callback_params[:paymentMethod]}"\
+                           "#{callback_params[:paymentRefrenceNumber]}#{fawry_secure_key}")
+end
+```
+
+i.e.: `fawryRefNumber + merchantRefNum + paymentAmount(2dp) +
+orderAmount(2dp) + orderStatus + paymentMethod + paymentRefrenceNumber
+(empty string if absent) + secureKey`, SHA-256, compared against the
+`messageSignature` field ON THE NOTIFICATION BODY ITSELF (confirmed:
+no dedicated header, no query param — the request brief's existing
+matrix entry was correct on this point). **This is genuinely a
+DIFFERENT field list/order from the outbound charge-request
+signature** — confirmed precisely as the task brief asked, not
+assumed to match. Notably `merchantRefNum` (request-signature naming)
+and `merchantRefNumber`/`merchantRefNum` appear inconsistently named
+across different Fawry doc pages/response shapes — the adapter reads
+both key spellings defensively when parsing the inbound payload (see
+`fawry-gateway-webhook/index.ts`'s own comment on this).
+
+The real Notification V2 payload shape (`server-notification-v2` doc
+page, real fetched JSON example) confirms the full field set:
+`requestId, fawryRefNumber, merchantRefNumber, customerName,
+customerMobile, customerMail, customerMerchantId, paymentAmount,
+orderAmount, fawryFees, shippingFees, orderStatus
+(NEW|PAID|CANCELED|REFUNDED|EXPIRED|PARTIAL_REFUNDED|FAILED),
+paymentMethod, paymentTime, authNumber, paymentRefrenceNumber,
+orderExpiryDate, orderItems, failureErrorCode, failureReason,
+messageSignature, threeDSInfo, invoiceInfo, command, message`. There is
+NO dedicated per-event id field distinct from `fawryRefNumber` (Fawry's
+own transaction reference, which is STABLE across multiple
+notifications for the SAME order as its status changes — e.g. a PAID
+notification and a later REFUNDED notification for the same order
+would carry the SAME `fawryRefNumber`) — so, like Paymob, dedup cannot
+key on `(provider_key, provider_event_id)` alone using `fawryRefNumber`
+as the "event id" (that would wrongly collapse a genuine PAID event and
+a later, genuinely different REFUNDED event for the same order into
+"the same event"). **No new migration was needed**: the EXISTING
+`payment_gateway_webhook_events_provider_payload_unique` index
+(`UNIQUE (provider_key, payload_hash) WHERE provider_event_id IS NULL`
+— added for Paymob, `20260827161918_paymob_webhook_events_payload_hash_dedup.sql`)
+already covers exactly this shape for any provider with no per-event
+id, so Fawry reuses it directly with `provider_event_id = NULL`,
+exactly like Paymob — CODE VERIFIED by inspection before writing any
+migration, confirming the task brief's own anticipation that this
+might already be resolved.
+
+### The Refund signature — OFFICIAL DOC VERIFIED + CODE VERIFIED against the same third-party source
+
+```ruby
+def refund_request_signature
+  Digest::SHA256.hexdigest("#{fawry_merchant_code}#{request_params[:reference_number]}"\
+                           "#{format('%<refund_amount>.2f', refund_amount: request_params[:refund_amount])}"\
+                           "#{request_params[:reason]}#{fawry_secure_key}")
+end
+```
+
+i.e.: `merchantCode + referenceNumber + refundAmount(2dp) + reason +
+secureKey`, SHA-256. Endpoint: `POST
+{base}/ECommerceWeb/Fawry/payments/refund` — CONFIRMED identical path
+from THREE independent sources agreeing exactly (Fawry's own
+`refund-issue-api` doc page, the `fawry-api/fawry` gem's
+`refund_request.rb`, and cross-referenced against the gem's
+`connection.rb` base-URL constants). `referenceNumber` here is Fawry's
+own `fawryRefNumber` (the REAL Fawry-assigned transaction reference
+returned in a successful charge/notification), NOT Mal3aby's
+`merchantRefNum` — mirroring the same "webhook must hand off the
+provider's real reference before a refund becomes possible" pattern
+already established by Paymob (transaction id) and Kashier (order id)
+in this project. The "authorized-but-uncaptured cannot be refunded"
+constraint mentioned in the task brief was NOT independently
+re-confirmed this session (Fawry's Express Checkout Link path as built
+here does not use a separate auth/capture step at all — that is a
+distinct, separate documented API,
+`server-apis/auth-capture-payment-apis`, which Mal3aby's adapter does
+not call) — this constraint is therefore not applicable to the flow
+actually implemented and is noted as N/A rather than silently dropped.
+
+### Base URLs — CODE VERIFIED against the real, open-source `fawry-api/fawry` Ruby gem's `connection.rb`
+
+```ruby
+FAWRY_BASE_URL = 'https://www.atfawry.com/ECommerceWeb/Fawry/'
+FAWRY_SANDBOX_BASE_URL = 'https://atfawry.fawrystaging.com//ECommerceWeb/Fawry/'
+```
+
+(the sandbox constant's real double-slash is preserved verbatim from
+the gem's own source — likely a harmless typo in the gem, but resolved
+in the adapter by using Fawry's own documented single-slash form,
+`https://atfawry.fawrystaging.com/ECommerceWeb/Fawry/`, which the
+`refund-issue-api` doc page's own example URL confirms independently
+as the correct, singly-slashed form: `https://atfawry.fawrystaging.com/ECommerceWeb/Fawry/payments/refund`).
+Cross-confirmed against THREE independent sources landing on the exact
+same base path (`ECommerceWeb/Fawry/`): Fawry's own refund-endpoint doc
+page, the open-source Ruby gem, and a third-party dev.to integration
+guide. **CODE VERIFIED, not LIVE VERIFIED**: no real request was
+attempted against `www.atfawry.com` (the live/production host) this
+session — see "What genuinely could not be tested" below.
+
+### Currency/amount encoding — OFFICIAL DOC VERIFIED
+
+Decimal STRING/number in MAJOR units, 2 decimal places (e.g. `580.55`
+for 580.55 EGP) — confirmed via every fetched request/response example
+across the charge, refund, and notification payloads. NOT minor-unit
+cents like Paymob. Same convention as Kashier's `amount` field (both
+use major-unit decimals, though Kashier's is always sent as a STRING
+and Fawry's examples show a mix of raw JSON numbers and strings across
+different doc pages — the adapter formats outbound amounts as a
+2-decimal-place value consistent with the signature's own `%.2f`
+requirement, sent as a JSON number, matching the majority of Fawry's
+own examples).
+
+### What genuinely could not be tested (CREDENTIAL-BLOCKED, disclosed honestly)
+
+- No real Fawry merchant account/staging credentials exist for this
+  project (re-confirmed: manual registration, ~2 business days,
+  unchanged from the prior session's finding) — the SAME constraint
+  that blocks Stripe/Paymob/Kashier's genuine end-to-end verification
+  also blocks Fawry's. A `payments/charge` or `payments/refund` call
+  with a garbage `merchantCode` was NOT attempted this session as a
+  contract test, because Fawry's charge/refund endpoints require a
+  `signature` field computed from a (necessarily fake, since no
+  secureKey exists) secure key — a garbage-secured request could
+  plausibly return either a generic "Invalid Signature" auth-shaped
+  error (useful, like Paymob's/Kashier's contract tests) OR silently
+  200 with a business-logic-shaped rejection depending on how Fawry
+  validates request order (merchant-code lookup first vs.
+  signature-check first) — this project's own standing rule is to not
+  fabricate a claimed evidence tier by guessing which failure mode
+  would occur. This is disclosed as NOT ATTEMPTED rather than claimed
+  as CONTRACT VERIFIED or falsely claimed as impossible — a future
+  session with real (or even garbage-but-registered) credentials
+  should attempt this first, following the exact pattern Paymob's and
+  Kashier's adapters used successfully.
+- A genuine Fawry-originated Notification V2 delivery, and a genuine
+  Express Checkout Link redirect-URL response, have never been seen —
+  the exact response field name for the redirect URL (see "genuine,
+  disclosed documentation gap" above) is the single highest-value
+  thing a future session with real credentials should confirm first,
+  since the adapter's dual-field-name fallback is a defensive
+  best-effort, not a confirmed fact.
+- The live-mode base URL `https://www.atfawry.com/ECommerceWeb/Fawry/`
+  is CODE VERIFIED (matches the gem's own constant and is structurally
+  consistent with the sandbox host's own path shape) but was not
+  independently fetched/pinged this session to confirm it currently
+  resolves and serves the same API shape as the sandbox host — flagged
+  in the adapter code for a future live-mode connection to re-confirm
+  first.
+
 ## Critical business-model fact (affects which providers are viable per club)
 
 **Stripe does not support Egypt as an account country** — a club would
@@ -282,7 +544,7 @@ real, provider-enforced constraint, not just a UI preference.
 | **PayPal** | Orders API v2 | Orders API + approve link / JS SDK buttons | 5 headers (`PAYPAL-TRANSMISSION-*`, `PAYPAL-CERT-URL`, `PAYPAL-AUTH-ALGO`), RSA-SHA256, verifiable locally or via `verify-webhook-signature` | Native `PayPal-Request-Id` header, ~45-day retention for refunds | EGP absent from documented currency list | `POST /v2/payments/captures/{id}/refund`; partial/time-limit specifics not fully confirmed from fetched docs | Distinct host `api-m.sandbox.paypal.com`, self-service sandbox accounts |
 | **Paymob** | Intentions API (v1), `POST /v1/intention/` | Unified Checkout (redirect, `{region}.checkout.paymob.com`) / Pixel (embedded) via `client_secret` + `public_key` | HMAC-SHA512 over 20 fixed-order field VALUES (documented list, not generic lexicographic sort — see "Paymob update" section above), dashboard-issued HMAC secret, hex lowercase, sent as `hmac` query param — CONFIRMED against Paymob's own worked example (2026-08-27) | Not documented — dedup via merchant `special_reference` (echoed as `order.merchant_order_id` in the callback, not a top-level field) | Yes — core EGP gateway | `POST /api/acceptance/void_refund/refund`, `{transaction_id, amount_cents}` body, `Token` auth header — CONFIRMED 2026-08-27 | Same base URL (`accept.paymob.com`) for sandbox and live — mode is entirely determined by which secret/public key pair and Integration ID(s) are used — CONFIRMED 2026-08-27 |
 | **Kashier** | No global version string; `v3` in the Payment Sessions endpoint path | Payment Sessions (`POST /v3/payment/sessions`, `sessionUrl` returned directly) | `x-kashier-signature` header, HMAC-SHA256 over an RFC 3986 query-string of alphabetically-sorted `signatureKeys` fields (`key=value&...`, not bare concatenation), keyed by the **Payment API Key** — CONFIRMED against Kashier's own published code sample and cross-checked byte-for-byte with an independent Python implementation (2026-08-27) | Kashier's own `transactionId` field is a genuine per-callback event id — dedup via the EXISTING `(provider_key, provider_event_id)` unique index, no new migration needed | Yes — EGP native; also USD/EUR/GBP (secondary-sourced) | `PUT {fep.kashier.io}/orders/:orderId/` (`apiOperation: REFUND`); synchronous JSON response — CONTRACT VERIFIED live-routed, real end-to-end success CREDENTIAL-BLOCKED (see "Kashier update" section) | Distinct `test-` prefixed base URL PER SUBDOMAIN (3 separate subdomain families: sessions, legacy iframe, refunds) + separate Payment-API-Key/Secret-Key pairs per environment — CONFIRMED code-example-level 2026-08-27 |
-| **Fawry (FawryPay)** | No unified version; per-endpoint (e.g. Notification V2) | Express Checkout Link (hosted redirect) | `messageSignature` body field, SHA-256 over fixed field concatenation — no dedicated header | Not documented — relies on merchant `merchantRefNum` uniqueness | Yes — EGP-only in every documented example | Full/partial via `POST /payments/refund`; sync JSON; authorized-but-uncaptured cannot be refunded | Staging domain exists but **credentials require manual merchant registration (~2 business days), not instant signup** |
+| **Fawry (FawryPay)** | No unified version; per-endpoint (e.g. Notification V2) | Express Checkout Link (`POST .../payments/charge`, server-to-server, returns a redirect URL) — CONFIRMED genuinely server-to-server, not a JS widget, via verbatim-quoted doc text 2026-08-27 | `messageSignature` BODY field (not a header, not a query param — CONFIRMED), SHA-256 over `fawryRefNumber+merchantRefNum+paymentAmount(2dp)+orderAmount(2dp)+orderStatus+paymentMethod+paymentRefrenceNumber+secureKey` — CONFIRMED via Fawry's own docs AND independently cross-checked against the real open-source `fawry-api/fawry` Ruby gem's source 2026-08-27; genuinely DIFFERENT field set from the outbound charge signature (`merchantCode+merchantRefNum+customerProfileId+returnUrl+itemId+quantity+price...+secureKey`) | No dedicated per-event id (`fawryRefNumber` is stable across multiple status-change notifications for the same order, unlike a true event id) — dedup via the EXISTING `(provider_key, payload_hash) WHERE provider_event_id IS NULL` index, same mechanism as Paymob, no new migration needed | Yes — EGP-only in every documented example | Full/partial via `POST /payments/refund`, `{merchantCode, referenceNumber, refundAmount, reason, signature}` — CODE VERIFIED path/fields against 3 independent sources 2026-08-27; auth-capture-uncaptured constraint N/A (adapter does not use the separate auth/capture API) | Staging domain (`atfawry.fawrystaging.com`) exists and IS directly reachable/documentable, but **credentials require manual merchant registration (~2 business days), not instant signup** — re-confirmed live 2026-08-27, unchanged |
 
 ## Documentation gaps, disclosed honestly
 
