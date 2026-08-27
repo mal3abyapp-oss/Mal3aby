@@ -393,7 +393,137 @@ to Paymob's live API with a garbage token, which returned a genuine
 `{"detail":"Invalid token."}` 401 rather than a 404 or validation
 error.
 
-## Other providers (PayPal, Kashier, Fawry) — not yet implemented
+## Kashier webhook verification (2026-08-27) — built this session
+
+Kashier's webhook model differs from BOTH Stripe's and Paymob's in
+several structural ways, each confirmed against Kashier's live
+documentation this session (see `PAYMENT_GATEWAY_PROVIDER_MATRIX.md`
+"Kashier update" section for source URLs and Kashier's own published
+code sample):
+
+1. **Signature location**: `x-kashier-signature` is a request HEADER
+   (like Stripe, unlike Paymob's query parameter).
+2. **What gets hashed — genuinely different from BOTH other
+   providers**: NOT the raw request body bytes (unlike Stripe), and
+   NOT a bare value-only concatenation (unlike Paymob) — Kashier's own
+   published Node.js sample builds a REAL RFC 3986 URL-encoded
+   query-string (`key1=value1&key2=value2...`, using Node's
+   `query-string` package / PHP's `PHP_QUERY_RFC3986`) from ONLY the
+   fields named in the payload's own `data.signatureKeys` array
+   (itself part of the payload — a server-supplied allowlist), with
+   those key NAMES sorted alphabetically before building the query
+   string. `kashier-gateway-webhook` reads the raw body as text first
+   (for the `payload_hash` used in the durable audit trail and to
+   parse the JSON safely once), then computes the HMAC over the
+   RFC3986-encoded query string built from the PARSED `data` object —
+   not the raw bytes, and not a bare concatenation.
+3. **Dedicated event id EXISTS, unlike Paymob**: Kashier's own
+   `transactionId` field (e.g. `"TX-249893122"`) is a genuine
+   per-callback identifier documented on every callback. This means
+   Kashier's dedup uses the EXISTING `(provider_key, provider_event_id)`
+   unique index — the SAME one Stripe's `event.id` already used — with
+   NO new migration required, resolving the task brief's own explicit
+   anticipation of this possibility before any Kashier-specific
+   migration was considered.
+
+**HMAC construction — OFFICIAL DOC VERIFIED against Kashier's own
+published code sample.** The literal, verbatim JavaScript sample from
+`developers.kashier.io/payment/webhook/`:
+```js
+data.signatureKeys.sort();
+const objectSignaturePayload = _.pick(data, data.signatureKeys);
+const signaturePayload = queryString.stringify(objectSignaturePayload);
+const signature = crypto.createHmac('sha256', PaymentApiKey)
+  .update(signaturePayload).digest('hex');
+```
+The accompanying PHP sample has a visible bug (it query-string-encodes
+the WHOLE `$data` object instead of the picked/sorted subset,
+inconsistent with its own preceding `sort($data_obj['signatureKeys'])`
+line and with the correct JS sample) — `kashier-gateway-webhook`
+follows the JS sample's self-consistent, doc-verified-correct logic.
+**CODE VERIFIED**: an independent Python reference implementation
+(`urllib.parse.quote` for RFC3986 encoding, `hmac.new(..., sha256)`)
+was built against Kashier's own published example payload
+(`merchantOrderId: "1642935044835"`, `kashierOrderId:
+"efb3d440-e3bf-4c86-b98e-c7bb1cbbcca1"`, `amount: 11334`, etc.) and,
+separately, a full signed test callback for a REAL disposable
+transaction was cross-checked byte-for-byte against the Edge
+Function's own Web Crypto `HMAC-SHA256` output using a REAL secret
+round-tripped through Supabase Vault — matching exactly.
+
+**What's ACTUALLY been proven for Kashier (LIVE VERIFIED, this
+session)**: a disposable test connection (real `vault.create_secret()`
+entries for both the Payment API Key and Secret Key, a real
+`club_gateway_connections` row on the pre-existing "Mala3by
+Verification Club") was created, and:
+- A hand-signed callback with the CORRECT HMAC (computed independently
+  in Python against the real vaulted Payment API Key, fetched by the
+  Edge Function via `get_vault_secret_service()`) was accepted —
+  proving the Edge Function's Web Crypto `HMAC-SHA256` computation
+  matches an independent reference implementation using a REAL secret,
+  not just a hypothetical test vector. The transaction's
+  `merchantOrderId` was resolved in O(1) via the direct UUID match
+  against `payment_gateway_transactions.id`, and correctly posted a
+  real `payments` row (`method='card'`, amount 100.00) via the
+  UNCHANGED `record_gateway_payment_service`, with
+  `provider_session_ref` correctly overwritten to Kashier's real order
+  id.
+- The SAME payload with an incorrect HMAC was rejected (400) —
+  negative evidence, proving the check discriminates rather than
+  accepting everything. A request with NO `x-kashier-signature` header
+  at all was also rejected (400).
+- A webhook claiming a DIFFERENT (mismatched) confirmed amount (999)
+  against a second staged transaction (staged at 300.00) was correctly
+  rejected — `payment_id: null` returned, the transaction was marked
+  `failed` with reason `"amount mismatch: staged=300.00
+  confirmed=999"`, and no payment was posted — proving the existing
+  fail-closed protection works unchanged when exercised through the
+  new Kashier code path.
+- The identical valid payload replayed a second time returned
+  `duplicate:true` rather than reprocessing — the EXISTING
+  `(provider_key, provider_event_id)` unique index works end-to-end
+  for Kashier's `transactionId`, with no new migration.
+- `verify_jwt=true` was LIVE VERIFIED on both
+  `kashier-create-checkout-session` and `kashier-create-refund` via a
+  real 401 (`UNAUTHORIZED_NO_AUTH_HEADER`) with no Authorization header.
+- The Payment Sessions API's request shape was CONTRACT VERIFIED: a
+  real HTTP request to `test-api.kashier.io/v3/payment/sessions` with a
+  garbage key returned Kashier's own genuine, path-specific
+  `{"error":"Authorization error","message":"Invalid token"}` (401) —
+  contrasted against a deliberately wrong path (a real Kashier-branded
+  404), proving the 401 is not a generic catch-all.
+- The Refund API's endpoint was CONTRACT VERIFIED as live-routed but
+  NOT auth-confirmed: real requests to `test-fep.kashier.io/orders/:orderId/`
+  with a garbage key and plausible orderId shapes consistently
+  returned a genuine, endpoint-specific `"Routing key is missing from
+  the URL"` error (400) — distinct from both the Sessions endpoint's
+  clean 401 and a genuine 404 for a deliberately wrong path — proving
+  the endpoint exists and is live-routed, but leaving open whether the
+  exact request shape used here would succeed with real Kashier
+  credentials (disclosed explicitly as CREDENTIAL-BLOCKED in
+  `kashier-create-refund/index.ts`'s own header comment).
+- All test fixtures (connection, both vault secrets, both staged
+  transactions, the posted payment and its allocation, the webhook
+  event rows) were deleted afterward; a follow-up query confirmed zero
+  rows remain and both borrowed invoices' outstanding balances were
+  restored to their pre-test values (400.00 and 500.00 respectively,
+  both `unpaid`).
+
+**What remains CREDENTIAL-BLOCKED**: a genuine Kashier-originated
+callback (real merchant account, real Payment API Key issued by
+Kashier, real Payment Session transaction completed on Kashier's
+hosted page) has never been exercised — no real Kashier account exists
+for this project. The Refund endpoint's request shape is built exactly
+per Kashier's documented example, but whether it succeeds against a
+REAL Kashier order is unproven — the contract test above proves the
+endpoint is live and distinctly-routed, not that this exact request
+shape is complete (see the "Routing key is missing" finding above).
+The live-mode refund base URL (`fep.kashier.io`, no `test-` prefix) is
+PATTERN-INFERRED from the consistent `test-` prefix convention seen
+everywhere else on this provider, not independently doc-confirmed this
+session.
+
+## Other providers (PayPal, Fawry) — not yet implemented
 
 Each remaining provider in `PAYMENT_GATEWAY_PROVIDER_MATRIX.md` uses a
 structurally different signature scheme:
@@ -401,14 +531,12 @@ structurally different signature scheme:
 - **PayPal** — 5 headers (`PAYPAL-TRANSMISSION-*`, `PAYPAL-CERT-URL`,
   `PAYPAL-AUTH-ALGO`), RSA-SHA256, verifiable locally or via PayPal's
   own `verify-webhook-signature` API.
-- **Kashier** — `x-kashier-signature` header, HMAC-SHA256 over
-  alphabetically-sorted `signatureKeys` fields.
 - **Fawry** — `messageSignature` body field (not a header), SHA-256
   over a fixed field concatenation.
 
 Each needs its own dedicated Edge Function (the shared
 `record_gateway_payment_service` / `mark_gateway_transaction_failed_service`
 RPCs are provider-agnostic and already reusable by all of them — only
-the *verification* layer is provider-specific, as demonstrated by the
-Paymob adapter reusing all four shared RPCs completely unchanged).
-None of these three are built in this phase.
+the *verification* layer is provider-specific, as demonstrated by both
+the Paymob and Kashier adapters reusing all four shared RPCs completely
+unchanged). Neither of these two is built in this phase.

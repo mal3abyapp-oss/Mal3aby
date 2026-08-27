@@ -1,24 +1,26 @@
-# Payment Gateway Architecture — Stripe & Paymob Adapters (end-to-end)
+# Payment Gateway Architecture — Stripe, Paymob & Kashier Adapters (end-to-end)
 
 Phase 2 (Multi-Gateway Online Payments), consolidated 2026-08-27,
-extended 2026-08-27 with the Paymob adapter. This document is the
-single map of the full Stripe and Paymob flows across all their
-pieces; the individual docs (`PAYMENT_GATEWAY_PROVIDER_MATRIX.md`,
+extended 2026-08-27 with the Paymob adapter, extended again 2026-08-27
+with the Kashier adapter. This document is the single map of the full
+Stripe, Paymob, and Kashier flows across all their pieces; the
+individual docs (`PAYMENT_GATEWAY_PROVIDER_MATRIX.md`,
 `PAYMENT_GATEWAY_WEBHOOK_MODEL.md`, `PAYMENT_GATEWAY_RECONCILIATION.md`)
 carry the detailed evidence for their own pieces.
 
-Both adapters share the SAME underlying schema
+All three adapters share the SAME underlying schema
 (`club_gateway_connections`, `payment_gateway_transactions`,
 `payment_gateway_webhook_events`) and the SAME provider-agnostic
 service-role RPCs (`record_gateway_payment_service`,
 `mark_gateway_transaction_failed_service`,
 `create_gateway_refund_service`, `get_gateway_transaction_status`) —
-none of those needed any Paymob-specific change; only the
+none of those needed any Paymob- or Kashier-specific change; only the
 provider-specific Edge Functions differ (Stripe's HMAC-SHA256
 header-based webhook signature vs. Paymob's HMAC-SHA512
-query-param/field-concatenation scheme; Stripe's checkout URL returned
-directly by the API vs. Paymob's hosted-checkout URL constructed
-client-side from a public key + client_secret).
+query-param/field-concatenation scheme vs. Kashier's HMAC-SHA256
+header-based-but-query-string-encoded scheme; Stripe's and Kashier's
+checkout URLs returned directly by the API vs. Paymob's hosted-checkout
+URL constructed client-side from a public key + client_secret).
 
 ## Constraints this design honors throughout
 
@@ -199,7 +201,7 @@ Staff issues a refund on a card payment
 | Grant hygiene on the new dedup index / `get_vault_secret_service` reuse | LIVE VERIFIED — queried `information_schema` directly; `service_role`-only on the vault RPC, `authenticated`-SELECT-only (RLS-gated) on the webhook events table, unchanged from the Stripe baseline |
 | Cross-tenant / grant checks on new service-role RPCs | N/A — no new service-role RPCs were created for Paymob; all reused Stripe's existing, already-tested RPCs unchanged |
 | Genuine Paymob-originated webhook delivery, genuine Paymob-hosted checkout completion | CREDENTIAL-BLOCKED — no real Paymob merchant account exists for this project (confirmed: "محدش عندي حسابات") |
-| Other 3 providers (PayPal, Kashier, Fawry) | Not built this phase — architecture documented in `PAYMENT_GATEWAY_PROVIDER_MATRIX.md` |
+| Other 3 providers (PayPal, Kashier, Fawry) | Kashier now built (see below); PayPal and Fawry not built this phase — architecture documented in `PAYMENT_GATEWAY_PROVIDER_MATRIX.md` |
 
 ### What a future session needs to reach SANDBOX VERIFIED for Paymob
 
@@ -210,6 +212,154 @@ ID(s) connected via `connect_club_gateway(...)` to a real test club,
 then a genuinely completed test-mode Unified Checkout transaction to
 generate a real Paymob-signed callback against the deployed
 `paymob-gateway-webhook` function.
+
+## The Kashier flow (2026-08-27)
+
+```
+Club Owner connects Kashier
+  connect_club_gateway() [authenticated, payment.methods.manage]
+    → writes club_gateway_connections row
+    → provider_merchant_ref = Kashier Merchant ID (MID-XXXX-XXX)
+    → secret_vault_id       = Kashier SECRET KEY (refund auth only)
+    → webhook_secret_vault_id = Kashier PAYMENT API KEY (session
+      creation `api-key` header AND webhook HMAC -- a DELIBERATE,
+      DOCUMENTED deviation from Paymob's single-key mapping, since
+      Kashier genuinely has two independent keys serving disjoint
+      purposes -- see kashier-create-checkout-session's own header
+      comment for the full rationale)
+
+Staff/customer initiates payment on an issued invoice
+  start_gateway_checkout() [authenticated, invoice.view]  -- UNCHANGED, provider-agnostic
+
+Client calls kashier-create-checkout-session { transaction_id }
+  [Edge Function, verify_jwt=true]
+    → re-derives authorization via get_gateway_transaction_status() (same as Stripe's/Paymob's)
+    → reads BOTH connection.secret_vault_id (Secret Key) and
+      connection.webhook_secret_vault_id (Payment API Key) via
+      get_vault_secret_service() -- Kashier's own documented example
+      sends both `Authorization: {{secret_key}}` and
+      `api-key: {{payment_api_key}}` headers on the SAME request
+    → selects the base URL from connection.environment (sandbox ->
+      test-api.kashier.io, live -> api.kashier.io) -- Kashier genuinely
+      uses a DIFFERENT HOST per environment, unlike Stripe/Paymob
+    → POST {base_url}/v3/payment/sessions
+      (amount as a DECIMAL STRING in major units e.g. "100.00" -- NOT
+       minor-unit cents like Paymob's amount_cents, currency,
+       merchantId, order=transaction_id, merchantRedirect, serverWebhook)
+    → UPDATE payment_gateway_transactions.provider_session_ref = session._id
+    → returns { checkout_url: sessionUrl } DIRECTLY from Kashier's
+      response (like Stripe, UNLIKE Paymob's client-side URL construction)
+
+Customer completes (or cancels) checkout on Kashier's hosted Payment Session page
+  → Kashier redirects to merchantRedirect (GatewayReturnPage, read-only, unchanged)
+
+Kashier delivers the server-to-server webhook (asynchronous)
+  kashier-gateway-webhook [Edge Function, verify_jwt=false]
+    → reads the `x-kashier-signature` HEADER (not a query param, unlike
+      Paymob) and the raw body as text
+    → resolves candidate connection(s): data.merchantOrderId (= the
+      Mal3aby transaction_id itself, O(1) DIRECT match, echoed back
+      from the `order` field sent at session-creation time -- same
+      strength as Paymob's special_reference pattern) →
+      provider_session_ref (data.kashierOrderId or the session id) →
+      O(N) fallback (defensive only)
+    → verifies HMAC-SHA256 over an RFC 3986 query-string built from
+      ONLY the fields named in data.signatureKeys, sorted
+      alphabetically by key name -- NOT bare value concatenation like
+      Paymob's scheme (see PAYMENT_GATEWAY_PROVIDER_MATRIX.md "Kashier
+      update" section for the exact construction and Kashier's own
+      published code sample this was built from), keyed by the Payment
+      API Key
+    → dedups via payment_gateway_webhook_events using the EXISTING
+      (provider_key, provider_event_id) unique index -- Kashier's own
+      transactionId field is a genuine per-callback event id, unlike
+      Paymob, so NO new migration was needed (confirming the task
+      brief's own anticipation of this)
+    → status === 'SUCCESS' → record_gateway_payment_service()
+      [service_role-only, UNCHANGED from Stripe's/Paymob's usage] --
+      also overwrites provider_session_ref with Kashier's real
+      kashierOrderId, which the refund endpoint requires
+    → status is PENDING/PROCESSING → acknowledged, no state change
+      (genuinely still in-flight, never posts a payment on a
+      non-terminal status)
+    → status is FAILED/DECLINED/CANCELLED/EXPIRED →
+      mark_gateway_transaction_failed_service()
+    → any other/unrecognized status (including a possible refund
+      event, whose exact event-name value was not independently
+      confirmed this session -- CREDENTIAL-BLOCKED) → acknowledged
+      only, never posted as a new payment (fails closed on ambiguity)
+
+Staff issues a refund on a card payment
+  kashier-create-refund { payment_id, amount, reason } [Edge Function, verify_jwt=true]
+    → re-derives authorization: has_permission('payment.refund', club_id) -- same as Stripe's/Paymob's
+    → reads connection.secret_vault_id (the Kashier SECRET KEY, not the
+      Payment API Key -- the refund endpoint's Authorization header
+      requires the Secret Key specifically)
+    → PUT {fep.kashier.io or test-fep.kashier.io}/orders/:orderId/
+      { apiOperation: "REFUND", reason, transaction: { amount } }
+      -- a THIRD, distinct subdomain family from BOTH the Payment
+      Sessions host AND the legacy iframe host (newly discovered this
+      session, not previously documented anywhere in this project)
+    → on response.status === "SUCCESS" → posts canonical refund
+      SYNCHRONOUSLY via create_gateway_refund_service()
+      [service_role-only, UNCHANGED -- already provider-agnostic]
+    → CONTRACT-TESTED but end-to-end success CREDENTIAL-BLOCKED: real
+      requests to test-fep.kashier.io with a garbage key/orderId
+      consistently return a "Routing key is missing from the URL"
+      error distinct from both a clean 401 and a genuine 404, proving
+      the endpoint is live-routed but leaving open whether a real
+      order id/header requirement this session could not discover is
+      needed -- disclosed explicitly in the function's own comment for
+      a future session with real credentials to resolve first
+```
+
+### Kashier vs. Paymob vs. Stripe: what genuinely differs
+
+| Aspect | Stripe | Paymob | Kashier |
+|---|---|---|---|
+| Checkout URL | Returned directly by the API | Constructed client-side from public key + client_secret | Returned directly by the API (`sessionUrl`) |
+| Webhook signature location | `Stripe-Signature` HEADER | `hmac` QUERY PARAMETER | `x-kashier-signature` HEADER |
+| Webhook signature scheme | HMAC-SHA256 over raw body bytes | HMAC-SHA512 over 20 documented field VALUES (bare concatenation) | HMAC-SHA256 over an RFC 3986 query-string of `signatureKeys` fields (key=value pairs) |
+| Webhook dedup key | `event.id` | content hash of the payload (no event id) | `transactionId` (a genuine per-callback event id, like Stripe) |
+| Merchant-reference echo | `metadata.mal3aby_transaction_id` / `client_reference_id` | `special_reference` → `order.merchant_order_id` | `order` (request) → `merchantOrderId` (webhook) |
+| Amount units | Integer minor units (with zero-decimal currency exceptions) | Integer minor units (`amount_cents`) always | Decimal STRING in major units (e.g. `"100.00"`) -- no minor-unit conversion |
+| Refund identifier | Stripe PaymentIntent id | Paymob's own numeric transaction id (distinct from the Intention id) | Kashier's own order id (`kashierOrderId`, handed off via the webhook, distinct from the merchant's `order` reference) |
+| Number of distinct provider secrets | One (`sk_...`) + one webhook secret | One secret key serves every purpose | TWO genuinely distinct keys (Payment API Key for sessions+webhook HMAC; Secret Key for refunds only) — a structural difference from both other providers |
+| Sandbox vs. live | Same host, `sk_test_`/`sk_live_` prefix | Same host, key-prefix-driven | DIFFERENT HOST per environment (`api.kashier.io` vs `test-api.kashier.io`), AND across THREE separate subdomain families (sessions/iframe/refunds) |
+
+## Evidence-level summary — Kashier adapter (2026-08-27)
+
+| Piece | Evidence level |
+|---|---|
+| Payment Sessions API request/response shape, webhook HMAC scheme, two-key model | OFFICIAL DOC VERIFIED (all fetched directly against Kashier's live docs this session — see `PAYMENT_GATEWAY_PROVIDER_MATRIX.md` "Kashier update" section for source URLs and the verbatim published code sample) |
+| HMAC-SHA256 query-string construction (pick signatureKeys, sort, RFC3986-encode) | OFFICIAL DOC VERIFIED + CODE VERIFIED (independent Python reference implementation matches Kashier's own published example and the Edge Function's Web Crypto output byte-for-byte) |
+| Webhook signature verification, end-to-end payment posting | LIVE VERIFIED — a hand-signed test callback against the real deployed `kashier-gateway-webhook` function and a real Supabase Vault secret produced a real `payments` row (`method='card'`, amount 100.00), one `payment_allocations` row, `provider_session_ref` correctly overwritten to Kashier's order id; confirmed by direct query afterward |
+| Webhook signature REJECTION (negative evidence) | LIVE VERIFIED — an incorrect signature and a missing signature header against the same real connection/secret were both rejected (400) |
+| Duplicate webhook idempotency | LIVE VERIFIED — the identical signed payload replayed against the live function returned `duplicate:true`; a direct count confirmed exactly one webhook event row, one payment, one allocation |
+| Amount-mismatch fail-closed rejection | LIVE VERIFIED — a webhook claiming a different confirmed amount (999) than the staged transaction (300.00) was rejected; `payment_id: null` returned, transaction durably marked `failed` with `failure_reason = 'amount mismatch: staged=300.00 confirmed=999'`, zero payments posted |
+| `record_gateway_payment_service`, `mark_gateway_transaction_failed_service`, `create_gateway_refund_service`, `get_gateway_transaction_status` reused as-is for Kashier | CODE VERIFIED (all four already provider-agnostic; confirmed no Kashier-specific change was needed or made) |
+| `verify_jwt=true` gate on the two authenticated functions | LIVE VERIFIED — real 401 (`UNAUTHORIZED_NO_AUTH_HEADER`) from both `kashier-create-checkout-session` and `kashier-create-refund` with no Authorization header |
+| Payment Sessions API request-shape correctness (no real credentials) | CONTRACT VERIFIED — a real HTTP request to `test-api.kashier.io/v3/payment/sessions` with a garbage key returned a genuine, path-specific `{"error":"Authorization error","message":"Invalid token"}` (401) — contrasted against a deliberately wrong path, which returned a real Kashier-branded 404, proving the 401 is not a generic catch-all |
+| Refund API request-shape / endpoint-liveness | CONTRACT VERIFIED as LIVE-ROUTED but NOT as auth-confirmed — real requests to `test-fep.kashier.io/orders/:orderId/` with a garbage key returned a genuine, endpoint-specific `"Routing key is missing from the URL"` error (400) distinct from both the Sessions endpoint's clean 401 and a genuine 404 — proves the endpoint exists and is live, but whether the exact request shape used here would succeed with real credentials is CREDENTIAL-BLOCKED and disclosed explicitly in the adapter's own code comment |
+| Live refund base URL (`fep.kashier.io`, no `test-` prefix) | PATTERN-INFERRED, not independently doc-confirmed this session — flagged explicitly in code for re-verification before any live-mode Kashier connection is made |
+| No new migration needed (`kashier` already in the `gateway` CHECK constraint; existing `(provider_key, provider_event_id)` unique index reused for dedup) | CODE VERIFIED by direct schema inspection before writing any migration — confirmed the task brief's own anticipation that Kashier's dedicated event id might make a new payload-hash migration unnecessary |
+| Grant hygiene (`get_vault_secret_service` service_role-only, `payment_gateway_webhook_events` authenticated-SELECT-only) | LIVE VERIFIED — queried `information_schema`/`has_function_privilege` directly; unchanged from the Stripe/Paymob baseline since no new grants were introduced |
+| Genuine Kashier-originated webhook delivery, genuine Kashier-hosted checkout completion | CREDENTIAL-BLOCKED — no real Kashier merchant account exists for this project |
+| Other 2 providers (PayPal, Fawry) | Not built this phase — architecture documented in `PAYMENT_GATEWAY_PROVIDER_MATRIX.md` |
+
+### What a future session needs to reach SANDBOX VERIFIED for Kashier
+
+A real Kashier merchant account (test-mode Payment API Key, Secret Key,
+and Merchant ID), connected via `connect_club_gateway(...)` to a real
+test club (Payment API Key into `webhook_secret_vault_id`, Secret Key
+into `secret_vault_id`, Merchant ID into `provider_merchant_ref` — see
+the deliberate key-mapping rationale in
+`kashier-create-checkout-session/index.ts`), then a genuinely completed
+test-mode Payment Session transaction to generate a real
+Kashier-signed webhook delivery against the deployed
+`kashier-gateway-webhook` function. A real refund attempt against a
+real Kashier order would also resolve the one remaining open question
+(the "Routing key is missing" contract-test finding above).
 
 ## Evidence-level summary (honest, per the project's taxonomy)
 
@@ -227,7 +377,7 @@ generate a real Paymob-signed callback against the deployed
 | `create_gateway_refund_service` invariants (same-provider, refundable-balance, idempotency) | CODE VERIFIED by inspection against `create_refund()`'s own proven shape; not independently live-exercised with a real refund this session |
 | `gateway_reconciliation_report` | LIVE VERIFIED grant matrix; join logic CODE VERIFIED by inspection, not exercised against a hand-broken exception fixture |
 | Genuine Stripe-originated webhook delivery, genuine Stripe-hosted checkout completion | CREDENTIAL-BLOCKED — no real Stripe account exists for this project (confirmed: "محدش عندي حسابات") |
-| Other 4 providers (PayPal, Paymob, Kashier, Fawry) | Not built this phase — architecture documented in `PAYMENT_GATEWAY_PROVIDER_MATRIX.md` |
+| Other providers | Paymob and Kashier now built (see their own sections above); PayPal and Fawry not built this phase — architecture documented in `PAYMENT_GATEWAY_PROVIDER_MATRIX.md` |
 
 ## What a future session needs to reach SANDBOX VERIFIED
 
