@@ -35,21 +35,39 @@ export interface Env {
 // NEVER be aggressively cached, since they're what a client uses to
 // discover which hashed assets to request next.
 //
-// Fix: explicit, differentiated Cache-Control set here (the one
-// request-time hook this static-assets-only setup has) --
-//   /assets/*  (Vite's hashed output directory): immutable, 1 year.
+// CORRECTION found live post-deploy: `no-cache` alone was NOT enough
+// on this zone. Real Cloudflare documentation (developers.cloudflare.com
+// /cache/concepts/cache-control/, confirmed via search, not assumed):
+// "When setting `no-cache` with Origin Cache Control on, Cloudflare
+// caches and always revalidates." Free/Pro/Business plans (this
+// project is on Free, confirmed earlier this session) have Origin
+// Cache Control ON by default -- so `no-cache` still lets Cloudflare's
+// edge KEEP a cached copy and serve it while "revalidating", which in
+// practice was observed live, immediately after deploying this exact
+// fix: a bare `fetch('/', {cache:'no-store'})` (cache:'no-store' only
+// controls the BROWSER's own cache, not Cloudflare's edge) kept
+// returning `cf-cache-status: HIT` with the PREVIOUS deploy's HTML/JS
+// reference for a period after the new deploy went live. This project
+// has no cache-purge tool/API token available in this environment, so
+// the fix must not depend on ever needing a manual purge again.
+//
+// `no-store` is unambiguous in Cloudflare's own default-cache-behavior
+// docs: "Cloudflare does not cache the resource when: the Cache-Control
+// header is set to ... no-store ..." -- regardless of Origin Cache
+// Control. This is the correct, purge-independent directive for
+// content that must never be edge-stale even for a moment.
+//
+//   /assets/*  (Vite's hashed output directory): immutable, 1 year --
+//     unaffected by this correction, hashed filenames make revalidation
+//     pointless regardless of edge caching semantics.
 //   everything else (index.html, sw.js, manifest.webmanifest, icons
 //     served from the public/ root, and the SPA-fallback index.html
-//     Workers Static Assets serves for any unmatched path): no-cache
-//     (always revalidate -- NOT max-age=0 must-revalidate, which is
-//     functionally identical for this purpose but no-cache is the
-//     more standard/explicit spelling of "always revalidate before
-//     use").
+//     Workers Static Assets serves for any unmatched path): no-store.
 function cacheControlFor(pathname: string): string {
   if (pathname.startsWith('/assets/')) {
     return 'public, max-age=31536000, immutable'
   }
-  return 'no-cache, must-revalidate'
+  return 'no-store'
 }
 
 function securityHeaders(supabaseUrl: string): Record<string, string> {
