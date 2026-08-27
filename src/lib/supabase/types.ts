@@ -7380,6 +7380,15 @@ export type Database = {
       ensure_player_qr: { Args: { p_player_id: string }; Returns: string }
       expire_due_academy_subscriptions: { Args: never; Returns: number }
       expire_stale_booking_holds: { Args: never; Returns: number }
+      extend_club_qa_subscription: {
+        Args: { p_club_id: string; p_days?: number; p_reason?: string }
+        Returns: {
+          club_id: string
+          new_end_at: string
+          new_lifecycle_status: string
+          new_status: string
+        }[]
+      }
       extend_grace_period: {
         Args: {
           p_grace_period_days: number
