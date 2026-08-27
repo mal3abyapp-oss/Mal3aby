@@ -6725,6 +6725,15 @@ export type Database = {
         Args: { p_explicit?: boolean; p_subscription_id: string }
         Returns: boolean
       }
+      _apply_gateway_payment_side_effects_internal: {
+        Args: {
+          p_amount: number
+          p_invoice_id: string
+          p_new_outstanding: number
+          p_payment_id: string
+        }
+        Returns: undefined
+      }
       _apply_shop_inventory_movement_internal: {
         Args: {
           p_actor_id: string
@@ -8563,6 +8572,14 @@ export type Database = {
         Args: { p_booking_id: string; p_reason?: string }
         Returns: undefined
       }
+      mark_gateway_transaction_failed_service: {
+        Args: {
+          p_provider_raw_status?: string
+          p_reason: string
+          p_transaction_id: string
+        }
+        Returns: undefined
+      }
       mark_staff_invite_resent: {
         Args: { p_membership_id: string }
         Returns: undefined
@@ -8701,6 +8718,16 @@ export type Database = {
           p_supplier_id?: string
           p_unit_cost?: number
           p_variant_id?: string
+        }
+        Returns: string
+      }
+      record_gateway_payment_service: {
+        Args: {
+          p_confirmed_amount: number
+          p_confirmed_currency: string
+          p_provider_raw_status: string
+          p_provider_session_ref: string
+          p_transaction_id: string
         }
         Returns: string
       }
