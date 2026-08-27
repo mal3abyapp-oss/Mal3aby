@@ -312,7 +312,17 @@ one mismatch is L-5 above (identified QA residue, not a systemic gap
 — every other invoice, including several `void`-status ones, reconciles
 exactly).
 
-## Backup/Recovery — see `BACKUP_RECOVERY_PLAN.md`
+## Backup/Recovery — TRUE STOP CONDITION raised, user decision recorded
+
+The Supabase organization is on the Free tier — confirmed via
+`get_organization`, not assumed. Free tier has **no automatic backups
+and no point-in-time recovery**. This was raised to the user directly
+as Stop Condition #2 (new paid infrastructure required to fix). **User
+decision (2026-08-27): continue without the Pro-plan upgrade for now.**
+Recorded as a deliberate, user-accepted risk in `BACKUP_RECOVERY_PLAN.md`
+— not silently worked around. The underlying exposure is unchanged and
+reversible at any time via a Dashboard plan upgrade; no code/migration
+work is needed to enable it when the user chooses to.
 
 ## Storage — see H-1/M-1 above; club-logo/shop-product-image upload
 paths do not exist in this codebase (nothing to audit there — if/when
@@ -342,9 +352,18 @@ cleanup step's own systematic sweep would catch.
 
 ## Launch Blockers Remaining: 0
 
-No BLOCKER or CRITICAL finding remains. All HIGH and MEDIUM findings
-were fixed and live-reverified in this session. The 5 LOW findings and
-1 accepted-risk item are genuinely low-severity, and 2 of the 5 LOW
-items are deliberately deferred pending the user's explicit go-ahead
-per the standing WhatsApp-subsystem protection directive — not
-oversights.
+No BLOCKER or CRITICAL security/data-integrity finding remains. All
+HIGH and MEDIUM findings were fixed and live-reverified in this
+session. The 5 LOW findings and 2 accepted-risk items are genuinely
+low-severity or explicitly user-decided, and 2 of the 5 LOW items are
+deliberately deferred pending the user's explicit go-ahead per the
+standing WhatsApp-subsystem protection directive — not oversights.
+
+**One item is not a security/data-integrity defect but a real
+operational risk the user has explicitly chosen to accept**: the
+Supabase Free-tier backup/recovery gap (see the Backup/Recovery
+section above and `BACKUP_RECOVERY_PLAN.md`). This is disclosed here
+precisely so it is never silently forgotten or presented as resolved.
+
+**Phase 1 is complete.** Proceeding to Phase 2 (Multi-Gateway Online
+Payments) per the directive's priority order.

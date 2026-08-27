@@ -48,8 +48,17 @@ genuinely necessary NEW paid external infrastructure service is
 required." Purchasing that upgrade is the user's decision to make, not
 something this session will do unilaterally.
 
-**This is flagged as a TRUE STOP CONDITION, not silently worked
-around, and not declared launch-ready while it stands unresolved.**
+**This was raised as a TRUE STOP CONDITION and presented to the user
+directly.** The user's explicit decision (2026-08-27): **continue
+without the Pro upgrade for now.** This is recorded here as a
+**deliberate, informed, user-accepted risk** — not a gap this session
+silently worked around or glossed over. The exposure described above
+(zero platform-provided recoverability for real production data) is
+real and unchanged by this decision; only the *response* to it has
+been decided. This decision should be revisited before real customer
+financial volume grows meaningfully, and can be reversed at any time
+by the user upgrading the plan in the Supabase Dashboard — no code or
+migration is required on this session's part to enable it.
 
 ## Recommended action
 
