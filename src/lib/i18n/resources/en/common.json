@@ -2709,7 +2709,11 @@
       }
     },
     "print": "Print",
-    "generatedAt": "Generated at"
+    "generatedAt": "Generated at",
+    "printFull": "Print Full Report",
+    "printFullPreparing": "Preparing full report...",
+    "printFullRowCount": "Showing all {{count}} matching rows.",
+    "printFullTruncated": "This report reached the maximum size this system can print at once. Narrow your filters to see every row."
   },
   "verifyInvoice": {
     "title": "Verify invoice",

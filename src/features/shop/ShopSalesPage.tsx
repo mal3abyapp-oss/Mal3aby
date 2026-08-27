@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '@/lib/supabase/client'
@@ -17,6 +17,8 @@ import {
 } from '@/components/ui/dialog'
 import { translateSupabaseError } from '@/lib/errors'
 import { ReportPrintButton, ReportPrintHeader } from '@/components/ui/report-print-header'
+import { fetchFullReport } from '@/lib/fetchFullReport'
+import { Printer } from 'lucide-react'
 
 // COMMERCIAL MODULE (2026-08-26) -- Sales history + Returns flow
 // (directive Section 43/44/64).
@@ -39,13 +41,22 @@ interface SaleItemRow {
   returnedQuantity: number
 }
 
-async function fetchSales(clubId: string): Promise<SaleRow[]> {
-  const { data, error } = await supabase.rpc('list_shop_sales', { p_club_id: clubId, p_limit: 50 })
-  if (error) throw error
-  return (data ?? []).map((r) => ({
+interface SaleApiRow {
+  sale_id: string; invoice_number: string; customer_name: string | null; status: string;
+  total: number | string; created_at: string
+}
+
+function mapSaleRows(rows: SaleApiRow[]): SaleRow[] {
+  return rows.map((r) => ({
     saleId: r.sale_id, invoiceNumber: r.invoice_number, customerName: r.customer_name, status: r.status,
     total: Number(r.total), createdAt: r.created_at,
   }))
+}
+
+async function fetchSales(clubId: string): Promise<SaleRow[]> {
+  const { data, error } = await supabase.rpc('list_shop_sales', { p_club_id: clubId, p_limit: 50 })
+  if (error) throw error
+  return mapSaleRows((data ?? []) as SaleApiRow[])
 }
 
 async function fetchSaleDetail(saleId: string): Promise<SaleItemRow[]> {
@@ -72,6 +83,28 @@ export function ShopSalesPage() {
     enabled: !!currentClubId,
   })
 
+  // PRINTING -- FULL FILTERED PRINT correction: screen stays bounded to 50
+  // (unchanged). "Print Full Report" pages through the same RPC with the
+  // same filters via fetchFullReport() -- capped, chunked, never silent.
+  const [fullSales, setFullSales] = useState<SaleRow[] | null>(null)
+  const [fullSalesTruncated, setFullSalesTruncated] = useState(false)
+  const fullPrintMutation = useMutation({
+    mutationFn: () => fetchFullReport<SaleApiRow>('list_shop_sales', { p_club_id: currentClubId }),
+    onSuccess: (result) => {
+      setFullSales(mapSaleRows(result.rows))
+      setFullSalesTruncated(result.truncated)
+      requestAnimationFrame(() => requestAnimationFrame(() => window.print()))
+    },
+  })
+  const printedSales = fullSales ?? sales
+
+  useEffect(() => {
+    if (fullSales === null) return
+    const handler = () => { setFullSales(null); setFullSalesTruncated(false) }
+    window.addEventListener('afterprint', handler)
+    return () => window.removeEventListener('afterprint', handler)
+  }, [fullSales])
+
   const columns: DataTableColumn<SaleRow>[] = [
     { key: 'invoice', header: t('shop.sales.columns.invoice'), render: (s) => <bdi>{s.invoiceNumber}</bdi> },
     { key: 'customer', header: t('shop.sales.columns.customer'), render: (s) => s.customerName ?? '—' },
@@ -94,12 +127,38 @@ export function ShopSalesPage() {
   return (
     <div>
       <div className="print:hidden">
-        <PageHeader title={t('shop.sales.title')} description={t('shop.sales.description')} actions={sales.length > 0 ? <ReportPrintButton /> : undefined} />
+        <PageHeader
+          title={t('shop.sales.title')}
+          description={t('shop.sales.description')}
+          actions={sales.length > 0 ? (
+            <>
+              <ReportPrintButton />
+              <Button
+                variant="outline"
+                size="sm"
+                disabled={fullPrintMutation.isPending}
+                onClick={() => { setFullSales(null); fullPrintMutation.mutate() }}
+              >
+                <Printer className="me-1 size-4" />
+                {fullPrintMutation.isPending ? t('reports.printFullPreparing') : t('reports.printFull')}
+              </Button>
+            </>
+          ) : undefined}
+        />
       </div>
       <div className="print-target visible-for-print">
         <ReportPrintHeader reportName={t('shop.sales.title')} />
-        <p className="mb-2 text-xs text-text-secondary print:block hidden">{t('shop.sales.printLimitNote', { count: 50 })}</p>
-        <DataTable columns={columns} rows={sales} rowKey={(s) => s.saleId} isLoading={isLoading} emptyTitle={t('shop.sales.emptyTitle')} emptyDescription={t('shop.sales.emptyDescription')} />
+        {fullSales !== null ? (
+          <>
+            <p className="mb-2 text-xs text-text-secondary">{t('reports.printFullRowCount', { count: fullSales.length })}</p>
+            {fullSalesTruncated && (
+              <p className="mb-2 text-xs font-medium text-status-warning">{t('reports.printFullTruncated')}</p>
+            )}
+          </>
+        ) : (
+          <p className="mb-2 text-xs text-text-secondary print:block hidden">{t('shop.sales.printLimitNote', { count: 50 })}</p>
+        )}
+        <DataTable columns={columns} rows={printedSales} rowKey={(s) => s.saleId} isLoading={isLoading} emptyTitle={t('shop.sales.emptyTitle')} emptyDescription={t('shop.sales.emptyDescription')} />
       </div>
 
       {returningSale && (

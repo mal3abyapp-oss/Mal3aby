@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '@/lib/supabase/client'
@@ -22,6 +22,8 @@ import {
 } from '@/components/ui/dialog'
 import { translateSupabaseError } from '@/lib/errors'
 import { ReportPrintButton, ReportPrintHeader } from '@/components/ui/report-print-header'
+import { fetchFullReport } from '@/lib/fetchFullReport'
+import { Printer } from 'lucide-react'
 
 // COMMERCIAL MODULE (2026-08-26) -- Inventory dashboard: balances,
 // low-stock filter, receive/transfer/adjust actions, movement history
@@ -78,13 +80,22 @@ async function fetchVariants(productId: string): Promise<VariantOption[]> {
   return (data ?? []).map((r) => ({ variantId: r.variant_id, size: r.size, color: r.color }))
 }
 
-async function fetchMovements(clubId: string): Promise<MovementRow[]> {
-  const { data, error } = await supabase.rpc('list_shop_inventory_movements', { p_club_id: clubId, p_limit: 50 })
-  if (error) throw error
-  return (data ?? []).map((r) => ({
+interface MovementApiRow {
+  movement_id: string; location_name: string; product_name_ar: string; variant_label: string | null;
+  movement_type: string; quantity: number | string; created_at: string; reason: string | null
+}
+
+function mapMovementRows(rows: MovementApiRow[]): MovementRow[] {
+  return rows.map((r) => ({
     movementId: r.movement_id, locationName: r.location_name, productNameAr: r.product_name_ar, variantLabel: r.variant_label,
     movementType: r.movement_type, quantity: Number(r.quantity), createdAt: r.created_at, reason: r.reason,
   }))
+}
+
+async function fetchMovements(clubId: string): Promise<MovementRow[]> {
+  const { data, error } = await supabase.rpc('list_shop_inventory_movements', { p_club_id: clubId, p_limit: 50 })
+  if (error) throw error
+  return mapMovementRows((data ?? []) as MovementApiRow[])
 }
 
 export function ShopInventoryPage() {
@@ -111,6 +122,36 @@ export function ShopInventoryPage() {
     void queryClient.invalidateQueries({ queryKey: ['shop-inventory-balances'] })
     void queryClient.invalidateQueries({ queryKey: ['shop-inventory-movements'] })
   }
+
+  // PRINTING -- FULL FILTERED PRINT correction: the screen query above
+  // stays bounded to 50 rows (unchanged, for performance). "Print Full
+  // Report" is a separate, explicit, on-demand fetch through
+  // fetchFullReport() -- same RPC, same filters (club id -- this page
+  // has no other movement filter today), server-side chunked, capped,
+  // never silently truncated. Only triggered on click, never on mount.
+  const [fullMovements, setFullMovements] = useState<MovementRow[] | null>(null)
+  const [fullMovementsTruncated, setFullMovementsTruncated] = useState(false)
+  const fullPrintMutation = useMutation({
+    mutationFn: () => fetchFullReport<MovementApiRow>('list_shop_inventory_movements', { p_club_id: currentClubId }),
+    onSuccess: (result) => {
+      setFullMovements(mapMovementRows(result.rows))
+      setFullMovementsTruncated(result.truncated)
+      // Print only after the full dataset has actually rendered into the DOM.
+      requestAnimationFrame(() => requestAnimationFrame(() => window.print()))
+    },
+  })
+  const printedMovements = fullMovements ?? movements
+
+  // After the print dialog closes (print or cancel), revert the on-screen
+  // table back to the normal bounded view -- fullMovements was only ever
+  // meant to exist for the duration of one print action, never as a
+  // lasting change to what the SCREEN shows.
+  useEffect(() => {
+    if (fullMovements === null) return
+    const handler = () => { setFullMovements(null); setFullMovementsTruncated(false) }
+    window.addEventListener('afterprint', handler)
+    return () => window.removeEventListener('afterprint', handler)
+  }, [fullMovements])
 
   const balanceColumns: DataTableColumn<BalanceRow>[] = [
     { key: 'product', header: t('shop.inventory.columns.product'), render: (b) => b.productNameAr + (b.variantLabel ? ` (${b.variantLabel})` : '') },
@@ -154,7 +195,18 @@ export function ShopInventoryPage() {
           <Button variant={lowStockOnly ? 'default' : 'outline'} size="sm" onClick={() => setLowStockOnly((v) => !v)}>
             {t('shop.inventory.lowStockOnly')}
           </Button>
-          <ReportPrintButton />
+          <div className="flex items-center gap-2">
+            <ReportPrintButton />
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={fullPrintMutation.isPending}
+              onClick={() => { setFullMovements(null); fullPrintMutation.mutate() }}
+            >
+              <Printer className="me-1 size-4" />
+              {fullPrintMutation.isPending ? t('reports.printFullPreparing') : t('reports.printFull')}
+            </Button>
+          </div>
         </div>
       </div>
 
@@ -166,10 +218,24 @@ export function ShopInventoryPage() {
         <DataTable columns={balanceColumns} rows={balances} rowKey={(b) => `${b.locationId}-${b.productId}-${b.variantId}`} isLoading={isLoading} emptyTitle={t('shop.inventory.emptyBalancesTitle')} />
 
         <h2 className="mb-2 mt-6 text-lg font-semibold">{t('shop.inventory.movementHistory')}</h2>
-        {/* Section 12: an explicit operational maximum, not a silent truncation --
-            list_shop_inventory_movements is called with p_limit: 50 above. */}
-        <p className="mb-2 text-xs text-text-secondary">{t('shop.inventory.movementHistoryLimitNote', { count: 50 })}</p>
-        <DataTable columns={movementColumns} rows={movements} rowKey={(m) => m.movementId} emptyTitle={t('shop.inventory.emptyMovementsTitle')} />
+        {fullMovements !== null && (
+          <p className="mb-2 text-xs text-text-secondary">
+            {t('reports.printFullRowCount', { count: fullMovements.length })}
+          </p>
+        )}
+        {fullMovementsTruncated && (
+          <p className="mb-2 text-xs font-medium text-status-warning">
+            {t('reports.printFullTruncated')}
+          </p>
+        )}
+        {/* Section 12: an explicit operational maximum on the SCREEN view only --
+            list_shop_inventory_movements is called with p_limit: 50 above.
+            Once "Print Full Report" has fetched the complete filtered set,
+            this note is replaced by the exact row count shown further up. */}
+        {fullMovements === null && (
+          <p className="mb-2 text-xs text-text-secondary">{t('shop.inventory.movementHistoryLimitNote', { count: 50 })}</p>
+        )}
+        <DataTable columns={movementColumns} rows={printedMovements} rowKey={(m) => m.movementId} emptyTitle={t('shop.inventory.emptyMovementsTitle')} />
       </div>
 
       {receiveOpen && <ReceiveStockDialog clubId={currentClubId as string} onClose={() => setReceiveOpen(false)} onDone={() => { setReceiveOpen(false); invalidate() }} />}
