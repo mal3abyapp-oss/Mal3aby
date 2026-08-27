@@ -2775,6 +2775,7 @@
   "settings": {
     "title": "الإعدادات",
     "description": "هوية النادي، سياسة الأكاديمية، المدفوعات، والاشتراك",
+    "buildVersion": "الإصدار {{sha}} · {{time}}",
     "clubSection": "النادي",
     "contactSection": "بيانات التواصل",
     "bookingPolicySection": "سياسة الحجز",

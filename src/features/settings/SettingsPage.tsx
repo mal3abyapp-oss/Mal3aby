@@ -15,6 +15,7 @@ import { PaymentMethodsCard } from '@/features/billing/PaymentMethodsCard'
 import { PaymentGatewaysCard } from '@/features/billing/PaymentGatewaysCard'
 import { ChangePasswordCard } from '@/features/account/ChangePasswordCard'
 import { GovernmentComplianceCard } from '@/features/clubs/GovernmentComplianceCard'
+import { BUILD_SHA, BUILD_TIME } from '@/lib/version'
 
 // P1-7 (critical usability fix pass, 2026-08-16): Settings was a
 // dumping ground -- /app/settings rendered only the Audit Log Viewer,
@@ -147,6 +148,14 @@ export function SettingsPage() {
           <ChangePasswordCard userEmail={session.user.email} />
         </section>
       )}
+
+      {/* VERSION VISIBILITY (item D, 2026-08-27 auth/cache bugfix
+          directive): a quiet, low-key build identifier so a deployed
+          build can actually be confirmed against git HEAD -- no secret
+          exposed, just the commit this dist/ was built from. */}
+      <p className="text-center text-xs text-text-secondary/60">
+        {t('settings.buildVersion', { sha: BUILD_SHA, time: new Date(BUILD_TIME).toLocaleString() })}
+      </p>
     </div>
   )
 }

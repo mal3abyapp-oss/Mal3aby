@@ -2,9 +2,30 @@ import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import { VitePWA } from 'vite-plugin-pwa'
 import path from 'path'
+import { execSync } from 'child_process'
+
+// VERSION VISIBILITY (2026-08-27, production auth-refresh + stale-cache
+// bugfix directive, item D): a real, verifiable build identifier so it's
+// possible to confirm whether a given browser is actually running the
+// latest deploy, without exposing any secret. Reads the real git commit
+// this build was made from at BUILD time (not runtime -- there is no
+// server-side code here to compute it live) -- falls back to 'unknown'
+// rather than failing the build if git isn't available in the build
+// environment (e.g. a tarball deploy with no .git directory).
+function readBuildGitSha(): string {
+  try {
+    return execSync('git rev-parse --short HEAD').toString().trim()
+  } catch {
+    return 'unknown'
+  }
+}
 
 // https://vite.dev/config/
 export default defineConfig({
+  define: {
+    __MAL3ABY_BUILD_SHA__: JSON.stringify(readBuildGitSha()),
+    __MAL3ABY_BUILD_TIME__: JSON.stringify(new Date().toISOString()),
+  },
   plugins: [
     react(),
     VitePWA({

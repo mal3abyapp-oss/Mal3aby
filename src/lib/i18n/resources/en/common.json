@@ -2767,6 +2767,7 @@
   "settings": {
     "title": "Settings",
     "description": "Club identity, academy policy, payments, and subscription",
+    "buildVersion": "Build {{sha}} · {{time}}",
     "clubSection": "Club",
     "academySection": "Academy settings",
     "activationPolicyTitle": "Subscription activation policy",
