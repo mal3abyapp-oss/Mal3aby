@@ -4964,7 +4964,9 @@ export type Database = {
           amount: number
           cash_shift_id: string | null
           id: string
+          idempotency_key: string | null
           payment_id: string
+          provider_refund_ref: string | null
           reason: string
           refunded_at: string
           refunded_by: string | null
@@ -4974,7 +4976,9 @@ export type Database = {
           amount: number
           cash_shift_id?: string | null
           id?: string
+          idempotency_key?: string | null
           payment_id: string
+          provider_refund_ref?: string | null
           reason: string
           refunded_at?: string
           refunded_by?: string | null
@@ -4984,7 +4988,9 @@ export type Database = {
           amount?: number
           cash_shift_id?: string | null
           id?: string
+          idempotency_key?: string | null
           payment_id?: string
+          provider_refund_ref?: string | null
           reason?: string
           refunded_at?: string
           refunded_by?: string | null
@@ -7117,6 +7123,18 @@ export type Database = {
           isSetofReturn: true
         }
       }
+      create_gateway_refund_service: {
+        Args: {
+          p_actor_id?: string
+          p_amount: number
+          p_idempotency_key?: string
+          p_payment_id: string
+          p_provider_refund_ref: string
+          p_reason: string
+          p_transaction_id: string
+        }
+        Returns: string
+      }
       create_payment_method_config: {
         Args: {
           p_club_id: string
@@ -7398,6 +7416,10 @@ export type Database = {
         }
         Returns: string
       }
+      gateway_reconciliation_report: {
+        Args: { p_club_id: string; p_date_from: string; p_date_to: string }
+        Returns: Json
+      }
       generate_club_slug: {
         Args: { p_club_id: string; p_preferred_base?: string }
         Returns: string
@@ -7632,6 +7654,18 @@ export type Database = {
           p_start_date: string
         }
         Returns: Json
+      }
+      get_gateway_transaction_status: {
+        Args: { p_transaction_id: string }
+        Returns: {
+          amount: number
+          currency: string
+          failure_reason: string
+          id: string
+          invoice_id: string
+          status: string
+          updated_at: string
+        }[]
       }
       get_government_compliance_exceptions: {
         Args: { p_club_id: string }
@@ -8172,6 +8206,10 @@ export type Database = {
         Returns: string
       }
       get_today_dashboard: { Args: { p_club_id: string }; Returns: Json }
+      get_vault_secret_service: {
+        Args: { p_secret_id: string }
+        Returns: string
+      }
       get_whatsapp_failed_messages: {
         Args: { p_club_id: string }
         Returns: {

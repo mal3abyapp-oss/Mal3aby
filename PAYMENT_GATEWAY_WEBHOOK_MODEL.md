@@ -1,21 +1,46 @@
 # Payment Gateway Webhook Model
 
-**Status: CODE VERIFIED, not SANDBOX VERIFIED.** Every SQL RPC below was
-live-tested against the real hosted project (`gxkrtlvpjwxhcqdisyob`)
-with disposable test fixtures. The Stripe webhook Edge Function's
-cryptographic logic (HMAC-SHA256 signing/verification, constant-time
-comparison) was cross-checked against an independent reference
-implementation and matched exactly. Its HTTP-level rejection paths
-(missing header, malformed/expired timestamp, no matching connection)
-were exercised live against the deployed function. What has **not**
-been tested: a genuine, correctly-signed webhook delivery from Stripe's
-own infrastructure, end-to-end through a real Checkout Session. The
-user has stated they do not currently have real Stripe test-mode
-credentials. Closing that gap requires: a Stripe account (test mode is
-free to create), a connected `club_gateway_connections` row with a real
-`sk_test_...` secret and `whsec_...` webhook secret in Vault, and either
-a real Checkout Session completed in Stripe's test mode or the Stripe
-CLI's `stripe trigger` / `stripe listen --forward-to` tooling.
+**Status update (2026-08-27, Phase 2 continuation): CODE VERIFIED +
+CONTRACT VERIFIED for the checkout-session-creation half; LIVE
+VERIFIED (with a disposable, hand-signed test event, NOT a genuine
+Stripe-originated delivery) for the webhook's signature verification,
+payment-posting, and duplicate-delivery idempotency.** See "What's
+ACTUALLY been proven now" below for the exact evidence tier of every
+claim. The remaining, honestly-labeled gap is CREDENTIAL-BLOCKED: no
+real Stripe account/test-mode keys exist for this project, so a
+genuine Stripe-originated webhook delivery (real HMAC secret issued by
+Stripe, real Checkout Session completed on Stripe's hosted page) has
+never been exercised. Everything this document previously described as
+"CODE VERIFIED, not SANDBOX VERIFIED" is superseded by the section
+below -- read it first.
+
+## CRITICAL BUG FOUND AND FIXED THIS SESSION: PostgREST does not expose the `vault` schema
+
+Every Edge Function in this integration (`stripe-gateway-webhook`,
+`stripe-create-checkout-session`, `stripe-create-refund`) originally
+read Vault secrets via `admin.schema('vault').from('decrypted_secrets')`
+-- the pattern the PRIOR session's own webhook function used and
+believed was live-verified. It was not: live-testing this session (see
+"What's ACTUALLY been proven now" below) discovered this call fails
+with `"Invalid schema: vault"` on every invocation -- PostgREST does
+not expose the `vault` schema to REST/client-library calls in this
+project. This is NOT an RLS or permission denial; it is a genuine "this
+schema is not queryable via the REST API at all" rejection. The
+practical effect: **every webhook signature verification attempt was
+silently failing before it could ever succeed**, because the secret
+read itself always returned nothing -- independent of whether the HMAC
+computation logic was correct (it was, confirmed via an isolated
+scratch-function cross-check).
+
+**Fix**: a new `service_role`-only RPC, `get_vault_secret_service(p_secret_id uuid)`
+(`language sql`, `security definer`, `set search_path to 'public',
+'vault', 'pg_temp'`), that reads `vault.decrypted_secrets` via plain
+SQL inside the database -- unaffected by PostgREST's schema-exposure
+configuration, since this is a database-side function call, not a REST
+request. All three Edge Functions now call
+`admin.rpc('get_vault_secret_service', { p_secret_id })` instead of the
+broken `.schema('vault')` pattern. Migration:
+`20260827093045_fix_vault_secret_read_service_role_rpc.sql`.
 
 ## Why a webhook needs its own payment-posting path
 
@@ -183,47 +208,103 @@ transaction durably marked `'failed'` with
 `failure_reason = 'amount mismatch: staged=150.00 confirmed=999.00'`,
 and a `payment.gateway_rejected` audit log entry recorded.
 
-## Known gap: checkout-session-creation is not yet built
+## Gap CLOSED: checkout-session-creation now exists
 
-This phase built the payment-**posting** half of the flow
-(`start_gateway_checkout` stages a transaction; the webhook confirms
-and posts it) but not the Stripe **Checkout Session creation** Edge
-Function that would call Stripe's API, receive back a real Checkout
-Session id, and write that id onto
-`payment_gateway_transactions.provider_session_ref` (and/or Stripe
-Checkout Session metadata) at creation time.
+`stripe-create-checkout-session` (verify_jwt=true, deployed 2026-08-27)
+now calls Stripe's real Checkout Sessions API
+(`POST https://api.stripe.com/v1/checkout/sessions`) and, on success,
+writes `payment_gateway_transactions.provider_session_ref` = the real
+Stripe Checkout Session id (plus `metadata.mal3aby_transaction_id` and
+`client_reference_id` on the Stripe object itself) at session-creation
+time, before the customer ever reaches Stripe's hosted checkout page.
+This means the webhook's exact-match candidate-resolution strategy
+(`provider_session_ref` lookup) now succeeds in the COMMON CASE with a
+single indexed query — genuinely O(1), not O(N) — for any transaction
+created through the normal checkout flow. The O(N) "try every enabled
+Stripe connection's webhook secret" path is retained in
+`stripe-gateway-webhook` as a defensive fallback only (e.g. a
+transaction whose session-creation call created the Stripe session but
+failed to persist `provider_session_ref` afterward — a narrow,
+explicitly-handled failure window documented in that function's own
+comment, where the webhook's secondary `metadata.mal3aby_transaction_id`
+match still resolves it without falling all the way to O(N)). This was
+never a security gap in either state — an incorrect secret simply
+fails to produce a matching signature, it cannot forge one — only an
+efficiency/clarity one, and it is now closed for the common case.
 
-Without that piece, the webhook function has no clean O(1) way to look
-up "which `club_gateway_connections` row (and therefore which webhook
-secret) does this incoming event belong to" before it can even attempt
-signature verification. The interim strategy implemented and
-documented in the function's own header comment: extract the Stripe
-object id from the **unverified** request body (safe — this is
-read-only and used only to narrow the candidate list, never to make a
-trust or payment decision), try an exact `provider_session_ref` match
-first, then a `metadata.mal3aby_transaction_id` match, and only if
-both come up empty, fall back to trying every enabled Stripe
-connection's webhook secret in turn until one produces a matching
-HMAC. This is O(connections-per-club) instead of O(1) and is a real
-efficiency/clarity gap — but it is not a security gap: an incorrect
-secret simply fails to produce a matching signature, it cannot forge
-one. Building the checkout-session-creation Edge Function (and having
-it populate `provider_session_ref`/metadata up front) is the clear next
-step to close this gap properly.
+Request-shape correctness for the Stripe Checkout Sessions API call
+was CONTRACT VERIFIED this session: a real HTTP request built with the
+function's exact parameter shape, sent to `api.stripe.com` with a
+syntactically-valid-but-fake `sk_test_...` key, returned Stripe's
+`"Invalid API Key provided"` (`invalid_request_error`, HTTP 401) —
+an AUTHENTICATION error, not a parameter-validation error. This proves
+the request shape itself (nested `line_items[0][price_data][...]`
+params, `metadata[mal3aby_transaction_id]`, `success_url`/`cancel_url`,
+the `Idempotency-Key` header) would be accepted by Stripe if the key
+were real.
+
+## What's ACTUALLY been proven now (2026-08-27 live verification)
+
+A full, disposable test fixture was created against the real hosted
+project (`gxkrtlvpjwxhcqdisyob`): a real `club_gateway_connections` row
+(Stripe/sandbox) with two REAL Supabase Vault secrets
+(`vault.create_secret`, not fabricated placeholders), a staged
+`payment_gateway_transactions` row, and a genuinely HMAC-SHA256-signed
+webhook payload — signed with the SAME secret stored in Vault, using
+the exact `timestamp.raw_body` construction Stripe's own signature
+scheme specifies, independently cross-checked against an isolated
+scratch Edge Function's `hmacSha256Hex` output before use.
+
+- **Signature verification: LIVE VERIFIED.** The genuinely-signed
+  request was POSTed to the real deployed `stripe-gateway-webhook`
+  function. It correctly verified the signature (after the
+  `get_vault_secret_service` fix above), resolved the transaction via
+  the `metadata.mal3aby_transaction_id` candidate path, and returned
+  `{"received":true,"payment_id":"<real uuid>"}` with HTTP 200.
+- **End-to-end payment posting: LIVE VERIFIED.** The database was
+  queried directly afterward: the transaction was `succeeded` with a
+  linked `payment_id`; exactly one `public.payments` row existed with
+  `method='card'`, the correct amount; exactly one
+  `public.payment_allocations` row existed.
+- **Duplicate webhook idempotency (governing directive item 7): LIVE
+  VERIFIED.** The IDENTICAL signed request (same event id, same
+  signature, same timestamp) was POSTed a second time. Response:
+  `{"received":true,"duplicate":true}`, HTTP 200. A direct count query
+  afterward confirmed exactly one `payments` row, one
+  `payment_allocations` row, and one `payment_gateway_webhook_events`
+  row — the second delivery was a true no-op, not a second post.
+- **Amount/currency mismatch defense (item 6): RE-VERIFIED LIVE** after
+  all of this session's changes. A second disposable transaction staged
+  at 300.00, confirmed at 999.00 via a direct `record_gateway_payment_service`
+  call: returned `NULL`, `payments` unaffected, transaction durably
+  marked `'failed'` with `failure_reason = 'amount mismatch: staged=300.00
+  confirmed=999.00'`.
+- **NOT proven, and cannot be without real credentials**: that a
+  request bearing this exact shape, sent by Stripe's own
+  infrastructure with a secret Stripe itself generated, would be
+  accepted — i.e., that this project's webhook secret configuration
+  and Stripe's real signing behavior actually agree. The HMAC algorithm
+  itself is per Stripe's own published spec and was applied correctly,
+  but "the algorithm is right" and "Stripe's production signer produces
+  bytes this verifies" are different claims; only the second is
+  CREDENTIAL-BLOCKED.
+
+All disposable test fixtures (connection, both vault secrets, both
+transactions, the payment, its allocation, the webhook event row) were
+deleted after verification; restored-state queries confirmed zero
+remaining rows.
 
 ## What's needed before this is SANDBOX VERIFIED
 
 - A real Stripe account with test-mode API keys and a webhook signing
-  secret (`whsec_...`), connected via `connect_club_gateway(...)` to a
-  real test club.
-- The checkout-session-creation Edge Function (not yet built — see the
-  gap above), so `provider_session_ref` is populated and a genuine
-  Stripe Checkout Session can be completed in test mode.
-- A real signed webhook delivery from Stripe (either through
-  `stripe listen --forward-to` + `stripe trigger checkout.session.completed`,
-  or a genuine completed test-mode Checkout) reaching the deployed
-  `stripe-gateway-webhook` function and being verified, processed, and
-  reflected in `public.payments`.
+  secret (`whsec_...`) actually issued by Stripe, connected via
+  `connect_club_gateway(...)` to a real test club.
+- A genuine Checkout Session completed on Stripe's own hosted page
+  (via `stripe-create-checkout-session`, now built) so a real
+  Stripe-originated `checkout.session.completed` event reaches the
+  deployed `stripe-gateway-webhook` function — this is the one
+  remaining link this session's disposable-but-hand-signed test cannot
+  stand in for.
 
 ## Other providers (PayPal, Paymob, Kashier, Fawry) — not yet implemented
 

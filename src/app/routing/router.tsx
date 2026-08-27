@@ -52,6 +52,7 @@ const FinanceInvoicesPage = lazy(() => import('@/features/finance/FinanceInvoice
 const FinanceCashPage = lazy(() => import('@/features/finance/FinanceCashPage').then((m) => ({ default: m.FinanceCashPage })))
 const FinanceExpensesPage = lazy(() => import('@/features/finance/FinanceExpensesPage').then((m) => ({ default: m.FinanceExpensesPage })))
 const FinanceReportsPage = lazy(() => import('@/features/finance/FinanceReportsPage').then((m) => ({ default: m.FinanceReportsPage })))
+const GatewayReturnPage = lazy(() => import('@/features/finance/GatewayReturnPage').then((m) => ({ default: m.GatewayReturnPage })))
 const ReportsOverviewPage = lazy(() => import('@/features/reports/ReportsOverviewPage').then((m) => ({ default: m.ReportsOverviewPage })))
 const ReportBookingsPage = lazy(() => import('@/features/reports/ReportBookingsPage').then((m) => ({ default: m.ReportBookingsPage })))
 const ReportOccupancyPage = lazy(() => import('@/features/reports/ReportOccupancyPage').then((m) => ({ default: m.ReportOccupancyPage })))
@@ -220,6 +221,19 @@ export const router = createBrowserRouter([
               { path: 'cash', element: <FinanceCashPage /> },
               { path: 'expenses', element: <FinanceExpensesPage /> },
               { path: 'reports', element: <FinanceReportsPage /> },
+              // MULTI-GATEWAY PAYMENTS (Phase 2, item 1/3/5): the
+              // hosted-checkout redirect LANDING route --
+              // stripe-create-checkout-session's success_url/cancel_url
+              // both point here. Deliberately a FinanceLayout child
+              // (not a standalone top-level route) so it inherits the
+              // authenticated app shell/session -- the customer or
+              // staff member completing checkout already has a Mal3aby
+              // session (this project's checkout flow starts from an
+              // authenticated invoice view, not an anonymous public
+              // link). Contains NO write path to payments/
+              // payment_gateway_transactions -- see the component's own
+              // header comment.
+              { path: 'gateway-return', element: <GatewayReturnPage /> },
             ],
           },
           // Directive section 31/32: old flat finance routes redirect

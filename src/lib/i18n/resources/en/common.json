@@ -3224,6 +3224,16 @@
       "expenses": "Expenses",
       "reports": "Reports"
     },
+    "gatewayReturn": {
+      "title": "Payment status",
+      "pending": "We are confirming your payment with the provider. This can take a few seconds.",
+      "cancelledHint": "It looks like checkout was cancelled -- confirming the final status now.",
+      "succeeded": "Payment confirmed.",
+      "failed": "This payment was not completed.",
+      "cancelledFinal": "Checkout was cancelled.",
+      "error": "We could not load this payment's status. Please check Finance for the latest status.",
+      "goToInvoice": "Go to Finance"
+    },
     "overview": {
       "revenue": "Revenue",
       "cashCollected": "Cash collected",
