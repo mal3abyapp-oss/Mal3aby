@@ -16,6 +16,42 @@ export interface Env {
   SUPABASE_URL: string
 }
 
+// CACHE-CONTROL FIX (2026-08-27, production auth-refresh + stale-cache
+// bugfix directive): Cloudflare Workers Static Assets' own default
+// Cache-Control was confirmed live (real production response headers,
+// not assumed) to be `public, max-age=0, must-revalidate` on EVERY
+// response -- index.html, the hashed JS/CSS bundles, sw.js, and the
+// manifest alike. `must-revalidate` on its own is not the stale-content
+// bug (a conditional GET still fetches fresh content when the browser
+// bothers to revalidate) -- the real bug was the service worker's
+// unconditional skipWaiting()/clientsClaim() (see vite.config.ts's own
+// comment on that). But this undifferentiated policy is still a real,
+// separate defect: content-hashed assets (index-<hash>.js, the CSS
+// bundle, any other /assets/* file) are IMMUTABLE by construction --
+// a new deploy always produces a new filename, so there is zero reason
+// to ever revalidate an already-cached hashed asset, and doing so on
+// every load wastes a round-trip for every single asset on every page
+// load. index.html/sw.js/the manifest are the opposite: they must
+// NEVER be aggressively cached, since they're what a client uses to
+// discover which hashed assets to request next.
+//
+// Fix: explicit, differentiated Cache-Control set here (the one
+// request-time hook this static-assets-only setup has) --
+//   /assets/*  (Vite's hashed output directory): immutable, 1 year.
+//   everything else (index.html, sw.js, manifest.webmanifest, icons
+//     served from the public/ root, and the SPA-fallback index.html
+//     Workers Static Assets serves for any unmatched path): no-cache
+//     (always revalidate -- NOT max-age=0 must-revalidate, which is
+//     functionally identical for this purpose but no-cache is the
+//     more standard/explicit spelling of "always revalidate before
+//     use").
+function cacheControlFor(pathname: string): string {
+  if (pathname.startsWith('/assets/')) {
+    return 'public, max-age=31536000, immutable'
+  }
+  return 'no-cache, must-revalidate'
+}
+
 function securityHeaders(supabaseUrl: string): Record<string, string> {
   const supabaseOrigin = new URL(supabaseUrl).origin
   return {
@@ -63,6 +99,7 @@ export default {
     for (const [key, value] of Object.entries(securityHeaders(env.SUPABASE_URL))) {
       headers.set(key, value)
     }
+    headers.set('Cache-Control', cacheControlFor(url.pathname))
     return new Response(response.body, {
       status: response.status,
       statusText: response.statusText,

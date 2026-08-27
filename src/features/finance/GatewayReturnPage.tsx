@@ -44,6 +44,12 @@ export function GatewayReturnPage() {
       setStatus('error')
       return
     }
+    // Narrowed to a plain `string` in a local const -- the `poll`
+    // function below closes over this, not the outer `transactionId`
+    // (whose type is still `string | null` from useSearchParams),
+    // since TS control-flow narrowing on an outer variable does not
+    // carry into a nested function declaration's closure.
+    const txnId = transactionId
 
     let cancelled = false
     let pollTimer: ReturnType<typeof setTimeout> | null = null
@@ -58,7 +64,7 @@ export function GatewayReturnPage() {
       // server-side on every call, same as every other RPC in this
       // codebase.
       const { data, error } = await supabase.rpc('get_gateway_transaction_status', {
-        p_transaction_id: transactionId,
+        p_transaction_id: txnId,
       })
 
       if (cancelled) return
