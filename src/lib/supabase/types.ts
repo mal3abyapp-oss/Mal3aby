@@ -8170,6 +8170,18 @@ export type Database = {
           total: number
         }[]
       }
+      get_shop_payment_method_mix: {
+        Args: {
+          p_club_id: string
+          p_end_date?: string
+          p_start_date?: string
+        }
+        Returns: {
+          method: string
+          total_amount: number
+          transaction_count: number
+        }[]
+      }
       get_shop_print_settings: {
         Args: { p_club_id: string }
         Returns: {
@@ -8198,6 +8210,19 @@ export type Database = {
           p_trading_name_en?: string
         }
         Returns: undefined
+      }
+      get_shop_sales_by_category: {
+        Args: {
+          p_club_id: string
+          p_end_date?: string
+          p_start_date?: string
+        }
+        Returns: {
+          category_id: string | null
+          category_name: string | null
+          revenue: number
+          units_sold: number
+        }[]
       }
       get_shop_stock_count_detail: {
         Args: { p_stock_count_id: string }
@@ -8701,6 +8726,23 @@ export type Database = {
           refund_status: string
           restock: boolean
           return_id: string
+        }[]
+      }
+      list_shop_recent_returns: {
+        Args: {
+          p_club_id: string
+          p_limit?: number
+        }
+        Returns: {
+          created_at: string
+          invoice_number: string
+          processed_by_name: string
+          reason: string
+          refund_amount: number | null
+          refund_method: string | null
+          restock: boolean
+          return_id: string
+          sale_id: string
         }[]
       }
       list_shop_stock_counts: {

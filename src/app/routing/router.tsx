@@ -38,6 +38,7 @@ const Customer360Page = lazy(() => import('@/features/customers/Customer360Page'
 const CustomerDuplicatesPage = lazy(() => import('@/features/customers/CustomerDuplicatesPage').then((m) => ({ default: m.CustomerDuplicatesPage })))
 const SubscriptionPage = lazy(() => import('@/features/billing/SubscriptionPage').then((m) => ({ default: m.SubscriptionPage })))
 const ShopLayout = lazy(() => import('@/features/shop/ShopLayout').then((m) => ({ default: m.ShopLayout })))
+const ShopDashboardPage = lazy(() => import('@/features/shop/ShopDashboardPage').then((m) => ({ default: m.ShopDashboardPage })))
 const ShopPOSPage = lazy(() => import('@/features/shop/ShopPOSPage').then((m) => ({ default: m.ShopPOSPage })))
 const ShopProductsPage = lazy(() => import('@/features/shop/ShopProductsPage').then((m) => ({ default: m.ShopProductsPage })))
 const ShopInventoryPage = lazy(() => import('@/features/shop/ShopInventoryPage').then((m) => ({ default: m.ShopInventoryPage })))
@@ -253,6 +254,11 @@ export const router = createBrowserRouter([
             element: <RequireNavDomain domain="shop"><ShopLayout /></RequireNavDomain>,
             children: [
               { index: true, element: <ShopPOSPage /> },
+              // COMMERCE PRO C6: additional page, not the new index --
+              // /app/shop's index stays ShopPOSPage (highest-frequency
+              // cashier action). See ShopDashboardPage.tsx's own header
+              // comment for the full reasoning.
+              { path: 'dashboard', element: <ShopDashboardPage /> },
               { path: 'products', element: <ShopProductsPage /> },
               { path: 'inventory', element: <ShopInventoryPage /> },
               { path: 'stock-count', element: <ShopStockCountPage /> },
