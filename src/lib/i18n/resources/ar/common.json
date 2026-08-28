@@ -3961,14 +3961,22 @@
         "category": "الفئة",
         "price": "السعر",
         "sku": "الرمز",
-        "status": "الحالة"
+        "barcode": "الباركود",
+        "status": "الحالة",
+        "stock": "المخزون",
+        "variants": "الأنواع"
       },
       "archiveVariant": "أرشفة",
       "reactivateVariant": "إعادة تفعيل",
       "imageUrlLabel": "رابط الصورة (اختياري)",
       "reorderLevelLabel": "حد تنبيه انخفاض المخزون (اختياري)",
       "reorderLevelHint": "يظهر المنتج في تقارير المخزون المنخفض عند وصول الرصيد إلى هذا الرقم أو أقل.",
-      "categoryFilterAll": "كل الفئات"
+      "categoryFilterAll": "كل الفئات",
+      "viewGrid": "شبكة",
+      "viewList": "قائمة",
+      "primaryImageLabel": "الصورة الرئيسية",
+      "lowStock": "مخزون منخفض",
+      "stockCount": "{{count}} متوفر"
     },
     "categories": {
       "manageTitle": "إدارة الفئات",
@@ -3979,7 +3987,20 @@
       "creating": "جاري الإنشاء...",
       "createError": "تعذّر إنشاء الفئة.",
       "saveError": "تعذّر حفظ الفئة.",
-      "emptyDescription": "لا توجد فئات بعد — يمكنك إنشاء واحدة من حقل الفئة داخل أي منتج."
+      "emptyDescription": "لا توجد فئات بعد — يمكنك إنشاء واحدة من حقل الفئة داخل أي منتج.",
+      "moveUp": "تحريك لأعلى",
+      "moveDown": "تحريك لأسفل"
+    },
+    "media": {
+      "uploadImage": "رفع صورة",
+      "replaceImage": "استبدال الصورة",
+      "removeImage": "إزالة الصورة",
+      "uploading": "جاري الرفع...",
+      "uploadError": "تعذّر رفع الصورة.",
+      "invalidType": "يُسمح فقط بصور JPEG أو PNG أو WebP.",
+      "tooLarge": "يجب ألا يتجاوز حجم الصورة 5 ميجابايت.",
+      "fileHint": "JPEG أو PNG أو WebP — بحد أقصى 5 ميجابايت.",
+      "galleryLabel": "صور إضافية"
     },
     "suppliers": {
       "manageTitle": "إدارة الموردين",

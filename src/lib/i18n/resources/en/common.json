@@ -3964,14 +3964,22 @@
         "category": "Category",
         "price": "Price",
         "sku": "SKU",
-        "status": "Status"
+        "barcode": "Barcode",
+        "status": "Status",
+        "stock": "Stock",
+        "variants": "Variants"
       },
       "archiveVariant": "Archive",
       "reactivateVariant": "Reactivate",
       "imageUrlLabel": "Image URL (optional)",
       "reorderLevelLabel": "Low-stock alert threshold (optional)",
       "reorderLevelHint": "Shown as low stock in reports once balance drops to or below this number.",
-      "categoryFilterAll": "All categories"
+      "categoryFilterAll": "All categories",
+      "viewGrid": "Grid",
+      "viewList": "List",
+      "primaryImageLabel": "Primary image",
+      "lowStock": "Low stock",
+      "stockCount": "{{count}} in stock"
     },
     "categories": {
       "manageTitle": "Manage categories",
@@ -3982,7 +3990,20 @@
       "creating": "Creating...",
       "createError": "Couldn't create the category.",
       "saveError": "Couldn't save the category.",
-      "emptyDescription": "No categories yet — create one from a product's category field."
+      "emptyDescription": "No categories yet — create one from a product's category field.",
+      "moveUp": "Move up",
+      "moveDown": "Move down"
+    },
+    "media": {
+      "uploadImage": "Upload image",
+      "replaceImage": "Replace image",
+      "removeImage": "Remove image",
+      "uploading": "Uploading...",
+      "uploadError": "Couldn't upload the image.",
+      "invalidType": "Only JPEG, PNG, or WebP images are allowed.",
+      "tooLarge": "Image must be 5MB or smaller.",
+      "fileHint": "JPEG, PNG, or WebP — up to 5MB.",
+      "galleryLabel": "Additional images"
     },
     "suppliers": {
       "manageTitle": "Manage suppliers",

@@ -5124,7 +5124,9 @@ export type Database = {
           club_id: string
           created_at: string
           created_by: string | null
+          display_order: number
           id: string
+          image_url: string | null
           name_ar: string
           name_en: string | null
           status: string
@@ -5133,7 +5135,9 @@ export type Database = {
           club_id: string
           created_at?: string
           created_by?: string | null
+          display_order?: number
           id?: string
+          image_url?: string | null
           name_ar: string
           name_en?: string | null
           status?: string
@@ -5142,7 +5146,9 @@ export type Database = {
           club_id?: string
           created_at?: string
           created_by?: string | null
+          display_order?: number
           id?: string
+          image_url?: string | null
           name_ar?: string
           name_en?: string | null
           status?: string
@@ -5442,6 +5448,7 @@ export type Database = {
           has_variants: boolean
           id: string
           image_url: string | null
+          image_urls: Json
           name_ar: string
           name_en: string | null
           reorder_level: number | null
@@ -5460,6 +5467,7 @@ export type Database = {
           has_variants?: boolean
           id?: string
           image_url?: string | null
+          image_urls?: Json
           name_ar: string
           name_en?: string | null
           reorder_level?: number | null
@@ -5478,6 +5486,7 @@ export type Database = {
           has_variants?: boolean
           id?: string
           image_url?: string | null
+          image_urls?: Json
           name_ar?: string
           name_en?: string | null
           reorder_level?: number | null
@@ -7252,7 +7261,13 @@ export type Database = {
         Returns: string
       }
       create_shop_category: {
-        Args: { p_club_id: string; p_name_ar: string; p_name_en?: string }
+        Args: {
+          p_club_id: string
+          p_display_order?: number
+          p_image_url?: string
+          p_name_ar: string
+          p_name_en?: string
+        }
         Returns: string
       }
       create_shop_product: {
@@ -7264,6 +7279,7 @@ export type Database = {
           p_description?: string
           p_has_variants?: boolean
           p_image_url?: string
+          p_image_urls?: Json
           p_name_ar: string
           p_name_en?: string
           p_reorder_level?: number
@@ -8426,6 +8442,8 @@ export type Database = {
         Args: { p_club_id: string }
         Returns: {
           category_id: string
+          display_order: number
+          image_url: string
           name_ar: string
           name_en: string
           status: string
@@ -8435,6 +8453,8 @@ export type Database = {
         Args: { p_club_id: string }
         Returns: {
           category_id: string
+          display_order: number
+          image_url: string
           name_ar: string
           name_en: string
           status: string
@@ -8501,6 +8521,7 @@ export type Database = {
           description: string
           has_variants: boolean
           image_url: string
+          image_urls: Json
           name_ar: string
           name_en: string
           product_id: string
@@ -9381,6 +9402,8 @@ export type Database = {
       update_shop_category: {
         Args: {
           p_category_id: string
+          p_display_order?: number
+          p_image_url?: string
           p_name_ar?: string
           p_name_en?: string
           p_status?: string
@@ -9394,6 +9417,7 @@ export type Database = {
           p_category_id?: string
           p_description?: string
           p_image_url?: string
+          p_image_urls?: Json
           p_name_ar: string
           p_name_en?: string
           p_product_id: string
