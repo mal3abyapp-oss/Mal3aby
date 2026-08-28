@@ -180,6 +180,7 @@
       "alerts": "التنبيهات",
       "trials": "التجارب المجانية",
       "auditLog": "سجل التدقيق",
+      "supportHistory": "سجل جلسات الدعم",
       "sectionStaffAccess": "الموظفون والصلاحيات",
       "platformStaff": "موظفو المنصة",
       "platformRoles": "أدوار وصلاحيات المنصة",
@@ -220,6 +221,25 @@
       "emptyTitle": "لا يوجد سجل تدقيق بعد",
       "loadingMore": "جارٍ التحميل...",
       "loadMore": "تحميل المزيد"
+    },
+    "supportHistoryPage": {
+      "title": "سجل جلسات الدعم",
+      "description": "سجل للقراءة فقط لكل جلسة دعم دخل بها أحد موظفي المنصة إلى نادٍ -- من، أي نادٍ، مستوى الوصول، السبب، والتوقيت",
+      "supportUser": "موظف الدعم",
+      "club": "النادي",
+      "clubFallback": "نادٍ",
+      "accessLevel": "مستوى الوصول",
+      "modeManage": "إدارة",
+      "modeView": "عرض فقط",
+      "reason": "السبب",
+      "started": "البداية",
+      "expires": "تنتهي",
+      "ended": "الانتهاء الفعلي",
+      "status": "الحالة",
+      "statusActive": "نشطة",
+      "statusExpired": "منتهية الصلاحية",
+      "statusEnded": "أُنهيت",
+      "emptyTitle": "لا توجد جلسات دعم بعد"
     },
     "clubDetailPage": {
       "loadingTitle": "...",

@@ -8020,6 +8020,22 @@ export type Database = {
         Args: { p_role_id: string }
         Returns: string[]
       }
+      get_platform_support_session_history: {
+        Args: { p_club_id?: string | null; p_limit?: number }
+        Returns: {
+          id: string
+          platform_owner_id: string
+          platform_owner_email: string | null
+          club_id: string
+          club_name: string | null
+          mode: string
+          reason: string | null
+          started_at: string
+          expires_at: string
+          ended_at: string | null
+          status: string
+        }[]
+      }
       get_platform_whatsapp_health: {
         Args: never
         Returns: {

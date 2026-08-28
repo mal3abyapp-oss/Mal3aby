@@ -180,6 +180,7 @@
       "alerts": "Alerts",
       "trials": "Free Trials",
       "auditLog": "Audit Log",
+      "supportHistory": "Support Session History",
       "sectionStaffAccess": "Staff & Access",
       "platformStaff": "Platform Staff",
       "platformRoles": "Platform Roles & Permissions",
@@ -220,6 +221,25 @@
       "emptyTitle": "No audit log yet",
       "loadingMore": "Loading...",
       "loadMore": "Load more"
+    },
+    "supportHistoryPage": {
+      "title": "Support Session History",
+      "description": "A read-only record of every support session a platform staff member opened into a club -- who, which club, access level, reason, and timing",
+      "supportUser": "Support user",
+      "club": "Club",
+      "clubFallback": "Club",
+      "accessLevel": "Access level",
+      "modeManage": "Manage",
+      "modeView": "View only",
+      "reason": "Reason",
+      "started": "Started",
+      "expires": "Expires",
+      "ended": "Ended",
+      "status": "Status",
+      "statusActive": "Active",
+      "statusExpired": "Expired",
+      "statusEnded": "Ended",
+      "emptyTitle": "No support sessions yet"
     },
     "clubDetailPage": {
       "loadingTitle": "...",
