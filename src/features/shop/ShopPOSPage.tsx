@@ -830,6 +830,7 @@ export function ShopPOSPage() {
         <div className="flex flex-col gap-3">
           <div className="flex flex-col gap-2 sm:flex-row">
             <Input
+              data-testid="pos-product-search"
               placeholder={t('shop.pos.searchProducts')}
               value={productSearch}
               onChange={(e) => setProductSearch(e.target.value)}
@@ -839,6 +840,7 @@ export function ShopPOSPage() {
               <ScanBarcode className="pointer-events-none absolute start-3 top-1/2 size-4 -translate-y-1/2 text-text-secondary" aria-hidden="true" />
               <Input
                 ref={barcodeInputRef}
+                data-testid="pos-barcode-input"
                 placeholder={t('shop.pos.barcodePlaceholder')}
                 value={barcodeInput}
                 onChange={(e) => { setBarcodeInput(e.target.value); setBarcodeNotFound(null) }}
@@ -852,6 +854,7 @@ export function ShopPOSPage() {
               type="button"
               variant="outline"
               className="h-11 shrink-0"
+              data-testid="pos-held-sales-button"
               onClick={() => setHeldSalesOpen(true)}
             >
               <PauseCircle className="me-2 size-4" aria-hidden="true" />
@@ -862,7 +865,7 @@ export function ShopPOSPage() {
             </Button>
           </div>
           {barcodeNotFound && (
-            <p role="alert" className="text-sm text-status-danger">{barcodeNotFound}</p>
+            <p role="alert" data-testid="pos-barcode-message" className="text-sm text-status-danger">{barcodeNotFound}</p>
           )}
 
           <CategoryStrip
@@ -1044,9 +1047,11 @@ function CategoryStrip({
     <div
       className="flex gap-2 overflow-x-auto pb-1"
       role="tablist"
+      data-testid="pos-category-strip"
       aria-label={t('shop.pos.categoryStripLabel')}
     >
       <CategoryChip
+        testId="pos-category-chip-all"
         active={activeCategory === ALL_PRODUCTS_CHIP}
         label={t('shop.pos.allProducts')}
         count={totalCount}
@@ -1054,6 +1059,7 @@ function CategoryStrip({
       />
       {hasBestSellers && (
         <CategoryChip
+          testId="pos-category-chip-best-sellers"
           active={activeCategory === BEST_SELLERS_CHIP}
           label={t('shop.pos.bestSellers')}
           count={bestSellersCount}
@@ -1064,6 +1070,7 @@ function CategoryStrip({
       {ordered.map((c) => (
         <CategoryChip
           key={c.categoryId}
+          testId={`pos-category-chip-${c.categoryId}`}
           active={activeCategory === c.categoryId}
           label={c.nameAr}
           count={categoryCounts[c.categoryId] ?? 0}
@@ -1082,6 +1089,7 @@ function CategoryChip({
   imageUrl,
   icon,
   onClick,
+  testId,
 }: {
   active: boolean
   label: string
@@ -1089,12 +1097,14 @@ function CategoryChip({
   imageUrl?: string | null
   icon?: ReactNode
   onClick: () => void
+  testId?: string
 }) {
   return (
     <button
       type="button"
       role="tab"
       aria-selected={active}
+      data-testid={testId}
       onClick={onClick}
       className={`flex h-11 shrink-0 items-center gap-2 rounded-full border px-3 text-sm font-medium transition-colors ${
         active
@@ -1149,7 +1159,7 @@ function ProductGrid({
   }
 
   return (
-    <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4">
+    <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4" data-testid="pos-product-grid">
       {products.map((p) => {
         const s = stockFor(p.productId)
         const disabled = s.isOut
@@ -1159,6 +1169,8 @@ function ProductGrid({
             type="button"
             disabled={disabled}
             onClick={() => !disabled && onSelect(p)}
+            data-testid={`pos-product-card-${p.productId}`}
+            data-out-of-stock={disabled}
             className={`flex flex-col overflow-hidden rounded-lg border text-start transition-shadow ${
               disabled
                 ? 'cursor-not-allowed border-border opacity-50'
@@ -1169,7 +1181,7 @@ function ProductGrid({
             <div className="relative">
               <ProductThumb src={p.imageUrl} alt={p.nameAr} className="aspect-square w-full" />
               {disabled && (
-                <span className="absolute inset-x-1 top-1 rounded-md bg-status-danger/90 px-1.5 py-0.5 text-center text-[11px] font-medium text-white">
+                <span data-testid={`pos-product-card-${p.productId}-out-of-stock-badge`} className="absolute inset-x-1 top-1 rounded-md bg-status-danger/90 px-1.5 py-0.5 text-center text-[11px] font-medium text-white">
                   {t('shop.pos.outOfStock')}
                 </span>
               )}
@@ -1226,33 +1238,33 @@ function SaleCompletePanel({ sale, onNewSale }: { sale: CompletedSale; onNewSale
   const { t } = useTranslation()
   const [printMode, setPrintMode] = useState<'invoice' | 'receipt' | null>(null)
   return (
-    <div className="mx-auto flex max-w-md flex-col items-center gap-4 rounded-md border border-border p-6 text-center">
+    <div className="mx-auto flex max-w-md flex-col items-center gap-4 rounded-md border border-border p-6 text-center" data-testid="pos-sale-complete-panel">
       <CheckCircle2 className="size-12 text-status-success" aria-hidden="true" />
       <div>
         <p className="text-lg font-semibold">{t('shop.pos.saleCompleted')}</p>
         {sale.invoiceNumber && (
-          <p className="text-sm text-text-secondary" dir="ltr">{sale.invoiceNumber}</p>
+          <p className="text-sm text-text-secondary" dir="ltr" data-testid="pos-sale-complete-invoice-number">{sale.invoiceNumber}</p>
         )}
       </div>
       <MoneyDisplay amount={sale.total} size="lg" />
 
       {sale.splitPaymentFailed && (
-        <div role="alert" className="w-full rounded-md border border-status-danger/40 bg-status-danger/10 p-3 text-start text-sm text-status-danger">
+        <div role="alert" data-testid="pos-sale-complete-split-failed" className="w-full rounded-md border border-status-danger/40 bg-status-danger/10 p-3 text-start text-sm text-status-danger">
           {t('shop.pos.saleCompletedSplitFailed')} {sale.splitPaymentFailed}
         </div>
       )}
 
       <div className="flex w-full flex-col gap-2 sm:flex-row">
-        <Button variant="outline" className="flex-1" onClick={() => setPrintMode('receipt')}>
+        <Button variant="outline" className="flex-1" data-testid="pos-sale-complete-print-receipt" onClick={() => setPrintMode('receipt')}>
           <Printer className="me-2 size-4" aria-hidden="true" />
           {t('shop.pos.printReceipt')}
         </Button>
-        <Button variant="outline" className="flex-1" onClick={() => setPrintMode('invoice')}>
+        <Button variant="outline" className="flex-1" data-testid="pos-sale-complete-print-invoice" onClick={() => setPrintMode('invoice')}>
           <Printer className="me-2 size-4" aria-hidden="true" />
           {t('shop.pos.printInvoice')}
         </Button>
       </div>
-      <Button className="h-11 w-full" onClick={onNewSale}>{t('shop.pos.newSale')}</Button>
+      <Button className="h-11 w-full" data-testid="pos-sale-complete-new-sale" onClick={onNewSale}>{t('shop.pos.newSale')}</Button>
 
       {printMode && (
         <ShopInvoiceDialog
@@ -1367,10 +1379,10 @@ function CartPanel({
       <div className="flex flex-col gap-1.5">
         <label className="text-sm font-medium text-text-secondary">{t('shop.pos.locationLabel')}</label>
         <Select value={locationId} onValueChange={setLocationId}>
-          <SelectTrigger><SelectValue placeholder={t('shop.pos.locationPlaceholder')} /></SelectTrigger>
+          <SelectTrigger data-testid="pos-location-select"><SelectValue placeholder={t('shop.pos.locationPlaceholder')} /></SelectTrigger>
           <SelectContent>
             {locations.map((l) => (
-              <SelectItem key={l.locationId} value={l.locationId}>{l.name}</SelectItem>
+              <SelectItem key={l.locationId} value={l.locationId} data-testid={`pos-location-${l.locationId}`}>{l.name}</SelectItem>
             ))}
           </SelectContent>
         </Select>
@@ -1379,7 +1391,7 @@ function CartPanel({
       <div className="flex flex-col gap-1.5">
         <label className="text-sm font-medium text-text-secondary">{t('shop.pos.customerLabel')}</label>
         {selectedCustomer ? (
-          <div className="flex items-center justify-between rounded-md border border-border p-2 text-sm">
+          <div className="flex items-center justify-between rounded-md border border-border p-2 text-sm" data-testid="pos-selected-customer">
             <span className="flex items-center gap-1.5">
               {isWalkIn && <User className="size-3.5 text-text-secondary" aria-hidden="true" />}
               {selectedCustomer.fullName ?? selectedCustomer.mobileDisplay}
@@ -1396,7 +1408,7 @@ function CartPanel({
                 resolves (lazily creating on first use) the club's own
                 system Walk-in Customer row rather than weakening that
                 requirement. */}
-            <Button type="button" variant="outline" size="sm" disabled={walkInPending} onClick={onWalkIn}>
+            <Button type="button" variant="outline" size="sm" disabled={walkInPending} data-testid="pos-walk-in-customer" onClick={onWalkIn}>
               <User className="me-2 size-4" aria-hidden="true" />
               {walkInPending ? t('shop.pos.walkInLoading') : t('shop.pos.walkInCustomer')}
             </Button>
@@ -1405,11 +1417,11 @@ function CartPanel({
         )}
       </div>
 
-      <div className="flex flex-col gap-2">
+      <div className="flex flex-col gap-2" data-testid="pos-cart-lines">
         {cart.map((l, idx) => {
           const lineTotal = l.displayPrice * l.quantity
           return (
-            <div key={`${l.productId}-${l.variantId}`} className="flex items-center gap-2 text-sm">
+            <div key={`${l.productId}-${l.variantId}`} className="flex items-center gap-2 text-sm" data-testid={`pos-cart-line-${l.productId}`}>
               <ProductThumb src={l.imageUrl} alt={l.productName} className="size-11 shrink-0 rounded-md" />
               <div className="min-w-0 flex-1">
                 <p className="truncate">{l.productName}{l.variantLabel ? ` (${l.variantLabel})` : ''}</p>
@@ -1420,7 +1432,7 @@ function CartPanel({
                 </div>
               </div>
               <div className="flex items-center gap-1">
-                <Button variant="outline" size="icon" className="size-9" onClick={() => updateQuantity(idx, -1)} aria-label={t('shop.pos.decreaseQty')}><Minus className="size-3.5" /></Button>
+                <Button variant="outline" size="icon" className="size-9" data-testid={`pos-cart-line-${l.productId}-decrease`} onClick={() => updateQuantity(idx, -1)} aria-label={t('shop.pos.decreaseQty')}><Minus className="size-3.5" /></Button>
                 <Input
                   type="number"
                   min="1"
@@ -1428,10 +1440,11 @@ function CartPanel({
                   value={l.quantity}
                   onChange={(e) => setQuantityDirect(idx, e.target.value)}
                   className="h-9 w-14 px-1 text-center tabular-nums"
+                  data-testid={`pos-cart-line-${l.productId}-quantity`}
                   aria-label={t('shop.pos.quantityFor', { name: l.productName })}
                 />
-                <Button variant="outline" size="icon" className="size-9" onClick={() => updateQuantity(idx, 1)} aria-label={t('shop.pos.increaseQty')}><Plus className="size-3.5" /></Button>
-                <Button variant="ghost" size="icon" className="size-9" onClick={() => removeLine(idx)} aria-label={t('shop.pos.removeLine')}><Trash2 className="size-3.5" /></Button>
+                <Button variant="outline" size="icon" className="size-9" data-testid={`pos-cart-line-${l.productId}-increase`} onClick={() => updateQuantity(idx, 1)} aria-label={t('shop.pos.increaseQty')}><Plus className="size-3.5" /></Button>
+                <Button variant="ghost" size="icon" className="size-9" data-testid={`pos-cart-line-${l.productId}-remove`} onClick={() => removeLine(idx)} aria-label={t('shop.pos.removeLine')}><Trash2 className="size-3.5" /></Button>
               </div>
             </div>
           )
@@ -1460,20 +1473,20 @@ function CartPanel({
 
       {/* Cart summary breakdown: Subtotal / Discount / Total, explicit
           per the task's requirement. */}
-      <div className="flex flex-col gap-1 border-t border-border pt-2">
+      <div className="flex flex-col gap-1 border-t border-border pt-2" data-testid="pos-cart-summary">
         <div className="flex items-center justify-between text-sm text-text-secondary">
           <span>{t('shop.pos.subtotal')}</span>
           <MoneyDisplay amount={subtotal} size="sm" />
         </div>
         {discountAmount > 0 && (
-          <div className="flex items-center justify-between text-sm text-status-success">
+          <div className="flex items-center justify-between text-sm text-status-success" data-testid="pos-cart-summary-discount">
             <span>{t('shop.pos.discountLabel')}</span>
             <MoneyDisplay amount={-discountAmount} size="sm" tone="success" />
           </div>
         )}
         <div className="flex items-center justify-between">
           <span className="text-sm font-medium">{t('shop.pos.total')}</span>
-          <MoneyDisplay amount={total} size="md" />
+          <span data-testid="pos-cart-summary-total"><MoneyDisplay amount={total} size="md" /></span>
         </div>
       </div>
 
@@ -1482,7 +1495,7 @@ function CartPanel({
           instruction (not merely disabled -- a role with no discount
           capability should not even see the affordance). */}
       {canDiscount && (
-        <div className="flex flex-col gap-1.5 rounded-md border border-border p-2">
+        <div className="flex flex-col gap-1.5 rounded-md border border-border p-2" data-testid="pos-discount-section">
           <div className="flex items-center justify-between">
             <label htmlFor="shop-pos-discount-toggle" className="flex items-center gap-1.5 text-sm font-medium text-text-secondary">
               <Percent className="size-3.5" aria-hidden="true" />
@@ -1492,6 +1505,7 @@ function CartPanel({
               id="shop-pos-discount-toggle"
               type="checkbox"
               checked={discountEnabled}
+              data-testid="pos-discount-toggle"
               onChange={(e) => { setDiscountEnabled(e.target.checked); if (!e.target.checked) { setDiscountInput(''); setDiscountReason('') } }}
               className="size-4"
             />
@@ -1499,10 +1513,10 @@ function CartPanel({
           {discountEnabled && (
             <>
               <div className="flex gap-2">
-                <Button type="button" size="sm" variant={discountMode === 'amount' ? 'default' : 'outline'} className="flex-1" onClick={() => setDiscountMode('amount')}>
+                <Button type="button" size="sm" variant={discountMode === 'amount' ? 'default' : 'outline'} className="flex-1" data-testid="pos-discount-mode-amount" onClick={() => setDiscountMode('amount')}>
                   {t('shop.pos.discountFixed')}
                 </Button>
-                <Button type="button" size="sm" variant={discountMode === 'percent' ? 'default' : 'outline'} className="flex-1" onClick={() => setDiscountMode('percent')}>
+                <Button type="button" size="sm" variant={discountMode === 'percent' ? 'default' : 'outline'} className="flex-1" data-testid="pos-discount-mode-percent" onClick={() => setDiscountMode('percent')}>
                   {t('shop.pos.discountPercent')}
                 </Button>
               </div>
@@ -1513,11 +1527,13 @@ function CartPanel({
                 inputMode="decimal"
                 placeholder={discountMode === 'percent' ? t('shop.pos.discountPercentPlaceholder') : t('shop.pos.discountAmountPlaceholder')}
                 value={discountInput}
+                data-testid="pos-discount-amount-input"
                 onChange={(e) => setDiscountInput(e.target.value)}
               />
               <Input
                 placeholder={t('shop.pos.discountReasonPlaceholder')}
                 value={discountReason}
+                data-testid="pos-discount-reason-input"
                 onChange={(e) => setDiscountReason(e.target.value)}
               />
             </>
@@ -1533,12 +1549,14 @@ function CartPanel({
         {paymentMethods.length === 0 ? (
           <p className="text-xs text-text-secondary">{t('shop.pos.noPaymentMethods')}</p>
         ) : (
-          <div className="grid grid-cols-2 gap-2">
+          <div className="grid grid-cols-2 gap-2" data-testid="pos-payment-methods">
             {paymentMethods.map((m) => (
               <button
                 key={m.id}
                 type="button"
                 onClick={() => setSelectedMethodId(m.id)}
+                data-testid={`pos-payment-method-${m.id}`}
+                data-underlying-method={m.underlyingMethod}
                 className={`flex h-14 flex-col items-center justify-center gap-0.5 rounded-md border px-2 text-center transition-colors ${
                   selectedMethodId === m.id
                     ? 'border-primary bg-primary text-primary-foreground'
@@ -1562,11 +1580,12 @@ function CartPanel({
             step="0.01"
             inputMode="decimal"
             value={cashReceivedInput}
+            data-testid="pos-cash-received-input"
             onChange={(e) => setCashReceivedInput(e.target.value)}
           />
           <div className="flex items-center justify-between text-sm">
             <span className="text-text-secondary">{t('shop.pos.changeDue')}</span>
-            <MoneyDisplay amount={changeDue} size="md" tone={changeDue > 0 ? 'success' : 'default'} />
+            <span data-testid="pos-change-due"><MoneyDisplay amount={changeDue} size="md" tone={changeDue > 0 ? 'success' : 'default'} /></span>
           </div>
         </div>
       )}
@@ -1581,12 +1600,13 @@ function CartPanel({
           id="shop-pos-split-toggle"
           type="checkbox"
           checked={splitEnabled}
+          data-testid="pos-split-toggle"
           onChange={(e) => { setSplitEnabled(e.target.checked); setSplitAmountInput(''); setSplitMethodId(null) }}
           className="size-4"
         />
       </div>
       {splitEnabled && (
-        <div className="flex flex-col gap-1.5 rounded-md border border-border p-2">
+        <div className="flex flex-col gap-1.5 rounded-md border border-border p-2" data-testid="pos-split-section">
           <label className="text-sm font-medium text-text-secondary">{t('shop.pos.splitAmountLabel')}</label>
           <Input
             type="number"
@@ -1594,25 +1614,26 @@ function CartPanel({
             step="0.01"
             max={total || undefined}
             value={splitAmountInput}
+            data-testid="pos-split-amount-input"
             onChange={(e) => setSplitAmountInput(e.target.value)}
           />
           <Select value={splitMethodId ?? ''} onValueChange={setSplitMethodId}>
-            <SelectTrigger><SelectValue placeholder={t('shop.pos.splitMethodPlaceholder')} /></SelectTrigger>
+            <SelectTrigger data-testid="pos-split-method-select"><SelectValue placeholder={t('shop.pos.splitMethodPlaceholder')} /></SelectTrigger>
             <SelectContent>
               {paymentMethods.map((m) => (
-                <SelectItem key={m.id} value={m.id}>{m.nameAr}</SelectItem>
+                <SelectItem key={m.id} value={m.id} data-testid={`pos-split-method-${m.id}`}>{m.nameAr}</SelectItem>
               ))}
             </SelectContent>
           </Select>
-          <p className="text-xs text-text-secondary">
+          <p className="text-xs text-text-secondary" data-testid="pos-split-primary-preview">
             {t('shop.pos.splitPrimaryPreview', { amount: primaryAmount.toFixed(2) })}
           </p>
         </div>
       )}
 
-      {error && <p role="alert" className="text-sm text-status-danger">{error}</p>}
+      {error && <p role="alert" data-testid="pos-error-message" className="text-sm text-status-danger">{error}</p>}
 
-      <Button disabled={isPending} className="h-11" onClick={onCompleteSale}>
+      <Button disabled={isPending} className="h-11" data-testid="pos-complete-sale" onClick={onCompleteSale}>
         {isPending ? t('shop.pos.completing') : t('shop.pos.completeSale')}
       </Button>
     </div>

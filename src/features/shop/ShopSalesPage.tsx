@@ -385,12 +385,12 @@ export function ShopSalesPage() {
       header: '',
       render: (s) => (
         <div className="flex items-center gap-1 print:hidden">
-          <Button variant="ghost" size="sm" onClick={() => setViewingInvoiceSaleId(s.saleId)}>
+          <Button variant="ghost" size="sm" data-testid={`shop-sale-row-${s.saleId}-view-invoice`} onClick={() => setViewingInvoiceSaleId(s.saleId)}>
             <Printer className="me-1 size-4" aria-hidden="true" />
             {t('shop.sales.viewInvoice')}
           </Button>
           {(s.status === 'completed' || s.status === 'partially_returned') && (
-            <Button variant="ghost" size="sm" onClick={() => setReturningSale(s)}>{t('shop.sales.processReturn')}</Button>
+            <Button variant="ghost" size="sm" data-testid={`shop-sale-row-${s.saleId}-process-return`} onClick={() => setReturningSale(s)}>{t('shop.sales.processReturn')}</Button>
           )}
         </div>
       ),
@@ -405,7 +405,7 @@ export function ShopSalesPage() {
           description={t('shop.sales.description')}
           actions={
             <>
-              <Button variant="outline" size="sm" onClick={() => setReturnLookupOpen(true)}>
+              <Button variant="outline" size="sm" data-testid="sales-find-for-return" onClick={() => setReturnLookupOpen(true)}>
                 <Search className="me-1 size-4" aria-hidden="true" />
                 {t('shop.sales.findSaleForReturn')}
               </Button>
@@ -431,13 +431,13 @@ export function ShopSalesPage() {
             Basket, Items Sold, Refunds, Net Sales. Reflects whatever
             filters are currently applied (defaults to "today"), not a
             hardcoded server-side "today" independent of the filter UI. */}
-        <div className="mb-4 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
-          <StatCard label={t('shop.sales.kpi.grossSales')} value={<MoneyDisplay amount={kpis?.grossSales ?? 0} size="md" />} icon={ShoppingBag} />
-          <StatCard label={t('shop.sales.kpi.transactions')} value={kpis?.transactionCount ?? 0} icon={Receipt} />
+        <div className="mb-4 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6" data-testid="sales-kpi-row">
+          <StatCard label={t('shop.sales.kpi.grossSales')} value={<span data-testid="sales-kpi-gross-sales"><MoneyDisplay amount={kpis?.grossSales ?? 0} size="md" /></span>} icon={ShoppingBag} />
+          <StatCard label={t('shop.sales.kpi.transactions')} value={<span data-testid="sales-kpi-transactions">{kpis?.transactionCount ?? 0}</span>} icon={Receipt} />
           <StatCard label={t('shop.sales.kpi.averageBasket')} value={<MoneyDisplay amount={kpis?.averageBasket ?? 0} size="md" />} icon={TrendingUp} />
           <StatCard label={t('shop.sales.kpi.itemsSold')} value={kpis?.itemsSold ?? 0} icon={Wallet} />
           <StatCard label={t('shop.sales.kpi.refunds')} value={<MoneyDisplay amount={kpis?.refundTotal ?? 0} size="md" />} icon={TrendingDown} tone={kpis && kpis.refundTotal > 0 ? 'danger' : 'default'} />
-          <StatCard label={t('shop.sales.kpi.netSales')} value={<MoneyDisplay amount={kpis?.netSales ?? 0} size="md" />} icon={ShoppingBag} tone="success" />
+          <StatCard label={t('shop.sales.kpi.netSales')} value={<span data-testid="sales-kpi-net-sales"><MoneyDisplay amount={kpis?.netSales ?? 0} size="md" /></span>} icon={ShoppingBag} tone="success" />
         </div>
 
         {/* Filters -- plan Section 2: date range, branch, cashier,
@@ -752,23 +752,25 @@ function ReturnLookupDialog({ onClose, onFound }: { onClose: () => void; onFound
           <div className="flex gap-2">
             <Input
               autoFocus
+              data-testid="return-lookup-input"
               placeholder={t('shop.sales.filters.invoiceNumberPlaceholder')}
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               onKeyDown={(e) => { if (e.key === 'Enter') setSubmitted(search.trim()) }}
             />
-            <Button onClick={() => setSubmitted(search.trim())} disabled={!search.trim()}>
+            <Button data-testid="return-lookup-submit" onClick={() => setSubmitted(search.trim())} disabled={!search.trim()}>
               <Search className="size-4" aria-hidden="true" />
             </Button>
           </div>
           {isLoading && <Skeleton className="h-16 w-full" />}
           {isFetched && submitted && results.length === 0 && (
-            <p className="text-sm text-text-secondary">{t('shop.sales.returnLookupEmpty')}</p>
+            <p className="text-sm text-text-secondary" data-testid="return-lookup-empty">{t('shop.sales.returnLookupEmpty')}</p>
           )}
           <div className="flex flex-col gap-1">
             {results.map((s) => (
               <button
                 key={s.saleId}
+                data-testid={`return-lookup-result-${s.saleId}`}
                 className="flex items-center justify-between rounded-md border border-border p-2 text-start text-sm hover:bg-muted/40"
                 onClick={() => onFound(s)}
                 disabled={!(s.status === 'completed' || s.status === 'partially_returned')}
@@ -917,6 +919,7 @@ function ReturnDialog({ sale, onClose }: { sale: SaleRow; onClose: () => void })
                     step="1"
                     className="w-20"
                     disabled={remaining <= 0}
+                    data-testid={`return-line-qty-${item.itemId}`}
                     value={returnQuantities[item.itemId] ?? ''}
                     onChange={(e) => setReturnQuantities((cur) => ({ ...cur, [item.itemId]: Number(e.target.value) }))}
                   />
@@ -925,7 +928,7 @@ function ReturnDialog({ sale, onClose }: { sale: SaleRow; onClose: () => void })
             })}
           </div>
           <label className="flex items-center gap-2 text-sm">
-            <input type="checkbox" checked={restock} onChange={(e) => setRestock(e.target.checked)} />
+            <input type="checkbox" checked={restock} data-testid="return-restock-toggle" onChange={(e) => setRestock(e.target.checked)} />
             {t('shop.sales.restockLabel')}
           </label>
 
@@ -945,7 +948,7 @@ function ReturnDialog({ sale, onClose }: { sale: SaleRow; onClose: () => void })
           </div>
 
           <label className="flex items-center gap-2 text-sm">
-            <input type="checkbox" checked={refundEnabled} onChange={(e) => setRefundEnabled(e.target.checked)} />
+            <input type="checkbox" checked={refundEnabled} data-testid="return-issue-refund-toggle" onChange={(e) => setRefundEnabled(e.target.checked)} />
             {t('shop.sales.issueRefundLabel')}
           </label>
 
@@ -953,10 +956,10 @@ function ReturnDialog({ sale, onClose }: { sale: SaleRow; onClose: () => void })
             <div className="flex flex-col gap-1.5">
               <label className="text-sm font-medium text-text-secondary">{t('shop.sales.refundPaymentChoiceLabel')}</label>
               <Select value={selectedPaymentId} onValueChange={setSelectedPaymentId}>
-                <SelectTrigger><SelectValue placeholder={t('shop.sales.refundPaymentChoicePlaceholder')} /></SelectTrigger>
+                <SelectTrigger data-testid="return-refund-payment-select"><SelectValue placeholder={t('shop.sales.refundPaymentChoicePlaceholder')} /></SelectTrigger>
                 <SelectContent>
                   {payments.map((p) => (
-                    <SelectItem key={p.paymentId} value={p.paymentId}>
+                    <SelectItem key={p.paymentId} value={p.paymentId} data-testid={`return-refund-payment-${p.paymentId}`}>
                       {t(`common.paymentMethodLabels.${p.method}`, { defaultValue: PAYMENT_METHOD_LABELS[p.method] ?? p.method })} — {p.amount.toFixed(2)}
                     </SelectItem>
                   ))}
@@ -967,18 +970,18 @@ function ReturnDialog({ sale, onClose }: { sale: SaleRow; onClose: () => void })
           )}
 
           {/* Real REFUND SUMMARY before confirming (plan Section 4). */}
-          <div className="flex flex-col gap-1 rounded-md border border-border p-3 text-sm">
+          <div className="flex flex-col gap-1 rounded-md border border-border p-3 text-sm" data-testid="return-refund-summary">
             <p className="mb-1 font-medium">{t('shop.sales.refundSummary.title')}</p>
-            <div className="flex items-center justify-between"><span className="text-text-secondary">{t('shop.sales.refundSummary.merchandiseTotal')}</span><MoneyDisplay amount={merchandiseRefundTotal} size="sm" /></div>
-            <div className="flex items-center justify-between"><span className="text-text-secondary">{t('shop.sales.refundSummary.previousRefunds')}</span><MoneyDisplay amount={previousRefundTotal} size="sm" /></div>
-            <div className="flex items-center justify-between"><span className="text-text-secondary">{t('shop.sales.refundSummary.newRefund')}</span><MoneyDisplay amount={newRefundAmount} size="sm" tone={newRefundAmount > 0 ? 'danger' : 'default'} /></div>
-            <div className="flex items-center justify-between"><span className="text-text-secondary">{t('shop.sales.refundSummary.remainingRefundable')}</span><MoneyDisplay amount={remainingRefundableValue} size="sm" tone="success" /></div>
+            <div className="flex items-center justify-between"><span className="text-text-secondary">{t('shop.sales.refundSummary.merchandiseTotal')}</span><span data-testid="return-refund-summary-merchandise"><MoneyDisplay amount={merchandiseRefundTotal} size="sm" /></span></div>
+            <div className="flex items-center justify-between"><span className="text-text-secondary">{t('shop.sales.refundSummary.previousRefunds')}</span><span data-testid="return-refund-summary-previous"><MoneyDisplay amount={previousRefundTotal} size="sm" /></span></div>
+            <div className="flex items-center justify-between"><span className="text-text-secondary">{t('shop.sales.refundSummary.newRefund')}</span><span data-testid="return-refund-summary-new"><MoneyDisplay amount={newRefundAmount} size="sm" tone={newRefundAmount > 0 ? 'danger' : 'default'} /></span></div>
+            <div className="flex items-center justify-between"><span className="text-text-secondary">{t('shop.sales.refundSummary.remainingRefundable')}</span><span data-testid="return-refund-summary-remaining"><MoneyDisplay amount={remainingRefundableValue} size="sm" tone="success" /></span></div>
           </div>
 
-          {error && <p role="alert" className="text-sm text-status-danger">{error}</p>}
+          {error && <p role="alert" data-testid="return-error-message" className="text-sm text-status-danger">{error}</p>}
           <div className="flex justify-end gap-2">
             <Button variant="outline" onClick={onClose}>{t('common.cancel')}</Button>
-            <Button disabled={!reason || returnMutation.isPending} onClick={() => { setError(null); returnMutation.mutate() }}>
+            <Button disabled={!reason || returnMutation.isPending} data-testid="return-submit" onClick={() => { setError(null); returnMutation.mutate() }}>
               {returnMutation.isPending ? t('shop.sales.processing') : t('shop.sales.processReturn')}
             </Button>
           </div>
