@@ -392,13 +392,24 @@ user-accepted decision, not a defect — see that section above.
 
 ## 2. Payment Gateways (Phase 2) — 5 of 5 providers built, cross-cutting security matrix clean
 
-| Provider | Adapter | Webhook sig scheme verified against | Evidence tier |
+**Table scope note**: the "Evidence tier" column below rates only the
+*webhook signature-scheme implementation* (protocol correctness,
+crypto verification against each provider's own documented scheme) —
+it is NOT a rating of the provider integration as a whole. No provider
+is SANDBOX VERIFIED or LIVE VERIFIED for an actual end-to-end
+checkout/payment flow; see "Credential status, honestly" immediately
+below the table, which remains the authoritative status for that.
+
+| Provider | Adapter | Webhook sig scheme verified against | Sig-scheme evidence tier |
 |---|---|---|---|
-| Stripe | checkout, webhook, refund | Primary docs + a real hand-signed HMAC-SHA256 payload sent to the live function | LIVE VERIFIED |
-| Paymob | checkout, webhook, refund | `docs.paymob.pk`/`developers.paymob.com`, byte-matched worked example | LIVE VERIFIED |
-| Kashier | checkout, webhook, refund | `developers.kashier.io/payment/webhook/` | LIVE VERIFIED |
-| Fawry | checkout, webhook, refund | `developer.fawrystaging.com` + the open-source `fawry-api/fawry` gem | LIVE VERIFIED (no self-service sandbox exists — see `PAYMENT_GATEWAY_ARCHITECTURE.md`) |
-| PayPal | checkout, webhook, refund | API-based `verify-webhook-signature`, `verification_status` checked explicitly (not HTTP status) | LIVE VERIFIED |
+| Stripe | checkout, webhook, refund | Primary docs + a real hand-signed HMAC-SHA256 payload sent to the live function | LIVE VERIFIED (signature check only) |
+| Paymob | checkout, webhook, refund | `docs.paymob.pk`/`developers.paymob.com`, byte-matched worked example | LIVE VERIFIED (signature check only) |
+| Kashier | checkout, webhook, refund | `developers.kashier.io/payment/webhook/` | LIVE VERIFIED (signature check only) |
+| Fawry | checkout, webhook, refund | `developer.fawrystaging.com` + the open-source `fawry-api/fawry` gem | LIVE VERIFIED (signature check only; no self-service sandbox exists — see `PAYMENT_GATEWAY_ARCHITECTURE.md`) |
+| PayPal | checkout, webhook, refund | API-based `verify-webhook-signature`, `verification_status` checked explicitly (not HTTP status) | LIVE VERIFIED (signature check only) |
+
+**Overall per-provider integration status: CREDENTIAL-BLOCKED, all 5**
+— unchanged and not upgraded by this freeze.
 
 All 5 share the same provider-agnostic RPC core
 (`start_gateway_checkout`, `record_gateway_payment_service`,
@@ -450,6 +461,17 @@ push alerting, no cross-session error dedup/clustering, Tail Workers
 require Workers Paid (confirmed via Cloudflare docs, not built).
 
 ## 4. Staging + Automated E2E (Phase 4) — see `STAGING_ARCHITECTURE.md`, `E2E_TEST_STRATEGY.md`
+
+**Staging evidence level, stated plainly**: ARCHITECTURE DOCUMENTED +
+CONFIGURED ON EXISTING INFRASTRUCTURE + PARTIALLY AUTOMATED. This is
+**not** a genuinely separate, live-isolated staging deployment (no
+`[env.staging]` Cloudflare Worker environment or second Supabase
+project exists or was created). Test-data isolation and test-build
+isolation both reuse the one real production Supabase project and the
+existing `workers.dev` fallback URL — a deliberate, documented,
+zero-new-cost choice (see `STAGING_ARCHITECTURE.md` §1–3), not an
+overclaim of environment separation. Do not describe this as "a
+staging environment" without this qualification.
 
 No new paid infrastructure created or required. Test-data isolation via
 the existing "QA Full Test Club" fixture (9-role matrix) inside the
@@ -601,3 +623,17 @@ memberships, shop, finance/cash/manual-payment flows, customer portal,
 master admin, platform staff, printing, QR) has already been
 independently live-verified across this and prior sessions in this
 engagement, with no outstanding BLOCKER or CRITICAL finding anywhere.
+
+**Next external action:** Connect at least one real provider merchant
+account and execute Provider Certification E2E.
+
+---
+
+## Release freeze — d685690
+
+This directive is closed. The commit above is frozen as the production
+launch readiness baseline, tagged `v1.1.0-production-launch-baseline`.
+No further development or audit work is planned against this baseline
+under this directive. See the repository tag and its annotation for
+the immutable scope summary of what this baseline does and does not
+include.
