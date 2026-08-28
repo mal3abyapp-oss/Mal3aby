@@ -3926,7 +3926,19 @@
       "partialPaymentLabel": "دفعة جزئية",
       "paidNowLabel": "المبلغ المدفوع الآن",
       "outstandingPreview": "الرصيد المتبقي: {{amount}}",
-      "partialAmountInvalid": "أدخل مبلغًا أكبر من 0 وأقل من الإجمالي."
+      "partialAmountInvalid": "أدخل مبلغًا أكبر من 0 وأقل من الإجمالي.",
+      "allProducts": "كل المنتجات",
+      "bestSellers": "الأكثر مبيعًا",
+      "categoryStripLabel": "فئات المنتجات",
+      "barcodePlaceholder": "امسح الباركود أو أدخله",
+      "barcodeNotFound": "لا يوجد منتج أو نوع مطابق للباركود \"{{code}}\".",
+      "barcodeOutOfStock": "{{name}} غير متوفر في المخزون ولا يمكن إضافته.",
+      "outOfStock": "غير متوفر",
+      "lowStockBadge": "مخزون منخفض",
+      "stockCount": "{{count}} بالمخزون",
+      "cartTitle": "السلة",
+      "viewCart": "عرض السلة",
+      "viewCartWithTotal": "عرض السلة ({{count}} عنصر)"
     },
     "products": {
       "title": "المنتجات",

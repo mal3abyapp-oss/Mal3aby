@@ -3929,7 +3929,19 @@
       "partialPaymentLabel": "Partial payment",
       "paidNowLabel": "Amount paid now",
       "outstandingPreview": "Remaining balance: {{amount}}",
-      "partialAmountInvalid": "Enter an amount greater than 0 and less than the subtotal."
+      "partialAmountInvalid": "Enter an amount greater than 0 and less than the subtotal.",
+      "allProducts": "All Products",
+      "bestSellers": "Best Sellers",
+      "categoryStripLabel": "Product categories",
+      "barcodePlaceholder": "Scan or enter barcode",
+      "barcodeNotFound": "No product or variant matches barcode \"{{code}}\".",
+      "barcodeOutOfStock": "{{name}} is out of stock and can't be added.",
+      "outOfStock": "Out of stock",
+      "lowStockBadge": "Low stock",
+      "stockCount": "{{count}} in stock",
+      "cartTitle": "Cart",
+      "viewCart": "View cart",
+      "viewCartWithTotal": "View cart ({{count}} items)"
     },
     "products": {
       "title": "Products",
