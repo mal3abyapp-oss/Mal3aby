@@ -111,3 +111,9 @@ Per directive §50: fresh `git status`, origin/main consistency, TypeScript, lin
 Phase 1 (foundational enforcement) → Phase 2 (extend the now-proven pattern to Memberships) → Phase 3 (nav + audit hygiene, depends on Phase 1/2's real state existing to hide nav correctly) → Phase 4 (plan seeding, independent of 1-3 but logically "foundational" so placed before UX) → Phase 5 (payment oversight, independent domain, placed after the module work since it's lower severity) → Phase 6 (test suite, needs 1/2/5 to exist first) → Phase 7 (UX, must come after backend is real, per directive §4's explicit rule) → Phase 8 (closure).
 
 Execution begins immediately with Phase 1.
+
+---
+
+## Closure
+
+All 8 phases complete. See `PLATFORM_OWNER_CONTROL_PRODUCTION_ACCEPTANCE.md` for the final acceptance report, live-verification evidence, and closing regression results.
