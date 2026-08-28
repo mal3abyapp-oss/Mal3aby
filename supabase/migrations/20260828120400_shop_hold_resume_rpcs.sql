@@ -187,6 +187,9 @@ begin
           or public.has_platform_support_access(v_held.club_id, true)) then
     raise exception 'not authorized';
   end if;
+  if not public._shop_module_active(v_held.club_id) then
+    raise exception 'the shop module is not active for this club';
+  end if;
 
   -- RETURN QUERY executes and appends its results to the function's
   -- result set immediately (documented Postgres/PL_pgSQL behavior) --
@@ -244,6 +247,9 @@ begin
   if not (v_held.club_id in (select public.user_club_ids()) and public.has_permission('shop.sale.create', v_held.club_id)
           or public.has_platform_support_access(v_held.club_id, true)) then
     raise exception 'not authorized';
+  end if;
+  if not public._shop_module_active(v_held.club_id) then
+    raise exception 'the shop module is not active for this club';
   end if;
 
   perform public.write_audit_log(
