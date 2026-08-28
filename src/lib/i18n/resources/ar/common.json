@@ -3980,6 +3980,24 @@
       "saveError": "تعذّر حفظ الفئة.",
       "emptyDescription": "لا توجد فئات بعد — يمكنك إنشاء واحدة من حقل الفئة داخل أي منتج."
     },
+    "suppliers": {
+      "manageTitle": "إدارة الموردين",
+      "pickerLabel": "المورد (اختياري)",
+      "pickerPlaceholder": "اختر موردًا",
+      "none": "بدون مورد",
+      "createNew": "+ إنشاء مورد جديد…",
+      "addSupplier": "إضافة مورد",
+      "nameLabel": "الاسم",
+      "phoneLabel": "رقم الهاتف",
+      "emailLabel": "البريد الإلكتروني (اختياري)",
+      "notesLabel": "ملاحظات (اختياري)",
+      "creating": "جاري الإنشاء...",
+      "createError": "تعذّر إنشاء المورد.",
+      "saveError": "تعذّر حفظ المورد.",
+      "deactivate": "إيقاف",
+      "reactivate": "إعادة تفعيل",
+      "emptyDescription": "لا يوجد موردون بعد — أضِف أول مورد أدناه."
+    },
     "inventory": {
       "title": "المخزون",
       "description": "أرصدة المخزون، الاستلام، التحويلات، والتسويات",

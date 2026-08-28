@@ -3983,6 +3983,24 @@
       "saveError": "Couldn't save the category.",
       "emptyDescription": "No categories yet — create one from a product's category field."
     },
+    "suppliers": {
+      "manageTitle": "Manage suppliers",
+      "pickerLabel": "Supplier (optional)",
+      "pickerPlaceholder": "Choose a supplier",
+      "none": "No supplier",
+      "createNew": "+ Create new supplier…",
+      "addSupplier": "Add supplier",
+      "nameLabel": "Name",
+      "phoneLabel": "Phone",
+      "emailLabel": "Email (optional)",
+      "notesLabel": "Notes (optional)",
+      "creating": "Creating...",
+      "createError": "Couldn't create the supplier.",
+      "saveError": "Couldn't save the supplier.",
+      "deactivate": "Deactivate",
+      "reactivate": "Reactivate",
+      "emptyDescription": "No suppliers yet — add your first one below."
+    },
     "inventory": {
       "title": "Inventory",
       "description": "Stock balances, receiving, transfers, and adjustments",
