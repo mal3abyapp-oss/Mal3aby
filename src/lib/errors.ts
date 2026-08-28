@@ -114,6 +114,21 @@ const MESSAGE_RULES: Array<[RegExp, string, string]> = [
   // fallback before this rule.
   [/price cannot be negative/i, 'السعر لا يمكن أن يكون بالسالب.', "The price can't be negative."],
   [/counted quantity cannot be negative/i, 'الكمية المعدودة لا يمكن أن تكون بالسالب.', "The counted quantity can't be negative."],
+  // Directive Section 7c (out-of-stock sale attempt) / Section 18
+  // ("insufficient stock" provocation): _apply_shop_inventory_movement_
+  // internal -- the single canonical engine every Shop stock-deducting
+  // write path (create_shop_sale, transfer_shop_stock, adjust_shop_stock,
+  // complete_shop_stock_count) routes through -- already correctly
+  // denies going negative server-side (confirmed live this session by
+  // reading its own definition: `if p_direction = 'out' and
+  // v_current_on_hand < p_quantity then raise exception 'insufficient
+  // stock: % available, % requested'`). That real, dynamic message had
+  // no translation rule and was falling through to each screen's
+  // generic fallback -- fixed generically (not matching the exact
+  // numbers, since MESSAGE_RULES only supports a fixed replacement
+  // string) so the shopper at least sees a clear, specific reason
+  // rather than "something went wrong".
+  [/insufficient stock/i, 'الكمية المتاحة في المخزون غير كافية لإتمام هذه العملية.', 'Not enough stock is available to complete this.'],
 ]
 
 const CODE_RULES: Record<string, [string, string]> = {
