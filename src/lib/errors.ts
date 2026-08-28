@@ -95,6 +95,17 @@ const MESSAGE_RULES: Array<[RegExp, string, string]> = [
   [/shift not found or you do not have permission to close it/i, 'الوردية غير موجودة أو لا تملك صلاحية إغلاقها.', "The shift wasn't found, or you don't have permission to close it."],
   [/branch not found in this club/i, 'الفرع غير موجود في هذا النادي.', 'The branch was not found in this club.'],
   [/this employee has an open cash shift -- close it before/i, 'هذا الموظف لديه وردية نقدية مفتوحة — يجب إغلاقها أولًا.', 'This employee has an open cash shift — it must be closed first.'],
+  // SHOP MODULE UX HARDENING (2026-08-28): every Shop RPC's own
+  // "the shop module is not active for this club" exception (added
+  // this session to close a real module-entitlement enforcement gap)
+  // was previously falling through to each screen's generic fallback
+  // ("couldn't create the product", etc.) -- not a raw DB-error leak,
+  // but not the specific, actionable message directive Section 12
+  // explicitly requires either. A club owner seeing this needs to
+  // understand it's a subscription/entitlement issue, not a bug, and
+  // know who to contact -- matching the directive's own example
+  // Arabic copy verbatim.
+  [/the shop module is not active for this club/i, 'المتجر غير متاح ضمن اشتراك ناديك. تواصل مع إدارة المنصة لتفعيله.', "The Shop isn't available on your club's current plan. Contact the platform team to activate it."],
 ]
 
 const CODE_RULES: Record<string, [string, string]> = {
