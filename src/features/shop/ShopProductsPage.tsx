@@ -623,8 +623,8 @@ export function ShopProductsPage() {
       ),
     },
     { key: 'category', header: t('shop.products.columns.category'), render: (p) => p.categoryNameAr ?? '—' },
-    { key: 'sku', header: t('shop.products.columns.sku'), render: (p) => p.sku ?? '—' },
-    { key: 'barcode', header: t('shop.products.columns.barcode'), render: (p) => p.barcode ?? '—' },
+    { key: 'sku', header: t('shop.products.columns.sku'), render: (p) => <span dir="ltr">{p.sku ?? '—'}</span> },
+    { key: 'barcode', header: t('shop.products.columns.barcode'), render: (p) => <span dir="ltr">{p.barcode ?? '—'}</span> },
     { key: 'price', header: t('shop.products.columns.price'), render: (p) => <MoneyDisplay amount={p.basePrice} size="sm" /> },
     {
       key: 'stock',

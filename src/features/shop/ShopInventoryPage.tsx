@@ -1279,7 +1279,7 @@ function ProductDetailDialog({ clubId, productId, onClose }: { clubId: string; p
         <div className="max-h-[60vh] overflow-y-auto">
           {tab === 'general' && product && (
             <div className="grid grid-cols-2 gap-3 text-sm">
-              <div><span className="text-text-secondary">{t('shop.inventory.detail.sku')}</span><p className="font-medium">{product.sku ?? '—'}</p></div>
+              <div><span className="text-text-secondary">{t('shop.inventory.detail.sku')}</span><p className="font-medium" dir="ltr">{product.sku ?? '—'}</p></div>
               <div><span className="text-text-secondary">{t('shop.inventory.detail.barcode')}</span><p className="font-medium" dir="ltr">{product.barcode ?? '—'}</p></div>
               <div><span className="text-text-secondary">{t('shop.inventory.detail.category')}</span><p className="font-medium">{product.category_name_ar ?? '—'}</p></div>
               <div><span className="text-text-secondary">{t('shop.inventory.detail.basePrice')}</span><MoneyDisplay amount={Number(product.base_price)} size="sm" /></div>
