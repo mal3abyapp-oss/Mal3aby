@@ -11,7 +11,22 @@
 -- over the parent product's when a variant is selected, matching how
 -- unit_price already prefers variant.price_override over
 -- product.base_price elsewhere in this module.
-create or replace function public.get_shop_sale_detail(p_sale_id uuid)
+-- CORRECTION (orchestrator review, applying this migration live): the
+-- comment below claiming "CREATE OR REPLACE in place is safe... no DROP
+-- ... issue" is WRONG, and citing 20260828100200 as precedent for that
+-- claim is backwards -- that exact migration is the one that PROVED the
+-- opposite (its first attempt hit the identical error this one does).
+-- Postgres rejects `create or replace function` whenever the RETURNS
+-- TABLE row shape changes, appended column or not, confirmed live
+-- applying this exact migration: "ERROR: 42P13: cannot change return
+-- type of existing function... Row type defined by OUT parameters is
+-- different." An explicit `drop function` is required first, exactly
+-- like every other return-shape change in this project's migration
+-- history. Grants ARE re-stated below, since a dropped function loses
+-- its prior grants.
+drop function if exists public.get_shop_sale_detail(uuid);
+
+create function public.get_shop_sale_detail(p_sale_id uuid)
 returns table(
   item_id uuid, product_name_ar text, variant_label text, sku text, quantity numeric,
   unit_price numeric, line_total numeric, returned_quantity numeric
@@ -45,13 +60,6 @@ begin
 end;
 $$;
 
--- Same signature as before (uuid) -- CREATE OR REPLACE in place is safe
--- (only the return row shape changed by appending a column), no DROP or
--- grant-leak class issue since PostgREST identity is (name, arg types),
--- not the return type -- matching the same reasoning
--- 20260828100200_shop_product_media_category_ux_rpcs.sql documented for
--- list_shop_products/list_shop_categories' own in-place return-shape
--- extension.
 revoke all on function public.get_shop_sale_detail(uuid) from public, anon;
 grant execute on function public.get_shop_sale_detail(uuid) to authenticated;
 
