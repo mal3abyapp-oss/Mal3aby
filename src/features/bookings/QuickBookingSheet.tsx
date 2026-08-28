@@ -283,7 +283,7 @@ export function QuickBookingSheet({
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
                   {durations.map((d) => (
-                    <SelectItem key={d.value} value={d.value} disabled={!d.isAvailable}>
+                    <SelectItem key={d.value} value={d.value} disabled={!d.isAvailable} data-testid={`quick-booking-duration-${d.value}`}>
                       {d.label}
                       {!d.isAvailable && ` — ${t('bookings.quick.durationUnavailable')}`}
                     </SelectItem>
@@ -417,6 +417,7 @@ export function QuickBookingSheet({
         <SheetFooter>
           <Button
             className="w-full"
+            data-testid="quick-booking-confirm"
             disabled={!selectedCustomer || !resolvedPrice || !clubTimezone || bookMutation.isPending || !!recurringResult || (isRecurring && (!occurrenceCount || Number(occurrenceCount) < 1 || Number(occurrenceCount) > 52)) || (payNow && !isRecurring && !receipt.isValid)}
             onClick={() => bookMutation.mutate()}
           >

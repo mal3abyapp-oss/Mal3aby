@@ -138,7 +138,7 @@ async function fetchVariants(productId: string): Promise<VariantOption[]> {
 function StatusBadge({ status }: { status: string }) {
   const { t } = useTranslation()
   const variant = status === 'completed' ? 'default' : status === 'cancelled' ? 'secondary' : status === 'in_progress' ? 'outline' : 'outline'
-  return <Badge variant={variant}>{t(`shop.stockCount.status.${status}`, { defaultValue: status })}</Badge>
+  return <Badge variant={variant} data-testid="stock-count-status" data-status={status}>{t(`shop.stockCount.status.${status}`, { defaultValue: status })}</Badge>
 }
 
 export function ShopStockCountPage() {
@@ -175,7 +175,7 @@ export function ShopStockCountPage() {
       key: 'actions',
       header: '',
       render: (c) => (
-        <Button size="sm" variant="outline" onClick={() => setDetailId(c.id)}>
+        <Button size="sm" variant="outline" data-testid={`stock-count-open-${c.id}`} onClick={() => setDetailId(c.id)}>
           {c.status === 'in_progress' ? t('shop.stockCount.continue') : t('shop.stockCount.view')}
         </Button>
       ),
@@ -187,7 +187,7 @@ export function ShopStockCountPage() {
       <PageHeader
         title={t('shop.stockCount.title')}
         description={t('shop.stockCount.description')}
-        actions={<Button onClick={() => setStartOpen(true)}>{t('shop.stockCount.startNew')}</Button>}
+        actions={<Button data-testid="stock-count-start-new" onClick={() => setStartOpen(true)}>{t('shop.stockCount.startNew')}</Button>}
       />
 
       <DataTable
@@ -246,18 +246,18 @@ function StartStockCountDialog({ clubId, onClose, onDone }: { clubId: string; on
           <div className="flex flex-col gap-1.5">
             <label className="text-sm font-medium text-text-secondary">{t('shop.stockCount.locationLabel')}</label>
             <Select value={locationId} onValueChange={setLocationId}>
-              <SelectTrigger><SelectValue placeholder={t('shop.inventory.locationPlaceholder')} /></SelectTrigger>
-              <SelectContent>{locations.map((l) => <SelectItem key={l.locationId} value={l.locationId}>{l.name}</SelectItem>)}</SelectContent>
+              <SelectTrigger data-testid="stock-count-location"><SelectValue placeholder={t('shop.inventory.locationPlaceholder')} /></SelectTrigger>
+              <SelectContent>{locations.map((l) => <SelectItem key={l.locationId} value={l.locationId} data-testid={`stock-count-location-${l.locationId}`}>{l.name}</SelectItem>)}</SelectContent>
             </Select>
           </div>
           <div className="flex flex-col gap-1.5">
             <label className="text-sm font-medium text-text-secondary">{t('shop.stockCount.notesLabel')}</label>
-            <Input value={notes} onChange={(e) => setNotes(e.target.value)} />
+            <Input data-testid="stock-count-notes" value={notes} onChange={(e) => setNotes(e.target.value)} />
           </div>
           {error && <p role="alert" className="text-sm text-status-danger">{error}</p>}
           <div className="flex justify-end gap-2">
             <Button variant="outline" onClick={onClose}>{t('common.cancel')}</Button>
-            <Button disabled={!locationId || mutation.isPending} onClick={() => { setError(null); mutation.mutate() }}>
+            <Button data-testid="stock-count-start-confirm" disabled={!locationId || mutation.isPending} onClick={() => { setError(null); mutation.mutate() }}>
               {mutation.isPending ? t('shop.stockCount.starting') : t('shop.stockCount.startNew')}
             </Button>
           </div>
@@ -351,21 +351,22 @@ function StockCountDetailDialog({ clubId, stockCountId, onClose, onChanged }: {
                 <div className="flex flex-1 flex-col gap-1.5">
                   <label className="text-sm font-medium text-text-secondary">{t('shop.stockCount.addProductLabel')}</label>
                   <Select value={addProductId} onValueChange={(v) => { setAddProductId(v); setAddVariantId('') }}>
-                    <SelectTrigger><SelectValue placeholder={t('shop.inventory.productPlaceholder')} /></SelectTrigger>
-                    <SelectContent>{products.map((p) => <SelectItem key={p.productId} value={p.productId}>{p.nameAr}</SelectItem>)}</SelectContent>
+                    <SelectTrigger data-testid="stock-count-add-product"><SelectValue placeholder={t('shop.inventory.productPlaceholder')} /></SelectTrigger>
+                    <SelectContent>{products.map((p) => <SelectItem key={p.productId} value={p.productId} data-testid={`stock-count-add-product-${p.productId}`}>{p.nameAr}</SelectItem>)}</SelectContent>
                   </Select>
                 </div>
                 {selectedAddProduct?.hasVariants && (
                   <div className="flex flex-1 flex-col gap-1.5">
                     <label className="text-sm font-medium text-text-secondary">{t('shop.inventory.variantLabel')}</label>
                     <Select value={addVariantId} onValueChange={setAddVariantId}>
-                      <SelectTrigger><SelectValue placeholder={t('shop.inventory.variantPlaceholder')} /></SelectTrigger>
-                      <SelectContent>{addVariants.map((v) => <SelectItem key={v.variantId} value={v.variantId}>{[v.size, v.color].filter(Boolean).join(' / ')}</SelectItem>)}</SelectContent>
+                      <SelectTrigger data-testid="stock-count-add-variant"><SelectValue placeholder={t('shop.inventory.variantPlaceholder')} /></SelectTrigger>
+                      <SelectContent>{addVariants.map((v) => <SelectItem key={v.variantId} value={v.variantId} data-testid={`stock-count-add-variant-${v.variantId}`}>{[v.size, v.color].filter(Boolean).join(' / ')}</SelectItem>)}</SelectContent>
                     </Select>
                   </div>
                 )}
                 <Button
                   size="sm"
+                  data-testid="stock-count-add-line"
                   disabled={!addProductId || (selectedAddProduct?.hasVariants && !addVariantId)}
                   onClick={() => {
                     setError(null)
@@ -415,6 +416,7 @@ function StockCountDetailDialog({ clubId, stockCountId, onClose, onChanged }: {
                                 min="0"
                                 step="0.01"
                                 className="w-24"
+                                data-testid={`stock-count-line-counted-${line.itemId}`}
                                 value={draftValue}
                                 onChange={(e) => setCountedDrafts((d) => ({ ...d, [line.itemId]: e.target.value }))}
                                 onBlur={() => {
@@ -472,10 +474,10 @@ function StockCountDetailDialog({ clubId, stockCountId, onClose, onChanged }: {
               <Button variant="outline" onClick={onClose}>{t('common.close')}</Button>
               {isInProgress && (
                 <>
-                  <Button variant="destructive" disabled={cancelMutation.isPending} onClick={() => cancelMutation.mutate()}>
+                  <Button variant="destructive" data-testid="stock-count-cancel" disabled={cancelMutation.isPending} onClick={() => cancelMutation.mutate()}>
                     {t('shop.stockCount.cancelCount')}
                   </Button>
-                  <Button disabled={!allCounted || completeMutation.isPending} onClick={() => completeMutation.mutate()}>
+                  <Button data-testid="stock-count-complete" disabled={!allCounted || completeMutation.isPending} onClick={() => completeMutation.mutate()}>
                     {completeMutation.isPending ? t('shop.stockCount.completing') : t('shop.stockCount.completeCount')}
                   </Button>
                 </>

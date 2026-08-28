@@ -335,24 +335,24 @@ export function EnrollmentSection() {
         <p className="text-sm text-text-secondary">{t('academy.enrollments.manageSubtitle')}</p>
         <Dialog open={wizardOpen} onOpenChange={setWizardOpen}>
           <DialogTrigger asChild>
-            <Button size="sm">{t('academy.enrollments.newEnrollment')}</Button>
+            <Button size="sm" data-testid="enrollment-wizard-open">{t('academy.enrollments.newEnrollment')}</Button>
           </DialogTrigger>
           <DialogContent>
             <DialogHeader><DialogTitle>{t('academy.enrollments.wizardTitle')}</DialogTitle></DialogHeader>
             <div className="flex flex-col gap-3">
               <Select value={wizardPlayerId} onValueChange={(v) => { setWizardPlayerId(v); setWizardGuardianId('') }}>
-                <SelectTrigger><SelectValue placeholder={t('academy.enrollments.player')} /></SelectTrigger>
-                <SelectContent>{players.map((p) => <SelectItem key={p.id} value={p.id}>{p.full_name}</SelectItem>)}</SelectContent>
+                <SelectTrigger data-testid="enrollment-wizard-player"><SelectValue placeholder={t('academy.enrollments.player')} /></SelectTrigger>
+                <SelectContent>{players.map((p) => <SelectItem key={p.id} value={p.id} data-testid={`enrollment-wizard-player-${p.id}`}>{p.full_name}</SelectItem>)}</SelectContent>
               </Select>
               {guardians.length > 0 && (
                 <Select value={wizardGuardianId} onValueChange={setWizardGuardianId}>
-                  <SelectTrigger><SelectValue placeholder={t('academy.enrollments.guardianForBilling')} /></SelectTrigger>
-                  <SelectContent>{guardians.map((g) => <SelectItem key={g.id} value={g.id}>{g.name}{g.isPrimary ? ` ${t('academy.players.primary')}` : ''}</SelectItem>)}</SelectContent>
+                  <SelectTrigger data-testid="enrollment-wizard-guardian"><SelectValue placeholder={t('academy.enrollments.guardianForBilling')} /></SelectTrigger>
+                  <SelectContent>{guardians.map((g) => <SelectItem key={g.id} value={g.id} data-testid={`enrollment-wizard-guardian-${g.id}`}>{g.name}{g.isPrimary ? ` ${t('academy.players.primary')}` : ''}</SelectItem>)}</SelectContent>
                 </Select>
               )}
               <Select value={wizardGroupId} onValueChange={setWizardGroupId}>
-                <SelectTrigger><SelectValue placeholder={t('academy.enrollments.group')} /></SelectTrigger>
-                <SelectContent>{groups.map((g) => <SelectItem key={g.id} value={g.id}>{g.name}</SelectItem>)}</SelectContent>
+                <SelectTrigger data-testid="enrollment-wizard-group"><SelectValue placeholder={t('academy.enrollments.group')} /></SelectTrigger>
+                <SelectContent>{groups.map((g) => <SelectItem key={g.id} value={g.id} data-testid={`enrollment-wizard-group-${g.id}`}>{g.name}</SelectItem>)}</SelectContent>
               </Select>
               {/* Phase E simplification: every subscription in production
                   has always been 'monthly' (0 rows ever used quarterly/
@@ -416,8 +416,9 @@ export function EnrollmentSection() {
                   )}
                 </div>
               )}
-              {wizardError && <p role="alert" className="text-sm text-status-danger">{wizardError}</p>}
+              {wizardError && <p role="alert" data-testid="enrollment-wizard-error" className="text-sm text-status-danger">{wizardError}</p>}
               <Button
+                data-testid="enrollment-wizard-submit"
                 disabled={!wizardPlayerId || !wizardGuardianId || !wizardGroupId || !wizardStart || !wizardEnd || selectedGroupForPrice?.subscription_price == null || enrollMutation.isPending}
                 onClick={() => enrollMutation.mutate()}
               >

@@ -294,6 +294,7 @@ export function BookingsMobileView({
             return (
               <button
                 key={`a-${s.startAt}`}
+                data-testid={activeField ? `booking-slot-${activeField.id}-${fromInstant(s.startAt, clubTimezone).time}` : undefined}
                 onClick={() => {
                   if (!activeField) return
                   const { time } = fromInstant(s.startAt, clubTimezone)
