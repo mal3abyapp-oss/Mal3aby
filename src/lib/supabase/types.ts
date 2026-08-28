@@ -8431,6 +8431,15 @@ export type Database = {
           status: string
         }[]
       }
+      list_shop_categories_all: {
+        Args: { p_club_id: string }
+        Returns: {
+          category_id: string
+          name_ar: string
+          name_en: string
+          status: string
+        }[]
+      }
       list_shop_inventory_locations: {
         Args: { p_club_id: string }
         Returns: {
@@ -9365,6 +9374,15 @@ export type Database = {
           p_gender?: string
           p_medical_notes?: string
           p_player_id: string
+          p_status?: string
+        }
+        Returns: undefined
+      }
+      update_shop_category: {
+        Args: {
+          p_category_id: string
+          p_name_ar?: string
+          p_name_en?: string
           p_status?: string
         }
         Returns: undefined

@@ -3966,7 +3966,22 @@
         "status": "Status"
       },
       "archiveVariant": "Archive",
-      "reactivateVariant": "Reactivate"
+      "reactivateVariant": "Reactivate",
+      "imageUrlLabel": "Image URL (optional)",
+      "reorderLevelLabel": "Low-stock alert threshold (optional)",
+      "reorderLevelHint": "Shown as low stock in reports once balance drops to or below this number.",
+      "categoryFilterAll": "All categories"
+    },
+    "categories": {
+      "manageTitle": "Manage categories",
+      "nameArLabel": "Name (Arabic)",
+      "nameEnLabel": "Name (English, optional)",
+      "createNew": "+ Create new category…",
+      "createAndUse": "Create and use",
+      "creating": "Creating...",
+      "createError": "Couldn't create the category.",
+      "saveError": "Couldn't save the category.",
+      "emptyDescription": "No categories yet — create one from a product's category field."
     },
     "inventory": {
       "title": "Inventory",

@@ -3963,7 +3963,22 @@
         "status": "الحالة"
       },
       "archiveVariant": "أرشفة",
-      "reactivateVariant": "إعادة تفعيل"
+      "reactivateVariant": "إعادة تفعيل",
+      "imageUrlLabel": "رابط الصورة (اختياري)",
+      "reorderLevelLabel": "حد تنبيه انخفاض المخزون (اختياري)",
+      "reorderLevelHint": "يظهر المنتج في تقارير المخزون المنخفض عند وصول الرصيد إلى هذا الرقم أو أقل.",
+      "categoryFilterAll": "كل الفئات"
+    },
+    "categories": {
+      "manageTitle": "إدارة الفئات",
+      "nameArLabel": "الاسم (بالعربية)",
+      "nameEnLabel": "الاسم (بالإنجليزية، اختياري)",
+      "createNew": "+ إنشاء فئة جديدة…",
+      "createAndUse": "إنشاء واستخدام",
+      "creating": "جاري الإنشاء...",
+      "createError": "تعذّر إنشاء الفئة.",
+      "saveError": "تعذّر حفظ الفئة.",
+      "emptyDescription": "لا توجد فئات بعد — يمكنك إنشاء واحدة من حقل الفئة داخل أي منتج."
     },
     "inventory": {
       "title": "المخزون",
