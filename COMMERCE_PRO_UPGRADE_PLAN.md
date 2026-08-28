@@ -138,13 +138,24 @@ existing role-composition mechanics.
   above) — club-scoped, RLS'd, no FK into `invoices`/`payments`, holds
   `product_id`/`variant_id`/`quantity` only, `held_by`, `held_at`,
   `customer_id` nullable, `note` nullable.
-- New `clubs` branding columns (additive):
-  `shop_print_logo_url`, `shop_print_trading_name_ar`,
-  `shop_print_trading_name_en`, `shop_print_address`,
-  `shop_print_phone`, `shop_print_tax_number`,
-  `shop_print_commercial_registration`, `shop_print_footer_note`,
-  `shop_print_return_policy`. All nullable — render only what's
-  configured, per §14's explicit "do not force all fields" instruction.
+- **Correction, found while prepping C4 context**: `clubs` already has
+  `logo_url text`, `tax_info jsonb`, and `invoice_settings jsonb` —
+  confirmed live in the real schema
+  (`20260815120000_phase2_identity_multitenant_rls.sql`) and confirmed,
+  via a full `src/` grep, **completely unused anywhere in the app**
+  (only auto-generated TypeScript type stubs reference them; `logo_url`
+  itself IS actively used elsewhere — `MembershipCard.tsx`,
+  `PublicClubBookingPage.tsx` — just never for Shop printing). §14's
+  branding fields (trading name ar/en, address, phone, tax/commercial-
+  registration numbers, footer note, return-policy text) belong inside
+  the existing `invoice_settings`/`tax_info` jsonb columns, NOT new
+  `shop_print_*` columns — reusing existing, already-designed-for-this
+  schema rather than duplicating it. C4 should confirm the exact
+  intended shape (there may be a reason these were never wired — check
+  for any design-doc trace before assuming) and wire the print UI to
+  read from them, adding a settings-page write path if none exists.
+  Only add a genuinely new column if something in §14's list has no
+  reasonable home in either jsonb blob.
 - New storage bucket: `shop-product-images` (public, 5MB limit,
   `{image/jpeg,image/png,image/webp}`).
 
