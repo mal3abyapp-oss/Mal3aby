@@ -16,11 +16,11 @@
 
 ### Phase A — Provider Policy UI (addresses gap 1, directive §11/§12)
 Build a UI on Club Detail for `set_club_gateway_provider_policy` / listing `club_gateway_provider_policy` rows, showing provider/connected/enabled/platform-allowed/policy-blocked status without exposing credentials. Live-test allow→block→restore on the QA club; confirm a second club unaffected.
-Status: PENDING
+Status: COMPLETE — committed `b07c22f`. New RPC `get_platform_club_gateway_overview` (migration `20260829010000_platform_gateway_policy_read_rpc.sql`), `ProviderPolicyPanel` in `PlatformClubDetailPage.tsx`. Live-verified: block Stripe → SQL-confirmed `policy_blocked` → `connect_club_gateway` rejection confirmed → restore via UI → SQL-confirmed `allowed`. Cross-club isolation confirmed (zero policy rows for any other club). Side-effect fix: stale Vite `.vite` pre-bundle cache found and cleared (dev-tooling issue, not a product defect).
 
 ### Phase B — Audit Label Mapping (addresses gap 2, directive §21)
 Extend `src/lib/domain/audit.ts`'s `ACTION_LABELS`/`ACTION_LABELS_EN` (and entity labels if needed) with human-readable AR/EN mappings for the 7+ action strings found live-unmapped. Live-verify in the real Audit Log UI.
-Status: PENDING
+Status: COMPLETE. Added AR+EN entries for `module.entitled`, `module.unentitled`, `module.activated`, `module.deactivated` (entity `club_module`), `club_payments.enabled`, `club_payments.disabled`, `commercial_entitlements.updated` (entity `commercial_entitlements`), and `club_gateway_provider_policy.updated` (entity `club_gateway_provider_policy`, newly relevant from Phase A). `tsc -b` and `eslint` clean. Live-verified in the real Club Detail → Audit Log tab: all entries (including this session's own Phase A block/restore actions) now render as readable Arabic labels instead of raw machine strings. Noted but out of scope: `payment.gateway_refund`/`payment.gateway_confirmed`/`payment.gateway_rejected`/`product.created` remain raw — these are club-tier transactional logs from already-closed prior phases, not Platform Owner control actions named in the directive's §21 list.
 
 ### Phase C — Mobile Modules Tab Discoverability (addresses gap 3, directive §24)
 Low-risk fix to `PlatformClubDetailPage.tsx`'s tab bar so Modules (and other tabs) are reachable without hidden horizontal scroll at 375px — e.g. allow the tab list to wrap, or ensure a visible scroll affordance. Visually verify at 375px.
