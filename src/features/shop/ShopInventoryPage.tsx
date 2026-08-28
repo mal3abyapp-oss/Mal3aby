@@ -9,6 +9,9 @@ import { PageHeader } from '@/components/ui/page-header'
 import { DataTable, type DataTableColumn } from '@/components/ui/data-table'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { Badge } from '@/components/ui/badge'
+import { StatCard } from '@/components/ui/stat-card'
+import { MoneyDisplay } from '@/components/ui/money-display'
 import {
   Select,
   SelectContent,
@@ -25,11 +28,28 @@ import {
 import { translateSupabaseError } from '@/lib/errors'
 import { ReportPrintButton, ReportPrintHeader } from '@/components/ui/report-print-header'
 import { fetchFullReport } from '@/lib/fetchFullReport'
-import { Printer } from 'lucide-react'
+import { ProductThumb } from '@/features/shop/shop-media'
+import {
+  Printer, Boxes, Wallet, AlertTriangle, XCircle, PackagePlus, ArrowLeftRight,
+  SlidersHorizontal, Trash2, Plus,
+} from 'lucide-react'
 
 // COMMERCIAL MODULE (2026-08-26) -- Inventory dashboard: balances,
 // low-stock filter, receive/transfer/adjust actions, movement history
 // (directive Section 59/103).
+//
+// COMMERCE PRO C8 (2026-08-28, plan Section 5 Phase C8): upgraded to a
+// real Inventory Dashboard (KPI row + recent-activity rollups, plan
+// Section 20/59), a Product Detail dialog with tabs (plan Section 21),
+// and multi-item Receiving/Transfer dialogs (plan Sections 22/23) that
+// call new atomic batch RPCs instead of looping the existing
+// single-item RPCs client-side -- see receive_shop_stock_batch's own
+// migration comment (20260828180000_shop_receive_transfer_batch_rpcs.sql)
+// for the full transaction-boundary reasoning. Stock Count UX
+// (ShopStockCountPage.tsx) is polished separately in that file only --
+// its canonical backend (start/record/complete RPCs) is untouched here,
+// per the plan's explicit instruction not to rebuild already-validated
+// backend.
 interface BalanceRow {
   locationId: string
   locationName: string
@@ -42,8 +62,11 @@ interface BalanceRow {
 }
 
 interface LocationOption { locationId: string; name: string }
-interface ProductOption { productId: string; nameAr: string; hasVariants: boolean }
-interface VariantOption { variantId: string; size: string | null; color: string | null }
+interface ProductOption {
+  productId: string; nameAr: string; hasVariants: boolean
+  imageUrl: string | null; sku: string | null; barcode: string | null
+}
+interface VariantOption { variantId: string; size: string | null; color: string | null; sku: string | null }
 interface SupplierOption { supplierId: string; name: string; isActive: boolean }
 interface MovementRow {
   movementId: string
@@ -56,6 +79,13 @@ interface MovementRow {
   reason: string | null
 }
 
+interface InventorySummary {
+  activeProducts: number
+  totalOnHand: number
+  lowStockCount: number
+  outOfStockCount: number
+}
+
 async function fetchBalances(clubId: string, lowStockOnly: boolean): Promise<BalanceRow[]> {
   const { data, error } = await supabase.rpc('get_shop_inventory_balances', { p_club_id: clubId, p_low_stock_only: lowStockOnly })
   if (error) throw error
@@ -63,6 +93,31 @@ async function fetchBalances(clubId: string, lowStockOnly: boolean): Promise<Bal
     locationId: r.location_id, locationName: r.location_name, productId: r.product_id, productNameAr: r.product_name_ar,
     variantId: r.variant_id, variantLabel: r.variant_label, onHand: Number(r.on_hand), reorderLevel: r.reorder_level,
   }))
+}
+
+async function fetchInventorySummary(clubId: string): Promise<InventorySummary> {
+  const { data, error } = await supabase.rpc('get_shop_inventory_summary', { p_club_id: clubId })
+  if (error) throw error
+  const row = data?.[0]
+  return {
+    activeProducts: row ? Number(row.active_products) : 0,
+    totalOnHand: row ? Number(row.total_on_hand) : 0,
+    lowStockCount: row ? Number(row.low_stock_count) : 0,
+    outOfStockCount: row ? Number(row.out_of_stock_count) : 0,
+  }
+}
+
+// Stock Value tile: reuses C7's get_shop_stock_valuation, gated on
+// shop.reports.view_profit (cost data) IN ADDITION TO inventory.view --
+// enforced by the RPC itself, not client-side. Matching the exact
+// established pattern (ShopProfitReport.tsx): call unconditionally,
+// treat isError as "no permission, don't show the figure" rather than
+// checking a permission key client-side first. A role without the
+// grant simply never sees this tile populate with a money figure.
+async function fetchStockValue(clubId: string): Promise<number> {
+  const { data, error } = await supabase.rpc('get_shop_stock_valuation', { p_club_id: clubId })
+  if (error) throw error
+  return (data ?? []).reduce((sum, r) => sum + (r.line_value === null ? 0 : Number(r.line_value)), 0)
 }
 
 async function fetchLocations(clubId: string): Promise<LocationOption[]> {
@@ -74,13 +129,16 @@ async function fetchLocations(clubId: string): Promise<LocationOption[]> {
 async function fetchProducts(clubId: string): Promise<ProductOption[]> {
   const { data, error } = await supabase.rpc('list_shop_products', { p_club_id: clubId, p_status: 'active' })
   if (error) throw error
-  return (data ?? []).map((r) => ({ productId: r.product_id, nameAr: r.name_ar, hasVariants: r.has_variants }))
+  return (data ?? []).map((r) => ({
+    productId: r.product_id, nameAr: r.name_ar, hasVariants: r.has_variants,
+    imageUrl: r.image_url, sku: r.sku, barcode: r.barcode,
+  }))
 }
 
 async function fetchVariants(productId: string): Promise<VariantOption[]> {
   const { data, error } = await supabase.rpc('list_shop_product_variants', { p_product_id: productId })
   if (error) throw error
-  return (data ?? []).map((r) => ({ variantId: r.variant_id, size: r.size, color: r.color }))
+  return (data ?? []).map((r) => ({ variantId: r.variant_id, size: r.size, color: r.color, sku: r.sku }))
 }
 
 // SHOP MODULE UX HARDENING (2026-08-28): real production acceptance
@@ -122,6 +180,38 @@ async function fetchMovements(clubId: string): Promise<MovementRow[]> {
   return mapMovementRows((data ?? []) as MovementApiRow[])
 }
 
+// Recent activity rollups (dashboard requirement: "Recent Receipts,
+// Recent Transfers, Recent Adjustments, Recent Damage/Loss") -- all
+// four derived from list_shop_inventory_movements's own
+// p_movement_type filter (already built in C7), not a new RPC. Damage
+// and Loss are two distinct movement_type values in the schema
+// (confirmed: adjust_shop_stock restricts p_movement_type to exactly
+// 'adjustment_in'/'adjustment_out'/'damage'/'loss') so "Recent
+// Damage/Loss" fetches both and merges client-side, sorted by date.
+async function fetchRecentByType(clubId: string, types: string[], limit: number): Promise<MovementRow[]> {
+  const results = await Promise.all(types.map(async (movementType) => {
+    const { data, error } = await supabase.rpc('list_shop_inventory_movements', {
+      p_club_id: clubId, p_movement_type: movementType, p_limit: limit,
+    })
+    if (error) throw error
+    return mapMovementRows((data ?? []) as MovementApiRow[])
+  }))
+  return results.flat().sort((a, b) => b.createdAt.localeCompare(a.createdAt)).slice(0, limit)
+}
+
+function stockStatus(onHand: number, reorderLevel: number | null): 'out' | 'low' | 'in' {
+  if (onHand <= 0) return 'out'
+  if (reorderLevel !== null && onHand <= reorderLevel) return 'low'
+  return 'in'
+}
+
+function StockStatusBadge({ status }: { status: 'out' | 'low' | 'in' }) {
+  const { t } = useTranslation()
+  if (status === 'out') return <Badge variant="destructive">{t('shop.inventory.status.out')}</Badge>
+  if (status === 'low') return <Badge variant="outline" className="border-status-warning text-status-warning">{t('shop.inventory.status.low')}</Badge>
+  return <Badge variant="outline" className="border-status-success text-status-success">{t('shop.inventory.status.in')}</Badge>
+}
+
 export function ShopInventoryPage() {
   const { t } = useTranslation()
   const { currentClubId } = useAuth()
@@ -132,10 +222,27 @@ export function ShopInventoryPage() {
   const [transferOpen, setTransferOpen] = useState(false)
   const [adjustOpen, setAdjustOpen] = useState(false)
   const [managingSuppliers, setManagingSuppliers] = useState(false)
+  const [detailProductId, setDetailProductId] = useState<string | null>(null)
 
+  const { data: summary } = useQuery({
+    queryKey: ['shop-inventory-summary', currentClubId],
+    queryFn: () => fetchInventorySummary(currentClubId as string),
+    enabled: !!currentClubId,
+  })
+  const { data: stockValue, isError: stockValueDenied } = useQuery({
+    queryKey: ['shop-inventory-stock-value', currentClubId],
+    queryFn: () => fetchStockValue(currentClubId as string),
+    enabled: !!currentClubId,
+    retry: false,
+  })
   const { data: balances = [], isLoading } = useQuery({
     queryKey: ['shop-inventory-balances', currentClubId, lowStockOnly],
     queryFn: () => fetchBalances(currentClubId as string, lowStockOnly),
+    enabled: !!currentClubId,
+  })
+  const { data: products = [] } = useQuery({
+    queryKey: ['shop-inv-products', currentClubId],
+    queryFn: () => fetchProducts(currentClubId as string),
     enabled: !!currentClubId,
   })
   const { data: movements = [] } = useQuery({
@@ -143,10 +250,38 @@ export function ShopInventoryPage() {
     queryFn: () => fetchMovements(currentClubId as string),
     enabled: !!currentClubId,
   })
+  const { data: recentReceipts = [] } = useQuery({
+    queryKey: ['shop-inventory-recent-receipts', currentClubId],
+    queryFn: () => fetchRecentByType(currentClubId as string, ['purchase_receipt'], 4),
+    enabled: !!currentClubId,
+  })
+  const { data: recentTransfers = [] } = useQuery({
+    queryKey: ['shop-inventory-recent-transfers', currentClubId],
+    queryFn: () => fetchRecentByType(currentClubId as string, ['transfer_out', 'transfer_in'], 4),
+    enabled: !!currentClubId,
+  })
+  const { data: recentAdjustments = [] } = useQuery({
+    queryKey: ['shop-inventory-recent-adjustments', currentClubId],
+    queryFn: () => fetchRecentByType(currentClubId as string, ['adjustment_in', 'adjustment_out'], 4),
+    enabled: !!currentClubId,
+  })
+  const { data: recentDamageLoss = [] } = useQuery({
+    queryKey: ['shop-inventory-recent-damage-loss', currentClubId],
+    queryFn: () => fetchRecentByType(currentClubId as string, ['damage', 'loss'], 4),
+    enabled: !!currentClubId,
+  })
+
+  const productImageById = new Map(products.map((p) => [p.productId, p.imageUrl]))
 
   function invalidate() {
     void queryClient.invalidateQueries({ queryKey: ['shop-inventory-balances'] })
     void queryClient.invalidateQueries({ queryKey: ['shop-inventory-movements'] })
+    void queryClient.invalidateQueries({ queryKey: ['shop-inventory-summary'] })
+    void queryClient.invalidateQueries({ queryKey: ['shop-inventory-stock-value'] })
+    void queryClient.invalidateQueries({ queryKey: ['shop-inventory-recent-receipts'] })
+    void queryClient.invalidateQueries({ queryKey: ['shop-inventory-recent-transfers'] })
+    void queryClient.invalidateQueries({ queryKey: ['shop-inventory-recent-adjustments'] })
+    void queryClient.invalidateQueries({ queryKey: ['shop-inventory-recent-damage-loss'] })
   }
 
   // PRINTING -- FULL FILTERED PRINT correction: the screen query above
@@ -180,7 +315,20 @@ export function ShopInventoryPage() {
   }, [fullMovements])
 
   const balanceColumns: DataTableColumn<BalanceRow>[] = [
-    { key: 'product', header: t('shop.inventory.columns.product'), render: (b) => b.productNameAr + (b.variantLabel ? ` (${b.variantLabel})` : '') },
+    {
+      key: 'image',
+      header: '',
+      render: (b) => <ProductThumb src={productImageById.get(b.productId) ?? null} alt={b.productNameAr} className="size-10 rounded-md" />,
+    },
+    {
+      key: 'product',
+      header: t('shop.inventory.columns.product'),
+      render: (b) => (
+        <button type="button" className="text-start text-accent-foreground hover:underline" onClick={() => setDetailProductId(b.productId)}>
+          {b.productNameAr}{b.variantLabel ? ` (${b.variantLabel})` : ''}
+        </button>
+      ),
+    },
     { key: 'location', header: t('shop.inventory.columns.location'), render: (b) => b.locationName },
     {
       key: 'onHand',
@@ -191,6 +339,8 @@ export function ShopInventoryPage() {
         </span>
       ),
     },
+    { key: 'reorderLevel', header: t('shop.inventory.columns.reorderLevel'), render: (b) => b.reorderLevel ?? '—' },
+    { key: 'status', header: t('shop.inventory.columns.status'), render: (b) => <StockStatusBadge status={stockStatus(b.onHand, b.reorderLevel)} /> },
   ]
 
   const movementColumns: DataTableColumn<MovementRow>[] = [
@@ -202,6 +352,12 @@ export function ShopInventoryPage() {
     { key: 'reason', header: t('shop.inventory.columns.reason'), render: (m) => m.reason ?? '—' },
   ]
 
+  const recentColumns: DataTableColumn<MovementRow>[] = [
+    { key: 'product', header: t('shop.inventory.columns.product'), render: (m) => m.productNameAr + (m.variantLabel ? ` (${m.variantLabel})` : '') },
+    { key: 'quantity', header: t('shop.inventory.columns.quantity'), render: (m) => m.quantity },
+    { key: 'date', header: t('shop.inventory.columns.date'), render: (m) => formatDate(m.createdAt, locale as SupportedLocale, 'Africa/Cairo', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) },
+  ]
+
   return (
     <div>
       <div className="print:hidden">
@@ -211,12 +367,63 @@ export function ShopInventoryPage() {
           actions={
             <>
               <Button variant="outline" onClick={() => setManagingSuppliers(true)}>{t('shop.suppliers.manageTitle')}</Button>
-              <Button variant="outline" onClick={() => setReceiveOpen(true)}>{t('shop.inventory.receiveStock')}</Button>
-              <Button variant="outline" onClick={() => setTransferOpen(true)}>{t('shop.inventory.transferStock')}</Button>
-              <Button variant="outline" onClick={() => setAdjustOpen(true)}>{t('shop.inventory.adjustStock')}</Button>
+              <Button variant="outline" onClick={() => setReceiveOpen(true)}><PackagePlus className="me-1 size-4" />{t('shop.inventory.receiveStock')}</Button>
+              <Button variant="outline" onClick={() => setTransferOpen(true)}><ArrowLeftRight className="me-1 size-4" />{t('shop.inventory.transferStock')}</Button>
+              <Button variant="outline" onClick={() => setAdjustOpen(true)}><SlidersHorizontal className="me-1 size-4" />{t('shop.inventory.adjustStock')}</Button>
             </>
           }
         />
+
+        {/* Dashboard: KPI row (plan Section 5 Phase C8, item 1). Total
+            SKUs / Low Stock / Out of Stock reuse get_shop_inventory_summary
+            (unchanged, C6-era). Stock Value reuses C7's
+            get_shop_stock_valuation, gated on shop.reports.view_profit --
+            the RPC itself enforces the gate (fetchStockValue above); when
+            denied, this tile shows a quantity-only fallback rather than a
+            money figure, matching the plan's own instruction ("show
+            quantity-only info to everyone else"). */}
+        <div className="mb-6 grid grid-cols-2 gap-3 sm:grid-cols-4">
+          <StatCard label={t('shop.inventory.kpis.totalSkus')} value={summary?.activeProducts ?? 0} icon={Boxes} />
+          <StatCard
+            label={t('shop.inventory.kpis.stockValue')}
+            value={stockValueDenied ? t('shop.inventory.kpis.stockValueHidden') : <MoneyDisplay amount={stockValue ?? 0} size="lg" />}
+            icon={Wallet}
+          />
+          <StatCard
+            label={t('shop.inventory.kpis.lowStock')}
+            value={summary?.lowStockCount ?? 0}
+            icon={AlertTriangle}
+            tone={summary && summary.lowStockCount > 0 ? 'warning' : 'default'}
+          />
+          <StatCard
+            label={t('shop.inventory.kpis.outOfStock')}
+            value={summary?.outOfStockCount ?? 0}
+            icon={XCircle}
+            tone={summary && summary.outOfStockCount > 0 ? 'danger' : 'default'}
+          />
+        </div>
+
+        {/* Recent activity rollups: Recent Receipts / Transfers /
+            Adjustments / Damage-Loss, each the last 4 rows of
+            list_shop_inventory_movements filtered by movement type. */}
+        <div className="mb-6 grid grid-cols-1 gap-4 lg:grid-cols-2 xl:grid-cols-4">
+          <div>
+            <h2 className="mb-2 text-sm font-semibold text-text-secondary">{t('shop.inventory.recent.receipts')}</h2>
+            <DataTable columns={recentColumns} rows={recentReceipts} rowKey={(m) => m.movementId} emptyTitle={t('shop.inventory.recent.empty')} />
+          </div>
+          <div>
+            <h2 className="mb-2 text-sm font-semibold text-text-secondary">{t('shop.inventory.recent.transfers')}</h2>
+            <DataTable columns={recentColumns} rows={recentTransfers} rowKey={(m) => m.movementId} emptyTitle={t('shop.inventory.recent.empty')} />
+          </div>
+          <div>
+            <h2 className="mb-2 text-sm font-semibold text-text-secondary">{t('shop.inventory.recent.adjustments')}</h2>
+            <DataTable columns={recentColumns} rows={recentAdjustments} rowKey={(m) => m.movementId} emptyTitle={t('shop.inventory.recent.empty')} />
+          </div>
+          <div>
+            <h2 className="mb-2 text-sm font-semibold text-text-secondary">{t('shop.inventory.recent.damageLoss')}</h2>
+            <DataTable columns={recentColumns} rows={recentDamageLoss} rowKey={(m) => m.movementId} emptyTitle={t('shop.inventory.recent.empty')} />
+          </div>
+        </div>
 
         <div className="mb-4 flex items-center justify-between">
           <Button variant={lowStockOnly ? 'default' : 'outline'} size="sm" onClick={() => setLowStockOnly((v) => !v)}>
@@ -269,6 +476,13 @@ export function ShopInventoryPage() {
       {transferOpen && <TransferStockDialog clubId={currentClubId as string} onClose={() => setTransferOpen(false)} onDone={() => { setTransferOpen(false); invalidate() }} />}
       {adjustOpen && <AdjustStockDialog clubId={currentClubId as string} onClose={() => setAdjustOpen(false)} onDone={() => { setAdjustOpen(false); invalidate() }} />}
       {managingSuppliers && <ManageSuppliersDialog clubId={currentClubId as string} onClose={() => setManagingSuppliers(false)} />}
+      {detailProductId && (
+        <ProductDetailDialog
+          clubId={currentClubId as string}
+          productId={detailProductId}
+          onClose={() => setDetailProductId(null)}
+        />
+      )}
     </div>
   )
 }
@@ -487,69 +701,192 @@ function ProductVariantPicker({ clubId, productId, variantId, onProductChange, o
   )
 }
 
+// =====================================================================
+// Multi-item Receiving UX (plan Section 22). One supplier delivery,
+// many product lines with per-line quantity + unit cost, plus a
+// running expected-total-cost display. Posts via receive_shop_stock_batch
+// (one atomic transaction for all lines -- see that RPC's own migration
+// comment for the full transaction-boundary reasoning: a client-side
+// loop over the single-item RPC was deliberately rejected because a
+// mid-loop failure would leave some lines committed and others not,
+// with no way to tell from the resulting state that the receipt was
+// only half-posted).
+// =====================================================================
+interface ReceiveLine {
+  key: string
+  productId: string
+  variantId: string
+  quantity: string
+  unitCost: string
+}
+
+function emptyReceiveLine(): ReceiveLine {
+  return { key: crypto.randomUUID(), productId: '', variantId: '', quantity: '', unitCost: '' }
+}
+
+function ReceiveLineRow({ clubId, line, onChange, onRemove, canRemove }: {
+  clubId: string; line: ReceiveLine; onChange: (line: ReceiveLine) => void; onRemove: () => void; canRemove: boolean
+}) {
+  const { t } = useTranslation()
+  const { data: products = [] } = useQuery({ queryKey: ['shop-inv-products', clubId], queryFn: () => fetchProducts(clubId) })
+  const selected = products.find((p) => p.productId === line.productId)
+  const { data: variants = [] } = useQuery({ queryKey: ['shop-inv-variants', line.productId], queryFn: () => fetchVariants(line.productId), enabled: !!selected?.hasVariants })
+
+  return (
+    <div className="flex flex-wrap items-end gap-2 rounded-md border border-border p-3">
+      <ProductThumb src={selected?.imageUrl ?? null} alt={selected?.nameAr ?? ''} className="size-10 shrink-0 rounded-md" />
+      <div className="flex min-w-40 flex-1 flex-col gap-1.5">
+        <label className="text-xs font-medium text-text-secondary">{t('shop.inventory.productLabel')}</label>
+        <Select value={line.productId} onValueChange={(v) => onChange({ ...line, productId: v, variantId: '' })}>
+          <SelectTrigger><SelectValue placeholder={t('shop.inventory.productPlaceholder')} /></SelectTrigger>
+          <SelectContent>{products.map((p) => <SelectItem key={p.productId} value={p.productId}>{p.nameAr}</SelectItem>)}</SelectContent>
+        </Select>
+      </div>
+      {selected?.hasVariants && (
+        <div className="flex min-w-32 flex-col gap-1.5">
+          <label className="text-xs font-medium text-text-secondary">{t('shop.inventory.variantLabel')}</label>
+          <Select value={line.variantId} onValueChange={(v) => onChange({ ...line, variantId: v })}>
+            <SelectTrigger><SelectValue placeholder={t('shop.inventory.variantPlaceholder')} /></SelectTrigger>
+            <SelectContent>{variants.map((v) => <SelectItem key={v.variantId} value={v.variantId}>{[v.size, v.color].filter(Boolean).join(' / ')}</SelectItem>)}</SelectContent>
+          </Select>
+        </div>
+      )}
+      <div className="flex w-24 flex-col gap-1.5">
+        <label className="text-xs font-medium text-text-secondary">{t('shop.inventory.quantityLabel')}</label>
+        <Input type="number" min="0.01" step="0.01" value={line.quantity} onChange={(e) => onChange({ ...line, quantity: e.target.value })} />
+      </div>
+      <div className="flex w-28 flex-col gap-1.5">
+        <label className="text-xs font-medium text-text-secondary">{t('shop.inventory.unitCostLabel')}</label>
+        <Input type="number" min="0" step="0.01" value={line.unitCost} onChange={(e) => onChange({ ...line, unitCost: e.target.value })} />
+      </div>
+      <Button type="button" variant="ghost" size="icon" disabled={!canRemove} onClick={onRemove} aria-label={t('shop.inventory.removeLine')}>
+        <Trash2 className="size-4" />
+      </Button>
+    </div>
+  )
+}
+
 function ReceiveStockDialog({ clubId, onClose, onDone }: { clubId: string; onClose: () => void; onDone: () => void }) {
   const { t } = useTranslation()
   const [locationId, setLocationId] = useState('')
-  const [productId, setProductId] = useState('')
-  const [variantId, setVariantId] = useState('')
-  const [quantity, setQuantity] = useState('')
-  const [unitCost, setUnitCost] = useState('')
   const [supplierId, setSupplierId] = useState('')
+  const [referenceNumber, setReferenceNumber] = useState('')
   const [notes, setNotes] = useState('')
+  const [lines, setLines] = useState<ReceiveLine[]>([emptyReceiveLine()])
   const [error, setError] = useState<string | null>(null)
+  const [receiptSummary, setReceiptSummary] = useState<{ lineCount: number; totalCost: number } | null>(null)
 
   const { data: locations = [] } = useQuery({ queryKey: ['shop-inv-locations', clubId], queryFn: () => fetchLocations(clubId) })
 
+  const validLines = lines.filter((l) => l.productId && Number(l.quantity) > 0)
+  const expectedTotalCost = validLines.reduce((sum, l) => sum + (Number(l.unitCost) || 0) * (Number(l.quantity) || 0), 0)
+  const hasAnyCost = validLines.some((l) => l.unitCost !== '')
+
+  function updateLine(key: string, next: ReceiveLine) {
+    setLines((prev) => prev.map((l) => (l.key === key ? next : l)))
+  }
+
   const mutation = useMutation({
     mutationFn: async () => {
-      // SHOP MODULE UX HARDENING (2026-08-28): receive_shop_stock
-      // already accepted p_supplier_id -- this call was the only piece
-      // missing to make "supplier association with receiving stock"
-      // (directive Section 4) actually reachable.
-      const { error: err } = await supabase.rpc('receive_shop_stock', {
-        p_location_id: locationId, p_product_id: productId, p_variant_id: variantId || undefined,
-        p_quantity: Number(quantity), p_unit_cost: unitCost ? Number(unitCost) : undefined,
-        p_supplier_id: supplierId || undefined, p_notes: notes || undefined,
+      const { error: err } = await supabase.rpc('receive_shop_stock_batch', {
+        p_location_id: locationId,
+        p_items: validLines.map((l) => ({
+          product_id: l.productId,
+          variant_id: l.variantId || null,
+          quantity: Number(l.quantity),
+          unit_cost: l.unitCost ? Number(l.unitCost) : null,
+        })),
+        p_supplier_id: supplierId || undefined,
+        p_reference_number: referenceNumber || undefined,
+        p_notes: notes || undefined,
       })
       if (err) throw err
     },
-    onSuccess: onDone,
+    onSuccess: () => setReceiptSummary({ lineCount: validLines.length, totalCost: expectedTotalCost }),
     onError: (err) => setError(translateSupabaseError(err, t('shop.inventory.receiveError'))),
   })
 
+  // Receipt summary screen -- shown after a successful post, before
+  // closing, so the operator has a clear confirmation of exactly what
+  // was recorded (plan's own instruction: "show a clear receipt summary
+  // after completion").
+  if (receiptSummary) {
+    return (
+      <Dialog open onOpenChange={() => onDone()}>
+        <DialogContent>
+          <DialogHeader><DialogTitle>{t('shop.inventory.receiptSummary.title')}</DialogTitle></DialogHeader>
+          <div className="flex flex-col gap-3">
+            <p className="text-sm text-text-secondary">{t('shop.inventory.receiptSummary.description', { count: receiptSummary.lineCount })}</p>
+            {hasAnyCost && (
+              <div className="flex items-center justify-between rounded-md border border-border p-3">
+                <span className="text-sm font-medium">{t('shop.inventory.receiptSummary.totalCost')}</span>
+                <MoneyDisplay amount={receiptSummary.totalCost} size="md" />
+              </div>
+            )}
+            <div className="flex justify-end">
+              <Button onClick={onDone}>{t('common.done')}</Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+    )
+  }
+
   return (
     <Dialog open onOpenChange={(open) => { if (!open) onClose() }}>
-      <DialogContent>
+      <DialogContent className="max-w-2xl">
         <DialogHeader><DialogTitle>{t('shop.inventory.receiveStock')}</DialogTitle></DialogHeader>
         <div className="flex flex-col gap-4">
-          <div className="flex flex-col gap-1.5">
-            <label className="text-sm font-medium text-text-secondary">{t('shop.inventory.locationLabel')}</label>
-            <Select value={locationId} onValueChange={setLocationId}>
-              <SelectTrigger><SelectValue placeholder={t('shop.inventory.locationPlaceholder')} /></SelectTrigger>
-              <SelectContent>{locations.map((l) => <SelectItem key={l.locationId} value={l.locationId}>{l.name}</SelectItem>)}</SelectContent>
-            </Select>
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            <div className="flex flex-col gap-1.5">
+              <label className="text-sm font-medium text-text-secondary">{t('shop.inventory.locationLabel')}</label>
+              <Select value={locationId} onValueChange={setLocationId}>
+                <SelectTrigger><SelectValue placeholder={t('shop.inventory.locationPlaceholder')} /></SelectTrigger>
+                <SelectContent>{locations.map((l) => <SelectItem key={l.locationId} value={l.locationId}>{l.name}</SelectItem>)}</SelectContent>
+              </Select>
+            </div>
+            <div className="flex flex-col gap-1.5">
+              <label className="text-sm font-medium text-text-secondary">{t('shop.suppliers.pickerLabel')}</label>
+              <SupplierPicker clubId={clubId} value={supplierId} onChange={setSupplierId} />
+            </div>
+            <div className="flex flex-col gap-1.5">
+              <label className="text-sm font-medium text-text-secondary">{t('shop.inventory.referenceNumberLabel')}</label>
+              <Input dir="ltr" value={referenceNumber} onChange={(e) => setReferenceNumber(e.target.value)} />
+            </div>
+            <div className="flex flex-col gap-1.5">
+              <label className="text-sm font-medium text-text-secondary">{t('shop.inventory.notesLabel')}</label>
+              <Input value={notes} onChange={(e) => setNotes(e.target.value)} />
+            </div>
           </div>
-          <ProductVariantPicker clubId={clubId} productId={productId} variantId={variantId} onProductChange={(v) => { setProductId(v); setVariantId('') }} onVariantChange={setVariantId} />
-          <div className="flex flex-col gap-1.5">
-            <label className="text-sm font-medium text-text-secondary">{t('shop.inventory.quantityLabel')}</label>
-            <Input type="number" min="0.01" step="0.01" value={quantity} onChange={(e) => setQuantity(e.target.value)} />
+
+          <div className="flex flex-col gap-2">
+            <label className="text-sm font-medium text-text-secondary">{t('shop.inventory.itemsLabel')}</label>
+            {lines.map((line) => (
+              <ReceiveLineRow
+                key={line.key}
+                clubId={clubId}
+                line={line}
+                onChange={(next) => updateLine(line.key, next)}
+                onRemove={() => setLines((prev) => prev.filter((l) => l.key !== line.key))}
+                canRemove={lines.length > 1}
+              />
+            ))}
+            <Button type="button" variant="outline" size="sm" onClick={() => setLines((prev) => [...prev, emptyReceiveLine()])}>
+              <Plus className="me-1 size-4" />{t('shop.inventory.addLine')}
+            </Button>
           </div>
-          <div className="flex flex-col gap-1.5">
-            <label className="text-sm font-medium text-text-secondary">{t('shop.inventory.unitCostLabel')}</label>
-            <Input type="number" min="0" step="0.01" value={unitCost} onChange={(e) => setUnitCost(e.target.value)} />
-          </div>
-          <div className="flex flex-col gap-1.5">
-            <label className="text-sm font-medium text-text-secondary">{t('shop.suppliers.pickerLabel')}</label>
-            <SupplierPicker clubId={clubId} value={supplierId} onChange={setSupplierId} />
-          </div>
-          <div className="flex flex-col gap-1.5">
-            <label className="text-sm font-medium text-text-secondary">{t('shop.inventory.notesLabel')}</label>
-            <Input value={notes} onChange={(e) => setNotes(e.target.value)} />
-          </div>
+
+          {hasAnyCost && (
+            <div className="flex items-center justify-between rounded-md border border-border bg-surface-muted p-3">
+              <span className="text-sm font-medium">{t('shop.inventory.expectedTotalCost')}</span>
+              <MoneyDisplay amount={expectedTotalCost} size="md" />
+            </div>
+          )}
+
           {error && <p role="alert" className="text-sm text-status-danger">{error}</p>}
           <div className="flex justify-end gap-2">
             <Button variant="outline" onClick={onClose}>{t('common.cancel')}</Button>
-            <Button disabled={!locationId || !productId || !quantity || mutation.isPending} onClick={() => { setError(null); mutation.mutate() }}>
+            <Button disabled={!locationId || validLines.length === 0 || mutation.isPending} onClick={() => { setError(null); mutation.mutate() }}>
               {mutation.isPending ? t('shop.inventory.receiving') : t('shop.inventory.receiveStock')}
             </Button>
           </div>
@@ -559,57 +896,190 @@ function ReceiveStockDialog({ clubId, onClose, onDone }: { clubId: string; onClo
   )
 }
 
+// =====================================================================
+// Multi-item Transfer UX (plan Section 23). FROM/TO location header,
+// item list (product, available qty at the from-location, transfer
+// qty), summary, confirm. Posts via transfer_shop_stock_batch (same
+// atomic-transaction reasoning as receiving).
+// =====================================================================
+interface TransferLine {
+  key: string
+  productId: string
+  variantId: string
+  quantity: string
+}
+
+function emptyTransferLine(): TransferLine {
+  return { key: crypto.randomUUID(), productId: '', variantId: '', quantity: '' }
+}
+
+function TransferLineRow({ clubId, sourceLocationId, line, onChange, onRemove, canRemove }: {
+  clubId: string; sourceLocationId: string; line: TransferLine; onChange: (line: TransferLine) => void; onRemove: () => void; canRemove: boolean
+}) {
+  const { t } = useTranslation()
+  const { data: products = [] } = useQuery({ queryKey: ['shop-inv-products', clubId], queryFn: () => fetchProducts(clubId) })
+  const selected = products.find((p) => p.productId === line.productId)
+  const { data: variants = [] } = useQuery({ queryKey: ['shop-inv-variants', line.productId], queryFn: () => fetchVariants(line.productId), enabled: !!selected?.hasVariants })
+
+  // Available quantity at the source location for this exact product/
+  // variant -- plan's own instruction ("product, available qty at the
+  // from-location, transfer qty"). Reuses get_shop_inventory_balances
+  // unmodified (already scoped by p_location_id).
+  const { data: sourceBalances = [] } = useQuery({
+    queryKey: ['shop-inv-source-balance', clubId, sourceLocationId],
+    queryFn: async () => {
+      const { data, error } = await supabase.rpc('get_shop_inventory_balances', { p_club_id: clubId, p_location_id: sourceLocationId })
+      if (error) throw error
+      return (data ?? []) as { product_id: string; variant_id: string | null; on_hand: number | string }[]
+    },
+    enabled: !!sourceLocationId,
+  })
+  const availableAtSource = sourceBalances.find((b) => b.product_id === line.productId
+    && (line.variantId ? b.variant_id === line.variantId : b.variant_id === null))
+  const availableQty = availableAtSource ? Number(availableAtSource.on_hand) : null
+
+  return (
+    <div className="flex flex-wrap items-end gap-2 rounded-md border border-border p-3">
+      <ProductThumb src={selected?.imageUrl ?? null} alt={selected?.nameAr ?? ''} className="size-10 shrink-0 rounded-md" />
+      <div className="flex min-w-40 flex-1 flex-col gap-1.5">
+        <label className="text-xs font-medium text-text-secondary">{t('shop.inventory.productLabel')}</label>
+        <Select value={line.productId} onValueChange={(v) => onChange({ ...line, productId: v, variantId: '' })}>
+          <SelectTrigger><SelectValue placeholder={t('shop.inventory.productPlaceholder')} /></SelectTrigger>
+          <SelectContent>{products.map((p) => <SelectItem key={p.productId} value={p.productId}>{p.nameAr}</SelectItem>)}</SelectContent>
+        </Select>
+      </div>
+      {selected?.hasVariants && (
+        <div className="flex min-w-32 flex-col gap-1.5">
+          <label className="text-xs font-medium text-text-secondary">{t('shop.inventory.variantLabel')}</label>
+          <Select value={line.variantId} onValueChange={(v) => onChange({ ...line, variantId: v })}>
+            <SelectTrigger><SelectValue placeholder={t('shop.inventory.variantPlaceholder')} /></SelectTrigger>
+            <SelectContent>{variants.map((v) => <SelectItem key={v.variantId} value={v.variantId}>{[v.size, v.color].filter(Boolean).join(' / ')}</SelectItem>)}</SelectContent>
+          </Select>
+        </div>
+      )}
+      {line.productId && (
+        <div className="flex flex-col gap-1.5">
+          <span className="text-xs font-medium text-text-secondary">{t('shop.inventory.availableAtSource')}</span>
+          <span className={`text-sm font-semibold ${availableQty !== null && availableQty <= 0 ? 'text-status-danger' : ''}`}>
+            {availableQty ?? '—'}
+          </span>
+        </div>
+      )}
+      <div className="flex w-24 flex-col gap-1.5">
+        <label className="text-xs font-medium text-text-secondary">{t('shop.inventory.quantityLabel')}</label>
+        <Input type="number" min="0.01" step="0.01" value={line.quantity} onChange={(e) => onChange({ ...line, quantity: e.target.value })} />
+      </div>
+      <Button type="button" variant="ghost" size="icon" disabled={!canRemove} onClick={onRemove} aria-label={t('shop.inventory.removeLine')}>
+        <Trash2 className="size-4" />
+      </Button>
+    </div>
+  )
+}
+
 function TransferStockDialog({ clubId, onClose, onDone }: { clubId: string; onClose: () => void; onDone: () => void }) {
   const { t } = useTranslation()
   const [sourceId, setSourceId] = useState('')
   const [destId, setDestId] = useState('')
-  const [productId, setProductId] = useState('')
-  const [variantId, setVariantId] = useState('')
-  const [quantity, setQuantity] = useState('')
+  const [notes, setNotes] = useState('')
+  const [lines, setLines] = useState<TransferLine[]>([emptyTransferLine()])
   const [error, setError] = useState<string | null>(null)
+  const [done, setDone] = useState<number | null>(null)
 
   const { data: locations = [] } = useQuery({ queryKey: ['shop-inv-locations', clubId], queryFn: () => fetchLocations(clubId) })
 
+  const validLines = lines.filter((l) => l.productId && Number(l.quantity) > 0)
+
+  function updateLine(key: string, next: TransferLine) {
+    setLines((prev) => prev.map((l) => (l.key === key ? next : l)))
+  }
+
   const mutation = useMutation({
     mutationFn: async () => {
-      const { error: err } = await supabase.rpc('transfer_shop_stock', {
-        p_source_location_id: sourceId, p_dest_location_id: destId, p_product_id: productId,
-        p_variant_id: variantId || undefined, p_quantity: Number(quantity),
+      const { error: err } = await supabase.rpc('transfer_shop_stock_batch', {
+        p_source_location_id: sourceId,
+        p_dest_location_id: destId,
+        p_items: validLines.map((l) => ({
+          product_id: l.productId, variant_id: l.variantId || null, quantity: Number(l.quantity),
+        })),
+        p_notes: notes || undefined,
       })
       if (err) throw err
     },
-    onSuccess: onDone,
+    onSuccess: () => setDone(validLines.length),
     onError: (err) => setError(translateSupabaseError(err, t('shop.inventory.transferError'))),
   })
 
+  if (done !== null) {
+    return (
+      <Dialog open onOpenChange={() => onDone()}>
+        <DialogContent>
+          <DialogHeader><DialogTitle>{t('shop.inventory.transferSummary.title')}</DialogTitle></DialogHeader>
+          <div className="flex flex-col gap-3">
+            <p className="text-sm text-text-secondary">{t('shop.inventory.transferSummary.description', { count: done })}</p>
+            <div className="flex justify-end">
+              <Button onClick={onDone}>{t('common.done')}</Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+    )
+  }
+
   return (
     <Dialog open onOpenChange={(open) => { if (!open) onClose() }}>
-      <DialogContent>
+      <DialogContent className="max-w-2xl">
         <DialogHeader><DialogTitle>{t('shop.inventory.transferStock')}</DialogTitle></DialogHeader>
         <div className="flex flex-col gap-4">
-          <div className="flex flex-col gap-1.5">
-            <label className="text-sm font-medium text-text-secondary">{t('shop.inventory.sourceLocationLabel')}</label>
-            <Select value={sourceId} onValueChange={setSourceId}>
-              <SelectTrigger><SelectValue placeholder={t('shop.inventory.locationPlaceholder')} /></SelectTrigger>
-              <SelectContent>{locations.map((l) => <SelectItem key={l.locationId} value={l.locationId}>{l.name}</SelectItem>)}</SelectContent>
-            </Select>
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            <div className="flex flex-col gap-1.5">
+              <label className="text-sm font-medium text-text-secondary">{t('shop.inventory.sourceLocationLabel')}</label>
+              <Select value={sourceId} onValueChange={(v) => { setSourceId(v); setLines([emptyTransferLine()]) }}>
+                <SelectTrigger><SelectValue placeholder={t('shop.inventory.locationPlaceholder')} /></SelectTrigger>
+                <SelectContent>{locations.map((l) => <SelectItem key={l.locationId} value={l.locationId}>{l.name}</SelectItem>)}</SelectContent>
+              </Select>
+            </div>
+            <div className="flex flex-col gap-1.5">
+              <label className="text-sm font-medium text-text-secondary">{t('shop.inventory.destLocationLabel')}</label>
+              <Select value={destId} onValueChange={setDestId}>
+                <SelectTrigger><SelectValue placeholder={t('shop.inventory.locationPlaceholder')} /></SelectTrigger>
+                <SelectContent>{locations.filter((l) => l.locationId !== sourceId).map((l) => <SelectItem key={l.locationId} value={l.locationId}>{l.name}</SelectItem>)}</SelectContent>
+              </Select>
+            </div>
+            <div className="flex flex-col gap-1.5 sm:col-span-2">
+              <label className="text-sm font-medium text-text-secondary">{t('shop.inventory.notesLabel')}</label>
+              <Input value={notes} onChange={(e) => setNotes(e.target.value)} />
+            </div>
           </div>
-          <div className="flex flex-col gap-1.5">
-            <label className="text-sm font-medium text-text-secondary">{t('shop.inventory.destLocationLabel')}</label>
-            <Select value={destId} onValueChange={setDestId}>
-              <SelectTrigger><SelectValue placeholder={t('shop.inventory.locationPlaceholder')} /></SelectTrigger>
-              <SelectContent>{locations.filter((l) => l.locationId !== sourceId).map((l) => <SelectItem key={l.locationId} value={l.locationId}>{l.name}</SelectItem>)}</SelectContent>
-            </Select>
+
+          <div className="flex flex-col gap-2">
+            <label className="text-sm font-medium text-text-secondary">{t('shop.inventory.itemsLabel')}</label>
+            {!sourceId && <p className="text-sm text-text-secondary">{t('shop.inventory.pickSourceFirst')}</p>}
+            {sourceId && lines.map((line) => (
+              <TransferLineRow
+                key={line.key}
+                clubId={clubId}
+                sourceLocationId={sourceId}
+                line={line}
+                onChange={(next) => updateLine(line.key, next)}
+                onRemove={() => setLines((prev) => prev.filter((l) => l.key !== line.key))}
+                canRemove={lines.length > 1}
+              />
+            ))}
+            {sourceId && (
+              <Button type="button" variant="outline" size="sm" onClick={() => setLines((prev) => [...prev, emptyTransferLine()])}>
+                <Plus className="me-1 size-4" />{t('shop.inventory.addLine')}
+              </Button>
+            )}
           </div>
-          <ProductVariantPicker clubId={clubId} productId={productId} variantId={variantId} onProductChange={(v) => { setProductId(v); setVariantId('') }} onVariantChange={setVariantId} />
-          <div className="flex flex-col gap-1.5">
-            <label className="text-sm font-medium text-text-secondary">{t('shop.inventory.quantityLabel')}</label>
-            <Input type="number" min="0.01" step="0.01" value={quantity} onChange={(e) => setQuantity(e.target.value)} />
+
+          <div className="rounded-md border border-border bg-surface-muted p-3 text-sm">
+            {t('shop.inventory.transferSummaryLine', { count: validLines.length })}
           </div>
+
           {error && <p role="alert" className="text-sm text-status-danger">{error}</p>}
           <div className="flex justify-end gap-2">
             <Button variant="outline" onClick={onClose}>{t('common.cancel')}</Button>
-            <Button disabled={!sourceId || !destId || !productId || !quantity || mutation.isPending} onClick={() => { setError(null); mutation.mutate() }}>
+            <Button disabled={!sourceId || !destId || validLines.length === 0 || mutation.isPending} onClick={() => { setError(null); mutation.mutate() }}>
               {mutation.isPending ? t('shop.inventory.transferring') : t('shop.inventory.transferStock')}
             </Button>
           </div>
@@ -683,6 +1153,262 @@ function AdjustStockDialog({ clubId, onClose, onDone }: { clubId: string; onClos
               {mutation.isPending ? t('shop.inventory.adjusting') : t('shop.inventory.adjustStock')}
             </Button>
           </div>
+        </div>
+      </DialogContent>
+    </Dialog>
+  )
+}
+
+// =====================================================================
+// Product Detail dialog (plan Section 21): GENERAL / STOCK / MOVEMENTS
+// / SALES HISTORY / RETURNS / SUPPLIER tabs. Follows the same
+// manual-tab-strip pattern ShopReportsPage.tsx already established
+// (this codebase's house pattern for a tabbed hub, not the Radix Tabs
+// primitive -- confirmed no existing Shop screen uses TabsList/
+// TabsTrigger).
+// =====================================================================
+type DetailTab = 'general' | 'stock' | 'movements' | 'sales' | 'returns' | 'supplier'
+
+function ProductDetailDialog({ clubId, productId, onClose }: { clubId: string; productId: string; onClose: () => void }) {
+  const { t } = useTranslation()
+  const { locale } = useDirection()
+  const [tab, setTab] = useState<DetailTab>('general')
+
+  const { data: product } = useQuery({
+    queryKey: ['shop-inv-product-detail', clubId, productId],
+    queryFn: async () => {
+      const { data, error } = await supabase.rpc('list_shop_products', { p_club_id: clubId })
+      if (error) throw error
+      return (data ?? []).find((p) => p.product_id === productId) ?? null
+    },
+    enabled: !!clubId,
+  })
+
+  const { data: stockRows = [] } = useQuery({
+    queryKey: ['shop-inv-product-stock', clubId, productId],
+    queryFn: async () => {
+      const { data, error } = await supabase.rpc('get_shop_inventory_balances', { p_club_id: clubId })
+      if (error) throw error
+      return (data ?? []).filter((r) => r.product_id === productId)
+    },
+    enabled: tab === 'stock' || tab === 'general',
+  })
+
+  const { data: movementRows = [] } = useQuery({
+    queryKey: ['shop-inv-product-movements', clubId, productId],
+    queryFn: async () => {
+      const { data, error } = await supabase.rpc('list_shop_inventory_movements', { p_club_id: clubId, p_product_id: productId, p_limit: 50 })
+      if (error) throw error
+      return data ?? []
+    },
+    enabled: tab === 'movements' || tab === 'supplier',
+  })
+
+  const { data: salesRows = [] } = useQuery({
+    queryKey: ['shop-inv-product-sales', clubId, productId],
+    queryFn: async () => {
+      const { data, error } = await supabase.rpc('list_shop_product_sales_history', { p_club_id: clubId, p_product_id: productId, p_limit: 50 })
+      if (error) throw error
+      return data ?? []
+    },
+    enabled: tab === 'sales',
+  })
+
+  const { data: returnRows = [] } = useQuery({
+    queryKey: ['shop-inv-product-returns', clubId, productId],
+    queryFn: async () => {
+      const { data, error } = await supabase.rpc('list_shop_product_returns', { p_club_id: clubId, p_product_id: productId, p_limit: 50 })
+      if (error) throw error
+      return data ?? []
+    },
+    enabled: tab === 'returns',
+  })
+
+  const { data: suppliersById = new Map<string, string>() } = useQuery({
+    queryKey: ['shop-suppliers-lookup', clubId],
+    queryFn: async () => {
+      const { data, error } = await supabase.from('shop_suppliers').select('id, name').eq('club_id', clubId)
+      if (error) throw error
+      return new Map((data ?? []).map((s) => [s.id as string, s.name as string]))
+    },
+    enabled: tab === 'supplier',
+  })
+
+  const totalOnHand = stockRows.reduce((sum, r) => sum + Number(r.on_hand), 0)
+
+  const supplierNames = Array.from(new Set(
+    movementRows
+      .filter((m) => m.movement_type === 'purchase_receipt' && m.reference_type === 'shop_supplier' && m.reference_id)
+      .map((m) => suppliersById.get(m.reference_id as string) ?? null)
+      .filter((n): n is string => !!n),
+  ))
+  const unattributedReceiptCount = movementRows.filter((m) => m.movement_type === 'purchase_receipt' && !m.reference_id).length
+
+  const tabs: { key: DetailTab; label: string }[] = [
+    { key: 'general', label: t('shop.inventory.detail.tabs.general') },
+    { key: 'stock', label: t('shop.inventory.detail.tabs.stock') },
+    { key: 'movements', label: t('shop.inventory.detail.tabs.movements') },
+    { key: 'sales', label: t('shop.inventory.detail.tabs.sales') },
+    { key: 'returns', label: t('shop.inventory.detail.tabs.returns') },
+    { key: 'supplier', label: t('shop.inventory.detail.tabs.supplier') },
+  ]
+
+  return (
+    <Dialog open onOpenChange={(open) => { if (!open) onClose() }}>
+      <DialogContent className="max-w-3xl">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-3">
+            <ProductThumb src={product?.image_url ?? null} alt={product?.name_ar ?? ''} className="size-10 rounded-md" />
+            <span>{product?.name_ar ?? t('shop.inventory.detail.title')}</span>
+          </DialogTitle>
+        </DialogHeader>
+
+        <div className="flex flex-wrap gap-1 border-b border-border pb-2">
+          {tabs.map((tb) => (
+            <button
+              key={tb.key}
+              type="button"
+              onClick={() => setTab(tb.key)}
+              className={`rounded-md px-3 py-1.5 text-sm font-medium transition ${tab === tb.key ? 'bg-muted text-foreground' : 'text-text-secondary hover:bg-muted/50'}`}
+            >
+              {tb.label}
+            </button>
+          ))}
+        </div>
+
+        <div className="max-h-[60vh] overflow-y-auto">
+          {tab === 'general' && product && (
+            <div className="grid grid-cols-2 gap-3 text-sm">
+              <div><span className="text-text-secondary">{t('shop.inventory.detail.sku')}</span><p className="font-medium">{product.sku ?? '—'}</p></div>
+              <div><span className="text-text-secondary">{t('shop.inventory.detail.barcode')}</span><p className="font-medium" dir="ltr">{product.barcode ?? '—'}</p></div>
+              <div><span className="text-text-secondary">{t('shop.inventory.detail.category')}</span><p className="font-medium">{product.category_name_ar ?? '—'}</p></div>
+              <div><span className="text-text-secondary">{t('shop.inventory.detail.basePrice')}</span><MoneyDisplay amount={Number(product.base_price)} size="sm" /></div>
+              <div><span className="text-text-secondary">{t('shop.inventory.detail.reorderLevel')}</span><p className="font-medium">{product.reorder_level ?? '—'}</p></div>
+              <div><span className="text-text-secondary">{t('shop.inventory.detail.totalOnHand')}</span><p className="font-medium">{totalOnHand}</p></div>
+            </div>
+          )}
+
+          {tab === 'stock' && (
+            <table className="w-full text-start text-sm">
+              <thead><tr className="border-b border-border text-text-secondary"><th className="p-2 text-start">{t('shop.inventory.columns.location')}</th><th className="p-2 text-start">{t('shop.inventory.columns.onHand')}</th></tr></thead>
+              <tbody>
+                {stockRows.map((r) => (
+                  <tr key={`${r.location_id}-${r.variant_id ?? ''}`} className="border-b border-border last:border-0">
+                    <td className="p-2">{r.location_name}{r.variant_label ? ` (${r.variant_label})` : ''}</td>
+                    <td className="p-2 font-medium">{Number(r.on_hand)}</td>
+                  </tr>
+                ))}
+                {stockRows.length === 0 && <tr><td colSpan={2} className="p-4 text-center text-text-secondary">{t('shop.inventory.emptyBalancesTitle')}</td></tr>}
+              </tbody>
+            </table>
+          )}
+
+          {tab === 'movements' && (
+            <table className="w-full text-start text-sm">
+              <thead>
+                <tr className="border-b border-border text-text-secondary">
+                  <th className="p-2 text-start">{t('shop.inventory.columns.date')}</th>
+                  <th className="p-2 text-start">{t('shop.inventory.columns.movementType')}</th>
+                  <th className="p-2 text-start">{t('shop.inventory.columns.quantity')}</th>
+                  <th className="p-2 text-start">{t('shop.inventory.columns.location')}</th>
+                  <th className="p-2 text-start">{t('shop.inventory.detail.reference')}</th>
+                </tr>
+              </thead>
+              <tbody>
+                {movementRows.map((m) => (
+                  <tr key={m.movement_id} className="border-b border-border last:border-0">
+                    <td className="p-2">{formatDate(m.created_at, locale as SupportedLocale, 'Africa/Cairo', { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}</td>
+                    <td className="p-2">{t(`shop.inventory.movementTypes.${m.movement_type}`, { defaultValue: m.movement_type })}</td>
+                    <td className="p-2">{Number(m.quantity)}</td>
+                    <td className="p-2">{m.location_name}</td>
+                    <td className="p-2 text-text-secondary">{m.reason ?? '—'}</td>
+                  </tr>
+                ))}
+                {movementRows.length === 0 && <tr><td colSpan={5} className="p-4 text-center text-text-secondary">{t('shop.inventory.emptyMovementsTitle')}</td></tr>}
+              </tbody>
+            </table>
+          )}
+
+          {tab === 'sales' && (
+            <table className="w-full text-start text-sm">
+              <thead>
+                <tr className="border-b border-border text-text-secondary">
+                  <th className="p-2 text-start">{t('shop.inventory.columns.date')}</th>
+                  <th className="p-2 text-start">{t('shop.inventory.detail.invoice')}</th>
+                  <th className="p-2 text-start">{t('shop.dashboard.columns.customer')}</th>
+                  <th className="p-2 text-start">{t('shop.inventory.columns.quantity')}</th>
+                  <th className="p-2 text-start">{t('shop.dashboard.columns.revenue')}</th>
+                </tr>
+              </thead>
+              <tbody>
+                {salesRows.map((s) => (
+                  <tr key={s.sale_id} className="border-b border-border last:border-0">
+                    <td className="p-2">{formatDate(s.created_at, locale as SupportedLocale, 'Africa/Cairo', { year: 'numeric', month: 'short', day: 'numeric' })}</td>
+                    <td className="p-2">{s.invoice_number}</td>
+                    <td className="p-2">{s.customer_name ?? t('shop.dashboard.walkIn')}</td>
+                    <td className="p-2">{Number(s.quantity)}</td>
+                    <td className="p-2"><MoneyDisplay amount={Number(s.line_total)} size="sm" /></td>
+                  </tr>
+                ))}
+                {salesRows.length === 0 && <tr><td colSpan={5} className="p-4 text-center text-text-secondary">{t('shop.dashboard.emptySales')}</td></tr>}
+              </tbody>
+            </table>
+          )}
+
+          {tab === 'returns' && (
+            <table className="w-full text-start text-sm">
+              <thead>
+                <tr className="border-b border-border text-text-secondary">
+                  <th className="p-2 text-start">{t('shop.inventory.columns.date')}</th>
+                  <th className="p-2 text-start">{t('shop.inventory.detail.invoice')}</th>
+                  <th className="p-2 text-start">{t('shop.inventory.columns.quantity')}</th>
+                  <th className="p-2 text-start">{t('shop.dashboard.columns.reason')}</th>
+                  <th className="p-2 text-start">{t('shop.dashboard.columns.refund')}</th>
+                </tr>
+              </thead>
+              <tbody>
+                {returnRows.map((r) => (
+                  <tr key={r.return_id} className="border-b border-border last:border-0">
+                    <td className="p-2">{formatDate(r.created_at, locale as SupportedLocale, 'Africa/Cairo', { year: 'numeric', month: 'short', day: 'numeric' })}</td>
+                    <td className="p-2">{r.invoice_number}</td>
+                    <td className="p-2">{Number(r.quantity)}</td>
+                    <td className="p-2 text-text-secondary">{r.reason}</td>
+                    <td className="p-2">{r.refund_amount === null ? t('shop.dashboard.restockOnly') : <MoneyDisplay amount={Number(r.refund_amount)} size="sm" tone="danger" />}</td>
+                  </tr>
+                ))}
+                {returnRows.length === 0 && <tr><td colSpan={5} className="p-4 text-center text-text-secondary">{t('shop.dashboard.emptyReturns')}</td></tr>}
+              </tbody>
+            </table>
+          )}
+
+          {tab === 'supplier' && (
+            <div className="flex flex-col gap-3 text-sm">
+              {/* No dedicated "default supplier per product" concept
+                  exists in the schema (shop_products has no supplier_id
+                  column -- supplier association is per-receipt, per the
+                  directive's own confirmed design). Derived here as the
+                  distinct set of suppliers who have ever supplied this
+                  product, from the movements this dialog already fetches. */}
+              {supplierNames.length === 0 && unattributedReceiptCount === 0 && (
+                <p className="text-text-secondary">{t('shop.inventory.detail.noSupplierData')}</p>
+              )}
+              {supplierNames.length > 0 && (
+                <div>
+                  <p className="mb-1 font-medium">{t('shop.inventory.detail.knownSuppliers')}</p>
+                  <ul className="list-inside list-disc">
+                    {supplierNames.map((name) => <li key={name}>{name}</li>)}
+                  </ul>
+                </div>
+              )}
+              {unattributedReceiptCount > 0 && (
+                <p className="text-text-secondary">{t('shop.inventory.detail.unattributedReceipts', { count: unattributedReceiptCount })}</p>
+              )}
+            </div>
+          )}
+        </div>
+
+        <div className="flex justify-end">
+          <Button variant="outline" onClick={onClose}>{t('common.close')}</Button>
         </div>
       </DialogContent>
     </Dialog>

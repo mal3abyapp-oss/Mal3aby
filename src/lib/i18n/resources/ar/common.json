@@ -769,7 +769,8 @@
       "wallet": "محفظة إلكترونية",
       "other": "أخرى"
     },
-    "change": "تغيير"
+    "change": "تغيير",
+    "done": "تم"
   },
   "bookings": {
     "statusLabels": {
@@ -4180,9 +4181,69 @@
         "onHand": "المتاح",
         "movementType": "النوع",
         "quantity": "الكمية",
-        "reason": "السبب"
+        "reason": "السبب",
+        "reorderLevel": "حد إعادة الطلب",
+        "status": "الحالة"
       },
-      "movementHistoryLimitNote": "يعرض آخر {{count}} حركة."
+      "movementHistoryLimitNote": "يعرض آخر {{count}} حركة.",
+      "addLine": "إضافة سطر",
+      "availableAtSource": "المتاح",
+      "detail": {
+        "barcode": "الباركود",
+        "basePrice": "السعر الأساسي",
+        "category": "الفئة",
+        "invoice": "الفاتورة",
+        "knownSuppliers": "الموردون المعروفون",
+        "noSupplierData": "لا توجد بيانات موردين مسجلة لهذا المنتج بعد.",
+        "reference": "المرجع",
+        "reorderLevel": "حد إعادة الطلب",
+        "sku": "رمز المنتج (SKU)",
+        "tabs": {
+          "general": "عام",
+          "movements": "الحركات",
+          "returns": "المرتجعات",
+          "sales": "سجل المبيعات",
+          "stock": "المخزون",
+          "supplier": "المورد"
+        },
+        "title": "تفاصيل المنتج",
+        "totalOnHand": "إجمالي الكمية المتاحة",
+        "unattributedReceipts": "{{count}} إيصال استلام بدون مورد مسجل"
+      },
+      "expectedTotalCost": "إجمالي التكلفة المتوقعة",
+      "itemsLabel": "الأصناف",
+      "kpis": {
+        "lowStock": "مخزون منخفض",
+        "outOfStock": "نفدت الكمية",
+        "stockValue": "قيمة المخزون",
+        "stockValueHidden": "مخفي",
+        "totalSkus": "إجمالي المنتجات"
+      },
+      "pickSourceFirst": "اختر موقع المصدر أولاً.",
+      "receiptSummary": {
+        "description": "تم تسجيل {{count}} سطر صنف في المخزون.",
+        "title": "تم تسجيل الاستلام",
+        "totalCost": "إجمالي التكلفة"
+      },
+      "recent": {
+        "adjustments": "أحدث التسويات",
+        "damageLoss": "أحدث حالات التلف / الفقد",
+        "empty": "لا يوجد شيء بعد",
+        "receipts": "أحدث الاستلامات",
+        "transfers": "أحدث التحويلات"
+      },
+      "referenceNumberLabel": "رقم المرجع / الفاتورة",
+      "removeLine": "حذف السطر",
+      "status": {
+        "in": "متوفر",
+        "low": "مخزون منخفض",
+        "out": "نفدت الكمية"
+      },
+      "transferSummary": {
+        "description": "تم تحويل {{count}} سطر صنف بين المواقع.",
+        "title": "تم تسجيل التحويل"
+      },
+      "transferSummaryLine": "سيتم تحويل {{count}} سطر صنف."
     },
     "sales": {
       "title": "المبيعات والمرتجعات",
@@ -4367,8 +4428,17 @@
       "summary": {
         "matched": "مطابق",
         "shortage": "عجز",
-        "surplus": "زيادة"
-      }
+        "surplus": "زيادة",
+        "counted": "عدد الأسطر المعدودة",
+        "netQuantity": "صافي فرق الكمية",
+        "valueCostUnavailable": "تم استبعاد {{count}} سطر من قيمة الفرق -- التكلفة غير متوفرة",
+        "valueDifference": "قيمة الفرق",
+        "valueHidden": "قيمة الفرق مخفية -- ليس لديك صلاحية عرض بيانات ربحية المتجر."
+      },
+      "allCategories": "كل الفئات",
+      "noMatchingLines": "لا توجد أصناف مطابقة لهذا البحث/الفلتر.",
+      "progress": "تم عد {{counted}} من {{total}} ({{pct}}%)",
+      "searchPlaceholder": "بحث عن منتج…"
     },
     "reports": {
       "pager": {

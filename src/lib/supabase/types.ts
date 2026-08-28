@@ -8739,6 +8739,59 @@ export type Database = {
           variant_label: string
         }[]
       }
+      list_shop_product_sales_history: {
+        // COMMERCE PRO C8: product-scoped sales history (all customers),
+        // for the Product Detail dialog's SALES HISTORY tab.
+        Args: {
+          p_club_id: string
+          p_product_id: string
+          p_variant_id?: string
+          p_start_date?: string
+          p_end_date?: string
+          p_limit?: number
+          p_offset?: number
+        }
+        Returns: {
+          sale_id: string
+          invoice_number: string
+          customer_name: string | null
+          sold_by_name: string | null
+          variant_label: string | null
+          quantity: number
+          unit_price: number
+          line_total: number
+          returned_quantity: number
+          sale_status: string
+          created_at: string
+        }[]
+      }
+      list_shop_product_returns: {
+        // COMMERCE PRO C8: product-scoped returned lines (all
+        // customers), for the Product Detail dialog's RETURNS tab.
+        Args: {
+          p_club_id: string
+          p_product_id: string
+          p_variant_id?: string
+          p_start_date?: string
+          p_end_date?: string
+          p_limit?: number
+          p_offset?: number
+        }
+        Returns: {
+          return_id: string
+          sale_id: string
+          invoice_number: string
+          customer_name: string | null
+          processed_by_name: string | null
+          variant_label: string | null
+          quantity: number
+          restock: boolean
+          reason: string
+          refund_amount: number | null
+          refund_method: string | null
+          created_at: string
+        }[]
+      }
       list_shop_product_variants: {
         Args: { p_product_id: string }
         Returns: {
@@ -9110,6 +9163,19 @@ export type Database = {
           p_supplier_id?: string
           p_unit_cost?: number
           p_variant_id?: string
+        }
+        Returns: string
+      }
+      receive_shop_stock_batch: {
+        // COMMERCE PRO C8: atomic multi-item receiving (one transaction
+        // for every line). p_items: jsonb array of {product_id,
+        // variant_id, quantity, unit_cost}.
+        Args: {
+          p_location_id: string
+          p_items: Json
+          p_supplier_id?: string
+          p_reference_number?: string
+          p_notes?: string
         }
         Returns: string
       }
@@ -9512,6 +9578,18 @@ export type Database = {
           p_quantity?: number
           p_source_location_id: string
           p_variant_id?: string
+        }
+        Returns: string
+      }
+      transfer_shop_stock_batch: {
+        // COMMERCE PRO C8: atomic multi-item transfer (one transaction
+        // for every line's out+in movement pair). p_items: jsonb array
+        // of {product_id, variant_id, quantity}.
+        Args: {
+          p_source_location_id: string
+          p_dest_location_id: string
+          p_items: Json
+          p_notes?: string
         }
         Returns: string
       }
