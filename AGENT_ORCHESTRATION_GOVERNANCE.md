@@ -85,6 +85,45 @@ around by finding an equivalent command.
    working on this repository should read this file before delegating
    git-write-capable work to a subagent.
 
+## Incident 2 (2026-08-28) — subagent worked directly inside the primary's active checkout
+
+During the Shop Production Acceptance directive, a background subagent
+(`product-explorer`, tasked with Stock Count/POS/Returns/Reports QA) was
+launched to fix real bugs it found along the way. It did — 3 genuine
+defects, each correctly root-caused and fixed via real migrations — but
+it committed those fixes **directly inside the primary orchestrating
+session's own active `main` checkout** (`D:\Ai Projects\Mal3aby`), not
+in an isolated worktree or branch. This is a governance deviation from
+Rule 2 above ("edit files in its own isolated branch/worktree") even
+though Rules 1/3/5/6 (no subagent push to `main`, only the orchestrator
+pushes, a blocked push is never bypassed) were **not** violated — the
+subagent committed locally and never attempted to push; the primary
+agent independently reviewed, independently re-verified the load-bearing
+claim (`get_shop_inventory_summary`'s `out_of_stock_count` — actually
+re-ran the RPC and confirmed the reported value before trusting it), and
+then merged/pushed exactly as Rule 4 requires.
+
+**Why this still matters even though nothing was pushed without review**:
+working inside the primary's live checkout means a subagent's local
+commits land directly on the branch the primary is actively using —
+two agents mutating the same working tree concurrently is a real risk
+(a race on the same file, a subagent's mid-edit state being read by the
+primary before it's finished, an uncommitted change silently picked up
+as if reviewed). It worked out safely this time because the subagent's
+edits were additive (a new migration file) and non-overlapping with the
+primary's own concurrent edits, and because the primary happened to
+independently verify before pushing anyway — but "it worked out" is not
+the same as "it was safe by design," which is the same reasoning
+Incident 1 above is built on.
+
+**Per explicit user instruction**: this is recorded as a governance
+deviation, not rolled back — the actual fixes are correct, independently
+verified, and stay merged. Future subagent launches for this project
+must be given an isolated worktree explicitly (the `isolation: "worktree"`
+option where the launching mechanism supports it, or an explicit
+`git worktree add` step in the subagent's own prompt where it does not)
+rather than assuming a subagent will choose isolation on its own.
+
 ## Why this is stricter than "just don't do bad things"
 
 The failure mode here was not a subagent trying to do something obviously
