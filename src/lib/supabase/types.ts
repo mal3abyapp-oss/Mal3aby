@@ -1357,6 +1357,10 @@ export type Database = {
           club_id: string
           field_limit: number | null
           notes: string | null
+          // PLATFORM OWNER CONTROL IMPLEMENTATION -- Phase 5: payment
+          // kill switch column (migration 20260828240000). Hand-added
+          // per this project's established types.ts convention.
+          payments_platform_disabled: boolean
           updated_at: string
           updated_by: string | null
         }
@@ -1366,6 +1370,7 @@ export type Database = {
           club_id: string
           field_limit?: number | null
           notes?: string | null
+          payments_platform_disabled?: boolean
           updated_at?: string
           updated_by?: string | null
         }
@@ -1375,6 +1380,7 @@ export type Database = {
           club_id?: string
           field_limit?: number | null
           notes?: string | null
+          payments_platform_disabled?: boolean
           updated_at?: string
           updated_by?: string | null
         }
@@ -4219,6 +4225,10 @@ export type Database = {
           created_at: string
           currency: string
           default_grace_period_days: number
+          default_modules: string[] | null
+          default_branch_limit: number | null
+          default_field_limit: number | null
+          default_academy_limit: number | null
           description_ar: string | null
           discount_label: string | null
           display_order: number
@@ -4237,6 +4247,10 @@ export type Database = {
           created_at?: string
           currency?: string
           default_grace_period_days?: number
+          default_modules?: string[] | null
+          default_branch_limit?: number | null
+          default_field_limit?: number | null
+          default_academy_limit?: number | null
           description_ar?: string | null
           discount_label?: string | null
           display_order?: number
@@ -4255,6 +4269,10 @@ export type Database = {
           created_at?: string
           currency?: string
           default_grace_period_days?: number
+          default_modules?: string[] | null
+          default_branch_limit?: number | null
+          default_field_limit?: number | null
+          default_academy_limit?: number | null
           description_ar?: string | null
           discount_label?: string | null
           display_order?: number
@@ -9480,6 +9498,16 @@ export type Database = {
         Args: { p_connection_id: string; p_enabled: boolean }
         Returns: undefined
       }
+      // PLATFORM OWNER CONTROL IMPLEMENTATION -- Phase 5: payment kill
+      // switch + provider policy RPCs (migration 20260828240000).
+      set_club_gateway_provider_policy: {
+        Args: { p_club_id: string; p_provider_key: string; p_status: string; p_reason?: string }
+        Returns: undefined
+      }
+      set_club_payments_enabled: {
+        Args: { p_club_id: string; p_enabled: boolean; p_reason?: string }
+        Returns: undefined
+      }
       set_club_module_active: {
         Args: { p_active: boolean; p_club_id: string; p_module_key: string }
         Returns: undefined
@@ -9495,6 +9523,21 @@ export type Database = {
       set_club_public_slug: {
         Args: { p_club_id: string; p_desired_slug?: string }
         Returns: string
+      }
+      // PLATFORM OWNER CONTROL IMPLEMENTATION -- Phase 3: audited
+      // replacement for the direct commercial_entitlements client
+      // upsert (see migration 20260828220000). Hand-added per this
+      // project's established convention of editing this file per-RPC
+      // rather than running a full generate_typescript_types regen.
+      set_commercial_entitlements: {
+        Args: {
+          p_club_id: string
+          p_branch_limit: number | null
+          p_field_limit: number | null
+          p_academy_limit: number | null
+          p_reason?: string
+        }
+        Returns: undefined
       }
       set_customer_whatsapp_consent: {
         Args: { p_club_id: string; p_consented: boolean; p_customer_id: string }
@@ -9751,11 +9794,19 @@ export type Database = {
         Returns: undefined
       }
       update_platform_plan: {
+        // PLATFORM OWNER CONTROL IMPLEMENTATION -- Phase 4: extended
+        // with the optional plan-default columns (migration
+        // 20260828231500). Hand-edited per this project's established
+        // convention rather than a full generate_typescript_types regen.
         Args: {
           p_name_ar: string
           p_plan_id: string
           p_price: number
           p_reason?: string
+          p_default_modules?: string[] | null
+          p_default_branch_limit?: number | null
+          p_default_field_limit?: number | null
+          p_default_academy_limit?: number | null
         }
         Returns: {
           billing_interval: string
@@ -9763,6 +9814,10 @@ export type Database = {
           created_at: string
           currency: string
           default_grace_period_days: number
+          default_modules: string[] | null
+          default_branch_limit: number | null
+          default_field_limit: number | null
+          default_academy_limit: number | null
           description_ar: string | null
           discount_label: string | null
           display_order: number

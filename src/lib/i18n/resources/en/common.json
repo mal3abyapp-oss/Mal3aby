@@ -247,7 +247,8 @@
         "recordPayment": "Couldn't record the payment.",
         "reversePayment": "Couldn't reverse the payment.",
         "saveLimits": "Couldn't save the commercial limits.",
-        "updateRequestStatus": "Couldn't update the request status."
+        "updateRequestStatus": "Couldn't update the request status.",
+        "setPaymentsEnabled": "Couldn't update the payment kill switch."
       },
       "invoiceColumns": {
         "number": "Invoice #",
@@ -345,7 +346,17 @@
         "requestSummary": "{{label}} — current limit {{limit}} / usage {{usage}}",
         "requestUnlimited": "unlimited",
         "approve": "Approve",
-        "reject": "Reject"
+        "reject": "Reject",
+        "reasonLabel": "Reason (optional)",
+        "overLimitWarning": "{{label}}: {{used}} currently in use, above the new limit of {{limit}}. Existing records are preserved — no new ones can be created until usage drops below the limit."
+      },
+      "paymentsCard": {
+        "title": "Online payments",
+        "enabled": "Enabled",
+        "disabled": "Disabled by platform",
+        "hint": "A kill switch independent of club suspension -- disabling blocks new online-payment checkouts only. Historical payments, refunds, and cash/manual payments are unaffected.",
+        "enable": "Re-enable payments",
+        "disable": "Disable payments"
       },
       "tabs": {
         "history": "Subscription history",
@@ -411,7 +422,8 @@
       "modules": {
         "fields": "Fields & Bookings",
         "academy": "Academy",
-        "shop": "Shop"
+        "shop": "Shop",
+        "clubMembership": "Club Memberships"
       },
       "modulesHint": "Turning a module off never deletes its history — the club keeps everything it already has, it just can't create anything new in that module until you turn it back on.",
       "modulesEntitled": "Entitled",
@@ -599,6 +611,11 @@
         "nameLabel": "Plan name",
         "priceLabel": "Price ({{currency}})",
         "priceChangeNote": "Changing the price doesn't affect any subscription already created at the previous price -- it only applies to new subscriptions.",
+        "defaultModulesLabel": "Default modules (optional)",
+        "defaultModulesHint": "Seeded onto a club's Modules only when that club has no existing entitlement for a module yet -- never overwrites an existing configuration.",
+        "defaultBranchLimitLabel": "Default branch limit (optional)",
+        "defaultFieldLimitLabel": "Default field limit (optional)",
+        "defaultAcademyLimitLabel": "Default academy limit (optional)",
         "saving": "Saving...",
         "save": "Save"
       }
@@ -773,6 +790,11 @@
     "done": "Done"
   },
   "bookings": {
+    "moduleNotActive": {
+      "title": "Bookings isn't available yet",
+      "notEntitled": "This club's plan doesn't include the Fields & Bookings module yet. Contact support to enable it.",
+      "notActivated": "The Fields & Bookings module has been unlocked for this club but hasn't been turned on yet."
+    },
     "statusLabels": {
       "pending_payment": "Awaiting payment",
       "confirmed": "Confirmed",
@@ -1238,6 +1260,11 @@
     }
   },
   "academy": {
+    "moduleNotActive": {
+      "title": "Academy isn't available yet",
+      "notEntitled": "This club's plan doesn't include the Academy module yet. Contact support to enable it.",
+      "notActivated": "The Academy module has been unlocked for this club but hasn't been turned on yet."
+    },
     "loading": "Loading...",
     "title": "Academy",
     "description": "Players, memberships, and attendance",
@@ -1457,6 +1484,11 @@
     }
   },
   "clubMemberships": {
+    "moduleNotActive": {
+      "title": "Club Memberships isn't available yet",
+      "notEntitled": "This club's plan doesn't include the Club Memberships module yet. Contact support to enable it.",
+      "notActivated": "The Club Memberships module has been unlocked for this club but hasn't been turned on yet."
+    },
     "title": "Club Memberships",
     "description": "Membership plans, members, and renewals",
     "membership": "Membership",
