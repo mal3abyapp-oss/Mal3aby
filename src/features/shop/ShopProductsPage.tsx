@@ -561,8 +561,19 @@ const VIEW_MODE_STORAGE_KEY = 'mala3by.shop.productsViewMode'
 
 export function ShopProductsPage() {
   const { t } = useTranslation()
-  const { currentClubId } = useAuth()
+  const { currentClubId, currentMembership } = useAuth()
   const queryClient = useQueryClient()
+  // COMMERCE PRO C10 (found during E2E authoring, fixed by the
+  // orchestrator): the real security boundary was already correct
+  // server-side (create_shop_product/update_shop_product/
+  // create_shop_category/update_shop_category all require
+  // shop.product.manage; the shop-product-images bucket's own write
+  // policies require it too) -- but the client-side UI never mirrored
+  // that gate, so a staff member without the permission would still see
+  // and could click "Add Product"/"Manage Categories" before the server
+  // correctly rejected the write. Matches the exact existing
+  // canDiscount pattern in ShopPOSPage.tsx.
+  const canManageProducts = (currentMembership?.permissionKeys ?? []).includes('shop.product.manage')
   const [search, setSearch] = useState('')
   const [categoryFilter, setCategoryFilter] = useState('')
   const [addOpen, setAddOpen] = useState(false)
@@ -671,15 +682,17 @@ export function ShopProductsPage() {
         title={t('shop.products.title')}
         description={t('shop.products.description')}
         actions={
-          <div className="flex gap-2">
-            <Button variant="outline" onClick={() => setManagingCategories(true)}>{t('shop.categories.manageTitle')}</Button>
-            <Dialog open={addOpen} onOpenChange={setAddOpen}>
-              <DialogTrigger asChild>
-                <Button>{t('shop.products.addProduct')}</Button>
-              </DialogTrigger>
-              <AddProductDialog clubId={currentClubId as string} onCreated={() => { setAddOpen(false); invalidate() }} />
-            </Dialog>
-          </div>
+          canManageProducts ? (
+            <div className="flex gap-2">
+              <Button variant="outline" onClick={() => setManagingCategories(true)}>{t('shop.categories.manageTitle')}</Button>
+              <Dialog open={addOpen} onOpenChange={setAddOpen}>
+                <DialogTrigger asChild>
+                  <Button data-testid="products-add-product">{t('shop.products.addProduct')}</Button>
+                </DialogTrigger>
+                <AddProductDialog clubId={currentClubId as string} onCreated={() => { setAddOpen(false); invalidate() }} />
+              </Dialog>
+            </div>
+          ) : undefined
         }
       />
 
