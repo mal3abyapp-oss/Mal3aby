@@ -562,6 +562,7 @@ export function BookingsPage() {
                       return (
                         <td
                           key={f.id}
+                          data-testid={`booking-slot-${f.id}-${slot.label}`}
                           className="cursor-pointer border-b border-s border-border p-1 hover:bg-accent/10"
                           onClick={() => setSlotSelection({ fieldId: f.id, fieldName: f.name, branchId: f.branch_id, date, startTime: slot.label })}
                         >

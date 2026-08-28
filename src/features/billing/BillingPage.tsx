@@ -689,7 +689,7 @@ export function BillingPage() {
       key: 'number',
       header: t('billing.table.invoiceNumber'),
       render: (r) => (
-        <button className="text-accent-foreground hover:underline" onClick={() => setSelectedInvoiceId(r.id)}>
+        <button data-testid={`invoice-row-${r.id}`} className="text-accent-foreground hover:underline" onClick={() => setSelectedInvoiceId(r.id)}>
           <bdi>{r.invoiceNumber}</bdi>
         </button>
       ),
@@ -877,6 +877,7 @@ export function BillingPage() {
           {detail && !wrongClubName && (
             <div className="flex flex-col gap-4">
               <div
+                data-testid="invoice-print-view"
                 data-print-size={printSize}
                 className={`print-target rounded-md border border-border p-4 text-sm print:border-0 ${refundReceipt || printPaymentId ? '' : 'visible-for-print'}`}
               >
@@ -974,10 +975,10 @@ export function BillingPage() {
 
               <div className="flex items-center gap-2 print:hidden">
                 <Select value={printSize} onValueChange={(v) => setPrintSize(v as 'a4' | '80mm')}>
-                  <SelectTrigger className="w-32"><SelectValue /></SelectTrigger>
+                  <SelectTrigger className="w-32" data-testid="invoice-print-size-toggle"><SelectValue /></SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="a4">A4</SelectItem>
-                    <SelectItem value="80mm">{t('billing.detail.receiptSize80mm')}</SelectItem>
+                    <SelectItem value="a4" data-testid="invoice-print-size-a4">A4</SelectItem>
+                    <SelectItem value="80mm" data-testid="invoice-print-size-80mm">{t('billing.detail.receiptSize80mm')}</SelectItem>
                   </SelectContent>
                 </Select>
                 <Button variant="outline" size="sm" className="w-fit" onClick={() => window.print()}>
@@ -1023,6 +1024,7 @@ export function BillingPage() {
                           <Button
                             size="sm"
                             variant="ghost"
+                            data-testid={`refund-payment-${p.id}`}
                             onClick={() => setRefundPaymentId(p.id)}
                           >
                             {t('billing.detail.refund')}
@@ -1167,9 +1169,9 @@ export function BillingPage() {
             <DialogTitle>{t('billing.refund.dialogTitle')}</DialogTitle>
           </DialogHeader>
           <div className="flex flex-col gap-3">
-            <Input type="number" placeholder={t('billing.refund.amountPlaceholder')} value={refundAmount} onChange={(e) => setRefundAmount(e.target.value)} />
-            <Input placeholder={t('billing.refund.reasonPlaceholder')} value={refundReason} onChange={(e) => setRefundReason(e.target.value)} />
-            <Button disabled={!refundAmount || !refundReason.trim() || refundMutation.isPending} onClick={() => refundMutation.mutate()}>
+            <Input data-testid="refund-amount-input" type="number" placeholder={t('billing.refund.amountPlaceholder')} value={refundAmount} onChange={(e) => setRefundAmount(e.target.value)} />
+            <Input data-testid="refund-reason-input" placeholder={t('billing.refund.reasonPlaceholder')} value={refundReason} onChange={(e) => setRefundReason(e.target.value)} />
+            <Button data-testid="refund-submit" disabled={!refundAmount || !refundReason.trim() || refundMutation.isPending} onClick={() => refundMutation.mutate()}>
               {t('billing.refund.submit')}
             </Button>
           </div>
@@ -1183,7 +1185,7 @@ export function BillingPage() {
           </DialogHeader>
           {printPayment && detail && (
             <div className="flex flex-col gap-3">
-              <div data-print-size={printSize} className="print-target visible-for-print rounded-md border border-border p-4 text-sm print:border-0">
+              <div data-testid="payment-receipt-view" data-print-size={printSize} className="print-target visible-for-print rounded-md border border-border p-4 text-sm print:border-0">
                 <p className="mb-2 font-bold">{t('billing.detail.paymentReceiptTitle')}</p>
                 <div className="flex flex-col gap-1">
                   <p>{t('billing.detail.invoicePrefix')} <bdi>{detail.invoice_number}</bdi></p>
@@ -1237,7 +1239,7 @@ export function BillingPage() {
           </DialogHeader>
           {refundReceipt && (
             <div className="flex flex-col gap-3">
-              <div data-print-size={printSize} className="print-target visible-for-print rounded-md border border-border p-4 text-sm print:border-0">
+              <div data-testid="refund-receipt-view" data-print-size={printSize} className="print-target visible-for-print rounded-md border border-border p-4 text-sm print:border-0">
                 <p className="mb-2 font-bold">{t('billing.refund.receiptTitle')}</p>
                 <div className="flex flex-col gap-1">
                   <p>{t('billing.refund.receiptInvoicePrefix')} <bdi>{refundReceipt.invoiceNumber}</bdi></p>
