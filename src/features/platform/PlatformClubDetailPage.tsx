@@ -3,6 +3,7 @@ import { Link, useParams } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
 import { supabase } from '@/lib/supabase/client'
+import { cn } from '@/lib/utils'
 import { PageHeader } from '@/components/ui/page-header'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -1029,10 +1030,35 @@ export function PlatformClubDetailPage() {
                 const usedKey = key === 'branch_limit' ? 'branches_used' : key === 'field_limit' ? 'fields_used' : 'academy_used'
                 const limit = usage?.[key] ?? null
                 const used = usage?.[usedKey] ?? 0
+                // PLATFORM OWNER AUTONOMOUS COMPLETION -- Phase D
+                // (2026-08-29): live-triggered with a real fixture
+                // (1 QA branch + branch_limit=0 set via this exact
+                // UI) -- confirmed the persistent display card had no
+                // visual indicator at all once an over-limit state was
+                // actually saved (only the pre-save warning inside the
+                // edit form existed). The RPC/trigger side already does
+                // the right thing (preserves existing records, blocks
+                // new ones) -- this was purely a "clear warning" gap
+                // per the directive's own §14 wording.
+                const isOverLimit = limit !== null && used > limit
                 return (
-                  <div key={key} className="rounded-lg border border-border p-3">
-                    <p className="text-sm font-medium">{limitTypeLabel[key]}</p>
+                  <div
+                    key={key}
+                    className={cn(
+                      'rounded-lg border p-3',
+                      isOverLimit ? 'border-status-danger/40 bg-status-danger/5' : 'border-border'
+                    )}
+                  >
+                    <div className="flex items-center justify-between gap-2">
+                      <p className="text-sm font-medium">{limitTypeLabel[key]}</p>
+                      {isOverLimit && (
+                        <StatusBadge tone="danger" label={t('platform.clubDetailPage.limitsCard.overLimitBadge')} />
+                      )}
+                    </div>
                     <p className="text-sm text-text-secondary tabular-nums">{used} {limit === null ? t('platform.clubDetailPage.limitsCard.unlimited') : `/ ${limit}`}</p>
+                    {isOverLimit && (
+                      <p className="mt-1 text-xs text-status-danger">{t('platform.clubDetailPage.limitsCard.overLimitHint')}</p>
+                    )}
                   </div>
                 )
               })}

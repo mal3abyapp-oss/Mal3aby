@@ -348,7 +348,9 @@
         "approve": "Approve",
         "reject": "Reject",
         "reasonLabel": "Reason (optional)",
-        "overLimitWarning": "{{label}}: {{used}} currently in use, above the new limit of {{limit}}. Existing records are preserved — no new ones can be created until usage drops below the limit."
+        "overLimitWarning": "{{label}}: {{used}} currently in use, above the new limit of {{limit}}. Existing records are preserved — no new ones can be created until usage drops below the limit.",
+        "overLimitBadge": "Over limit",
+        "overLimitHint": "Current usage is above the limit — existing records are preserved, and no new ones can be created until usage drops below the limit or the limit is raised."
       },
       "paymentsCard": {
         "title": "Online payments",
