@@ -1,0 +1,62 @@
+-- Commerce Pro C7: Cost-at-sale snapshot (plan Section 5, Phase C7,
+-- item 1). "Do this first" per the task -- every profitability/
+-- valuation report in this phase depends on this column existing
+-- correctly.
+--
+-- Investigation performed before writing this migration (per the
+-- task's explicit instruction not to invent a fake per-product cost
+-- field without checking first): confirmed via direct schema read of
+-- shop_products/shop_product_variants (20260826210231_shop_catalog_schema.sql,
+-- unchanged through C1-C6, C1's own image/gallery additions did not
+-- touch cost) that NEITHER table has ever had a cost column. The only
+-- cost data anywhere in this schema is
+-- shop_inventory_movements.unit_cost, populated exclusively by
+-- receive_shop_stock() on movement_type='purchase_receipt'
+-- (20260826230437_shop_receive_transfer_support_audit.sql, confirmed
+-- latest). Every other movement_type (sale, transfer, adjustment,
+-- stock_count_adjustment, opening_balance) leaves unit_cost null.
+--
+-- Cost-at-sale derivation method chosen: LAST COST (most recent
+-- purchase_receipt unit_cost for this exact product/variant, scanning
+-- across ALL of this club's locations, as of the moment of sale --
+-- not scoped to the selling location, because a club-wide most-recent
+-- purchase price is a more representative cost signal than
+-- "whichever location happened to receive stock last", and because
+-- transfer_in/transfer_out movements never carry unit_cost themselves
+-- -- confirmed via direct schema read, shop_inventory_movements' own
+-- check constraint allows a null unit_cost, and transfer_shop_stock's
+-- live body (20260826230437) passes `null` for unit_cost on both its
+-- transfer_out and transfer_in calls). Scoping to "this location only"
+-- would therefore silently miss the true last-known cost for any unit
+-- that arrived at this location via an inter-location transfer rather
+-- than a direct receipt.
+--
+-- Documented limitations (honest, not hidden):
+-- 1. "Last cost", not FIFO or weighted-average -- if a club received
+--    the same product at two different unit costs across two
+--    purchase_receipt events, this always uses whichever receipt is
+--    chronologically most recent as of the sale, not a blended cost.
+--    A simpler, defensible default for a club-run shop (not a
+--    warehouse-scale accounting system) -- the plan explicitly leaves
+--    this choice to the implementer's judgment.
+-- 2. If a product/variant has NEVER had a purchase_receipt movement
+--    (e.g. its only stock ever came in via opening_balance or a
+--    manual adjustment_in with no unit_cost, or it simply hasn't been
+--    restocked since going live), unit_cost_snapshot is correctly left
+--    NULL -- not defaulted to 0, not inferred from base_price. Every
+--    downstream report (Gross Profit, Stock Valuation) must render
+--    "Cost unavailable" for a null snapshot, never a fabricated 0.
+-- 3. Never backfilled for historical sales (plan invariant 5) -- rows
+--    created before this migration, and any row created after this
+--    migration but before a genuine purchase_receipt exists for that
+--    unit, both correctly show unit_cost_snapshot = null forever. This
+--    column is populated once, at INSERT time, by create_shop_sale
+--    itself -- never retroactively recalculated by a later purchase
+--    receipt (that would silently rewrite a completed sale's own
+--    historical cost basis, which the plan's invariants forbid for
+--    the exact same reason discount rewriting is forbidden).
+alter table public.shop_sale_items
+  add column unit_cost_snapshot numeric check (unit_cost_snapshot is null or unit_cost_snapshot >= 0);
+
+comment on column public.shop_sale_items.unit_cost_snapshot is
+  'Forward-only cost-at-sale snapshot (last known purchase_receipt unit_cost for this product/variant at the moment of sale, club-wide across all locations). NULL for any row created before this column existed, or for any unit never yet received via receive_shop_stock -- render "Cost unavailable", never fabricate a value. Never backfilled or recalculated after insert (Commerce Pro plan invariant 5).';
