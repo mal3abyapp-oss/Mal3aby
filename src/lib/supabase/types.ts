@@ -8140,9 +8140,63 @@ export type Database = {
           product_name_ar: string
           quantity: number
           returned_quantity: number
+          sku: string
           unit_price: number
           variant_label: string
         }[]
+      }
+      get_shop_sale_invoice_data: {
+        Args: { p_sale_id: string }
+        Returns: {
+          address: string
+          branch_id: string
+          branch_name: string
+          club_id: string
+          created_at: string
+          customer_id: string
+          customer_mobile: string
+          customer_name: string
+          discount_amount: number
+          discount_reason: string
+          invoice_id: string
+          invoice_number: string
+          invoice_status: string
+          location_name: string
+          payments: Json
+          sale_id: string
+          sold_by_name: string
+          subtotal: number
+          total: number
+        }[]
+      }
+      get_shop_print_settings: {
+        Args: { p_club_id: string }
+        Returns: {
+          address: string
+          commercial_registration: string
+          footer_note: string
+          logo_url: string
+          phone: string
+          return_policy: string
+          tax_number: string
+          trading_name_ar: string
+          trading_name_en: string
+        }[]
+      }
+      update_shop_print_settings: {
+        Args: {
+          p_address?: string
+          p_club_id: string
+          p_commercial_registration?: string
+          p_footer_note?: string
+          p_logo_url?: string
+          p_phone?: string
+          p_return_policy?: string
+          p_tax_number?: string
+          p_trading_name_ar?: string
+          p_trading_name_en?: string
+        }
+        Returns: undefined
       }
       get_shop_stock_count_detail: {
         Args: { p_stock_count_id: string }

@@ -4164,7 +4164,19 @@
         "partially_returned": "مرتجع جزئيًا",
         "returned": "مرتجع"
       },
-      "printLimitNote": "يعرض آخر {{count}} عملية بيع/إرجاع."
+      "printLimitNote": "يعرض آخر {{count}} عملية بيع/إرجاع.",
+      "viewInvoice": "الفاتورة"
+    },
+    "invoice": {
+      "dialogTitle": "فاتورة البيع",
+      "loadError": "تعذّر تحميل هذه الفاتورة.",
+      "sku": "رمز الصنف",
+      "cashier": "الكاشير",
+      "subtotal": "الإجمالي الفرعي",
+      "discount": "الخصم",
+      "taxNumber": "الرقم الضريبي",
+      "commercialRegistration": "رقم السجل التجاري",
+      "thankYou": "شكرًا لتسوقكم معنا"
     },
     "settings": {
       "title": "إعدادات المتجر",
@@ -4178,7 +4190,22 @@
       "locationKind": {
         "branch": "فرع",
         "warehouse": "مستودع"
-      }
+      },
+      "printSettingsTitle": "الهوية التجارية وإعدادات الطباعة",
+      "printSettingsHint": "تظهر على فواتير المتجر المطبوعة، وإيصالات الطابعة الحرارية، وإيصالات الدفع. تُطبع فقط الحقول التي تملأها.",
+      "printSettingsSaveError": "تعذّر حفظ إعدادات الطباعة.",
+      "printSettingsReadOnlyHint": "لا تملك صلاحية تعديل هذه الإعدادات. اطلب من مالك النادي منحك الصلاحية.",
+      "tradingNameAr": "الاسم التجاري (عربي)",
+      "tradingNameEn": "الاسم التجاري (إنجليزي)",
+      "address": "العنوان",
+      "phone": "الهاتف",
+      "taxNumber": "الرقم الضريبي",
+      "commercialRegistration": "رقم السجل التجاري",
+      "footerNote": "ملاحظة أسفل الفاتورة",
+      "returnPolicy": "سياسة الاسترجاع",
+      "save": "حفظ",
+      "saving": "جارٍ الحفظ...",
+      "saved": "تم الحفظ"
     },
     "stockCount": {
       "title": "جرد المخزون",

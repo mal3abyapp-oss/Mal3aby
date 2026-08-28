@@ -22,6 +22,7 @@ import {
 } from '@/components/ui/select'
 import { Trash2, Plus, Minus, ScanBarcode, ShoppingCart, Sparkles, User, PauseCircle, Percent, Banknote, Printer, CheckCircle2 } from 'lucide-react'
 import { translateSupabaseError } from '@/lib/errors'
+import { ShopInvoiceDialog } from '@/features/shop/ShopInvoiceDocument'
 
 // COMMERCIAL MODULE (2026-08-26) -- the POS/reception sale screen
 // (directive Section 28: Customer -> Product Search -> Variant ->
@@ -615,6 +616,7 @@ export function ShopPOSPage() {
       setSplitMethodId(null)
       setCashReceivedInput('')
       setCompletedSale({
+        saleId: result.saleId,
         invoiceId: result.invoiceId,
         invoiceNumber: result.invoiceNumber,
         total: result.total,
@@ -1188,6 +1190,7 @@ function ProductGrid({
 }
 
 interface CompletedSale {
+  saleId: string
   invoiceId: string | null
   invoiceNumber: string | null
   total: number
@@ -1195,24 +1198,25 @@ interface CompletedSale {
 }
 
 // Post-sale completion panel -- a single clear panel, not a stack of
-// dialogs (explicit plan instruction). "Print receipt"/"print invoice"
-// here deliberately link to the REAL existing invoice/payment view
-// (BillingPage.tsx via /app/finance/payments?invoice=..., confirmed by
-// grep as the actual established navigation pattern every other module
-// uses to reach an invoice) rather than a dedicated one-click print
-// action -- BillingPage.tsx's own print-target/data-print-size/
-// window.print() mechanism (Section 6 of the plan's own current-state
-// findings) lives inside that page today, keyed off finding the right
-// payment/invoice card on screen, not a query-param that auto-opens a
-// receipt view. A DEDICATED thermal-80mm-receipt / one-click Shop
-// invoice print is explicitly Phase C4's scope ("Invoice A4 redesign,
-// thermal 80mm receipt, payment receipt") -- not invented here. These
-// buttons open the real invoice so the cashier can use the existing
-// print button there; they are labeled "print" because that is the
-// cashier's actual next step, not because this page performs printing
-// itself.
+// dialogs (explicit plan instruction).
+//
+// COMMERCE PRO C4 update: "print receipt"/"print invoice" now open the
+// REAL documents built this phase (ShopInvoiceDialog, from
+// ShopInvoiceDocument.tsx -- the shared A4/80mm invoice component also
+// used by ShopSalesPage.tsx) directly in this same screen, replacing
+// the prior placeholder that linked out to BillingPage.tsx via
+// /app/finance/payments?invoice=... (that link was C3's own explicitly
+// documented interim choice -- "a dedicated one-click print... is
+// explicitly Phase C4's scope" -- this is that phase). Two buttons:
+// "print invoice" opens the A4 invoice at a click; "print receipt"
+// opens the same dialog pre-set to the 80mm thermal size (the dialog's
+// own toggle still lets the cashier switch either way) -- covers the
+// "reprint" requirement (a button on an already-completed sale, not
+// just at time-of-sale) since this panel IS the post-sale view and the
+// same dialog is reachable again later from ShopSalesPage.tsx.
 function SaleCompletePanel({ sale, onNewSale }: { sale: CompletedSale; onNewSale: () => void }) {
   const { t } = useTranslation()
+  const [printMode, setPrintMode] = useState<'invoice' | 'receipt' | null>(null)
   return (
     <div className="mx-auto flex max-w-md flex-col items-center gap-4 rounded-md border border-border p-6 text-center">
       <CheckCircle2 className="size-12 text-status-success" aria-hidden="true" />
@@ -1231,16 +1235,24 @@ function SaleCompletePanel({ sale, onNewSale }: { sale: CompletedSale; onNewSale
       )}
 
       <div className="flex w-full flex-col gap-2 sm:flex-row">
-        {sale.invoiceId && (
-          <Button variant="outline" className="flex-1" asChild>
-            <a href={`/app/finance/payments?invoice=${sale.invoiceId}`} target="_blank" rel="noreferrer">
-              <Printer className="me-2 size-4" aria-hidden="true" />
-              {t('shop.pos.printReceipt')}
-            </a>
-          </Button>
-        )}
+        <Button variant="outline" className="flex-1" onClick={() => setPrintMode('receipt')}>
+          <Printer className="me-2 size-4" aria-hidden="true" />
+          {t('shop.pos.printReceipt')}
+        </Button>
+        <Button variant="outline" className="flex-1" onClick={() => setPrintMode('invoice')}>
+          <Printer className="me-2 size-4" aria-hidden="true" />
+          {t('shop.pos.printInvoice')}
+        </Button>
       </div>
       <Button className="h-11 w-full" onClick={onNewSale}>{t('shop.pos.newSale')}</Button>
+
+      {printMode && (
+        <ShopInvoiceDialog
+          saleId={sale.saleId}
+          initialPrintSize={printMode === 'receipt' ? '80mm' : 'a4'}
+          onClose={() => setPrintMode(null)}
+        />
+      )}
     </div>
   )
 }

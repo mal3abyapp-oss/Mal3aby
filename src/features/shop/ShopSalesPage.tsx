@@ -21,6 +21,7 @@ import { translateSupabaseError } from '@/lib/errors'
 import { ReportPrintButton, ReportPrintHeader } from '@/components/ui/report-print-header'
 import { fetchFullReport } from '@/lib/fetchFullReport'
 import { Printer } from 'lucide-react'
+import { ShopInvoiceDialog } from '@/features/shop/ShopInvoiceDocument'
 
 // COMMERCIAL MODULE (2026-08-26) -- Sales history + Returns flow
 // (directive Section 43/44/64).
@@ -79,6 +80,13 @@ export function ShopSalesPage() {
   const { currentClubId } = useAuth()
   const { locale } = useDirection()
   const [returningSale, setReturningSale] = useState<SaleRow | null>(null)
+  // COMMERCE PRO C4 -- real per-sale invoice document (A4/80mm), opened
+  // by clicking the invoice number, matching BillingPage.tsx's own
+  // row-click-opens-detail pattern. Closes the gap this phase targets:
+  // ShopSalesPage previously only had a filtered-table print (the
+  // ReportPrintButton/fetchFullReport machinery above, unchanged), no
+  // real per-sale invoice document.
+  const [viewingInvoiceSaleId, setViewingInvoiceSaleId] = useState<string | null>(null)
 
   const { data: sales = [], isLoading } = useQuery({
     queryKey: ['shop-sales', currentClubId],
@@ -109,7 +117,19 @@ export function ShopSalesPage() {
   }, [fullSales])
 
   const columns: DataTableColumn<SaleRow>[] = [
-    { key: 'invoice', header: t('shop.sales.columns.invoice'), render: (s) => <bdi>{s.invoiceNumber}</bdi> },
+    {
+      key: 'invoice',
+      header: t('shop.sales.columns.invoice'),
+      render: (s) => (
+        <button
+          data-testid={`shop-sale-row-${s.saleId}`}
+          className="text-accent-foreground hover:underline"
+          onClick={() => setViewingInvoiceSaleId(s.saleId)}
+        >
+          <bdi>{s.invoiceNumber}</bdi>
+        </button>
+      ),
+    },
     { key: 'customer', header: t('shop.sales.columns.customer'), render: (s) => s.customerName ?? '—' },
     { key: 'total', header: t('shop.sales.columns.total'), render: (s) => <MoneyDisplay amount={s.total} size="sm" /> },
     {
@@ -121,9 +141,17 @@ export function ShopSalesPage() {
     {
       key: 'actions',
       header: '',
-      render: (s) => (s.status === 'completed' || s.status === 'partially_returned') ? (
-        <Button variant="ghost" size="sm" className="print:hidden" onClick={() => setReturningSale(s)}>{t('shop.sales.processReturn')}</Button>
-      ) : null,
+      render: (s) => (
+        <div className="flex items-center gap-1 print:hidden">
+          <Button variant="ghost" size="sm" onClick={() => setViewingInvoiceSaleId(s.saleId)}>
+            <Printer className="me-1 size-4" aria-hidden="true" />
+            {t('shop.sales.viewInvoice')}
+          </Button>
+          {(s.status === 'completed' || s.status === 'partially_returned') && (
+            <Button variant="ghost" size="sm" onClick={() => setReturningSale(s)}>{t('shop.sales.processReturn')}</Button>
+          )}
+        </div>
+      ),
     },
   ]
 
@@ -149,7 +177,14 @@ export function ShopSalesPage() {
           ) : undefined}
         />
       </div>
-      <div className="print-target visible-for-print">
+      {/* COMMERCE PRO C4: this list's own print-target must stop being
+          "visible for print" while the per-sale ShopInvoiceDialog is
+          open on top of it -- otherwise two print-targets would both
+          carry .visible-for-print at once (Radix Dialog doesn't unmount
+          this page underneath an opened Dialog), matching the same
+          pattern BillingPage.tsx already established for its own
+          invoice-detail vs. payment/refund-receipt print-targets. */}
+      <div className={`print-target ${viewingInvoiceSaleId ? '' : 'visible-for-print'}`}>
         <ReportPrintHeader reportName={t('shop.sales.title')} />
         {fullSales !== null ? (
           <>
@@ -166,6 +201,10 @@ export function ShopSalesPage() {
 
       {returningSale && (
         <ReturnDialog sale={returningSale} onClose={() => setReturningSale(null)} />
+      )}
+
+      {viewingInvoiceSaleId && (
+        <ShopInvoiceDialog saleId={viewingInvoiceSaleId} onClose={() => setViewingInvoiceSaleId(null)} />
       )}
     </div>
   )

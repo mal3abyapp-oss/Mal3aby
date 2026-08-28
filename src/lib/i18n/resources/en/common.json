@@ -4167,7 +4167,19 @@
         "partially_returned": "Partially returned",
         "returned": "Returned"
       },
-      "printLimitNote": "Showing the most recent {{count}} sales/returns."
+      "printLimitNote": "Showing the most recent {{count}} sales/returns.",
+      "viewInvoice": "Invoice"
+    },
+    "invoice": {
+      "dialogTitle": "Sale Invoice",
+      "loadError": "Couldn't load this invoice.",
+      "sku": "SKU",
+      "cashier": "Cashier",
+      "subtotal": "Subtotal",
+      "discount": "Discount",
+      "taxNumber": "Tax No.",
+      "commercialRegistration": "Commercial Reg. No.",
+      "thankYou": "Thank you for your purchase"
     },
     "settings": {
       "title": "Shop settings",
@@ -4181,7 +4193,22 @@
       "locationKind": {
         "branch": "Branch",
         "warehouse": "Warehouse"
-      }
+      },
+      "printSettingsTitle": "Branding & print settings",
+      "printSettingsHint": "Shown on printed Shop invoices, thermal receipts, and payment receipts. Only fields you fill in are printed.",
+      "printSettingsSaveError": "Couldn't save the print settings.",
+      "printSettingsReadOnlyHint": "You don't have permission to edit these settings. Ask a club owner to grant you access.",
+      "tradingNameAr": "Trading name (Arabic)",
+      "tradingNameEn": "Trading name (English)",
+      "address": "Address",
+      "phone": "Phone",
+      "taxNumber": "Tax number",
+      "commercialRegistration": "Commercial registration number",
+      "footerNote": "Footer note",
+      "returnPolicy": "Return policy",
+      "save": "Save",
+      "saving": "Saving...",
+      "saved": "Saved"
     },
     "stockCount": {
       "title": "Stock Count",
