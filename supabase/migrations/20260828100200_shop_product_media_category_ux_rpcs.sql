@@ -289,11 +289,22 @@ grant execute on function public.update_shop_category(uuid, text, text, text, te
 
 -- ============================================================
 -- list_shop_products: append image_urls to the returned row shape.
--- Same input signature as today -- create or replace updates in place,
--- no overload created, no grant re-statement needed (grant already
--- applies to this exact input signature from 20260826211854).
+--
+-- CORRECTION (orchestrator review, applying this migration live):
+-- the original comment here was wrong -- Postgres rejects
+-- `create or replace function` when the RETURNS TABLE row shape
+-- changes, even with an unchanged input signature
+-- ("cannot change return type of existing function... Row type
+-- defined by OUT parameters is different"), confirmed live applying
+-- this exact migration. An explicit `drop function` is required first
+-- for all three read RPCs below, matching the pattern already used
+-- elsewhere in this file for input-signature changes. Grants ARE
+-- re-stated after each drop+create, since a dropped function loses its
+-- prior grants.
 -- ============================================================
-create or replace function public.list_shop_products(p_club_id uuid, p_search text default null, p_category_id uuid default null, p_status text default 'active')
+drop function if exists public.list_shop_products(uuid, text, uuid, text);
+
+create function public.list_shop_products(p_club_id uuid, p_search text default null, p_category_id uuid default null, p_status text default 'active')
 returns table(
   product_id uuid, name_ar text, name_en text, category_id uuid, category_name_ar text,
   description text, image_url text, has_variants boolean, base_price numeric,
@@ -328,13 +339,19 @@ begin
 end;
 $$;
 
+revoke all on function public.list_shop_products(uuid, text, uuid, text) from public;
+revoke all on function public.list_shop_products(uuid, text, uuid, text) from anon;
+grant execute on function public.list_shop_products(uuid, text, uuid, text) to authenticated;
+
 -- ============================================================
 -- list_shop_categories: append image_url, display_order; order by
 -- display_order first (falls back to name_ar for equal/default-0
 -- orders, preserving today's alphabetical behavior for clubs that
--- never set an explicit order). Same input signature -- in-place replace.
+-- never set an explicit order). Same drop+recreate reason as above.
 -- ============================================================
-create or replace function public.list_shop_categories(p_club_id uuid)
+drop function if exists public.list_shop_categories(uuid);
+
+create function public.list_shop_categories(p_club_id uuid)
 returns table(category_id uuid, name_ar text, name_en text, status text, image_url text, display_order integer)
 language plpgsql
 stable security definer
@@ -355,11 +372,17 @@ begin
 end;
 $$;
 
+revoke all on function public.list_shop_categories(uuid) from public;
+revoke all on function public.list_shop_categories(uuid) from anon;
+grant execute on function public.list_shop_categories(uuid) to authenticated;
+
 -- ============================================================
 -- list_shop_categories_all: same additions, used by Manage Categories
--- UI. Same input signature -- in-place replace.
+-- UI. Same drop+recreate reason as above.
 -- ============================================================
-create or replace function public.list_shop_categories_all(p_club_id uuid)
+drop function if exists public.list_shop_categories_all(uuid);
+
+create function public.list_shop_categories_all(p_club_id uuid)
 returns table(category_id uuid, name_ar text, name_en text, status text, image_url text, display_order integer)
 language plpgsql
 stable security definer
@@ -379,5 +402,9 @@ begin
     order by c.display_order, c.status, c.name_ar;
 end;
 $$;
+
+revoke all on function public.list_shop_categories_all(uuid) from public;
+revoke all on function public.list_shop_categories_all(uuid) from anon;
+grant execute on function public.list_shop_categories_all(uuid) to authenticated;
 
 commit;
