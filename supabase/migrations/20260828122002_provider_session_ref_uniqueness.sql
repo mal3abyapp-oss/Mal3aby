@@ -1,0 +1,72 @@
+-- SECURITY HARDENING (Payment Gateway Security Attack Matrix Extension,
+-- item 3 -- "provider transaction reuse across different transactions"):
+-- close a genuine missing-invariant gap found during live testing.
+--
+-- WHAT WAS FOUND: record_gateway_payment_service() never validated that
+-- p_provider_session_ref is unique across payment_gateway_transactions.
+-- Live-tested this session: two genuinely DIFFERENT, disposable
+-- payment_gateway_transactions rows (different transaction ids,
+-- different invoices, different amounts) were both successfully posted
+-- to 'succeeded' with the IDENTICAL provider_session_ref value
+-- ('cs_test_late_failure_fixture'), each producing its own real
+-- payments row. No DB-level uniqueness constraint existed on this
+-- column at all.
+--
+-- WHY THIS WAS NOT EXPLOITABLE BY AN EXTERNAL ATTACKER (verified by
+-- reading every caller): record_gateway_payment_service is service_role
+-- -only (revoked from public/anon/authenticated), reachable only from
+-- the 5 gateway webhook Edge Functions and (defensively) the synchronous
+-- refund functions. Every one of the 5 webhooks passes p_provider_session_ref
+-- as a value read from the webhook's OWN payload, and none of them uses
+-- that payload for ANY write decision until the provider's cryptographic
+-- signature over the raw request body has already been verified (see
+-- each webhook's own header comment -- "nothing this function reads
+-- from the request body is trusted for any WRITE decision until the
+-- signature has been verified"). A real Stripe/Paymob/Kashier/Fawry/
+-- PayPal Checkout Session/order/intention id is also always unique by
+-- construction (assigned by the provider's own API at session-creation
+-- time and persisted by Mal3aby's own *-create-checkout-session
+-- functions) -- so no genuine webhook delivery could ever legitimately
+-- carry a colliding value. Reproducing the gap required directly
+-- invoking the service_role-only RPC with a manually-forged string,
+-- which requires already holding service_role credentials (a much
+-- larger compromise entirely outside this RPC's own threat model) or
+-- already holding a genuine webhook signing secret for the SAME
+-- connection (at which point the attacker can only affect their own
+-- connection's own transactions, not cross-tenant).
+--
+-- WHY WE FIX IT ANYWAY: defense in depth. A missing invariant that is
+-- not exploitable TODAY given the current call graph can become
+-- exploitable later if a future caller (another Edge Function, an
+-- admin tool, a future direct-API-confirmation path per this project's
+-- own "poll a provider's status API" design note) ever forwards a
+-- less-trusted value into this parameter without the same webhook-
+-- signature discipline. Enforcing the invariant at the database layer
+-- (not just "every current caller happens to be careful") is exactly
+-- this project's own established security posture elsewhere (RLS +
+-- RPC-internal checks, not UI-only enforcement).
+--
+-- DESIGN: partial unique index on (gateway, provider_session_ref) WHERE
+-- provider_session_ref IS NOT NULL -- scoped per-gateway (not global)
+-- because different providers' own session/order/intention id formats
+-- are independent namespaces; a coincidental string collision between,
+-- say, a Paymob transaction id and an unrelated Fawry reference number
+-- is not the invariant being protected (that would be a false-positive
+-- concern, not a real security issue). Partial (not a plain unique
+-- index) because provider_session_ref is nullable and a transaction can
+-- legitimately still be 'pending' with no session ref populated yet
+-- (session-creation call failed after staging but before the provider
+-- API round-trip -- see stripe-create-checkout-session's own comment on
+-- this exact window); multiple such not-yet-linked pending rows must
+-- remain possible.
+--
+-- BACKFILL SAFETY: checked live before writing this migration -- zero
+-- real (non-test-fixture) rows currently violate this constraint. The
+-- two rows that DID share a value were this session's own disposable
+-- fixtures, deleted before this migration was written.
+create unique index payment_gateway_transactions_gateway_session_ref_unique
+  on public.payment_gateway_transactions (gateway, provider_session_ref)
+  where provider_session_ref is not null;
+
+comment on index public.payment_gateway_transactions_gateway_session_ref_unique is
+  'Payment Gateway Security Attack Matrix Extension, item 3: enforces that a given providers own session/order/intention reference can never be linked to more than one payment_gateway_transactions row. Defense-in-depth -- record_gateway_payment_service never itself validated this, and no genuine webhook delivery could produce a colliding value given signature-verification-before-trust, but the invariant is now enforced at the database layer regardless of caller discipline.';
