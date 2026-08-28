@@ -127,6 +127,39 @@ snapshot, correctly reports exactly one known-cost line with the
 arithmetically exact profit/margin figures alongside the 4 still-
 correctly-unavailable ones.
 
+### 6.1 Post-closure finding — Gross Profit / returns adjustment (fixed, LIVE VERIFIED)
+
+An additional live QA pass performed after the 10-phase closure (see
+`COMMERCE_ADDITIONAL_LIVE_QA_2026-08-28.md`) found a real, genuine gap:
+`get_shop_gross_profit` intentionally includes `'returned'`-status
+sales in its figures (the same documented filter `get_shop_top_products`
+already uses) — a legitimate, conventional **gross** accounting
+figure — but had no parallel way to see the **return-adjusted**
+reality, unlike `get_shop_sales_kpis` (C5/C6), which already separates
+`gross_sales` from `net_sales`/`refund_total` side by side. A real,
+fully refunded sale (250.00 revenue, 120 cost, 130.00 margin) was still
+counted in full toward `gross_profit`, which could mislead a club owner
+about actual realized profitability.
+
+**Fixed, not a regression of the original honesty guarantee**: the
+existing `gross_*` columns are unchanged and remain valid as gross
+figures. `get_shop_gross_profit` now additionally returns
+`net_revenue_known_cost`, `net_cost_of_goods`, `net_gross_profit`, and
+`net_margin_pct` — computed by proportionally excluding each known-cost
+line's already-tracked `returned_quantity`, applying the exact same
+cost-unavailable exclusion boundary as the rest of the RPC. Fully
+returned known-cost sales now correctly contribute **zero** to the net
+figures. Surfaced in `ShopProfitReport.tsx` as a clearly labeled,
+separate "Net (after returns)" row alongside the existing "Gross
+(before returns)" row — not a replacement.
+
+**LIVE VERIFIED**: re-ran the fixed RPC against the exact real
+transaction data that surfaced the gap. Net figures correctly excluded
+the fully-returned sale entirely (net revenue/profit/margin reflecting
+only the still-unreturned portion of other sales), while the gross
+figures remained unchanged and valid for their own purpose. Commit
+`b46e93e`.
+
 ## 7. Inventory improvements — LIVE VERIFIED for the highest-risk claim
 
 Inventory Dashboard, Product Detail/Stock History (6 tabs, 4 needing no
@@ -257,23 +290,39 @@ continuation of a standing, already-disclosed constraint, not a new one.
 
 ## 13. Verdict
 
-**All 10 phases complete.** 3 real bugs found and fixed via independent
-live database verification (not merely trusted from subagent reports).
-1 real client-side security defense-in-depth gap found and fixed. 2
-real RTL consistency defects found and fixed. 1 real performance gap
-(missing search debounce) found and fixed. Zero destructive schema
-changes. Zero new accepted risks beyond a continuation of the
-already-disclosed browser-verification constraint. Global Regression
-clean across all four gates (`tsc -b`, lint, build, unit tests) both
-mid-directive and at close. The Commerce Pro upgrade is **CODE VERIFIED
-and LIVE VERIFIED at the data/RPC layer throughout** — genuinely
-production-ready by every mechanical and live-database measure
-available in this environment — **with the explicit, standing caveat
-that no module in this directive has been exercised end-to-end by a
-real cashier in a real browser**, which remains the honest, disclosed
-boundary of "verified" for this phase of the engagement, exactly
-matching how this same boundary was disclosed for the original E2E
-phase of the broader production-launch-hardening directive.
+**All 10 phases complete. Commerce Pro is now CLOSED — production-
+operation-only from this point forward.** Final commit: `b46e93e`.
+
+Across the full directive (10 phases plus one accepted post-closure
+live QA pass): 3 real bugs found and fixed via independent live
+database verification during phase reviews (not merely trusted from
+subagent reports); 1 real client-side security defense-in-depth gap
+found and fixed; 2 real RTL consistency defects found and fixed; 1 real
+performance gap (missing search debounce) found and fixed; 1 real
+Gross Profit returns-adjustment gap found and fixed in the accepted
+post-closure QA pass (§6.1). Zero destructive schema changes throughout.
+Zero new accepted risks beyond a continuation of the already-disclosed
+browser-verification constraint. Global Regression clean across all
+gates (`tsc -b`, lint, build, unit tests, zero-credential E2E) at every
+checkpoint, including the final closure verification.
+
+The Commerce Pro upgrade is **CODE VERIFIED and LIVE VERIFIED at the
+data/RPC layer throughout** — genuinely production-ready by every
+mechanical and live-database measure available in this environment —
+**with the explicit, standing caveat that no module in this directive
+has been exercised end-to-end by a real cashier in a real browser**,
+which remains the honest, disclosed boundary of "verified" for this
+phase of the engagement, exactly matching how this same boundary was
+disclosed for the original E2E phase of the broader production-launch-
+hardening directive. Authenticated Commerce E2E specs (27 tests, 6
+files) are IMPLEMENTED and STRUCTURALLY VERIFIED (clean collection,
+clean type-check) but ENVIRONMENT-BLOCKED for actual execution — no
+safe authenticated session is available in this environment, a standing
+constraint unchanged since Phase 4 of the original engagement.
+
+**No further Commerce QA is planned.** New Commerce work resumes only
+from real user feedback, a production incident, or an explicit new
+instruction — not from further self-directed investigation.
 
 **Next recommended action**: when a legitimate authenticated session
 becomes available (the established pattern: the user logs in and hands
