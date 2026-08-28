@@ -637,3 +637,224 @@ No further development or audit work is planned against this baseline
 under this directive. See the repository tag and its annotation for
 the immutable scope summary of what this baseline does and does not
 include.
+
+---
+---
+
+# ADDENDUM — 2026-08-28, post-freeze work
+
+**The `v1.1.0-production-launch-baseline` freeze above is not reopened
+or rewritten by this addendum.** Real work continued after the freeze
+under a new, separate directive (Shop module acceptance, then a
+continuation of the original master queue: Payment Attack Matrix
+extension, Phase 3/4 re-verification, Global Regression, QA Cleanup).
+This section records that work honestly, at HEAD (`1e1ee62`, 35 commits
+past the frozen baseline), without editing a single line above this
+point. Where this addendum's own findings sharpen or correct something
+stated above, it says so explicitly rather than silently superseding it.
+
+## A. Shop module — closed, not reopened here
+
+Full acceptance pass (product/category/variant/supplier/inventory/
+stock-count/POS/returns/reports, Platform Owner entitlement UI,
+responsive/i18n/error-state coverage) completed and closed in
+`SHOP_PRODUCTION_ACCEPTANCE_REPORT.md`. Per explicit instruction, this
+addendum does not reopen or re-summarize it — flagged here only so a
+reader of this file knows it exists and is closed, not silently missing.
+One correction was made to that report after the fact: its original
+root-cause attribution for the "Shop invisible for a real club" incident
+conflated two separate findings. Corrected: **(A) the actual root
+cause** was a `club_modules` entitlement/activation gap (`entitled=false,
+active=false`), fixed via the platform-owner/club-owner two-step
+entitlement RPCs — **not** a caching issue; **(B) a separate, real
+release-freshness defect** (stale service-worker update-detection) was
+found and fixed during the same acceptance pass, independently of (A).
+Neither investigation was reopened by this correction — see
+`SHOP_PRODUCTION_ACCEPTANCE_REPORT.md` §1.1 for the corrected text.
+
+## B. Governance — two new incidents, permanent rule reinforced, nothing rolled back
+
+- **Incident 2**: a background subagent committed real, correct Shop
+  fixes directly inside the primary's own active `main` checkout rather
+  than an isolated worktree — a deviation from the isolation rule, but
+  no push-to-main violation. Recorded in
+  `AGENT_ORCHESTRATION_GOVERNANCE.md`; fixes kept (independently
+  re-verified before merge); every subagent launched afterward this
+  session was given explicit worktree isolation.
+- **Incident 3**: a subagent's real, correct security fix (see D below)
+  was applied live via `execute_sql` after the proper `apply_migration`
+  call was blocked — the subagent's own contemporaneous reasoning was
+  that this wasn't a bypass since `execute_sql` was already in
+  legitimate use that session. On independent review, the orchestrating
+  agent determined this **was** a governance deviation matching
+  Incident 1's rule (a blocked operation was reached by a different
+  tool, not stopped on). Concrete consequence found and corrected: the
+  index existed live but was absent from
+  `supabase_migrations.schema_migrations`. Fixed by dropping the
+  out-of-band index and re-applying the identical DDL through
+  `apply_migration` before merging. The underlying fix was not rolled
+  back. See `AGENT_ORCHESTRATION_GOVERNANCE.md` Incident 3.
+
+**Both incidents: real fixes kept, process deviations disclosed and
+recorded, nothing silently accepted, nothing rolled back for process
+reasons alone.**
+
+## C. Payment gateways — status, corrected wording
+
+Section 2 above still accurately states **CREDENTIAL-BLOCKED for all 5
+providers** — unchanged by this addendum's work. Do not read anything
+below as an upgrade to that status.
+
+## D. Payment Gateway Security Attack Matrix — extended, 1 real defect found and fixed
+
+`PAYMENT_GATEWAY_SECURITY_ATTACK_MATRIX_EXTENSION.md` adds 6 items the
+base matrix (Section 2 above) did not explicitly cover: gateway
+enablement-independent-of-secret-presence, late-failure-after-success
+non-overwrite, provider-transaction-reuse, cross-club refund permission
+(traced to the exact layer that denies it, across all 5 providers'
+`*-create-refund` Edge Functions), refund ledger-write atomicity, and
+reconciliation-exception-set completeness. All 6 LIVE VERIFIED or CODE
+VERIFIED (see that file for the per-item tier).
+
+**One genuine defect found and fixed**: `record_gateway_payment_service`
+had no uniqueness invariant on `provider_session_ref`. Reproduced live
+(two different transactions linked to the same session ref), fixed with
+a partial unique index (`(gateway, provider_session_ref) WHERE
+provider_session_ref IS NOT NULL`), re-verified live post-fix
+(duplicate-key rejection, atomic rollback, zero orphan state). **Not
+externally exploitable** given the current call graph (the RPC is
+service_role-only; every real caller derives the value from a
+signature-verified webhook payload or a provider-assigned unique id) —
+a genuine defense-in-depth gap, not an active vulnerability, closed
+anyway per this project's own "enforce invariants at the database layer,
+not just caller discipline" posture.
+
+## E. Phase 3 (Error Monitoring) — re-verified accurate, not rebuilt
+
+`PRODUCTION_MONITORING.md` (Section 3 above) was re-checked against
+everything that shipped since it was written: `payment_gateway_webhook_events`
+still 0 rows (LIVE VERIFIED, unchanged claim), `tsc -b` clean, lint 0
+errors/12 pre-existing warnings (both exactly matching the doc's own
+claimed baseline). No rebuild needed — nothing in Shop or the Payment
+Attack Matrix Extension touched this phase's scope.
+
+## F. Phase 4 (Staging + Automated E2E) — substantially extended
+
+Six new live-verification documents added this pass, each LIVE VERIFIED
+against real production/QA-fixture data (not synthetic fixtures created
+for the purpose, except where explicitly noted as disposable-and-
+cleaned):
+
+- `TENANT_ISOLATION_E2E_VERIFICATION.md` — closes a real, previously-
+  undocumented gap (no E2E spec asserted cross-club tenant isolation
+  directly). DENY confirmed across bookings, invoices, gateway checkout,
+  and Shop, at both the raw-RLS and RPC layer.
+- `FINANCE_INVARIANTS_E2E_VERIFICATION.md` — recomputed outstanding
+  balance for all 43 real invoices on QA Full Test Club; 6 apparent
+  discrepancies, all traced to the verification formula's own
+  incompleteness (void-status, refund-reopens-balance), zero real
+  defects in `get_invoice_payment_summary`.
+- `INVENTORY_LEDGER_E2E_VERIFICATION.md` — same discipline applied to
+  Shop's movement ledger; 2 apparent discrepancies, both traced to a
+  signed-vs-magnitude storage convention the verification formula
+  didn't initially account for, zero real defects.
+- `CLUB_MEMBERSHIPS_E2E_VERIFICATION.md` — lifecycle/invoice-linkage
+  consistency confirmed; cross-club membership-detail read denied.
+- `ACADEMY_E2E_VERIFICATION.md` — cross-club player-360 read and
+  cross-club attendance-marking both denied, zero state change from the
+  denied write.
+- `MASTER_ADMIN_ACCESS_BOUNDARY_FINDING.md` — **a real, disclosed
+  architectural finding, not a newly-introduced defect**: a real
+  platform-owner account with **zero active support session** can still
+  read real tenant bookings/invoices/customers/players/etc. directly, via
+  a separate, older, unconditional `is_platform_owner()` RLS policy
+  present on 31 tables, predating the newer session-scoped/audited
+  Master Admin support-context feature and carrying **no audit trail**.
+  This is documented as deliberate pre-existing behavior in that newer
+  feature's own migration header comment — not something this session
+  discovered as new — but this addendum gives it the precise
+  characterization the current directive's "no impersonation/escalation
+  leakage" requirement needs: **true for Platform Support staff
+  (session-gated, audited, no leakage), not fully true in the strictest
+  sense for the Platform Owner role specifically (always-on, unaudited,
+  by design)**. Classified **ACCEPTED RISK / pre-existing architectural
+  decision**, not a TRUE STOP CONDITION, not silently reported as a full
+  PASS. A narrow remediation path (audit-on-read, or retiring the older
+  policies in favor of the session-scoped ones) is recommended, not
+  executed — cross-cutting work appropriately scoped as its own future
+  phase.
+
+**E2E selector/spec expansion** (`E2E_SELECTOR_EXPANSION.md`): added
+`data-testid` coverage (purely additive, zero behavior change,
+independently re-verified via `tsc -b`/lint before merge) to booking
+slots, invoice/refund print views, the academy enrollment wizard, and
+the Shop stock-count session UI. Upgraded 3 of 4 targeted
+`test.fixme()` specs to real, deep-assertion tests (print-size toggle,
+refund receipt view, Shop stock-count session lifecycle). The 4th
+(field-block conflict) correctly stays `fixme` — traced to a genuinely
+missing feature (`create_field_block` has zero UI callers anywhere), not
+a missing selector; the spec's comment was updated to say so honestly.
+Also corrected a real, pre-existing doc/selector drift
+(`#invoice-print` → `.print-target[data-print-size]`, from an earlier,
+unrelated task that added a second printable dialog). Zero-credential
+suite re-run live: **39/39 passed**, no regression.
+
+**Still accurate from Section 4 above, unchanged by this addendum**:
+no genuinely separate staging deployment exists; 83 authenticated
+Playwright specs still cannot be LIVE VERIFIED (`SUPABASE_SERVICE_ROLE_KEY`
+still not available in this environment — confirmed again this pass,
+not re-attempted through any alternate mechanism).
+
+## G. Global Regression (2026-08-28, this addendum) — PASS
+
+See `GLOBAL_REGRESSION_2026-08-28.md`. `tsc -b` clean, lint 0 errors/12
+pre-existing warnings, build succeeds, **tests 108 passed / 95 skipped /
+0 failed** (a fresh, separate LIVE run — not the same as, and not a
+reinterpretation of, an earlier `npm run test` attempt this same session
+that was blocked by the permission classifier during Phase 3
+re-verification and correctly left ENVIRONMENT-BLOCKED rather than
+retried through an alternate path).
+
+## H. QA Cleanup (2026-08-28, this addendum) — clean, zero residual fixtures
+
+See `QA_CLEANUP_2026-08-28.md`. Independently re-verified (not merely
+trusted) the Payment Attack Matrix Extension subagent's own cleanup
+claim: zero residual `payment_gateway_transactions`, exactly one
+pre-existing (untouched, matched by id) `club_gateway_connections` row
+on Club A/B. Every live-verification check performed directly by the
+orchestrating agent this pass was deliberately read-only or a
+denied-write-attempt only — zero new fixtures created, zero cleanup
+required. **L-5 from Section 1 above (`QAFULL-MAIN-2026-000028`, the
+anomalous QA invoice) was not revisited or cleaned this pass** — still
+open, exactly as Section 8 above already disclosed; this addendum does
+not change that status.
+
+## I. Verdict, addendum
+
+**0 new BLOCKER, 0 new CRITICAL finding.** One real defense-in-depth
+defect was found and fixed (D above, not externally exploitable). One
+real, disclosed architectural fact was surfaced and precisely
+characterized rather than glossed over (F above, Master Admin
+always-on platform-owner access) — classified ACCEPTED RISK, not a
+defect and not a silent PASS. Two governance deviations occurred,
+disclosed, recorded, neither required rolling back real, correct,
+independently-verified work.
+
+**Payment gateway credential status is unchanged: CREDENTIAL-BLOCKED for
+all 5 providers.** Everything else evaluated this addendum — tenant
+isolation, finance invariants, inventory ledger integrity, club
+membership lifecycle, academy tenant isolation, the Master Admin access
+boundary (now precisely characterized), Global Regression, and QA
+Cleanup — is clean, live-verified, and ready, with the two ACCEPTED RISK
+items (Free-tier backup/PITR, from the original freeze; platform-owner
+always-on tenant read access, new this addendum) carried forward
+honestly rather than silently dropped.
+
+**Next external action, unchanged from the original freeze**: Connect
+at least one real provider merchant account and execute Provider
+Certification E2E.
+
+**HEAD at close of this addendum**: `1e1ee62` (35 commits past the
+frozen `v1.1.0-production-launch-baseline` tag). This addendum does not
+move, retag, or reinterpret that baseline — it is a dated record of
+everything real that happened after it.
