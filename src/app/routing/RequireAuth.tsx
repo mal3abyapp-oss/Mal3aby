@@ -203,6 +203,90 @@ function RequireShopModule({ children }: { children: ReactNode }) {
 
 export { RequireShopModule }
 
+// PLATFORM OWNER CONTROL IMPLEMENTATION -- Phase 3 (P2): the same
+// route-level "not available" UX RequireShopModule already gives Shop,
+// generalized for Academy/Fields/Club Membership now that Phase 1/2 of
+// this program gave those modules the same real RPC-layer enforcement
+// Shop already had (_academy_module_active/_fields_module_active/
+// _club_membership_module_active). Same disclosure as RequireShopModule:
+// this is UX only, not the security boundary -- the RPC-layer check
+// inside every write RPC is what actually enforces the module state.
+function RequireModule({ moduleKey, titleKey, notEntitledKey, notActivatedKey, children }: {
+  moduleKey: string
+  titleKey: string
+  notEntitledKey: string
+  notActivatedKey: string
+  children: ReactNode
+}) {
+  const { currentClubId } = useAuth()
+  const { t } = useTranslation()
+  const { data, isLoading } = useQuery({
+    queryKey: ['module-state', moduleKey, currentClubId],
+    queryFn: async () => {
+      const { data, error } = await supabase.rpc('get_club_modules', { p_club_id: currentClubId as string })
+      if (error) throw error
+      return (data ?? []).find((m) => m.module_key === moduleKey) ?? null
+    },
+    enabled: !!currentClubId,
+  })
+
+  if (isLoading) return null
+
+  if (!data || !data.entitled || !data.active) {
+    return (
+      <div className="flex min-h-[60vh] flex-col items-center justify-center gap-2 p-6 text-center">
+        <p className="text-lg font-medium text-text-primary">{t(titleKey)}</p>
+        <p className="max-w-sm text-sm text-text-secondary">
+          {!data || !data.entitled ? t(notEntitledKey) : t(notActivatedKey)}
+        </p>
+      </div>
+    )
+  }
+
+  return children
+}
+
+function RequireAcademyModule({ children }: { children: ReactNode }) {
+  return (
+    <RequireModule
+      moduleKey="academy"
+      titleKey="academy.moduleNotActive.title"
+      notEntitledKey="academy.moduleNotActive.notEntitled"
+      notActivatedKey="academy.moduleNotActive.notActivated"
+    >
+      {children}
+    </RequireModule>
+  )
+}
+
+function RequireFieldsModule({ children }: { children: ReactNode }) {
+  return (
+    <RequireModule
+      moduleKey="fields"
+      titleKey="bookings.moduleNotActive.title"
+      notEntitledKey="bookings.moduleNotActive.notEntitled"
+      notActivatedKey="bookings.moduleNotActive.notActivated"
+    >
+      {children}
+    </RequireModule>
+  )
+}
+
+function RequireClubMembershipModule({ children }: { children: ReactNode }) {
+  return (
+    <RequireModule
+      moduleKey="club_membership"
+      titleKey="clubMemberships.moduleNotActive.title"
+      notEntitledKey="clubMemberships.moduleNotActive.notEntitled"
+      notActivatedKey="clubMemberships.moduleNotActive.notActivated"
+    >
+      {children}
+    </RequireModule>
+  )
+}
+
+export { RequireAcademyModule, RequireFieldsModule, RequireClubMembershipModule }
+
 // Guards /platform specifically — requires the platform_owner role on at
 // least one active membership. Real enforcement is still server-side
 // (public.is_platform_owner() SECURITY DEFINER + RLS policies); this only

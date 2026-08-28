@@ -143,6 +143,10 @@ export function PlatformClubDetailPage() {
   const [branchLimitInput, setBranchLimitInput] = useState('')
   const [fieldLimitInput, setFieldLimitInput] = useState('')
   const [academyLimitInput, setAcademyLimitInput] = useState('')
+  // PLATFORM OWNER CONTROL IMPLEMENTATION -- Phase 3 (P1): a reason,
+  // matching every other commercial-change dialog on this page, now
+  // that limit changes are audited (see set_commercial_entitlements()).
+  const [limitReasonInput, setLimitReasonInput] = useState('')
 
   const { data: club, isError: clubError } = useQuery({ queryKey: ['platform-club', clubId], queryFn: () => fetchClub(clubId!), enabled: !!clubId })
   // Phase C directive (Club 360): the audit's core test -- "if a club
@@ -467,32 +471,54 @@ export function PlatformClubDetailPage() {
     onError: () => setActionError(t('platform.clubDetailPage.errors.reversePayment')),
   })
 
-  // Task #54: commercial_entitlements/commercial_upgrade_requests both
-  // already grant platform owners full RLS write access (verified via
-  // direct policy inspection before building this) -- no new RPC
-  // needed, direct table writes match this page's existing pattern
-  // (club suspend/reactivate already do this). An empty input clears
-  // the limit back to unlimited (null), matching the column's own
-  // semantics.
+  // PLATFORM OWNER CONTROL IMPLEMENTATION -- Phase 3 (P1): the audit's
+  // one confirmed unaudited commercial-write path -- this used to be a
+  // direct client-side .upsert() with zero audit trail, the single
+  // exception to every other commercial RPC on this page. Now routed
+  // through set_commercial_entitlements(), which captures a before/
+  // after snapshot (including current usage and any over-limit
+  // condition the change creates) and writes a real audit_log entry,
+  // same discipline as every sibling mutation here. An empty input
+  // still clears the limit back to unlimited (null), matching the
+  // column's own semantics -- unchanged from before.
   const saveLimitsMutation = useMutation({
     mutationFn: async () => {
       const toLimit = (v: string) => (v.trim() === '' ? null : Number(v))
-      const { error } = await supabase
-        .from('commercial_entitlements')
-        .upsert({
-          club_id: clubId!,
-          branch_limit: toLimit(branchLimitInput),
-          field_limit: toLimit(fieldLimitInput),
-          academy_limit: toLimit(academyLimitInput),
-        })
+      const { error } = await supabase.rpc('set_commercial_entitlements', {
+        p_club_id: clubId!,
+        p_branch_limit: toLimit(branchLimitInput),
+        p_field_limit: toLimit(fieldLimitInput),
+        p_academy_limit: toLimit(academyLimitInput),
+        p_reason: limitReasonInput.trim() || undefined,
+      })
       if (error) throw error
     },
     onSuccess: () => {
       invalidateEntitlements()
       setEditingLimits(false)
+      setLimitReasonInput('')
     },
     onError: () => setActionError(t('platform.clubDetailPage.errors.saveLimits')),
   })
+
+  // Directive Section 15/42/§9 of the audit: never silently create an
+  // over-limit state -- warn before saving, but never block the save
+  // (an operator setting an intentionally tight limit is a legitimate
+  // action; existing over-limit branches/fields/programs are always
+  // preserved, never deleted, per the RPC's own design).
+  const overLimitWarnings = (['branch_limit', 'field_limit', 'academy_limit'] as const)
+    .map((key) => {
+      const input = key === 'branch_limit' ? branchLimitInput : key === 'field_limit' ? fieldLimitInput : academyLimitInput
+      if (input.trim() === '') return null
+      const newLimit = Number(input)
+      const usedKey = key === 'branch_limit' ? 'branches_used' : key === 'field_limit' ? 'fields_used' : 'academy_used'
+      const used = usage?.[usedKey] ?? 0
+      if (Number.isFinite(newLimit) && used > newLimit) {
+        return t('platform.clubDetailPage.limitsCard.overLimitWarning', { label: limitTypeLabel[key], used, limit: newLimit })
+      }
+      return null
+    })
+    .filter((w): w is string => w !== null)
 
   const resolveUpgradeRequestMutation = useMutation({
     mutationFn: async ({ requestId, status }: { requestId: string; status: 'approved' | 'dismissed' }) => {
@@ -961,11 +987,22 @@ export function PlatformClubDetailPage() {
                   <Input type="number" min="0" value={academyLimitInput} onChange={(e) => setAcademyLimitInput(e.target.value)} placeholder={t('platform.clubDetailPage.limitsCard.unlimitedPlaceholder')} />
                 </div>
               </div>
+              {overLimitWarnings.length > 0 && (
+                <div className="flex flex-col gap-1 rounded-md border border-status-warning/40 bg-status-warning/10 p-3 text-sm text-status-warning" data-testid="limits-over-limit-warning">
+                  {overLimitWarnings.map((w) => (
+                    <p key={w}>{w}</p>
+                  ))}
+                </div>
+              )}
+              <div className="flex flex-col gap-1.5">
+                <label className="text-sm font-medium text-text-secondary">{t('platform.clubDetailPage.limitsCard.reasonLabel')}</label>
+                <Input value={limitReasonInput} onChange={(e) => setLimitReasonInput(e.target.value)} placeholder={t('platform.clubDetailPage.reasonDialog.reasonPlaceholder')} />
+              </div>
               <div className="flex gap-2">
                 <Button size="sm" onClick={() => saveLimitsMutation.mutate()} disabled={saveLimitsMutation.isPending}>
                   {saveLimitsMutation.isPending ? t('platform.clubDetailPage.limitsCard.saving') : t('platform.clubDetailPage.limitsCard.saveLimits')}
                 </Button>
-                <Button size="sm" variant="outline" onClick={() => setEditingLimits(false)}>{t('platform.clubDetailPage.limitsCard.cancel')}</Button>
+                <Button size="sm" variant="outline" onClick={() => { setEditingLimits(false); setLimitReasonInput('') }}>{t('platform.clubDetailPage.limitsCard.cancel')}</Button>
               </div>
             </div>
           ) : (

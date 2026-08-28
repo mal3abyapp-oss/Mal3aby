@@ -4,7 +4,7 @@ import { PublicLayout } from '@/app/layouts/PublicLayout'
 import { AppLayout } from '@/app/layouts/AppLayout'
 import { PlatformLayout } from '@/app/layouts/PlatformLayout'
 import { PortalLayout } from '@/app/layouts/PortalLayout'
-import { RequireAuth, RequireNavDomain, RequirePlatformOwner, RequirePortalAuth, RequirePortalCustomer, RequireShopModule } from '@/app/routing/RequireAuth'
+import { RequireAuth, RequireNavDomain, RequirePlatformOwner, RequirePortalAuth, RequirePortalCustomer, RequireShopModule, RequireAcademyModule, RequireFieldsModule, RequireClubMembershipModule } from '@/app/routing/RequireAuth'
 import { RedirectWithSearch } from '@/app/routing/RedirectWithSearch'
 import { RouteLoadingFallback } from '@/app/routing/RouteLoadingFallback'
 
@@ -194,9 +194,14 @@ export const router = createBrowserRouter([
         element: <AppLayout />,
         children: [
           { index: true, element: <RequireNavDomain domain="today"><TodayPage /></RequireNavDomain> },
-          { path: 'bookings', element: <RequireNavDomain domain="bookings"><BookingsPage /></RequireNavDomain> },
-          { path: 'academy', element: <RequireNavDomain domain="academy"><AcademyPage /></RequireNavDomain> },
-          { path: 'memberships', element: <RequireNavDomain domain="memberships"><MembershipsPage /></RequireNavDomain> },
+          // PLATFORM OWNER CONTROL IMPLEMENTATION -- Phase 3 (P2): same
+          // RequireShopModule pattern (module-active friendly "not
+          // available" state), now extended to Fields/Academy/
+          // Membership routes now that Phase 1/2 gave those modules
+          // real RPC-layer enforcement too.
+          { path: 'bookings', element: <RequireNavDomain domain="bookings"><RequireFieldsModule><BookingsPage /></RequireFieldsModule></RequireNavDomain> },
+          { path: 'academy', element: <RequireNavDomain domain="academy"><RequireAcademyModule><AcademyPage /></RequireAcademyModule></RequireNavDomain> },
+          { path: 'memberships', element: <RequireNavDomain domain="memberships"><RequireClubMembershipModule><MembershipsPage /></RequireClubMembershipModule></RequireNavDomain> },
           // Academy Player/Guardian/Customer integrity closure: the
           // canonical Player 360 detail/edit page, same pattern as
           // Customer 360 (/app/customers/:customerId) and Staff 360

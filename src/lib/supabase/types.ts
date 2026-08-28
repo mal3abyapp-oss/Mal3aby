@@ -9496,6 +9496,21 @@ export type Database = {
         Args: { p_club_id: string; p_desired_slug?: string }
         Returns: string
       }
+      // PLATFORM OWNER CONTROL IMPLEMENTATION -- Phase 3: audited
+      // replacement for the direct commercial_entitlements client
+      // upsert (see migration 20260828220000). Hand-added per this
+      // project's established convention of editing this file per-RPC
+      // rather than running a full generate_typescript_types regen.
+      set_commercial_entitlements: {
+        Args: {
+          p_club_id: string
+          p_branch_limit: number | null
+          p_field_limit: number | null
+          p_academy_limit: number | null
+          p_reason?: string
+        }
+        Returns: undefined
+      }
       set_customer_whatsapp_consent: {
         Args: { p_club_id: string; p_consented: boolean; p_customer_id: string }
         Returns: undefined
