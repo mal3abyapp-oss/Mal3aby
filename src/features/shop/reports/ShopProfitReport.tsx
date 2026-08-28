@@ -109,11 +109,32 @@ export function ReportShopGrossProfitContent() {
           </div>
         )}
 
+        <p className="mb-1.5 text-xs font-medium text-text-secondary">{t('shop.reports.gp.grossSectionLabel')}</p>
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-4" data-testid="report-gross-profit-stats">
           <StatCard label={t('shop.reports.gp.revenue')} value={<span data-testid="report-gross-profit-revenue"><MoneyDisplay amount={Number(data?.revenue_known_cost ?? 0)} size="md" /></span>} icon={DollarSign} />
           <StatCard label={t('shop.reports.gp.cogs')} value={<MoneyDisplay amount={Number(data?.cost_of_goods ?? 0)} size="md" />} icon={PieChart} />
           <StatCard label={t('shop.reports.gp.grossProfit')} value={<span data-testid="report-gross-profit-gross-profit"><MoneyDisplay amount={Number(data?.gross_profit ?? 0)} size="md" /></span>} icon={TrendingUp} tone={Number(data?.gross_profit ?? 0) >= 0 ? 'success' : 'danger'} />
           <StatCard label={t('shop.reports.gp.marginPct')} value={<span data-testid="report-gross-profit-margin-pct">{`${Number(data?.margin_pct ?? 0).toFixed(1)}%`}</span>} icon={TrendingUp} />
+        </div>
+
+        {/* Found during a post-close live QA pass (2026-08-28): a fully
+            (or partially) refunded sale's original revenue/cost still
+            counted in full toward the GROSS figures above, with no way
+            to see the return-adjusted reality -- a club owner could be
+            shown paper profit from merchandise that was physically
+            returned and refunded. Fixed at the RPC layer
+            (get_shop_gross_profit now also returns net_* columns,
+            proportionally excluding each line's returned quantity) and
+            surfaced here as a clearly separate, clearly labeled second
+            row -- the gross figures above are NOT replaced (still valid
+            as "gross"), this is the honest net-of-returns counterpart
+            shown alongside them, not instead of them. */}
+        <p className="mb-1.5 mt-4 text-xs font-medium text-text-secondary">{t('shop.reports.gp.netSectionLabel')}</p>
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4" data-testid="report-gross-profit-net-stats">
+          <StatCard label={t('shop.reports.gp.netRevenue')} value={<span data-testid="report-gross-profit-net-revenue"><MoneyDisplay amount={Number(data?.net_revenue_known_cost ?? 0)} size="md" /></span>} icon={DollarSign} />
+          <StatCard label={t('shop.reports.gp.netCogs')} value={<MoneyDisplay amount={Number(data?.net_cost_of_goods ?? 0)} size="md" />} icon={PieChart} />
+          <StatCard label={t('shop.reports.gp.netGrossProfit')} value={<span data-testid="report-gross-profit-net-gross-profit"><MoneyDisplay amount={Number(data?.net_gross_profit ?? 0)} size="md" /></span>} icon={TrendingUp} tone={Number(data?.net_gross_profit ?? 0) >= 0 ? 'success' : 'danger'} />
+          <StatCard label={t('shop.reports.gp.netMarginPct')} value={<span data-testid="report-gross-profit-net-margin-pct">{`${Number(data?.net_margin_pct ?? 0).toFixed(1)}%`}</span>} icon={TrendingUp} />
         </div>
 
         <p className="mt-4 text-xs text-text-secondary">

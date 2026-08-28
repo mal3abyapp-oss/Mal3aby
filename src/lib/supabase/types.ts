@@ -8301,6 +8301,10 @@ export type Database = {
           known_cost_lines: number
           cost_unavailable_lines: number
           cost_unavailable_revenue: number
+          net_revenue_known_cost: number
+          net_cost_of_goods: number
+          net_gross_profit: number
+          net_margin_pct: number
         }[]
       }
       get_shop_stock_valuation: {

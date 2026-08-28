@@ -4541,7 +4541,13 @@
         "honestyNoticeTitle": "Profitability is only shown for sales with a known cost.",
         "honestyNoticeWithGap": "{{lines}} sale line(s) totaling EGP {{revenue}} in revenue have no recorded cost (sold before cost tracking began, or the item was never received through Receive Stock) and are excluded from every figure below -- never estimated.",
         "honestyNoticeNoGap": "Every sale line in this range has a known cost -- no lines were excluded.",
-        "coverageNote": "{{known}} line(s) included in the figures above; {{unknown}} line(s) excluded for lacking a known cost."
+        "coverageNote": "{{known}} line(s) included in the figures above; {{unknown}} line(s) excluded for lacking a known cost.",
+        "grossSectionLabel": "Gross (before returns)",
+        "netSectionLabel": "Net (after returns)",
+        "netRevenue": "Revenue (net of returns)",
+        "netCogs": "Cost of Goods (net of returns)",
+        "netGrossProfit": "Net Profit",
+        "netMarginPct": "Net Margin %"
       },
       "supplierActivity": {
         "title": "Supplier Purchase Activity",
