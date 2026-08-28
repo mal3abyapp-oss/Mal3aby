@@ -358,6 +358,17 @@
         "enable": "Re-enable payments",
         "disable": "Disable payments"
       },
+      "providerPolicy": {
+        "title": "Payment provider policy",
+        "hint": "Restrict which payment providers this club may connect or re-enable. Blocking a provider never disconnects an existing connection -- it only prevents a new connection or turning a currently-disabled one back on.",
+        "notConnected": "Not connected",
+        "connectedEnabled": "Connected & enabled",
+        "connectedDisabled": "Connected, disabled",
+        "allowed": "Allowed",
+        "blocked": "Policy-blocked",
+        "block": "Block",
+        "restore": "Restore"
+      },
       "tabs": {
         "history": "Subscription history",
         "invoices": "Invoices & payments",
