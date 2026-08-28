@@ -45,7 +45,14 @@ const ShopInventoryPage = lazy(() => import('@/features/shop/ShopInventoryPage')
 const ShopStockCountPage = lazy(() => import('@/features/shop/ShopStockCountPage').then((m) => ({ default: m.ShopStockCountPage })))
 const ShopSalesPage = lazy(() => import('@/features/shop/ShopSalesPage').then((m) => ({ default: m.ShopSalesPage })))
 const ShopSettingsPage = lazy(() => import('@/features/shop/ShopSettingsPage').then((m) => ({ default: m.ShopSettingsPage })))
-const ReportShopPage = lazy(() => import('@/features/reports/ReportShopPage').then((m) => ({ default: m.ReportShopPage })))
+// COMMERCE PRO C7: ReportShopPage.tsx (top-products/inventory-summary
+// only) replaced as the /app/reports/shop route target by
+// ShopReportsPage.tsx, the full 16-report suite hub (Section 5, Phase
+// C7) -- same route, same nav entry point, richer content. The old
+// component file is left in place (still imports cleanly, no dead
+// import elsewhere) rather than deleted, in case a narrower rollback
+// is ever needed; it is simply no longer wired into the router.
+const ShopReportsPage = lazy(() => import('@/features/shop/ShopReportsPage').then((m) => ({ default: m.ShopReportsPage })))
 const FinanceLayout = lazy(() => import('@/features/finance/FinanceLayout').then((m) => ({ default: m.FinanceLayout })))
 const FinanceOverviewPage = lazy(() => import('@/features/finance/FinanceOverviewPage').then((m) => ({ default: m.FinanceOverviewPage })))
 const FinancePaymentsPage = lazy(() => import('@/features/finance/FinancePaymentsPage').then((m) => ({ default: m.FinancePaymentsPage })))
@@ -301,7 +308,7 @@ export const router = createBrowserRouter([
           // (RequireShopModule) -- a club without Shop entitled/active
           // should not see a Shop report at all, matching the
           // directive's own "not merely add features" scoping.
-          { path: 'reports/shop', element: <RequireNavDomain domain="reports"><RequireShopModule><ReportShopPage /></RequireShopModule></RequireNavDomain> },
+          { path: 'reports/shop', element: <RequireNavDomain domain="reports"><RequireShopModule><ShopReportsPage /></RequireShopModule></RequireNavDomain> },
           // P1-7: /app/club's content moved into the new Settings hub
           // originally, then further split in the IA restructuring
           // (Phase 5) -- kept as a redirect for any stale links/

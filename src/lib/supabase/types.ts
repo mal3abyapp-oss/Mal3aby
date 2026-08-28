@@ -5529,6 +5529,11 @@ export type Database = {
           sale_id: string
           unit_price: number
           variant_id: string | null
+          // COMMERCE PRO C7: forward-only cost-at-sale snapshot. Null
+          // for any row created before this column existed, or for a
+          // unit never yet received via receive_shop_stock -- render
+          // "Cost unavailable", never fabricate a value.
+          unit_cost_snapshot: number | null
         }
         Insert: {
           id?: string
@@ -5540,6 +5545,7 @@ export type Database = {
           sale_id: string
           unit_price: number
           variant_id?: string | null
+          unit_cost_snapshot?: number | null
         }
         Update: {
           id?: string
@@ -5551,6 +5557,7 @@ export type Database = {
           sale_id?: string
           unit_price?: number
           variant_id?: string | null
+          unit_cost_snapshot?: number | null
         }
         Relationships: [
           {
@@ -7599,7 +7606,16 @@ export type Database = {
         }[]
       }
       get_customer_shop_purchases: {
-        Args: { p_club_id: string; p_customer_id: string }
+        // COMMERCE PRO C7: p_start_date/p_end_date/p_limit/p_offset
+        // appended (all optional/defaulted) -- return shape unchanged.
+        Args: {
+          p_club_id: string
+          p_customer_id: string
+          p_start_date?: string
+          p_end_date?: string
+          p_limit?: number
+          p_offset?: number
+        }
         Returns: {
           created_at: string
           invoice_id: string
@@ -8251,11 +8267,15 @@ export type Database = {
         }[]
       }
       get_shop_top_products: {
+        // COMMERCE PRO C7: p_offset/p_category_id appended (both
+        // optional/defaulted) -- return shape unchanged.
         Args: {
           p_club_id: string
           p_end_date?: string
           p_limit?: number
           p_start_date?: string
+          p_offset?: number
+          p_category_id?: string
         }
         Returns: {
           product_id: string
@@ -8263,6 +8283,98 @@ export type Database = {
           revenue: number
           units_returned: number
           units_sold: number
+        }[]
+      }
+      get_shop_gross_profit: {
+        Args: {
+          p_club_id: string
+          p_start_date?: string
+          p_end_date?: string
+          p_category_id?: string
+          p_product_id?: string
+        }
+        Returns: {
+          revenue_known_cost: number
+          cost_of_goods: number
+          gross_profit: number
+          margin_pct: number
+          known_cost_lines: number
+          cost_unavailable_lines: number
+          cost_unavailable_revenue: number
+        }[]
+      }
+      get_shop_stock_valuation: {
+        Args: { p_club_id: string; p_location_id?: string }
+        Returns: {
+          location_id: string
+          location_name: string
+          product_id: string
+          product_name_ar: string
+          variant_id: string | null
+          variant_label: string | null
+          on_hand: number
+          unit_cost: number | null
+          line_value: number | null
+        }[]
+      }
+      get_shop_supplier_purchase_activity: {
+        Args: {
+          p_club_id: string
+          p_start_date?: string
+          p_end_date?: string
+          p_supplier_id?: string
+        }
+        Returns: {
+          supplier_id: string | null
+          supplier_name: string
+          receipt_count: number
+          total_quantity: number
+          total_cost_value: number
+          last_receipt_at: string | null
+        }[]
+      }
+      list_shop_sale_returns: {
+        Args: {
+          p_club_id: string
+          p_start_date?: string
+          p_end_date?: string
+          p_restock_only?: boolean
+          p_refunded_only?: boolean
+          p_limit?: number
+          p_offset?: number
+        }
+        Returns: {
+          return_id: string
+          sale_id: string
+          invoice_number: string
+          processed_by_name: string | null
+          restock: boolean
+          reason: string
+          created_at: string
+          refund_amount: number | null
+          refund_method: string | null
+        }[]
+      }
+      list_shop_stock_count_variance: {
+        Args: {
+          p_club_id: string
+          p_start_date?: string
+          p_end_date?: string
+          p_location_id?: string
+          p_nonzero_only?: boolean
+          p_limit?: number
+          p_offset?: number
+        }
+        Returns: {
+          stock_count_id: string
+          location_name: string
+          completed_at: string | null
+          product_name_ar: string
+          variant_label: string | null
+          system_quantity: number
+          counted_quantity: number
+          variance: number
+          counted_by_name: string | null
         }[]
       }
       get_or_create_shop_walk_in_customer: {
@@ -8600,12 +8712,17 @@ export type Database = {
         }[]
       }
       list_shop_inventory_movements: {
+        // COMMERCE PRO C7: p_start_date/p_end_date/p_movement_type
+        // appended (all optional/defaulted) -- return shape unchanged.
         Args: {
           p_club_id: string
           p_limit?: number
           p_location_id?: string
           p_offset?: number
           p_product_id?: string
+          p_start_date?: string
+          p_end_date?: string
+          p_movement_type?: string
         }
         Returns: {
           actor_id: string

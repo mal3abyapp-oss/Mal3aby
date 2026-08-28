@@ -883,11 +883,11 @@
       "time": "Time",
       "duration": "Duration",
       "durations": {
-        "0.5": "30 minutes",
         "1": "1 hour",
-        "1.5": "1.5 hours",
         "2": "2 hours",
-        "3": "3 hours"
+        "3": "3 hours",
+        "0.5": "30 minutes",
+        "1.5": "1.5 hours"
       },
       "durationUnavailable": "not available at this time",
       "customer": "Customer",
@@ -4372,6 +4372,125 @@
         "shortage": "Shortage",
         "surplus": "Surplus"
       }
+    },
+    "reports": {
+      "pager": {
+        "range": "Showing {{from}}-{{to}}",
+        "prev": "Previous",
+        "next": "Next"
+      },
+      "hubTitle": "Shop Reports",
+      "hubDescription": "Sales, inventory, and profitability reports for the Shop module",
+      "tabs": {
+        "salesSummary": "Sales Summary",
+        "salesDetail": "Sales Detail",
+        "productSales": "Product Sales",
+        "categorySales": "Category Sales",
+        "paymentMethodSales": "Payment Method Sales",
+        "cashierSales": "Cashier Sales",
+        "customerPurchases": "Customer Purchases",
+        "returns": "Returns / Refunds",
+        "inventoryOnHand": "Inventory On Hand",
+        "stockMovementLedger": "Stock Movement Ledger",
+        "lowStock": "Low Stock",
+        "outOfStock": "Out of Stock",
+        "stockValuation": "Stock Valuation",
+        "grossProfit": "Gross Profit / Margin",
+        "supplierActivity": "Supplier Activity",
+        "stockCountVariance": "Stock Count Variance"
+      },
+      "salesSummary": {
+        "title": "Sales Summary",
+        "openDashboard": "Open Dashboard",
+        "detailHint": "For a transaction-level list, see the Sales Detail report. For live, today-scoped operational detail (top products, category/payment mix, recent activity), see the Shop Dashboard."
+      },
+      "salesDetail": {
+        "title": "Sales Detail"
+      },
+      "productSales": {
+        "title": "Product Sales"
+      },
+      "categorySales": {
+        "title": "Category Sales",
+        "category": "Category",
+        "uncategorized": "Uncategorized"
+      },
+      "paymentMethodSales": {
+        "title": "Payment Method Sales",
+        "transactions": "Transactions",
+        "totalCollected": "Total Collected"
+      },
+      "cashierSales": {
+        "title": "Cashier Sales",
+        "unknown": "Unknown",
+        "boundNote": "Based on up to {{count}} sales in the selected date range."
+      },
+      "customerPurchases": {
+        "title": "Customer Purchases",
+        "pickCustomer": "Select a customer to view their purchase history.",
+        "qty": "Qty",
+        "unitPrice": "Unit Price"
+      },
+      "returns": {
+        "title": "Returns / Refunds",
+        "processedBy": "Processed By",
+        "refund": "Refund",
+        "noRefund": "No refund",
+        "refundedOnly": "Refunded only"
+      },
+      "inventoryOnHand": {
+        "title": "Inventory On Hand",
+        "reorderLevel": "Reorder Level"
+      },
+      "lowStock": {
+        "title": "Low Stock",
+        "empty": "No low-stock items",
+        "knownGapNote": "Note: a product/variant that has never had any stock movement recorded anywhere is not yet included in this list, even if it is effectively out of stock -- a known, documented gap (see Inventory report code comments)."
+      },
+      "outOfStock": {
+        "title": "Out of Stock",
+        "empty": "No out-of-stock items"
+      },
+      "stockMovementLedger": {
+        "title": "Stock Movement Ledger"
+      },
+      "stockValuation": {
+        "title": "Stock Valuation",
+        "lineValue": "Line Value",
+        "totalValue": "Total Value",
+        "unknownCostNote": "{{count}} item(s) have on-hand stock with no known cost yet and are excluded from the total."
+      },
+      "gp": {
+        "title": "Gross Profit / Margin",
+        "revenue": "Revenue (known cost)",
+        "cogs": "Cost of Goods",
+        "grossProfit": "Gross Profit",
+        "marginPct": "Margin %",
+        "unitCost": "Unit Cost",
+        "costUnavailable": "Cost unavailable",
+        "honestyNoticeTitle": "Profitability is only shown for sales with a known cost.",
+        "honestyNoticeWithGap": "{{lines}} sale line(s) totaling EGP {{revenue}} in revenue have no recorded cost (sold before cost tracking began, or the item was never received through Receive Stock) and are excluded from every figure below -- never estimated.",
+        "honestyNoticeNoGap": "Every sale line in this range has a known cost -- no lines were excluded.",
+        "coverageNote": "{{known}} line(s) included in the figures above; {{unknown}} line(s) excluded for lacking a known cost."
+      },
+      "supplierActivity": {
+        "title": "Supplier Purchase Activity",
+        "supplierColumn": "Supplier",
+        "noSupplier": "No supplier recorded",
+        "receiptCount": "Receipts",
+        "totalQuantity": "Total Quantity",
+        "totalCostValue": "Total Cost Value",
+        "lastReceipt": "Last Receipt"
+      },
+      "stockCountVariance": {
+        "title": "Stock Count Variance",
+        "completedAt": "Completed",
+        "systemQty": "System Qty",
+        "countedQty": "Counted Qty",
+        "variance": "Variance",
+        "nonzeroOnly": "Non-zero variance only"
+      },
+      "permissionDenied": "You do not have permission to view profitability data for this report. Ask a club owner to grant the \"View profit reports\" permission."
     }
   }
 }
