@@ -769,7 +769,8 @@
       "wallet": "E-wallet",
       "other": "Other"
     },
-    "change": "Change"
+    "change": "Change",
+    "done": "Done"
   },
   "bookings": {
     "statusLabels": {
@@ -4183,9 +4184,69 @@
         "onHand": "On hand",
         "movementType": "Type",
         "quantity": "Qty",
-        "reason": "Reason"
+        "reason": "Reason",
+        "reorderLevel": "Reorder Level",
+        "status": "Status"
       },
-      "movementHistoryLimitNote": "Showing the most recent {{count}} movements."
+      "movementHistoryLimitNote": "Showing the most recent {{count}} movements.",
+      "addLine": "Add line",
+      "availableAtSource": "Available",
+      "detail": {
+        "barcode": "Barcode",
+        "basePrice": "Base Price",
+        "category": "Category",
+        "invoice": "Invoice",
+        "knownSuppliers": "Known suppliers",
+        "noSupplierData": "No supplier data recorded for this product yet.",
+        "reference": "Reference",
+        "reorderLevel": "Reorder Level",
+        "sku": "SKU",
+        "tabs": {
+          "general": "General",
+          "movements": "Movements",
+          "returns": "Returns",
+          "sales": "Sales History",
+          "stock": "Stock",
+          "supplier": "Supplier"
+        },
+        "title": "Product Detail",
+        "totalOnHand": "Total On Hand",
+        "unattributedReceipts": "{{count}} receipt(s) with no supplier recorded"
+      },
+      "expectedTotalCost": "Expected Total Cost",
+      "itemsLabel": "Items",
+      "kpis": {
+        "lowStock": "Low Stock",
+        "outOfStock": "Out of Stock",
+        "stockValue": "Stock Value",
+        "stockValueHidden": "Hidden",
+        "totalSkus": "Total SKUs"
+      },
+      "pickSourceFirst": "Choose a source location first.",
+      "receiptSummary": {
+        "description": "Recorded {{count}} item line(s) into inventory.",
+        "title": "Receipt Recorded",
+        "totalCost": "Total Cost"
+      },
+      "recent": {
+        "adjustments": "Recent Adjustments",
+        "damageLoss": "Recent Damage / Loss",
+        "empty": "Nothing yet",
+        "receipts": "Recent Receipts",
+        "transfers": "Recent Transfers"
+      },
+      "referenceNumberLabel": "Reference / Invoice Number",
+      "removeLine": "Remove line",
+      "status": {
+        "in": "In Stock",
+        "low": "Low Stock",
+        "out": "Out of Stock"
+      },
+      "transferSummary": {
+        "description": "Transferred {{count}} item line(s) between locations.",
+        "title": "Transfer Recorded"
+      },
+      "transferSummaryLine": "{{count}} item line(s) will be transferred."
     },
     "sales": {
       "title": "Sales & Returns",
@@ -4370,8 +4431,17 @@
       "summary": {
         "matched": "Matched",
         "shortage": "Shortage",
-        "surplus": "Surplus"
-      }
+        "surplus": "Surplus",
+        "counted": "Lines Counted",
+        "netQuantity": "Net Qty Difference",
+        "valueCostUnavailable": "{{count}} line(s) excluded from the value figure -- cost unavailable",
+        "valueDifference": "Value Difference",
+        "valueHidden": "Value difference is hidden -- you do not have permission to view Shop profitability data."
+      },
+      "allCategories": "All categories",
+      "noMatchingLines": "No items match this search/filter.",
+      "progress": "{{counted}} / {{total}} counted ({{pct}}%)",
+      "searchPlaceholder": "Search products…"
     },
     "reports": {
       "pager": {
