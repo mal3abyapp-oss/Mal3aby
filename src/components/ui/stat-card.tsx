@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react'
 import { Link } from 'react-router-dom'
 import { cn } from '@/lib/utils'
 import { Card, CardContent } from '@/components/ui/card'
@@ -15,7 +16,13 @@ import type { LucideIcon } from 'lucide-react'
 // that don't pass it, so no other call site needed to change).
 export interface StatCardProps {
   label: string
-  value: string | number
+  // COMMERCE PRO C5: widened from `string | number` to `ReactNode` so a
+  // KPI tile can render a real <MoneyDisplay> (locale-aware currency
+  // formatting + <bdi> RTL isolation) instead of a bare formatted
+  // string. Backward-compatible -- every existing caller passes a
+  // string/number, both still valid under ReactNode, so no other call
+  // site changes behavior.
+  value: ReactNode
   icon?: LucideIcon
   tone?: 'default' | 'danger' | 'success' | 'warning'
   className?: string
