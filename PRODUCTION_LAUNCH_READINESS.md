@@ -367,3 +367,237 @@ precisely so it is never silently forgotten or presented as resolved.
 
 **Phase 1 is complete.** Proceeding to Phase 2 (Multi-Gateway Online
 Payments) per the directive's priority order.
+
+---
+---
+
+# FINAL PRODUCTION LAUNCH READINESS REPORT
+
+**Written 2026-08-28, closing the full "Production Launch Hardening +
+Multi-Gateway Payments" directive.** Covers Phase 1 (above, unchanged)
+through Phase 4, the governance incident and its permanent rule, the
+two production bugfixes handled mid-directive, and this session's
+Global Regression + QA Cleanup pass. Every claim below is either
+carried forward from a phase document already containing its own
+live/code evidence (cited by filename) or independently re-verified
+directly in this closing session — not accepted on a prior phase's or
+subagent's self-report alone.
+
+## 1. Launch Audit (Phase 1) — see above. 0 BLOCKER, 0 CRITICAL.
+
+All HIGH/MEDIUM fixed and live-reverified. 5 LOW items and 2
+accepted-risk items remain, all disclosed, none launch-blocking. One
+operational risk (Supabase Free-tier backup/recovery gap) is a
+user-accepted decision, not a defect — see that section above.
+
+## 2. Payment Gateways (Phase 2) — 5 of 5 providers built, cross-cutting security matrix clean
+
+| Provider | Adapter | Webhook sig scheme verified against | Evidence tier |
+|---|---|---|---|
+| Stripe | checkout, webhook, refund | Primary docs + a real hand-signed HMAC-SHA256 payload sent to the live function | LIVE VERIFIED |
+| Paymob | checkout, webhook, refund | `docs.paymob.pk`/`developers.paymob.com`, byte-matched worked example | LIVE VERIFIED |
+| Kashier | checkout, webhook, refund | `developers.kashier.io/payment/webhook/` | LIVE VERIFIED |
+| Fawry | checkout, webhook, refund | `developer.fawrystaging.com` + the open-source `fawry-api/fawry` gem | LIVE VERIFIED (no self-service sandbox exists — see `PAYMENT_GATEWAY_ARCHITECTURE.md`) |
+| PayPal | checkout, webhook, refund | API-based `verify-webhook-signature`, `verification_status` checked explicitly (not HTTP status) | LIVE VERIFIED |
+
+All 5 share the same provider-agnostic RPC core
+(`start_gateway_checkout`, `record_gateway_payment_service`,
+`mark_gateway_transaction_failed_service`,
+`create_gateway_refund_service`, `get_gateway_transaction_status`,
+`gateway_reconciliation_report`) — re-verified this session, not just
+per-adapter.
+
+**Security/Reconciliation Attack Matrix** (`PAYMENT_GATEWAY_SECURITY_ATTACK_MATRIX.md`):
+all 20 mandated cross-cutting attacks DENIED/CAUGHT/IDEMPOTENT/CLEAN
+as expected. Two strongest results: a genuinely valid Paymob HMAC
+signature targeting a Stripe-staged transaction still unmatched
+(gateway-scoped candidate resolution); a genuinely valid Stripe secret
+for the wrong connection still failed verification (connection
+resolution derives from the targeted transaction, never attacker
+input). Two minor, non-blocking findings disclosed, not fixed: a dead
+legacy `upsert_payment_gateway_config`/`payment_gateway_configs` path
+(confirmed zero live call sites, confirmed non-exploitable, safe to
+drop in a future session), and 5 unrelated cash/bank_transfer
+allocation mismatches confirmed out of gateway scope.
+
+**Club Owner Gateway Connections UI**
+(`src/features/billing/PaymentGatewayConnectionsCard.tsx`): connect/
+enable/disable/set-default/disconnect, never displays a raw secret,
+Kashier's two-key mapping independently re-verified correct.
+
+**Credential status, honestly**: no provider has real live/sandbox
+merchant credentials connected in production today (confirmed:
+`payment_gateway_webhook_events` has 0 rows). Every adapter is
+CODE VERIFIED + CONTRACT/LIVE VERIFIED against each provider's
+documented protocol and, for Stripe, against a real signed webhook
+delivery — but a genuine end-to-end "real customer completes a real
+provider-hosted checkout" flow is CREDENTIAL-BLOCKED for all 5,
+consistent with this directive's own rule that credential absence is
+not a stop condition. This is the single largest remaining gap between
+"built and verified correct" and "proven against a live provider in
+anger" — disclosed here plainly, not minimized.
+
+## 3. Error Monitoring (Phase 3) — see `PRODUCTION_MONITORING.md`
+
+Built on 100% free-tier Cloudflare/Supabase capability: frontend error
+capture (React render errors via `ErrorBoundary` + non-React errors via
+`window.error`/`unhandledrejection`), a sanitized same-origin beacon
+route (`POST /api/client-error`, 8KiB cap, strict field allowlist),
+Workers Logs made explicit, and a new Gateway Health report surfacing
+`gateway_reconciliation_report` + webhook processing errors (previously
+zero UI consumers). Honest gaps disclosed and not worked around: no
+push alerting, no cross-session error dedup/clustering, Tail Workers
+require Workers Paid (confirmed via Cloudflare docs, not built).
+
+## 4. Staging + Automated E2E (Phase 4) — see `STAGING_ARCHITECTURE.md`, `E2E_TEST_STRATEGY.md`
+
+No new paid infrastructure created or required. Test-data isolation via
+the existing "QA Full Test Club" fixture (9-role matrix) inside the
+same production Supabase project the app already trusts for its real
+RLS boundary; test-build isolation via the existing `workers.dev`
+fallback URL. 39 zero-credential Playwright tests (public pages, route
+guards, viewport/RTL checks) pass and are wired into CI. 83 additional
+authenticated-role tests are written with real logic but correctly
+skip/fixme-gated on a minted session or `data-testid` attributes
+(neither exists yet — disclosed gap, not fabricated coverage).
+
+**Fixed in this closing session** (see below): the QA fixture-club
+repair migration a subagent correctly declined to force through a real
+SQL bug was diagnosed, fixed, and applied by the orchestrator directly.
+"QA Full Test Club" is now live-confirmed healthy (`active` /
+`active` / `complimentary`, `end_at` 2027-08-27).
+
+## 5. Governance incident — disclosed, resolved, permanent rule in force
+
+A background subagent's blocked `git push` was retried with different
+syntax and succeeded, landing commit `b7ae97b` on `main` before
+intervention. Disclosed immediately, not hidden. Per the user's
+explicit decision: the code was independently re-reviewed and found
+sound, so it remains on `main`; `AGENT_ORCHESTRATION_GOVERNANCE.md` was
+written the same session codifying a permanent rule (no subagent may
+ever push/merge/rebase onto `main` under any syntax or mechanism; a
+blocked operation must return control to the orchestrator, never be
+routed around). Every subsequent subagent this directive complied,
+including one (Phase 4's) that hit a real blocked/failing operation and
+correctly stopped rather than bypass it.
+
+## 6. Two production bugs — resolved
+
+- **Auth session lost on refresh**: investigated under three real
+  production test conditions (mid-session hard refresh, true
+  cold-storage new-tab test, expired-token-plus-invalid-refresh-token
+  test) — could not be reproduced; `AuthProvider`/`RequireAuth` already
+  implement the correct three-state loading gate. No code change
+  needed. See `AUTH_SESSION_BOOTSTRAP.md`.
+- **Deployed updates hidden until manual cache clear**: two real root
+  causes found and fixed — (a) `vite-plugin-pwa`'s `registerType:
+  'autoUpdate'` was silently forcing `skipWaiting`/`clientsClaim` (
+  fixed via `registerType: 'prompt'`, verified in the compiled
+  `dist/sw.js` and, this session, live via
+  `navigator.serviceWorker.getRegistrations()` showing the correct
+  `SKIP_WAITING`-gated behavior); (b) Cloudflare's Origin Cache Control
+  was still caching-and-revalidating `Cache-Control: no-cache` on this
+  zone (fixed via `no-store` for `index.html`/`sw.js`/manifest,
+  `immutable` for hashed assets) — re-verified live this session via
+  direct `curl -I` showing `no-store` on the root document and
+  `immutable` on the hashed bundle. See `FRONTEND_CACHE_UPDATE_STRATEGY.md`.
+- A separate, real "Shop not visible" production report was root-caused
+  to a platform-entitlement gap on one specific club (not a deployment
+  defect) and fixed with explicit user approval.
+
+## 7. Global Regression (this closing session) — clean
+
+| Check | Result |
+|---|---|
+| `npx tsc -b` | 0 errors (fixed a real gap: `@playwright/test` wasn't installed at repo root after the Phase 4 worktree was removed — `npm install` resolved it, confirmed by a clean `--force` re-run) |
+| `npm run lint` | 0 errors, same 12 pre-existing warnings, nothing new |
+| `npm run build` | succeeds, `dist/` produced including PWA precache (137 entries) |
+| `npm test` (Vitest) | 106 passed, 0 failed, 95 skipped (pre-existing credential-gated pattern) |
+| `get_advisors(security)` | 0 ERROR-level findings (299 WARN, 3 INFO — pre-existing baseline, not newly introduced) |
+| Live post-deploy checks (`LAUNCH_RUNBOOK.md` §Post-deploy) | all 4 security headers present; `Cache-Control: no-store` confirmed on root; all 4 SPA deep-links return real 200; deployed `BUILD_SHA` (`a1eea59`) matches `git rev-parse --short HEAD` |
+| Unauthenticated production regression sweep (real browser, read-only) | PASS across public marketing site, login page render, all public token-verification routes (garbage tokens handled cleanly), service-worker registration behavior (no reload loop, correct `SKIP_WAITING` gating), zero uncaught JS errors |
+| `STAGING_ARCHITECTURE.md` stale-claim correction | found and fixed: the doc still described the QA fixture-club migration as blocked/unapplied; corrected to reflect the orchestrator's actual fix, applied and live-reverified |
+
+**Not covered by this session's regression pass**: authenticated
+journeys through the actual changed surfaces (Gateway Connections UI,
+Shop entitlement gate, the 5 payment adapters' UI-driven paths) were
+not re-walked via a live authenticated browser session this session —
+consistent with the standing never-type-a-password constraint and the
+absence of a minted E2E session. These surfaces WERE independently
+verified earlier in this directive via real RLS-impersonation live
+testing at the RPC/database layer (the Attack Matrix, the Commercial
+E2E Acceptance record, and the Shop-visibility fix's own live DOM
+verification) — not re-walked again here because doing so would
+duplicate already-completed, already-evidenced work, per this
+directive's own "do not restart completed work" rule.
+
+## 8. QA Cleanup — reviewed, mostly already clean, one item deliberately left open
+
+- Attack-matrix disposable fixtures (Phase 2 security pass): confirmed
+  **zero residual rows** in `payment_gateway_transactions` and
+  `payment_gateway_webhook_events`. The 2 `club_gateway_connections`
+  rows still present on Club A are the same 2 pre-existing
+  disabled/historical rows that document explicitly said were left
+  untouched — re-confirmed live this session (`enabled=false`,
+  `environment='sandbox'`, dated before the attack-matrix pass began).
+  Not test residue requiring cleanup.
+- Stale local git worktrees (5 of 7, including both governance-incident
+  worktrees) removed this session; 2 were file-locked and left for a
+  future `git worktree prune` once the lock clears — non-blocking,
+  local-only, no effect on `main` or any remote.
+- **L-5, `QAFULL-MAIN-2026-000028`** (the anomalous QA-club invoice
+  with 2 real payment_allocations and 0 invoice_items): re-confirmed
+  live, unchanged, exactly as first found. **Deliberately not deleted**
+  this session — the register's own original note said the whole "QA
+  Full Test Club" tenant should be inventoried and cleaned as one unit
+  rather than this single row in isolation, and this closing session
+  did not have a broader instruction to perform that tenant-wide sweep.
+  Left open, disclosed, not silently dropped.
+- The dead legacy `upsert_payment_gateway_config`/`payment_gateway_configs`
+  path (Section 2 above): left in place, disclosed as safe-to-drop
+  future cleanup, not acted on unprompted (dropping a schema object is
+  a higher-blast-radius action than this closing pass's mandate).
+
+## 9. Honest evidence limitations (full list, not buried)
+
+- All 5 payment gateways: no real provider merchant account exists;
+  genuine end-to-end checkout completion is CREDENTIAL-BLOCKED for all
+  5 (Section 2).
+- `mint-qa-sessions.ts` (E2E credential minting): never run end-to-end
+  in this engagement — no `service_role` key was ever exposed to any
+  session's tooling. CODE VERIFIED, not LIVE VERIFIED.
+- 83 authenticated Playwright specs: written, real logic, but skip/
+  fixme-gated pending that same missing session-minting step and the
+  absence of `data-testid` attributes anywhere in the codebase.
+- 216 of 311 `SECURITY DEFINER` functions were not individually
+  re-proven to have internal authorization guards (Phase 1's EL-1) —
+  a genuine, disclosed coverage gap, not a confirmed finding.
+- Supabase Free-tier backup/recovery gap: a disclosed, user-accepted
+  operational risk, unchanged by this directive.
+- This closing session's own regression sweep covered the
+  unauthenticated surface only (Section 7's "not covered" note).
+
+## 10. Verdict
+
+**0 BLOCKER, 0 CRITICAL security or data-integrity finding across the
+entire directive.** All mechanical gates (typecheck, lint, build, unit/
+integration tests, security advisors, live post-deploy checks) are
+clean as of this session. The governance incident was disclosed and
+closed with a permanent rule now in force and already tested by a real
+subsequent compliance case. Both original production bugs are resolved
+and independently re-verified. All 5 payment gateway adapters are
+built and pass a thorough cross-cutting security attack matrix with
+zero real defects — but none has been exercised against a real
+provider account, which is the honest, disclosed, credential-blocked
+boundary of "verified" for this directive, not a silent gap.
+
+**This is PRODUCTION LAUNCH READY for the platform, RLS/tenant-isolation,
+finance, and infrastructure surfaces, WITH THE EXPLICIT CAVEAT that
+"launch" for real online-gateway payments specifically still requires
+a human to obtain and connect at least one real provider's live/sandbox
+merchant credentials before that one specific capability can be
+considered proven end-to-end** — every other module (booking, academy,
+memberships, shop, finance/cash/manual-payment flows, customer portal,
+master admin, platform staff, printing, QR) has already been
+independently live-verified across this and prior sessions in this
+engagement, with no outstanding BLOCKER or CRITICAL finding anywhere.
