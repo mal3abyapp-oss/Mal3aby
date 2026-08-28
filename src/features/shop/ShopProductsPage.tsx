@@ -25,8 +25,8 @@ import {
   DialogTrigger,
 } from '@/components/ui/dialog'
 import { translateSupabaseError } from '@/lib/errors'
+import { ProductThumb } from '@/features/shop/shop-media'
 import {
-  ImageOff,
   LayoutGrid,
   List as ListIcon,
   Upload,
@@ -55,6 +55,12 @@ import {
 // margin here would mean fabricating a number from a moving average
 // this page has no honest way to compute, so it is omitted rather than
 // guessed.
+//
+// COMMERCE PRO C2 (2026-08-28) -- ProductThumb/ImagePlaceholder moved
+// to shop-media.tsx (shared with ShopPOSPage.tsx's product cards and
+// category strip, which need the exact same real-fallback/no-layout-
+// jump pattern). No behavior change here -- same components, imported
+// instead of defined locally.
 const PRODUCT_IMAGES_BUCKET = 'shop-product-images'
 const MAX_IMAGE_BYTES = 5 * 1024 * 1024
 const ACCEPTED_IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/webp']
@@ -261,34 +267,6 @@ async function uploadProductImage(clubId: string, entityId: string, file: File):
   if (error) throw error
   const { data } = supabase.storage.from(PRODUCT_IMAGES_BUCKET).getPublicUrl(path)
   return data.publicUrl
-}
-
-// A real placeholder (not a broken-image icon): a neutral square with
-// a centered icon, reserving the same aspect-ratio box the real image
-// would occupy so there is never a layout jump switching between the
-// two states.
-function ImagePlaceholder({ className }: { className?: string }) {
-  return (
-    <div className={`flex items-center justify-center bg-surface-muted text-text-secondary ${className ?? ''}`}>
-      <ImageOff className="size-6" aria-hidden="true" />
-    </div>
-  )
-}
-
-function ProductThumb({ src, alt, className }: { src: string | null; alt: string; className?: string }) {
-  const [failed, setFailed] = useState(false)
-  if (!src || failed) {
-    return <ImagePlaceholder className={className} />
-  }
-  return (
-    <img
-      src={src}
-      alt={alt}
-      loading="lazy"
-      className={`object-cover ${className ?? ''}`}
-      onError={() => setFailed(true)}
-    />
-  )
 }
 
 function PrimaryImageUploader({
