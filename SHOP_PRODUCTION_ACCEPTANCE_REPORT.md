@@ -11,7 +11,14 @@
 
 All fixes below are real, root-caused, applied live to the production database and/or deployed to `mal3aby.app`, and independently re-verified (not just self-reported) before being counted here.
 
-### 1.1 Stale service worker silently hid the Shop module (root cause of the original "Shop is missing" report)
+### 1.1 CORRECTION — two separate findings, not one
+
+An earlier draft of this report conflated two distinct defects under one "root cause." Corrected here: they are separate, independently confirmed findings, and neither investigation is being reopened by this correction.
+
+**A. Shop visibility root cause (the original "Shop is missing for my real club" report)**
+Conclusively proven earlier in this engagement, via direct database inspection, not stale-SW related: club `b9178c0f-...`'s `club_modules` row for `shop` was `entitled = false, active = false`. The module became visible only after the real platform-owner account called `set_club_module_entitlement(..., 'shop', true)`, followed by the real club-owner account calling `set_club_module_active(..., 'shop', true)`. This is a platform-entitlement/club-activation state issue, not a caching or service-worker issue.
+
+**B. Release-freshness defect (separate, found during this Shop acceptance pass)**
 - **Root cause**: `PwaUpdatePrompt.tsx`'s `useRegisterSW` only shows the update toast in reaction to a live Workbox `waiting` *event* — it never checked `registration.waiting` on mount. A tab open across a deploy (or a worker that entered `waiting` before the component mounted) was left running old JS with zero visible signal.
 - **Confirmed live**: `navigator.serviceWorker.getRegistrations()` showed a real waiting worker on a real desktop session while curl-verified production content was already current — this was never the earlier Cloudflare cache bug recurring.
 - **Fix**: explicit `registration.waiting` check on mount + visibility change + interval poll, plus an `updatefound`/`statechange` listener as a second safety net. `src/app/PwaUpdatePrompt.tsx`.
