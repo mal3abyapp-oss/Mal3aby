@@ -26,6 +26,7 @@ import {
 } from '@/components/ui/dialog'
 import { translateSupabaseError } from '@/lib/errors'
 import { ProductThumb } from '@/features/shop/shop-media'
+import { useDebouncedValue } from '@/hooks/useDebouncedValue'
 import {
   LayoutGrid,
   List as ListIcon,
@@ -577,9 +578,13 @@ export function ShopProductsPage() {
     localStorage.setItem(VIEW_MODE_STORAGE_KEY, mode)
   }
 
+  // COMMERCE PRO C9 (performance sweep): debounce the network query, not
+  // the input itself -- see ShopPOSPage.tsx's identical comment.
+  const debouncedSearch = useDebouncedValue(search, 250)
+
   const { data: products = [], isLoading } = useQuery({
-    queryKey: ['shop-products', currentClubId, search, categoryFilter],
-    queryFn: () => fetchProducts(currentClubId as string, search, categoryFilter || undefined),
+    queryKey: ['shop-products', currentClubId, debouncedSearch, categoryFilter],
+    queryFn: () => fetchProducts(currentClubId as string, debouncedSearch, categoryFilter || undefined),
     enabled: !!currentClubId,
   })
 

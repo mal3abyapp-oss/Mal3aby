@@ -23,6 +23,7 @@ import {
 import { Trash2, Plus, Minus, ScanBarcode, ShoppingCart, Sparkles, User, PauseCircle, Percent, Banknote, Printer, CheckCircle2 } from 'lucide-react'
 import { translateSupabaseError } from '@/lib/errors'
 import { ShopInvoiceDialog } from '@/features/shop/ShopInvoiceDocument'
+import { useDebouncedValue } from '@/hooks/useDebouncedValue'
 
 // COMMERCIAL MODULE (2026-08-26) -- the POS/reception sale screen
 // (directive Section 28: Customer -> Product Search -> Variant ->
@@ -283,9 +284,16 @@ export function ShopPOSPage() {
 
   const barcodeInputRef = useRef<HTMLInputElement>(null)
 
+  // COMMERCE PRO C9 (performance sweep, directive Section 28 --
+  // "debounced search where appropriate"): the input itself stays wired
+  // to the raw productSearch state (no typing lag), only the network
+  // query key is debounced -- so a cashier typing "water" fires one
+  // request after they pause, not five requests for five keystrokes.
+  const debouncedProductSearch = useDebouncedValue(productSearch, 250)
+
   const { data: products = [], isLoading: productsLoading } = useQuery({
-    queryKey: ['shop-pos-products', currentClubId, productSearch],
-    queryFn: () => fetchProducts(currentClubId as string, productSearch),
+    queryKey: ['shop-pos-products', currentClubId, debouncedProductSearch],
+    queryFn: () => fetchProducts(currentClubId as string, debouncedProductSearch),
     enabled: !!currentClubId,
   })
   const { data: categories = [] } = useQuery({
