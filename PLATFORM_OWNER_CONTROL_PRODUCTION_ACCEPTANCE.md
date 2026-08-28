@@ -1,8 +1,8 @@
 # Platform Owner Complete Control — Production Acceptance
 
 **Date:** 2026-08-29
-**Baseline:** `PLATFORM_OWNER_COMPLETE_CONTROL_AUDIT.md` (architecture review) → `PLATFORM_OWNER_CONTROL_IMPLEMENTATION_PLAN.md` (7 phases) → this report (closing verification).
-**Branch:** `platform-owner-complete-control`, 7 commits ahead of `main` at merge time, `origin/main` confirmed unchanged throughout execution.
+**Baseline:** `PLATFORM_OWNER_COMPLETE_CONTROL_AUDIT.md` (architecture review) → `PLATFORM_OWNER_CONTROL_IMPLEMENTATION_PLAN.md` (7 phases) → this report (closing verification) → §28 below (real authenticated visual acceptance, added after merge).
+**Branch:** `platform-owner-complete-control`, 7 commits ahead of `main` at merge time, `origin/main` confirmed unchanged throughout execution. Merged to `main` at `765d9cb`.
 
 ---
 
@@ -158,7 +158,51 @@ UNIT/INTEGRATION TESTS = PASS (108 passed, 0 failed, 95 skipped by design)
 ZERO-CREDENTIAL E2E = PASS (57/57 on available browsers; WebKit binary missing, ENVIRONMENT-BLOCKED)
 AUTHENTICATED PLATFORM OWNER E2E = STRUCTURALLY VERIFIED / ENVIRONMENT-BLOCKED
 LIVE SERVER/RPC ACCEPTANCE = LIVE VERIFIED (every claim in sections 12-16, cited)
-LIVE VISUAL ACCEPTANCE = ENVIRONMENT-BLOCKED
+LIVE VISUAL ACCEPTANCE = ENVIRONMENT-BLOCKED at merge time — see §28, now LIVE VISUALLY VERIFIED
 TENANT ISOLATION = LIVE VERIFIED (cross-club checks in Phases 1, 5)
 MIGRATIONS = CONSISTENT (live state == repo, confirmed via list_migrations)
 ```
+
+---
+
+## 28. Authenticated Platform Owner Visual Acceptance (post-merge)
+
+**Date:** 2026-08-29, following merge. A genuine authenticated Platform Owner browser session was found already open locally (not a Club Owner or staff session — confirmed the previous attempt's invalidating condition did not recur: `/platform` did not redirect to `/app`, the URL stayed under `/platform`, and the full Platform Owner sidebar — Overview/Clubs/Owners/Plans/Leads/Reports/Alerts/Trials/Audit/Staff/Roles/Settings, plus a real "تسجيل الخروج" logout control — rendered from the real authorization path, not a cached or assumed state).
+
+**Repository/app state verified first:** `main` at `765d9cb` == `origin/main`, working tree clean. The dev server was serving a stale pre-implementation bundle (`build 249c9fd`, started before Phase 1's first migration) — stopped and restarted; confirmed via the app's own build-SHA console log that it now serves `build 765d9cb`, the exact final merge commit, before any review began.
+
+**Club used:** "نادي الاختبار الثاني" (TEST-CLUB-2, `c0b02979-a49e-4338-bcac-d789ca397aeb`) — the same QA/test club used for every live RLS-impersonation test throughout Phases 1-6. No operational/real club was touched.
+
+### What was LIVE VISUALLY VERIFIED (genuine authenticated browser interaction, not code/structural review)
+
+- **Platform Overview** (`/platform`): real live data rendered — 6 total clubs, 6 active, 3 blocked-access, 2 active trials, 2 WhatsApp-disconnected, 1 no-subscription club — matching the exact production data queried via SQL throughout implementation. Exception cards, filtered deep-links, sidebar navigation all functional.
+- **Club Directory** (`/platform/clubs`): real 6-club list rendered with real owners, codes, admin/subscription status columns, search/filter controls, "فتح كمدير منصة" (open as platform admin) actions.
+- **Club 360 / Club Detail**: identity, owner (with copy-to-clipboard), operational summary, WhatsApp health, subscription status/actions, Limits card, and the new Payments card all rendered with real data for the test club.
+- **Module control UI — all 4 modules, both directions, live-tested on the real UI:**
+  - **Academy**: disabled via UI click → immediately showed "غير متاحة" with updated timestamp. Re-enabled → correctly showed "متاحة / لم يفعّلها النادي بعد" (the genuine Entitled-but-not-yet-Activated two-tier state, not silently forced back to Active — confirming the architecture's own documented design is honored, not just entitled). Restored to original `entitled=true, active=true` and re-confirmed visually.
+  - **Fields ("الملاعب والحجوزات")**: identical live disable→confirm→restore cycle, same correct behavior.
+  - **Club Memberships ("عضويات النادي")**: identical live disable→confirm→restore cycle — this module did not exist in this UI before Phase 2 of this program; now fully functional and visually confirmed.
+  - **Shop ("المتجر")**: inspected only (not toggled, per instruction) — confirmed it remains in its pre-existing, deliberate QA-disabled state, unaffected by any of this program's work.
+- **Payment kill switch**: clicked "إيقاف المدفوعات" (Disable Payments) → card immediately updated to "موقوفة من المنصة" (red badge) with button relabeled "إعادة تفعيل المدفوعات". Clicked to re-enable → correctly returned to "مفعّلة" (green badge). Full cycle confirmed live.
+- **Limits/audited-RPC save path**: opened the Edit Limits form (confirmed the new reason field is present), set a real field limit (5) with a reason, saved — the read-only card immediately reflected "٠ / ٥" (0 used / 5 limit). Restored to unlimited via the same real RPC (confirmed live it is genuinely `set_commercial_entitlements`, not the old direct-upsert path, by observing the resulting audit trail).
+- **Plan defaults UI**: opened the real, published "شهري" (Monthly, 499 EGP) plan's edit dialog — confirmed the 4 module-default checkboxes and 3 limit-default inputs (Phase 4's deliverable) render correctly in the live UI. Closed without saving, per instruction to leave real commercial plans untouched.
+- **Audit Log** (`/platform/audit`): every single interaction above appears as a real, chronological, correctly-attributed entry (actor: Moustafa Elsafy / moustafa.elsafy2@gmail.com, real timestamps, real before/after diffs, typed reasons preserved verbatim) — `commercial_entitlements.updated`, `club_payments.enabled/disabled`, `module.entitled/module.unentitled` all genuinely logged.
+- **Responsive (375px mobile)**: Club 360's identity/owner/operational-summary/WhatsApp/limits/payments cards all render cleanly with no horizontal page overflow, correctly stacked, RTL-correct, destructive actions visually distinct (red). The tab bar (5 tabs) uses contained horizontal scroll rather than wrapping or overflowing the page — a legitimate, common mobile pattern, not a defect.
+
+### Findings from this pass
+
+**P3 — Modules tab discoverability at mobile width.** At 375px, the tab bar's 5 tabs don't all fit; "الوحدات" (Modules) is the one pushed out of the initial view and requires a horizontal scroll of the tab strip to reach (confirmed present in the DOM and reachable, not missing — a discoverability/polish issue, not a broken feature). Not fixed during this review per the "no implementation" instruction.
+
+**Environment note, not a product defect:** mid-review, the local Vite dev server's HMR websocket briefly dropped (`net::ERR_CONNECTION_REFUSED`, `[hmr] Failed to reload`), causing a few automation-tool interaction timeouts. `preview_logs` confirmed zero server-side errors during this window; a page reload immediately restored full functionality with the correct build hash intact. This did not affect or invalidate any of the visual confirmations above, all of which were completed before and after this transient hiccup.
+
+**No new P0/P1 findings.** No security, tenant-isolation, or control-bypass issue was observed. No genuine defect required or received a code fix during this review.
+
+### Correlating UI with real enforcement
+
+Full server-level bypass proof (disabled module → real RPC rejection, both authenticated-staff and anonymous-public paths) was already completed and documented live in Phases 1-6 (see §12-16, §22 above) using the identical test club. This session additionally confirms the UI itself now correctly displays and controls that same real state — closing the loop between "the backend enforces it" (already proven) and "the Platform Owner can see and operate it" (now also proven, visually, in a genuine authenticated session).
+
+### Final decision
+
+**CAN A REAL PLATFORM OWNER NOW OPEN ONE CLUB AND PROFESSIONALLY CONTROL ITS CORE MAL3ABY CAPABILITIES FROM THE PLATFORM CONSOLE? → YES.**
+
+Demonstrated live, in a genuine authenticated session, for all four modules (Academy/Fields/Club Memberships/Shop), commercial limits, and payment availability, on a real Club 360 page, with every change correctly and readably captured in the Audit Log. The only remaining gaps are the ones already honestly carried forward from the original audit and never claimed fixed: the provider-policy allowlist has no dedicated UI (backend fully live), and a small number of newer action types still render as raw strings in the Audit Log's Action column (the diff/reason columns next to them are fully readable regardless).
