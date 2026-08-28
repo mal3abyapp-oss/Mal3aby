@@ -411,7 +411,8 @@
       "modules": {
         "fields": "Fields & Bookings",
         "academy": "Academy",
-        "shop": "Shop"
+        "shop": "Shop",
+        "clubMembership": "Club Memberships"
       },
       "modulesHint": "Turning a module off never deletes its history — the club keeps everything it already has, it just can't create anything new in that module until you turn it back on.",
       "modulesEntitled": "Entitled",

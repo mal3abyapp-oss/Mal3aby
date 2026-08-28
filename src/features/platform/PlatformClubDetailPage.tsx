@@ -1229,10 +1229,17 @@ interface ModuleRow {
   updatedAt: string | null
 }
 
+// PLATFORM OWNER CONTROL IMPLEMENTATION -- Phase 2: club_membership
+// registered as a 4th real module (see migration
+// 20260828210000_club_membership_module_registration.sql) -- the same
+// Modules tab this constant already feeds now shows it automatically,
+// no new tab/section needed (Club 360 UX guidance: extend, don't
+// fragment).
 const MODULE_LABELS: Record<string, string> = {
   fields: 'platform.clubDetailPage.modules.fields',
   academy: 'platform.clubDetailPage.modules.academy',
   shop: 'platform.clubDetailPage.modules.shop',
+  club_membership: 'platform.clubDetailPage.modules.clubMembership',
 }
 
 async function fetchModules(clubId: string): Promise<ModuleRow[]> {

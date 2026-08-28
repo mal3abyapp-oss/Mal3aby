@@ -1,0 +1,792 @@
+-- PLATFORM OWNER CONTROL IMPLEMENTATION -- Phase 2 (P1).
+-- PLATFORM_OWNER_COMPLETE_CONTROL_AUDIT.md finding: Club Memberships (a
+-- real, fully-built recurring-membership-plan commerce product --
+-- club_membership_plans/club_membership_subscriptions, added
+-- 2026-08-26, genuinely distinct from both academy `subscriptions` and
+-- platform SaaS billing) was built AFTER the club_modules entitlement
+-- architecture already existed, and was never registered in it. No
+-- entitlement toggle, no platform visibility, no enforcement.
+--
+-- This migration: (1) extends the module_key CHECK to add
+-- 'club_membership', (2) backfills every existing club to
+-- entitled=true, active=true -- same continuity guarantee the original
+-- Academy/Fields backfill gave (2026-08-26205643), never silently
+-- turning off a product clubs may already be using, (3) adds
+-- _club_membership_module_active(), exact mirror of the proven
+-- _shop_module_active()/_academy_module_active()/_fields_module_active()
+-- pattern, (4) wires it into the two "new commitment" write chokepoints
+-- (sell_club_membership, purchase_club_membership_self_service) and
+-- their renewal counterparts (renew_club_membership,
+-- renew_club_membership_self_service) -- both create a new
+-- club_membership_subscriptions row and both are gated by
+-- club_write_allowed(..., 'new_commitment') already, so gating them
+-- alongside that existing check matches this codebase's own precedent.
+-- Plan CRUD (create/update/archive/restore_club_membership_plan) is
+-- deliberately left unswept -- administrative setup, not a "new
+-- commitment" against club resources, matching Phase 1's identical
+-- scoping decision for archive_field_pricing_rules.
+
+-- Step 1: widen the module_key domain. Existing rows are unaffected --
+-- this only adds a new permitted value, never touches existing data.
+alter table public.club_modules drop constraint club_modules_module_key_check;
+alter table public.club_modules add constraint club_modules_module_key_check
+  check (module_key in ('fields', 'academy', 'shop', 'club_membership'));
+
+-- Step 2: backfill every existing club to entitled+active=true, mirroring
+-- the original Fields/Academy backfill exactly (idempotent via ON CONFLICT).
+insert into public.club_modules (club_id, module_key, entitled, active)
+select c.id, 'club_membership', true, true
+from public.clubs c
+on conflict (club_id, module_key) do nothing;
+
+-- Step 3: also widen set_club_module_entitlement/set_club_module_active's
+-- own validation list (they hardcode the same 3-value check independently
+-- of the table CHECK, per their own migration's design) so the Platform
+-- Owner UI can actually toggle this new module -- otherwise the table CHECK
+-- would allow the row to exist but these RPCs would reject writing to it.
+create or replace function public.set_club_module_entitlement(p_club_id uuid, p_module_key text, p_entitled boolean)
+returns void
+language plpgsql
+security definer
+set search_path to 'public', 'pg_temp'
+as $$
+declare
+  v_before public.club_modules;
+begin
+  if not (public.is_platform_owner() or public.has_platform_permission('platform.club.manage')) then
+    raise exception 'not authorized';
+  end if;
+  if p_module_key not in ('fields', 'academy', 'shop', 'club_membership') then
+    raise exception 'unknown module';
+  end if;
+
+  select * into v_before from public.club_modules where club_id = p_club_id and module_key = p_module_key;
+  if v_before.id is null then
+    raise exception 'module row not found for this club';
+  end if;
+
+  update public.club_modules
+  set entitled = p_entitled,
+      active = case when not p_entitled then false else active end,
+      updated_at = now(),
+      updated_by = auth.uid()
+  where club_id = p_club_id and module_key = p_module_key;
+
+  perform public.write_audit_log(
+    p_club_id,
+    case when p_entitled then 'module.entitled' else 'module.unentitled' end,
+    'club_module', v_before.id,
+    jsonb_build_object('entitled', v_before.entitled, 'active', v_before.active),
+    jsonb_build_object('entitled', p_entitled, 'active', case when not p_entitled then false else v_before.active end),
+    null
+  );
+end;
+$$;
+
+revoke all on function public.set_club_module_entitlement(uuid, text, boolean) from public;
+revoke all on function public.set_club_module_entitlement(uuid, text, boolean) from anon;
+grant execute on function public.set_club_module_entitlement(uuid, text, boolean) to authenticated;
+
+create or replace function public.set_club_module_active(p_club_id uuid, p_module_key text, p_active boolean)
+returns void
+language plpgsql
+security definer
+set search_path to 'public', 'pg_temp'
+as $$
+declare
+  v_before public.club_modules;
+  v_via_support boolean;
+begin
+  v_via_support := not public.has_permission('club.update', p_club_id) and public.has_platform_support_access(p_club_id, true);
+  if not (public.has_permission('club.update', p_club_id) or v_via_support) then
+    raise exception 'not authorized';
+  end if;
+  if p_module_key not in ('fields', 'academy', 'shop', 'club_membership') then
+    raise exception 'unknown module';
+  end if;
+
+  select * into v_before from public.club_modules where club_id = p_club_id and module_key = p_module_key;
+  if v_before.id is null then
+    raise exception 'module row not found for this club';
+  end if;
+  if p_active and not v_before.entitled then
+    raise exception 'this module is not available on your current plan -- contact support to enable it';
+  end if;
+
+  update public.club_modules
+  set active = p_active, updated_at = now(), updated_by = auth.uid()
+  where club_id = p_club_id and module_key = p_module_key;
+
+  perform public.write_audit_log(
+    p_club_id,
+    case when p_active then 'module.activated' else 'module.deactivated' end,
+    'club_module', v_before.id,
+    jsonb_build_object('active', v_before.active),
+    jsonb_build_object('active', p_active),
+    null
+  );
+
+  if v_via_support then
+    perform public.write_audit_log_as_support(
+      p_club_id,
+      case when p_active then 'module.activated' else 'module.deactivated' end,
+      'club_module', v_before.id,
+      jsonb_build_object('active', v_before.active),
+      jsonb_build_object('active', p_active),
+      null
+    );
+  end if;
+end;
+$$;
+
+revoke all on function public.set_club_module_active(uuid, text, boolean) from public;
+revoke all on function public.set_club_module_active(uuid, text, boolean) from anon;
+grant execute on function public.set_club_module_active(uuid, text, boolean) to authenticated;
+
+-- Step 4: the new canonical entitlement helper.
+create or replace function public._club_membership_module_active(p_club_id uuid)
+returns boolean
+language sql
+stable security definer
+set search_path to 'public', 'pg_temp'
+as $$
+  select coalesce(bool_and(entitled) and bool_and(active), false)
+  from public.club_modules
+  where club_id = p_club_id and module_key = 'club_membership'
+$$;
+
+revoke all on function public._club_membership_module_active(uuid) from public;
+revoke all on function public._club_membership_module_active(uuid) from anon;
+grant execute on function public._club_membership_module_active(uuid) to authenticated;
+
+-- ============================================================
+-- sell_club_membership(): add the module-active check. Body otherwise
+-- byte-identical to the current live definition
+-- (20260826081007_club_membership_fix_idempotency_ambiguous_column.sql).
+-- ============================================================
+create or replace function public.sell_club_membership(
+  p_club_id uuid,
+  p_customer_id uuid,
+  p_plan_id uuid,
+  p_branch_id uuid,
+  p_start_date date,
+  p_discount numeric default 0,
+  p_idempotency_key uuid default null
+)
+returns table(membership_subscription_id uuid, invoice_id uuid, membership_number text)
+language plpgsql
+security definer
+set search_path to 'public', 'pg_temp'
+as $$
+declare
+  v_plan record;
+  v_existing_membership_id uuid;
+  v_existing_invoice_id uuid;
+  v_existing_number text;
+  v_end_date date;
+  v_net_price numeric;
+  v_invoice_number text;
+  v_invoice_id uuid;
+  v_subscription_id uuid;
+  v_membership_number text;
+  v_branch_allowed boolean;
+begin
+  if auth.uid() is null then
+    raise exception 'authentication required';
+  end if;
+
+  if not (p_club_id in (select public.user_club_ids()) and public.has_permission('club_membership.create', p_club_id)) then
+    raise exception 'not authorized';
+  end if;
+
+  if not public._club_membership_module_active(p_club_id) then
+    raise exception 'the club membership module is not active for this club';
+  end if;
+
+  if not public.club_write_allowed(p_club_id, 'new_commitment') then
+    raise exception 'club subscription does not allow new commitments';
+  end if;
+
+  if p_idempotency_key is not null then
+    select k.membership_subscription_id into v_existing_membership_id
+    from public.club_membership_sale_keys k
+    where k.idempotency_key = p_idempotency_key;
+
+    if v_existing_membership_id is not null then
+      select s.invoice_id, s.membership_number into v_existing_invoice_id, v_existing_number
+      from public.club_membership_subscriptions s where s.id = v_existing_membership_id;
+      return query select v_existing_membership_id, v_existing_invoice_id, v_existing_number;
+      return;
+    end if;
+  end if;
+
+  if not exists (select 1 from public.customers where id = p_customer_id and club_id = p_club_id) then
+    raise exception 'customer not found in this club';
+  end if;
+
+  if not public.user_has_branch_access(p_club_id, p_branch_id) then
+    raise exception 'you do not have access to this branch';
+  end if;
+
+  select * into v_plan from public.club_membership_plans
+  where id = p_plan_id and club_id = p_club_id and archived_at is null
+  for update;
+
+  if v_plan.id is null then
+    raise exception 'plan not found in this club';
+  end if;
+
+  if not v_plan.is_active then
+    raise exception 'this plan is no longer available for purchase';
+  end if;
+
+  if not exists (select 1 from public.branches where id = p_branch_id and club_id = p_club_id) then
+    raise exception 'branch not found in this club';
+  end if;
+
+  if v_plan.branch_scope = 'selected_branches' then
+    select exists (
+      select 1 from public.club_membership_plan_branches
+      where plan_id = v_plan.id and branch_id = p_branch_id
+    ) into v_branch_allowed;
+
+    if not v_branch_allowed then
+      raise exception 'this plan is not available at the selected branch';
+    end if;
+  end if;
+
+  v_end_date := case v_plan.duration_unit
+    when 'day' then (p_start_date + (v_plan.duration_value || ' days')::interval)::date
+    when 'month' then (p_start_date + (v_plan.duration_value || ' months')::interval - interval '1 day')::date
+    when 'year' then (p_start_date + (v_plan.duration_value || ' years')::interval - interval '1 day')::date
+  end;
+
+  if exists (
+    select 1 from public.club_membership_subscriptions ex
+    where ex.club_id = p_club_id
+      and ex.customer_id = p_customer_id
+      and ex.status in ('pending_payment', 'scheduled', 'active', 'frozen')
+      and daterange(ex.start_date, ex.end_date, '[]') && daterange(p_start_date, v_end_date, '[]')
+  ) then
+    raise exception 'this customer already has a membership period that overlaps the selected dates';
+  end if;
+
+  v_net_price := round(greatest(v_plan.price - coalesce(p_discount, 0), 0), 2);
+  v_membership_number := public._next_club_membership_number_internal(p_club_id);
+
+  v_invoice_number := public.issue_invoice_number(p_branch_id, p_club_id);
+  insert into public.invoices (club_id, branch_id, invoice_number, customer_id, status, subtotal, discount, total, issued_at, created_by)
+  values (p_club_id, p_branch_id, v_invoice_number, p_customer_id, 'issued', v_plan.price, coalesce(p_discount, 0), v_net_price, now(), auth.uid())
+  returning id into v_invoice_id;
+
+  insert into public.club_membership_subscriptions (
+    club_id, branch_id, customer_id, plan_id, membership_number,
+    plan_name_ar_snapshot, plan_name_en_snapshot, price_snapshot,
+    duration_value_snapshot, duration_unit_snapshot,
+    start_date, end_date, status, invoice_id, created_by
+  )
+  values (
+    p_club_id, p_branch_id, p_customer_id, v_plan.id, v_membership_number,
+    v_plan.name_ar, v_plan.name_en, v_net_price,
+    v_plan.duration_value, v_plan.duration_unit,
+    p_start_date, v_end_date, 'pending_payment', v_invoice_id, auth.uid()
+  )
+  returning id into v_subscription_id;
+
+  insert into public.invoice_items (invoice_id, description, reference_type, reference_id, quantity, unit_price, line_total)
+  values (v_invoice_id, v_plan.name_ar, 'club_membership', v_subscription_id, 1, v_plan.price, v_net_price);
+
+  if p_idempotency_key is not null then
+    insert into public.club_membership_sale_keys (idempotency_key, membership_subscription_id)
+    values (p_idempotency_key, v_subscription_id)
+    on conflict (idempotency_key) do nothing;
+  end if;
+
+  perform public.write_audit_log(
+    p_club_id, 'club_membership.created', 'club_membership_subscription', v_subscription_id, null,
+    jsonb_build_object('plan_id', v_plan.id, 'customer_id', p_customer_id, 'start_date', p_start_date, 'end_date', v_end_date, 'price', v_net_price),
+    null
+  );
+
+  return query select v_subscription_id, v_invoice_id, v_membership_number;
+end;
+$$;
+
+-- ============================================================
+-- renew_club_membership(): add the module-active check. Body otherwise
+-- byte-identical to the current live definition
+-- (20260826081115_club_membership_fix_renew_invoice_column_swap.sql).
+-- ============================================================
+create or replace function public.renew_club_membership(
+  p_membership_subscription_id uuid,
+  p_plan_id uuid default null,
+  p_start_date date default null,
+  p_discount numeric default 0,
+  p_idempotency_key uuid default null
+)
+returns table(membership_subscription_id uuid, invoice_id uuid, membership_number text)
+language plpgsql
+security definer
+set search_path to 'public', 'pg_temp'
+as $$
+declare
+  v_current record;
+  v_plan record;
+  v_existing_membership_id uuid;
+  v_existing_invoice_id uuid;
+  v_existing_number text;
+  v_effective_start date;
+  v_end_date date;
+  v_net_price numeric;
+  v_invoice_number text;
+  v_invoice_id uuid;
+  v_subscription_id uuid;
+  v_membership_number text;
+  v_today date;
+  v_branch_allowed boolean;
+begin
+  if auth.uid() is null then
+    raise exception 'authentication required';
+  end if;
+
+  select s.* into v_current
+  from public.club_membership_subscriptions s
+  where s.id = p_membership_subscription_id
+    and s.club_id in (select public.user_club_ids())
+    and public.has_permission('club_membership.renew', s.club_id)
+  for update;
+
+  if v_current.id is null then
+    raise exception 'club membership not found or you do not have permission to renew it';
+  end if;
+
+  if not public._club_membership_module_active(v_current.club_id) then
+    raise exception 'the club membership module is not active for this club';
+  end if;
+
+  if not public.club_write_allowed(v_current.club_id, 'new_commitment') then
+    raise exception 'club subscription does not allow new commitments';
+  end if;
+
+  if v_current.status not in ('active', 'scheduled', 'expired') then
+    raise exception 'only an active, scheduled, or expired membership can be renewed';
+  end if;
+
+  select (day_start at time zone (select timezone from public.clubs where id = v_current.club_id))::date
+    into v_today
+    from public.club_local_day_bounds(v_current.club_id, current_date);
+
+  if v_current.status in ('active', 'scheduled') then
+    v_effective_start := v_current.end_date + 1;
+  else
+    v_effective_start := coalesce(p_start_date, v_today);
+  end if;
+
+  if p_start_date is not null and v_current.status = 'expired' then
+    v_effective_start := p_start_date;
+  end if;
+
+  if p_idempotency_key is not null then
+    select k.membership_subscription_id into v_existing_membership_id
+    from public.club_membership_sale_keys k
+    where k.idempotency_key = p_idempotency_key;
+
+    if v_existing_membership_id is not null then
+      select s.invoice_id, s.membership_number into v_existing_invoice_id, v_existing_number
+      from public.club_membership_subscriptions s where s.id = v_existing_membership_id;
+      return query select v_existing_membership_id, v_existing_invoice_id, v_existing_number;
+      return;
+    end if;
+  end if;
+
+  select * into v_plan from public.club_membership_plans
+  where id = coalesce(p_plan_id, v_current.plan_id) and club_id = v_current.club_id and archived_at is null
+  for update;
+
+  if v_plan.id is null then
+    raise exception 'plan not found in this club';
+  end if;
+
+  if not v_plan.is_active then
+    raise exception 'this plan is no longer available for purchase';
+  end if;
+
+  if not v_plan.allow_renewal then
+    raise exception 'this plan does not allow renewal';
+  end if;
+
+  if v_plan.branch_scope = 'selected_branches' then
+    select exists (
+      select 1 from public.club_membership_plan_branches
+      where plan_id = v_plan.id and branch_id = v_current.branch_id
+    ) into v_branch_allowed;
+
+    if not v_branch_allowed then
+      raise exception 'this plan is not available at the membership''s branch';
+    end if;
+  end if;
+
+  v_end_date := case v_plan.duration_unit
+    when 'day' then (v_effective_start + (v_plan.duration_value || ' days')::interval)::date
+    when 'month' then (v_effective_start + (v_plan.duration_value || ' months')::interval - interval '1 day')::date
+    when 'year' then (v_effective_start + (v_plan.duration_value || ' years')::interval - interval '1 day')::date
+  end;
+
+  if exists (
+    select 1 from public.club_membership_subscriptions ex
+    where ex.club_id = v_current.club_id
+      and ex.customer_id = v_current.customer_id
+      and ex.id != v_current.id
+      and ex.status in ('pending_payment', 'scheduled', 'active', 'frozen')
+      and daterange(ex.start_date, ex.end_date, '[]') && daterange(v_effective_start, v_end_date, '[]')
+  ) then
+    raise exception 'this customer already has a membership period that overlaps the computed renewal dates';
+  end if;
+
+  v_net_price := round(greatest(v_plan.price - coalesce(p_discount, 0), 0), 2);
+  v_membership_number := public._next_club_membership_number_internal(v_current.club_id);
+
+  v_invoice_number := public.issue_invoice_number(v_current.branch_id, v_current.club_id);
+  insert into public.invoices (club_id, branch_id, invoice_number, customer_id, status, subtotal, discount, total, issued_at, created_by)
+  values (v_current.club_id, v_current.branch_id, v_invoice_number, v_current.customer_id, 'issued', v_plan.price, coalesce(p_discount, 0), v_net_price, now(), auth.uid())
+  returning id into v_invoice_id;
+
+  insert into public.club_membership_subscriptions (
+    club_id, branch_id, customer_id, plan_id, membership_number,
+    plan_name_ar_snapshot, plan_name_en_snapshot, price_snapshot,
+    duration_value_snapshot, duration_unit_snapshot,
+    start_date, end_date, status, invoice_id, created_by
+  )
+  values (
+    v_current.club_id, v_current.branch_id, v_current.customer_id, v_plan.id, v_membership_number,
+    v_plan.name_ar, v_plan.name_en, v_net_price,
+    v_plan.duration_value, v_plan.duration_unit,
+    v_effective_start, v_end_date, 'pending_payment', v_invoice_id, auth.uid()
+  )
+  returning id into v_subscription_id;
+
+  insert into public.invoice_items (invoice_id, description, reference_type, reference_id, quantity, unit_price, line_total)
+  values (v_invoice_id, v_plan.name_ar, 'club_membership', v_subscription_id, 1, v_plan.price, v_net_price);
+
+  if p_idempotency_key is not null then
+    insert into public.club_membership_sale_keys (idempotency_key, membership_subscription_id)
+    values (p_idempotency_key, v_subscription_id)
+    on conflict (idempotency_key) do nothing;
+  end if;
+
+  perform public.write_audit_log(
+    v_current.club_id, 'club_membership.renewed', 'club_membership_subscription', v_subscription_id,
+    jsonb_build_object('previous_membership_subscription_id', v_current.id),
+    jsonb_build_object('plan_id', v_plan.id, 'start_date', v_effective_start, 'end_date', v_end_date, 'price', v_net_price),
+    null
+  );
+
+  return query select v_subscription_id, v_invoice_id, v_membership_number;
+end;
+$$;
+
+-- ============================================================
+-- purchase_club_membership_self_service(): add the module-active check.
+-- Body otherwise byte-identical to the current live definition
+-- (20260826082130_club_membership_wire_purchase_bypass_only.sql).
+-- ============================================================
+create or replace function public.purchase_club_membership_self_service(
+  p_club_id uuid,
+  p_plan_id uuid,
+  p_branch_id uuid,
+  p_start_date date,
+  p_idempotency_key uuid default null
+)
+returns table(membership_subscription_id uuid, invoice_id uuid, membership_number text)
+language plpgsql
+security definer
+set search_path to 'public', 'pg_temp'
+as $$
+declare
+  v_customer_id uuid;
+  v_plan record;
+  v_existing_membership_id uuid;
+  v_existing_invoice_id uuid;
+  v_existing_number text;
+  v_end_date date;
+  v_invoice_number text;
+  v_invoice_id uuid;
+  v_subscription_id uuid;
+  v_membership_number text;
+  v_branch_allowed boolean;
+  v_today date;
+begin
+  if auth.uid() is null then
+    raise exception 'authentication required';
+  end if;
+
+  select id into v_customer_id from public.customers
+  where club_id = p_club_id and user_id = auth.uid();
+
+  if v_customer_id is null then
+    raise exception 'no linked customer profile found for this club';
+  end if;
+
+  if not public._club_membership_module_active(p_club_id) then
+    raise exception 'this club is not currently accepting new membership purchases';
+  end if;
+
+  if public.get_public_club_subscription_access(p_club_id) = 'blocked' then
+    raise exception 'this club is not currently accepting new membership purchases';
+  end if;
+
+  if p_idempotency_key is not null then
+    select k.membership_subscription_id into v_existing_membership_id
+    from public.club_membership_sale_keys k
+    where k.idempotency_key = p_idempotency_key;
+
+    if v_existing_membership_id is not null then
+      select s.invoice_id, s.membership_number into v_existing_invoice_id, v_existing_number
+      from public.club_membership_subscriptions s where s.id = v_existing_membership_id and s.customer_id = v_customer_id;
+      if v_existing_invoice_id is not null then
+        return query select v_existing_membership_id, v_existing_invoice_id, v_existing_number;
+        return;
+      end if;
+    end if;
+  end if;
+
+  select (day_start at time zone (select timezone from public.clubs where id = p_club_id))::date
+    into v_today
+    from public.club_local_day_bounds(p_club_id, current_date);
+
+  if p_start_date < v_today then
+    raise exception 'start date cannot be in the past';
+  end if;
+
+  select * into v_plan from public.club_membership_plans
+  where id = p_plan_id and club_id = p_club_id and archived_at is null and is_active = true and is_public = true
+  for update;
+
+  if v_plan.id is null then
+    raise exception 'plan not found or not currently available for purchase';
+  end if;
+
+  if not exists (select 1 from public.branches where id = p_branch_id and club_id = p_club_id) then
+    raise exception 'branch not found in this club';
+  end if;
+
+  if v_plan.branch_scope = 'selected_branches' then
+    select exists (
+      select 1 from public.club_membership_plan_branches
+      where plan_id = v_plan.id and branch_id = p_branch_id
+    ) into v_branch_allowed;
+
+    if not v_branch_allowed then
+      raise exception 'this plan is not available at the selected branch';
+    end if;
+  end if;
+
+  v_end_date := case v_plan.duration_unit
+    when 'day' then (p_start_date + (v_plan.duration_value || ' days')::interval)::date
+    when 'month' then (p_start_date + (v_plan.duration_value || ' months')::interval - interval '1 day')::date
+    when 'year' then (p_start_date + (v_plan.duration_value || ' years')::interval - interval '1 day')::date
+  end;
+
+  if exists (
+    select 1 from public.club_membership_subscriptions ex
+    where ex.club_id = p_club_id
+      and ex.customer_id = v_customer_id
+      and ex.status in ('pending_payment', 'scheduled', 'active', 'frozen')
+      and daterange(ex.start_date, ex.end_date, '[]') && daterange(p_start_date, v_end_date, '[]')
+  ) then
+    raise exception 'you already have a membership period that overlaps the selected dates';
+  end if;
+
+  v_membership_number := public._next_club_membership_number_internal(p_club_id);
+  v_invoice_number := public.issue_invoice_number(p_branch_id, p_club_id);
+
+  perform set_config('app.allow_customer_self_service_write', 'true', true);
+  insert into public.invoices (club_id, branch_id, invoice_number, customer_id, status, subtotal, discount, total, issued_at, created_by)
+  values (p_club_id, p_branch_id, v_invoice_number, v_customer_id, 'issued', v_plan.price, 0, v_plan.price, now(), auth.uid())
+  returning id into v_invoice_id;
+
+  insert into public.club_membership_subscriptions (
+    club_id, branch_id, customer_id, plan_id, membership_number,
+    plan_name_ar_snapshot, plan_name_en_snapshot, price_snapshot,
+    duration_value_snapshot, duration_unit_snapshot,
+    start_date, end_date, status, invoice_id, created_by
+  )
+  values (
+    p_club_id, p_branch_id, v_customer_id, v_plan.id, v_membership_number,
+    v_plan.name_ar, v_plan.name_en, v_plan.price,
+    v_plan.duration_value, v_plan.duration_unit,
+    p_start_date, v_end_date, 'pending_payment', v_invoice_id, auth.uid()
+  )
+  returning id into v_subscription_id;
+  perform set_config('app.allow_customer_self_service_write', 'false', true);
+
+  insert into public.invoice_items (invoice_id, description, reference_type, reference_id, quantity, unit_price, line_total)
+  values (v_invoice_id, v_plan.name_ar, 'club_membership', v_subscription_id, 1, v_plan.price, v_plan.price);
+
+  if p_idempotency_key is not null then
+    insert into public.club_membership_sale_keys (idempotency_key, membership_subscription_id)
+    values (p_idempotency_key, v_subscription_id)
+    on conflict (idempotency_key) do nothing;
+  end if;
+
+  perform public.write_audit_log(
+    p_club_id, 'club_membership.created', 'club_membership_subscription', v_subscription_id, null,
+    jsonb_build_object('plan_id', v_plan.id, 'customer_id', v_customer_id, 'start_date', p_start_date, 'end_date', v_end_date, 'price', v_plan.price, 'source', 'customer_portal'),
+    null
+  );
+
+  return query select v_subscription_id, v_invoice_id, v_membership_number;
+end;
+$$;
+
+-- ============================================================
+-- renew_club_membership_self_service(): add the module-active check.
+-- Body otherwise byte-identical to the current live definition
+-- (20260826082346_club_membership_renew_self_service_bypass_v3.sql).
+-- ============================================================
+create or replace function public.renew_club_membership_self_service(
+  p_membership_subscription_id uuid,
+  p_idempotency_key uuid default null
+)
+returns table(membership_subscription_id uuid, invoice_id uuid, membership_number text)
+language plpgsql
+security definer
+set search_path to 'public', 'pg_temp'
+as $$
+declare
+  v_current record;
+  v_customer_id uuid;
+  v_plan record;
+  v_existing_membership_id uuid;
+  v_existing_invoice_id uuid;
+  v_existing_number text;
+  v_effective_start date;
+  v_end_date date;
+  v_invoice_number text;
+  v_invoice_id uuid;
+  v_subscription_id uuid;
+  v_membership_number text;
+  v_today date;
+begin
+  if auth.uid() is null then
+    raise exception 'authentication required';
+  end if;
+
+  select s.* into v_current
+  from public.club_membership_subscriptions s
+  join public.customers c on c.id = s.customer_id
+  where s.id = p_membership_subscription_id and c.user_id = auth.uid()
+  for update;
+
+  if v_current.id is null then
+    raise exception 'membership not found';
+  end if;
+  v_customer_id := v_current.customer_id;
+
+  if not public._club_membership_module_active(v_current.club_id) then
+    raise exception 'this club is not currently accepting new membership purchases';
+  end if;
+
+  if public.get_public_club_subscription_access(v_current.club_id) = 'blocked' then
+    raise exception 'this club is not currently accepting new membership purchases';
+  end if;
+
+  if v_current.status not in ('active', 'scheduled', 'expired') then
+    raise exception 'only an active, scheduled, or expired membership can be renewed';
+  end if;
+
+  select (day_start at time zone (select timezone from public.clubs where id = v_current.club_id))::date
+    into v_today
+    from public.club_local_day_bounds(v_current.club_id, current_date);
+
+  v_effective_start := case
+    when v_current.status in ('active', 'scheduled') then v_current.end_date + 1
+    else v_today
+  end;
+
+  if p_idempotency_key is not null then
+    select k.membership_subscription_id into v_existing_membership_id
+    from public.club_membership_sale_keys k
+    where k.idempotency_key = p_idempotency_key;
+
+    if v_existing_membership_id is not null then
+      select s.invoice_id, s.membership_number into v_existing_invoice_id, v_existing_number
+      from public.club_membership_subscriptions s where s.id = v_existing_membership_id and s.customer_id = v_customer_id;
+      if v_existing_invoice_id is not null then
+        return query select v_existing_membership_id, v_existing_invoice_id, v_existing_number;
+        return;
+      end if;
+    end if;
+  end if;
+
+  select * into v_plan from public.club_membership_plans
+  where id = v_current.plan_id and club_id = v_current.club_id and archived_at is null and is_active = true
+  for update;
+
+  if v_plan.id is null then
+    raise exception 'this plan is no longer available -- please contact the club to renew';
+  end if;
+
+  if not v_plan.allow_renewal then
+    raise exception 'this plan does not allow renewal';
+  end if;
+
+  v_end_date := case v_plan.duration_unit
+    when 'day' then (v_effective_start + (v_plan.duration_value || ' days')::interval)::date
+    when 'month' then (v_effective_start + (v_plan.duration_value || ' months')::interval - interval '1 day')::date
+    when 'year' then (v_effective_start + (v_plan.duration_value || ' years')::interval - interval '1 day')::date
+  end;
+
+  if exists (
+    select 1 from public.club_membership_subscriptions ex
+    where ex.club_id = v_current.club_id
+      and ex.customer_id = v_customer_id
+      and ex.id != v_current.id
+      and ex.status in ('pending_payment', 'scheduled', 'active', 'frozen')
+      and daterange(ex.start_date, ex.end_date, '[]') && daterange(v_effective_start, v_end_date, '[]')
+  ) then
+    raise exception 'you already have a membership period that overlaps the computed renewal dates';
+  end if;
+
+  v_membership_number := public._next_club_membership_number_internal(v_current.club_id);
+  v_invoice_number := public.issue_invoice_number(v_current.branch_id, v_current.club_id);
+
+  perform set_config('app.allow_customer_self_service_write', 'true', true);
+  insert into public.invoices (club_id, branch_id, invoice_number, customer_id, status, subtotal, discount, total, issued_at, created_by)
+  values (v_current.club_id, v_current.branch_id, v_invoice_number, v_customer_id, 'issued', v_plan.price, 0, v_plan.price, now(), auth.uid())
+  returning id into v_invoice_id;
+
+  insert into public.club_membership_subscriptions (
+    club_id, branch_id, customer_id, plan_id, membership_number,
+    plan_name_ar_snapshot, plan_name_en_snapshot, price_snapshot,
+    duration_value_snapshot, duration_unit_snapshot,
+    start_date, end_date, status, invoice_id, created_by
+  )
+  values (
+    v_current.club_id, v_current.branch_id, v_customer_id, v_plan.id, v_membership_number,
+    v_plan.name_ar, v_plan.name_en, v_plan.price,
+    v_plan.duration_value, v_plan.duration_unit,
+    v_effective_start, v_end_date, 'pending_payment', v_invoice_id, auth.uid()
+  )
+  returning id into v_subscription_id;
+  perform set_config('app.allow_customer_self_service_write', 'false', true);
+
+  insert into public.invoice_items (invoice_id, description, reference_type, reference_id, quantity, unit_price, line_total)
+  values (v_invoice_id, v_plan.name_ar, 'club_membership', v_subscription_id, 1, v_plan.price, v_plan.price);
+
+  if p_idempotency_key is not null then
+    insert into public.club_membership_sale_keys (idempotency_key, membership_subscription_id)
+    values (p_idempotency_key, v_subscription_id)
+    on conflict (idempotency_key) do nothing;
+  end if;
+
+  perform public.write_audit_log(
+    v_current.club_id, 'club_membership.renewed', 'club_membership_subscription', v_subscription_id,
+    jsonb_build_object('previous_membership_subscription_id', v_current.id),
+    jsonb_build_object('plan_id', v_plan.id, 'start_date', v_effective_start, 'end_date', v_end_date, 'price', v_plan.price, 'source', 'customer_portal'),
+    null
+  );
+
+  return query select v_subscription_id, v_invoice_id, v_membership_number;
+end;
+$$;
