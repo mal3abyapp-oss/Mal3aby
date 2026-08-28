@@ -96,6 +96,26 @@ this plan. Confirmed, not assumed:
    and public read avoids needing signed URLs for a catalog grid; INSERT/
    UPDATE/DELETE remain permission-gated, matching Shop's own existing
    "read broadly, write narrowly" posture on `shop.view`/`shop.product.manage`).
+8. **`CREATE OR REPLACE FUNCTION` cannot change a `RETURNS TABLE` row
+   shape in place — ever, appended column or not — an explicit
+   `DROP FUNCTION` is always required first.** This has broken 3
+   separate times across C1/C4/C5 (each time a subagent's own migration
+   comment claimed otherwise, twice explicitly misciting an EARLIER
+   broken instance of this exact mistake as if it were proof the
+   pattern works). The real Postgres behavior, confirmed by actually
+   applying each migration live, not by reading the code: `ERROR: 42P13:
+   cannot change return type of existing function... Row type defined
+   by OUT parameters is different.` This applies **only** to
+   `RETURNS TABLE`/composite return-type changes — an unchanged return
+   shape with only new/reordered *input* parameters is a different
+   function identity to Postgres and `CREATE OR REPLACE` (or a plain
+   `CREATE`) works fine there, no drop needed (confirmed working
+   correctly for `list_shop_sales`/`get_shop_sales_kpis` in C5). Any
+   future phase extending an existing RPC's return columns must write
+   `DROP FUNCTION IF EXISTS ...` immediately before the
+   `CREATE FUNCTION`, and re-state every grant afterward (a dropped
+   function loses its prior grants) — do not trust a "same signature,
+   in-place replace is safe" comment without this exact check.
 
 ## 3. New permissions (additive, per §30)
 
