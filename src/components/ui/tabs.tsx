@@ -66,6 +66,15 @@ const TabsList = React.forwardRef<
     updateEdges()
     const el = listRef.current
     if (!el) return
+    // Guard for environments without ResizeObserver (older browsers,
+    // and jsdom in this project's own test suite -- caught by
+    // DirectionProvider.test.tsx failing with "ResizeObserver is not
+    // defined" during Phase C's regression pass). The scroll-shadow
+    // affordance simply doesn't react to resize in that case; the
+    // initial updateEdges() call above and the onScroll handler below
+    // still keep it correct for the far more common case of the user
+    // actually scrolling.
+    if (typeof ResizeObserver === 'undefined') return
     const resizeObserver = new ResizeObserver(updateEdges)
     resizeObserver.observe(el)
     return () => resizeObserver.disconnect()
