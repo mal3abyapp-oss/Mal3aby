@@ -69,7 +69,7 @@ export function ReportShopInventoryOnHandContent() {
   const { t } = useTranslation()
   const { rows, isLoading } = useBalancesReport(false, false)
   return (
-    <div>
+    <div data-testid="report-inventory-on-hand" data-row-count={rows.length} data-loading={isLoading}>
       <div className="mb-3 flex justify-end print:hidden"><ReportHeaderActions hasRows={rows.length > 0} /></div>
       <div className="print-target visible-for-print">
         <ReportPrintHeader reportName={t('shop.reports.inventoryOnHand.title')} />
@@ -268,15 +268,15 @@ export function ReportShopStockValuationContent() {
   ]
 
   if (isError) {
-    return <p className="py-8 text-center text-sm text-status-danger">{t('shop.reports.permissionDenied')}</p>
+    return <p className="py-8 text-center text-sm text-status-danger" data-testid="report-stock-valuation-permission-denied">{t('shop.reports.permissionDenied')}</p>
   }
 
   return (
-    <div>
+    <div data-testid="report-stock-valuation" data-row-count={rows.length} data-unknown-cost-count={unknownCount}>
       <div className="mb-3 flex items-center justify-between print:hidden">
         <p className="text-sm text-text-secondary">
-          {t('shop.reports.stockValuation.totalValue')}: <MoneyDisplay amount={totalValue} size="md" />
-          {unknownCount > 0 && <span className="ms-2 text-status-warning">{t('shop.reports.stockValuation.unknownCostNote', { count: unknownCount })}</span>}
+          {t('shop.reports.stockValuation.totalValue')}: <span data-testid="report-stock-valuation-total"><MoneyDisplay amount={totalValue} size="md" /></span>
+          {unknownCount > 0 && <span className="ms-2 text-status-warning" data-testid="report-stock-valuation-unknown-cost-note">{t('shop.reports.stockValuation.unknownCostNote', { count: unknownCount })}</span>}
         </p>
         <ReportHeaderActions hasRows={rows.length > 0} />
       </div>

@@ -308,6 +308,7 @@ function PrimaryImageUploader({
           <label className="w-fit">
             <input
               type="file"
+              data-testid="products-primary-image-input"
               accept={ACCEPTED_IMAGE_TYPES.join(',')}
               className="hidden"
               disabled={uploading}
@@ -675,7 +676,7 @@ export function ShopProductsPage() {
             <Button variant="outline" onClick={() => setManagingCategories(true)}>{t('shop.categories.manageTitle')}</Button>
             <Dialog open={addOpen} onOpenChange={setAddOpen}>
               <DialogTrigger asChild>
-                <Button>{t('shop.products.addProduct')}</Button>
+                <Button data-testid="products-add-product">{t('shop.products.addProduct')}</Button>
               </DialogTrigger>
               <AddProductDialog clubId={currentClubId as string} onCreated={() => { setAddOpen(false); invalidate() }} />
             </Dialog>
@@ -792,7 +793,7 @@ function ProductGrid({
   }
 
   return (
-    <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5">
+    <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5" data-testid="products-grid">
       {products.map((p) => {
         const qty = stockByProduct?.[p.productId]
         const isLow = qty !== undefined && p.reorderLevel !== null && qty <= p.reorderLevel
@@ -800,11 +801,14 @@ function ProductGrid({
           <button
             key={p.productId}
             onClick={() => onSelect(p)}
+            data-testid={`products-card-${p.productId}`}
             className="flex flex-col overflow-hidden rounded-lg border border-border text-start transition-shadow hover:shadow-md"
           >
             {/* aspect-square reserves the image's box up front -- no
                 layout jump once the <img> itself finishes loading. */}
-            <ProductThumb src={p.imageUrl} alt={p.nameAr} className="aspect-square w-full" />
+            <span data-testid={`products-card-${p.productId}-thumb`} data-has-image={!!p.imageUrl}>
+              <ProductThumb src={p.imageUrl} alt={p.nameAr} className="aspect-square w-full" />
+            </span>
             <div className="flex flex-1 flex-col gap-1 p-2">
               <div className="flex items-start justify-between gap-1">
                 <span className="line-clamp-2 text-sm font-medium text-text-primary">{p.nameAr}</span>

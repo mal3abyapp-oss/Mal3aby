@@ -59,7 +59,7 @@ export function ReportShopGrossProfitContent() {
   })
 
   if (isError) {
-    return <p className="py-8 text-center text-sm text-status-danger">{t('shop.reports.permissionDenied')}</p>
+    return <p className="py-8 text-center text-sm text-status-danger" data-testid="report-gross-profit-permission-denied">{t('shop.reports.permissionDenied')}</p>
   }
 
   const knownLines = Number(data?.known_cost_lines ?? 0)
@@ -96,7 +96,7 @@ export function ReportShopGrossProfitContent() {
         <ReportPrintHeader reportName={t('shop.reports.gp.title')} />
 
         {!isLoading && (
-          <div className="mb-4 flex items-start gap-2 rounded-md border border-status-warning/30 bg-status-warning/10 p-3 text-sm text-status-warning">
+          <div className="mb-4 flex items-start gap-2 rounded-md border border-status-warning/30 bg-status-warning/10 p-3 text-sm text-status-warning" data-testid="report-gross-profit-honesty-notice" data-has-gap={hasUnknown}>
             <AlertTriangle className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
             <div>
               <p className="font-medium">{t('shop.reports.gp.honestyNoticeTitle')}</p>
@@ -109,11 +109,11 @@ export function ReportShopGrossProfitContent() {
           </div>
         )}
 
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-          <StatCard label={t('shop.reports.gp.revenue')} value={<MoneyDisplay amount={Number(data?.revenue_known_cost ?? 0)} size="md" />} icon={DollarSign} />
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4" data-testid="report-gross-profit-stats">
+          <StatCard label={t('shop.reports.gp.revenue')} value={<span data-testid="report-gross-profit-revenue"><MoneyDisplay amount={Number(data?.revenue_known_cost ?? 0)} size="md" /></span>} icon={DollarSign} />
           <StatCard label={t('shop.reports.gp.cogs')} value={<MoneyDisplay amount={Number(data?.cost_of_goods ?? 0)} size="md" />} icon={PieChart} />
-          <StatCard label={t('shop.reports.gp.grossProfit')} value={<MoneyDisplay amount={Number(data?.gross_profit ?? 0)} size="md" />} icon={TrendingUp} tone={Number(data?.gross_profit ?? 0) >= 0 ? 'success' : 'danger'} />
-          <StatCard label={t('shop.reports.gp.marginPct')} value={`${Number(data?.margin_pct ?? 0).toFixed(1)}%`} icon={TrendingUp} />
+          <StatCard label={t('shop.reports.gp.grossProfit')} value={<span data-testid="report-gross-profit-gross-profit"><MoneyDisplay amount={Number(data?.gross_profit ?? 0)} size="md" /></span>} icon={TrendingUp} tone={Number(data?.gross_profit ?? 0) >= 0 ? 'success' : 'danger'} />
+          <StatCard label={t('shop.reports.gp.marginPct')} value={<span data-testid="report-gross-profit-margin-pct">{`${Number(data?.margin_pct ?? 0).toFixed(1)}%`}</span>} icon={TrendingUp} />
         </div>
 
         <p className="mt-4 text-xs text-text-secondary">

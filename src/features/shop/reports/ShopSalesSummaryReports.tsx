@@ -74,9 +74,9 @@ export function ReportShopSalesSummaryContent() {
       </div>
       <div className="print-target visible-for-print">
         <ReportPrintHeader reportName={t('shop.reports.salesSummary.title')} />
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
-          <StatCard label={t('shop.sales.kpi.grossSales')} value={<MoneyDisplay amount={Number(kpis?.gross_sales ?? 0)} size="md" />} icon={ShoppingBag} />
-          <StatCard label={t('shop.sales.kpi.transactions')} value={Number(kpis?.transaction_count ?? 0)} icon={Receipt} />
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6" data-testid="report-sales-summary-stats">
+          <StatCard label={t('shop.sales.kpi.grossSales')} value={<span data-testid="report-sales-summary-gross-sales"><MoneyDisplay amount={Number(kpis?.gross_sales ?? 0)} size="md" /></span>} icon={ShoppingBag} />
+          <StatCard label={t('shop.sales.kpi.transactions')} value={<span data-testid="report-sales-summary-transactions">{Number(kpis?.transaction_count ?? 0)}</span>} icon={Receipt} />
           <StatCard label={t('shop.sales.kpi.averageBasket')} value={<MoneyDisplay amount={Number(kpis?.average_basket ?? 0)} size="md" />} icon={TrendingUp} />
           <StatCard label={t('shop.sales.kpi.itemsSold')} value={Number(kpis?.items_sold ?? 0)} icon={Wallet} />
           <StatCard label={t('shop.sales.kpi.refunds')} value={<MoneyDisplay amount={Number(kpis?.refund_total ?? 0)} size="md" />} icon={TrendingDown} tone={Number(kpis?.refund_total ?? 0) > 0 ? 'danger' : 'default'} />
