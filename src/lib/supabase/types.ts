@@ -4219,6 +4219,10 @@ export type Database = {
           created_at: string
           currency: string
           default_grace_period_days: number
+          default_modules: string[] | null
+          default_branch_limit: number | null
+          default_field_limit: number | null
+          default_academy_limit: number | null
           description_ar: string | null
           discount_label: string | null
           display_order: number
@@ -4237,6 +4241,10 @@ export type Database = {
           created_at?: string
           currency?: string
           default_grace_period_days?: number
+          default_modules?: string[] | null
+          default_branch_limit?: number | null
+          default_field_limit?: number | null
+          default_academy_limit?: number | null
           description_ar?: string | null
           discount_label?: string | null
           display_order?: number
@@ -4255,6 +4263,10 @@ export type Database = {
           created_at?: string
           currency?: string
           default_grace_period_days?: number
+          default_modules?: string[] | null
+          default_branch_limit?: number | null
+          default_field_limit?: number | null
+          default_academy_limit?: number | null
           description_ar?: string | null
           discount_label?: string | null
           display_order?: number
@@ -9766,11 +9778,19 @@ export type Database = {
         Returns: undefined
       }
       update_platform_plan: {
+        // PLATFORM OWNER CONTROL IMPLEMENTATION -- Phase 4: extended
+        // with the optional plan-default columns (migration
+        // 20260828231500). Hand-edited per this project's established
+        // convention rather than a full generate_typescript_types regen.
         Args: {
           p_name_ar: string
           p_plan_id: string
           p_price: number
           p_reason?: string
+          p_default_modules?: string[] | null
+          p_default_branch_limit?: number | null
+          p_default_field_limit?: number | null
+          p_default_academy_limit?: number | null
         }
         Returns: {
           billing_interval: string
@@ -9778,6 +9798,10 @@ export type Database = {
           created_at: string
           currency: string
           default_grace_period_days: number
+          default_modules: string[] | null
+          default_branch_limit: number | null
+          default_field_limit: number | null
+          default_academy_limit: number | null
           description_ar: string | null
           discount_label: string | null
           display_order: number

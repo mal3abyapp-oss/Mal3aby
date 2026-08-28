@@ -602,6 +602,11 @@
         "nameLabel": "Plan name",
         "priceLabel": "Price ({{currency}})",
         "priceChangeNote": "Changing the price doesn't affect any subscription already created at the previous price -- it only applies to new subscriptions.",
+        "defaultModulesLabel": "Default modules (optional)",
+        "defaultModulesHint": "Seeded onto a club's Modules only when that club has no existing entitlement for a module yet -- never overwrites an existing configuration.",
+        "defaultBranchLimitLabel": "Default branch limit (optional)",
+        "defaultFieldLimitLabel": "Default field limit (optional)",
+        "defaultAcademyLimitLabel": "Default academy limit (optional)",
         "saving": "Saving...",
         "save": "Save"
       }
