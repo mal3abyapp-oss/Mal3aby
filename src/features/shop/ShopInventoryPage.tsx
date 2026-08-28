@@ -3,6 +3,8 @@ import { useTranslation } from 'react-i18next'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '@/lib/supabase/client'
 import { useAuth } from '@/app/providers/AuthProvider'
+import { useDirection } from '@/app/providers/DirectionProvider'
+import { formatDate, type SupportedLocale } from '@/lib/i18n/config'
 import { PageHeader } from '@/components/ui/page-header'
 import { DataTable, type DataTableColumn } from '@/components/ui/data-table'
 import { Button } from '@/components/ui/button'
@@ -123,6 +125,7 @@ async function fetchMovements(clubId: string): Promise<MovementRow[]> {
 export function ShopInventoryPage() {
   const { t } = useTranslation()
   const { currentClubId } = useAuth()
+  const { locale } = useDirection()
   const queryClient = useQueryClient()
   const [lowStockOnly, setLowStockOnly] = useState(false)
   const [receiveOpen, setReceiveOpen] = useState(false)
@@ -191,7 +194,7 @@ export function ShopInventoryPage() {
   ]
 
   const movementColumns: DataTableColumn<MovementRow>[] = [
-    { key: 'date', header: t('shop.inventory.columns.date'), render: (m) => new Date(m.createdAt).toLocaleString() },
+    { key: 'date', header: t('shop.inventory.columns.date'), render: (m) => formatDate(m.createdAt, locale as SupportedLocale, 'Africa/Cairo', { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) },
     { key: 'product', header: t('shop.inventory.columns.product'), render: (m) => m.productNameAr + (m.variantLabel ? ` (${m.variantLabel})` : '') },
     { key: 'location', header: t('shop.inventory.columns.location'), render: (m) => m.locationName },
     { key: 'type', header: t('shop.inventory.columns.movementType'), render: (m) => t(`shop.inventory.movementTypes.${m.movementType}`, { defaultValue: m.movementType }) },

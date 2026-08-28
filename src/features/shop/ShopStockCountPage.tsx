@@ -3,6 +3,8 @@ import { useTranslation } from 'react-i18next'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '@/lib/supabase/client'
 import { useAuth } from '@/app/providers/AuthProvider'
+import { useDirection } from '@/app/providers/DirectionProvider'
+import { formatDate, type SupportedLocale } from '@/lib/i18n/config'
 import { PageHeader } from '@/components/ui/page-header'
 import { DataTable, type DataTableColumn } from '@/components/ui/data-table'
 import { Button } from '@/components/ui/button'
@@ -142,6 +144,7 @@ function StatusBadge({ status }: { status: string }) {
 export function ShopStockCountPage() {
   const { t } = useTranslation()
   const { currentClubId } = useAuth()
+  const { locale } = useDirection()
   const queryClient = useQueryClient()
   const [startOpen, setStartOpen] = useState(false)
   const [detailId, setDetailId] = useState<string | null>(null)
@@ -167,7 +170,7 @@ export function ShopStockCountPage() {
       header: t('shop.stockCount.columns.variances'),
       render: (c) => (c.varianceItemCount > 0 ? <span className="font-semibold text-status-warning">{c.varianceItemCount}</span> : c.varianceItemCount),
     },
-    { key: 'started', header: t('shop.stockCount.columns.started'), render: (c) => (c.startedAt ? new Date(c.startedAt).toLocaleString() : '—') },
+    { key: 'started', header: t('shop.stockCount.columns.started'), render: (c) => (c.startedAt ? formatDate(c.startedAt, locale as SupportedLocale, 'Africa/Cairo', { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : '—') },
     {
       key: 'actions',
       header: '',
@@ -268,6 +271,7 @@ function StockCountDetailDialog({ clubId, stockCountId, onClose, onChanged }: {
   clubId: string; stockCountId: string; onClose: () => void; onChanged: () => void
 }) {
   const { t } = useTranslation()
+  const { locale } = useDirection()
   const queryClient = useQueryClient()
   const [addProductId, setAddProductId] = useState('')
   const [addVariantId, setAddVariantId] = useState('')
@@ -380,8 +384,8 @@ function StockCountDetailDialog({ clubId, stockCountId, onClose, onChanged }: {
                 <ReportPrintHeader
                   reportName={`${t('shop.stockCount.title')} — ${detail.locationName}`}
                   filterSummary={[
-                    detail.startedAt ? `${t('shop.stockCount.printStartedAt')}: ${new Date(detail.startedAt).toLocaleString()}` : null,
-                    detail.completedAt ? `${t('shop.stockCount.printCompletedAt')}: ${new Date(detail.completedAt).toLocaleString()}` : null,
+                    detail.startedAt ? `${t('shop.stockCount.printStartedAt')}: ${formatDate(detail.startedAt, locale as SupportedLocale, 'Africa/Cairo', { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}` : null,
+                    detail.completedAt ? `${t('shop.stockCount.printCompletedAt')}: ${formatDate(detail.completedAt, locale as SupportedLocale, 'Africa/Cairo', { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}` : null,
                     detail.startedByName ? `${t('shop.stockCount.printStartedBy')}: ${detail.startedByName}` : null,
                     detail.completedByName ? `${t('shop.stockCount.printCompletedBy')}: ${detail.completedByName}` : null,
                   ].filter(Boolean).join(' — ')}

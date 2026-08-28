@@ -3,6 +3,8 @@ import { useTranslation } from 'react-i18next'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '@/lib/supabase/client'
 import { useAuth } from '@/app/providers/AuthProvider'
+import { useDirection } from '@/app/providers/DirectionProvider'
+import { formatDate, type SupportedLocale } from '@/lib/i18n/config'
 import { PageHeader } from '@/components/ui/page-header'
 import { DataTable, type DataTableColumn } from '@/components/ui/data-table'
 import { StatusBadge } from '@/components/ui/status-badge'
@@ -75,6 +77,7 @@ const STATUS_TONE: Record<string, 'success' | 'neutral' | 'warning' | 'danger'> 
 export function ShopSalesPage() {
   const { t } = useTranslation()
   const { currentClubId } = useAuth()
+  const { locale } = useDirection()
   const [returningSale, setReturningSale] = useState<SaleRow | null>(null)
 
   const { data: sales = [], isLoading } = useQuery({
@@ -114,7 +117,7 @@ export function ShopSalesPage() {
       header: t('shop.sales.columns.status'),
       render: (s) => <StatusBadge tone={STATUS_TONE[s.status] ?? 'neutral'} label={t(`shop.sales.status.${s.status}`, { defaultValue: s.status })} />,
     },
-    { key: 'date', header: t('shop.sales.columns.date'), render: (s) => new Date(s.createdAt).toLocaleString() },
+    { key: 'date', header: t('shop.sales.columns.date'), render: (s) => formatDate(s.createdAt, locale as SupportedLocale, 'Africa/Cairo', { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) },
     {
       key: 'actions',
       header: '',
