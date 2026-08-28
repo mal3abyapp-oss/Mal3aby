@@ -17,10 +17,20 @@
 -- completely unchanged (still i.status, for anything that genuinely
 -- wants the invoice's own draft/issued/void state).
 --
--- Same input signature, in-place CREATE OR REPLACE (return table gains
--- one column at the end) -- matches get_shop_sale_detail's own sku
--- addition from C4 (20260828140300_shop_sale_invoice_document_rpcs.sql).
-create or replace function public.get_shop_sale_invoice_data(p_sale_id uuid)
+-- CORRECTION (orchestrator review, applying this migration live): the
+-- comment below was wrong, and its cited precedent was itself the
+-- ALREADY-BROKEN original version of that migration, not the corrected
+-- one. Postgres rejects CREATE OR REPLACE for any RETURNS TABLE shape
+-- change, appended column or not -- confirmed live applying this exact
+-- migration unmodified: "ERROR: 42P13: cannot change return type of
+-- existing function." This is now the THIRD time this same mistake has
+-- been made across C1/C4/C5 -- see COMMERCE_PRO_UPGRADE_PLAN.md
+-- Section 2, invariant 8, added after this fix specifically so it stops
+-- recurring in C6-C10. Fixed with the same explicit DROP FUNCTION +
+-- grant re-statement pattern used for the prior two instances.
+drop function if exists public.get_shop_sale_invoice_data(uuid);
+
+create function public.get_shop_sale_invoice_data(p_sale_id uuid)
 returns table(
   sale_id uuid,
   club_id uuid,
