@@ -419,7 +419,8 @@
       "modulesActive": "مفعّلة",
       "modulesNotActivated": "لم يفعّلها النادي بعد",
       "modulesEnable": "إتاحة",
-      "modulesDisable": "إيقاف الإتاحة"
+      "modulesDisable": "إيقاف الإتاحة",
+      "modulesLastChanged": "آخر تغيير: {{date}}"
     },
     "clubsPage": {
       "title": "الأندية",

@@ -419,7 +419,8 @@
       "modulesActive": "Active",
       "modulesNotActivated": "Not activated by club yet",
       "modulesEnable": "Enable",
-      "modulesDisable": "Disable"
+      "modulesDisable": "Disable",
+      "modulesLastChanged": "Last changed: {{date}}"
     },
     "clubsPage": {
       "title": "Clubs",

@@ -1226,6 +1226,7 @@ interface ModuleRow {
   moduleKey: string
   entitled: boolean
   active: boolean
+  updatedAt: string | null
 }
 
 const MODULE_LABELS: Record<string, string> = {
@@ -1237,7 +1238,11 @@ const MODULE_LABELS: Record<string, string> = {
 async function fetchModules(clubId: string): Promise<ModuleRow[]> {
   const { data, error } = await supabase.rpc('get_club_modules', { p_club_id: clubId })
   if (error) throw error
-  return (data ?? []).map((r) => ({ moduleKey: r.module_key, entitled: r.entitled, active: r.active }))
+  // SHOP MODULE UX HARDENING (2026-08-28) -- directive Section 11 asks
+  // "when was entitlement changed if such audit data exists". It does:
+  // club_modules.updated_at, already returned by this RPC but silently
+  // dropped by this mapping before now.
+  return (data ?? []).map((r) => ({ moduleKey: r.module_key, entitled: r.entitled, active: r.active, updatedAt: r.updated_at ?? null }))
 }
 
 function ModulesPanel({ clubId }: { clubId: string }) {
@@ -1272,6 +1277,11 @@ function ModulesPanel({ clubId }: { clubId: string }) {
                 <StatusBadge tone={m.active ? 'success' : 'warning'} label={m.active ? t('platform.clubDetailPage.modulesActive') : t('platform.clubDetailPage.modulesNotActivated')} />
               )}
             </div>
+            {m.updatedAt && (
+              <p className="mt-1 text-xs text-text-secondary">
+                {t('platform.clubDetailPage.modulesLastChanged', { date: new Date(m.updatedAt).toLocaleString() })}
+              </p>
+            )}
           </div>
           <Button
             variant={m.entitled ? 'outline' : 'default'}
