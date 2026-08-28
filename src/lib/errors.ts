@@ -106,6 +106,14 @@ const MESSAGE_RULES: Array<[RegExp, string, string]> = [
   // know who to contact -- matching the directive's own example
   // Arabic copy verbatim.
   [/the shop module is not active for this club/i, 'المتجر غير متاح ضمن اشتراك ناديك. تواصل مع إدارة المنصة لتفعيله.', "The Shop isn't available on your club's current plan. Contact the platform team to activate it."],
+  // Directive Section 18 ("invalid price" error-state provocation):
+  // create_shop_product/update_shop_product/create_shop_product_variant/
+  // update_shop_product_variant all raise this exact text server-side as
+  // a real defense-in-depth backstop behind the client's own min="0"
+  // input constraint -- was falling through to each dialog's generic
+  // fallback before this rule.
+  [/price cannot be negative/i, 'السعر لا يمكن أن يكون بالسالب.', "The price can't be negative."],
+  [/counted quantity cannot be negative/i, 'الكمية المعدودة لا يمكن أن تكون بالسالب.', "The counted quantity can't be negative."],
 ]
 
 const CODE_RULES: Record<string, [string, string]> = {
