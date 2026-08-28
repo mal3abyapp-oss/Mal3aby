@@ -520,6 +520,24 @@ export function PlatformClubDetailPage() {
     })
     .filter((w): w is string => w !== null)
 
+  // PLATFORM OWNER CONTROL IMPLEMENTATION -- Phase 5 (P2): the audit's
+  // confirmed gap -- no per-club payment kill switch existed
+  // independent of full club suspension. Never touches gateway
+  // credentials/connections; only gates NEW checkout attempts via
+  // start_gateway_checkout()'s own server-side check.
+  const setPaymentsEnabledMutation = useMutation({
+    mutationFn: async (enabled: boolean) => {
+      const { error } = await supabase.rpc('set_club_payments_enabled', {
+        p_club_id: clubId!,
+        p_enabled: enabled,
+        p_reason: enabled ? 'Re-enabled from Club Detail' : 'Disabled from Club Detail',
+      })
+      if (error) throw error
+    },
+    onSuccess: invalidateEntitlements,
+    onError: () => setActionError(t('platform.clubDetailPage.errors.setPaymentsEnabled')),
+  })
+
   const resolveUpgradeRequestMutation = useMutation({
     mutationFn: async ({ requestId, status }: { requestId: string; status: 'approved' | 'dismissed' }) => {
       const { data: userData } = await supabase.auth.getUser()
@@ -1055,6 +1073,34 @@ export function PlatformClubDetailPage() {
               ))}
             </div>
           )}
+        </CardContent>
+      </Card>
+
+      {/* PLATFORM OWNER CONTROL IMPLEMENTATION -- Phase 5 (P2): payment
+          kill switch. Deliberately compact -- a single toggle, no
+          provider-allowlist UI here (that's set_club_gateway_provider_
+          policy, reachable via a future dedicated screen if usage
+          proves it's needed; the RPC/enforcement already exists). */}
+      <Card className="mb-4">
+        <CardHeader>
+          <CardTitle className="text-base">{t('platform.clubDetailPage.paymentsCard.title')}</CardTitle>
+        </CardHeader>
+        <CardContent className="flex items-center justify-between gap-3">
+          <div>
+            <StatusBadge
+              tone={entitlements?.payments_platform_disabled ? 'danger' : 'success'}
+              label={entitlements?.payments_platform_disabled ? t('platform.clubDetailPage.paymentsCard.disabled') : t('platform.clubDetailPage.paymentsCard.enabled')}
+            />
+            <p className="mt-1 text-xs text-text-secondary">{t('platform.clubDetailPage.paymentsCard.hint')}</p>
+          </div>
+          <Button
+            size="sm"
+            variant={entitlements?.payments_platform_disabled ? 'default' : 'destructive'}
+            disabled={setPaymentsEnabledMutation.isPending}
+            onClick={() => setPaymentsEnabledMutation.mutate(!!entitlements?.payments_platform_disabled)}
+          >
+            {entitlements?.payments_platform_disabled ? t('platform.clubDetailPage.paymentsCard.enable') : t('platform.clubDetailPage.paymentsCard.disable')}
+          </Button>
         </CardContent>
       </Card>
 

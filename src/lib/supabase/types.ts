@@ -1357,6 +1357,10 @@ export type Database = {
           club_id: string
           field_limit: number | null
           notes: string | null
+          // PLATFORM OWNER CONTROL IMPLEMENTATION -- Phase 5: payment
+          // kill switch column (migration 20260828240000). Hand-added
+          // per this project's established types.ts convention.
+          payments_platform_disabled: boolean
           updated_at: string
           updated_by: string | null
         }
@@ -1366,6 +1370,7 @@ export type Database = {
           club_id: string
           field_limit?: number | null
           notes?: string | null
+          payments_platform_disabled?: boolean
           updated_at?: string
           updated_by?: string | null
         }
@@ -1375,6 +1380,7 @@ export type Database = {
           club_id?: string
           field_limit?: number | null
           notes?: string | null
+          payments_platform_disabled?: boolean
           updated_at?: string
           updated_by?: string | null
         }
@@ -9490,6 +9496,16 @@ export type Database = {
       }
       set_club_gateway_enabled: {
         Args: { p_connection_id: string; p_enabled: boolean }
+        Returns: undefined
+      }
+      // PLATFORM OWNER CONTROL IMPLEMENTATION -- Phase 5: payment kill
+      // switch + provider policy RPCs (migration 20260828240000).
+      set_club_gateway_provider_policy: {
+        Args: { p_club_id: string; p_provider_key: string; p_status: string; p_reason?: string }
+        Returns: undefined
+      }
+      set_club_payments_enabled: {
+        Args: { p_club_id: string; p_enabled: boolean; p_reason?: string }
         Returns: undefined
       }
       set_club_module_active: {

@@ -247,7 +247,8 @@
         "recordPayment": "Couldn't record the payment.",
         "reversePayment": "Couldn't reverse the payment.",
         "saveLimits": "Couldn't save the commercial limits.",
-        "updateRequestStatus": "Couldn't update the request status."
+        "updateRequestStatus": "Couldn't update the request status.",
+        "setPaymentsEnabled": "Couldn't update the payment kill switch."
       },
       "invoiceColumns": {
         "number": "Invoice #",
@@ -348,6 +349,14 @@
         "reject": "Reject",
         "reasonLabel": "Reason (optional)",
         "overLimitWarning": "{{label}}: {{used}} currently in use, above the new limit of {{limit}}. Existing records are preserved — no new ones can be created until usage drops below the limit."
+      },
+      "paymentsCard": {
+        "title": "Online payments",
+        "enabled": "Enabled",
+        "disabled": "Disabled by platform",
+        "hint": "A kill switch independent of club suspension -- disabling blocks new online-payment checkouts only. Historical payments, refunds, and cash/manual payments are unaffected.",
+        "enable": "Re-enable payments",
+        "disable": "Disable payments"
       },
       "tabs": {
         "history": "Subscription history",
