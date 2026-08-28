@@ -8164,6 +8164,7 @@ export type Database = {
           location_name: string
           payments: Json
           sale_id: string
+          sale_status: string
           sold_by_name: string
           subtotal: number
           total: number
@@ -8635,19 +8636,71 @@ export type Database = {
       }
       list_shop_sales: {
         Args: {
+          p_branch_id?: string
+          p_category_id?: string
+          p_cashier_id?: string
           p_club_id: string
+          p_customer_id?: string
+          p_end_date?: string
+          p_invoice_number?: string
           p_limit?: number
           p_offset?: number
+          p_payment_method?: string
+          p_product_id?: string
+          p_start_date?: string
           p_status?: string
         }
         Returns: {
+          branch_id: string
           created_at: string
           customer_name: string
+          discount_amount: number
           invoice_number: string
+          item_count: number
+          refund_amount: number
           sale_id: string
+          sold_by: string
           sold_by_name: string
           status: string
           total: number
+        }[]
+      }
+      get_shop_sales_kpis: {
+        Args: {
+          p_branch_id?: string
+          p_cashier_id?: string
+          p_category_id?: string
+          p_club_id: string
+          p_customer_id?: string
+          p_end_date?: string
+          p_invoice_number?: string
+          p_payment_method?: string
+          p_product_id?: string
+          p_start_date?: string
+          p_status?: string
+        }
+        Returns: {
+          average_basket: number
+          discount_total: number
+          gross_sales: number
+          items_sold: number
+          net_sales: number
+          refund_total: number
+          transaction_count: number
+        }[]
+      }
+      get_shop_sale_returns_history: {
+        Args: { p_sale_id: string }
+        Returns: {
+          created_at: string
+          lines: Json
+          processed_by_name: string
+          reason: string
+          refund_amount: number
+          refund_method: string
+          refund_status: string
+          restock: boolean
+          return_id: string
         }[]
       }
       list_shop_stock_counts: {
@@ -9106,6 +9159,7 @@ export type Database = {
         Args: {
           p_idempotency_key?: string
           p_lines: Json
+          p_payment_id?: string
           p_reason?: string
           p_refund_amount?: number
           p_restock: boolean
