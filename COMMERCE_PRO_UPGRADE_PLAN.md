@@ -99,6 +99,13 @@ this plan. Confirmed, not assumed:
 
 ## 3. New permissions (additive, per §30)
 
+**Correction after reading the existing permission seed
+(`20260826205943_shop_inventory_permissions_seed.sql`)**: `shop.sale.refund`
+**already exists** and already gates returns/refunds — the plan's
+originally-proposed `shop.returns.create` would have been a redundant
+fragmentation of an existing permission, exactly what §30 warns against.
+Dropped from this list; returns continue to use `shop.sale.refund`.
+
 - `shop.discount.apply` — apply a discount at POS checkout.
 - `shop.discount.override_limit` — exceed a club-configured max-discount
   threshold (only if a threshold is configured; otherwise unused).
@@ -106,8 +113,6 @@ this plan. Confirmed, not assumed:
   data is commercially sensitive; gated separately from `shop.reports.view`).
 - `shop.settings.manage` — manage club branding/print settings (reuses
   existing `shop.product.manage`-adjacent scope, new key for clarity).
-- `shop.returns.create` — process a return (currently folded into
-  generic `shop.sale.create`/`shop.view` — split out for least-privilege).
 
 No fragmentation beyond this. Club Owner retains full control via
 existing role-composition mechanics.
