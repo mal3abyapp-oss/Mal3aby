@@ -7302,6 +7302,8 @@ export type Database = {
         Args: {
           p_club_id: string
           p_customer_id: string
+          p_discount_amount?: number
+          p_discount_reason?: string
           p_idempotency_key?: string
           p_items: Json
           p_location_id: string
@@ -7310,6 +7312,10 @@ export type Database = {
           p_payment_reference?: string
         }
         Returns: string
+      }
+      discard_held_shop_sale: {
+        Args: { p_held_sale_id: string }
+        Returns: undefined
       }
       deactivate_platform_staff: {
         Args: { p_membership_id: string }
@@ -8177,6 +8183,49 @@ export type Database = {
           revenue: number
           units_returned: number
           units_sold: number
+        }[]
+      }
+      get_or_create_shop_walk_in_customer: {
+        Args: { p_club_id: string }
+        Returns: string
+      }
+      hold_shop_sale: {
+        Args: {
+          p_club_id: string
+          p_customer_id?: string
+          p_items: Json
+          p_note?: string
+        }
+        Returns: string
+      }
+      list_held_shop_sales: {
+        Args: { p_club_id: string }
+        Returns: {
+          customer_id: string
+          customer_name: string
+          held_at: string
+          held_by: string
+          held_by_name: string
+          held_sale_id: string
+          item_count: number
+          note: string
+          total_quantity: number
+        }[]
+      }
+      resume_shop_sale: {
+        Args: { p_held_sale_id: string }
+        Returns: {
+          customer_id: string
+          product_id: string
+          product_name_ar: string
+          product_name_en: string
+          product_status: string
+          quantity: number
+          unit_price: number
+          variant_color: string
+          variant_id: string
+          variant_size: string
+          variant_status: string
         }[]
       }
       get_staff_360_summary: {

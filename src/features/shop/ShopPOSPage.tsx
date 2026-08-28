@@ -10,7 +10,9 @@ import { Input } from '@/components/ui/input'
 import { MoneyDisplay } from '@/components/ui/money-display'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet'
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog'
 import { ProductThumb } from '@/features/shop/shop-media'
+import { CustomerSelector, type SelectedCustomer } from '@/components/ui/customer-selector'
 import {
   Select,
   SelectContent,
@@ -18,7 +20,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import { Trash2, Plus, Minus, ScanBarcode, ShoppingCart, Sparkles } from 'lucide-react'
+import { Trash2, Plus, Minus, ScanBarcode, ShoppingCart, Sparkles, User, PauseCircle, Percent, Banknote, Printer, CheckCircle2 } from 'lucide-react'
 import { translateSupabaseError } from '@/lib/errors'
 
 // COMMERCIAL MODULE (2026-08-26) -- the POS/reception sale screen
@@ -30,19 +32,23 @@ import { translateSupabaseError } from '@/lib/errors'
 // sends a price to the server at all, only product_id/variant_id/
 // quantity, so there is structurally nothing here to tamper with.
 //
-// COMMERCE PRO C2 (2026-08-28) -- POS rebuild. See
-// COMMERCE_PRO_UPGRADE_PLAN.md Section 5 (Phase C2) and
-// COMMERCE_C2_POS_REBUILD_REPORT.md for the full account. Scope: the
-// chrome around product-picking only -- category strip, image-forward
-// product cards, a dedicated barcode-scan input, and a responsive
-// layout (cart reachable via a Sheet on mobile instead of being
-// squeezed beside the grid). Cart STATE and its mutating functions
-// (addToCart/updateQuantity/removeLine, the CartLine shape, and the
-// create_shop_sale call itself) are UNCHANGED from the pre-C2 version
-// -- byte-identical logic, only the surrounding UI moved. Payment
-// panel, discounts, and hold/resume are explicitly Phase C3's scope
-// and were not touched here beyond what was needed to keep the page
-// compiling with the new layout.
+// COMMERCE PRO C2 (2026-08-28) -- POS rebuild (category strip,
+// image-forward product cards, barcode input, responsive layout). See
+// COMMERCE_C2_POS_REBUILD_REPORT.md.
+//
+// COMMERCE PRO C3 (2026-08-28) -- Cart UX, customer selection, payment
+// panel, discounts, hold/resume. See COMMERCE_PRO_UPGRADE_PLAN.md
+// Section 5 (Phase C3) and COMMERCE_C3_CART_PAYMENT_REPORT.md for the
+// full account. Cart line rendering (thumbnail/qty input/line total/
+// remove/clear-with-confirm), stock-limit UX feedback, a real discount
+// UI wired to create_shop_sale's new p_discount_amount/p_discount_reason
+// params, a real payment-method-controls panel sourced from
+// payment_method_configs (cash tender/change, sequential multi-payment
+// via record_payment), a single post-sale completion panel, and
+// Hold/Resume (non-canonical draft cart, never touches
+// invoices/payments/inventory) are all new in this phase. The
+// create_shop_sale item-array shape and price-preview-only
+// architecture above are UNCHANGED.
 interface ProductOption {
   productId: string
   nameAr: string
@@ -74,15 +80,21 @@ interface CategoryOption {
   displayOrder: number
 }
 
-interface CustomerOption {
-  id: string
-  fullName: string | null
-  mobileDisplay: string | null
-}
-
 interface LocationOption {
   locationId: string
   name: string
+}
+
+interface PaymentMethodConfig {
+  id: string
+  underlyingMethod: string
+  provider: string | null
+  nameAr: string
+  nameEn: string
+  instructionsAr: string | null
+  instructionsEn: string | null
+  isActive: boolean
+  displayOrder: number
 }
 
 interface CartLine {
@@ -92,6 +104,7 @@ interface CartLine {
   variantLabel: string | null
   quantity: number
   displayPrice: number
+  imageUrl: string | null
 }
 
 async function fetchProducts(clubId: string, search: string): Promise<ProductOption[]> {
@@ -127,38 +140,36 @@ async function fetchLocations(clubId: string): Promise<LocationOption[]> {
   return (data ?? []).map((r) => ({ locationId: r.location_id, name: r.name }))
 }
 
-async function fetchCustomers(clubId: string, search: string): Promise<CustomerOption[]> {
-  if (!search.trim()) return []
-  const escaped = search.trim().replace(/[%,]/g, '\\$&')
-  const { data, error } = await supabase
-    .from('customers')
-    .select('id, full_name, mobile_display')
-    .eq('club_id', clubId)
-    .or(`full_name.ilike.%${escaped}%,mobile_display.ilike.%${escaped}%`)
-    .limit(10)
-  if (error) throw error
-  return (data ?? []).map((c) => ({ id: c.id, fullName: c.full_name, mobileDisplay: c.mobile_display }))
+// Best-effort aggregate on-hand stock, keyed by product_id and by
+// product_id::variant_id, across every location -- same fail-open
+// pattern as ShopProductsPage.tsx's fetchStockByProduct (Phase C1).
+// Requires inventory.view, a permission distinct from shop.view/
+// shop.sale.create; a cashier role that can sell but not view
+// inventory detail is a real, intentional combination, so a failure
+// here must never block the sell screen from rendering -- stock
+// badges/limits are an enrichment, not the page's core purpose or its
+// real enforcement boundary (create_shop_sale's own server-side stock
+// check, via _apply_shop_inventory_movement_internal, is that boundary
+// -- this is UX-layer feedback only, matching the same "defense in
+// depth, not the security boundary" framing C2 used for the
+// out-of-stock card disable).
+interface StockMap {
+  byProduct: Record<string, number>
+  byVariant: Record<string, number>
 }
-
-// Best-effort aggregate on-hand stock per product, across every
-// location and variant -- same fail-open pattern as
-// ShopProductsPage.tsx's fetchStockByProduct (Phase C1). Requires
-// inventory.view, a permission distinct from shop.view/shop.pos.
-// (whatever gates this page itself); a cashier role that can sell but
-// not view inventory detail is a real, intentional combination, so a
-// failure here must never block the sell screen from rendering --
-// stock badges are an enrichment, not the page's core purpose. Callers
-// treat `null` as "unknown" (renders no stock badge, product remains
-// clickable) rather than fabricating a false "in stock" or "out of
-// stock" signal.
-async function fetchStockByProduct(clubId: string): Promise<Record<string, number> | null> {
+async function fetchStock(clubId: string): Promise<StockMap | null> {
   const { data, error } = await supabase.rpc('get_shop_inventory_balances', { p_club_id: clubId })
   if (error) return null
-  const totals: Record<string, number> = {}
+  const byProduct: Record<string, number> = {}
+  const byVariant: Record<string, number> = {}
   for (const row of data ?? []) {
-    totals[row.product_id] = (totals[row.product_id] ?? 0) + Number(row.on_hand)
+    byProduct[row.product_id] = (byProduct[row.product_id] ?? 0) + Number(row.on_hand)
+    if (row.variant_id) {
+      const key = `${row.product_id}:${row.variant_id}`
+      byVariant[key] = (byVariant[key] ?? 0) + Number(row.on_hand)
+    }
   }
-  return totals
+  return { byProduct, byVariant }
 }
 
 interface TopProductRow {
@@ -173,11 +184,55 @@ interface TopProductRow {
 // sensitive than shop.view per its own migration comment). A cashier
 // without report.view is an expected, legitimate combination, so a
 // denial here fails silently to "no Best Sellers chip" rather than a
-// page-level error -- same fail-open contract as fetchStockByProduct.
+// page-level error -- same fail-open contract as fetchStock.
 async function fetchTopProductIds(clubId: string): Promise<TopProductRow[] | null> {
   const { data, error } = await supabase.rpc('get_shop_top_products', { p_club_id: clubId, p_limit: 12 })
   if (error) return null
   return (data ?? []).map((r) => ({ productId: r.product_id, unitsSold: Number(r.units_sold) }))
+}
+
+// Payment methods -- sourced from the club's real configured
+// payment_method_configs (Master Payment Directive #82), never a
+// hardcoded CASH/CARD/INSTAPAY/WALLET/BANK/ONLINE list. Only
+// is_active methods are shown. Read directly against the table (no
+// dedicated list RPC exists for this -- confirmed by grep before
+// writing this page; BillingPage.tsx's own PaymentMethodsCard.tsx
+// reads the table the same way), relying on the table's own
+// `payment_method_configs_select_club_staff` RLS policy (any club
+// staff member may SELECT, no extra permission needed to see the
+// list at checkout -- matches customer_visible screening being a
+// portal/customer-facing concern only, not a staff one).
+async function fetchPaymentMethods(clubId: string): Promise<PaymentMethodConfig[]> {
+  const { data, error } = await supabase
+    .from('payment_method_configs')
+    .select('id, underlying_method, provider, name_ar, name_en, instructions_ar, instructions_en, is_active, display_order')
+    .eq('club_id', clubId)
+    .eq('is_active', true)
+    .order('display_order')
+  if (error) throw error
+  return (data ?? []).map((r) => ({
+    id: r.id, underlyingMethod: r.underlying_method, provider: r.provider, nameAr: r.name_ar, nameEn: r.name_en,
+    instructionsAr: r.instructions_ar, instructionsEn: r.instructions_en, isActive: r.is_active, displayOrder: r.display_order,
+  }))
+}
+
+interface HeldSaleRow {
+  heldSaleId: string
+  customerId: string | null
+  customerName: string | null
+  heldByName: string | null
+  heldAt: string
+  note: string | null
+  itemCount: number
+  totalQuantity: number
+}
+async function fetchHeldSales(clubId: string): Promise<HeldSaleRow[]> {
+  const { data, error } = await supabase.rpc('list_held_shop_sales', { p_club_id: clubId })
+  if (error) throw error
+  return (data ?? []).map((r) => ({
+    heldSaleId: r.held_sale_id, customerId: r.customer_id, customerName: r.customer_name, heldByName: r.held_by_name,
+    heldAt: r.held_at, note: r.note, itemCount: Number(r.item_count), totalQuantity: Number(r.total_quantity),
+  }))
 }
 
 const BEST_SELLERS_CHIP = '__best_sellers__'
@@ -185,24 +240,46 @@ const ALL_PRODUCTS_CHIP = '__all__'
 
 export function ShopPOSPage() {
   const { t } = useTranslation()
-  const { currentClubId } = useAuth()
+  const { currentClubId, currentMembership } = useAuth()
   const queryClient = useQueryClient()
+  const canDiscount = (currentMembership?.permissionKeys ?? []).includes('shop.discount.apply')
 
   const [productSearch, setProductSearch] = useState('')
   const [activeCategory, setActiveCategory] = useState<string>(ALL_PRODUCTS_CHIP)
   const [pickingProduct, setPickingProduct] = useState<ProductOption | null>(null)
   const [cart, setCart] = useState<CartLine[]>([])
-  const [customerSearch, setCustomerSearch] = useState('')
-  const [selectedCustomer, setSelectedCustomer] = useState<CustomerOption | null>(null)
+  const [selectedCustomer, setSelectedCustomer] = useState<SelectedCustomer | null>(null)
+  const [isWalkIn, setIsWalkIn] = useState(false)
   const [locationId, setLocationId] = useState('')
-  const [paymentMethod, setPaymentMethod] = useState('cash')
-  const [partialPayment, setPartialPayment] = useState(false)
-  const [paymentAmountInput, setPaymentAmountInput] = useState('')
   const [error, setError] = useState<string | null>(null)
-  const [lastSetupNotice, setLastSetupNotice] = useState<string | null>(null)
   const [barcodeInput, setBarcodeInput] = useState('')
   const [barcodeNotFound, setBarcodeNotFound] = useState<string | null>(null)
   const [mobileCartOpen, setMobileCartOpen] = useState(false)
+  const [clearCartConfirmOpen, setClearCartConfirmOpen] = useState(false)
+  const [heldSalesOpen, setHeldSalesOpen] = useState(false)
+  const [holdNote, setHoldNote] = useState('')
+  const [holdDialogOpen, setHoldDialogOpen] = useState(false)
+  const [completedSale, setCompletedSale] = useState<CompletedSale | null>(null)
+
+  // Discount state -- fixed amount OR percentage, never both applied at
+  // once (the toggle switches the interpretation of discountInput, the
+  // *amount actually sent* is always resolved to a single numeric value
+  // before calling create_shop_sale).
+  const [discountEnabled, setDiscountEnabled] = useState(false)
+  const [discountMode, setDiscountMode] = useState<'amount' | 'percent'>('amount')
+  const [discountInput, setDiscountInput] = useState('')
+  const [discountReason, setDiscountReason] = useState('')
+
+  // Payment state -- a primary method + amount, and an optional second
+  // "split-tender" line collected via record_payment after
+  // create_shop_sale succeeds (plan Section 5 decision: sequential RPC
+  // calls, not a widened create_shop_sale transaction).
+  const [selectedMethodId, setSelectedMethodId] = useState<string | null>(null)
+  const [cashReceivedInput, setCashReceivedInput] = useState('')
+  const [splitEnabled, setSplitEnabled] = useState(false)
+  const [splitAmountInput, setSplitAmountInput] = useState('')
+  const [splitMethodId, setSplitMethodId] = useState<string | null>(null)
+
   const barcodeInputRef = useRef<HTMLInputElement>(null)
 
   const { data: products = [], isLoading: productsLoading } = useQuery({
@@ -215,9 +292,9 @@ export function ShopPOSPage() {
     queryFn: () => fetchCategories(currentClubId as string),
     enabled: !!currentClubId,
   })
-  const { data: stockByProduct } = useQuery({
+  const { data: stock } = useQuery({
     queryKey: ['shop-pos-stock', currentClubId],
-    queryFn: () => fetchStockByProduct(currentClubId as string),
+    queryFn: () => fetchStock(currentClubId as string),
     enabled: !!currentClubId,
   })
   const { data: topProducts } = useQuery({
@@ -235,10 +312,15 @@ export function ShopPOSPage() {
     queryFn: () => fetchLocations(currentClubId as string),
     enabled: !!currentClubId,
   })
-  const { data: customerResults = [] } = useQuery({
-    queryKey: ['shop-pos-customers', currentClubId, customerSearch],
-    queryFn: () => fetchCustomers(currentClubId as string, customerSearch),
-    enabled: !!currentClubId && customerSearch.trim().length > 0,
+  const { data: paymentMethods = [] } = useQuery({
+    queryKey: ['shop-pos-payment-methods', currentClubId],
+    queryFn: () => fetchPaymentMethods(currentClubId as string),
+    enabled: !!currentClubId,
+  })
+  const { data: heldSales = [], refetch: refetchHeldSales } = useQuery({
+    queryKey: ['shop-pos-held-sales', currentClubId],
+    queryFn: () => fetchHeldSales(currentClubId as string),
+    enabled: !!currentClubId && heldSalesOpen,
   })
 
   // Category chip counts -- derived from the already-fetched product
@@ -261,20 +343,42 @@ export function ShopPOSPage() {
 
   function stockFor(productId: string): { qty: number | null; isOut: boolean; isLow: boolean; reorderLevel: number | null } {
     const product = products.find((p) => p.productId === productId)
-    if (!stockByProduct || !product) return { qty: null, isOut: false, isLow: false, reorderLevel: product?.reorderLevel ?? null }
-    const qty = stockByProduct[productId] ?? 0
+    if (!stock || !product) return { qty: null, isOut: false, isLow: false, reorderLevel: product?.reorderLevel ?? null }
+    const qty = stock.byProduct[productId] ?? 0
     const isOut = qty <= 0
     const isLow = !isOut && product.reorderLevel !== null && qty <= product.reorderLevel
     return { qty, isOut, isLow, reorderLevel: product.reorderLevel }
   }
 
+  // Line-level available stock -- variant-specific when the line has a
+  // variant (falls back to the product-level aggregate only when no
+  // variant-level row exists, e.g. a variant just added with no
+  // separate balance row yet). `null` means "unknown" (permission
+  // denied/RPC failed) -- never treated as zero, so cart edits are not
+  // wrongly blocked by a missing-data state.
+  function availableFor(productId: string, variantId: string | null): number | null {
+    if (!stock) return null
+    if (variantId) {
+      const key = `${productId}:${variantId}`
+      if (key in stock.byVariant) return stock.byVariant[key] ?? null
+    }
+    return productId in stock.byProduct ? (stock.byProduct[productId] ?? null) : null
+  }
+
   function addToCart(product: ProductOption, variant: VariantOption | null) {
+    const available = availableFor(product.productId, variant?.variantId ?? null)
     setCart((current) => {
       const existingIdx = current.findIndex((l) => l.productId === product.productId && l.variantId === (variant?.variantId ?? null))
       const existing = existingIdx >= 0 ? current[existingIdx] : undefined
+      const nextQty = (existing?.quantity ?? 0) + 1
+      if (available !== null && nextQty > available) {
+        setError(t('shop.pos.stockLimitReached', { name: product.nameAr, available }))
+        return current
+      }
+      setError(null)
       if (existing) {
         const next = [...current]
-        next[existingIdx] = { ...existing, quantity: existing.quantity + 1 }
+        next[existingIdx] = { ...existing, quantity: nextQty }
         return next
       }
       const label = variant ? [variant.size, variant.color].filter(Boolean).join(' / ') : null
@@ -287,6 +391,7 @@ export function ShopPOSPage() {
           variantLabel: label,
           quantity: 1,
           displayPrice: variant?.priceOverride ?? product.basePrice,
+          imageUrl: product.imageUrl,
         },
       ]
     })
@@ -299,8 +404,39 @@ export function ShopPOSPage() {
       if (!line) return current
       const q = line.quantity + delta
       if (q <= 0) return current.filter((_, i) => i !== idx)
+      const available = availableFor(line.productId, line.variantId)
+      if (available !== null && q > available) {
+        setError(t('shop.pos.stockLimitReached', { name: line.productName, available }))
+        return current
+      }
+      setError(null)
       const next = [...current]
       next[idx] = { ...line, quantity: q }
+      return next
+    })
+  }
+
+  // Direct quantity edit (a number input, not just +/-) -- respects the
+  // exact same stock-limit validation as the +/- buttons. A blank or
+  // invalid value is left as-is (no destructive coercion to 0/1 while
+  // the cashier is mid-edit); only a valid positive number is applied.
+  function setQuantityDirect(idx: number, raw: string) {
+    const parsed = Number(raw)
+    if (!raw.trim() || !Number.isFinite(parsed)) return
+    setCart((current) => {
+      const line = current[idx]
+      if (!line) return current
+      if (parsed <= 0) return current.filter((_, i) => i !== idx)
+      const available = availableFor(line.productId, line.variantId)
+      if (available !== null && parsed > available) {
+        setError(t('shop.pos.stockLimitReached', { name: line.productName, available }))
+        const next = [...current]
+        next[idx] = { ...line, quantity: available }
+        return next
+      }
+      setError(null)
+      const next = [...current]
+      next[idx] = { ...line, quantity: parsed }
       return next
     })
   }
@@ -309,27 +445,20 @@ export function ShopPOSPage() {
     setCart((current) => current.filter((_, i) => i !== idx))
   }
 
+  function clearCart() {
+    setCart([])
+    setClearCartConfirmOpen(false)
+    setDiscountEnabled(false)
+    setDiscountInput('')
+    setDiscountReason('')
+  }
+
   // ------------------------------------------------------------
-  // Barcode scan input. A barcode scanner behaves like a very fast
-  // keyboard: it "types" the encoded digits followed by Enter. This
-  // input stays focused between scans (refocused after every
-  // add-to-cart, every not-found message, and on a short interval
-  // watching for blur caused by an incidental click elsewhere on the
-  // page) so the cashier never has to click into it before the next
-  // scan. No debounce is applied to the keystrokes themselves --
-  // scanners fire real, distinct keydown events through the browser's
-  // normal input pipeline (this is not a firehose of synthetic events
-  // React needs to coalesce), and the match only ever runs once, on
-  // Enter, against the input's final committed value -- so there is no
-  // realistic double-submit risk from scan speed alone. Duplicate
-  // Enter/double-scan of the SAME barcode in immediate succession is
-  // handled by the existing addToCart increment-if-present logic
-  // (harmless: it just increments quantity by 1 again, which is
-  // correct scanner behavior -- scan twice, get two units).
+  // Barcode scan input. Unchanged from Phase C2 -- see that phase's
+  // report for the full reasoning (refocus-after-every-scan via ref,
+  // no debounce needed, exact/variant match, out-of-stock feedback).
   // ------------------------------------------------------------
   function refocusBarcodeInput() {
-    // Deferred a tick so it runs after whatever state update/re-render
-    // this call was triggered from.
     window.setTimeout(() => barcodeInputRef.current?.focus(), 0)
   }
 
@@ -341,16 +470,13 @@ export function ShopPOSPage() {
     const productMatch = products.find((p) => p.barcode === code)
     if (productMatch) {
       if (productMatch.hasVariants) {
-        // A product-level barcode match on a variant-bearing product is
-        // ambiguous (which variant?) -- open the variant picker instead
-        // of guessing.
         setPickingProduct(productMatch)
         setBarcodeInput('')
         refocusBarcodeInput()
         return
       }
-      const stock = stockFor(productMatch.productId)
-      if (stock.isOut) {
+      const s = stockFor(productMatch.productId)
+      if (s.isOut) {
         setBarcodeNotFound(t('shop.pos.barcodeOutOfStock', { name: productMatch.nameAr }))
         setBarcodeInput('')
         refocusBarcodeInput()
@@ -362,19 +488,14 @@ export function ShopPOSPage() {
       return
     }
 
-    // No product-level match -- search variant barcodes across every
-    // loaded product. Variants are fetched lazily per-product elsewhere
-    // in this page, so a full-catalog variant barcode scan issues a
-    // direct RPC call here instead of relying on cached per-product
-    // variant queries that may not exist yet.
     void (async () => {
       for (const product of products) {
         if (!product.hasVariants) continue
         const productVariants = await fetchVariants(product.productId)
         const variantMatch = productVariants.find((v) => v.barcode === code)
         if (variantMatch) {
-          const stock = stockFor(product.productId)
-          if (stock.isOut) {
+          const s = stockFor(product.productId)
+          if (s.isOut) {
             setBarcodeNotFound(t('shop.pos.barcodeOutOfStock', { name: product.nameAr }))
           } else {
             addToCart(product, variantMatch)
@@ -392,39 +513,113 @@ export function ShopPOSPage() {
 
   const subtotal = cart.reduce((sum, l) => sum + l.displayPrice * l.quantity, 0)
 
-  // Partial payment (COMMERCIAL CLOSURE 2026-08-27): create_shop_sale's
-  // p_payment_amount defaults to the full subtotal when omitted --
-  // identical to prior behavior. Staff who opt into "pay partial" collect
-  // the remainder later via the invoice's normal payment flow (the same
-  // record_payment() engine every other invoice type already uses).
-  const paidAmount = partialPayment ? Number(paymentAmountInput || 0) : subtotal
-  const outstandingPreview = Math.max(subtotal - paidAmount, 0)
+  // Discount resolution -- percent is converted to an amount here, once,
+  // client-side for display purposes only; create_shop_sale re-validates
+  // (amount cannot exceed subtotal) and is the actual source of truth
+  // for what gets persisted. Clamped to [0, subtotal] so a stray > 100%
+  // entry or a fixed amount bigger than the cart can never show a
+  // negative total in the preview.
+  const discountAmount = useMemo(() => {
+    if (!discountEnabled || !canDiscount) return 0
+    const raw = Number(discountInput || 0)
+    if (!Number.isFinite(raw) || raw <= 0) return 0
+    const amount = discountMode === 'percent' ? subtotal * (raw / 100) : raw
+    return Math.min(Math.max(amount, 0), subtotal)
+  }, [discountEnabled, canDiscount, discountInput, discountMode, subtotal])
+
+  const total = Math.max(subtotal - discountAmount, 0)
+
+  const primaryAmount = splitEnabled ? Math.max(total - Number(splitAmountInput || 0), 0) : total
+  const splitAmount = splitEnabled ? Number(splitAmountInput || 0) : 0
+  const cashReceived = Number(cashReceivedInput || 0)
+  const selectedMethod = paymentMethods.find((m) => m.id === selectedMethodId) ?? null
+  const isPrimaryCash = selectedMethod?.underlyingMethod === 'cash'
+  // Change is cashier-facing arithmetic ONLY -- never sent to the
+  // server, never included in p_payment_amount, never written as a
+  // payment allocation or any canonical row (hard invariant, plan
+  // Non-negotiable Invariant #3). Computed purely for on-screen display.
+  const changeDue = isPrimaryCash ? Math.max(cashReceived - primaryAmount, 0) : 0
 
   const saleMutation = useMutation({
     mutationFn: async () => {
+      if (!selectedMethod) throw new Error(t('shop.pos.paymentMethodRequired'))
       const items = cart.map((l) => ({ product_id: l.productId, variant_id: l.variantId, quantity: l.quantity }))
       const { data, error: err } = await supabase.rpc('create_shop_sale', {
         p_club_id: currentClubId as string,
         p_location_id: locationId,
         p_customer_id: selectedCustomer!.id,
         p_items: items,
-        p_payment_method: paymentMethod,
+        p_payment_method: selectedMethod.underlyingMethod,
         p_payment_reference: undefined,
         p_idempotency_key: crypto.randomUUID(),
-        p_payment_amount: partialPayment ? paidAmount : undefined,
+        p_payment_amount: primaryAmount,
+        p_discount_amount: discountAmount > 0 ? discountAmount : undefined,
+        p_discount_reason: discountAmount > 0 ? (discountReason.trim() || undefined) : undefined,
       })
       if (err) throw err
-      return data
+      const saleId = data as string
+      // Sequential split-tender (plan Section 5 decision): the sale and
+      // its first payment are already fully committed at this point --
+      // stock deducted, invoice issued, first payment recorded. A
+      // second payment line, if configured, is now collected via the
+      // already-hardened record_payment() RPC against the SAME invoice.
+      // If this second call fails, the sale itself is NOT lost or rolled
+      // back -- it already succeeded -- so the failure is surfaced
+      // distinctly (see onError below / partialPaymentFailure state)
+      // rather than presented as "the whole sale failed."
+      let invoiceId: string | null = null
+      let invoiceNumber: string | null = null
+      {
+        const { data: saleRow } = await supabase.from('shop_sales').select('invoice_id').eq('id', saleId).maybeSingle()
+        invoiceId = saleRow?.invoice_id ?? null
+        if (invoiceId) {
+          const { data: invRow } = await supabase.from('invoices').select('invoice_number').eq('id', invoiceId).maybeSingle()
+          invoiceNumber = invRow?.invoice_number ?? null
+        }
+      }
+
+      let splitPaymentFailed: string | null = null
+      if (splitEnabled && splitAmount > 0 && invoiceId) {
+        if (!splitMethodId) {
+          splitPaymentFailed = t('shop.pos.splitMethodRequired')
+        } else {
+          const splitMethod = paymentMethods.find((m) => m.id === splitMethodId)
+          if (splitMethod) {
+            const { error: splitErr } = await supabase.rpc('record_payment', {
+              p_invoice_id: invoiceId,
+              p_amount: splitAmount,
+              p_method: splitMethod.underlyingMethod,
+              p_reference: undefined,
+              p_idempotency_key: crypto.randomUUID(),
+            })
+            if (splitErr) {
+              splitPaymentFailed = translateSupabaseError(splitErr, t('shop.pos.splitPaymentError'))
+            }
+          }
+        }
+      }
+
+      return { saleId, invoiceId, invoiceNumber, total, splitPaymentFailed }
     },
-    onSuccess: () => {
+    onSuccess: (result) => {
       setCart([])
       setSelectedCustomer(null)
-      setCustomerSearch('')
-      setPartialPayment(false)
-      setPaymentAmountInput('')
+      setIsWalkIn(false)
       setError(null)
-      setLastSetupNotice(t('shop.pos.saleCompleted'))
       setMobileCartOpen(false)
+      setDiscountEnabled(false)
+      setDiscountInput('')
+      setDiscountReason('')
+      setSplitEnabled(false)
+      setSplitAmountInput('')
+      setSplitMethodId(null)
+      setCashReceivedInput('')
+      setCompletedSale({
+        invoiceId: result.invoiceId,
+        invoiceNumber: result.invoiceNumber,
+        total: result.total,
+        splitPaymentFailed: result.splitPaymentFailed,
+      })
       void queryClient.invalidateQueries({ queryKey: ['shop-inventory-balances'] })
       void queryClient.invalidateQueries({ queryKey: ['shop-pos-stock'] })
     },
@@ -436,38 +631,184 @@ export function ShopPOSPage() {
     if (!locationId) { setError(t('shop.pos.locationRequired')); return }
     if (!selectedCustomer) { setError(t('shop.pos.customerRequired')); return }
     if (cart.length === 0) { setError(t('shop.pos.cartEmpty')); return }
-    if (partialPayment && (paidAmount <= 0 || paidAmount >= subtotal)) {
+    if (!selectedMethodId) { setError(t('shop.pos.paymentMethodRequired')); return }
+    if (splitEnabled && (splitAmount <= 0 || splitAmount >= total)) {
       setError(t('shop.pos.partialAmountInvalid'))
       return
     }
+    if (splitEnabled && !splitMethodId) { setError(t('shop.pos.splitMethodRequired')); return }
     saleMutation.mutate()
+  }
+
+  const walkInMutation = useMutation({
+    mutationFn: async () => {
+      const { data, error: err } = await supabase.rpc('get_or_create_shop_walk_in_customer', { p_club_id: currentClubId as string })
+      if (err) throw err
+      return data as string
+    },
+    onSuccess: (id) => {
+      setSelectedCustomer({ id, fullName: t('shop.pos.walkInCustomer'), mobileDisplay: null })
+      setIsWalkIn(true)
+    },
+    onError: (err) => setError(translateSupabaseError(err, t('shop.pos.walkInError'))),
+  })
+
+  const holdMutation = useMutation({
+    mutationFn: async () => {
+      const items = cart.map((l) => ({ product_id: l.productId, variant_id: l.variantId, quantity: l.quantity }))
+      // The walk-in customer is a real customers row (lazily created by
+      // get_or_create_shop_walk_in_customer) -- no reason to drop it on
+      // hold; passing it through means resuming correctly re-attaches
+      // the same walk-in identity rather than leaving the resumed cart
+      // with no customer at all.
+      const { error: err } = await supabase.rpc('hold_shop_sale', {
+        p_club_id: currentClubId as string,
+        p_items: items,
+        p_customer_id: selectedCustomer?.id || undefined,
+        p_note: holdNote.trim() || undefined,
+      })
+      if (err) throw err
+    },
+    onSuccess: () => {
+      setCart([])
+      setSelectedCustomer(null)
+      setIsWalkIn(false)
+      setHoldNote('')
+      setHoldDialogOpen(false)
+      setError(null)
+    },
+    onError: (err) => setError(translateSupabaseError(err, t('shop.pos.holdError'))),
+  })
+
+  const resumeMutation = useMutation({
+    mutationFn: async (heldSaleId: string) => {
+      const { data, error: err } = await supabase.rpc('resume_shop_sale', { p_held_sale_id: heldSaleId })
+      if (err) throw err
+      const rows = data ?? []
+      // Fetch the REAL customer row rather than showing a generic
+      // placeholder label -- same "always fetch, never fabricate the
+      // displayed identity" rule CustomerSelector's own create/dup-match
+      // paths already follow.
+      const customerId = rows[0]?.customer_id ?? null
+      let customer: SelectedCustomer | null = null
+      if (customerId) {
+        const { data: c } = await supabase.from('customers').select('id, full_name, mobile_display').eq('id', customerId).maybeSingle()
+        if (c) customer = { id: c.id, fullName: c.full_name, mobileDisplay: c.mobile_display }
+      }
+      return { rows, customer }
+    },
+    onSuccess: ({ rows, customer }, heldSaleId) => {
+      if (rows.length === 0) return
+      const newLines: CartLine[] = rows.map((r) => ({
+        productId: r.product_id,
+        productName: r.product_name_ar,
+        variantId: r.variant_id,
+        variantLabel: [r.variant_size, r.variant_color].filter(Boolean).join(' / ') || null,
+        quantity: Number(r.quantity),
+        displayPrice: Number(r.unit_price),
+        // resume_shop_sale doesn't return image_url (it only re-derives
+        // pricing/naming data, per the RPC's own "never trust cached
+        // price" comment) -- enrich from the already-loaded product
+        // list when the product is still present there; falls back to
+        // no thumbnail (real placeholder, not a broken image) rather
+        // than erroring if the product was archived since being held.
+        imageUrl: products.find((p) => p.productId === r.product_id)?.imageUrl ?? null,
+      }))
+      setCart(newLines)
+      if (customer) {
+        setSelectedCustomer(customer)
+        setIsWalkIn(false)
+      }
+      // A product/variant can be archived AFTER a sale was held but
+      // BEFORE it's resumed. resume_shop_sale still loads it back
+      // faithfully (it's a draft snapshot, not a live-availability
+      // check) -- but checkout would then fail confusingly at
+      // create_shop_sale with a generic "not found or inactive" error.
+      // Surface that clearly right away instead, since the cashier just
+      // took a successful-looking action.
+      const inactiveNames = rows
+        .filter((r) => r.product_status !== 'active' || (r.variant_id && r.variant_status !== 'active'))
+        .map((r) => r.product_name_ar)
+      if (inactiveNames.length > 0) {
+        setError(t('shop.pos.resumedWithInactiveItems', { names: inactiveNames.join(', ') }))
+      } else {
+        setError(null)
+      }
+      setHeldSalesOpen(false)
+      setMobileCartOpen(true)
+      void queryClient.invalidateQueries({ queryKey: ['shop-pos-held-sales', currentClubId] })
+      void refetchHeldSales()
+      void heldSaleId
+    },
+    onError: (err) => setError(translateSupabaseError(err, t('shop.pos.resumeError'))),
+  })
+
+  const discardHeldMutation = useMutation({
+    mutationFn: async (heldSaleId: string) => {
+      const { error: err } = await supabase.rpc('discard_held_shop_sale', { p_held_sale_id: heldSaleId })
+      if (err) throw err
+    },
+    onSuccess: () => void refetchHeldSales(),
+    onError: (err) => setError(translateSupabaseError(err, t('shop.pos.discardHeldError'))),
+  })
+
+  if (completedSale) {
+    return (
+      <div>
+        <PageHeader title={t('shop.pos.title')} description={t('shop.pos.description')} />
+        <SaleCompletePanel sale={completedSale} onNewSale={() => setCompletedSale(null)} />
+      </div>
+    )
   }
 
   const cartPanel = (
     <CartPanel
+      clubId={currentClubId as string}
       locations={locations}
       locationId={locationId}
       setLocationId={setLocationId}
       selectedCustomer={selectedCustomer}
-      setSelectedCustomer={setSelectedCustomer}
-      customerSearch={customerSearch}
-      setCustomerSearch={setCustomerSearch}
-      customerResults={customerResults}
+      setSelectedCustomer={(c) => { setSelectedCustomer(c); setIsWalkIn(false) }}
+      isWalkIn={isWalkIn}
+      onWalkIn={() => walkInMutation.mutate()}
+      walkInPending={walkInMutation.isPending}
       cart={cart}
       updateQuantity={updateQuantity}
+      setQuantityDirect={setQuantityDirect}
       removeLine={removeLine}
+      onClearCart={() => setClearCartConfirmOpen(true)}
       subtotal={subtotal}
-      partialPayment={partialPayment}
-      setPartialPayment={setPartialPayment}
-      paymentAmountInput={paymentAmountInput}
-      setPaymentAmountInput={setPaymentAmountInput}
-      outstandingPreview={outstandingPreview}
-      paymentMethod={paymentMethod}
-      setPaymentMethod={setPaymentMethod}
+      canDiscount={canDiscount}
+      discountEnabled={discountEnabled}
+      setDiscountEnabled={setDiscountEnabled}
+      discountMode={discountMode}
+      setDiscountMode={setDiscountMode}
+      discountInput={discountInput}
+      setDiscountInput={setDiscountInput}
+      discountReason={discountReason}
+      setDiscountReason={setDiscountReason}
+      discountAmount={discountAmount}
+      total={total}
+      paymentMethods={paymentMethods}
+      selectedMethodId={selectedMethodId}
+      setSelectedMethodId={setSelectedMethodId}
+      cashReceivedInput={cashReceivedInput}
+      setCashReceivedInput={setCashReceivedInput}
+      isPrimaryCash={isPrimaryCash}
+      changeDue={changeDue}
+      primaryAmount={primaryAmount}
+      splitEnabled={splitEnabled}
+      setSplitEnabled={setSplitEnabled}
+      splitAmountInput={splitAmountInput}
+      setSplitAmountInput={setSplitAmountInput}
+      splitMethodId={splitMethodId}
+      setSplitMethodId={setSplitMethodId}
       error={error}
-      lastSetupNotice={lastSetupNotice}
       isPending={saleMutation.isPending}
       onCompleteSale={handleCompleteSale}
+      onOpenHold={() => setHoldDialogOpen(true)}
+      onOpenHeldSales={() => setHeldSalesOpen(true)}
+      heldSalesCount={heldSales.length}
     />
   )
 
@@ -497,6 +838,18 @@ export function ShopPOSPage() {
                 aria-label={t('shop.pos.barcodePlaceholder')}
               />
             </div>
+            <Button
+              type="button"
+              variant="outline"
+              className="h-11 shrink-0"
+              onClick={() => setHeldSalesOpen(true)}
+            >
+              <PauseCircle className="me-2 size-4" aria-hidden="true" />
+              {t('shop.pos.heldSales')}
+              {heldSales.length > 0 && (
+                <span className="ms-1.5 rounded-full bg-surface-muted px-1.5 text-xs tabular-nums">{heldSales.length}</span>
+              )}
+            </Button>
           </div>
           {barcodeNotFound && (
             <p role="alert" className="text-sm text-status-danger">{barcodeNotFound}</p>
@@ -546,18 +899,12 @@ export function ShopPOSPage() {
         {/* Desktop/tablet cart panel -- squeezed alongside the grid at
             lg+ per the preserved 1fr/360px split. Hidden below lg;
             mobile users reach the cart via the floating button + Sheet
-            below instead (product-first flow, per the plan's explicit
-            "cart should NOT be squeezed alongside the grid on mobile"
-            instruction). */}
+            below instead. */}
         <div className="hidden lg:block">{cartPanel}</div>
       </div>
 
       {/* Mobile cart access: a fixed bottom bar showing the running
-          item count/subtotal, opening the full cart in a Sheet. Kept
-          intentionally simple -- Phase C3 owns cart/payment UX polish,
-          this is just the C2-scoped "how do you even reach the cart on
-          a phone" wiring so the page is usable end-to-end on mobile
-          without squeezing the grid. */}
+          item count/subtotal, opening the full cart in a Sheet. */}
       <div className="fixed inset-x-0 bottom-0 z-40 border-t border-border bg-surface p-3 shadow-lg lg:hidden">
         <Button className="h-12 w-full text-base" onClick={() => setMobileCartOpen(true)}>
           <ShoppingCart className="me-2 size-5" aria-hidden="true" />
@@ -566,7 +913,7 @@ export function ShopPOSPage() {
             : t('shop.pos.viewCart')}
           {cart.length > 0 && (
             <span className="ms-auto">
-              <MoneyDisplay amount={subtotal} size="sm" />
+              <MoneyDisplay amount={total} size="sm" />
             </span>
           )}
         </Button>
@@ -581,6 +928,82 @@ export function ShopPOSPage() {
             <SheetTitle>{t('shop.pos.cartTitle')}</SheetTitle>
           </SheetHeader>
           {cartPanel}
+        </SheetContent>
+      </Sheet>
+
+      {/* Clear-cart confirmation -- a real confirm step, not a silent
+          instant-clear, per the task's explicit requirement. */}
+      <Dialog open={clearCartConfirmOpen} onOpenChange={setClearCartConfirmOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>{t('shop.pos.clearCartConfirmTitle')}</DialogTitle>
+            <DialogDescription>{t('shop.pos.clearCartConfirmDescription')}</DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setClearCartConfirmOpen(false)}>{t('common.cancel')}</Button>
+            <Button variant="destructive" onClick={clearCart}>{t('shop.pos.clearCartConfirmAction')}</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Hold-sale note dialog. */}
+      <Dialog open={holdDialogOpen} onOpenChange={setHoldDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>{t('shop.pos.holdSaleTitle')}</DialogTitle>
+            <DialogDescription>{t('shop.pos.holdSaleDescription')}</DialogDescription>
+          </DialogHeader>
+          <Input
+            placeholder={t('shop.pos.holdNotePlaceholder')}
+            value={holdNote}
+            onChange={(e) => setHoldNote(e.target.value)}
+          />
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setHoldDialogOpen(false)}>{t('common.cancel')}</Button>
+            <Button disabled={holdMutation.isPending} onClick={() => holdMutation.mutate()}>
+              {holdMutation.isPending ? t('shop.pos.holding') : t('shop.pos.holdSaleAction')}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Held Sales drawer -- resume loads the draft back into the
+          active cart and consumes the held-sale row server-side; it
+          does not itself create a shop_sales row. */}
+      <Sheet open={heldSalesOpen} onOpenChange={setHeldSalesOpen}>
+        <SheetContent side="left" className="flex w-full flex-col gap-3 overflow-y-auto sm:max-w-md">
+          <SheetHeader>
+            <SheetTitle>{t('shop.pos.heldSales')}</SheetTitle>
+          </SheetHeader>
+          {heldSales.length === 0 ? (
+            <p className="py-8 text-center text-sm text-text-secondary">{t('shop.pos.noHeldSales')}</p>
+          ) : (
+            <div className="flex flex-col gap-2">
+              {heldSales.map((h) => (
+                <div key={h.heldSaleId} className="flex flex-col gap-1.5 rounded-md border border-border p-3">
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm font-medium">
+                      {h.customerName ?? t('shop.pos.noCustomerOnHold')}
+                    </span>
+                    <span className="text-xs text-text-secondary">{new Date(h.heldAt).toLocaleTimeString()}</span>
+                  </div>
+                  <p className="text-xs text-text-secondary">
+                    {t('shop.pos.heldSaleSummary', { items: h.itemCount, quantity: h.totalQuantity })}
+                    {h.heldByName ? ` — ${h.heldByName}` : ''}
+                  </p>
+                  {h.note && <p className="text-xs italic text-text-secondary">{h.note}</p>}
+                  <div className="flex gap-2">
+                    <Button size="sm" className="flex-1" disabled={resumeMutation.isPending} onClick={() => resumeMutation.mutate(h.heldSaleId)}>
+                      {t('shop.pos.resumeSale')}
+                    </Button>
+                    <Button size="sm" variant="ghost" disabled={discardHeldMutation.isPending} onClick={() => discardHeldMutation.mutate(h.heldSaleId)}>
+                      {t('shop.pos.discardHold')}
+                    </Button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
         </SheetContent>
       </Sheet>
     </div>
@@ -609,12 +1032,6 @@ function CategoryStrip({
 
   return (
     <div
-      // overflow-x-auto + the browser's own bidi-aware scrolling means
-      // this scrolls start-to-end correctly in both directions without
-      // any manual RTL flip: in an `dir="rtl"` ancestor (this whole app
-      // is mounted with dir="rtl" by default) the scrollable content's
-      // logical start is already the visual right, so "scrolling toward
-      // more chips" naturally goes right-to-left without extra code.
       className="flex gap-2 overflow-x-auto pb-1"
       role="tablist"
       aria-label={t('shop.pos.categoryStripLabel')}
@@ -669,11 +1086,6 @@ function CategoryChip({
       role="tab"
       aria-selected={active}
       onClick={onClick}
-      // h-11 (44px) touch target -- matches this project's own
-      // touch-friendly sizing convention for primary interactive
-      // controls (e.g. Button's "lg" size is h-10; this is slightly
-      // taller since it is a repeated, rapid-tap POS control, not an
-      // occasional form action).
       className={`flex h-11 shrink-0 items-center gap-2 rounded-full border px-3 text-sm font-medium transition-colors ${
         active
           ? 'border-primary bg-primary text-primary-foreground'
@@ -729,18 +1141,14 @@ function ProductGrid({
   return (
     <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4">
       {products.map((p) => {
-        const stock = stockFor(p.productId)
-        const disabled = stock.isOut
+        const s = stockFor(p.productId)
+        const disabled = s.isOut
         return (
           <button
             key={p.productId}
             type="button"
             disabled={disabled}
             onClick={() => !disabled && onSelect(p)}
-            // min-h-[7rem] plus the image aspect-square ensures a real
-            // touch target well above the 44px minimum even on the
-            // smallest 2-column mobile layout -- this is the primary,
-            // highest-frequency tap target on the whole page.
             className={`flex flex-col overflow-hidden rounded-lg border text-start transition-shadow ${
               disabled
                 ? 'cursor-not-allowed border-border opacity-50'
@@ -755,7 +1163,7 @@ function ProductGrid({
                   {t('shop.pos.outOfStock')}
                 </span>
               )}
-              {!disabled && stock.isLow && (
+              {!disabled && s.isLow && (
                 <span className="absolute inset-x-1 top-1 rounded-md bg-status-warning/90 px-1.5 py-0.5 text-center text-[11px] font-medium text-white">
                   {t('shop.pos.lowStockBadge')}
                 </span>
@@ -765,9 +1173,9 @@ function ProductGrid({
               <span className="line-clamp-2 text-sm font-medium text-text-primary">{p.nameAr}</span>
               <div className="mt-auto flex items-center justify-between">
                 <MoneyDisplay amount={p.basePrice} size="sm" />
-                {stock.qty !== null && !disabled && (
-                  <span className={`text-xs ${stock.isLow ? 'font-medium text-status-warning' : 'text-text-secondary'}`}>
-                    {t('shop.pos.stockCount', { count: stock.qty })}
+                {s.qty !== null && !disabled && (
+                  <span className={`text-xs ${s.isLow ? 'font-medium text-status-warning' : 'text-text-secondary'}`}>
+                    {t('shop.pos.stockCount', { count: s.qty })}
                   </span>
                 )}
               </div>
@@ -779,54 +1187,158 @@ function ProductGrid({
   )
 }
 
+interface CompletedSale {
+  invoiceId: string | null
+  invoiceNumber: string | null
+  total: number
+  splitPaymentFailed: string | null
+}
+
+// Post-sale completion panel -- a single clear panel, not a stack of
+// dialogs (explicit plan instruction). "Print receipt"/"print invoice"
+// here deliberately link to the REAL existing invoice/payment view
+// (BillingPage.tsx via /app/finance/payments?invoice=..., confirmed by
+// grep as the actual established navigation pattern every other module
+// uses to reach an invoice) rather than a dedicated one-click print
+// action -- BillingPage.tsx's own print-target/data-print-size/
+// window.print() mechanism (Section 6 of the plan's own current-state
+// findings) lives inside that page today, keyed off finding the right
+// payment/invoice card on screen, not a query-param that auto-opens a
+// receipt view. A DEDICATED thermal-80mm-receipt / one-click Shop
+// invoice print is explicitly Phase C4's scope ("Invoice A4 redesign,
+// thermal 80mm receipt, payment receipt") -- not invented here. These
+// buttons open the real invoice so the cashier can use the existing
+// print button there; they are labeled "print" because that is the
+// cashier's actual next step, not because this page performs printing
+// itself.
+function SaleCompletePanel({ sale, onNewSale }: { sale: CompletedSale; onNewSale: () => void }) {
+  const { t } = useTranslation()
+  return (
+    <div className="mx-auto flex max-w-md flex-col items-center gap-4 rounded-md border border-border p-6 text-center">
+      <CheckCircle2 className="size-12 text-status-success" aria-hidden="true" />
+      <div>
+        <p className="text-lg font-semibold">{t('shop.pos.saleCompleted')}</p>
+        {sale.invoiceNumber && (
+          <p className="text-sm text-text-secondary" dir="ltr">{sale.invoiceNumber}</p>
+        )}
+      </div>
+      <MoneyDisplay amount={sale.total} size="lg" />
+
+      {sale.splitPaymentFailed && (
+        <div role="alert" className="w-full rounded-md border border-status-danger/40 bg-status-danger/10 p-3 text-start text-sm text-status-danger">
+          {t('shop.pos.saleCompletedSplitFailed')} {sale.splitPaymentFailed}
+        </div>
+      )}
+
+      <div className="flex w-full flex-col gap-2 sm:flex-row">
+        {sale.invoiceId && (
+          <Button variant="outline" className="flex-1" asChild>
+            <a href={`/app/finance/payments?invoice=${sale.invoiceId}`} target="_blank" rel="noreferrer">
+              <Printer className="me-2 size-4" aria-hidden="true" />
+              {t('shop.pos.printReceipt')}
+            </a>
+          </Button>
+        )}
+      </div>
+      <Button className="h-11 w-full" onClick={onNewSale}>{t('shop.pos.newSale')}</Button>
+    </div>
+  )
+}
+
 function CartPanel({
+  clubId,
   locations,
   locationId,
   setLocationId,
   selectedCustomer,
   setSelectedCustomer,
-  customerSearch,
-  setCustomerSearch,
-  customerResults,
+  isWalkIn,
+  onWalkIn,
+  walkInPending,
   cart,
   updateQuantity,
+  setQuantityDirect,
   removeLine,
+  onClearCart,
   subtotal,
-  partialPayment,
-  setPartialPayment,
-  paymentAmountInput,
-  setPaymentAmountInput,
-  outstandingPreview,
-  paymentMethod,
-  setPaymentMethod,
+  canDiscount,
+  discountEnabled,
+  setDiscountEnabled,
+  discountMode,
+  setDiscountMode,
+  discountInput,
+  setDiscountInput,
+  discountReason,
+  setDiscountReason,
+  discountAmount,
+  total,
+  paymentMethods,
+  selectedMethodId,
+  setSelectedMethodId,
+  cashReceivedInput,
+  setCashReceivedInput,
+  isPrimaryCash,
+  changeDue,
+  primaryAmount,
+  splitEnabled,
+  setSplitEnabled,
+  splitAmountInput,
+  setSplitAmountInput,
+  splitMethodId,
+  setSplitMethodId,
   error,
-  lastSetupNotice,
   isPending,
   onCompleteSale,
+  onOpenHold,
+  onOpenHeldSales,
+  heldSalesCount,
 }: {
+  clubId: string
   locations: LocationOption[]
   locationId: string
   setLocationId: (v: string) => void
-  selectedCustomer: CustomerOption | null
-  setSelectedCustomer: (c: CustomerOption | null) => void
-  customerSearch: string
-  setCustomerSearch: (v: string) => void
-  customerResults: CustomerOption[]
+  selectedCustomer: SelectedCustomer | null
+  setSelectedCustomer: (c: SelectedCustomer) => void
+  isWalkIn: boolean
+  onWalkIn: () => void
+  walkInPending: boolean
   cart: CartLine[]
   updateQuantity: (idx: number, delta: number) => void
+  setQuantityDirect: (idx: number, raw: string) => void
   removeLine: (idx: number) => void
+  onClearCart: () => void
   subtotal: number
-  partialPayment: boolean
-  setPartialPayment: (v: boolean) => void
-  paymentAmountInput: string
-  setPaymentAmountInput: (v: string) => void
-  outstandingPreview: number
-  paymentMethod: string
-  setPaymentMethod: (v: string) => void
+  canDiscount: boolean
+  discountEnabled: boolean
+  setDiscountEnabled: (v: boolean) => void
+  discountMode: 'amount' | 'percent'
+  setDiscountMode: (v: 'amount' | 'percent') => void
+  discountInput: string
+  setDiscountInput: (v: string) => void
+  discountReason: string
+  setDiscountReason: (v: string) => void
+  discountAmount: number
+  total: number
+  paymentMethods: PaymentMethodConfig[]
+  selectedMethodId: string | null
+  setSelectedMethodId: (v: string) => void
+  cashReceivedInput: string
+  setCashReceivedInput: (v: string) => void
+  isPrimaryCash: boolean
+  changeDue: number
+  primaryAmount: number
+  splitEnabled: boolean
+  setSplitEnabled: (v: boolean) => void
+  splitAmountInput: string
+  setSplitAmountInput: (v: string) => void
+  splitMethodId: string | null
+  setSplitMethodId: (v: string | null) => void
   error: string | null
-  lastSetupNotice: string | null
   isPending: boolean
   onCompleteSale: () => void
+  onOpenHold: () => void
+  onOpenHeldSales: () => void
+  heldSalesCount: number
 }) {
   const { t } = useTranslation()
 
@@ -848,101 +1360,237 @@ function CartPanel({
         <label className="text-sm font-medium text-text-secondary">{t('shop.pos.customerLabel')}</label>
         {selectedCustomer ? (
           <div className="flex items-center justify-between rounded-md border border-border p-2 text-sm">
-            <span>{selectedCustomer.fullName ?? selectedCustomer.mobileDisplay}</span>
-            <Button variant="ghost" size="sm" onClick={() => setSelectedCustomer(null)}>{t('common.change')}</Button>
+            <span className="flex items-center gap-1.5">
+              {isWalkIn && <User className="size-3.5 text-text-secondary" aria-hidden="true" />}
+              {selectedCustomer.fullName ?? selectedCustomer.mobileDisplay}
+            </span>
+            <Button variant="ghost" size="sm" onClick={() => setSelectedCustomer({ id: '', fullName: '', mobileDisplay: null })}>
+              {t('common.change')}
+            </Button>
           </div>
         ) : (
-          <>
-            <Input
-              placeholder={t('shop.pos.searchCustomer')}
-              value={customerSearch}
-              onChange={(e) => setCustomerSearch(e.target.value)}
-            />
-            {customerResults.length > 0 && (
-              <div className="flex flex-col gap-1 rounded-md border border-border">
-                {customerResults.map((c) => (
-                  <button
-                    key={c.id}
-                    onClick={() => { setSelectedCustomer(c); setCustomerSearch('') }}
-                    className="p-2 text-start text-sm hover:bg-surface-hover"
-                  >
-                    {c.fullName ?? c.mobileDisplay}
-                    {c.fullName && c.mobileDisplay && <span className="text-text-secondary" dir="ltr"> — {c.mobileDisplay}</span>}
-                  </button>
-                ))}
-              </div>
-            )}
-          </>
+          <div className="flex flex-col gap-2">
+            {/* Explicit "Walk-in Customer" option, distinct from "no
+                customer selected yet" -- create_shop_sale still requires
+                a real, non-null customer_id server-side, so this
+                resolves (lazily creating on first use) the club's own
+                system Walk-in Customer row rather than weakening that
+                requirement. */}
+            <Button type="button" variant="outline" size="sm" disabled={walkInPending} onClick={onWalkIn}>
+              <User className="me-2 size-4" aria-hidden="true" />
+              {walkInPending ? t('shop.pos.walkInLoading') : t('shop.pos.walkInCustomer')}
+            </Button>
+            <CustomerSelector clubId={clubId} value={null} onSelect={setSelectedCustomer} />
+          </div>
         )}
       </div>
 
       <div className="flex flex-col gap-2">
-        {cart.map((l, idx) => (
-          <div key={`${l.productId}-${l.variantId}`} className="flex items-center justify-between gap-2 text-sm">
-            <div className="min-w-0 flex-1">
-              <p className="truncate">{l.productName}{l.variantLabel ? ` (${l.variantLabel})` : ''}</p>
-              <MoneyDisplay amount={l.displayPrice * l.quantity} size="sm" />
+        {cart.map((l, idx) => {
+          const lineTotal = l.displayPrice * l.quantity
+          return (
+            <div key={`${l.productId}-${l.variantId}`} className="flex items-center gap-2 text-sm">
+              <ProductThumb src={l.imageUrl} alt={l.productName} className="size-11 shrink-0 rounded-md" />
+              <div className="min-w-0 flex-1">
+                <p className="truncate">{l.productName}{l.variantLabel ? ` (${l.variantLabel})` : ''}</p>
+                <div className="flex items-center gap-2 text-xs text-text-secondary">
+                  <MoneyDisplay amount={l.displayPrice} size="sm" />
+                  <span aria-hidden="true">×</span>
+                  <MoneyDisplay amount={lineTotal} size="sm" tone="default" />
+                </div>
+              </div>
+              <div className="flex items-center gap-1">
+                <Button variant="outline" size="icon" className="size-9" onClick={() => updateQuantity(idx, -1)} aria-label={t('shop.pos.decreaseQty')}><Minus className="size-3.5" /></Button>
+                <Input
+                  type="number"
+                  min="1"
+                  step="1"
+                  value={l.quantity}
+                  onChange={(e) => setQuantityDirect(idx, e.target.value)}
+                  className="h-9 w-14 px-1 text-center tabular-nums"
+                  aria-label={t('shop.pos.quantityFor', { name: l.productName })}
+                />
+                <Button variant="outline" size="icon" className="size-9" onClick={() => updateQuantity(idx, 1)} aria-label={t('shop.pos.increaseQty')}><Plus className="size-3.5" /></Button>
+                <Button variant="ghost" size="icon" className="size-9" onClick={() => removeLine(idx)} aria-label={t('shop.pos.removeLine')}><Trash2 className="size-3.5" /></Button>
+              </div>
             </div>
-            <div className="flex items-center gap-1">
-              <Button variant="outline" size="icon" className="size-9" onClick={() => updateQuantity(idx, -1)}><Minus className="size-3.5" /></Button>
-              <span className="w-6 text-center tabular-nums">{l.quantity}</span>
-              <Button variant="outline" size="icon" className="size-9" onClick={() => updateQuantity(idx, 1)}><Plus className="size-3.5" /></Button>
-              <Button variant="ghost" size="icon" className="size-9" onClick={() => removeLine(idx)}><Trash2 className="size-3.5" /></Button>
-            </div>
-          </div>
-        ))}
+          )
+        })}
         {cart.length === 0 && <p className="py-4 text-center text-sm text-text-secondary">{t('shop.pos.cartEmpty')}</p>}
       </div>
 
-      <div className="flex items-center justify-between border-t border-border pt-2">
-        <span className="text-sm font-medium">{t('shop.pos.subtotal')}</span>
-        <MoneyDisplay amount={subtotal} size="md" />
+      {cart.length > 0 && (
+        <div className="flex items-center justify-between gap-2 border-t border-border pt-2">
+          <Button variant="ghost" size="sm" onClick={onOpenHold}>
+            <PauseCircle className="me-1.5 size-4" aria-hidden="true" />
+            {t('shop.pos.holdSaleAction')}
+          </Button>
+          <Button variant="ghost" size="sm" className="text-status-danger" onClick={onClearCart}>
+            <Trash2 className="me-1.5 size-4" aria-hidden="true" />
+            {t('shop.pos.clearCart')}
+          </Button>
+        </div>
+      )}
+      {cart.length === 0 && heldSalesCount > 0 && (
+        <Button variant="ghost" size="sm" onClick={onOpenHeldSales}>
+          <PauseCircle className="me-1.5 size-4" aria-hidden="true" />
+          {t('shop.pos.viewHeldSales', { count: heldSalesCount })}
+        </Button>
+      )}
+
+      {/* Cart summary breakdown: Subtotal / Discount / Total, explicit
+          per the task's requirement. */}
+      <div className="flex flex-col gap-1 border-t border-border pt-2">
+        <div className="flex items-center justify-between text-sm text-text-secondary">
+          <span>{t('shop.pos.subtotal')}</span>
+          <MoneyDisplay amount={subtotal} size="sm" />
+        </div>
+        {discountAmount > 0 && (
+          <div className="flex items-center justify-between text-sm text-status-success">
+            <span>{t('shop.pos.discountLabel')}</span>
+            <MoneyDisplay amount={-discountAmount} size="sm" tone="success" />
+          </div>
+        )}
+        <div className="flex items-center justify-between">
+          <span className="text-sm font-medium">{t('shop.pos.total')}</span>
+          <MoneyDisplay amount={total} size="md" />
+        </div>
       </div>
 
+      {/* Discount UI -- permission-gated: hidden entirely for a cashier
+          without shop.discount.apply, per the task's explicit
+          instruction (not merely disabled -- a role with no discount
+          capability should not even see the affordance). */}
+      {canDiscount && (
+        <div className="flex flex-col gap-1.5 rounded-md border border-border p-2">
+          <div className="flex items-center justify-between">
+            <label htmlFor="shop-pos-discount-toggle" className="flex items-center gap-1.5 text-sm font-medium text-text-secondary">
+              <Percent className="size-3.5" aria-hidden="true" />
+              {t('shop.pos.discountToggle')}
+            </label>
+            <input
+              id="shop-pos-discount-toggle"
+              type="checkbox"
+              checked={discountEnabled}
+              onChange={(e) => { setDiscountEnabled(e.target.checked); if (!e.target.checked) { setDiscountInput(''); setDiscountReason('') } }}
+              className="size-4"
+            />
+          </div>
+          {discountEnabled && (
+            <>
+              <div className="flex gap-2">
+                <Button type="button" size="sm" variant={discountMode === 'amount' ? 'default' : 'outline'} className="flex-1" onClick={() => setDiscountMode('amount')}>
+                  {t('shop.pos.discountFixed')}
+                </Button>
+                <Button type="button" size="sm" variant={discountMode === 'percent' ? 'default' : 'outline'} className="flex-1" onClick={() => setDiscountMode('percent')}>
+                  {t('shop.pos.discountPercent')}
+                </Button>
+              </div>
+              <Input
+                type="number"
+                min="0"
+                step="0.01"
+                inputMode="decimal"
+                placeholder={discountMode === 'percent' ? t('shop.pos.discountPercentPlaceholder') : t('shop.pos.discountAmountPlaceholder')}
+                value={discountInput}
+                onChange={(e) => setDiscountInput(e.target.value)}
+              />
+              <Input
+                placeholder={t('shop.pos.discountReasonPlaceholder')}
+                value={discountReason}
+                onChange={(e) => setDiscountReason(e.target.value)}
+              />
+            </>
+          )}
+        </div>
+      )}
+
+      {/* Payment method controls -- large, tappable, sourced from the
+          club's real configured payment_method_configs (never a
+          hardcoded static list). */}
+      <div className="flex flex-col gap-1.5">
+        <label className="text-sm font-medium text-text-secondary">{t('shop.pos.paymentMethodLabel')}</label>
+        {paymentMethods.length === 0 ? (
+          <p className="text-xs text-text-secondary">{t('shop.pos.noPaymentMethods')}</p>
+        ) : (
+          <div className="grid grid-cols-2 gap-2">
+            {paymentMethods.map((m) => (
+              <button
+                key={m.id}
+                type="button"
+                onClick={() => setSelectedMethodId(m.id)}
+                className={`flex h-14 flex-col items-center justify-center gap-0.5 rounded-md border px-2 text-center transition-colors ${
+                  selectedMethodId === m.id
+                    ? 'border-primary bg-primary text-primary-foreground'
+                    : 'border-border bg-surface hover:bg-surface-muted'
+                }`}
+              >
+                {m.underlyingMethod === 'cash' && <Banknote className="size-4" aria-hidden="true" />}
+                <span className="line-clamp-1 text-sm font-medium">{m.nameAr}</span>
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {isPrimaryCash && (
+        <div className="flex flex-col gap-1.5 rounded-md border border-border p-2">
+          <label className="text-sm font-medium text-text-secondary">{t('shop.pos.amountReceived')}</label>
+          <Input
+            type="number"
+            min="0"
+            step="0.01"
+            inputMode="decimal"
+            value={cashReceivedInput}
+            onChange={(e) => setCashReceivedInput(e.target.value)}
+          />
+          <div className="flex items-center justify-between text-sm">
+            <span className="text-text-secondary">{t('shop.pos.changeDue')}</span>
+            <MoneyDisplay amount={changeDue} size="md" tone={changeDue > 0 ? 'success' : 'default'} />
+          </div>
+        </div>
+      )}
+
+      {/* Split-tender: sequential create_shop_sale (primary amount) +
+          record_payment (this remainder), per plan Section 5. */}
       <div className="flex items-center justify-between">
-        <label htmlFor="shop-pos-partial-toggle" className="text-sm font-medium text-text-secondary">
-          {t('shop.pos.partialPaymentLabel')}
+        <label htmlFor="shop-pos-split-toggle" className="text-sm font-medium text-text-secondary">
+          {t('shop.pos.splitPaymentLabel')}
         </label>
         <input
-          id="shop-pos-partial-toggle"
+          id="shop-pos-split-toggle"
           type="checkbox"
-          checked={partialPayment}
-          onChange={(e) => { setPartialPayment(e.target.checked); setPaymentAmountInput('') }}
+          checked={splitEnabled}
+          onChange={(e) => { setSplitEnabled(e.target.checked); setSplitAmountInput(''); setSplitMethodId(null) }}
           className="size-4"
         />
       </div>
-      {partialPayment && (
-        <div className="flex flex-col gap-1.5">
-          <label className="text-sm font-medium text-text-secondary">{t('shop.pos.paidNowLabel')}</label>
+      {splitEnabled && (
+        <div className="flex flex-col gap-1.5 rounded-md border border-border p-2">
+          <label className="text-sm font-medium text-text-secondary">{t('shop.pos.splitAmountLabel')}</label>
           <Input
             type="number"
             min="0.01"
             step="0.01"
-            max={subtotal || undefined}
-            value={paymentAmountInput}
-            onChange={(e) => setPaymentAmountInput(e.target.value)}
+            max={total || undefined}
+            value={splitAmountInput}
+            onChange={(e) => setSplitAmountInput(e.target.value)}
           />
+          <Select value={splitMethodId ?? ''} onValueChange={setSplitMethodId}>
+            <SelectTrigger><SelectValue placeholder={t('shop.pos.splitMethodPlaceholder')} /></SelectTrigger>
+            <SelectContent>
+              {paymentMethods.map((m) => (
+                <SelectItem key={m.id} value={m.id}>{m.nameAr}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
           <p className="text-xs text-text-secondary">
-            {t('shop.pos.outstandingPreview', { amount: outstandingPreview.toFixed(2) })}
+            {t('shop.pos.splitPrimaryPreview', { amount: primaryAmount.toFixed(2) })}
           </p>
         </div>
       )}
 
-      <div className="flex flex-col gap-1.5">
-        <label className="text-sm font-medium text-text-secondary">{t('shop.pos.paymentMethodLabel')}</label>
-        <Select value={paymentMethod} onValueChange={setPaymentMethod}>
-          <SelectTrigger><SelectValue /></SelectTrigger>
-          <SelectContent>
-            <SelectItem value="cash">{t('shop.pos.methodCash')}</SelectItem>
-            <SelectItem value="card">{t('shop.pos.methodCard')}</SelectItem>
-            <SelectItem value="bank_transfer">{t('shop.pos.methodBankTransfer')}</SelectItem>
-            <SelectItem value="wallet">{t('shop.pos.methodWallet')}</SelectItem>
-          </SelectContent>
-        </Select>
-      </div>
-
       {error && <p role="alert" className="text-sm text-status-danger">{error}</p>}
-      {lastSetupNotice && <p className="text-sm text-status-success">{lastSetupNotice}</p>}
 
       <Button disabled={isPending} className="h-11" onClick={onCompleteSale}>
         {isPending ? t('shop.pos.completing') : t('shop.pos.completeSale')}
