@@ -23,23 +23,65 @@ import { Button } from '@/components/ui/button'
 //      activates the waiting worker and reloads the page onto it --
 //      the one moment code truly changes under the user is a moment
 //      they explicitly chose.
+//
+// REAL BUG FOUND live in production (2026-08-28), fixed here: a tab
+// that already had a worker sitting in the `waiting` state BEFORE this
+// component mounted (e.g. a deploy landed while the tab was open, or
+// registration timing meant workbox-window's synthetic `waiting` event
+// on register() didn't fire the way `useRegisterSW`'s `onNeedRefresh`
+// expects) never showed the update toast at all -- `onNeedRefresh` only
+// fires in reaction to a live Workbox `waiting` EVENT, never by reading
+// existing registration state. Confirmed live:
+// `navigator.serviceWorker.getRegistrations()` showed a real `waiting`
+// worker with zero visible prompt to the user, on a device serving a
+// stale bundle while curl-verified production was already current.
+// Fixed by explicitly checking `registration.waiting` right after
+// registration and on every visibility/interval check, not only
+// reacting to the `waiting` event -- this makes the prompt reliably
+// appear for a worker that was already waiting before this component
+// ever ran, closing the exact gap that produced the stale-bundle
+// symptom without requiring any manual cache/site-data clearing.
 export function PwaUpdatePrompt() {
   const { t } = useTranslation()
   const {
-    needRefresh: [needRefresh],
+    needRefresh: [needRefresh, setNeedRefresh],
     updateServiceWorker,
   } = useRegisterSW({
     onRegisteredSW(_url, registration) {
       if (!registration) return
+
+      const checkForWaitingWorker = () => {
+        if (registration.waiting) setNeedRefresh(true)
+      }
+      // Catches a worker that was ALREADY waiting before this component
+      // mounted -- the real gap: useRegisterSW's onNeedRefresh only
+      // fires on a live 'waiting' EVENT, never by inspecting existing
+      // registration state at startup.
+      checkForWaitingWorker()
+
       // Explicit periodic check -- vite-plugin-pwa's own default
       // check only fires on page load/navigation, which a
       // long-lived open tab may never do again.
       const interval = setInterval(() => {
-        void registration.update()
+        void registration.update().then(checkForWaitingWorker)
       }, 60_000)
       // Registration objects aren't re-created per render, but guard
       // against leaking the interval if this component ever unmounts.
       window.addEventListener('beforeunload', () => clearInterval(interval), { once: true })
+
+      // Belt-and-suspenders: if a worker enters `waiting` at any point
+      // after registration (the normal live-update case this component
+      // already handled before this fix), still catch it directly
+      // rather than relying solely on useRegisterSW's own event wiring.
+      registration.addEventListener('updatefound', () => {
+        const installing = registration.installing
+        if (!installing) return
+        installing.addEventListener('statechange', () => {
+          if (installing.state === 'installed' && navigator.serviceWorker.controller) {
+            setNeedRefresh(true)
+          }
+        })
+      })
     },
   })
 
@@ -48,13 +90,17 @@ export function PwaUpdatePrompt() {
   // long-backgrounded tab shortly after a deploy.
   useEffect(() => {
     function onVisible() {
-      if (document.visibilityState === 'visible') {
-        void navigator.serviceWorker?.getRegistration().then((r) => r?.update())
-      }
+      if (document.visibilityState !== 'visible') return
+      void navigator.serviceWorker?.getRegistration().then((r) => {
+        if (!r) return
+        void r.update()
+        if (r.waiting) setNeedRefresh(true)
+      })
     }
     document.addEventListener('visibilitychange', onVisible)
+    onVisible()
     return () => document.removeEventListener('visibilitychange', onVisible)
-  }, [])
+  }, [setNeedRefresh])
 
   if (!needRefresh) return null
 
