@@ -61,7 +61,17 @@ Continuing: Shop/inventory, academy, memberships, staff, support-session cross-t
 
 ### Phase 3 — Privilege escalation: club staff + platform staff (§4, §19, §20)
 Test self-role-change, permission self-grant, ceiling violations. Verify `set_platform_staff_role()`'s existing escalation guards; verify the club-level equivalent (`set_staff_role`) has the same shape.
-Status: PENDING
+Status: COMPLETE. Migration `20260829070000_platform_staff_role_escalation_fix.sql`.
+
+**CRITICAL P0 finding, live-exploited and fixed -- the single most severe finding of this program.** `platform_staff_memberships_write` was the exact same bug class as Phase 1's `club_memberships` finding, but worse: an RLS `ALL`-command policy gated only on `platform.staff.create`/`update`/`disable`, with **zero column restriction and zero trigger protection** (unlike `club_memberships`, which at least has `protect_club_membership_identity_columns()` guarding `role_id`; `platform_staff_memberships` has no triggers at all).
+
+Live-attacked with a synthetic QA fixture (the existing `mal3aby.qa.receptionist` test identity, granted a temporary `platform_admin` membership, deleted immediately after each step): as that `platform_admin`-role identity, a direct `update platform_staff_memberships set platform_role_id = <platform_owner's role id>` **succeeded**, completely bypassing `set_platform_staff_role()`'s real privilege-ceiling check (`pp.key not in (select caller_platform_permission_keys())`) and its last-assigner-lockout guard, with **zero `audit_logs` row produced**. The resulting role grants nearly every platform permission (`platform.finance.manage`, `platform.subscription.manage`, `platform.club.suspend`, `platform.staff.role.assign`, 22 permissions total) -- a near-complete, invisible, self-granted escalation from any `platform_admin`-tier account. (Does not by itself satisfy `is_platform_owner()`, which checks the separate `club_memberships` table -- but platform-staff-tier authority alone is already severe.)
+
+**Fix**: dropped the dangerous policy entirely. Confirmed zero legitimate frontend call site exists for direct `platform_staff_memberships` writes (grepped `src/` -- zero matches; the real UI only calls `list_platform_staff`/`list_platform_roles`/`deactivate_platform_staff`/`set_platform_staff_role`, all `SECURITY DEFINER` RPCs, all unaffected). Confirmed no create/invite-platform-staff RPC or UI exists either way -- new memberships are already, today, a superuser/migration-only operation; this migration doesn't change that, only closes the unused-but-dangerous direct-write surface.
+
+**Regression-verified live**: re-attempted the exact same escalation attack post-fix -- correctly blocked (0 rows affected, role unchanged). Re-verified both legitimate RPCs still work and are correctly audited: `set_platform_staff_role()` (role downgrade to `platform_viewer`, produced a real `platform_staff.role_changed` audit row) and `deactivate_platform_staff()` (both succeeded). Fixture fully cleaned up, `platform_staff_memberships` confirmed back to 0 rows (original baseline -- no real platform staff exist yet in this environment).
+
+`tsc -b` clean, full test suite 10/10 files / 108/108 tests pass.
 
 ### Phase 4 — Branch isolation (§5)
 Verify branch-scoped staff cannot read/write another branch's bookings/payments/cash/inventory/POS/memberships/academy/attendance/reports.
