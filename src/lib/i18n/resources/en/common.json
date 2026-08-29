@@ -462,10 +462,25 @@
       "modulesEntitled": "Entitled",
       "modulesNotEntitled": "Not entitled",
       "modulesActive": "Active",
-      "modulesNotActivated": "Not activated by club yet",
+      "modulesNotActivated": "Not activated",
       "modulesEnable": "Enable",
       "modulesDisable": "Disable",
-      "modulesLastChanged": "Last changed: {{date}}"
+      "modulesLastChanged": "Last changed: {{date}}",
+      "modulesActivate": "Activate",
+      "modulesDeactivate": "Deactivate",
+      "modulesActivateDefaultReason": "Activated from Platform Owner console",
+      "modulesDeactivateDefaultReason": "Deactivated from Platform Owner console",
+      "modulesEffectiveState": {
+        "active": "Effective state: Active",
+        "inactive": "Effective state: Inactive",
+        "not_entitled": "Effective state: Not available",
+        "blocked_by_subscription": "Effective state: Blocked by subscription"
+      },
+      "modulesDeactivateDialog": {
+        "title": "Deactivate \"{{module}}\"",
+        "impact": "Deactivating this module will block new operations inside it, while keeping all existing data and records.",
+        "confirm": "Confirm deactivation"
+      }
     },
     "clubsPage": {
       "title": "Clubs",

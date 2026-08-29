@@ -1210,7 +1210,7 @@ export function PlatformClubDetailPage() {
           />
         </TabsContent>
         <TabsContent value="modules">
-          {clubId && <ModulesPanel clubId={clubId} />}
+          {clubId && <ModulesPanel clubId={clubId} subscriptionAccess={access ?? null} />}
         </TabsContent>
       </Tabs>
 
@@ -1372,21 +1372,79 @@ async function fetchModules(clubId: string): Promise<ModuleRow[]> {
   return (data ?? []).map((r) => ({ moduleKey: r.module_key, entitled: r.entitled, active: r.active, updatedAt: r.updated_at ?? null }))
 }
 
-function ModulesPanel({ clubId }: { clubId: string }) {
+// PLATFORM OWNER MODULE ACTIVATION CONTROL -- finite corrective phase
+// (2026-08-29). Prior state: Platform Owner could only toggle
+// ENTITLEMENT here -- OPERATIONAL ACTIVATION (`active`) required a
+// Club Owner login or a support session, which is no longer the
+// intended product behavior (a Platform Owner who re-entitles a module
+// they just disabled could not themselves finish restoring it).
+// set_club_module_active() now also accepts is_platform_owner() /
+// platform.club.manage, symmetric with set_club_module_entitlement()'s
+// existing authority -- see migration
+// 20260829030000_platform_owner_module_activation_authority.sql.
+//
+// EFFECTIVE STATE is computed here, not stored -- it's a pure function
+// of three already-loaded facts (entitled, active, and the club's own
+// subscription access), matching this page's existing pattern of
+// deriving display state rather than adding new persisted columns:
+//   - not entitled            -> NOT_AVAILABLE (nothing else matters)
+//   - entitled, subscription blocked -> BLOCKED_BY_SUBSCRIPTION (matches
+//     club_write_allowed()'s own real gate -- a Platform-Owner-active
+//     module is still unusable if the club's subscription itself blocks
+//     writes, and hiding that behind a plain "Active" badge would be
+//     misleading)
+//   - entitled, not active    -> INACTIVE
+//   - entitled, active, subscription not blocked -> ACTIVE
+type ModuleEffectiveState = 'active' | 'inactive' | 'not_entitled' | 'blocked_by_subscription'
+
+function computeEffectiveState(m: ModuleRow, subscriptionAccess: string | null): ModuleEffectiveState {
+  if (!m.entitled) return 'not_entitled'
+  if (subscriptionAccess === 'blocked') return 'blocked_by_subscription'
+  if (!m.active) return 'inactive'
+  return 'active'
+}
+
+const EFFECTIVE_STATE_TONE: Record<ModuleEffectiveState, 'success' | 'warning' | 'danger' | 'neutral'> = {
+  active: 'success',
+  inactive: 'warning',
+  not_entitled: 'neutral',
+  blocked_by_subscription: 'danger',
+}
+
+function ModulesPanel({ clubId, subscriptionAccess }: { clubId: string; subscriptionAccess: string | null }) {
   const { t } = useTranslation()
   const queryClient = useQueryClient()
+  const [deactivateTarget, setDeactivateTarget] = useState<{ moduleKey: string; reason: string } | null>(null)
 
   const { data: modules = [], isLoading } = useQuery({
     queryKey: ['platform-club-modules', clubId],
     queryFn: () => fetchModules(clubId),
   })
 
-  const toggleMutation = useMutation({
+  const invalidate = () => void queryClient.invalidateQueries({ queryKey: ['platform-club-modules', clubId] })
+
+  const entitlementMutation = useMutation({
     mutationFn: async ({ moduleKey, entitled }: { moduleKey: string; entitled: boolean }) => {
       const { error } = await supabase.rpc('set_club_module_entitlement', { p_club_id: clubId, p_module_key: moduleKey, p_entitled: entitled })
       if (error) throw error
     },
-    onSuccess: () => void queryClient.invalidateQueries({ queryKey: ['platform-club-modules', clubId] }),
+    onSuccess: invalidate,
+  })
+
+  const activationMutation = useMutation({
+    mutationFn: async ({ moduleKey, active, reason }: { moduleKey: string; active: boolean; reason?: string }) => {
+      const { error } = await supabase.rpc('set_club_module_active', {
+        p_club_id: clubId,
+        p_module_key: moduleKey,
+        p_active: active,
+        p_reason: reason?.trim() || (active ? t('platform.clubDetailPage.modulesActivateDefaultReason') : t('platform.clubDetailPage.modulesDeactivateDefaultReason')),
+      })
+      if (error) throw error
+    },
+    onSuccess: () => {
+      invalidate()
+      setDeactivateTarget(null)
+    },
   })
 
   if (isLoading) return null
@@ -1394,32 +1452,87 @@ function ModulesPanel({ clubId }: { clubId: string }) {
   return (
     <div className="flex flex-col gap-3">
       <p className="text-sm text-text-secondary">{t('platform.clubDetailPage.modulesHint')}</p>
-      {modules.map((m) => (
-        <div key={m.moduleKey} className="flex items-center justify-between rounded-md border border-border p-3">
-          <div>
-            <p className="font-medium">{t(MODULE_LABELS[m.moduleKey] ?? m.moduleKey)}</p>
-            <div className="mt-1 flex gap-2">
-              <StatusBadge tone={m.entitled ? 'success' : 'neutral'} label={m.entitled ? t('platform.clubDetailPage.modulesEntitled') : t('platform.clubDetailPage.modulesNotEntitled')} />
-              {m.entitled && (
-                <StatusBadge tone={m.active ? 'success' : 'warning'} label={m.active ? t('platform.clubDetailPage.modulesActive') : t('platform.clubDetailPage.modulesNotActivated')} />
+      {modules.map((m) => {
+        const effective = computeEffectiveState(m, subscriptionAccess)
+        return (
+          <div key={m.moduleKey} className="flex flex-col gap-3 rounded-md border border-border p-3 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <p className="font-medium">{t(MODULE_LABELS[m.moduleKey] ?? m.moduleKey)}</p>
+              <div className="mt-1 flex flex-wrap gap-1.5">
+                <StatusBadge tone={m.entitled ? 'success' : 'neutral'} label={m.entitled ? t('platform.clubDetailPage.modulesEntitled') : t('platform.clubDetailPage.modulesNotEntitled')} />
+                {m.entitled && (
+                  <StatusBadge tone={m.active ? 'success' : 'warning'} label={m.active ? t('platform.clubDetailPage.modulesActive') : t('platform.clubDetailPage.modulesNotActivated')} />
+                )}
+                <StatusBadge tone={EFFECTIVE_STATE_TONE[effective]} label={t(`platform.clubDetailPage.modulesEffectiveState.${effective}`)} />
+              </div>
+              {m.updatedAt && (
+                <p className="mt-1 text-xs text-text-secondary">
+                  {t('platform.clubDetailPage.modulesLastChanged', { date: new Date(m.updatedAt).toLocaleString() })}
+                </p>
               )}
             </div>
-            {m.updatedAt && (
-              <p className="mt-1 text-xs text-text-secondary">
-                {t('platform.clubDetailPage.modulesLastChanged', { date: new Date(m.updatedAt).toLocaleString() })}
-              </p>
-            )}
+            <div className="flex flex-wrap gap-2">
+              <Button
+                variant={m.entitled ? 'outline' : 'default'}
+                size="sm"
+                disabled={entitlementMutation.isPending}
+                onClick={() => entitlementMutation.mutate({ moduleKey: m.moduleKey, entitled: !m.entitled })}
+              >
+                {m.entitled ? t('platform.clubDetailPage.modulesDisable') : t('platform.clubDetailPage.modulesEnable')}
+              </Button>
+              {m.entitled && (
+                <Button
+                  variant={m.active ? 'outline' : 'default'}
+                  size="sm"
+                  disabled={activationMutation.isPending}
+                  onClick={() => {
+                    if (m.active) {
+                      setDeactivateTarget({ moduleKey: m.moduleKey, reason: '' })
+                    } else {
+                      activationMutation.mutate({ moduleKey: m.moduleKey, active: true })
+                    }
+                  }}
+                >
+                  {m.active ? t('platform.clubDetailPage.modulesDeactivate') : t('platform.clubDetailPage.modulesActivate')}
+                </Button>
+              )}
+            </div>
           </div>
-          <Button
-            variant={m.entitled ? 'outline' : 'default'}
-            size="sm"
-            disabled={toggleMutation.isPending}
-            onClick={() => toggleMutation.mutate({ moduleKey: m.moduleKey, entitled: !m.entitled })}
-          >
-            {m.entitled ? t('platform.clubDetailPage.modulesDisable') : t('platform.clubDetailPage.modulesEnable')}
-          </Button>
-        </div>
-      ))}
+        )
+      })}
+
+      {/* High-impact confirmation per directive: deactivation never
+          deletes data -- state that explicitly, not a generic
+          destructive-sounding warning. */}
+      <Dialog open={deactivateTarget !== null} onOpenChange={(open) => !open && setDeactivateTarget(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>
+              {t('platform.clubDetailPage.modulesDeactivateDialog.title', {
+                module: deactivateTarget ? t(MODULE_LABELS[deactivateTarget.moduleKey] ?? deactivateTarget.moduleKey) : '',
+              })}
+            </DialogTitle>
+          </DialogHeader>
+          <div className="flex flex-col gap-3">
+            <p className="text-sm text-status-warning">{t('platform.clubDetailPage.modulesDeactivateDialog.impact')}</p>
+            <Input
+              value={deactivateTarget?.reason ?? ''}
+              onChange={(e) => setDeactivateTarget((prev) => (prev ? { ...prev, reason: e.target.value } : prev))}
+              placeholder={t('platform.clubDetailPage.reasonDialog.reasonPlaceholder')}
+            />
+            <Button
+              variant="destructive"
+              disabled={activationMutation.isPending}
+              onClick={() => {
+                if (!deactivateTarget) return
+                activationMutation.mutate({ moduleKey: deactivateTarget.moduleKey, active: false, reason: deactivateTarget.reason })
+              }}
+            >
+              {t('platform.clubDetailPage.modulesDeactivateDialog.confirm')}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

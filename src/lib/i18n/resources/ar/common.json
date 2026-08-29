@@ -462,10 +462,25 @@
       "modulesEntitled": "متاحة",
       "modulesNotEntitled": "غير متاحة",
       "modulesActive": "مفعّلة",
-      "modulesNotActivated": "لم يفعّلها النادي بعد",
+      "modulesNotActivated": "غير مفعّلة",
       "modulesEnable": "إتاحة",
       "modulesDisable": "إيقاف الإتاحة",
-      "modulesLastChanged": "آخر تغيير: {{date}}"
+      "modulesLastChanged": "آخر تغيير: {{date}}",
+      "modulesActivate": "تفعيل",
+      "modulesDeactivate": "إيقاف التفعيل",
+      "modulesActivateDefaultReason": "تفعيل من لوحة صاحب المنصة",
+      "modulesDeactivateDefaultReason": "إيقاف تفعيل من لوحة صاحب المنصة",
+      "modulesEffectiveState": {
+        "active": "الحالة الفعلية: مفعّلة",
+        "inactive": "الحالة الفعلية: موقوفة",
+        "not_entitled": "الحالة الفعلية: غير متاحة",
+        "blocked_by_subscription": "الحالة الفعلية: موقوفة بسبب الاشتراك"
+      },
+      "modulesDeactivateDialog": {
+        "title": "إيقاف تفعيل وحدة \"{{module}}\"",
+        "impact": "إيقاف الوحدة سيمنع العمليات الجديدة داخلها، مع الاحتفاظ بجميع البيانات والسجلات السابقة.",
+        "confirm": "تأكيد إيقاف التفعيل"
+      }
     },
     "clubsPage": {
       "title": "الأندية",
