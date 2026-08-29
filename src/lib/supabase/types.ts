@@ -9547,7 +9547,7 @@ export type Database = {
         Returns: undefined
       }
       set_club_module_active: {
-        Args: { p_active: boolean; p_club_id: string; p_module_key: string }
+        Args: { p_active: boolean; p_club_id: string; p_module_key: string; p_reason?: string | null }
         Returns: undefined
       }
       set_club_module_entitlement: {
