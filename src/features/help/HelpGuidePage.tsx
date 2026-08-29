@@ -17,6 +17,7 @@ import {
   Settings,
   LayoutDashboard,
   ChevronRight,
+  ChevronDown,
   type LucideIcon,
 } from 'lucide-react'
 
@@ -39,6 +40,48 @@ interface HelpModule {
   // i18n (help.modules.<key>.steps), same pattern as howItWorksSteps on
   // the public HomePage.
   screenshot?: string
+}
+
+// A single step, collapsed to a short label by default -- click to
+// expand the full explanation. User feedback (2026-08-29, after the
+// content pass below made every module's step list noticeably longer):
+// "خليك تخلي الشرح عبارة عن ان كل نقطه تفتح الشرح للحفاظ علي المساحه"
+// -- each point should open its own explanation to save vertical space,
+// rather than the full sentence always showing. Steps stay full
+// sentences in i18n (unchanged data shape); this only changes how one
+// step is DISPLAYED -- the natural break at the first " -- " (the
+// double-hyphen em-dash convention used throughout this codebase's own
+// copy) becomes the always-visible label, with the rest revealed on
+// expand. A step with no such break just shows its first ~50 chars as
+// the label instead.
+function HelpStep({ index, text }: { index: number; text: string }) {
+  const [open, setOpen] = useState(false)
+  const breakAt = text.indexOf(' -- ')
+  const label = breakAt > 0 && breakAt < 90 ? text.slice(0, breakAt) : text.length > 70 ? `${text.slice(0, 68)}…` : text
+  const hasMore = label !== text
+
+  return (
+    <li className="flex gap-3">
+      <span className="flex size-6 shrink-0 items-center justify-center rounded-full bg-dark-base text-xs font-bold text-white">
+        {index + 1}
+      </span>
+      <div className="min-w-0 flex-1">
+        {hasMore ? (
+          <button
+            type="button"
+            onClick={() => setOpen((v) => !v)}
+            className="flex w-full items-start gap-2 text-start text-sm font-medium text-text-primary"
+          >
+            <span className="flex-1 pt-0.5">{label}</span>
+            <ChevronDown className={cn('mt-1 size-4 shrink-0 text-text-secondary transition-transform', open && 'rotate-180')} />
+          </button>
+        ) : (
+          <p className="pt-0.5 text-sm text-text-primary">{label}</p>
+        )}
+        {hasMore && open && <p className="mt-1.5 text-sm text-text-secondary">{text}</p>}
+      </div>
+    </li>
+  )
 }
 
 const MODULES: HelpModule[] = [
@@ -112,16 +155,9 @@ export function HelpGuidePage() {
               </div>
             )}
 
-            <ol className="mt-5 flex flex-col gap-3">
+            <ol className="mt-5 flex flex-col gap-1">
               {Array.isArray(steps) &&
-                steps.map((step, i) => (
-                  <li key={i} className="flex gap-3">
-                    <span className="flex size-6 shrink-0 items-center justify-center rounded-full bg-dark-base text-xs font-bold text-white">
-                      {i + 1}
-                    </span>
-                    <span className="pt-0.5 text-sm text-text-primary">{step}</span>
-                  </li>
-                ))}
+                steps.map((step, i) => <HelpStep key={i} index={i} text={step} />)}
             </ol>
           </CardContent>
         </Card>

@@ -4732,140 +4732,191 @@
     "modules": {
       "today": {
         "title": "Today (Dashboard)",
-        "summary": "The first screen you see after logging in — a quick summary of everything happening in your club today, plus shortcuts to the actions you do most.",
+        "summary": "The first screen you see after logging in — it changes based on your role, and is built to give you everything that needs a decision from you today, in one glance.",
         "screenshotAlt": "The Today dashboard in Mal3aby, showing today's booking count, check-ins, revenue, and quick-action buttons",
         "steps": [
-          "The numbers at the top (bookings today, checked in, revenue, occupied fields) update live — no need to refresh.",
-          "The quick-action buttons (New booking, Collect payment, Scan QR, Add customer) take you straight to that action without digging through menus.",
-          "The \"Getting started\" checklist shows until you've added your first staff member, customer, field, and booking — then it disappears automatically.",
-          "The \"Needs attention\" section (when shown) collects anything waiting on a decision from you, like overdue invoices or payments pending review."
+          "The screen adapts to your role: reception sees Now/Next plus quick actions, a manager sees everything plus academy risk and financial transparency, and a coach sees only their sessions and player attendance — no admin clutter.",
+          "The \"Getting started\" checklist tracks 4 real things (first staff member, first customer, first field, first booking) and disappears automatically once you've done them — dismissing it manually won't bring it back.",
+          "The top numbers (bookings today, checked in, occupied fields, revenue) refresh automatically every minute — no need to reload the page.",
+          "\"Needs attention\" (when shown) collects 5 real kinds of alerts: confirmed bookings today that aren't fully paid, bookings starting within the hour with no check-in yet, academy subscriptions expiring within 3 days, customer-uploaded payment proofs waiting on your review, and WhatsApp messages that permanently failed to send.",
+          "Every item in \"Needs attention\" is clickable — it takes you straight to where you fix it, not just a display.",
+          "If you're the club owner, you'll also see a \"Financial Transparency\" section showing exactly how much each staff member collected today, plus an alert if any unusual discounts or refunds happened that same day.",
+          "The quick-action buttons (New booking, Collect payment, Scan QR, Add customer) take you straight to that action without digging through side menus."
         ]
       },
       "bookings": {
         "title": "Bookings",
-        "summary": "Schedule and manage field bookings — a calendar screen showing your fields and time slots, with new bookings one click away.",
+        "summary": "Schedule and manage field bookings — a detailed time grid per field, with conflicts checked automatically before you confirm anything.",
         "screenshotAlt": "The Bookings screen in Mal3aby, showing the available and booked time slots for a field",
         "steps": [
-          "From \"New booking\", pick the field, date, and time — the system automatically stops you from double-booking the same field at the same time.",
+          "The screen offers two views: \"Selected Field\" (a full-day grid for one field, in 30-minute slots from 6 AM to 11 PM) or \"All Fields\" (one grid showing every field together).",
+          "From \"New Booking\", pick a duration (30 minutes up to 3 hours) — any duration that would conflict with an existing booking or closure is automatically disabled, not just rejected after you click.",
           "Type the customer's phone number; if they're an existing customer, the system finds them automatically instead of you re-entering their details.",
+          "You can choose \"Pay Now\" or \"Awaiting Payment\" — available payment methods are cash, card, bank transfer, mobile wallet, or other.",
+          "\"Weekly recurring booking\" creates up to 52 occurrences at the same time each week in one go, and reports exactly how many were created vs. conflicted — each occurrence is billed separately, there's no single upfront payment for the whole series.",
           "After confirming, the customer gets an entry code (QR) they can use to verify their booking and check in — even without WhatsApp.",
-          "From the same screen you can cancel a booking, reschedule it, or check the customer in manually."
+          "From any booking's details you can: reschedule it to a different time or field, mark \"No-show\" (a real double-confirm, since a misclick here is hard to undo), cancel it (a reason is required), or collect the remaining balance directly.",
+          "The outstanding amount shown always accounts for any prior refund automatically — never just \"total minus paid\"."
         ]
       },
       "customers": {
         "title": "Customers",
-        "summary": "Every club customer's record in one place — each customer has a single \"360\" page with their full booking, payment, and activity history.",
+        "summary": "Every club customer's record in one place — each customer has a single \"360\" page with 8 tabs covering everything about them.",
         "screenshotAlt": "A customer detail page in Mal3aby (Customer 360) showing their info, booking history, and payments",
         "steps": [
-          "Search for any customer by name or phone number from the search box at the top of the screen.",
-          "Open any customer's page to see all their bookings, subscriptions, payments, and activity history in one place.",
-          "If two customer records look like duplicates, the screen flags it and lets you merge them into one so data doesn't stay split."
+          "Search works by name or phone number in any format you type it — the system compares the cleaned-up digits, not just an exact text match.",
+          "If you add a customer with a phone number that already exists, the screen tells you right away and gives you a link to the existing record instead of creating a duplicate.",
+          "The \"WhatsApp consent\" question only appears once a valid phone number is entered, and there's no default — you must explicitly choose yes or no.",
+          "The \"Duplicates\" page groups customers who share the same phone number or email, and lets you \"flag as duplicate\" — that's a review flag only, it never auto-merges bookings or invoices between records.",
+          "The customer's \"360\" page has 8 tabs: Overview, Bookings, Academy & Players, Club Membership, Products (shop purchases), Financial Account, WhatsApp & Communication, and Activity & Audit.",
+          "The \"Financial Account\" tab shows total invoiced, paid, refunded, and outstanding, with every invoice's source clearly marked (booking, subscription, membership, or shop).",
+          "From the same customer page you can add a new academy player (the customer automatically becomes the guardian) or sell them a club membership directly — no need to switch screens.",
+          "\"Portal Account\" shows their online-account status (not activated / invite sent / activated / invite expired) with a button to send or resend the activation invite."
         ]
       },
       "academy": {
         "title": "Academy",
-        "summary": "For running sports academies — training groups, players, session attendance, and academy subscriptions.",
+        "summary": "For running sports academies — training groups, players, session attendance, and subscriptions that renew monthly.",
         "screenshotAlt": "The Academy screen in Mal3aby, showing training groups and players",
         "steps": [
-          "Create a training group (e.g. \"Under-10s\") and set its coach and weekly schedule.",
-          "Add players to the group — each player gets a subscription that renews on the period you set.",
-          "The coach can mark attendance for each session from their own Today page, without needing to touch other screens.",
-          "The \"Player 360\" page shows a player's full attendance history, subscriptions, and payments in one place."
+          "The screen has 4 tabs: Overview, Players, Subscriptions, and Attendance. A coach sees their own dedicated screen (sessions and attendance only) instead of the full tabbed view.",
+          "\"Overview\" shows today's sessions, sessions with attendance not yet marked, active players, subscriptions expiring within 3 days, and overdue academy invoices.",
+          "Player records are deliberately minimal: name and guardian link only — no date of birth, height, weight, or medical data required.",
+          "The enrollment wizard walks you through: Player → Guardian (for billing) → Group → dates → Enroll — the subscription price is locked to the group's own price (not typed in manually), only the discount is editable.",
+          "Right after enrollment, the system prompts you straight to \"Collect Payment Now\" on the invoice that was just created.",
+          "Subscription statuses: pending, active, frozen, expired, cancelled — plus an extra \"due for renewal\" status that appears automatically when an active subscription is within a week of ending.",
+          "\"Freeze\" takes a date range and an optional reason, and automatically extends the end date by the frozen duration.",
+          "Attendance can be marked even without a pre-built weekly schedule — the system creates an on-the-fly session automatically so a coach is never blocked. Attendance can be marked manually or by scanning the player's own QR code."
         ]
       },
       "memberships": {
         "title": "Club Memberships",
-        "summary": "For general club membership (separate from Academy) — membership plans, renewals, freezes, and cancellations.",
+        "summary": "For general club membership (separate from Academy) — membership plans, renewals, freezes, and cancellations, entirely independent of academy subscriptions.",
         "screenshotAlt": "The Club Memberships screen in Mal3aby, showing membership plans and current members",
         "steps": [
-          "Set up the membership plans your club offers (monthly, quarterly, yearly) with the right price and duration for each.",
-          "Link any customer to a membership plan to automatically track its start and end dates.",
-          "If a customer is traveling or needs to pause temporarily, you can \"freeze\" their membership instead of cancelling it outright.",
-          "The system warns you before any membership expires, so you can reach out for renewal in time."
+          "The screen has 4 tabs: Overview, Plans, Members, and Expiring (within 7 days).",
+          "Each plan defines: name (Arabic and English), price, duration (day/month/year), which branches it's available at, and whether it allows renewal and freezing (with an optional max freeze-days cap).",
+          "Archiving a plan instead of deleting it keeps existing members' records intact — nothing is permanently erased.",
+          "The \"Sell Membership\" wizard walks you through: customer, plan, branch (if the plan is branch-scoped), start date (end date is calculated automatically), then any discount.",
+          "If a customer is traveling or needs to pause, \"Freeze\" takes a date range and reason — but only works if the plan itself allows freezing, otherwise the button is disabled with a tooltip explaining why.",
+          "\"Cancel\" requires typing a reason plus an explicit double confirmation, to prevent accidental cancellations.",
+          "Every freeze and renewal is logged in its own append-only history — nothing gets overwritten.",
+          "From any member's details you can view a shareable membership card or open their invoice directly."
         ]
       },
       "shop": {
         "title": "Shop & Point of Sale",
-        "summary": "If your club sells products (water, drinks, equipment), the Shop module gives you a full point-of-sale (POS) and inventory system.",
+        "summary": "If your club sells products (water, drinks, equipment), the Shop module gives you a full point-of-sale (POS) and inventory system with every movement tracked.",
         "screenshotAlt": "The Shop screen in Mal3aby before activation -- a message explaining it's available but not yet turned on",
         "steps": [
           "Shop is an optional module -- if you don't see it active on your club, contact Mal3aby support to have it turned on for you.",
-          "Once activated, add your products under \"Products\" with a price and available stock quantity.",
-          "From the POS screen, pick the products the customer is buying and the system totals it automatically.",
-          "Stock decreases automatically with every sale — review quantities anytime from \"Inventory\".",
-          "If a customer returns a product, use \"Sales\" to process a partial or full return and refund the correct amount."
+          "The POS screen has a category strip (including an auto-generated \"Best Sellers\" chip from real sales history) and a barcode-scanner field that auto-refocuses after every scan.",
+          "Products with variants (size, color) show as pickable options, and available quantity is checked live so you can't sell more than what's in stock.",
+          "A POS discount is either a fixed amount or a percentage (never both at once), and requires a reason to be entered.",
+          "You can \"hold\" a cart mid-sale and come back to it later — inventory and invoices are untouched until you resume and complete it.",
+          "\"Walk-in customer\" gives you a one-click way to use a shared generic customer for someone who doesn't want to register — it's a real customer record, not a placeholder.",
+          "\"Inventory\" shows total stock value, low-stock and out-of-stock products, plus recent receipts, transfers, adjustments, and damage/loss activity.",
+          "Receiving or transferring multiple items happens as one single operation (not line by line), and any customer return (partial or full) is tracked separately from the original invoice's own status."
         ]
       },
       "finance": {
         "title": "Finance",
-        "summary": "Everything related to club money — payments, invoices, cash shifts, expenses, and financial reports, all in one place.",
+        "summary": "Everything related to club money — payments, invoices, cash shifts, and financial reports, organized into 6 clear sections.",
         "screenshotAlt": "The Finance overview screen in Mal3aby, showing a summary of payments and outstanding balances",
         "steps": [
-          "\"Overview\" gives you a quick summary of outstanding balances, payments, and pending invoices.",
-          "\"Payments & Collections\" lets you review and approve payment proofs customers upload (bank transfer, mobile wallet, etc.).",
-          "\"Cash Shifts\" lets you open and close cash-register shifts with a clear record — every pound logged with who collected it and when.",
-          "\"Reports\" gives you ready-made numbers on revenue, collections, and expenses you can review or export easily."
+          "The module has 6 sections: Overview, Payments & Collections, Invoices & Receipts, Cash Shifts & Treasury, Expenses, and Reports.",
+          "\"Overview\" has 14 different stat cards (revenue, cash collected, bank transfers, electronic payments, outstanding, unpaid invoices, partially-paid invoices, refunds, net movement, open shifts, and more) — every number is clickable and takes you to the screen that owns it.",
+          "\"Payments & Collections\" has 3 sub-tabs: All, Outstanding (unpaid only), and Pending Proofs (customer-uploaded payment proofs waiting on your review).",
+          "\"Invoices & Receipts\" has 2 sub-tabs: Invoices, and Official Receipts (used for government compliance if your club is registered with an official body).",
+          "\"Cash Shifts & Treasury\" has 3 sub-tabs: Shifts (open/close/history with inline shortage or overage settlement), Reconciliation (cross-checking cash payments against shifts and official receipts), and Liability (cash shortages owed by specific employees).",
+          "The \"Expenses\" tab is a deliberate stub right now -- there's no real expense-tracking system in the platform yet, and the screen states that plainly rather than showing fake data.",
+          "Payment methods available everywhere in the system: cash, card, bank transfer, mobile wallet, or other.",
+          "The outstanding balance on any invoice is always computed the same way everywhere in the system (total minus paid plus completed refunds) — one trustworthy number, not different calculations on different screens."
         ]
       },
       "reports": {
         "title": "Reports",
-        "summary": "Detailed reports on club performance — revenue, occupancy, customers, academy, and more, each with its own screen.",
+        "summary": "12 detailed reports on club performance, each with its own screen, filterable by date range or branch.",
         "screenshotAlt": "The main Reports screen in Mal3aby, showing the list of available reports",
         "steps": [
-          "From the main Reports screen, pick the report you need (revenue, occupancy, customers, etc.).",
-          "Most reports let you filter by a date range or by branch if your club has more than one location.",
-          "Reports update from real, live data — there's nothing stale or needing a manual refresh."
+          "\"Bookings\" and \"Occupancy\": booking counts by status, average booking value, and utilization rate per field.",
+          "\"Revenue\": total revenue and refunds -- the same figures shown on the executive dashboard, no duplicate calculations.",
+          "\"Collections\": total collected broken down by which employee collected it -- the same data behind Today's Financial Transparency widget.",
+          "\"Payment Methods\": collected/refunded/net per method, and it also owns an actual reconciliation workflow (confirm or flag transactions), not just a passive display.",
+          "\"Exceptions\": total discounts, refunds, and voided invoices -- the same data feeding Today's exceptions alert.",
+          "\"Official Receipts\": counts and totals for issued/reversed government-compliance receipts, plus a distinct compliance-exceptions view.",
+          "\"Reconciliation\": a real cross-check between cash payments, cash shifts, and official receipts using direct data links -- not an approximate time-window guess.",
+          "\"Gateway Health\": online payment status (successful/pending transactions) and any webhook processing failures -- data that used to be reachable only via raw database queries.",
+          "\"Employee Liability\": per-employee cash shortage (created/settled/outstanding), and every row links directly to that employee's own financial account with an inline way to settle it.",
+          "\"Academy\" and \"Customers\": active enrollments, attendance rate, expiring subscriptions, and top spenders -- every row links directly to the player or customer's own page, not a name search."
         ]
       },
       "whatsapp": {
         "title": "WhatsApp",
-        "summary": "Mal3aby sends automatic WhatsApp messages to customers — booking confirmations, reminders before their time, and payment receipts.",
+        "summary": "Mal3aby sends automatic WhatsApp messages to customers — booking confirmations, reminders, and payment receipts — with full visibility into connection health and message activity.",
         "screenshotAlt": "The WhatsApp screen in Mal3aby, showing connection status and a log of sent messages",
         "steps": [
-          "You need to connect your club's WhatsApp number once from the \"Connection\" tab (by scanning a QR code from the club's phone).",
+          "The module has 4 tabs: Overview, Activity, Connection, and Settings — entirely separate from the rest of club settings.",
+          "You need to connect your club's WhatsApp number once from the \"Connection\" tab (by scanning a QR code from the club's phone that's logged into WhatsApp).",
+          "Connection status is shown precisely: connected, disconnected, needs QR scan, connecting, reconnecting, degraded, logged out, restricted, or failed — not just a simple \"working/not working\".",
+          "\"Overview\" shows how many messages are queued and how many failed permanently — that failure count is clickable and takes you straight to the Activity tab, pre-filtered to failed messages.",
           "Once connected, messages send automatically on every new booking or payment — no need to send them manually.",
-          "The \"Activity\" tab shows every message sent and whether it reached the customer.",
-          "Even if WhatsApp isn't connected or working, the customer still gets an independent entry code (QR) they can use."
+          "The \"Settings\" tab has rate-limit safety controls, designed to protect your club's number from being banned for sending too many messages too fast.",
+          "Other screens like Bookings and Customers only show a small summary (sent/pending/failed) with a link back here — the actual send/retry controls aren't duplicated everywhere.",
+          "Even if WhatsApp isn't connected or working, the customer still gets an independent entry code (QR) they can use to check in."
         ]
       },
       "scan": {
         "title": "Scan QR",
-        "summary": "A quick screen for checking customers in by scanning their booking's QR code — ideal for a tablet or phone at the entrance.",
-        "screenshotAlt": "The QR scan screen in Mal3aby for checking customers in",
+        "summary": "A quick screen for checking customers in by scanning a QR code, with a separate confirmation step so no one gets checked in by accident.",
         "steps": [
-          "Open the screen and point the camera at the QR code the customer shows you (from WhatsApp or their booking page).",
-          "The system verifies the code is valid and linked to today's booking before checking the customer in.",
-          "If the code is expired, already used, or not a valid booking, you'll get a clear message instead of a wrong check-in."
+          "Scanning happens in two separate steps: the first just validates the code and shows its details, and a second explicit \"Confirm Check-in\" tap performs the actual check-in — there's no automatic check-in from a scan alone.",
+          "One screen handles 3 code types: a booking code (confirm check-in), an academy subscription code (player attendance -- the coach picks the right session for today), and a club membership code (verification only, no confirm step needed).",
+          "If a booking's QR code is valid but the booking still has an outstanding balance, the system won't allow entry and shows the exact amount due with a \"Collect Payment\" button right there -- a deliberate distinct outcome, not a generic rejection.",
+          "Club membership codes give a precise reason when denied: expired, frozen, cancelled, not started yet, or no membership at all -- never just a generic \"invalid\".",
+          "The screen shows the person's real photo (or an initial-based avatar if none exists) plus their name and subscription status, so staff can visually confirm identity before approving entry.",
+          "If the code is expired, already used, or not a valid booking, you'll get a clear message explaining exactly why instead of a wrong check-in."
         ]
       },
       "staff": {
         "title": "Staff",
-        "summary": "Manage club staff and their permissions — each staff member gets a role (reception, coach, manager) that decides what they can see and do.",
+        "summary": "Manage club staff and their permissions — each staff member gets a role that decides what they can see and do, with custom roles available when you need them.",
         "screenshotAlt": "The Staff screen in Mal3aby, showing the list of staff and their roles",
         "steps": [
-          "Add a new staff member and assign their role — the built-in roles cover most cases (reception, coach, manager, scan-only).",
-          "If you need custom permissions not covered by the built-in roles, create a \"custom role\" from \"Roles\".",
-          "Each staff member's own page shows their activity and work history in the system."
+          "Adding staff has two modes: \"Existing Account\" (for someone who already has a Mal3aby login) or \"Create New Account\" (gives you a one-time setup link to send them yourself — it's not auto-emailed).",
+          "Built-in roles: club manager, branch manager, receptionist, accountant, academy manager, coach, and scanner — plus any custom role you've created under \"Roles\".",
+          "You must choose which branches a staff member can work on (all branches or specific ones) — there's no default.",
+          "\"Cash custody\" is a separate toggle entirely from role — it must be explicitly granted before a staff member can hold cash-shift custody.",
+          "Membership statuses: active, invited (hasn't accepted yet — entirely distinct from active), or inactive. You can resend or cancel an invite anytime.",
+          "The \"Roles & Permissions\" page: built-in roles are view-only (not editable), while custom roles are fully editable — turning on one permission automatically enables any permissions it depends on.",
+          "You can \"copy\" an existing role as a starting point for a new custom role instead of starting from scratch.",
+          "Each staff member's own \"360\" page has 5 tabs: Overview, Access & Permissions, Cash Shifts & Custody, Financial Account, and Activity & Audit — including any outstanding cash liability they still owe."
         ]
       },
       "auditLog": {
         "title": "Audit Log",
-        "summary": "A documented record of every sensitive action taken in the club — who did what and when, for transparency and review.",
+        "summary": "A documented record of every sensitive action taken in the club — who did what and when, for transparency and review, designed so no one can edit it.",
         "screenshotAlt": "The Audit Log screen in Mal3aby, showing a list of recorded actions",
         "steps": [
-          "Every important action (editing a booking, refunding money, changing a price) is logged here automatically — nothing to turn on.",
-          "You can filter the log by staff member, action type, or date range.",
-          "The log is designed so no one — not even the club owner — can edit or delete it, so it stays a trustworthy record."
+          "Every important action (editing a booking, refunding money, changing a price, applying a discount) is logged here automatically — nothing to turn on, and there's no UI anywhere to edit or delete an entry.",
+          "Every action is written as a clear sentence (not a technical code), and some actions show extra detail directly — like the exact amount of a discount or refund, or the shortage/overage when a cash shift closes.",
+          "If your role is branch manager, you'll only see your branch's actions; a club owner or manager sees everything across every branch.",
+          "Some entries are clickable and take you straight to the linked invoice, booking, or customer — others (like a cash shift) stay plain text since they have no dedicated detail screen to jump to.",
+          "If you want deeper technical detail (the raw before/after data as JSON), an optional \"Technical details\" section sits under each entry."
         ]
       },
       "settings": {
         "title": "Settings",
-        "summary": "Your club's core details — name, academy policies, available payment methods, and your Mal3aby platform subscription status.",
+        "summary": "The hub for your club's core details — organized into clear sections, not one long dumping ground.",
         "screenshotAlt": "The Settings screen in Mal3aby, showing club details and configuration options",
         "steps": [
-          "Edit your club's name and core details from here.",
-          "Choose the payment methods your club accepts (cash, bank transfer, online gateways).",
-          "Check your Mal3aby platform subscription status (free trial, paid plan) and renewal date."
+          "The sections here are: Club Identity, Contact Info, Booking Policy, Public Booking Link, Academy Activation Policy (owner/manager only), Payment Methods & Gateway Connections, Government Finance Compliance, Notifications (a link out to the WhatsApp module), Platform Subscription, and Account Security.",
+          "Branches & fields, staff, and the audit log aren't here — each moved to its own dedicated page.",
+          "\"Payment Methods\" defines what your club actually accepts (cash, bank transfer, online gateways) — that controls which options show up in every collection screen across the app.",
+          "\"Public Booking Link\" is the same link you can share with customers so they can book for themselves without calling reception.",
+          "\"Platform Subscription\" shows your own Mal3aby subscription status (free trial or paid plan) and renewal date — entirely separate from your customers' money.",
+          "\"Account Security\" lets you change your own account password without needing to contact support.",
+          "Every edit control here runs off a real permission — so a custom role granted the right permission gets working edit access here too, just like a regular manager."
         ]
       }
     }
