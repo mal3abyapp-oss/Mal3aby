@@ -3256,13 +3256,38 @@
       }
     },
     "home": {
-      "heroTitle": "Manage your club, academy, and fields from one place",
-      "heroSubtitle": "Bookings, subscriptions, players, invoices, attendance, QR, and reports in one easy-to-use system.",
+      "eyebrow": "With Mal3aby",
+      "heroTitle": "No more scattered spreadsheets\nYour whole club, in one place",
+      "heroSubtitle": "A booking, a payment, a subscription, a shop sale — it all records itself instantly. You just open the screen and watch your club run.",
       "startFreeTrial": "Start your free trial",
+      "watchHowItWorks": "See how it works",
       "login": "Log in",
-      "trialBadge": "7 days free · No credit card required",
+      "trialBadge": "7 days free · No credit card required · Cancel anytime",
       "customerLink": "Already a customer of a club? Sign in to see your bookings, payments, and QR code",
+      "mockup": {
+        "tabLabel": "Today",
+        "bookingsToday": "Bookings today",
+        "revenueToday": "Revenue today",
+        "fieldsOccupied": "Fields occupied",
+        "bookingRow": "Booking — Field 2",
+        "confirmed": "Confirmed",
+        "subscriptionRow": "Academy subscription",
+        "pendingPayment": "Pending payment",
+        "shopSaleRow": "Shop sale",
+        "completed": "Completed",
+        "qrLine": "QR check-in — instant, no paper"
+      },
+      "suitableFor": {
+        "title": "Whatever kind of space you run, it fits",
+        "club": { "title": "Sports clubs", "desc": "Manage branches, fields, and memberships from one place" },
+        "academy": { "title": "Sports academies", "desc": "Players, guardians, subscriptions, and QR attendance" },
+        "fields": { "title": "Daily-booking fields", "desc": "A public booking page for your customers — no app, no signup" },
+        "sportsCenter": { "title": "Sports centers", "desc": "Multiple branches, teams, and permissions for every employee" }
+      },
       "featuresTitle": "Core features",
+      "benefitsEyebrow": "Not a feature list — a working system",
+      "benefitsTitle": "Every part of your club, connected",
+      "benefitsSubtitle": "A customer books, the invoice writes itself, and the report updates instantly. Nothing you have to do twice by hand.",
       "features": {
         "bookings": "Bookings",
         "academy": "Academy",
@@ -3271,7 +3296,39 @@
         "reports": "Reports",
         "staffManagement": "Staff management"
       },
-      "pricingTitle": "Pricing"
+      "benefits": {
+        "bookings": { "title": "Bookings & fields", "desc": "A live calendar for every field and branch, hourly/daily pricing, and automatic conflict prevention." },
+        "academy": { "title": "Academy & subscriptions", "desc": "Training groups, players and guardians, monthly subscriptions, and QR attendance in a second." },
+        "shop": { "title": "Shop & point of sale", "desc": "Sell products and drinks from a fast POS, with stock and counts tracked as you go." },
+        "invoicesAndPayments": { "title": "Invoices & payments", "desc": "Automatic invoices, cash and electronic collection, cash shifts, and live outstanding-balance tracking." },
+        "qr": { "title": "QR check-in", "desc": "One code per booking or subscription — fast, secure entry with no paper and no waiting at the door." },
+        "reports": { "title": "Live financial reports", "desc": "Revenue, outstanding balances, staff performance, and stock — without piecing data together yourself." }
+      },
+      "howItWorks": {
+        "eyebrow": "From signup to running",
+        "title": "Your first real booking, same day",
+        "subtitle": "No complex setup, no technical team needed — four steps and you're ready for your first booking.",
+        "step1": { "title": "Register your club", "desc": "Club details, branches, and fields — five minutes, no more." },
+        "step2": { "title": "Set pricing and your team", "desc": "Set your pricing, and add staff with the right permissions for each." },
+        "step3": { "title": "Share your booking link", "desc": "A public booking page for your club your customers can book from directly." },
+        "step4": { "title": "Go live and take bookings", "desc": "Every booking, payment, and report syncs instantly from day one." }
+      },
+      "pricingTitle": "Pricing",
+      "pricingEyebrow": "Pricing",
+      "pricingSubtitle": "Choose the plan that fits your club's size — and start with a full-featured free trial before any commitment.",
+      "mostPopular": "Most popular",
+      "perMonth": "per month",
+      "finalCta": {
+        "title": "Drop the paperwork. Try Mal3aby.",
+        "subtitle": "7 days free, every feature unlocked, no credit card."
+      },
+      "faq": {
+        "title": "Frequently asked questions",
+        "q1": { "question": "Do I need a technical team to get started?", "answer": "No. Registering and adding your club and fields takes minutes, and you can start taking bookings the same day with no setup or technical experience." },
+        "q2": { "question": "Is my data and my customers' data safe?", "answer": "Your club's data is fully isolated from every other club on the platform, and every sensitive action (financial or administrative) is recorded in a permanent audit log." },
+        "q3": { "question": "Can I use it with more than one branch?", "answer": "Yes, the system is built from the ground up to manage multiple branches from one account, with independent permissions for each branch and its staff." },
+        "q4": { "question": "Can I change my plan or cancel anytime?", "answer": "Yes, you can change your plan or cancel your subscription anytime from your account settings, with no long-term commitment." }
+      }
     },
     "privacy": {
       "title": "Privacy Policy",
