@@ -618,3 +618,217 @@ $$;
 -- mistake) -- every RPC in this matrix requires real authorization to
 -- write, so a correctly-unauthorized actor never reaches a mutating
 -- branch, but wrapping in a transaction costs nothing and is safer.
+
+
+-- ============================================================
+-- ANTI-FRAUD HARDENING REGRESSION (2026-08-29) -- appended, not a
+-- replacement of the tests above. Covers the P0/P1 findings from
+-- ANTI_FRAUD_SECURITY_HARDENING_PLAN.md. Same methodology as the rest
+-- of this file: real SET ROLE authenticated + set_config('request.jwt.claims',
+-- ...) impersonation, top-level statements (not DO blocks), compare
+-- each assertion query's output to the EXPECTED comment above it.
+--
+-- Fixture identities used below are real, standing QA identities in
+-- this project's own Supabase project (confirmed present as of this
+-- writing) -- adjust if running against a different environment:
+--   platform owner:        mal3aby.qa.platform-owner.20260821@example.com
+--   TEST-CLUB-1 owner:     mala3by.test.owner1@gmail.com   (has real data)
+--   TEST-CLUB-2 owner:     mala3by.test.owner2@gmail.com   (QA sandbox club)
+--   receptionist fixture:  mal3aby.qa.receptionist.20260821@example.com
+-- Re-query club_memberships/auth.users if these no longer resolve.
+
+-- ============================================================
+-- AF-TEST 1: unaudited direct-write RLS bypass on commercial_entitlements
+-- (Phase 1 finding). EXPECTED: 0 rows affected (no UPDATE match).
+-- ============================================================
+set role authenticated;
+select set_config('request.jwt.claims', json_build_object('sub','556b515d-fdf9-421a-8e33-563737adb919','role','authenticated')::text, true);
+set local role authenticated;
+update public.commercial_entitlements set branch_limit = 999
+where club_id = 'c0b02979-a49e-4338-bcac-d789ca397aeb'
+returning club_id, branch_limit;  -- EXPECTED: zero rows returned
+reset role;
+select branch_limit from public.commercial_entitlements where club_id = 'c0b02979-a49e-4338-bcac-d789ca397aeb';  -- EXPECTED: unchanged (null in the baseline environment)
+
+-- ============================================================
+-- AF-TEST 2: unaudited direct-write RLS bypass on club_memberships.has_cash_custody
+-- (Phase 1 finding). EXPECTED: 0 rows affected.
+-- ============================================================
+set role authenticated;
+select set_config('request.jwt.claims', json_build_object('sub','8694a8b8-e1b4-46ee-857f-4bc8e8f72d31','role','authenticated')::text, true);
+set local role authenticated;
+update public.club_memberships set has_cash_custody = true
+where user_id = '8694a8b8-e1b4-46ee-857f-4bc8e8f72d31' and club_id = 'c0b02979-a49e-4338-bcac-d789ca397aeb'
+returning id, has_cash_custody;  -- EXPECTED: zero rows returned
+reset role;
+
+-- ============================================================
+-- AF-TEST 3: create_gateway_refund_service() defense-in-depth actor
+-- check (Phase 2 finding, CF-3). EXPECTED: 'not authorized' exception
+-- for an actor with no payment.refund permission on the target club.
+-- Uses a deliberately fake gateway transaction id -- the actor check
+-- (added this pass) must fire BEFORE the transaction-lookup check, so
+-- this never risks a real mutation regardless of which id is used.
+-- ============================================================
+select public.create_gateway_refund_service(
+  (select id from public.payments where club_id = '57ce89e4-184a-413f-bc47-ee0fdb878727' limit 1),
+  1.00::numeric, 'regression test -- unauthorized actor', 'test-ref', gen_random_uuid(),
+  '8694a8b8-e1b4-46ee-857f-4bc8e8f72d31'::uuid, null
+);  -- EXPECTED: ERROR P0001 'not authorized'
+
+-- ============================================================
+-- AF-TEST 4: academy module-active bypass on ensure_adhoc_attendance_session()
+-- and generate_training_sessions() (Phase 5 finding). Requires a real
+-- group_id in a club with Academy currently deactivated -- this test is
+-- STATE-DEPENDENT (the target club's academy module must be active
+-- before AND after this test runs, or wrap steps in a temporary
+-- deactivate/reactivate as the live verification pass did). Shown here
+-- as the assertion shape; a full harness would script the
+-- deactivate -> attempt -> reactivate cycle around a disposable fixture
+-- group, matching ANTI_FRAUD_SECURITY_HARDENING_PLAN.md Phase 5's own
+-- live verification.
+-- EXPECTED (with academy inactive for the target club):
+--   ERROR P0001 'the academy module is not active for this club'
+-- ============================================================
+-- select public.ensure_adhoc_attendance_session('<real-group-id-in-a-club-with-academy-inactive>', current_date);
+
+-- ============================================================
+-- AF-TEST 5: platform staff role self-escalation via direct write
+-- (Phase 3 finding -- the most severe of this pass). EXPECTED: 0 rows
+-- affected. This environment currently has no standing
+-- platform_staff_memberships fixture (the live verification pass
+-- created and deleted a temporary one) -- kept here as a template with
+-- a placeholder id; the authoritative live proof is documented in
+-- ANTI_FRAUD_SECURITY_HARDENING_PLAN.md Phase 3.
+-- ============================================================
+-- update public.platform_staff_memberships set platform_role_id = (select id from platform_roles where key = 'platform_owner')
+-- where id = '<a-real-non-owner-platform-staff-membership-id>'
+-- returning id, platform_role_id;  -- EXPECTED: zero rows returned
+
+-- ============================================================
+-- AF-TEST 6: platform_support_sessions self-write tampering (Phase 3
+-- continued finding). EXPECTED: 0 rows affected on an UPDATE attempting
+-- to change mode/expires_at/club_id on the caller's own session row.
+-- This test starts and ends a REAL support session (via the legitimate
+-- RPCs) against TEST-CLUB-2 so it is fully self-contained and leaves no
+-- residue beyond a normal, correctly-terminated session record. Run the
+-- three statements below as one round-trip so the session id carries
+-- over via WITH.
+-- ============================================================
+set role authenticated;
+select set_config('request.jwt.claims', json_build_object('sub','556b515d-fdf9-421a-8e33-563737adb919','role','authenticated')::text, true);
+set local role authenticated;
+with new_session as (
+  select public.start_platform_support_session('c0b02979-a49e-4338-bcac-d789ca397aeb', 'view', 'regression test fixture') as id
+)
+update public.platform_support_sessions set mode = 'manage', expires_at = now() + interval '30 days'
+where id = (select id from new_session)
+returning id, mode;  -- EXPECTED: zero rows returned
+select public.end_platform_support_session();
+reset role;
+
+-- ============================================================
+-- AF-TEST 7: numeric invariant -- negative payment amount rejected at
+-- the database level regardless of application logic (defense-in-depth
+-- backstop). EXPECTED: ERROR 23514 payments_amount_check.
+-- Wrapped in begin/rollback so it never actually persists even though
+-- the CHECK constraint itself would also prevent a commit.
+-- ============================================================
+begin;
+insert into public.payments (club_id, branch_id, customer_id, amount, method, status, received_at)
+select 'b9178c0f-00b5-4c71-abec-b8772ffb8682',
+       (select id from public.branches where club_id = 'b9178c0f-00b5-4c71-abec-b8772ffb8682' limit 1),
+       (select id from public.customers where club_id = 'b9178c0f-00b5-4c71-abec-b8772ffb8682' limit 1),
+       -50, 'cash', 'completed', now();  -- EXPECTED: ERROR 23514 payments_amount_check
+rollback;
+
+-- ============================================================
+-- AF-TEST 8: branch isolation -- report RPC rejects a client-supplied
+-- p_branch_id outside the caller's scope. STATE-DEPENDENT: requires a
+-- real branch-scoped staff membership (the live verification pass used
+-- a disposable QA fixture -- see Phase 4 in the plan doc for the full
+-- setup/teardown). Shown here as the assertion shape.
+-- EXPECTED (with a branch-scoped, non-owner caller and an
+-- out-of-scope p_branch_id): ERROR P0001 'not authorized'
+-- ============================================================
+-- select * from public.get_revenue_report('<club-id>', '2026-01-01', '2026-12-31', '<out-of-scope-branch-id>', null);
+
+-- ============================================================
+-- AF-TEST 9: record_payment() / claim_manual_payment() no_show gap
+-- (CF-2/SP-001 follow-up, Phase 9 -- see 20260829090000_record_payment_
+-- block_no_show_bookings.sql and 20260829090500_claim_manual_payment_
+-- block_no_show_bookings.sql). The prior SP-001 fix blocked 'cancelled'
+-- bookings but left 'no_show' -- a real, distinct, terminal booking
+-- status -- uncovered on BOTH RPCs. Live-confirmed pre-fix: 30 real
+-- production bookings with status in ('cancelled','no_show') still
+-- carried an 'issued' invoice, 3 specifically 'no_show'.
+--
+-- Fully self-contained: builds a synthetic customer/invoice/booking on
+-- TEST-CLUB-1 (real branch/field, synthetic everything else), marks it
+-- no_show via the real mark_booking_no_show()-equivalent direct status
+-- set (kept as a direct insert here since this block must stay inside
+-- one rolled-back transaction; the live verification pass separately
+-- proved mark_booking_no_show() itself works via the real RPC), attacks
+-- both payment RPCs, then rolls back -- zero residue regardless of
+-- outcome.
+-- EXPECTED: both calls raise an error mentioning 'no_show'.
+-- ============================================================
+begin;
+
+insert into public.customers (id, club_id, full_name, mobile_display, is_walk_in)
+values ('00000000-0000-0000-0000-0000000af101', '57ce89e4-184a-413f-bc47-ee0fdb878727', 'AF-TEST-9 no_show regression fixture', '01000009999', true);
+
+insert into public.invoices (id, club_id, branch_id, customer_id, invoice_number, status, total, subtotal)
+values (
+  '00000000-0000-0000-0000-0000000af102', '57ce89e4-184a-413f-bc47-ee0fdb878727',
+  '2f2cc7e5-83cc-4a02-a65b-0660f2cd1997', '00000000-0000-0000-0000-0000000af101',
+  'AF-TEST-9-REGRESSION', 'issued', 60.00, 60.00
+);
+
+insert into public.bookings (id, club_id, branch_id, field_id, customer_id, invoice_id, status, start_at, end_at, total_price, discount_amount, source)
+values (
+  '00000000-0000-0000-0000-0000000af103', '57ce89e4-184a-413f-bc47-ee0fdb878727',
+  '2f2cc7e5-83cc-4a02-a65b-0660f2cd1997', '4b42c842-71ed-4b87-b03d-1cddfd10f997',
+  '00000000-0000-0000-0000-0000000af101', '00000000-0000-0000-0000-0000000af102',
+  'no_show', now() - interval '1 day', now() - interval '1 day' + interval '1 hour', 60.00, 0, 'staff'
+);
+
+set local role authenticated;
+select set_config('request.jwt.claims', json_build_object('sub','12fadb01-c60b-4be7-a330-6c0786a2daa0','role','authenticated')::text, true);
+select public.record_payment('00000000-0000-0000-0000-0000000af102'::uuid, 60.00, 'cash', 'AF-TEST-9');
+-- ^ EXPECTED: ERROR P0001 'this booking was no_show -- payment can no longer be recorded against it'
+
+reset role;
+rollback;
+-- ^ nothing persisted regardless -- the record_payment() error above
+-- already aborts this transaction; rollback is a no-op safety net.
+
+-- claim_manual_payment() sub-test run separately (its own fixture, since
+-- the block above already aborted on the first assertion):
+begin;
+
+insert into public.customers (id, club_id, full_name, mobile_display, is_walk_in, user_id)
+values ('00000000-0000-0000-0000-0000000af111', '57ce89e4-184a-413f-bc47-ee0fdb878727', 'AF-TEST-9b no_show portal-claim fixture', '01000009998', false, '2310e033-b4a5-4735-b2fc-1006e40c25b9');
+
+insert into public.invoices (id, club_id, branch_id, customer_id, invoice_number, status, total, subtotal)
+values (
+  '00000000-0000-0000-0000-0000000af112', '57ce89e4-184a-413f-bc47-ee0fdb878727',
+  '2f2cc7e5-83cc-4a02-a65b-0660f2cd1997', '00000000-0000-0000-0000-0000000af111',
+  'AF-TEST-9B-REGRESSION', 'issued', 45.00, 45.00
+);
+
+insert into public.bookings (id, club_id, branch_id, field_id, customer_id, invoice_id, status, start_at, end_at, total_price, discount_amount, source)
+values (
+  '00000000-0000-0000-0000-0000000af113', '57ce89e4-184a-413f-bc47-ee0fdb878727',
+  '2f2cc7e5-83cc-4a02-a65b-0660f2cd1997', '4b42c842-71ed-4b87-b03d-1cddfd10f997',
+  '00000000-0000-0000-0000-0000000af111', '00000000-0000-0000-0000-0000000af112',
+  'no_show', now() - interval '1 day', now() - interval '1 day' + interval '1 hour', 45.00, 0, 'staff'
+);
+
+set local role authenticated;
+select set_config('request.jwt.claims', json_build_object('sub','2310e033-b4a5-4735-b2fc-1006e40c25b9','role','authenticated')::text, true);
+select public.claim_manual_payment('00000000-0000-0000-0000-0000000af112'::uuid, null, 45.00, 'AF-TEST-9b', 'regression');
+-- ^ EXPECTED: ERROR P0001 'this booking was no_show -- payment can no longer be claimed against it'
+
+reset role;
+rollback;

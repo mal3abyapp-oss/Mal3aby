@@ -1,0 +1,41 @@
+-- ZERO-TRUST ANTI-FRAUD HARDENING -- Phase 3 (2026-08-29)
+--
+-- LIVE-EXPLOITED AND CONFIRMED, genuine P0 privilege escalation: the
+-- exact same bug class as Phase 1's club_memberships finding, but for
+-- Platform Staff. platform_staff_memberships_write is an RLS ALL-command
+-- policy gated only on 'platform.staff.create'/'update'/'disable' --
+-- with NO column restriction and, critically, NO trigger equivalent to
+-- club_memberships' protect_club_membership_identity_columns() (that
+-- table's role_id/custom_role_id are protected by a real BEFORE UPDATE
+-- trigger; platform_staff_memberships has zero triggers at all).
+--
+-- Live attack performed with a synthetic QA fixture (the existing
+-- mal3aby.qa.receptionist test identity, granted a temporary
+-- platform_admin platform_staff_memberships row, deleted immediately
+-- after confirming and reverting): as that platform_admin-role
+-- identity, a direct `update platform_staff_memberships set
+-- platform_role_id = <platform_owner's platform_role_id> where id = ...`
+-- succeeded -- completely bypassing set_platform_staff_role()'s real
+-- privilege-ceiling check (`pp.key not in
+-- (select caller_platform_permission_keys())`) and its last-assigner-
+-- lockout guard, with ZERO audit_logs row produced. The resulting role
+-- grants nearly every platform permission (platform.finance.manage,
+-- platform.subscription.manage, platform.club.suspend,
+-- platform.staff.role.assign, etc.) -- a near-complete, invisible,
+-- self-granted escalation. (It does not by itself satisfy
+-- is_platform_owner(), which checks a separate table --
+-- club_memberships.role_id -> roles.key='platform_owner' -- but the
+-- platform-staff-tier authority alone is already severe.)
+--
+-- Fix: same shape as Phase 1. Confirmed zero legitimate frontend call
+-- site exists for direct platform_staff_memberships writes at all
+-- (grepped `src/` -- zero matches) -- the real UI (PlatformStaffPage.tsx)
+-- only ever calls list_platform_staff/list_platform_roles/
+-- deactivate_platform_staff/set_platform_staff_role, all SECURITY
+-- DEFINER RPCs, all unaffected by revoking the caller's direct table
+-- grant. There is currently no create/invite-platform-staff RPC or UI
+-- either -- new memberships are already, today, a superuser/migration-
+-- only operation in practice; this migration does not change that, it
+-- only closes the unused-but-dangerous direct-write surface.
+
+drop policy if exists platform_staff_memberships_write on public.platform_staff_memberships;

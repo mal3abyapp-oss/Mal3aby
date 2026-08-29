@@ -14,6 +14,19 @@ import { createClient, type SupabaseClient } from '@supabase/supabase-js'
 // own status -- this is what protects a partially/fully-paid-then-cancelled
 // invoice's remaining balance without ever touching what was already paid.
 //
+// ANTI-FRAUD HARDENING FOLLOW-UP (2026-08-29): the 'cancelled' fix above
+// left a real, distinct booking status -- 'no_show' -- uncovered in BOTH
+// record_payment() and claim_manual_payment(). Live-confirmed against
+// production data: 30 real bookings with status in ('cancelled','no_show')
+// still carried an 'issued' (payable) invoice, 3 specifically 'no_show'.
+// Fixed by widening both RPCs' single-status check to
+// `status in ('cancelled', 'no_show')`. See migrations
+// 20260829090000_record_payment_block_no_show_bookings.sql and
+// 20260829090500_claim_manual_payment_block_no_show_bookings.sql. Covered
+// below by the same test shape as the existing 'cancelled' tests, applied
+// to a 'no_show' booking instead -- a no-show, like a cancellation, means
+// the customer never received the service and must not remain payable.
+//
 // Real integration test against the live Supabase project (not mocked),
 // following the same pattern as customer360.integration.test.ts -- needs a
 // real QA staff account with booking.create/booking.cancel/payment.create
@@ -243,5 +256,50 @@ describeIfConfigured('SP-001: cancelled booking financial integrity (live integr
       p_invoice_id: invoiceId, p_payment_method_config_id: methodConfig.id as string, p_claimed_amount: 10,
     })
     expect(claim.error).not.toBeNull()
+  })
+
+  it('a record_payment() attempt against a no_show booking is rejected (2026-08-29 follow-up)', async () => {
+    const { start, end } = futureSlot(15, 12)
+    const booking = await client.rpc('create_booking', {
+      p_field_id: fieldId, p_customer_id: customerId, p_start_at: start, p_end_at: end, p_notes: 'SP001_IT_TEST_NOSHOW_RP',
+    })
+    expect(booking.error).toBeNull()
+    const bookingId = booking.data as string
+    createdBookingIds.push(bookingId)
+
+    const { data: row } = await client.from('bookings').select('invoice_id').eq('id', bookingId).single()
+    const invoiceId = row!.invoice_id as string
+
+    const noShow = await client.rpc('mark_booking_no_show', { p_booking_id: bookingId, p_reason: 'SP001_IT_TEST_NOSHOW_RP no-show' })
+    expect(noShow.error).toBeNull()
+
+    const payment = await client.rpc('record_payment', { p_invoice_id: invoiceId, p_amount: 1, p_method: 'bank_transfer' })
+    expect(payment.error).not.toBeNull()
+    expect(payment.error?.message).toMatch(/no_show/i)
+  })
+
+  it('a claim_manual_payment() attempt against a no_show booking is rejected (2026-08-29 follow-up)', async () => {
+    const { start, end } = futureSlot(15, 16)
+    const booking = await client.rpc('create_booking', {
+      p_field_id: fieldId, p_customer_id: customerId, p_start_at: start, p_end_at: end, p_notes: 'SP001_IT_TEST_NOSHOW_CLAIM',
+    })
+    expect(booking.error).toBeNull()
+    const bookingId = booking.data as string
+    createdBookingIds.push(bookingId)
+
+    const { data: row } = await client.from('bookings').select('invoice_id').eq('id', bookingId).single()
+    const invoiceId = row!.invoice_id as string
+
+    const noShow = await client.rpc('mark_booking_no_show', { p_booking_id: bookingId, p_reason: 'SP001_IT_TEST_NOSHOW_CLAIM no-show' })
+    expect(noShow.error).toBeNull()
+
+    const { data: methodConfig } = await client.from('payment_method_configs').select('id').eq('club_id', clubId).limit(1).maybeSingle()
+    if (!methodConfig) return // this test club has no configured payment methods -- nothing to claim against, not a failure of the invariant.
+
+    const claim = await client.rpc('claim_manual_payment', {
+      p_invoice_id: invoiceId, p_payment_method_config_id: methodConfig.id as string, p_claimed_amount: 10,
+    })
+    expect(claim.error).not.toBeNull()
+    expect(claim.error?.message).toMatch(/no_show/i)
   })
 })
