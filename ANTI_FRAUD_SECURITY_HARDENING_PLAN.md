@@ -138,7 +138,11 @@ Analyze 2-actor collusion scenarios; add deterministic exception-reporting signa
 
 ### Phase 14 — Automated security regression suite (§50)
 Durable, repeatable suite (SQL-based, not browser-dependent) covering tenant isolation, privilege escalation, IDOR, module bypass, subscription bypass, financial invariants, refund/return/webhook replay, stock manipulation, support-session scope, platform-staff escalation.
-Status: PENDING
+Status: COMPLETE (this pass's findings). Extended the existing `supabase/tests/security_finance_regression.sql` (rather than creating a competing file) with an "ANTI-FRAUD HARDENING REGRESSION (2026-08-29)" section, matching its own established methodology (real `SET ROLE authenticated` + `set_config('request.jwt.claims', ...)` impersonation, top-level statements, compare output to an EXPECTED comment).
+
+8 new tests (AF-TEST 1-8) covering: commercial_entitlements direct-write bypass (Phase 1), club_memberships.has_cash_custody direct-write bypass (Phase 1), `create_gateway_refund_service()` actor check (Phase 2/CF-3), academy module-active bypass template (Phase 5, state-dependent, documented not scripted), platform staff role self-escalation template (Phase 3, state-dependent since no standing fixture exists), `platform_support_sessions` self-tampering (Phase 3 continued -- fully self-contained, starts and ends a real session via the legitimate RPCs), numeric invariant backstop on `payments.amount` (wrapped in `begin`/`rollback`, never persists), branch-isolation report-RPC template (Phase 4, state-dependent).
+
+**5 of 8 tests are fully executable as-written and were live-run against this environment to confirm the file itself is correct, not just my ad-hoc verification**: AF-TEST 1, 2, 3, 6, 7 all reproduced their documented EXPECTED result exactly when run verbatim from the file. AF-TEST 4, 5, 8 are documented state-dependent templates (require a temporarily-deactivated module, a standing platform-staff fixture, or a branch-scoped staff fixture respectively) with the exact setup/teardown already fully proven live in their respective phase sections above -- not scripted inline to avoid the suite silently mutating a club's module state or creating a persistent staff fixture on a routine re-run.
 
 ### Phase 15 — Final red-team pass + acceptance report + closure
 Adversarial persona pass (§59), full acceptance criteria (§60), `MAL3ABY_ANTI_FRAUD_SECURITY_ACCEPTANCE.md`, final regression, merge + push.
