@@ -103,10 +103,12 @@ const MODULES: HelpModule[] = [
   { key: 'settings', icon: Settings, screenshot: '/help/settings.png' },
 ]
 
+const FIRST_MODULE = MODULES[0]!
+
 export function HelpGuidePage() {
   const { t } = useTranslation()
-  const [activeKey, setActiveKey] = useState(MODULES[0].key)
-  const active = MODULES.find((m) => m.key === activeKey) ?? MODULES[0]
+  const [activeKey, setActiveKey] = useState(FIRST_MODULE.key)
+  const active = MODULES.find((m) => m.key === activeKey) ?? FIRST_MODULE
   const steps = t(`help.modules.${active.key}.steps`, { returnObjects: true }) as string[]
 
   return (
