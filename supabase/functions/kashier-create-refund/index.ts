@@ -74,16 +74,33 @@ const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!
 const SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
 const ANON_KEY = Deno.env.get('SUPABASE_ANON_KEY')!
 
-const CORS_HEADERS = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-  'Access-Control-Allow-Methods': 'POST, OPTIONS',
+// CORS tightened (pre-launch hardening, 2026-08-29): this function is
+// called only by the authenticated Mal3aby app itself via
+// supabase.functions.invoke (JWT-Bearer auth, not browser-ambient
+// cookie auth -- so wildcard CORS was never a CSRF vector here, per
+// the pre-launch edge-function audit), but a privilege-relevant
+// endpoint should still not advertise itself as fetchable from any
+// origin as a matter of defense-in-depth. Allowlisted to the real app
+// origins plus the local dev server -- never widened to '*' again.
+const ALLOWED_ORIGINS = new Set([
+  'https://mal3aby.app',
+  'https://www.mal3aby.app',
+  'http://localhost:5173',
+])
+
+function corsHeadersFor(req: Request): Record<string, string> {
+  const origin = req.headers.get('origin')
+  return {
+    'Access-Control-Allow-Origin': origin && ALLOWED_ORIGINS.has(origin) ? origin : 'https://mal3aby.app',
+    'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+    'Access-Control-Allow-Methods': 'POST, OPTIONS',
+  }
 }
 
-function jsonResponse(body: unknown, status = 200) {
+function jsonResponse(req: Request, body: unknown, status = 200) {
   return new Response(JSON.stringify(body), {
     status,
-    headers: { 'Content-Type': 'application/json', ...CORS_HEADERS },
+    headers: { 'Content-Type': 'application/json', ...corsHeadersFor(req) },
   })
 }
 
@@ -131,22 +148,22 @@ async function deterministicUuidFromString(input: string): Promise<string> {
 
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
-    return new Response(null, { headers: CORS_HEADERS })
+    return new Response(null, { headers: corsHeadersFor(req) })
   }
   if (req.method !== 'POST') {
-    return jsonResponse({ error: 'method not allowed' }, 405)
+    return jsonResponse(req, { error: 'method not allowed' }, 405)
   }
 
   const authHeader = req.headers.get('Authorization')
   if (!authHeader) {
-    return jsonResponse({ error: 'authentication required' }, 401)
+    return jsonResponse(req, { error: 'authentication required' }, 401)
   }
 
   let body: { payment_id?: string; amount?: number; reason?: string }
   try {
     body = await req.json()
   } catch {
-    return jsonResponse({ error: 'malformed JSON body' }, 400)
+    return jsonResponse(req, { error: 'malformed JSON body' }, 400)
   }
 
   const paymentId = body.payment_id
@@ -154,13 +171,13 @@ Deno.serve(async (req) => {
   const reason = body.reason
 
   if (!paymentId || typeof paymentId !== 'string') {
-    return jsonResponse({ error: 'payment_id is required' }, 400)
+    return jsonResponse(req, { error: 'payment_id is required' }, 400)
   }
   if (typeof amount !== 'number' || !(amount > 0)) {
-    return jsonResponse({ error: 'amount must be a positive number' }, 400)
+    return jsonResponse(req, { error: 'amount must be a positive number' }, 400)
   }
   if (!reason || typeof reason !== 'string' || reason.trim() === '') {
-    return jsonResponse({ error: 'a reason is required for a refund' }, 400)
+    return jsonResponse(req, { error: 'a reason is required for a refund' }, 400)
   }
 
   const callerClient = createClient(SUPABASE_URL, ANON_KEY, {
@@ -173,7 +190,7 @@ Deno.serve(async (req) => {
   } = await callerClient.auth.getUser()
 
   if (userError || !user) {
-    return jsonResponse({ error: 'invalid or expired session' }, 401)
+    return jsonResponse(req, { error: 'invalid or expired session' }, 401)
   }
 
   const admin = createClient(SUPABASE_URL, SERVICE_ROLE_KEY)
@@ -185,11 +202,11 @@ Deno.serve(async (req) => {
     .maybeSingle()
 
   if (paymentError || !payment) {
-    return jsonResponse({ error: 'payment not found' }, 404)
+    return jsonResponse(req, { error: 'payment not found' }, 404)
   }
 
   if (payment.method !== 'card') {
-    return jsonResponse({ error: 'this payment was not a gateway (card) payment -- use the regular refund flow' }, 400)
+    return jsonResponse(req, { error: 'this payment was not a gateway (card) payment -- use the regular refund flow' }, 400)
   }
 
   const { data: authorized, error: authError } = await callerClient.rpc('has_permission', {
@@ -198,7 +215,7 @@ Deno.serve(async (req) => {
   })
 
   if (authError || authorized !== true) {
-    return jsonResponse({ error: 'not authorized to refund this payment' }, 403)
+    return jsonResponse(req, { error: 'not authorized to refund this payment' }, 403)
   }
 
   const { data: txn, error: txnError } = await admin
@@ -209,11 +226,11 @@ Deno.serve(async (req) => {
     .maybeSingle()
 
   if (txnError || !txn) {
-    return jsonResponse({ error: 'no succeeded gateway transaction found for this payment' }, 404)
+    return jsonResponse(req, { error: 'no succeeded gateway transaction found for this payment' }, 404)
   }
 
   if (txn.gateway !== 'kashier') {
-    return jsonResponse({ error: 'this payment was not processed through kashier' }, 400)
+    return jsonResponse(req, { error: 'this payment was not processed through kashier' }, 400)
   }
 
   const { data: existingRefunds } = await admin
@@ -226,11 +243,11 @@ Deno.serve(async (req) => {
   const refundable = Number(payment.amount) - refundedSum
 
   if (amount > refundable) {
-    return jsonResponse({ error: `refund amount exceeds refundable balance (refundable: ${refundable})` }, 400)
+    return jsonResponse(req, { error: `refund amount exceeds refundable balance (refundable: ${refundable})` }, 400)
   }
 
   if (!txn.connection_id) {
-    return jsonResponse({ error: 'gateway transaction has no linked connection' }, 400)
+    return jsonResponse(req, { error: 'gateway transaction has no linked connection' }, 400)
   }
 
   const { data: connection, error: connError } = await admin
@@ -240,18 +257,18 @@ Deno.serve(async (req) => {
     .maybeSingle()
 
   if (connError || !connection || connection.club_id !== payment.club_id) {
-    return jsonResponse({ error: 'gateway connection not found' }, 404)
+    return jsonResponse(req, { error: 'gateway connection not found' }, 404)
   }
 
   if (!connection.secret_vault_id) {
     // secret_vault_id holds the Kashier SECRET KEY (see file header) --
     // required for the refund endpoint's Authorization header.
-    return jsonResponse({ error: 'gateway connection has no credentials configured' }, 400)
+    return jsonResponse(req, { error: 'gateway connection has no credentials configured' }, 400)
   }
 
   const providerRef = txn.provider_session_ref
   if (!providerRef) {
-    return jsonResponse({ error: 'original gateway transaction has no provider reference on file' }, 400)
+    return jsonResponse(req, { error: 'original gateway transaction has no provider reference on file' }, 400)
   }
 
   const { data: decryptedSecret, error: secretError } = await admin.rpc('get_vault_secret_service', {
@@ -259,7 +276,7 @@ Deno.serve(async (req) => {
   })
 
   if (secretError || !decryptedSecret) {
-    return jsonResponse({ error: 'could not resolve gateway credentials' }, 500)
+    return jsonResponse(req, { error: 'could not resolve gateway credentials' }, 500)
   }
 
   const kashierSecretKey = decryptedSecret
@@ -280,9 +297,10 @@ Deno.serve(async (req) => {
         reason,
         transaction: { amount },
       }),
+      signal: AbortSignal.timeout(15000),
     })
   } catch {
-    return jsonResponse({ error: 'could not reach kashier' }, 502)
+    return jsonResponse(req, { error: 'could not reach kashier' }, 502)
   }
 
   const kashierBody = await kashierResponse.json().catch(() => null)
@@ -293,7 +311,7 @@ Deno.serve(async (req) => {
     // processed even though the HTTP call itself may have succeeded.
     // Do not post a canonical refund on a guess.
     const sanitizedMessage = sanitizeKashierError(kashierBody)
-    return jsonResponse({
+    return jsonResponse(req, {
       refund_id: null,
       status: 'not_confirmed',
       message: sanitizedMessage,
@@ -305,7 +323,7 @@ Deno.serve(async (req) => {
     // Kashier confirmed SUCCESS but did not return the shape we expect
     // to derive an idempotency key from -- surfaced explicitly rather
     // than posting a canonical refund with a guessed/missing reference.
-    return jsonResponse({
+    return jsonResponse(req, {
       error: 'kashier confirmed the refund but did not return a recognizable transaction id',
       status: 'not_confirmed',
     }, 502)
@@ -335,11 +353,11 @@ Deno.serve(async (req) => {
     // is a genuine "we owe a ledger fix" state, surfaced clearly
     // rather than silently swallowed, same discipline as
     // stripe-create-refund's / paymob-create-refund's own equivalent branch.
-    return jsonResponse({
+    return jsonResponse(req, {
       error: `kashier refund succeeded (${kashierTransactionId}) but posting the canonical refund failed: ${rpcError.message}`,
       provider_refund_ref: kashierTransactionId,
     }, 500)
   }
 
-  return jsonResponse({ refund_id: refundId, provider_refund_ref: kashierTransactionId, status: 'succeeded' })
+  return jsonResponse(req, { refund_id: refundId, provider_refund_ref: kashierTransactionId, status: 'succeeded' })
 })

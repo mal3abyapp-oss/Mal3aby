@@ -114,16 +114,33 @@ const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!
 const SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
 const ANON_KEY = Deno.env.get('SUPABASE_ANON_KEY')!
 
-const CORS_HEADERS = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-  'Access-Control-Allow-Methods': 'POST, OPTIONS',
+// CORS tightened (pre-launch hardening, 2026-08-29): this function is
+// called only by the authenticated Mal3aby app itself via
+// supabase.functions.invoke (JWT-Bearer auth, not browser-ambient
+// cookie auth -- so wildcard CORS was never a CSRF vector here, per
+// the pre-launch edge-function audit), but a privilege-relevant
+// endpoint should still not advertise itself as fetchable from any
+// origin as a matter of defense-in-depth. Allowlisted to the real app
+// origins plus the local dev server -- never widened to '*' again.
+const ALLOWED_ORIGINS = new Set([
+  'https://mal3aby.app',
+  'https://www.mal3aby.app',
+  'http://localhost:5173',
+])
+
+function corsHeadersFor(req: Request): Record<string, string> {
+  const origin = req.headers.get('origin')
+  return {
+    'Access-Control-Allow-Origin': origin && ALLOWED_ORIGINS.has(origin) ? origin : 'https://mal3aby.app',
+    'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+    'Access-Control-Allow-Methods': 'POST, OPTIONS',
+  }
 }
 
-function jsonResponse(body: unknown, status = 200) {
+function jsonResponse(req: Request, body: unknown, status = 200) {
   return new Response(JSON.stringify(body), {
     status,
-    headers: { 'Content-Type': 'application/json', ...CORS_HEADERS },
+    headers: { 'Content-Type': 'application/json', ...corsHeadersFor(req) },
   })
 }
 
@@ -168,6 +185,7 @@ async function fetchAccessToken(
         'Content-Type': 'application/x-www-form-urlencoded',
       },
       body: 'grant_type=client_credentials',
+      signal: AbortSignal.timeout(15000),
     })
   } catch {
     return { error: 'could not reach paypal (oauth)' }
@@ -184,27 +202,27 @@ async function fetchAccessToken(
 
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
-    return new Response(null, { headers: CORS_HEADERS })
+    return new Response(null, { headers: corsHeadersFor(req) })
   }
   if (req.method !== 'POST') {
-    return jsonResponse({ error: 'method not allowed' }, 405)
+    return jsonResponse(req, { error: 'method not allowed' }, 405)
   }
 
   const authHeader = req.headers.get('Authorization')
   if (!authHeader) {
-    return jsonResponse({ error: 'authentication required' }, 401)
+    return jsonResponse(req, { error: 'authentication required' }, 401)
   }
 
   let body: { transaction_id?: string }
   try {
     body = await req.json()
   } catch {
-    return jsonResponse({ error: 'malformed JSON body' }, 400)
+    return jsonResponse(req, { error: 'malformed JSON body' }, 400)
   }
 
   const transactionId = body.transaction_id
   if (!transactionId || typeof transactionId !== 'string') {
-    return jsonResponse({ error: 'transaction_id is required' }, 400)
+    return jsonResponse(req, { error: 'transaction_id is required' }, 400)
   }
 
   const callerClient = createClient(SUPABASE_URL, ANON_KEY, {
@@ -217,7 +235,7 @@ Deno.serve(async (req) => {
   } = await callerClient.auth.getUser()
 
   if (userError || !user) {
-    return jsonResponse({ error: 'invalid or expired session' }, 401)
+    return jsonResponse(req, { error: 'invalid or expired session' }, 401)
   }
 
   const admin = createClient(SUPABASE_URL, SERVICE_ROLE_KEY)
@@ -229,15 +247,15 @@ Deno.serve(async (req) => {
     .maybeSingle()
 
   if (txnError || !txn) {
-    return jsonResponse({ error: 'transaction not found' }, 404)
+    return jsonResponse(req, { error: 'transaction not found' }, 404)
   }
 
   if (txn.gateway !== 'paypal') {
-    return jsonResponse({ error: 'this transaction was not staged for paypal' }, 400)
+    return jsonResponse(req, { error: 'this transaction was not staged for paypal' }, 400)
   }
 
   if (txn.status !== 'pending') {
-    return jsonResponse({ error: `transaction is not pending (status: ${txn.status})` }, 409)
+    return jsonResponse(req, { error: `transaction is not pending (status: ${txn.status})` }, 409)
   }
 
   // Independent server-side re-authorization -- reuses
@@ -248,11 +266,11 @@ Deno.serve(async (req) => {
   })
 
   if (authError || !statusRows || statusRows.length === 0) {
-    return jsonResponse({ error: 'not authorized for this transaction' }, 403)
+    return jsonResponse(req, { error: 'not authorized for this transaction' }, 403)
   }
 
   if (!txn.connection_id) {
-    return jsonResponse({ error: 'transaction has no linked gateway connection' }, 400)
+    return jsonResponse(req, { error: 'transaction has no linked gateway connection' }, 400)
   }
 
   const { data: connection, error: connError } = await admin
@@ -262,17 +280,17 @@ Deno.serve(async (req) => {
     .maybeSingle()
 
   if (connError || !connection || connection.club_id !== txn.club_id) {
-    return jsonResponse({ error: 'gateway connection not found' }, 404)
+    return jsonResponse(req, { error: 'gateway connection not found' }, 404)
   }
 
   if (!connection.enabled || !connection.secret_vault_id) {
-    return jsonResponse({ error: 'gateway connection is not enabled or has no credentials configured' }, 400)
+    return jsonResponse(req, { error: 'gateway connection is not enabled or has no credentials configured' }, 400)
   }
 
   if (!connection.public_key) {
     // public_key holds the PayPal Client ID here -- required alongside
     // the Client Secret for OAuth Basic auth (see file header).
-    return jsonResponse({ error: 'gateway connection has no client id configured' }, 400)
+    return jsonResponse(req, { error: 'gateway connection has no client id configured' }, 400)
   }
 
   const environment = connection.environment === 'live' ? 'live' : 'sandbox'
@@ -288,7 +306,7 @@ Deno.serve(async (req) => {
   })
 
   if (secretError || !clientSecret) {
-    return jsonResponse({ error: 'could not resolve gateway credentials' }, 500)
+    return jsonResponse(req, { error: 'could not resolve gateway credentials' }, 500)
   }
 
   const clientId = connection.public_key
@@ -300,7 +318,7 @@ Deno.serve(async (req) => {
       p_reason: `paypal oauth token request failed: ${tokenResult.error}`,
       p_provider_raw_status: null,
     })
-    return jsonResponse({ error: 'could not authenticate with paypal' }, 502)
+    return jsonResponse(req, { error: 'could not authenticate with paypal' }, 502)
   }
   const accessToken = tokenResult.token
 
@@ -354,6 +372,7 @@ Deno.serve(async (req) => {
         'PayPal-Request-Id': `mal3aby-checkout-${transactionId}`,
       },
       body: JSON.stringify(orderRequestBody),
+      signal: AbortSignal.timeout(15000),
     })
   } catch {
     await admin.rpc('mark_gateway_transaction_failed_service', {
@@ -361,7 +380,7 @@ Deno.serve(async (req) => {
       p_reason: 'paypal order creation: network error contacting paypal',
       p_provider_raw_status: null,
     })
-    return jsonResponse({ error: 'could not reach paypal' }, 502)
+    return jsonResponse(req, { error: 'could not reach paypal' }, 502)
   }
 
   const paypalBody = await paypalResponse.json().catch(() => null)
@@ -373,7 +392,7 @@ Deno.serve(async (req) => {
       p_reason: `paypal order creation failed: ${sanitizedMessage}`,
       p_provider_raw_status: String(paypalResponse.status),
     })
-    return jsonResponse({ error: sanitizedMessage }, 502)
+    return jsonResponse(req, { error: sanitizedMessage }, 502)
   }
 
   // Extract the approve link -- fail closed if neither documented
@@ -390,7 +409,7 @@ Deno.serve(async (req) => {
       p_reason: 'paypal order response did not contain an approve/payer-action link',
       p_provider_raw_status: String(paypalBody.status ?? ''),
     })
-    return jsonResponse({ error: 'paypal did not return a recognizable checkout redirect URL' }, 502)
+    return jsonResponse(req, { error: 'paypal did not return a recognizable checkout redirect URL' }, 502)
   }
 
   // Persist provider_session_ref = PayPal's order id -- this is the
@@ -408,5 +427,5 @@ Deno.serve(async (req) => {
     console.error('failed to persist provider_session_ref', updateError)
   }
 
-  return jsonResponse({ checkout_url: approveLink.href })
+  return jsonResponse(req, { checkout_url: approveLink.href })
 })

@@ -173,6 +173,7 @@ async function fetchAccessToken(
         'Content-Type': 'application/x-www-form-urlencoded',
       },
       body: 'grant_type=client_credentials',
+      signal: AbortSignal.timeout(15000),
     })
   } catch {
     return { error: 'could not reach paypal (oauth)' }
@@ -404,6 +405,7 @@ Deno.serve(async (req) => {
           webhook_id: candidate.webhookId,
           webhook_event: payload,
         }),
+        signal: AbortSignal.timeout(15000),
       })
     } catch {
       continue
@@ -526,6 +528,7 @@ Deno.serve(async (req) => {
           // rather than double-capturing.
           'PayPal-Request-Id': `mal3aby-capture-${orderId}`,
         },
+        signal: AbortSignal.timeout(15000),
       })
     } catch {
       await markProcessed({ transaction_id: transactionId, processing_error: 'network error triggering capture' })

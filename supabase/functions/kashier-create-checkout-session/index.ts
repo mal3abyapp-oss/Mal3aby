@@ -75,16 +75,33 @@ const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!
 const SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
 const ANON_KEY = Deno.env.get('SUPABASE_ANON_KEY')!
 
-const CORS_HEADERS = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-  'Access-Control-Allow-Methods': 'POST, OPTIONS',
+// CORS tightened (pre-launch hardening, 2026-08-29): this function is
+// called only by the authenticated Mal3aby app itself via
+// supabase.functions.invoke (JWT-Bearer auth, not browser-ambient
+// cookie auth -- so wildcard CORS was never a CSRF vector here, per
+// the pre-launch edge-function audit), but a privilege-relevant
+// endpoint should still not advertise itself as fetchable from any
+// origin as a matter of defense-in-depth. Allowlisted to the real app
+// origins plus the local dev server -- never widened to '*' again.
+const ALLOWED_ORIGINS = new Set([
+  'https://mal3aby.app',
+  'https://www.mal3aby.app',
+  'http://localhost:5173',
+])
+
+function corsHeadersFor(req: Request): Record<string, string> {
+  const origin = req.headers.get('origin')
+  return {
+    'Access-Control-Allow-Origin': origin && ALLOWED_ORIGINS.has(origin) ? origin : 'https://mal3aby.app',
+    'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+    'Access-Control-Allow-Methods': 'POST, OPTIONS',
+  }
 }
 
-function jsonResponse(body: unknown, status = 200) {
+function jsonResponse(req: Request, body: unknown, status = 200) {
   return new Response(JSON.stringify(body), {
     status,
-    headers: { 'Content-Type': 'application/json', ...CORS_HEADERS },
+    headers: { 'Content-Type': 'application/json', ...corsHeadersFor(req) },
   })
 }
 
@@ -110,27 +127,27 @@ function sanitizeKashierError(body: unknown): string {
 
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
-    return new Response(null, { headers: CORS_HEADERS })
+    return new Response(null, { headers: corsHeadersFor(req) })
   }
   if (req.method !== 'POST') {
-    return jsonResponse({ error: 'method not allowed' }, 405)
+    return jsonResponse(req, { error: 'method not allowed' }, 405)
   }
 
   const authHeader = req.headers.get('Authorization')
   if (!authHeader) {
-    return jsonResponse({ error: 'authentication required' }, 401)
+    return jsonResponse(req, { error: 'authentication required' }, 401)
   }
 
   let body: { transaction_id?: string }
   try {
     body = await req.json()
   } catch {
-    return jsonResponse({ error: 'malformed JSON body' }, 400)
+    return jsonResponse(req, { error: 'malformed JSON body' }, 400)
   }
 
   const transactionId = body.transaction_id
   if (!transactionId || typeof transactionId !== 'string') {
-    return jsonResponse({ error: 'transaction_id is required' }, 400)
+    return jsonResponse(req, { error: 'transaction_id is required' }, 400)
   }
 
   const callerClient = createClient(SUPABASE_URL, ANON_KEY, {
@@ -143,7 +160,7 @@ Deno.serve(async (req) => {
   } = await callerClient.auth.getUser()
 
   if (userError || !user) {
-    return jsonResponse({ error: 'invalid or expired session' }, 401)
+    return jsonResponse(req, { error: 'invalid or expired session' }, 401)
   }
 
   const admin = createClient(SUPABASE_URL, SERVICE_ROLE_KEY)
@@ -155,15 +172,15 @@ Deno.serve(async (req) => {
     .maybeSingle()
 
   if (txnError || !txn) {
-    return jsonResponse({ error: 'transaction not found' }, 404)
+    return jsonResponse(req, { error: 'transaction not found' }, 404)
   }
 
   if (txn.gateway !== 'kashier') {
-    return jsonResponse({ error: 'this transaction was not staged for kashier' }, 400)
+    return jsonResponse(req, { error: 'this transaction was not staged for kashier' }, 400)
   }
 
   if (txn.status !== 'pending') {
-    return jsonResponse({ error: `transaction is not pending (status: ${txn.status})` }, 409)
+    return jsonResponse(req, { error: `transaction is not pending (status: ${txn.status})` }, 409)
   }
 
   // Independent server-side re-authorization -- reuses
@@ -174,11 +191,11 @@ Deno.serve(async (req) => {
   })
 
   if (authError || !statusRows || statusRows.length === 0) {
-    return jsonResponse({ error: 'not authorized for this transaction' }, 403)
+    return jsonResponse(req, { error: 'not authorized for this transaction' }, 403)
   }
 
   if (!txn.connection_id) {
-    return jsonResponse({ error: 'transaction has no linked gateway connection' }, 400)
+    return jsonResponse(req, { error: 'transaction has no linked gateway connection' }, 400)
   }
 
   const { data: connection, error: connError } = await admin
@@ -188,19 +205,19 @@ Deno.serve(async (req) => {
     .maybeSingle()
 
   if (connError || !connection || connection.club_id !== txn.club_id) {
-    return jsonResponse({ error: 'gateway connection not found' }, 404)
+    return jsonResponse(req, { error: 'gateway connection not found' }, 404)
   }
 
   if (!connection.enabled || !connection.webhook_secret_vault_id) {
     // webhook_secret_vault_id holds the Payment API Key for Kashier
     // (see file header) -- required to create a session at all.
-    return jsonResponse({ error: 'gateway connection is not enabled or has no credentials configured' }, 400)
+    return jsonResponse(req, { error: 'gateway connection is not enabled or has no credentials configured' }, 400)
   }
 
   if (!connection.provider_merchant_ref) {
     // provider_merchant_ref holds Kashier's Merchant ID (MID-XXXX-XXX)
     // -- a REQUIRED body field for Payment Sessions creation.
-    return jsonResponse({ error: 'gateway connection has no merchant id configured' }, 400)
+    return jsonResponse(req, { error: 'gateway connection has no merchant id configured' }, 400)
   }
 
   const environment = connection.environment === 'live' ? 'live' : 'sandbox'
@@ -219,7 +236,7 @@ Deno.serve(async (req) => {
   })
 
   if (apiKeyError || !paymentApiKey) {
-    return jsonResponse({ error: 'could not resolve gateway credentials' }, 500)
+    return jsonResponse(req, { error: 'could not resolve gateway credentials' }, 500)
   }
 
   // secret_vault_id holds the Kashier SECRET KEY here -- the Payment
@@ -237,7 +254,7 @@ Deno.serve(async (req) => {
   }
 
   if (!secretKey) {
-    return jsonResponse({ error: 'gateway connection has no secret key configured' }, 400)
+    return jsonResponse(req, { error: 'gateway connection has no secret key configured' }, 400)
   }
 
   // EGP/USD/EUR/GBP are all standard 2-decimal currencies for Kashier
@@ -286,6 +303,7 @@ Deno.serve(async (req) => {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify(sessionPayload),
+      signal: AbortSignal.timeout(15000),
     })
   } catch {
     await admin.rpc('mark_gateway_transaction_failed_service', {
@@ -293,7 +311,7 @@ Deno.serve(async (req) => {
       p_reason: 'kashier session creation: network error contacting kashier',
       p_provider_raw_status: null,
     })
-    return jsonResponse({ error: 'could not reach kashier' }, 502)
+    return jsonResponse(req, { error: 'could not reach kashier' }, 502)
   }
 
   const kashierBody = await kashierResponse.json().catch(() => null)
@@ -305,7 +323,7 @@ Deno.serve(async (req) => {
       p_reason: `kashier session creation failed: ${sanitizedMessage}`,
       p_provider_raw_status: String(kashierResponse.status),
     })
-    return jsonResponse({ error: sanitizedMessage }, 502)
+    return jsonResponse(req, { error: sanitizedMessage }, 502)
   }
 
   // Persist provider_session_ref = Kashier's session id (`_id`) as a
@@ -325,5 +343,5 @@ Deno.serve(async (req) => {
 
   // sessionUrl is returned DIRECTLY by Kashier's API (like Stripe,
   // unlike Paymob) -- no client-side URL construction needed.
-  return jsonResponse({ checkout_url: kashierBody.sessionUrl })
+  return jsonResponse(req, { checkout_url: kashierBody.sessionUrl })
 })

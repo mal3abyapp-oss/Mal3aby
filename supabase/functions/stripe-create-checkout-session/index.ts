@@ -28,16 +28,33 @@ const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!
 const SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
 const ANON_KEY = Deno.env.get('SUPABASE_ANON_KEY')!
 
-const CORS_HEADERS = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-  'Access-Control-Allow-Methods': 'POST, OPTIONS',
+// CORS tightened (pre-launch hardening, 2026-08-29): this function is
+// called only by the authenticated Mal3aby app itself via
+// supabase.functions.invoke (JWT-Bearer auth, not browser-ambient
+// cookie auth -- so wildcard CORS was never a CSRF vector here, per
+// the pre-launch edge-function audit), but a privilege-relevant
+// endpoint should still not advertise itself as fetchable from any
+// origin as a matter of defense-in-depth. Allowlisted to the real app
+// origins plus the local dev server -- never widened to '*' again.
+const ALLOWED_ORIGINS = new Set([
+  'https://mal3aby.app',
+  'https://www.mal3aby.app',
+  'http://localhost:5173',
+])
+
+function corsHeadersFor(req: Request): Record<string, string> {
+  const origin = req.headers.get('origin')
+  return {
+    'Access-Control-Allow-Origin': origin && ALLOWED_ORIGINS.has(origin) ? origin : 'https://mal3aby.app',
+    'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+    'Access-Control-Allow-Methods': 'POST, OPTIONS',
+  }
 }
 
-function jsonResponse(body: unknown, status = 200) {
+function jsonResponse(req: Request, body: unknown, status = 200) {
   return new Response(JSON.stringify(body), {
     status,
-    headers: { 'Content-Type': 'application/json', ...CORS_HEADERS },
+    headers: { 'Content-Type': 'application/json', ...corsHeadersFor(req) },
   })
 }
 
@@ -86,27 +103,27 @@ function sanitizeStripeError(err: unknown): { message: string; type?: string; co
 
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
-    return new Response(null, { headers: CORS_HEADERS })
+    return new Response(null, { headers: corsHeadersFor(req) })
   }
   if (req.method !== 'POST') {
-    return jsonResponse({ error: 'method not allowed' }, 405)
+    return jsonResponse(req, { error: 'method not allowed' }, 405)
   }
 
   const authHeader = req.headers.get('Authorization')
   if (!authHeader) {
-    return jsonResponse({ error: 'authentication required' }, 401)
+    return jsonResponse(req, { error: 'authentication required' }, 401)
   }
 
   let body: { transaction_id?: string }
   try {
     body = await req.json()
   } catch {
-    return jsonResponse({ error: 'malformed JSON body' }, 400)
+    return jsonResponse(req, { error: 'malformed JSON body' }, 400)
   }
 
   const transactionId = body.transaction_id
   if (!transactionId || typeof transactionId !== 'string') {
-    return jsonResponse({ error: 'transaction_id is required' }, 400)
+    return jsonResponse(req, { error: 'transaction_id is required' }, 400)
   }
 
   // Caller-scoped client -- every read through this client is subject
@@ -122,7 +139,7 @@ Deno.serve(async (req) => {
   } = await callerClient.auth.getUser()
 
   if (userError || !user) {
-    return jsonResponse({ error: 'invalid or expired session' }, 401)
+    return jsonResponse(req, { error: 'invalid or expired session' }, 401)
   }
 
   // service-role client -- required to read the transaction/connection
@@ -138,11 +155,11 @@ Deno.serve(async (req) => {
     .maybeSingle()
 
   if (txnError || !txn) {
-    return jsonResponse({ error: 'transaction not found' }, 404)
+    return jsonResponse(req, { error: 'transaction not found' }, 404)
   }
 
   if (txn.gateway !== 'stripe') {
-    return jsonResponse({ error: 'this transaction was not staged for stripe' }, 400)
+    return jsonResponse(req, { error: 'this transaction was not staged for stripe' }, 400)
   }
 
   if (txn.status !== 'pending') {
@@ -152,7 +169,7 @@ Deno.serve(async (req) => {
     // and creating one for a non-pending transaction would risk a
     // second, orphaned Stripe session for an already-resolved
     // Mal3aby-side transaction. Refuse explicitly.
-    return jsonResponse({ error: `transaction is not pending (status: ${txn.status})` }, 409)
+    return jsonResponse(req, { error: `transaction is not pending (status: ${txn.status})` }, 409)
   }
 
   // Independent server-side re-authorization -- reuse
@@ -172,11 +189,11 @@ Deno.serve(async (req) => {
   })
 
   if (authError || !statusRows || statusRows.length === 0) {
-    return jsonResponse({ error: 'not authorized for this transaction' }, 403)
+    return jsonResponse(req, { error: 'not authorized for this transaction' }, 403)
   }
 
   if (!txn.connection_id) {
-    return jsonResponse({ error: 'transaction has no linked gateway connection' }, 400)
+    return jsonResponse(req, { error: 'transaction has no linked gateway connection' }, 400)
   }
 
   const { data: connection, error: connError } = await admin
@@ -186,11 +203,11 @@ Deno.serve(async (req) => {
     .maybeSingle()
 
   if (connError || !connection || connection.club_id !== txn.club_id) {
-    return jsonResponse({ error: 'gateway connection not found' }, 404)
+    return jsonResponse(req, { error: 'gateway connection not found' }, 404)
   }
 
   if (!connection.enabled || !connection.secret_vault_id) {
-    return jsonResponse({ error: 'gateway connection is not enabled or has no credentials configured' }, 400)
+    return jsonResponse(req, { error: 'gateway connection is not enabled or has no credentials configured' }, 400)
   }
 
   // NOTE: reads via get_vault_secret_service(), a SECURITY DEFINER SQL
@@ -204,7 +221,7 @@ Deno.serve(async (req) => {
   })
 
   if (secretError || !decryptedSecret) {
-    return jsonResponse({ error: 'could not resolve gateway credentials' }, 500)
+    return jsonResponse(req, { error: 'could not resolve gateway credentials' }, 500)
   }
 
   const stripeSecretKey = decryptedSecret
@@ -249,6 +266,7 @@ Deno.serve(async (req) => {
         'Idempotency-Key': `checkout-session:${transactionId}`,
       },
       body: params.toString(),
+      signal: AbortSignal.timeout(15000),
     })
   } catch (networkErr) {
     // Genuine connection-level failure -- fail closed: mark the
@@ -259,7 +277,7 @@ Deno.serve(async (req) => {
       p_reason: 'stripe checkout session creation: network error contacting stripe',
       p_provider_raw_status: null,
     })
-    return jsonResponse({ error: 'could not reach stripe' }, 502)
+    return jsonResponse(req, { error: 'could not reach stripe' }, 502)
   }
 
   const stripeBody = await stripeResponse.json().catch(() => null)
@@ -271,7 +289,7 @@ Deno.serve(async (req) => {
       p_reason: `stripe checkout session creation failed: ${sanitized.type ?? 'error'} - ${sanitized.message}`,
       p_provider_raw_status: sanitized.code ?? null,
     })
-    return jsonResponse({ error: sanitized.message, type: sanitized.type }, 502)
+    return jsonResponse(req, { error: sanitized.message, type: sanitized.type }, 502)
   }
 
   // Persist provider_session_ref -- this is EXACTLY what closes the
@@ -296,5 +314,5 @@ Deno.serve(async (req) => {
     console.error('failed to persist provider_session_ref', updateError)
   }
 
-  return jsonResponse({ checkout_url: stripeBody.url })
+  return jsonResponse(req, { checkout_url: stripeBody.url })
 })

@@ -464,7 +464,10 @@ Deno.serve(async (req) => {
           try {
             const sessionSearch = await fetch(
               `https://api.stripe.com/v1/checkout/sessions?payment_intent=${encodeURIComponent(paymentIntentId)}&limit=1`,
-              { headers: { Authorization: `Bearer ${apiDecryptedSecret}` } },
+              {
+                headers: { Authorization: `Bearer ${apiDecryptedSecret}` },
+                signal: AbortSignal.timeout(15000),
+              },
             )
             const sessionSearchBody = await sessionSearch.json().catch(() => null)
             const sessionId = sessionSearchBody?.data?.[0]?.id

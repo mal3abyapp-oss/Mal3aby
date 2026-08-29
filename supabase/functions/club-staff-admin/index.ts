@@ -29,30 +29,47 @@ import { createClient } from 'jsr:@supabase/supabase-js@2'
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!
 const SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
 
-const CORS_HEADERS = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-  'Access-Control-Allow-Methods': 'POST, OPTIONS',
+// CORS tightened (pre-launch hardening, 2026-08-29): this function is
+// called only by the authenticated Mal3aby app itself via
+// supabase.functions.invoke (JWT-Bearer auth, not browser-ambient
+// cookie auth -- so wildcard CORS was never a CSRF vector here, per
+// the pre-launch edge-function audit), but a privilege-relevant
+// endpoint should still not advertise itself as fetchable from any
+// origin as a matter of defense-in-depth. Allowlisted to the real app
+// origins plus the local dev server -- never widened to '*' again.
+const ALLOWED_ORIGINS = new Set([
+  'https://mal3aby.app',
+  'https://www.mal3aby.app',
+  'http://localhost:5173',
+])
+
+function corsHeadersFor(req: Request): Record<string, string> {
+  const origin = req.headers.get('origin')
+  return {
+    'Access-Control-Allow-Origin': origin && ALLOWED_ORIGINS.has(origin) ? origin : 'https://mal3aby.app',
+    'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+    'Access-Control-Allow-Methods': 'POST, OPTIONS',
+  }
 }
 
-function jsonResponse(body: unknown, status = 200) {
+function jsonResponse(req: Request, body: unknown, status = 200) {
   return new Response(JSON.stringify(body), {
     status,
-    headers: { 'Content-Type': 'application/json', ...CORS_HEADERS },
+    headers: { 'Content-Type': 'application/json', ...corsHeadersFor(req) },
   })
 }
 
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
-    return new Response(null, { headers: CORS_HEADERS })
+    return new Response(null, { headers: corsHeadersFor(req) })
   }
   if (req.method !== 'POST') {
-    return jsonResponse({ error: 'method not allowed' }, 405)
+    return jsonResponse(req, { error: 'method not allowed' }, 405)
   }
 
   const authHeader = req.headers.get('Authorization')
   if (!authHeader) {
-    return jsonResponse({ error: 'authentication required' }, 401)
+    return jsonResponse(req, { error: 'authentication required' }, 401)
   }
 
   let body: {
@@ -70,12 +87,12 @@ Deno.serve(async (req) => {
   try {
     body = await req.json()
   } catch {
-    return jsonResponse({ error: 'invalid request body' }, 400)
+    return jsonResponse(req, { error: 'invalid request body' }, 400)
   }
 
   const clubId = body.club_id
   if (!clubId) {
-    return jsonResponse({ error: 'club_id is required' }, 400)
+    return jsonResponse(req, { error: 'club_id is required' }, 400)
   }
 
   // Caller-scoped client -- resolves the REAL calling user from their own
@@ -85,7 +102,7 @@ Deno.serve(async (req) => {
   })
   const { data: callerData, error: callerError } = await callerClient.auth.getUser()
   if (callerError || !callerData.user) {
-    return jsonResponse({ error: 'authentication required' }, 401)
+    return jsonResponse(req, { error: 'authentication required' }, 401)
   }
   const callerId = callerData.user.id
 
@@ -99,17 +116,17 @@ Deno.serve(async (req) => {
 
   if (body.action === 'create') {
     if (!(await callerHasPermission('staff.create'))) {
-      return jsonResponse({ error: 'not authorized' }, 403)
+      return jsonResponse(req, { error: 'not authorized' }, 403)
     }
     const { email, full_name: fullName, role_key: roleKey, custom_role_id: customRoleId, branch_ids: branchIds } = body
     if (!email || typeof email !== 'string' || !email.includes('@')) {
-      return jsonResponse({ error: 'a valid email is required' }, 400)
+      return jsonResponse(req, { error: 'a valid email is required' }, 400)
     }
     if ((roleKey && customRoleId) || (!roleKey && !customRoleId)) {
-      return jsonResponse({ error: 'specify exactly one of a system role or a custom role' }, 400)
+      return jsonResponse(req, { error: 'specify exactly one of a system role or a custom role' }, 400)
     }
     if (roleKey === 'platform_owner') {
-      return jsonResponse({ error: 'not authorized' }, 403)
+      return jsonResponse(req, { error: 'not authorized' }, 403)
     }
 
     // Escalation guard (mirrors invite_staff_member()'s own
@@ -125,7 +142,7 @@ Deno.serve(async (req) => {
     } else {
       const { data: roleRow } = await admin.from('roles').select('id').eq('key', roleKey).maybeSingle()
       if (!roleRow) {
-        return jsonResponse({ error: 'unknown role' }, 400)
+        return jsonResponse(req, { error: 'unknown role' }, 400)
       }
       const { data: rows } = await admin
         .from('role_permissions')
@@ -135,7 +152,7 @@ Deno.serve(async (req) => {
     }
     for (const key of permissionKeys) {
       if (!(await callerHasPermission(key))) {
-        return jsonResponse({ error: 'cannot assign a role with permissions you do not hold yourself' }, 403)
+        return jsonResponse(req, { error: 'cannot assign a role with permissions you do not hold yourself' }, 403)
       }
     }
 
@@ -150,13 +167,13 @@ Deno.serve(async (req) => {
       // of the raw Auth error, letting the frontend offer switching to
       // the existing-account (Mode A) flow.
       if (message.toLowerCase().includes('already') || message.toLowerCase().includes('registered')) {
-        return jsonResponse({ error: 'account_exists', message: 'An account already exists with this email. You can link it to this club instead.' }, 409)
+        return jsonResponse(req, { error: 'account_exists', message: 'An account already exists with this email. You can link it to this club instead.' }, 409)
       }
-      return jsonResponse({ error: message }, 400)
+      return jsonResponse(req, { error: message }, 400)
     }
     const newUserId = createdUser.user?.id
     if (!newUserId) {
-      return jsonResponse({ error: 'account creation failed' }, 500)
+      return jsonResponse(req, { error: 'account creation failed' }, 500)
     }
 
     // profiles row is auto-created by the existing handle_new_user()
@@ -178,7 +195,7 @@ Deno.serve(async (req) => {
       // club membership (same discipline as activate-portal-account and
       // platform-staff-admin before it).
       await admin.auth.admin.deleteUser(newUserId).catch(() => {})
-      return jsonResponse({ error: membershipError.message || 'could not create staff membership' }, 400)
+      return jsonResponse(req, { error: membershipError.message || 'could not create staff membership' }, 400)
     }
 
     const { data: linkData, error: linkError } = await admin.auth.admin.generateLink({
@@ -186,10 +203,10 @@ Deno.serve(async (req) => {
       email,
     })
     if (linkError) {
-      return jsonResponse({ membership_id: membershipId, user_id: newUserId, warning: 'account created but the setup link could not be generated' })
+      return jsonResponse(req, { membership_id: membershipId, user_id: newUserId, warning: 'account created but the setup link could not be generated' })
     }
 
-    return jsonResponse({
+    return jsonResponse(req, {
       membership_id: membershipId,
       user_id: newUserId,
       setup_link: linkData.properties?.action_link ?? null,
@@ -198,11 +215,11 @@ Deno.serve(async (req) => {
 
   if (body.action === 'change_email') {
     if (!(await callerHasPermission('staff.update'))) {
-      return jsonResponse({ error: 'not authorized' }, 403)
+      return jsonResponse(req, { error: 'not authorized' }, 403)
     }
     const { target_user_id: targetUserId, target_membership_id: targetMembershipId, new_email: newEmail } = body
     if (!targetUserId || !targetMembershipId || !newEmail || !newEmail.includes('@')) {
-      return jsonResponse({ error: 'a target membership/user and a valid new email are required' }, 400)
+      return jsonResponse(req, { error: 'a target membership/user and a valid new email are required' }, 400)
     }
 
     const { data: targetMembership } = await admin
@@ -213,7 +230,7 @@ Deno.serve(async (req) => {
       .eq('club_id', clubId)
       .maybeSingle()
     if (!targetMembership) {
-      return jsonResponse({ error: 'this account is not staff at this club' }, 404)
+      return jsonResponse(req, { error: 'this account is not staff at this club' }, 404)
     }
 
     const { data: oldUserData } = await admin.auth.admin.getUserById(targetUserId)
@@ -223,7 +240,7 @@ Deno.serve(async (req) => {
     if (updateError) {
       const message = updateError.message || 'could not update email'
       const status = message.toLowerCase().includes('already') || message.toLowerCase().includes('registered') ? 409 : 400
-      return jsonResponse({ error: message }, status)
+      return jsonResponse(req, { error: message }, status)
     }
 
     await admin.rpc('write_audit_log', {
@@ -236,16 +253,16 @@ Deno.serve(async (req) => {
       p_reason: null,
     })
 
-    return jsonResponse({ success: true })
+    return jsonResponse(req, { success: true })
   }
 
   if (body.action === 'reset_password') {
     if (!(await callerHasPermission('staff.update'))) {
-      return jsonResponse({ error: 'not authorized' }, 403)
+      return jsonResponse(req, { error: 'not authorized' }, 403)
     }
     const { target_user_id: targetUserId, target_membership_id: targetMembershipId } = body
     if (!targetUserId || !targetMembershipId) {
-      return jsonResponse({ error: 'a target membership and user are required' }, 400)
+      return jsonResponse(req, { error: 'a target membership and user are required' }, 400)
     }
 
     const { data: targetMembership } = await admin
@@ -256,13 +273,13 @@ Deno.serve(async (req) => {
       .eq('club_id', clubId)
       .maybeSingle()
     if (!targetMembership) {
-      return jsonResponse({ error: 'this account is not staff at this club' }, 404)
+      return jsonResponse(req, { error: 'this account is not staff at this club' }, 404)
     }
 
     const { data: targetUserData } = await admin.auth.admin.getUserById(targetUserId)
     const targetEmail = targetUserData.user?.email
     if (!targetEmail) {
-      return jsonResponse({ error: "could not resolve this account's email" }, 400)
+      return jsonResponse(req, { error: "could not resolve this account's email" }, 400)
     }
 
     const { data: linkData, error: linkError } = await admin.auth.admin.generateLink({
@@ -270,7 +287,7 @@ Deno.serve(async (req) => {
       email: targetEmail,
     })
     if (linkError) {
-      return jsonResponse({ error: linkError.message || 'could not generate a reset link' }, 400)
+      return jsonResponse(req, { error: linkError.message || 'could not generate a reset link' }, 400)
     }
 
     // Audit ONLY that a reset/resend happened -- never the token/link.
@@ -284,8 +301,8 @@ Deno.serve(async (req) => {
       p_reason: null,
     })
 
-    return jsonResponse({ reset_link: linkData.properties?.action_link ?? null })
+    return jsonResponse(req, { reset_link: linkData.properties?.action_link ?? null })
   }
 
-  return jsonResponse({ error: 'unknown action' }, 400)
+  return jsonResponse(req, { error: 'unknown action' }, 400)
 })
