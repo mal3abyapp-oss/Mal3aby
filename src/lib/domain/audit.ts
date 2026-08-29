@@ -122,6 +122,22 @@ export const ACTION_LABELS: Record<string, string> = {
   'club_membership.frozen': 'تجميد عضوية نادٍ',
   'club_membership.resumed': 'استئناف عضوية نادٍ',
   'club_membership.cancelled': 'إلغاء عضوية نادٍ',
+
+  // PLATFORM OWNER AUTONOMOUS COMPLETION -- Phase B: the Platform Owner
+  // Complete Control program's own real audit trail was found live-
+  // rendering these as raw strings during the authenticated visual
+  // acceptance pass (module.entitled, club_payments.disabled, etc. all
+  // confirmed appearing unmapped in the real Audit Log UI). Same
+  // coverage-gap pattern as the PERSONA COUNCIL AUDIT sections above --
+  // filling it the same way.
+  'module.entitled': 'إتاحة وحدة',
+  'module.unentitled': 'إلغاء إتاحة وحدة',
+  'module.activated': 'تفعيل وحدة',
+  'module.deactivated': 'إيقاف تفعيل وحدة',
+  'club_payments.enabled': 'تفعيل المدفوعات الإلكترونية',
+  'club_payments.disabled': 'إيقاف المدفوعات الإلكترونية',
+  'commercial_entitlements.updated': 'تعديل الحدود التجارية',
+  'club_gateway_provider_policy.updated': 'تعديل سياسة موفر دفع',
 }
 
 export const ENTITY_LABELS: Record<string, string> = {
@@ -165,6 +181,13 @@ export const ENTITY_LABELS: Record<string, string> = {
   payment_method_config: 'طريقة دفع',
   payment_proof: 'إثبات دفع',
   players: 'لاعب',
+
+  // PLATFORM OWNER AUTONOMOUS COMPLETION -- Phase B (2026-08-29): entity
+  // types for the module-control / payment-kill-switch / limit / gateway-
+  // policy actions added to ACTION_LABELS above.
+  club_module: 'وحدة نادٍ',
+  commercial_entitlements: 'الحدود التجارية',
+  club_gateway_provider_policy: 'سياسة موفر دفع',
 }
 
 // English mirror of ACTION_LABELS above -- same keys, same order, kept as
@@ -262,6 +285,16 @@ export const ACTION_LABELS_EN: Record<string, string> = {
   'club_membership.frozen': 'Freeze club membership',
   'club_membership.resumed': 'Resume club membership',
   'club_membership.cancelled': 'Cancel club membership',
+
+  // PLATFORM OWNER AUTONOMOUS COMPLETION -- Phase B, English mirror.
+  'module.entitled': 'Entitle module',
+  'module.unentitled': 'Unentitle module',
+  'module.activated': 'Activate module',
+  'module.deactivated': 'Deactivate module',
+  'club_payments.enabled': 'Enable online payments',
+  'club_payments.disabled': 'Disable online payments',
+  'commercial_entitlements.updated': 'Update commercial limits',
+  'club_gateway_provider_policy.updated': 'Update payment provider policy',
 }
 
 export const ENTITY_LABELS_EN: Record<string, string> = {
@@ -303,6 +336,11 @@ export const ENTITY_LABELS_EN: Record<string, string> = {
   payment_method_config: 'Payment method',
   payment_proof: 'Payment proof',
   players: 'Player',
+
+  // PLATFORM OWNER AUTONOMOUS COMPLETION -- Phase B, English mirror.
+  club_module: 'Club module',
+  commercial_entitlements: 'Commercial limits',
+  club_gateway_provider_policy: 'Payment provider policy',
 }
 
 /** Looks up a label, falling back to the raw value if genuinely unmapped -- never throws, matches the existing safe-fallback convention used throughout the app's other label maps. Defaults to 'ar' so any caller that hasn't been updated yet keeps its previous behavior. */

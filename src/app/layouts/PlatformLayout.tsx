@@ -23,6 +23,7 @@ import {
   LogOut,
   UserCog,
   KeyRound,
+  History,
 } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 
@@ -79,6 +80,11 @@ const navSections: NavSection[] = [
       { to: '/platform/alerts', labelKey: 'platform.nav.alerts', icon: Bell },
       { to: '/platform/trials', labelKey: 'platform.nav.trials', icon: Award },
       { to: '/platform/audit', labelKey: 'platform.nav.auditLog', icon: ShieldCheck },
+      // PLATFORM OWNER AUTONOMOUS COMPLETION -- Phase E (2026-08-29):
+      // directive Section 22, a practical read-only support session
+      // history screen. Grouped with Audit Log -- both are
+      // read-only historical logs of privileged platform actions.
+      { to: '/platform/support-history', labelKey: 'platform.nav.supportHistory', icon: History },
     ],
   },
   // PLATFORM STAFF + PLATFORM ROLES & PERMISSIONS (2026-08-26) -- a

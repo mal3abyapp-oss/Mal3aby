@@ -180,6 +180,7 @@
       "alerts": "Alerts",
       "trials": "Free Trials",
       "auditLog": "Audit Log",
+      "supportHistory": "Support Session History",
       "sectionStaffAccess": "Staff & Access",
       "platformStaff": "Platform Staff",
       "platformRoles": "Platform Roles & Permissions",
@@ -220,6 +221,25 @@
       "emptyTitle": "No audit log yet",
       "loadingMore": "Loading...",
       "loadMore": "Load more"
+    },
+    "supportHistoryPage": {
+      "title": "Support Session History",
+      "description": "A read-only record of every support session a platform staff member opened into a club -- who, which club, access level, reason, and timing",
+      "supportUser": "Support user",
+      "club": "Club",
+      "clubFallback": "Club",
+      "accessLevel": "Access level",
+      "modeManage": "Manage",
+      "modeView": "View only",
+      "reason": "Reason",
+      "started": "Started",
+      "expires": "Expires",
+      "ended": "Ended",
+      "status": "Status",
+      "statusActive": "Active",
+      "statusExpired": "Expired",
+      "statusEnded": "Ended",
+      "emptyTitle": "No support sessions yet"
     },
     "clubDetailPage": {
       "loadingTitle": "...",
@@ -348,7 +368,9 @@
         "approve": "Approve",
         "reject": "Reject",
         "reasonLabel": "Reason (optional)",
-        "overLimitWarning": "{{label}}: {{used}} currently in use, above the new limit of {{limit}}. Existing records are preserved — no new ones can be created until usage drops below the limit."
+        "overLimitWarning": "{{label}}: {{used}} currently in use, above the new limit of {{limit}}. Existing records are preserved — no new ones can be created until usage drops below the limit.",
+        "overLimitBadge": "Over limit",
+        "overLimitHint": "Current usage is above the limit — existing records are preserved, and no new ones can be created until usage drops below the limit or the limit is raised."
       },
       "paymentsCard": {
         "title": "Online payments",
@@ -357,6 +379,17 @@
         "hint": "A kill switch independent of club suspension -- disabling blocks new online-payment checkouts only. Historical payments, refunds, and cash/manual payments are unaffected.",
         "enable": "Re-enable payments",
         "disable": "Disable payments"
+      },
+      "providerPolicy": {
+        "title": "Payment provider policy",
+        "hint": "Restrict which payment providers this club may connect or re-enable. Blocking a provider never disconnects an existing connection -- it only prevents a new connection or turning a currently-disabled one back on.",
+        "notConnected": "Not connected",
+        "connectedEnabled": "Connected & enabled",
+        "connectedDisabled": "Connected, disabled",
+        "allowed": "Allowed",
+        "blocked": "Policy-blocked",
+        "block": "Block",
+        "restore": "Restore"
       },
       "tabs": {
         "history": "Subscription history",

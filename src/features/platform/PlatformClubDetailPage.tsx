@@ -3,6 +3,7 @@ import { Link, useParams } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
 import { supabase } from '@/lib/supabase/client'
+import { cn } from '@/lib/utils'
 import { PageHeader } from '@/components/ui/page-header'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -1029,10 +1030,35 @@ export function PlatformClubDetailPage() {
                 const usedKey = key === 'branch_limit' ? 'branches_used' : key === 'field_limit' ? 'fields_used' : 'academy_used'
                 const limit = usage?.[key] ?? null
                 const used = usage?.[usedKey] ?? 0
+                // PLATFORM OWNER AUTONOMOUS COMPLETION -- Phase D
+                // (2026-08-29): live-triggered with a real fixture
+                // (1 QA branch + branch_limit=0 set via this exact
+                // UI) -- confirmed the persistent display card had no
+                // visual indicator at all once an over-limit state was
+                // actually saved (only the pre-save warning inside the
+                // edit form existed). The RPC/trigger side already does
+                // the right thing (preserves existing records, blocks
+                // new ones) -- this was purely a "clear warning" gap
+                // per the directive's own §14 wording.
+                const isOverLimit = limit !== null && used > limit
                 return (
-                  <div key={key} className="rounded-lg border border-border p-3">
-                    <p className="text-sm font-medium">{limitTypeLabel[key]}</p>
+                  <div
+                    key={key}
+                    className={cn(
+                      'rounded-lg border p-3',
+                      isOverLimit ? 'border-status-danger/40 bg-status-danger/5' : 'border-border'
+                    )}
+                  >
+                    <div className="flex items-center justify-between gap-2">
+                      <p className="text-sm font-medium">{limitTypeLabel[key]}</p>
+                      {isOverLimit && (
+                        <StatusBadge tone="danger" label={t('platform.clubDetailPage.limitsCard.overLimitBadge')} />
+                      )}
+                    </div>
                     <p className="text-sm text-text-secondary tabular-nums">{used} {limit === null ? t('platform.clubDetailPage.limitsCard.unlimited') : `/ ${limit}`}</p>
+                    {isOverLimit && (
+                      <p className="mt-1 text-xs text-status-danger">{t('platform.clubDetailPage.limitsCard.overLimitHint')}</p>
+                    )}
                   </div>
                 )
               })}
@@ -1077,30 +1103,41 @@ export function PlatformClubDetailPage() {
       </Card>
 
       {/* PLATFORM OWNER CONTROL IMPLEMENTATION -- Phase 5 (P2): payment
-          kill switch. Deliberately compact -- a single toggle, no
-          provider-allowlist UI here (that's set_club_gateway_provider_
-          policy, reachable via a future dedicated screen if usage
-          proves it's needed; the RPC/enforcement already exists). */}
+          kill switch. AUTONOMOUS COMPLETION -- Phase A: the
+          provider-allowlist UI this comment used to say was deferred to
+          "a future dedicated screen" is now built directly below, in
+          the same card, as ProviderPolicyPanel -- the RPC
+          (set_club_gateway_provider_policy) has been live since Phase
+          5; this closes the confirmed UI gap. */}
       <Card className="mb-4">
         <CardHeader>
           <CardTitle className="text-base">{t('platform.clubDetailPage.paymentsCard.title')}</CardTitle>
         </CardHeader>
-        <CardContent className="flex items-center justify-between gap-3">
-          <div>
-            <StatusBadge
-              tone={entitlements?.payments_platform_disabled ? 'danger' : 'success'}
-              label={entitlements?.payments_platform_disabled ? t('platform.clubDetailPage.paymentsCard.disabled') : t('platform.clubDetailPage.paymentsCard.enabled')}
-            />
-            <p className="mt-1 text-xs text-text-secondary">{t('platform.clubDetailPage.paymentsCard.hint')}</p>
+        <CardContent className="flex flex-col gap-4">
+          <div className="flex items-center justify-between gap-3">
+            <div>
+              <StatusBadge
+                tone={entitlements?.payments_platform_disabled ? 'danger' : 'success'}
+                label={entitlements?.payments_platform_disabled ? t('platform.clubDetailPage.paymentsCard.disabled') : t('platform.clubDetailPage.paymentsCard.enabled')}
+              />
+              <p className="mt-1 text-xs text-text-secondary">{t('platform.clubDetailPage.paymentsCard.hint')}</p>
+            </div>
+            <Button
+              size="sm"
+              variant={entitlements?.payments_platform_disabled ? 'default' : 'destructive'}
+              disabled={setPaymentsEnabledMutation.isPending}
+              onClick={() => setPaymentsEnabledMutation.mutate(!!entitlements?.payments_platform_disabled)}
+            >
+              {entitlements?.payments_platform_disabled ? t('platform.clubDetailPage.paymentsCard.enable') : t('platform.clubDetailPage.paymentsCard.disable')}
+            </Button>
           </div>
-          <Button
-            size="sm"
-            variant={entitlements?.payments_platform_disabled ? 'default' : 'destructive'}
-            disabled={setPaymentsEnabledMutation.isPending}
-            onClick={() => setPaymentsEnabledMutation.mutate(!!entitlements?.payments_platform_disabled)}
-          >
-            {entitlements?.payments_platform_disabled ? t('platform.clubDetailPage.paymentsCard.enable') : t('platform.clubDetailPage.paymentsCard.disable')}
-          </Button>
+          {clubId && (
+            <div className="border-t border-border pt-4">
+              <p className="mb-2 text-sm font-medium">{t('platform.clubDetailPage.providerPolicy.title')}</p>
+              <p className="mb-3 text-xs text-text-secondary">{t('platform.clubDetailPage.providerPolicy.hint')}</p>
+              <ProviderPolicyPanel clubId={clubId} />
+            </div>
+          )}
         </CardContent>
       </Card>
 
@@ -1380,6 +1417,97 @@ function ModulesPanel({ clubId }: { clubId: string }) {
             onClick={() => toggleMutation.mutate({ moduleKey: m.moduleKey, entitled: !m.entitled })}
           >
             {m.entitled ? t('platform.clubDetailPage.modulesDisable') : t('platform.clubDetailPage.modulesEnable')}
+          </Button>
+        </div>
+      ))}
+    </div>
+  )
+}
+
+// PLATFORM OWNER AUTONOMOUS COMPLETION -- Phase A: per-club/provider
+// payment allowlist UI. set_club_gateway_provider_policy() has been
+// live since Commerce/Payment Phase 5 with zero UI -- this closes that
+// gap. Never reads/shows a secret (get_platform_club_gateway_overview
+// only returns `connected`/`enabled` booleans, matching
+// list_club_gateway_connections' own established convention). Blocking
+// a provider never disconnects an existing connection -- it only
+// prevents a NEW connection or re-enabling one that's currently off,
+// exactly matching the RPC's own documented, already-live behavior.
+interface ProviderPolicyRow {
+  providerKey: string
+  providerDisplayName: string
+  connected: boolean
+  enabled: boolean
+  policyStatus: string
+  policyReason: string | null
+}
+
+async function fetchGatewayOverview(clubId: string): Promise<ProviderPolicyRow[]> {
+  const { data, error } = await supabase.rpc('get_platform_club_gateway_overview', { p_club_id: clubId })
+  if (error) throw error
+  return (data ?? []).map((r) => ({
+    providerKey: r.provider_key,
+    providerDisplayName: r.provider_display_name,
+    connected: r.connected,
+    enabled: r.enabled,
+    policyStatus: r.policy_status,
+    policyReason: r.policy_reason,
+  }))
+}
+
+function ProviderPolicyPanel({ clubId }: { clubId: string }) {
+  const { t } = useTranslation()
+  const queryClient = useQueryClient()
+
+  const { data: rows = [], isLoading } = useQuery({
+    queryKey: ['platform-club-gateway-overview', clubId],
+    queryFn: () => fetchGatewayOverview(clubId),
+  })
+
+  const policyMutation = useMutation({
+    mutationFn: async ({ providerKey, status }: { providerKey: string; status: 'allowed' | 'policy_blocked' }) => {
+      const { error } = await supabase.rpc('set_club_gateway_provider_policy', {
+        p_club_id: clubId,
+        p_provider_key: providerKey,
+        p_status: status,
+        p_reason: status === 'policy_blocked' ? 'Blocked from Club Detail' : 'Restored from Club Detail',
+      })
+      if (error) throw error
+    },
+    onSuccess: () => void queryClient.invalidateQueries({ queryKey: ['platform-club-gateway-overview', clubId] }),
+  })
+
+  if (isLoading) return null
+
+  return (
+    <div className="flex flex-col gap-2">
+      {rows.map((r) => (
+        <div key={r.providerKey} className="flex items-center justify-between rounded-md border border-border p-2.5">
+          <div>
+            <p className="text-sm font-medium">{r.providerDisplayName}</p>
+            <div className="mt-1 flex flex-wrap gap-1.5">
+              <StatusBadge
+                tone={r.connected ? (r.enabled ? 'success' : 'neutral') : 'neutral'}
+                label={r.connected ? (r.enabled ? t('platform.clubDetailPage.providerPolicy.connectedEnabled') : t('platform.clubDetailPage.providerPolicy.connectedDisabled')) : t('platform.clubDetailPage.providerPolicy.notConnected')}
+              />
+              <StatusBadge
+                tone={r.policyStatus === 'policy_blocked' ? 'danger' : 'success'}
+                label={r.policyStatus === 'policy_blocked' ? t('platform.clubDetailPage.providerPolicy.blocked') : t('platform.clubDetailPage.providerPolicy.allowed')}
+              />
+            </div>
+          </div>
+          <Button
+            size="sm"
+            variant={r.policyStatus === 'policy_blocked' ? 'default' : 'outline'}
+            disabled={policyMutation.isPending}
+            onClick={() =>
+              policyMutation.mutate({
+                providerKey: r.providerKey,
+                status: r.policyStatus === 'policy_blocked' ? 'allowed' : 'policy_blocked',
+              })
+            }
+          >
+            {r.policyStatus === 'policy_blocked' ? t('platform.clubDetailPage.providerPolicy.restore') : t('platform.clubDetailPage.providerPolicy.block')}
           </Button>
         </div>
       ))}

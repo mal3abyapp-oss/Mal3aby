@@ -7953,6 +7953,28 @@ export type Database = {
           role_name: string
         }[]
       }
+      // PLATFORM OWNER AUTONOMOUS COMPLETION -- Phase A: read RPC
+      // backing the new provider-policy UI (migration 20260829010000).
+      get_platform_club_gateway_overview: {
+        Args: { p_club_id: string }
+        Returns: {
+          provider_key: string
+          provider_display_name: string
+          supported_countries: string[]
+          connection_id: string | null
+          environment: string | null
+          connected: boolean
+          enabled: boolean
+          is_default: boolean
+          last_verified_at: string | null
+          last_verification_error: string | null
+          last_webhook_at: string | null
+          last_webhook_error: string | null
+          policy_status: string
+          policy_reason: string | null
+          policy_updated_at: string | null
+        }[]
+      }
       get_platform_clubs_access: {
         Args: { p_club_ids: string[] }
         Returns: {
@@ -7997,6 +8019,22 @@ export type Database = {
       get_platform_role_permissions: {
         Args: { p_role_id: string }
         Returns: string[]
+      }
+      get_platform_support_session_history: {
+        Args: { p_club_id?: string | null; p_limit?: number }
+        Returns: {
+          id: string
+          platform_owner_id: string
+          platform_owner_email: string | null
+          club_id: string
+          club_name: string | null
+          mode: string
+          reason: string | null
+          started_at: string
+          expires_at: string
+          ended_at: string | null
+          status: string
+        }[]
       }
       get_platform_whatsapp_health: {
         Args: never
