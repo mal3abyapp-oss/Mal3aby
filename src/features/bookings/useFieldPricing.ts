@@ -21,6 +21,21 @@ export function useClubTimezone(clubId: string | null) {
 // V1 Operational Product Rebuild (Section H — Pricing UX): the price an
 // employee sees anywhere in the product must come from the server-side
 // resolve_field_price() RPC, never be guessed/recomputed client-side.
+//
+// Real, but benign, condition found in live QA (2026-08-30): callers
+// like BookingsPage's field-header card ask for "the price right now"
+// by passing the current wall-clock time as both start and end — which
+// legitimately has no matching pricing_rules row whenever "now" falls
+// outside every configured rule's time range (e.g. outside the club's
+// operating hours, or in an unpriced gap). resolve_field_price() then
+// correctly `raise exception`s ("no pricing rule found..."), which
+// PostgREST surfaces as an HTTP 400 -- an expected business outcome,
+// not a real error, and the UI already falls back to a friendly
+// "price varies by time" message when data is null (see call sites).
+// Without retry:false, React Query still retried this 3x by default
+// and logged the exception to the console on every retry, all wasted
+// work for a condition that will never succeed on retry. retry:false
+// stops that; the UI's existing graceful fallback is unchanged.
 export function useResolvedFieldPrice(fieldId: string | null, date: string | null, startTime: string | null, endTime: string | null) {
   return useQuery({
     queryKey: ['resolve-field-price', fieldId, date, startTime, endTime],
@@ -35,6 +50,7 @@ export function useResolvedFieldPrice(fieldId: string | null, date: string | nul
       return Number(data)
     },
     enabled: !!fieldId && !!date && !!startTime && !!endTime,
+    retry: false,
   })
 }
 
