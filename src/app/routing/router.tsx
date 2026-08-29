@@ -4,7 +4,7 @@ import { PublicLayout } from '@/app/layouts/PublicLayout'
 import { AppLayout } from '@/app/layouts/AppLayout'
 import { PlatformLayout } from '@/app/layouts/PlatformLayout'
 import { PortalLayout } from '@/app/layouts/PortalLayout'
-import { RequireAuth, RequireNavDomain, RequirePlatformOwner, RequirePortalAuth, RequirePortalCustomer, RequireShopModule, RequireAcademyModule, RequireFieldsModule, RequireClubMembershipModule } from '@/app/routing/RequireAuth'
+import { RequireAuth, RequireGuest, RequireNavDomain, RequirePlatformOwner, RequirePortalAuth, RequirePortalCustomer, RequireShopModule, RequireAcademyModule, RequireFieldsModule, RequireClubMembershipModule } from '@/app/routing/RequireAuth'
 import { RedirectWithSearch } from '@/app/routing/RedirectWithSearch'
 import { RouteLoadingFallback } from '@/app/routing/RouteLoadingFallback'
 
@@ -130,13 +130,26 @@ export const router = createBrowserRouter([
   {
     element: <PublicLayout />,
     children: [
-      { path: '/', element: <HomePage /> },
+      // "/", "/login", "/signup" are guest-only in intent: an already
+      // authenticated visitor landing here (a bookmark, a re-typed URL,
+      // a stale open tab) must be routed to their real destination, not
+      // shown marketing/auth chrome that reads as "you're logged out"
+      // -- see RequireGuest's own header comment for the live bug this
+      // closes. "/forgot-password"/"/reset-password" are deliberately
+      // NOT wrapped: a logged-in user legitimately resetting their own
+      // password must still be able to reach that flow.
+      {
+        element: <RequireGuest />,
+        children: [
+          { path: '/', element: <HomePage /> },
+          { path: '/login', element: <LoginPage /> },
+          { path: '/signup', element: <SignupPage /> },
+        ],
+      },
       { path: '/pricing', element: <PricingPage /> },
       { path: '/contact', element: <ContactPage /> },
       { path: '/terms', element: <TermsPage /> },
       { path: '/privacy', element: <PrivacyPage /> },
-      { path: '/login', element: <LoginPage /> },
-      { path: '/signup', element: <SignupPage /> },
       { path: '/forgot-password', element: <ForgotPasswordPage /> },
       { path: '/reset-password', element: <ResetPasswordPage /> },
     ],

@@ -7,6 +7,88 @@ import { canSeeNavDomain, type NavDomain } from '@/lib/domain/navigation'
 import { Button } from '@/components/ui/button'
 import { supabase } from '@/lib/supabase/client'
 
+// Real production bug report (2026-08-29): a user with a genuinely
+// valid, non-expired session navigated back to "/" (the marketing
+// landing page) and saw the logged-out marketing/login CTAs, which
+// they reasonably read as "I've been signed out" -- confirmed live
+// that the session was NOT actually cleared (localStorage still held
+// a valid, unexpired sb-...-auth-token; supabase.auth.getSession()
+// still resolved it). The real bug: "/" and "/login"/"/signup" never
+// checked whether a session already existed at all -- PublicLayout's
+// route group renders the marketing/auth chrome unconditionally for
+// any visitor, authenticated or not, so an already-logged-in user
+// bookmarking or re-navigating to "/" (or "/login") just sees the
+// guest-facing page with no redirect anywhere, indistinguishable from
+// an actual logout.
+//
+// Guards the guest-only routes ("/", "/login", "/signup") the same
+// way RequireAuth guards the authenticated ones, just inverted: an
+// existing session means "you don't belong on this page", not "show
+// it anyway". Reuses the exact same destination-resolution order
+// LoginPage's own post-submit navigate() already established
+// (platform owner -> /platform, active club membership -> /app,
+// linked customer record -> /portal, else -> /onboarding) via the same
+// three RPCs, so a returning already-authenticated visitor lands
+// exactly where a fresh login would have sent them -- no second,
+// possibly-drifting definition of "where does this account belong".
+async function resolveAuthenticatedDestination(): Promise<string> {
+  const { data: ownerData, error: ownerError } = await supabase.rpc('is_platform_owner')
+  if (!ownerError && ownerData === true) return '/platform'
+
+  const { count: clubCount } = await supabase
+    .from('club_memberships')
+    .select('id', { count: 'exact', head: true })
+    .eq('status', 'active')
+  if ((clubCount ?? 0) > 0) return '/app'
+
+  const { count: customerCount } = await supabase
+    .from('customers')
+    .select('id', { count: 'exact', head: true })
+  return (customerCount ?? 0) > 0 ? '/portal' : '/onboarding'
+}
+
+export function RequireGuest() {
+  const { session, loading } = useAuth()
+  const location = useLocation()
+  const { data: destination, isLoading: resolving } = useQuery({
+    queryKey: ['guest-guard-destination', session?.user.id],
+    queryFn: resolveAuthenticatedDestination,
+    enabled: !!session,
+  })
+
+  // Deliberately NOT gated on `loading` the way RequireAuth/RequirePlatformOwner
+  // are -- those protect a page that must never flash its authenticated
+  // content before a session is confirmed, so blocking on `loading` there
+  // is the safe default. Here it is backwards: "/" is the very first
+  // thing an anonymous visitor sees, the overwhelming majority of hits,
+  // and it has nothing sensitive to hide -- forcing it to wait on
+  // AuthProvider's own getSession() round-trip (a real async microtask
+  // even when there is no session at all) would regress every anonymous
+  // visitor's first paint to fix a redirect that only matters for the
+  // rare already-authenticated case. Instead: render the guest page
+  // immediately by default, and only ever redirect once `loading` is
+  // done AND a real session is confirmed -- so an anonymous visit is
+  // exactly as fast as before this guard existed, while an
+  // authenticated visit still gets redirected the moment that becomes
+  // knowable (one render later, not on first paint).
+  if (loading || !session) return <Outlet />
+
+  // A stale `from` location (e.g. an old bookmark to a protected route
+  // whose session had expired, later resolved by a fresh login) can
+  // still legitimately name a real destination -- honor it exactly
+  // like LoginPage's own post-submit logic already does, before
+  // falling back to the role-based default.
+  const from = (location.state as { from?: Location })?.from?.pathname
+  if (from) return <Navigate to={from} replace />
+
+  // Session confirmed but destination not resolved yet -- still render
+  // the guest page rather than a blank screen; the redirect below fires
+  // the moment resolveAuthenticatedDestination() resolves.
+  if (resolving || !destination) return <Outlet />
+
+  return <Navigate to={destination} replace />
+}
+
 const ClaimAccountPageLazy = lazy(() =>
   import('@/features/portal/ClaimAccountPage').then((m) => ({ default: m.ClaimAccountPage })),
 )
