@@ -117,7 +117,15 @@ export function PlansSection() {
     {
       key: 'duration',
       header: t('clubMemberships.plans.columns.duration'),
-      render: (p) => `${p.duration_value} ${t(`clubMemberships.durationUnits.${p.duration_unit}`)}`,
+      // Bug found in live QA (2026-08-30): this concatenated the raw
+      // count with durationUnits' combined "month/months" dropdown
+      // label, always rendering nonsense like "1 شهر/أشهر" ("1
+      // month/months") instead of correctly-agreed "1 شهر" / "3
+      // أشهر". durationUnits.* is still correct as-is for its own
+      // use (the day/month/year picker, a generic unit-name label
+      // shown once with no count attached) -- this needs real
+      // count-based pluralization instead, via a dedicated key.
+      render: (p) => t(`clubMemberships.durationDisplay.${p.duration_unit}`, { count: p.duration_value }),
     },
     {
       key: 'branchScope',

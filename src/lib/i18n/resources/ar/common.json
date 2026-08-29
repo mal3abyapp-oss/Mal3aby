@@ -1577,6 +1577,23 @@
       "month": "شهر/أشهر",
       "year": "سنة/سنوات"
     },
+    "durationDisplay": {
+      "day_one": "يوم واحد",
+      "day_two": "يومان",
+      "day_few": "{{count}} أيام",
+      "day_many": "{{count}} يومًا",
+      "day_other": "{{count}} يوم",
+      "month_one": "شهر واحد",
+      "month_two": "شهران",
+      "month_few": "{{count}} أشهر",
+      "month_many": "{{count}} شهرًا",
+      "month_other": "{{count}} شهر",
+      "year_one": "سنة واحدة",
+      "year_two": "سنتان",
+      "year_few": "{{count}} سنوات",
+      "year_many": "{{count}} سنة",
+      "year_other": "{{count}} سنة"
+    },
     "overview": {
       "totalActive": "الأعضاء النشطون",
       "scheduled": "مجدولة",
