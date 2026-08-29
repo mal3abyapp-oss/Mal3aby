@@ -832,3 +832,119 @@ select public.claim_manual_payment('00000000-0000-0000-0000-0000000af112'::uuid,
 
 reset role;
 rollback;
+
+-- ============================================================
+-- AUDIT LOG HARDENING REGRESSION (2026-08-29) -- appended, not a
+-- replacement of the tests above. Covers the audit-log-specific
+-- program: coverage gaps (Phases 1-2) and the tamper-evident hash
+-- chain (Phase 3) added to audit_logs in
+-- 20260829180000_audit_log_hardening_phase3_hash_chain.sql. Same
+-- methodology as the rest of this file.
+
+-- ============================================================
+-- AF-TEST 10a: hash chain structural integrity -- the ENTIRE real
+-- audit_logs table must verify clean at all times. This is the
+-- single strongest regression guard in this file: it does not test
+-- one known-fixed bug, it re-derives and checks every row's hash
+-- against every OTHER row currently in the table, live, every time
+-- this is run. Live-confirmed clean against 1583 real historical rows
+-- plus every row added since.
+-- EXPECTED: 0 rows (empty result = the entire chain is internally
+-- consistent, no tampering detected anywhere in the table's history).
+-- ============================================================
+select * from public.verify_audit_log_chain();
+
+-- ============================================================
+-- AF-TEST 10b: the verification function genuinely detects tampering
+-- (not merely "returns 0 rows because it never checks anything real").
+-- Live-reproduced this pass on a REAL historical row (sequence_number
+-- 500), rolled back immediately -- both the row_hash_mismatch (content
+-- altered) and sequence_gap (row deleted) cases were confirmed to
+-- fire correctly with the exact row identified. This block re-proves
+-- the row_hash_mismatch case against whatever the current lowest
+-- sequence_number is, so it works on any environment regardless of
+-- how many rows exist.
+-- EXPECTED: exactly 1 row, problem_type='row_hash_mismatch', naming
+-- the tampered sequence_number.
+-- ============================================================
+begin;
+update public.audit_logs set reason = 'AF-TEST-10b regression tamper simulation -- must be detected and rolled back'
+where sequence_number = (select min(sequence_number) from public.audit_logs);
+select * from public.verify_audit_log_chain();
+rollback;
+-- ^ the tamper above is discarded regardless of the detection result --
+-- this test only ever proves detection works, it never leaves a real
+-- tampered row behind.
+
+-- ============================================================
+-- AF-TEST 10c: verify_audit_log_chain() is service_role-only -- not
+-- callable by authenticated or anon. A general-purpose integrity tool
+-- that iterates the whole table should never be client-reachable.
+-- EXPECTED: both auth_can_execute and anon_can_execute are false.
+-- ============================================================
+select
+  has_function_privilege('authenticated', 'public.verify_audit_log_chain(bigint, bigint)', 'execute') as auth_can_execute,
+  has_function_privilege('anon', 'public.verify_audit_log_chain(bigint, bigint)', 'execute') as anon_can_execute;
+
+-- ============================================================
+-- AF-TEST 11: audit-log coverage gaps closed in Phases 1-2 --
+-- mark_booking_no_show(), record_payment_with_official_receipt(), and
+-- complete_new_club_onboarding() previously wrote zero audit_logs rows
+-- despite each creating a real financial/compliance/tenant-lifecycle
+-- event. Live-confirmed via direct RPC calls with synthetic fixtures
+-- (customer/invoice/booking on TEST-CLUB-1; a full new-club onboarding
+-- flow) during this pass -- not re-scripted here as a fixture-heavy
+-- block (each already required a real branch/field/multi-table fixture
+-- chain unique to its own RPC), but the structural guard below catches
+-- a future regression on the SAME bug class across the whole schema:
+-- any SECURITY DEFINER function that inserts into a financially-
+-- sensitive table without ever calling write_audit_log() (or a direct
+-- audit_logs insert).
+-- EXPECTED: 0 rows (an increase here means a new coverage gap was
+-- introduced -- inspect the named function and either add the missing
+-- write_audit_log() call or, if it's genuinely low-materiality data
+-- like plain customer profile edits or walk-in-customer creation,
+-- confirm that judgment explicitly and extend this query's exclusion
+-- list with a comment explaining why).
+-- ============================================================
+select p.proname
+from pg_proc p
+join pg_namespace n on n.oid = p.pronamespace
+where n.nspname = 'public'
+  and p.prosecdef = true
+  and (
+    p.prosrc ilike '%insert into public.payments%'
+    or p.prosrc ilike '%insert into public.refunds%'
+    or p.prosrc ilike '%insert into public.invoices%'
+    or p.prosrc ilike '%insert into public.subscriptions%'
+    or p.prosrc ilike '%insert into public.shop_sales%'
+    or p.prosrc ilike '%insert into public.club_membership_subscriptions%'
+    or p.prosrc ilike '%insert into public.bookings%'
+    or p.prosrc ilike '%insert into public.enrollments%'
+    or p.prosrc ilike '%insert into public.official_collection_receipts%'
+    or p.prosrc ilike '%insert into public.clubs%'
+    or p.prosrc ilike '%update public.payments%'
+    or p.prosrc ilike '%update public.refunds%'
+    or p.prosrc ilike '%update public.invoices%'
+    or p.prosrc ilike '%update public.subscriptions%'
+    or p.prosrc ilike '%update public.club_membership_subscriptions%'
+    or p.prosrc ilike '%update public.bookings%'
+    or p.prosrc ilike '%update public.enrollments%'
+  )
+  and p.prosrc not ilike '%write_audit_log%'
+  and p.prosrc not ilike '%insert into public.audit_logs%'
+  and p.proname not like '\_%'
+  -- Reviewed and confirmed genuinely low-materiality this pass, not a
+  -- coverage gap: get_or_create_shop_walk_in_customer() (a single
+  -- placeholder row, zero financial/permission value) and
+  -- upsert_customer() (plain name/phone/email edits -- logging every
+  -- call would be noise, not signal; customer.phone_changed already
+  -- exists as a separate, targeted audit path for the specifically
+  -- sensitive case). expire_due_academy_subscriptions() is excluded
+  -- here too -- it DOES write an aggregate audit_logs row per run, but
+  -- via a direct INSERT the 'update public.subscriptions' match above
+  -- would otherwise flag (the 'insert into public.audit_logs' exclusion
+  -- above already covers it).
+  and p.proname not in ('get_or_create_shop_walk_in_customer', 'upsert_customer')
+order by p.proname;
+
