@@ -59,6 +59,25 @@ export function PwaUpdatePrompt() {
       // registration state at startup.
       checkForWaitingWorker()
 
+      // SECOND REAL GAP FOUND (2026-08-29, live report: user had to
+      // clear cache/history to see a deploy that had already shipped
+      // minutes earlier): the check above only inspects EXISTING
+      // registration state -- it never actively asks the browser "is
+      // there a newer service worker on the server right now?" On a
+      // freshly opened tab (the common case: user opens the app after
+      // a deploy landed), there is nothing yet in `.waiting` to find,
+      // and the ONLY thing that would have triggered a real network
+      // check was the 60s interval below -- so a user who opened the
+      // app and didn't leave the tab open for a full minute could
+      // navigate the whole session on a stale precached shell with
+      // zero visible signal, exactly the reported symptom. Fixed by
+      // firing a real update() check immediately on registration too,
+      // not only every 60s afterward -- this is a network request
+      // (workbox-window's registration.update()), not a local read, so
+      // it actually asks the server rather than only reflecting
+      // whatever this tab already knew.
+      void registration.update().then(checkForWaitingWorker)
+
       // Explicit periodic check -- vite-plugin-pwa's own default
       // check only fires on page load/navigation, which a
       // long-lived open tab may never do again.
