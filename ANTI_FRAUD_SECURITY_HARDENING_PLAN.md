@@ -87,7 +87,11 @@ All QA fixtures (test custom roles, staff memberships, support session) cleaned 
 
 ### Phase 4 — Branch isolation (§5)
 Verify branch-scoped staff cannot read/write another branch's bookings/payments/cash/inventory/POS/memberships/academy/attendance/reports.
-Status: PENDING
+Status: COMPLETE. Genuine PASS, no fix needed -- live-verified with a real QA fixture.
+
+Set up on TEST-CLUB-2: 2 real branches (via `manage_branch()`), a real QA staff member (`mal3aby.qa.receptionist`) invited and scoped to Branch A only via `set_staff_branch_scope()`. Confirmed: (1) reading `branches` as the scoped receptionist returns only Branch A -- Branch B is invisible, correctly filtered by `user_has_branch_access()` inside `branches_select_own_club`; (2) calling `get_revenue_report()` with `p_branch_id` explicitly set to Branch B (a client-supplied filter naming a branch outside the caller's scope) is correctly rejected with "not authorized" -- confirms report RPCs re-validate a client-supplied branch filter against the caller's real scope rather than trusting it, directly satisfying directive §18's "export endpoints must enforce the same authorization as UI reports"; (3) code-read confirmed `get_revenue_report()`'s implicit (no explicit `p_branch_id`) path also correctly restricts to `caller_accessible_branch_ids()` rather than silently defaulting to all-club data for a scoped user.
+
+All fixtures cleaned up (branches deleted, fixture membership deleted -- both via the superuser connection since Phase 1's fix correctly removed the client-facing direct-write path being tested). TEST-CLUB-2 confirmed restored to baseline (0 branches, 1 membership = the real owner).
 
 ### Phase 5 — Module & subscription bypass (§35, §34) — re-verify, don't rebuild
 Given the recon finding that Academy/Fields/Club-Membership got only 1 migration each (vs Shop's 7+ sweep passes), this is the highest-probability place to find a real entitlement-bypass RPC. Full enumeration of every write RPC in each domain, cross-checked against the `_X_module_active()` call sites found.
