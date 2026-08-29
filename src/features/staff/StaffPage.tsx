@@ -520,8 +520,14 @@ export function StaffPage() {
                   </div>
                 )}
                 <div className="flex flex-col gap-1.5">
+                  {/* Bug found in live QA (2026-08-30): this label always
+                      read "Email (for an existing account)" even on the
+                      "Create New Account" tab -- actively contradicting
+                      the tab someone had just chosen. The hint paragraph
+                      below was already correctly mode-gated; the label
+                      itself wasn't. */}
                   <label htmlFor="staff-email" className="text-sm font-medium text-text-secondary">
-                    {t('staff.emailLabel')}
+                    {t(addMode === 'existing' ? 'staff.emailLabel' : 'staff.emailLabelNew')}
                   </label>
                   <Input
                     id="staff-email"

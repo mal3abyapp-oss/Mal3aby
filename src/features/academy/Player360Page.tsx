@@ -210,7 +210,20 @@ export function Player360Page() {
 
       <PageHeader
         title={p.full_name}
-        description={summary.primary_guardian ? `${t('academy.players.primary', { defaultValue: 'Primary' })}: ${summary.primary_guardian.full_name}` : t('academy.players.noGuardians', { defaultValue: 'No guardians linked' })}
+        description={
+          // Real bug found in live QA (2026-08-30): this fell straight to
+          // "No guardians linked" whenever there was no PRIMARY guardian --
+          // including when a guardian had genuinely just been linked but
+          // not yet marked primary, which reads as "your save didn't
+          // work" to a real user. Now distinguishes the two states using
+          // summary.guardians (the full linked list), not just
+          // primary_guardian.
+          summary.primary_guardian
+            ? `${t('academy.players.primary', { defaultValue: 'Primary' })}: ${summary.primary_guardian.full_name}`
+            : summary.guardians.length > 0
+              ? t('academy.players.guardiansLinkedNoPrimary', { defaultValue: 'No primary guardian set' })
+              : t('academy.players.noGuardians', { defaultValue: 'No guardians linked' })
+        }
         actions={
           <div className="flex flex-wrap gap-2">
             <Button size="sm" variant="outline" onClick={() => setEditOpen(true)}>{t('common.edit')}</Button>
