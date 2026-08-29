@@ -47,7 +47,17 @@ Status: COMPLETE. Migration `20260829040000_revoke_unaudited_platform_owner_dire
 
 ### Phase 2 — Cross-tenant isolation + IDOR sweep (§3, §6, §30)
 Live adversarial RLS-impersonation testing: Club A token + Club B object across bookings, invoices, memberships, academy, shop sales/returns, staff, support sessions. Use the proven `SET ROLE authenticated` + `set_config('request.jwt.claims', ...)` pattern.
-Status: PENDING
+Status: IN PROGRESS.
+
+**Live-attacked and confirmed BLOCKED** (Club A owner token + Club B real object id, direct table read/write and RPC-level): `bookings` (read + `cancel_booking()` RPC, non-leaking error), `invoices` (read), `customers` (read + `get_customer_360_summary()` RPC, non-leaking error), `shop_sales` (read), `enrollments` (read), `club_membership_subscriptions` (read), `return_shop_sale()` RPC (correctly rejects on ownership after passing input-shape validation -- confirmed the earlier "at least one line" error was validation-order, not an authorization bypass, by resubmitting with a real non-empty line and confirming it then failed on "not authorized" instead).
+
+**Genuine PASS, no fix needed, code-verified**: `qr_confirm_checkin()` uses `select ... for update` row locks on both `qr_credentials` and `bookings` before every status check -- correctly serializes concurrent redemption attempts rather than racing, and independently re-checks `wrong_club`/`already_used`/`revoked`/`expired`/booking-status on every call. Satisfies directive Section 31 (race conditions) and Section 32 (replay) by construction. `qr_validate()` (booking/player_membership/club_membership types) similarly re-checks tenant scope, consumed/revoked/expired, and per-type sub-status (including the already-fixed NOT_STARTED/pending_payment carve-out) on every call -- no forged-payload or replay path found.
+
+**CF-3 fixed** (defense-in-depth, not a directly client-exploitable P0): live-confirmed `create_gateway_refund_service()` is `service_role`-only (`has_function_privilege` returns false for both `authenticated` and `anon`) -- not reachable by any client-side attacker, downgrading it from CF-3's original framing. Still added the missing internal `has_permission_as()` check as genuine defense-in-depth (migration `20260829050000_gateway_refund_service_defense_in_depth.sql`), gated on `p_actor_id is not null` so the one legitimate system-call path (stripe-gateway-webhook's provider-originated reconciliation, `p_actor_id: null`, already authorized by HMAC signature verification) is unaffected. Live-verified all 3 cases: unauthorized actor rejected ("not authorized", zero refund row created), authorized actor passes through to the next real check, null-actor webhook path unaffected. Confirmed all 5 real `*-create-refund` Edge Functions already pass `p_actor_id: user.id` (grepped, all identical) and already independently re-check `has_permission('payment.refund', ...)` against the caller's own JWT before ever calling this RPC -- that Edge-Function-layer boundary was already solid; this is additive.
+
+`tsc -b` clean, full test suite 10/10 files / 108/108 tests pass after both fixes.
+
+Continuing: Shop/inventory, academy, memberships, staff, support-session cross-tenant sweep.
 
 ### Phase 3 — Privilege escalation: club staff + platform staff (§4, §19, §20)
 Test self-role-change, permission self-grant, ceiling violations. Verify `set_platform_staff_role()`'s existing escalation guards; verify the club-level equivalent (`set_staff_role`) has the same shape.
