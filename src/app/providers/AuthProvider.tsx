@@ -170,7 +170,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       .eq('user_id', uid)
 
     if (error || !data) {
-      setMemberships([])
+      // REAL BUG (found live in production during two independent QA
+      // passes, 2026-08-29, both times coinciding with a live deploy):
+      // a TRANSIENT query failure here (a network blip during a
+      // service-worker takeover or Cloudflare deploy cutover being the
+      // most likely real-world trigger) used to clear memberships to []
+      // exactly like a genuine "no session" case -- but this runs from
+      // onAuthStateChange on every token refresh, well after `loading`
+      // has already settled false, so RequireNavDomain's `memberships.
+      // length === 0 && !loading` check rendered its terminal "this
+      // account has no club access" screen for an account that
+      // definitely does have access, on nothing more than a dropped
+      // request. A real query failure should leave the last-known-good
+      // membership state alone (stale-but-correct beats
+      // wrongly-empty) -- only an actual signed-out session (the `!uid`
+      // branch above, and the explicit onAuthStateChange sign-out
+      // branch) should ever clear it.
       return
     }
 
