@@ -276,7 +276,13 @@ export function FieldsManagement() {
         const hours = resolveHoursForDay(allHoursRows, f.id, dayOfWeek)
         if (hours.isUnrestricted) return <span className="text-text-secondary">{t('clubs.fieldsManagement.openAllDay')}</span>
         if (hours.isClosed) return <span className="text-status-danger">{t('clubs.fieldsManagement.closedToday')}</span>
-        return <span className="tabular-nums">{hours.openTime?.slice(0, 5)}–{hours.closeTime?.slice(0, 5)}</span>
+        // RTL bidi fix (found in live QA, 2026-08-29): two bare LTR time
+        // strings joined by a dash inside an RTL-directioned cell get
+        // visually reordered by the browser's bidi algorithm ("08:00–23:00"
+        // rendered as "23:00–08:00") even though the DOM text order is
+        // correct -- dir="ltr" pins the visual order to match the logical
+        // one, same fix as the identical pattern in BookingsPage.tsx.
+        return <span dir="ltr" className="tabular-nums">{hours.openTime?.slice(0, 5)}–{hours.closeTime?.slice(0, 5)}</span>
       },
     },
     {

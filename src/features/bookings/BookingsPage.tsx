@@ -199,7 +199,17 @@ function FieldColumnHeader({ field, clubId, date, clubTimezone }: { field: Field
     <div className="flex flex-col gap-0.5 p-2">
       <p className="font-semibold">{field.name}</p>
       <p className="text-xs text-text-secondary">
-        {hours.isUnrestricted ? t('bookings.page.openAllDay') : hours.isClosed ? t('bookings.page.closedToday') : `${hours.openTime?.slice(0, 5)} — ${hours.closeTime?.slice(0, 5)}`}
+        {hours.isUnrestricted ? (
+          t('bookings.page.openAllDay')
+        ) : hours.isClosed ? (
+          t('bookings.page.closedToday')
+        ) : (
+          // RTL bidi fix (found in live QA, 2026-08-29): see the identical
+          // fix's comment in FieldsManagement.tsx -- two bare LTR time
+          // strings joined by a dash get visually reordered by the
+          // browser's bidi algorithm inside this RTL cell without dir="ltr".
+          <span dir="ltr">{hours.openTime?.slice(0, 5)} — {hours.closeTime?.slice(0, 5)}</span>
+        )}
       </p>
       <p className="text-xs font-medium text-accent tabular-nums">
         {currentPrice != null ? t('bookings.page.pricePerHourNow', { price: formatNumber(Math.round(currentPrice), i18n.language.startsWith('ar') ? 'ar' : 'en') }) : t('bookings.page.priceVariesByTime')}
