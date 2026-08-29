@@ -4744,7 +4744,7 @@
       "bookings": {
         "title": "Bookings",
         "summary": "Schedule and manage field bookings — a calendar screen showing your fields and time slots, with new bookings one click away.",
-        "screenshotAlt": "The new booking dialog in Mal3aby, showing field, date, time, and customer selection",
+        "screenshotAlt": "The Bookings screen in Mal3aby, showing the available and booked time slots for a field",
         "steps": [
           "From \"New booking\", pick the field, date, and time — the system automatically stops you from double-booking the same field at the same time.",
           "Type the customer's phone number; if they're an existing customer, the system finds them automatically instead of you re-entering their details.",
@@ -4787,9 +4787,10 @@
       "shop": {
         "title": "Shop & Point of Sale",
         "summary": "If your club sells products (water, drinks, equipment), the Shop module gives you a full point-of-sale (POS) and inventory system.",
-        "screenshotAlt": "The point-of-sale (POS) screen in Mal3aby, showing products and the sale cart",
+        "screenshotAlt": "The Shop screen in Mal3aby before activation -- a message explaining it's available but not yet turned on",
         "steps": [
-          "Add your products under \"Products\" with a price and available stock quantity.",
+          "Shop is an optional module -- if you don't see it active on your club, contact Mal3aby support to have it turned on for you.",
+          "Once activated, add your products under \"Products\" with a price and available stock quantity.",
           "From the POS screen, pick the products the customer is buying and the system totals it automatically.",
           "Stock decreases automatically with every sale — review quantities anytime from \"Inventory\".",
           "If a customer returns a product, use \"Sales\" to process a partial or full return and refund the correct amount."

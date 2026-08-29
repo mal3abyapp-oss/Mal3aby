@@ -43,7 +43,7 @@ interface HelpModule {
 
 const MODULES: HelpModule[] = [
   { key: 'today', icon: LayoutDashboard, screenshot: '/help/today.png' },
-  { key: 'bookings', icon: CalendarDays, screenshot: '/help/booking-new.png' },
+  { key: 'bookings', icon: CalendarDays, screenshot: '/help/bookings.png' },
   { key: 'customers', icon: UserCog, screenshot: '/help/customer-360.png' },
   { key: 'academy', icon: GraduationCap, screenshot: '/help/academy.png' },
   { key: 'memberships', icon: IdCard, screenshot: '/help/memberships.png' },
@@ -51,7 +51,10 @@ const MODULES: HelpModule[] = [
   { key: 'finance', icon: Receipt, screenshot: '/help/finance-overview.png' },
   { key: 'reports', icon: BarChart3, screenshot: '/help/reports.png' },
   { key: 'whatsapp', icon: MessageCircle, screenshot: '/help/whatsapp.png' },
-  { key: 'scan', icon: ScanLine, screenshot: '/help/scan.png' },
+  // No screenshot: /scan requires real camera access, which the QA
+  // capture environment cannot grant -- steps-only for this module
+  // rather than shipping a broken image link.
+  { key: 'scan', icon: ScanLine },
   { key: 'staff', icon: UserCog, screenshot: '/help/staff.png' },
   { key: 'auditLog', icon: ShieldCheck, screenshot: '/help/audit-log.png' },
   { key: 'settings', icon: Settings, screenshot: '/help/settings.png' },
