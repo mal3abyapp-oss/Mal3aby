@@ -54,9 +54,31 @@ interface HelpModule {
 // copy) becomes the always-visible label, with the rest revealed on
 // expand. A step with no such break just shows its first ~50 chars as
 // the label instead.
+// Finds the first " -- " break that is safe to cut a label at -- i.e.
+// not inside an unclosed "(...)" aside (a real live bug: several steps
+// use " -- " for a parenthetical clarification like "(حضور لاعب -- ...)"
+// before their actual sentence-level break, which produced a collapsed
+// label ending mid-parenthesis with no closing ")"). Skips any
+// candidate break where open parens outnumber closed ones so far.
+function findSafeBreak(text: string): number {
+  let depth = 0
+  let searchFrom = 0
+  while (searchFrom < text.length) {
+    const idx = text.indexOf(' -- ', searchFrom)
+    if (idx === -1) return -1
+    for (let i = searchFrom; i < idx; i++) {
+      if (text[i] === '(') depth++
+      else if (text[i] === ')') depth--
+    }
+    if (depth <= 0) return idx
+    searchFrom = idx + 4
+  }
+  return -1
+}
+
 function HelpStep({ index, text }: { index: number; text: string }) {
   const [open, setOpen] = useState(false)
-  const breakAt = text.indexOf(' -- ')
+  const breakAt = findSafeBreak(text)
   const label = breakAt > 0 && breakAt < 90 ? text.slice(0, breakAt) : text.length > 70 ? `${text.slice(0, 68)}…` : text
   const hasMore = label !== text
 
