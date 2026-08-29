@@ -5700,8 +5700,10 @@ export type Database = {
           id: string
           invoice_item_id: string | null
           line_total: number
+          net_line_total: number
           product_id: string
           quantity: number
+          refunded_amount: number
           returned_quantity: number
           sale_id: string
           unit_cost_snapshot: number | null
@@ -5712,8 +5714,10 @@ export type Database = {
           id?: string
           invoice_item_id?: string | null
           line_total: number
+          net_line_total: number
           product_id: string
           quantity: number
+          refunded_amount?: number
           returned_quantity?: number
           sale_id: string
           unit_cost_snapshot?: number | null
@@ -5724,8 +5728,10 @@ export type Database = {
           id?: string
           invoice_item_id?: string | null
           line_total?: number
+          net_line_total?: number
           product_id?: string
           quantity?: number
+          refunded_amount?: number
           returned_quantity?: number
           sale_id?: string
           unit_cost_snapshot?: number | null
@@ -5766,18 +5772,21 @@ export type Database = {
       shop_sale_return_items: {
         Row: {
           id: string
+          line_refund_amount: number
           quantity: number
           return_id: string
           sale_item_id: string
         }
         Insert: {
           id?: string
+          line_refund_amount?: number
           quantity: number
           return_id: string
           sale_item_id: string
         }
         Update: {
           id?: string
+          line_refund_amount?: number
           quantity?: number
           return_id?: string
           sale_item_id?: string
@@ -7444,6 +7453,7 @@ export type Database = {
         }
         Returns: {
           booking_id: string
+          booking_qr_token: string
           booking_ref: string
           hold_expires_at: string
           invoice_id: string

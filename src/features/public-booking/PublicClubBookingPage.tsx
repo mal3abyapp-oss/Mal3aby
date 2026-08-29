@@ -214,6 +214,15 @@ export function PublicClubBookingPage() {
   const [confirmedBookingId, setConfirmedBookingId] = useState<string | null>(null)
   const [confirmedHoldExpiresAt, setConfirmedHoldExpiresAt] = useState<string | null>(null)
   const [confirmedTotal, setConfirmedTotal] = useState<number | null>(null)
+  // FINAL ACCEPTANCE CLOSURE (2026-08-29) -- WhatsApp-independent entry
+  // credential: create_public_booking() now returns the same raw
+  // booking_qr_token it already mints and sends via WhatsApp/email, so
+  // the confirmation screen can offer a direct, reliable link to the
+  // already-built, already-secured /qr/:token page (SecureBookingPage)
+  // regardless of whether either notification channel actually
+  // delivers. See the accompanying migration's header comment for the
+  // full security reasoning.
+  const [confirmedQrToken, setConfirmedQrToken] = useState<string | null>(null)
   const [copiedField, setCopiedField] = useState<string | null>(null)
 
   // HIGH-ROI UX PASS 01, supplementary item 6 (Public Booking language
@@ -354,6 +363,7 @@ export function PublicClubBookingPage() {
       setConfirmedBookingId(row?.booking_id ?? null)
       setConfirmedHoldExpiresAt(row?.hold_expires_at ?? null)
       setConfirmedTotal(row?.total_price != null ? Number(row.total_price) : null)
+      setConfirmedQrToken(row?.booking_qr_token ?? null)
       setStep('confirmed')
     },
     onError: (error: { message?: string }) => {
@@ -744,6 +754,24 @@ export function PublicClubBookingPage() {
               <HoldCountdown holdExpiresAt={confirmedHoldExpiresAt} />
             )}
 
+            {/* FINAL ACCEPTANCE CLOSURE (2026-08-29): the primary,
+                reliable path to the booking/entry-code page -- does not
+                depend on WhatsApp or email delivery succeeding, unlike
+                the notification-only channels below. Rendered directly
+                from the token this page's own browser just received in
+                the booking-creation response, linking to the existing,
+                already-secured /qr/:token page. Prominent placement
+                (right after the reference number, before the calendar/
+                payment panels) since this is now the one guaranteed way
+                every customer can reach their credential. */}
+            {confirmedQrToken && (
+              <Button asChild size="lg" className="w-full">
+                <a href={`/qr/${confirmedQrToken}`}>
+                  {t('publicBooking.viewBookingAndEntryCode')}
+                </a>
+              </Button>
+            )}
+
             {/* HIGH-ROI UX PASS 01, item 19: a plain .ics download for
                 the just-created booking -- low cost, reduces no-shows.
                 No payment secrets/tokens in the description, per the
@@ -819,7 +847,15 @@ export function PublicClubBookingPage() {
               </div>
             )}
 
-            <p className="text-center text-xs text-text-secondary">{t('publicBooking.whatsappHint')}</p>
+            {/* FINAL ACCEPTANCE CLOSURE (2026-08-29): reworded from an
+                unconditional "check WhatsApp for your link and code"
+                promise -- WhatsApp delivery silently no-ops when the
+                club's account is disconnected (queue_whatsapp_notification()),
+                so that copy could leave a customer with no working
+                instructions at all. Now describes WhatsApp/email as an
+                additional copy of what the button above already
+                guarantees, not the only path to it. */}
+            <p className="text-center text-xs text-text-secondary">{t('publicBooking.whatsappHintSupplementary')}</p>
 
             {/* Confirmed gap fix: the confirmation screen previously never
                 mentioned that a self-service account/portal exists at all
