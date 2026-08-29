@@ -1,0 +1,54 @@
+-- ZERO-TRUST ANTI-FRAUD HARDENING -- ACCEPTANCE GAP CLOSURE (2026-08-29)
+--
+-- This closes a finding a PRIOR session in this same program investigated
+-- and left as an "accepted limitation" -- club_role_permissions_insert
+-- was suspected of having the same unaudited-direct-write-bypass shape
+-- as every other fix in this program (an RLS INSERT policy gated only on
+-- has_permission('roles.manage', club_id), with NO equivalent to
+-- create_club_role()'s own permission_set_escalates() ceiling check),
+-- but a live attack that session ran appeared to consistently fail,
+-- and the finding was left undone with a note to "root-cause it
+-- properly in a future session."
+--
+-- RE-INVESTIGATED THIS PASS, ROOT-CAUSED, AND CONFIRMED REAL: the
+-- prior session's "consistently blocked" result was a false negative
+-- caused by leftover role/session state from earlier statements in the
+-- same investigation, not a genuine security control. A clean,
+-- isolated re-attempt this pass -- a QA fixture custom role on
+-- TEST-CLUB-2 holding ONLY 'roles.manage' (created via the real,
+-- correctly-guarded create_club_role() RPC), then a direct
+-- `insert into club_role_permissions (club_role_id, permission_id)
+-- select <the role>, id from permissions where key = 'payment.refund'`
+-- as that fixture actor -- SUCCEEDED. The row was verified present via
+-- a follow-up SELECT: the role now legitimately grants both
+-- 'roles.manage' (its original, authorized grant) AND 'payment.refund'
+-- (a permission the granting actor never held), a genuine, confirmed
+-- privilege escalation via direct table write, immediately reverted
+-- (fixture role/membership fully deleted).
+--
+-- This is exactly the same bug class as every other fix in this
+-- program: the RLS INSERT policy only re-checks 'roles.manage' on the
+-- target club_role's club, never that the specific permission being
+-- inserted is one the actor already holds -- create_club_role() gets
+-- this right via permission_set_escalates(), but a direct table write
+-- bypasses it entirely, with zero audit trail (no write_audit_log()
+-- call exists for a raw table insert).
+--
+-- Fix: identical shape to every other fix in this program -- drop the
+-- unaudited INSERT/DELETE direct-write policies. club_role_permissions
+-- already has a separate, correctly-scoped SELECT policy
+-- (club_role_permissions_select), so no replacement is needed; reads
+-- are unaffected. Writes now exclusively via create_club_role() /
+-- update_club_role() / copy_club_role(), all of which call
+-- permission_set_escalates() and write_audit_log().
+--
+-- club_roles' own INSERT/UPDATE/DELETE policies were investigated in
+-- this same pass and are NOT touched here: club_roles itself has no
+-- permission-set column (only name/description) -- there is no
+-- ceiling-check-relevant column a direct write to club_roles alone
+-- could escalate, so that table's existing shape is not part of this
+-- specific bug class. Only club_role_permissions (which stores the
+-- actual permission grants) is in scope.
+
+drop policy if exists club_role_permissions_insert on public.club_role_permissions;
+drop policy if exists club_role_permissions_delete on public.club_role_permissions;
