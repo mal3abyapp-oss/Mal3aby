@@ -10,6 +10,7 @@ import { StatusBadge } from '@/components/ui/status-badge'
 import { useResolvedFieldPrice } from './useFieldPricing'
 import { fromInstant, formatInstant } from '@/lib/domain/time'
 import { useDirection } from '@/app/providers/DirectionProvider'
+import { formatNumber } from '@/lib/i18n/config'
 import type { QuickBookingSlot } from './QuickBookingSheet'
 
 // BOOKING CALENDAR UX PHASE (2026-08-23) -- full rewrite of the mobile
@@ -69,7 +70,7 @@ export function BookingsMobileView({
   onSlotSelect: (slot: QuickBookingSlot) => void
   onBookingSelect: (booking: BookingRow) => void
 }) {
-  const { t } = useTranslation()
+  const { t, i18n } = useTranslation()
   const { locale } = useDirection()
   const [selectedFieldId, setSelectedFieldId] = useState<string | null>(fields[0]?.id ?? null)
   const [duration, setDuration] = useState<number>(DEFAULT_DURATION_MINUTES)
@@ -205,7 +206,7 @@ export function BookingsMobileView({
         <div className="rounded-lg border border-accent/30 bg-accent/5 p-2.5 text-sm">
           <span className="text-text-secondary">{t('bookings.mobile.priceNow')}</span>
           {currentPrice != null ? (
-            <span className="font-semibold tabular-nums">{t('bookings.mobile.pricePerHour', { price: currentPrice.toFixed(0) })}</span>
+            <span className="font-semibold tabular-nums">{t('bookings.mobile.pricePerHour', { price: formatNumber(Math.round(currentPrice), i18n.language.startsWith('ar') ? 'ar' : 'en') })}</span>
           ) : (
             <span className="text-status-danger">{t('bookings.mobile.noApprovedPrice')}</span>
           )}

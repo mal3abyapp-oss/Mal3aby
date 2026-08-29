@@ -2483,7 +2483,22 @@
         "total": "Total",
         "returnState": "Return",
         "returnedCount": "{{count}} returned"
-      }
+      },
+      "portalAccount": "Portal account",
+      "portalActivated": "Activated",
+      "portalInviteSent": "Invite sent",
+      "portalInviteExpired": "Invite expired",
+      "portalNotActivated": "Not activated",
+      "portalInviteSending": "Sending...",
+      "portalResendInvite": "Resend invite",
+      "portalSendInvite": "Send activation invite",
+      "portalNeedsPhone": "Add a valid phone number to send an activation invite.",
+      "portalInviteError": "Couldn't send the activation invite.",
+      "viewInvoice": "View invoice",
+      "portalInviteManualTitle": "Deliver this activation invite manually",
+      "portalInviteManualHelp": "This invite was not sent automatically. Copy the link and the code below and send them to the customer yourself (e.g. via WhatsApp chat or SMS). The code must be delivered separately from the link.",
+      "portalInviteLinkLabel": "Activation link",
+      "portalInviteSecretLabel": "Activation code"
     },
     "duplicates": {
       "title": "Possible duplicate customers",
@@ -2539,8 +2554,8 @@
       "unpaidSubscriptions": "Unpaid subscriptions",
       "sessionsToday": "Sessions today",
       "newCustomersToday": "New customers today",
-      "now": "Now (NOW)",
-      "next": "Next (NEXT)"
+      "now": "Now",
+      "next": "Next"
     },
     "attentionNeeded": {
       "title": "Needs attention",

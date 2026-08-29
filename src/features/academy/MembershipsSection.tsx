@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '@/lib/supabase/client'
@@ -475,6 +475,11 @@ function SubscribeWizard({
   const [collectNow, setCollectNow] = useState(true)
   const [method, setMethod] = useState('cash')
   const [wizardError, setWizardError] = useState<string | null>(null)
+  // SAAS ACCEPTANCE REVIEW (2026-08-29): this dialog's "collect now"
+  // payment call never passed p_idempotency_key, unlike the
+  // already-hardened Bookings/Billing/Customer360/Shop-POS payment
+  // sites -- see the matching fix/comment in academy/PlayersSection.tsx.
+  const paymentIdempotencyKeyRef = useRef(crypto.randomUUID())
 
   const endDate = addMonthsToDate(startDate, 1)
   const price = membership.subscriptionPrice ?? 0
@@ -528,6 +533,7 @@ function SubscribeWizard({
             p_method: method,
             ...rest,
             p_notes: p_receipt_notes,
+            p_idempotency_key: paymentIdempotencyKeyRef.current,
           })
           if (payError) throw payError
         } else {
@@ -535,6 +541,7 @@ function SubscribeWizard({
             p_invoice_id: invoiceId,
             p_amount: total,
             p_method: method,
+            p_idempotency_key: paymentIdempotencyKeyRef.current,
           })
           if (payError) throw payError
         }

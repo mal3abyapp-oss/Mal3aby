@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useSearchParams } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
@@ -135,6 +135,11 @@ function ClaimPaymentDialog({ invoice, clubId, onClose }: { invoice: InvoiceRow;
   const [proofNote, setProofNote] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [submitted, setSubmitted] = useState(false)
+  // SAAS ACCEPTANCE REVIEW (2026-08-29): claim_manual_payment() now
+  // accepts an idempotency key -- stable for the lifetime of this
+  // dialog instance (one real claim submission attempt), matching the
+  // established convention used elsewhere in this codebase.
+  const claimIdempotencyKeyRef = useRef(crypto.randomUUID())
 
   const { data: methods = [] } = useQuery({
     queryKey: ['portal-payment-methods', clubId],
@@ -155,6 +160,7 @@ function ClaimPaymentDialog({ invoice, clubId, onClose }: { invoice: InvoiceRow;
         p_claimed_amount: amountNum,
         p_reference: reference.trim() || undefined,
         p_proof_note: proofNote.trim() || undefined,
+        p_idempotency_key: claimIdempotencyKeyRef.current,
       })
       if (rpcError) throw rpcError
     },

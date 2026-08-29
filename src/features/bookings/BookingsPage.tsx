@@ -22,6 +22,7 @@ import { BookingsMobileView } from './BookingsMobileView'
 import { BookingsFieldDayView } from './BookingsFieldDayView'
 import { resolveHoursForDay, useResolvedFieldPrice, useClubTimezone } from './useFieldPricing'
 import { toInstant, fromInstant } from '@/lib/domain/time'
+import { formatNumber } from '@/lib/i18n/config'
 
 // Section F: mobile gets a dedicated layout, not a squeezed desktop
 // grid. Matches the app's own mobile breakpoint (md: 768px, see
@@ -184,7 +185,7 @@ async function fetchOperatingHours(clubId: string) {
 }
 
 function FieldColumnHeader({ field, clubId, date, clubTimezone }: { field: FieldWithBranch; clubId: string; date: string; clubTimezone?: string }) {
-  const { t } = useTranslation()
+  const { t, i18n } = useTranslation()
   const dayOfWeek = new Date(`${date}T12:00:00`).getDay()
   const { data: hoursRows = [] } = useQuery({
     queryKey: ['field-operating-hours-all', clubId],
@@ -201,7 +202,7 @@ function FieldColumnHeader({ field, clubId, date, clubTimezone }: { field: Field
         {hours.isUnrestricted ? t('bookings.page.openAllDay') : hours.isClosed ? t('bookings.page.closedToday') : `${hours.openTime?.slice(0, 5)} — ${hours.closeTime?.slice(0, 5)}`}
       </p>
       <p className="text-xs font-medium text-accent tabular-nums">
-        {currentPrice != null ? t('bookings.page.pricePerHourNow', { price: currentPrice.toFixed(0) }) : t('bookings.page.priceVariesByTime')}
+        {currentPrice != null ? t('bookings.page.pricePerHourNow', { price: formatNumber(Math.round(currentPrice), i18n.language.startsWith('ar') ? 'ar' : 'en') }) : t('bookings.page.priceVariesByTime')}
       </p>
     </div>
   )

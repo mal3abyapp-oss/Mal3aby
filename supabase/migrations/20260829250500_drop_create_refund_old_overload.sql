@@ -1,0 +1,15 @@
+-- Postgres treats a function with a different argument LIST (not just
+-- default values) as a distinct overload, not a replacement -- the
+-- previous migration's CREATE OR REPLACE with an added 4th parameter
+-- created a SECOND create_refund(uuid,numeric,text) overload alongside
+-- the new create_refund(uuid,numeric,text,uuid) one, rather than
+-- replacing it. Any caller still invoking the 3-arg form (positional
+-- RPC calls, or any client library resolving by arg count) would
+-- silently hit the OLD, un-idempotent version -- completely
+-- defeating this session's own create_refund idempotency fix.
+-- Drop the stale 3-arg overload; the 4-arg version's 4th parameter
+-- already defaults to null, so every existing 3-arg call site
+-- (there are none left in this codebase after BillingPage.tsx's
+-- update, but this guards any future/external caller too) resolves
+-- correctly to the one true, hardened version.
+drop function if exists public.create_refund(uuid, numeric, text);

@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button'
 import { StatCard } from '@/components/ui/stat-card'
 import { ErrorState } from '@/components/ui/error-state'
 import { formatMoney } from '@/lib/domain/billing'
+import { formatDate } from '@/lib/i18n/config'
 import { rowsToCsv, downloadCsv } from '@/lib/csv'
 import { translateSupabaseError } from '@/lib/errors'
 import { useDirection } from '@/app/providers/DirectionProvider'
@@ -103,7 +104,12 @@ export function ReportsOverviewPage() {
             <ul className="flex flex-col gap-1">
               {data.revenue_by_day.map((d) => (
                 <li key={d.date} className="flex justify-between rounded-md border border-border p-2 text-sm">
-                  <span className="tabular-nums">{d.date}</span>
+                  {/* d.date is a bare YYYY-MM-DD day bucket (no time component) --
+                      format with timeZone: 'UTC' explicitly so it renders as the
+                      same calendar day Postgres bucketed it into, regardless of
+                      the viewer's own browser timezone (avoids the classic
+                      off-by-one-day bug from local-zone Date parsing). */}
+                  <span className="tabular-nums">{formatDate(d.date, locale, 'UTC', { month: 'short', day: 'numeric' })}</span>
                   <span>{formatMoney(d.revenue, 'EGP', locale)}</span>
                 </li>
               ))}

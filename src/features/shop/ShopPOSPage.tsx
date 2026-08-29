@@ -260,6 +260,19 @@ export function ShopPOSPage() {
   const [clearCartConfirmOpen, setClearCartConfirmOpen] = useState(false)
   const [heldSalesOpen, setHeldSalesOpen] = useState(false)
   const [holdNote, setHoldNote] = useState('')
+
+  // SAAS ACCEPTANCE REVIEW (2026-08-29) -- idempotency key correctness
+  // fix: p_idempotency_key was previously generated fresh with
+  // crypto.randomUUID() INSIDE saleMutation's mutationFn, which reruns
+  // in full on every retry -- a network retry of the exact same
+  // checkout attempt would send a DIFFERENT key each time, completely
+  // defeating the server-side idempotency guard it exists to provide.
+  // These refs are generated once per checkout attempt and only
+  // regenerated when the cart is actually reset (clearCart, a
+  // completed sale, a completed hold) -- stable across retries of the
+  // SAME attempt, fresh for a genuinely new one.
+  const saleIdempotencyKeyRef = useRef(crypto.randomUUID())
+  const splitPaymentIdempotencyKeyRef = useRef(crypto.randomUUID())
   const [holdDialogOpen, setHoldDialogOpen] = useState(false)
   const [completedSale, setCompletedSale] = useState<CompletedSale | null>(null)
 
@@ -460,6 +473,9 @@ export function ShopPOSPage() {
     setDiscountEnabled(false)
     setDiscountInput('')
     setDiscountReason('')
+    // A cleared cart is a genuinely new checkout attempt -- fresh keys.
+    saleIdempotencyKeyRef.current = crypto.randomUUID()
+    splitPaymentIdempotencyKeyRef.current = crypto.randomUUID()
   }
 
   // ------------------------------------------------------------
@@ -560,7 +576,7 @@ export function ShopPOSPage() {
         p_items: items,
         p_payment_method: selectedMethod.underlyingMethod,
         p_payment_reference: undefined,
-        p_idempotency_key: crypto.randomUUID(),
+        p_idempotency_key: saleIdempotencyKeyRef.current,
         p_payment_amount: primaryAmount,
         p_discount_amount: discountAmount > 0 ? discountAmount : undefined,
         p_discount_reason: discountAmount > 0 ? (discountReason.trim() || undefined) : undefined,
@@ -599,7 +615,7 @@ export function ShopPOSPage() {
               p_amount: splitAmount,
               p_method: splitMethod.underlyingMethod,
               p_reference: undefined,
-              p_idempotency_key: crypto.randomUUID(),
+              p_idempotency_key: splitPaymentIdempotencyKeyRef.current,
             })
             if (splitErr) {
               splitPaymentFailed = translateSupabaseError(splitErr, t('shop.pos.splitPaymentError'))
@@ -623,6 +639,9 @@ export function ShopPOSPage() {
       setSplitAmountInput('')
       setSplitMethodId(null)
       setCashReceivedInput('')
+      // Sale completed -- next checkout is a new attempt, fresh keys.
+      saleIdempotencyKeyRef.current = crypto.randomUUID()
+      splitPaymentIdempotencyKeyRef.current = crypto.randomUUID()
       setCompletedSale({
         saleId: result.saleId,
         invoiceId: result.invoiceId,
@@ -686,6 +705,9 @@ export function ShopPOSPage() {
       setHoldNote('')
       setHoldDialogOpen(false)
       setError(null)
+      // Cart is held -- resuming later builds a fresh checkout attempt.
+      saleIdempotencyKeyRef.current = crypto.randomUUID()
+      splitPaymentIdempotencyKeyRef.current = crypto.randomUUID()
     },
     onError: (err) => setError(translateSupabaseError(err, t('shop.pos.holdError'))),
   })

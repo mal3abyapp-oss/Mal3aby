@@ -318,6 +318,15 @@ export function BillingPage() {
   const [refundPaymentId, setRefundPaymentId] = useState<string | null>(null)
   const [refundAmount, setRefundAmount] = useState('')
   const [refundReason, setRefundReason] = useState('')
+  // SAAS ACCEPTANCE REVIEW (2026-08-29): create_refund() previously
+  // accepted no idempotency key at all -- a double-click or network
+  // retry of the same refund submission could double-post a real
+  // refund. Regenerated each time the refund dialog opens for a new
+  // payment (see setRefundPaymentId call sites below), stable across
+  // retries of the SAME submission -- matching this codebase's
+  // established stable-key convention (ShopPOSPage, academy payment
+  // dialogs).
+  const refundIdempotencyKeyRef = useRef(crypto.randomUUID())
   const [voidReason, setVoidReason] = useState('')
   const [formError, setFormError] = useState<string | null>(null)
 
@@ -641,6 +650,7 @@ export function BillingPage() {
         p_payment_id: refundPaymentId,
         p_amount: Number(refundAmount),
         p_reason: refundReason,
+        p_idempotency_key: refundIdempotencyKeyRef.current,
       })
       if (error) throw error
       return paymentBeingRefunded
@@ -1025,7 +1035,10 @@ export function BillingPage() {
                             size="sm"
                             variant="ghost"
                             data-testid={`refund-payment-${p.id}`}
-                            onClick={() => setRefundPaymentId(p.id)}
+                            onClick={() => {
+                              refundIdempotencyKeyRef.current = crypto.randomUUID()
+                              setRefundPaymentId(p.id)
+                            }}
                           >
                             {t('billing.detail.refund')}
                           </Button>

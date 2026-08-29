@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
@@ -530,6 +530,14 @@ function SubscribePlayerWizard({
   const [collectNow, setCollectNow] = useState(true)
   const [method, setMethod] = useState('cash')
   const [wizardError, setWizardError] = useState<string | null>(null)
+  // SAAS ACCEPTANCE REVIEW (2026-08-29): this dialog's "collect now"
+  // payment call never passed p_idempotency_key at all, unlike the
+  // already-hardened Bookings/Billing/Customer360/Shop-POS payment
+  // sites -- a double-click on submit (or a network retry) could
+  // record the same payment twice. Stable for the lifetime of this
+  // dialog instance (one real payment attempt), matching the
+  // established stable-key convention used elsewhere in this codebase.
+  const paymentIdempotencyKeyRef = useRef(crypto.randomUUID())
 
   const { data: memberships = [] } = useQuery({ queryKey: ['memberships-for-subscribe', currentClubId], queryFn: () => fetchActiveMemberships(currentClubId!), enabled: !!currentClubId })
   const { data: guardians = [] } = useQuery({ queryKey: ['guardians-for-subscribe', player.id], queryFn: () => fetchGuardiansForPlayer(player.id), enabled: true })
@@ -621,6 +629,7 @@ function SubscribePlayerWizard({
             p_method: method,
             ...rest,
             p_notes: p_receipt_notes,
+            p_idempotency_key: paymentIdempotencyKeyRef.current,
           })
           if (payError) { setWizardError(translateSupabaseError(payError, t('academy.enrollments.enrollError'))); return }
         } else {
@@ -628,6 +637,7 @@ function SubscribePlayerWizard({
             p_invoice_id: invoiceId,
             p_amount: total,
             p_method: method,
+            p_idempotency_key: paymentIdempotencyKeyRef.current,
           })
           if (payError) { setWizardError(translateSupabaseError(payError, t('academy.enrollments.enrollError'))); return }
         }
@@ -776,6 +786,9 @@ function CollectExistingPaymentDialog({
   const { currentClubId } = useAuth()
   const [method, setMethod] = useState('cash')
   const [error, setError] = useState<string | null>(null)
+  // SAAS ACCEPTANCE REVIEW (2026-08-29): same idempotency-key gap as
+  // SubscribePlayerWizard's collect-now above -- see that comment.
+  const paymentIdempotencyKeyRef = useRef(crypto.randomUUID())
 
   const { data: info, isLoading } = useQuery({
     queryKey: ['outstanding-invoice-for-player', player.id],
@@ -802,6 +815,7 @@ function CollectExistingPaymentDialog({
           p_method: method,
           ...rest,
           p_notes: p_receipt_notes,
+          p_idempotency_key: paymentIdempotencyKeyRef.current,
         })
         if (payError) throw payError
       } else {
@@ -809,6 +823,7 @@ function CollectExistingPaymentDialog({
           p_invoice_id: info.invoiceId,
           p_amount: info.outstanding,
           p_method: method,
+          p_idempotency_key: paymentIdempotencyKeyRef.current,
         })
         if (payError) throw payError
       }

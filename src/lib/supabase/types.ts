@@ -10,7 +10,7 @@ export type Database = {
   // Allows to automatically instantiate createClient with right options
   // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
   __InternalSupabase: {
-    PostgrestVersion: "14.17"
+    PostgrestVersion: "14.5"
   }
   public: {
     Tables: {
@@ -141,7 +141,10 @@ export type Database = {
           entity_id: string | null
           entity_type: string
           id: string
+          previous_row_hash: string | null
           reason: string | null
+          row_hash: string
+          sequence_number: number
           support_session_id: string | null
         }
         Insert: {
@@ -156,7 +159,10 @@ export type Database = {
           entity_id?: string | null
           entity_type: string
           id?: string
+          previous_row_hash?: string | null
           reason?: string | null
+          row_hash: string
+          sequence_number?: number
           support_session_id?: string | null
         }
         Update: {
@@ -171,7 +177,10 @@ export type Database = {
           entity_id?: string | null
           entity_type?: string
           id?: string
+          previous_row_hash?: string | null
           reason?: string | null
+          row_hash?: string
+          sequence_number?: number
           support_session_id?: string | null
         }
         Relationships: [
@@ -709,6 +718,58 @@ export type Database = {
           },
           {
             foreignKeyName: "club_gateway_connections_provider_key_fkey"
+            columns: ["provider_key"]
+            isOneToOne: false
+            referencedRelation: "payment_gateway_providers"
+            referencedColumns: ["key"]
+          },
+        ]
+      }
+      club_gateway_provider_policy: {
+        Row: {
+          club_id: string
+          id: string
+          provider_key: string
+          reason: string | null
+          status: string
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          club_id: string
+          id?: string
+          provider_key: string
+          reason?: string | null
+          status?: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          club_id?: string
+          id?: string
+          provider_key?: string
+          reason?: string | null
+          status?: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "club_gateway_provider_policy_club_id_fkey"
+            columns: ["club_id"]
+            isOneToOne: false
+            referencedRelation: "clubs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "club_gateway_provider_policy_club_id_fkey"
+            columns: ["club_id"]
+            isOneToOne: false
+            referencedRelation: "commercial_entitlements_usage"
+            referencedColumns: ["club_id"]
+          },
+          {
+            foreignKeyName: "club_gateway_provider_policy_provider_key_fkey"
             columns: ["provider_key"]
             isOneToOne: false
             referencedRelation: "payment_gateway_providers"
@@ -1357,9 +1418,6 @@ export type Database = {
           club_id: string
           field_limit: number | null
           notes: string | null
-          // PLATFORM OWNER CONTROL IMPLEMENTATION -- Phase 5: payment
-          // kill switch column (migration 20260828240000). Hand-added
-          // per this project's established types.ts convention.
           payments_platform_disabled: boolean
           updated_at: string
           updated_by: string | null
@@ -1588,6 +1646,7 @@ export type Database = {
           full_name: string
           gender: string | null
           id: string
+          is_walk_in: boolean
           merged_into_customer_id: string | null
           mobile_display: string | null
           national_id: string | null
@@ -1611,6 +1670,7 @@ export type Database = {
           full_name: string
           gender?: string | null
           id?: string
+          is_walk_in?: boolean
           merged_into_customer_id?: string | null
           mobile_display?: string | null
           national_id?: string | null
@@ -1634,6 +1694,7 @@ export type Database = {
           full_name?: string
           gender?: string | null
           id?: string
+          is_walk_in?: boolean
           merged_into_customer_id?: string | null
           mobile_display?: string | null
           national_id?: string | null
@@ -2588,6 +2649,7 @@ export type Database = {
           claimed_by: string
           club_id: string
           id: string
+          idempotency_key: string | null
           invoice_id: string
           payment_method_config_id: string | null
           proof_note: string | null
@@ -2604,6 +2666,7 @@ export type Database = {
           claimed_by: string
           club_id: string
           id?: string
+          idempotency_key?: string | null
           invoice_id: string
           payment_method_config_id?: string | null
           proof_note?: string | null
@@ -2620,6 +2683,7 @@ export type Database = {
           claimed_by?: string
           club_id?: string
           id?: string
+          idempotency_key?: string | null
           invoice_id?: string
           payment_method_config_id?: string | null
           proof_note?: string | null
@@ -4224,11 +4288,11 @@ export type Database = {
           billing_interval_count: number
           created_at: string
           currency: string
-          default_grace_period_days: number
-          default_modules: string[] | null
+          default_academy_limit: number | null
           default_branch_limit: number | null
           default_field_limit: number | null
-          default_academy_limit: number | null
+          default_grace_period_days: number
+          default_modules: string[] | null
           description_ar: string | null
           discount_label: string | null
           display_order: number
@@ -4246,11 +4310,11 @@ export type Database = {
           billing_interval_count: number
           created_at?: string
           currency?: string
-          default_grace_period_days?: number
-          default_modules?: string[] | null
+          default_academy_limit?: number | null
           default_branch_limit?: number | null
           default_field_limit?: number | null
-          default_academy_limit?: number | null
+          default_grace_period_days?: number
+          default_modules?: string[] | null
           description_ar?: string | null
           discount_label?: string | null
           display_order?: number
@@ -4268,11 +4332,11 @@ export type Database = {
           billing_interval_count?: number
           created_at?: string
           currency?: string
-          default_grace_period_days?: number
-          default_modules?: string[] | null
+          default_academy_limit?: number | null
           default_branch_limit?: number | null
           default_field_limit?: number | null
-          default_academy_limit?: number | null
+          default_grace_period_days?: number
+          default_modules?: string[] | null
           description_ar?: string | null
           discount_label?: string | null
           display_order?: number
@@ -5188,6 +5252,101 @@ export type Database = {
           },
         ]
       }
+      shop_held_sale_items: {
+        Row: {
+          held_sale_id: string
+          id: string
+          product_id: string
+          quantity: number
+          variant_id: string | null
+        }
+        Insert: {
+          held_sale_id: string
+          id?: string
+          product_id: string
+          quantity: number
+          variant_id?: string | null
+        }
+        Update: {
+          held_sale_id?: string
+          id?: string
+          product_id?: string
+          quantity?: number
+          variant_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "shop_held_sale_items_held_sale_id_fkey"
+            columns: ["held_sale_id"]
+            isOneToOne: false
+            referencedRelation: "shop_held_sales"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "shop_held_sale_items_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "shop_products"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "shop_held_sale_items_variant_id_fkey"
+            columns: ["variant_id"]
+            isOneToOne: false
+            referencedRelation: "shop_product_variants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      shop_held_sales: {
+        Row: {
+          club_id: string
+          customer_id: string | null
+          held_at: string
+          held_by: string | null
+          id: string
+          note: string | null
+        }
+        Insert: {
+          club_id: string
+          customer_id?: string | null
+          held_at?: string
+          held_by?: string | null
+          id?: string
+          note?: string | null
+        }
+        Update: {
+          club_id?: string
+          customer_id?: string | null
+          held_at?: string
+          held_by?: string | null
+          id?: string
+          note?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "shop_held_sales_club_id_fkey"
+            columns: ["club_id"]
+            isOneToOne: false
+            referencedRelation: "clubs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "shop_held_sales_club_id_fkey"
+            columns: ["club_id"]
+            isOneToOne: false
+            referencedRelation: "commercial_entitlements_usage"
+            referencedColumns: ["club_id"]
+          },
+          {
+            foreignKeyName: "shop_held_sales_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "customers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       shop_inventory_balances: {
         Row: {
           club_id: string
@@ -5545,13 +5704,9 @@ export type Database = {
           quantity: number
           returned_quantity: number
           sale_id: string
+          unit_cost_snapshot: number | null
           unit_price: number
           variant_id: string | null
-          // COMMERCE PRO C7: forward-only cost-at-sale snapshot. Null
-          // for any row created before this column existed, or for a
-          // unit never yet received via receive_shop_stock -- render
-          // "Cost unavailable", never fabricate a value.
-          unit_cost_snapshot: number | null
         }
         Insert: {
           id?: string
@@ -5561,9 +5716,9 @@ export type Database = {
           quantity: number
           returned_quantity?: number
           sale_id: string
+          unit_cost_snapshot?: number | null
           unit_price: number
           variant_id?: string | null
-          unit_cost_snapshot?: number | null
         }
         Update: {
           id?: string
@@ -5573,9 +5728,9 @@ export type Database = {
           quantity?: number
           returned_quantity?: number
           sale_id?: string
+          unit_cost_snapshot?: number | null
           unit_price?: number
           variant_id?: string | null
-          unit_cost_snapshot?: number | null
         }
         Relationships: [
           {
@@ -5714,6 +5869,8 @@ export type Database = {
           club_id: string
           created_at: string
           customer_id: string | null
+          discount_amount: number
+          discount_reason: string | null
           id: string
           idempotency_key: string | null
           invoice_id: string | null
@@ -5725,6 +5882,8 @@ export type Database = {
           club_id: string
           created_at?: string
           customer_id?: string | null
+          discount_amount?: number
+          discount_reason?: string | null
           id?: string
           idempotency_key?: string | null
           invoice_id?: string | null
@@ -5736,6 +5895,8 @@ export type Database = {
           club_id?: string
           created_at?: string
           customer_id?: string | null
+          discount_amount?: number
+          discount_reason?: string | null
           id?: string
           idempotency_key?: string | null
           invoice_id?: string | null
@@ -6757,6 +6918,7 @@ export type Database = {
       }
     }
     Functions: {
+      _academy_module_active: { Args: { p_club_id: string }; Returns: boolean }
       _activate_club_membership_if_due_internal: {
         Args: { p_membership_subscription_id: string }
         Returns: boolean
@@ -6787,6 +6949,28 @@ export type Database = {
           p_reference_type?: string
           p_unit_cost?: number
           p_variant_id: string
+        }
+        Returns: string
+      }
+      _club_membership_module_active: {
+        Args: { p_club_id: string }
+        Returns: boolean
+      }
+      _compute_audit_log_row_hash: {
+        Args: {
+          p_acting_as_platform_admin: boolean
+          p_action: string
+          p_actor_id: string
+          p_after: Json
+          p_before: Json
+          p_club_id: string
+          p_created_at: string
+          p_entity_id: string
+          p_entity_type: string
+          p_previous_row_hash: string
+          p_reason: string
+          p_sequence_number: number
+          p_support_session_id: string
         }
         Returns: string
       }
@@ -6824,6 +7008,7 @@ export type Database = {
           start_at: string
         }[]
       }
+      _fields_module_active: { Args: { p_club_id: string }; Returns: boolean }
       _mint_booking_qr_token_internal: {
         Args: {
           p_booking_id: string
@@ -6946,6 +7131,7 @@ export type Database = {
       claim_manual_payment: {
         Args: {
           p_claimed_amount: number
+          p_idempotency_key?: string
           p_invoice_id: string
           p_payment_method_config_id: string
           p_proof_note?: string
@@ -7282,7 +7468,12 @@ export type Database = {
         }[]
       }
       create_refund: {
-        Args: { p_amount: number; p_payment_id: string; p_reason: string }
+        Args: {
+          p_amount: number
+          p_idempotency_key?: string
+          p_payment_id: string
+          p_reason: string
+        }
         Returns: string
       }
       create_shop_category: {
@@ -7338,10 +7529,6 @@ export type Database = {
         }
         Returns: string
       }
-      discard_held_shop_sale: {
-        Args: { p_held_sale_id: string }
-        Returns: undefined
-      }
       deactivate_platform_staff: {
         Args: { p_membership_id: string }
         Returns: undefined
@@ -7353,6 +7540,10 @@ export type Database = {
       delete_club_role: { Args: { p_club_role_id: string }; Returns: undefined }
       delete_platform_custom_role: {
         Args: { p_role_id: string }
+        Returns: undefined
+      }
+      discard_held_shop_sale: {
+        Args: { p_held_sale_id: string }
         Returns: undefined
       }
       disconnect_club_gateway: {
@@ -7624,15 +7815,13 @@ export type Database = {
         }[]
       }
       get_customer_shop_purchases: {
-        // COMMERCE PRO C7: p_start_date/p_end_date/p_limit/p_offset
-        // appended (all optional/defaulted) -- return shape unchanged.
         Args: {
           p_club_id: string
           p_customer_id: string
-          p_start_date?: string
           p_end_date?: string
           p_limit?: number
           p_offset?: number
+          p_start_date?: string
         }
         Returns: {
           created_at: string
@@ -7869,6 +8058,10 @@ export type Database = {
         Returns: Json
       }
       get_open_cash_shifts: { Args: { p_club_id: string }; Returns: Json }
+      get_or_create_shop_walk_in_customer: {
+        Args: { p_club_id: string }
+        Returns: string
+      }
       get_payment_method_report: {
         Args: {
           p_branch_id?: string
@@ -7929,6 +8122,26 @@ export type Database = {
           owner_user_id: string
         }[]
       }
+      get_platform_club_gateway_overview: {
+        Args: { p_club_id: string }
+        Returns: {
+          connected: boolean
+          connection_id: string
+          enabled: boolean
+          environment: string
+          is_default: boolean
+          last_verification_error: string
+          last_verified_at: string
+          last_webhook_at: string
+          last_webhook_error: string
+          policy_reason: string
+          policy_status: string
+          policy_updated_at: string
+          provider_display_name: string
+          provider_key: string
+          supported_countries: string[]
+        }[]
+      }
       get_platform_club_owners: {
         Args: { p_limit?: number; p_offset?: number; p_search?: string }
         Returns: {
@@ -7951,28 +8164,6 @@ export type Database = {
           member_count: number
           role_key: string
           role_name: string
-        }[]
-      }
-      // PLATFORM OWNER AUTONOMOUS COMPLETION -- Phase A: read RPC
-      // backing the new provider-policy UI (migration 20260829010000).
-      get_platform_club_gateway_overview: {
-        Args: { p_club_id: string }
-        Returns: {
-          provider_key: string
-          provider_display_name: string
-          supported_countries: string[]
-          connection_id: string | null
-          environment: string | null
-          connected: boolean
-          enabled: boolean
-          is_default: boolean
-          last_verified_at: string | null
-          last_verification_error: string | null
-          last_webhook_at: string | null
-          last_webhook_error: string | null
-          policy_status: string
-          policy_reason: string | null
-          policy_updated_at: string | null
         }[]
       }
       get_platform_clubs_access: {
@@ -8021,18 +8212,18 @@ export type Database = {
         Returns: string[]
       }
       get_platform_support_session_history: {
-        Args: { p_club_id?: string | null; p_limit?: number }
+        Args: { p_club_id?: string; p_limit?: number }
         Returns: {
-          id: string
-          platform_owner_id: string
-          platform_owner_email: string | null
           club_id: string
-          club_name: string | null
-          mode: string
-          reason: string | null
-          started_at: string
+          club_name: string
+          ended_at: string
           expires_at: string
-          ended_at: string | null
+          id: string
+          mode: string
+          platform_owner_email: string
+          platform_owner_id: string
+          reason: string
+          started_at: string
           status: string
         }[]
       }
@@ -8178,6 +8369,28 @@ export type Database = {
         }
         Returns: Json
       }
+      get_shop_gross_profit: {
+        Args: {
+          p_category_id?: string
+          p_club_id: string
+          p_end_date?: string
+          p_product_id?: string
+          p_start_date?: string
+        }
+        Returns: {
+          cost_of_goods: number
+          cost_unavailable_lines: number
+          cost_unavailable_revenue: number
+          gross_profit: number
+          known_cost_lines: number
+          margin_pct: number
+          net_cost_of_goods: number
+          net_gross_profit: number
+          net_margin_pct: number
+          net_revenue_known_cost: number
+          revenue_known_cost: number
+        }[]
+      }
       get_shop_inventory_balances: {
         Args: {
           p_club_id: string
@@ -8204,6 +8417,28 @@ export type Database = {
           total_on_hand: number
         }[]
       }
+      get_shop_payment_method_mix: {
+        Args: { p_club_id: string; p_end_date?: string; p_start_date?: string }
+        Returns: {
+          method: string
+          total_amount: number
+          transaction_count: number
+        }[]
+      }
+      get_shop_print_settings: {
+        Args: { p_club_id: string }
+        Returns: {
+          address: string
+          commercial_registration: string
+          footer_note: string
+          logo_url: string
+          phone: string
+          return_policy: string
+          tax_number: string
+          trading_name_ar: string
+          trading_name_en: string
+        }[]
+      }
       get_shop_sale_detail: {
         Args: { p_sale_id: string }
         Returns: {
@@ -8220,7 +8455,6 @@ export type Database = {
       get_shop_sale_invoice_data: {
         Args: { p_sale_id: string }
         Returns: {
-          address: string
           branch_id: string
           branch_name: string
           club_id: string
@@ -8242,58 +8476,51 @@ export type Database = {
           total: number
         }[]
       }
-      get_shop_payment_method_mix: {
-        Args: {
-          p_club_id: string
-          p_end_date?: string
-          p_start_date?: string
-        }
+      get_shop_sale_returns_history: {
+        Args: { p_sale_id: string }
         Returns: {
-          method: string
-          total_amount: number
-          transaction_count: number
+          created_at: string
+          lines: Json
+          processed_by_name: string
+          reason: string
+          refund_amount: number
+          refund_method: string
+          refund_status: string
+          restock: boolean
+          return_id: string
         }[]
-      }
-      get_shop_print_settings: {
-        Args: { p_club_id: string }
-        Returns: {
-          address: string
-          commercial_registration: string
-          footer_note: string
-          logo_url: string
-          phone: string
-          return_policy: string
-          tax_number: string
-          trading_name_ar: string
-          trading_name_en: string
-        }[]
-      }
-      update_shop_print_settings: {
-        Args: {
-          p_address?: string
-          p_club_id: string
-          p_commercial_registration?: string
-          p_footer_note?: string
-          p_logo_url?: string
-          p_phone?: string
-          p_return_policy?: string
-          p_tax_number?: string
-          p_trading_name_ar?: string
-          p_trading_name_en?: string
-        }
-        Returns: undefined
       }
       get_shop_sales_by_category: {
-        Args: {
-          p_club_id: string
-          p_end_date?: string
-          p_start_date?: string
-        }
+        Args: { p_club_id: string; p_end_date?: string; p_start_date?: string }
         Returns: {
-          category_id: string | null
-          category_name: string | null
+          category_id: string
+          category_name: string
           revenue: number
           units_sold: number
+        }[]
+      }
+      get_shop_sales_kpis: {
+        Args: {
+          p_branch_id?: string
+          p_cashier_id?: string
+          p_category_id?: string
+          p_club_id: string
+          p_customer_id?: string
+          p_end_date?: string
+          p_invoice_number?: string
+          p_payment_method?: string
+          p_product_id?: string
+          p_start_date?: string
+          p_status?: string
+        }
+        Returns: {
+          average_basket: number
+          discount_total: number
+          gross_sales: number
+          items_sold: number
+          net_sales: number
+          refund_total: number
+          transaction_count: number
         }[]
       }
       get_shop_stock_count_detail: {
@@ -8322,16 +8549,44 @@ export type Database = {
           variant_label: string
         }[]
       }
-      get_shop_top_products: {
-        // COMMERCE PRO C7: p_offset/p_category_id appended (both
-        // optional/defaulted) -- return shape unchanged.
+      get_shop_stock_valuation: {
+        Args: { p_club_id: string; p_location_id?: string }
+        Returns: {
+          line_value: number
+          location_id: string
+          location_name: string
+          on_hand: number
+          product_id: string
+          product_name_ar: string
+          unit_cost: number
+          variant_id: string
+          variant_label: string
+        }[]
+      }
+      get_shop_supplier_purchase_activity: {
         Args: {
           p_club_id: string
           p_end_date?: string
-          p_limit?: number
           p_start_date?: string
-          p_offset?: number
+          p_supplier_id?: string
+        }
+        Returns: {
+          last_receipt_at: string
+          receipt_count: number
+          supplier_id: string
+          supplier_name: string
+          total_cost_value: number
+          total_quantity: number
+        }[]
+      }
+      get_shop_top_products: {
+        Args: {
           p_category_id?: string
+          p_club_id: string
+          p_end_date?: string
+          p_limit?: number
+          p_offset?: number
+          p_start_date?: string
         }
         Returns: {
           product_id: string
@@ -8339,145 +8594,6 @@ export type Database = {
           revenue: number
           units_returned: number
           units_sold: number
-        }[]
-      }
-      get_shop_gross_profit: {
-        Args: {
-          p_club_id: string
-          p_start_date?: string
-          p_end_date?: string
-          p_category_id?: string
-          p_product_id?: string
-        }
-        Returns: {
-          revenue_known_cost: number
-          cost_of_goods: number
-          gross_profit: number
-          margin_pct: number
-          known_cost_lines: number
-          cost_unavailable_lines: number
-          cost_unavailable_revenue: number
-          net_revenue_known_cost: number
-          net_cost_of_goods: number
-          net_gross_profit: number
-          net_margin_pct: number
-        }[]
-      }
-      get_shop_stock_valuation: {
-        Args: { p_club_id: string; p_location_id?: string }
-        Returns: {
-          location_id: string
-          location_name: string
-          product_id: string
-          product_name_ar: string
-          variant_id: string | null
-          variant_label: string | null
-          on_hand: number
-          unit_cost: number | null
-          line_value: number | null
-        }[]
-      }
-      get_shop_supplier_purchase_activity: {
-        Args: {
-          p_club_id: string
-          p_start_date?: string
-          p_end_date?: string
-          p_supplier_id?: string
-        }
-        Returns: {
-          supplier_id: string | null
-          supplier_name: string
-          receipt_count: number
-          total_quantity: number
-          total_cost_value: number
-          last_receipt_at: string | null
-        }[]
-      }
-      list_shop_sale_returns: {
-        Args: {
-          p_club_id: string
-          p_start_date?: string
-          p_end_date?: string
-          p_restock_only?: boolean
-          p_refunded_only?: boolean
-          p_limit?: number
-          p_offset?: number
-        }
-        Returns: {
-          return_id: string
-          sale_id: string
-          invoice_number: string
-          processed_by_name: string | null
-          restock: boolean
-          reason: string
-          created_at: string
-          refund_amount: number | null
-          refund_method: string | null
-        }[]
-      }
-      list_shop_stock_count_variance: {
-        Args: {
-          p_club_id: string
-          p_start_date?: string
-          p_end_date?: string
-          p_location_id?: string
-          p_nonzero_only?: boolean
-          p_limit?: number
-          p_offset?: number
-        }
-        Returns: {
-          stock_count_id: string
-          location_name: string
-          completed_at: string | null
-          product_name_ar: string
-          variant_label: string | null
-          system_quantity: number
-          counted_quantity: number
-          variance: number
-          counted_by_name: string | null
-        }[]
-      }
-      get_or_create_shop_walk_in_customer: {
-        Args: { p_club_id: string }
-        Returns: string
-      }
-      hold_shop_sale: {
-        Args: {
-          p_club_id: string
-          p_customer_id?: string
-          p_items: Json
-          p_note?: string
-        }
-        Returns: string
-      }
-      list_held_shop_sales: {
-        Args: { p_club_id: string }
-        Returns: {
-          customer_id: string
-          customer_name: string
-          held_at: string
-          held_by: string
-          held_by_name: string
-          held_sale_id: string
-          item_count: number
-          note: string
-          total_quantity: number
-        }[]
-      }
-      resume_shop_sale: {
-        Args: { p_held_sale_id: string }
-        Returns: {
-          customer_id: string
-          product_id: string
-          product_name_ar: string
-          product_name_en: string
-          product_status: string
-          quantity: number
-          unit_price: number
-          variant_color: string
-          variant_id: string
-          variant_size: string
-          variant_status: string
         }[]
       }
       get_staff_360_summary: {
@@ -8595,6 +8711,15 @@ export type Database = {
         Args: { p_club_id: string; p_require_manage?: boolean }
         Returns: boolean
       }
+      hold_shop_sale: {
+        Args: {
+          p_club_id: string
+          p_customer_id?: string
+          p_items: Json
+          p_note?: string
+        }
+        Returns: string
+      }
       invite_staff_member: {
         Args: {
           p_branch_ids?: string[]
@@ -8675,6 +8800,20 @@ export type Database = {
           name_en: string
           permission_count: number
           updated_at: string
+        }[]
+      }
+      list_held_shop_sales: {
+        Args: { p_club_id: string }
+        Returns: {
+          customer_id: string
+          customer_name: string
+          held_at: string
+          held_by: string
+          held_by_name: string
+          held_sale_id: string
+          item_count: number
+          note: string
+          total_quantity: number
         }[]
       }
       list_payment_gateway_providers: {
@@ -8772,17 +8911,15 @@ export type Database = {
         }[]
       }
       list_shop_inventory_movements: {
-        // COMMERCE PRO C7: p_start_date/p_end_date/p_movement_type
-        // appended (all optional/defaulted) -- return shape unchanged.
         Args: {
           p_club_id: string
+          p_end_date?: string
           p_limit?: number
           p_location_id?: string
+          p_movement_type?: string
           p_offset?: number
           p_product_id?: string
           p_start_date?: string
-          p_end_date?: string
-          p_movement_type?: string
         }
         Returns: {
           actor_id: string
@@ -8799,57 +8936,53 @@ export type Database = {
           variant_label: string
         }[]
       }
-      list_shop_product_sales_history: {
-        // COMMERCE PRO C8: product-scoped sales history (all customers),
-        // for the Product Detail dialog's SALES HISTORY tab.
-        Args: {
-          p_club_id: string
-          p_product_id: string
-          p_variant_id?: string
-          p_start_date?: string
-          p_end_date?: string
-          p_limit?: number
-          p_offset?: number
-        }
-        Returns: {
-          sale_id: string
-          invoice_number: string
-          customer_name: string | null
-          sold_by_name: string | null
-          variant_label: string | null
-          quantity: number
-          unit_price: number
-          line_total: number
-          returned_quantity: number
-          sale_status: string
-          created_at: string
-        }[]
-      }
       list_shop_product_returns: {
-        // COMMERCE PRO C8: product-scoped returned lines (all
-        // customers), for the Product Detail dialog's RETURNS tab.
         Args: {
           p_club_id: string
-          p_product_id: string
-          p_variant_id?: string
-          p_start_date?: string
           p_end_date?: string
           p_limit?: number
           p_offset?: number
+          p_product_id: string
+          p_start_date?: string
+          p_variant_id?: string
         }
         Returns: {
+          created_at: string
+          customer_name: string
+          invoice_number: string
+          processed_by_name: string
+          quantity: number
+          reason: string
+          refund_amount: number
+          refund_method: string
+          restock: boolean
           return_id: string
           sale_id: string
-          invoice_number: string
-          customer_name: string | null
-          processed_by_name: string | null
-          variant_label: string | null
-          quantity: number
-          restock: boolean
-          reason: string
-          refund_amount: number | null
-          refund_method: string | null
+          variant_label: string
+        }[]
+      }
+      list_shop_product_sales_history: {
+        Args: {
+          p_club_id: string
+          p_end_date?: string
+          p_limit?: number
+          p_offset?: number
+          p_product_id: string
+          p_start_date?: string
+          p_variant_id?: string
+        }
+        Returns: {
           created_at: string
+          customer_name: string
+          invoice_number: string
+          line_total: number
+          quantity: number
+          returned_quantity: number
+          sale_id: string
+          sale_status: string
+          sold_by_name: string
+          unit_price: number
+          variant_label: string
         }[]
       }
       list_shop_product_variants: {
@@ -8889,11 +9022,47 @@ export type Database = {
           status: string
         }[]
       }
+      list_shop_recent_returns: {
+        Args: { p_club_id: string; p_limit?: number }
+        Returns: {
+          created_at: string
+          invoice_number: string
+          processed_by_name: string
+          reason: string
+          refund_amount: number
+          refund_method: string
+          restock: boolean
+          return_id: string
+          sale_id: string
+        }[]
+      }
+      list_shop_sale_returns: {
+        Args: {
+          p_club_id: string
+          p_end_date?: string
+          p_limit?: number
+          p_offset?: number
+          p_refunded_only?: boolean
+          p_restock_only?: boolean
+          p_start_date?: string
+        }
+        Returns: {
+          created_at: string
+          invoice_number: string
+          processed_by_name: string
+          reason: string
+          refund_amount: number
+          refund_method: string
+          restock: boolean
+          return_id: string
+          sale_id: string
+        }[]
+      }
       list_shop_sales: {
         Args: {
           p_branch_id?: string
-          p_category_id?: string
           p_cashier_id?: string
+          p_category_id?: string
           p_club_id: string
           p_customer_id?: string
           p_end_date?: string
@@ -8920,59 +9089,26 @@ export type Database = {
           total: number
         }[]
       }
-      get_shop_sales_kpis: {
+      list_shop_stock_count_variance: {
         Args: {
-          p_branch_id?: string
-          p_cashier_id?: string
-          p_category_id?: string
           p_club_id: string
-          p_customer_id?: string
           p_end_date?: string
-          p_invoice_number?: string
-          p_payment_method?: string
-          p_product_id?: string
-          p_start_date?: string
-          p_status?: string
-        }
-        Returns: {
-          average_basket: number
-          discount_total: number
-          gross_sales: number
-          items_sold: number
-          net_sales: number
-          refund_total: number
-          transaction_count: number
-        }[]
-      }
-      get_shop_sale_returns_history: {
-        Args: { p_sale_id: string }
-        Returns: {
-          created_at: string
-          lines: Json
-          processed_by_name: string
-          reason: string
-          refund_amount: number
-          refund_method: string
-          refund_status: string
-          restock: boolean
-          return_id: string
-        }[]
-      }
-      list_shop_recent_returns: {
-        Args: {
-          p_club_id: string
           p_limit?: number
+          p_location_id?: string
+          p_nonzero_only?: boolean
+          p_offset?: number
+          p_start_date?: string
         }
         Returns: {
-          created_at: string
-          invoice_number: string
-          processed_by_name: string
-          reason: string
-          refund_amount: number | null
-          refund_method: string | null
-          restock: boolean
-          return_id: string
-          sale_id: string
+          completed_at: string
+          counted_by_name: string
+          counted_quantity: number
+          location_name: string
+          product_name_ar: string
+          stock_count_id: string
+          system_quantity: number
+          variance: number
+          variant_label: string
         }[]
       }
       list_shop_stock_counts: {
@@ -9227,15 +9363,12 @@ export type Database = {
         Returns: string
       }
       receive_shop_stock_batch: {
-        // COMMERCE PRO C8: atomic multi-item receiving (one transaction
-        // for every line). p_items: jsonb array of {product_id,
-        // variant_id, quantity, unit_cost}.
         Args: {
-          p_location_id: string
           p_items: Json
-          p_supplier_id?: string
-          p_reference_number?: string
+          p_location_id: string
           p_notes?: string
+          p_reference_number?: string
+          p_supplier_id?: string
         }
         Returns: string
       }
@@ -9436,6 +9569,22 @@ export type Database = {
         Args: { p_membership_subscription_id: string; p_reason?: string }
         Returns: undefined
       }
+      resume_shop_sale: {
+        Args: { p_held_sale_id: string }
+        Returns: {
+          customer_id: string
+          product_id: string
+          product_name_ar: string
+          product_name_en: string
+          product_status: string
+          quantity: number
+          unit_price: number
+          variant_color: string
+          variant_id: string
+          variant_size: string
+          variant_status: string
+        }[]
+      }
       retry_failed_whatsapp_message: {
         Args: { p_queue_id: string }
         Returns: undefined
@@ -9536,22 +9685,30 @@ export type Database = {
         Args: { p_connection_id: string; p_enabled: boolean }
         Returns: undefined
       }
-      // PLATFORM OWNER CONTROL IMPLEMENTATION -- Phase 5: payment kill
-      // switch + provider policy RPCs (migration 20260828240000).
       set_club_gateway_provider_policy: {
-        Args: { p_club_id: string; p_provider_key: string; p_status: string; p_reason?: string }
-        Returns: undefined
-      }
-      set_club_payments_enabled: {
-        Args: { p_club_id: string; p_enabled: boolean; p_reason?: string }
+        Args: {
+          p_club_id: string
+          p_provider_key: string
+          p_reason?: string
+          p_status: string
+        }
         Returns: undefined
       }
       set_club_module_active: {
-        Args: { p_active: boolean; p_club_id: string; p_module_key: string; p_reason?: string | null }
+        Args: {
+          p_active: boolean
+          p_club_id: string
+          p_module_key: string
+          p_reason?: string
+        }
         Returns: undefined
       }
       set_club_module_entitlement: {
         Args: { p_club_id: string; p_entitled: boolean; p_module_key: string }
+        Returns: undefined
+      }
+      set_club_payments_enabled: {
+        Args: { p_club_id: string; p_enabled: boolean; p_reason?: string }
         Returns: undefined
       }
       set_club_public_booking_enabled: {
@@ -9562,17 +9719,12 @@ export type Database = {
         Args: { p_club_id: string; p_desired_slug?: string }
         Returns: string
       }
-      // PLATFORM OWNER CONTROL IMPLEMENTATION -- Phase 3: audited
-      // replacement for the direct commercial_entitlements client
-      // upsert (see migration 20260828220000). Hand-added per this
-      // project's established convention of editing this file per-RPC
-      // rather than running a full generate_typescript_types regen.
       set_commercial_entitlements: {
         Args: {
+          p_academy_limit: number
+          p_branch_limit: number
           p_club_id: string
-          p_branch_limit: number | null
-          p_field_limit: number | null
-          p_academy_limit: number | null
+          p_field_limit: number
           p_reason?: string
         }
         Returns: undefined
@@ -9667,14 +9819,11 @@ export type Database = {
         Returns: string
       }
       transfer_shop_stock_batch: {
-        // COMMERCE PRO C8: atomic multi-item transfer (one transaction
-        // for every line's out+in movement pair). p_items: jsonb array
-        // of {product_id, variant_id, quantity}.
         Args: {
-          p_source_location_id: string
           p_dest_location_id: string
           p_items: Json
           p_notes?: string
+          p_source_location_id: string
         }
         Returns: string
       }
@@ -9832,30 +9981,26 @@ export type Database = {
         Returns: undefined
       }
       update_platform_plan: {
-        // PLATFORM OWNER CONTROL IMPLEMENTATION -- Phase 4: extended
-        // with the optional plan-default columns (migration
-        // 20260828231500). Hand-edited per this project's established
-        // convention rather than a full generate_typescript_types regen.
         Args: {
+          p_default_academy_limit?: number
+          p_default_branch_limit?: number
+          p_default_field_limit?: number
+          p_default_modules?: string[]
           p_name_ar: string
           p_plan_id: string
           p_price: number
           p_reason?: string
-          p_default_modules?: string[] | null
-          p_default_branch_limit?: number | null
-          p_default_field_limit?: number | null
-          p_default_academy_limit?: number | null
         }
         Returns: {
           billing_interval: string
           billing_interval_count: number
           created_at: string
           currency: string
-          default_grace_period_days: number
-          default_modules: string[] | null
+          default_academy_limit: number | null
           default_branch_limit: number | null
           default_field_limit: number | null
-          default_academy_limit: number | null
+          default_grace_period_days: number
+          default_modules: string[] | null
           description_ar: string | null
           discount_label: string | null
           display_order: number
@@ -9898,6 +10043,21 @@ export type Database = {
           p_name_ar?: string
           p_name_en?: string
           p_status?: string
+        }
+        Returns: undefined
+      }
+      update_shop_print_settings: {
+        Args: {
+          p_address?: string
+          p_club_id: string
+          p_commercial_registration?: string
+          p_footer_note?: string
+          p_logo_url?: string
+          p_phone?: string
+          p_return_policy?: string
+          p_tax_number?: string
+          p_trading_name_ar?: string
+          p_trading_name_en?: string
         }
         Returns: undefined
       }
@@ -9963,6 +10123,14 @@ export type Database = {
       user_has_field_access: {
         Args: { p_club_id: string; p_field_id: string }
         Returns: boolean
+      }
+      verify_audit_log_chain: {
+        Args: { p_from_sequence?: number; p_to_sequence?: number }
+        Returns: {
+          detail: string
+          problem_type: string
+          sequence_number: number
+        }[]
       }
       verify_booking_qr_public: {
         Args: { p_token: string }

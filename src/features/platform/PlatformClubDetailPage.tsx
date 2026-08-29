@@ -484,12 +484,22 @@ export function PlatformClubDetailPage() {
   // column's own semantics -- unchanged from before.
   const saveLimitsMutation = useMutation({
     mutationFn: async () => {
-      const toLimit = (v: string) => (v.trim() === '' ? null : Number(v))
+      // toLimit intentionally returns null for an empty input (clears the
+      // limit back to unlimited -- the column's own semantics). The
+      // generated RPC arg type is a plain `number` because Postgres
+      // parameter types carry no nullability signal the generator can see
+      // (this integer parameter has always accepted a real SQL null at
+      // runtime; a fresh `generate_typescript_types` run can tighten this
+      // inferred type without the underlying function changing at all) --
+      // cast at the call site rather than loosen the generated type or
+      // touch the RPC signature, since both would be wider changes than
+      // this single call site actually needs.
+      const toLimit = (v: string) => (v.trim() === '' ? null : Number(v)) as number | null
       const { error } = await supabase.rpc('set_commercial_entitlements', {
         p_club_id: clubId!,
-        p_branch_limit: toLimit(branchLimitInput),
-        p_field_limit: toLimit(fieldLimitInput),
-        p_academy_limit: toLimit(academyLimitInput),
+        p_branch_limit: toLimit(branchLimitInput) as number,
+        p_field_limit: toLimit(fieldLimitInput) as number,
+        p_academy_limit: toLimit(academyLimitInput) as number,
         p_reason: limitReasonInput.trim() || undefined,
       })
       if (error) throw error

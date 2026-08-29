@@ -2487,7 +2487,22 @@
         "total": "الإجمالي",
         "returnState": "الإرجاع",
         "returnedCount": "تم إرجاع {{count}}"
-      }
+      },
+      "portalAccount": "حساب البوابة",
+      "portalActivated": "مُفعّل",
+      "portalInviteSent": "تم إرسال الدعوة",
+      "portalInviteExpired": "انتهت صلاحية الدعوة",
+      "portalNotActivated": "غير مُفعّل",
+      "portalInviteSending": "جارٍ الإرسال...",
+      "portalResendInvite": "إعادة إرسال الدعوة",
+      "portalSendInvite": "إرسال دعوة تفعيل",
+      "portalNeedsPhone": "أضف رقم هاتف صالحًا لإرسال دعوة تفعيل الحساب.",
+      "portalInviteError": "تعذّر إرسال دعوة التفعيل.",
+      "viewInvoice": "عرض الفاتورة",
+      "portalInviteManualTitle": "سلّم دعوة التفعيل هذه يدويًا",
+      "portalInviteManualHelp": "لم يتم إرسال هذه الدعوة تلقائيًا. انسخ الرابط والرمز أدناه وأرسلهما للعميل بنفسك (مثلاً عبر محادثة واتساب أو رسالة نصية). يجب إرسال الرمز بشكل منفصل عن الرابط.",
+      "portalInviteLinkLabel": "رابط التفعيل",
+      "portalInviteSecretLabel": "رمز التفعيل"
     },
     "duplicates": {
       "title": "عملاء محتمل تكرارهم",
@@ -2543,8 +2558,8 @@
       "unpaidSubscriptions": "اشتراكات غير مدفوعة",
       "sessionsToday": "حصص اليوم",
       "newCustomersToday": "عملاء جدد اليوم",
-      "now": "الآن (NOW)",
-      "next": "التالي (NEXT)"
+      "now": "الآن",
+      "next": "التالي"
     },
     "attentionNeeded": {
       "title": "يحتاج انتباه",

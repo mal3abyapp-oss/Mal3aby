@@ -7,6 +7,7 @@ import { Input } from '@/components/ui/input'
 import { translateSupabaseError } from '@/lib/errors'
 import { type PricingRuleRow } from '@/lib/domain/fields'
 import { useResolvedFieldPrice } from '@/features/bookings/useFieldPricing'
+import { formatNumber } from '@/lib/i18n/config'
 
 // P1-6 (critical usability fix pass, 2026-08-16): the old pricing UX
 // exposed raw day_of_week integers, a numeric "priority" as the primary
@@ -61,7 +62,7 @@ export function PricingEditor({
   fieldId: string
   pricingRules: PricingRuleRow[]
 }) {
-  const { t } = useTranslation()
+  const { t, i18n } = useTranslation()
   const dayNames = [0, 1, 2, 3, 4, 5, 6].map((d) => t(`academy.structure.dayOfWeekLabels.${d}`))
   const queryClient = useQueryClient()
   const [showAdvanced, setShowAdvanced] = useState(false)
@@ -152,7 +153,7 @@ export function PricingEditor({
         {currentPriceLoading ? (
           <span>{t('clubs.pricingEditor.calculating')}</span>
         ) : currentPrice != null ? (
-          <span className="font-semibold tabular-nums">{t('clubs.pricingEditor.pricePerHour', { price: currentPrice.toFixed(0) })}</span>
+          <span className="font-semibold tabular-nums">{t('clubs.pricingEditor.pricePerHour', { price: formatNumber(Math.round(currentPrice), i18n.language.startsWith('ar') ? 'ar' : 'en') })}</span>
         ) : (
           <span className="text-status-danger">{t('clubs.pricingEditor.noApprovedPrice')}</span>
         )}

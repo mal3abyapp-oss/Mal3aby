@@ -10,6 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { useResolvedFieldPrice } from './useFieldPricing'
 import { fromInstant, formatInstant } from '@/lib/domain/time'
 import { useDirection } from '@/app/providers/DirectionProvider'
+import { formatNumber } from '@/lib/i18n/config'
 import type { QuickBookingSlot } from './QuickBookingSheet'
 
 // BOOKING CALENDAR UX PHASE (2026-08-23) -- desktop primary workflow:
@@ -171,7 +172,7 @@ export function BookingsFieldDayView({
           <div className="rounded-lg border border-accent/30 bg-accent/5 p-2.5 text-sm">
             <span className="text-text-secondary">{t('bookings.mobile.priceNow')}</span>
             {currentPrice != null ? (
-              <span className="font-semibold tabular-nums">{t('bookings.mobile.pricePerHour', { price: currentPrice.toFixed(0) })}</span>
+              <span className="font-semibold tabular-nums">{t('bookings.mobile.pricePerHour', { price: formatNumber(Math.round(currentPrice), locale) })}</span>
             ) : (
               <span className="text-status-danger">{t('bookings.mobile.noApprovedPrice')}</span>
             )}
