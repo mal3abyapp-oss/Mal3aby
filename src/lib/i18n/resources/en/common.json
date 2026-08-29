@@ -2510,6 +2510,7 @@
       "createFirstBooking": "Create your first booking"
     },
     "more": {
+      "shopDesc": "Products, inventory, POS, and sales",
       "membershipsDesc": "Club membership plans, members, and renewals",
       "customersDesc": "Search for customers and manage their data",
       "billingDesc": "Invoice, payment, and outstanding records",

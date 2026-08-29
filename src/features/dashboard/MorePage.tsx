@@ -2,7 +2,7 @@ import { Link } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { PageHeader } from '@/components/ui/page-header'
 import { Card, CardContent } from '@/components/ui/card'
-import { Users, Receipt, BarChart3, UserCog, Settings, ChevronRight, Building2, ShieldCheck, MessageCircle, LogOut, IdCard } from 'lucide-react'
+import { Users, Receipt, BarChart3, UserCog, Settings, ChevronRight, Building2, ShieldCheck, MessageCircle, LogOut, IdCard, ShoppingCart } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 import { useAuth } from '@/app/providers/AuthProvider'
 import { canSeeNavDomain, type NavDomain } from '@/lib/domain/navigation'
@@ -52,6 +52,15 @@ interface MoreItem {
 }
 
 const ITEMS: MoreItem[] = [
+  // Discoverability fix (2026-08-29): the Shop module was reachable
+  // from the desktop sidebar (AppLayout.tsx's navSections) but had NO
+  // entry point at all on mobile -- absent from both the bottom nav
+  // (deliberately minimal, per the comment above) and this "More"
+  // list. A club with Shop entitled+active was invisible on mobile
+  // despite working correctly once reached directly by URL. Added
+  // here, first in the list to mirror its position (right after
+  // Bookings) in the desktop sidebar.
+  { to: '/app/shop', labelKey: 'nav.shop', descriptionKey: 'dashboard.more.shopDesc', icon: ShoppingCart, domain: 'shop' },
   { to: '/app/memberships', labelKey: 'nav.memberships', descriptionKey: 'dashboard.more.membershipsDesc', icon: IdCard, domain: 'memberships' },
   { to: '/app/customers', labelKey: 'nav.customers', descriptionKey: 'dashboard.more.customersDesc', icon: Users, domain: 'customers' },
   { to: '/app/finance', labelKey: 'nav.finance', descriptionKey: 'dashboard.more.financeDesc', icon: Receipt, domain: 'finance' },
