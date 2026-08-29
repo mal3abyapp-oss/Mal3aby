@@ -82,6 +82,10 @@ const BranchesFieldsPage = lazy(() => import('@/features/clubs/BranchesFieldsPag
 const AuditLogPage = lazy(() => import('@/features/settings/AuditLogPage').then((m) => ({ default: m.AuditLogPage })))
 const WhatsAppPage = lazy(() => import('@/features/whatsapp/WhatsAppPage').then((m) => ({ default: m.WhatsAppPage })))
 const ScanPage = lazy(() => import('@/features/scanner/ScanPage').then((m) => ({ default: m.ScanPage })))
+// "شرح الأداة" help/how-to-use guide (2026-08-29 request): written
+// walkthrough + real screenshots per module, see HelpGuidePage's own
+// header comment.
+const HelpGuidePage = lazy(() => import('@/features/help/HelpGuidePage').then((m) => ({ default: m.HelpGuidePage })))
 
 const PortalRoot = lazy(() => import('@/features/portal/PortalRoot').then((m) => ({ default: m.PortalRoot })))
 const PortalBookingsPage = lazy(() => import('@/features/portal/PortalBookingsPage').then((m) => ({ default: m.PortalBookingsPage })))
@@ -373,6 +377,10 @@ export const router = createBrowserRouter([
           // own destinations (see MAL3ABY_INFORMATION_ARCHITECTURE.md
           // §2's Settings reallocation table).
           { path: 'settings', element: <RequireNavDomain domain="settings"><SettingsPage /></RequireNavDomain> },
+          // Help guide: no domain gate (reference content, not a data
+          // screen) -- same "today" treatment canSeeNavDomain() already
+          // gives every authenticated member regardless of role.
+          { path: 'help', element: <RequireNavDomain domain="today"><HelpGuidePage /></RequireNavDomain> },
           { path: 'more', element: <RequireNavDomain domain="today"><MorePage /></RequireNavDomain> },
         ],
       },

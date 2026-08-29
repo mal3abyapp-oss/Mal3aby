@@ -50,7 +50,8 @@
     "more": "More",
     "scan": "Scan",
     "logout": "Log out",
-    "shop": "Shop"
+    "shop": "Shop",
+    "help": "How to Use"
   },
   "portal": {
     "nav": {
@@ -2540,7 +2541,8 @@
       "whatsappDesc": "Connection, activity, and sending controls",
       "staffDesc": "Manage staff and their roles",
       "auditLogDesc": "Log of every sensitive operation in the club",
-      "settingsDesc": "Club identity, academy, payments, and subscription"
+      "settingsDesc": "Club identity, academy, payments, and subscription",
+      "helpDesc": "A written walkthrough of every part of the system, with real screenshots"
     },
     "today": {
       "newBooking": "New booking",
@@ -4722,6 +4724,149 @@
         "nonzeroOnly": "Non-zero variance only"
       },
       "permissionDenied": "You do not have permission to view profitability data for this report. Ask a club owner to grant the \"View profit reports\" permission."
+    }
+  },
+  "help": {
+    "title": "How to Use",
+    "subtitle": "A written guide to every part of Mal3aby, with real screenshots from inside the system. Pick a topic from the list to get started.",
+    "modules": {
+      "today": {
+        "title": "Today (Dashboard)",
+        "summary": "The first screen you see after logging in — a quick summary of everything happening in your club today, plus shortcuts to the actions you do most.",
+        "screenshotAlt": "The Today dashboard in Mal3aby, showing today's booking count, check-ins, revenue, and quick-action buttons",
+        "steps": [
+          "The numbers at the top (bookings today, checked in, revenue, occupied fields) update live — no need to refresh.",
+          "The quick-action buttons (New booking, Collect payment, Scan QR, Add customer) take you straight to that action without digging through menus.",
+          "The \"Getting started\" checklist shows until you've added your first staff member, customer, field, and booking — then it disappears automatically.",
+          "The \"Needs attention\" section (when shown) collects anything waiting on a decision from you, like overdue invoices or payments pending review."
+        ]
+      },
+      "bookings": {
+        "title": "Bookings",
+        "summary": "Schedule and manage field bookings — a calendar screen showing your fields and time slots, with new bookings one click away.",
+        "screenshotAlt": "The new booking dialog in Mal3aby, showing field, date, time, and customer selection",
+        "steps": [
+          "From \"New booking\", pick the field, date, and time — the system automatically stops you from double-booking the same field at the same time.",
+          "Type the customer's phone number; if they're an existing customer, the system finds them automatically instead of you re-entering their details.",
+          "After confirming, the customer gets an entry code (QR) they can use to verify their booking and check in — even without WhatsApp.",
+          "From the same screen you can cancel a booking, reschedule it, or check the customer in manually."
+        ]
+      },
+      "customers": {
+        "title": "Customers",
+        "summary": "Every club customer's record in one place — each customer has a single \"360\" page with their full booking, payment, and activity history.",
+        "screenshotAlt": "A customer detail page in Mal3aby (Customer 360) showing their info, booking history, and payments",
+        "steps": [
+          "Search for any customer by name or phone number from the search box at the top of the screen.",
+          "Open any customer's page to see all their bookings, subscriptions, payments, and activity history in one place.",
+          "If two customer records look like duplicates, the screen flags it and lets you merge them into one so data doesn't stay split."
+        ]
+      },
+      "academy": {
+        "title": "Academy",
+        "summary": "For running sports academies — training groups, players, session attendance, and academy subscriptions.",
+        "screenshotAlt": "The Academy screen in Mal3aby, showing training groups and players",
+        "steps": [
+          "Create a training group (e.g. \"Under-10s\") and set its coach and weekly schedule.",
+          "Add players to the group — each player gets a subscription that renews on the period you set.",
+          "The coach can mark attendance for each session from their own Today page, without needing to touch other screens.",
+          "The \"Player 360\" page shows a player's full attendance history, subscriptions, and payments in one place."
+        ]
+      },
+      "memberships": {
+        "title": "Club Memberships",
+        "summary": "For general club membership (separate from Academy) — membership plans, renewals, freezes, and cancellations.",
+        "screenshotAlt": "The Club Memberships screen in Mal3aby, showing membership plans and current members",
+        "steps": [
+          "Set up the membership plans your club offers (monthly, quarterly, yearly) with the right price and duration for each.",
+          "Link any customer to a membership plan to automatically track its start and end dates.",
+          "If a customer is traveling or needs to pause temporarily, you can \"freeze\" their membership instead of cancelling it outright.",
+          "The system warns you before any membership expires, so you can reach out for renewal in time."
+        ]
+      },
+      "shop": {
+        "title": "Shop & Point of Sale",
+        "summary": "If your club sells products (water, drinks, equipment), the Shop module gives you a full point-of-sale (POS) and inventory system.",
+        "screenshotAlt": "The point-of-sale (POS) screen in Mal3aby, showing products and the sale cart",
+        "steps": [
+          "Add your products under \"Products\" with a price and available stock quantity.",
+          "From the POS screen, pick the products the customer is buying and the system totals it automatically.",
+          "Stock decreases automatically with every sale — review quantities anytime from \"Inventory\".",
+          "If a customer returns a product, use \"Sales\" to process a partial or full return and refund the correct amount."
+        ]
+      },
+      "finance": {
+        "title": "Finance",
+        "summary": "Everything related to club money — payments, invoices, cash shifts, expenses, and financial reports, all in one place.",
+        "screenshotAlt": "The Finance overview screen in Mal3aby, showing a summary of payments and outstanding balances",
+        "steps": [
+          "\"Overview\" gives you a quick summary of outstanding balances, payments, and pending invoices.",
+          "\"Payments & Collections\" lets you review and approve payment proofs customers upload (bank transfer, mobile wallet, etc.).",
+          "\"Cash Shifts\" lets you open and close cash-register shifts with a clear record — every pound logged with who collected it and when.",
+          "\"Reports\" gives you ready-made numbers on revenue, collections, and expenses you can review or export easily."
+        ]
+      },
+      "reports": {
+        "title": "Reports",
+        "summary": "Detailed reports on club performance — revenue, occupancy, customers, academy, and more, each with its own screen.",
+        "screenshotAlt": "The main Reports screen in Mal3aby, showing the list of available reports",
+        "steps": [
+          "From the main Reports screen, pick the report you need (revenue, occupancy, customers, etc.).",
+          "Most reports let you filter by a date range or by branch if your club has more than one location.",
+          "Reports update from real, live data — there's nothing stale or needing a manual refresh."
+        ]
+      },
+      "whatsapp": {
+        "title": "WhatsApp",
+        "summary": "Mal3aby sends automatic WhatsApp messages to customers — booking confirmations, reminders before their time, and payment receipts.",
+        "screenshotAlt": "The WhatsApp screen in Mal3aby, showing connection status and a log of sent messages",
+        "steps": [
+          "You need to connect your club's WhatsApp number once from the \"Connection\" tab (by scanning a QR code from the club's phone).",
+          "Once connected, messages send automatically on every new booking or payment — no need to send them manually.",
+          "The \"Activity\" tab shows every message sent and whether it reached the customer.",
+          "Even if WhatsApp isn't connected or working, the customer still gets an independent entry code (QR) they can use."
+        ]
+      },
+      "scan": {
+        "title": "Scan QR",
+        "summary": "A quick screen for checking customers in by scanning their booking's QR code — ideal for a tablet or phone at the entrance.",
+        "screenshotAlt": "The QR scan screen in Mal3aby for checking customers in",
+        "steps": [
+          "Open the screen and point the camera at the QR code the customer shows you (from WhatsApp or their booking page).",
+          "The system verifies the code is valid and linked to today's booking before checking the customer in.",
+          "If the code is expired, already used, or not a valid booking, you'll get a clear message instead of a wrong check-in."
+        ]
+      },
+      "staff": {
+        "title": "Staff",
+        "summary": "Manage club staff and their permissions — each staff member gets a role (reception, coach, manager) that decides what they can see and do.",
+        "screenshotAlt": "The Staff screen in Mal3aby, showing the list of staff and their roles",
+        "steps": [
+          "Add a new staff member and assign their role — the built-in roles cover most cases (reception, coach, manager, scan-only).",
+          "If you need custom permissions not covered by the built-in roles, create a \"custom role\" from \"Roles\".",
+          "Each staff member's own page shows their activity and work history in the system."
+        ]
+      },
+      "auditLog": {
+        "title": "Audit Log",
+        "summary": "A documented record of every sensitive action taken in the club — who did what and when, for transparency and review.",
+        "screenshotAlt": "The Audit Log screen in Mal3aby, showing a list of recorded actions",
+        "steps": [
+          "Every important action (editing a booking, refunding money, changing a price) is logged here automatically — nothing to turn on.",
+          "You can filter the log by staff member, action type, or date range.",
+          "The log is designed so no one — not even the club owner — can edit or delete it, so it stays a trustworthy record."
+        ]
+      },
+      "settings": {
+        "title": "Settings",
+        "summary": "Your club's core details — name, academy policies, available payment methods, and your Mal3aby platform subscription status.",
+        "screenshotAlt": "The Settings screen in Mal3aby, showing club details and configuration options",
+        "steps": [
+          "Edit your club's name and core details from here.",
+          "Choose the payment methods your club accepts (cash, bank transfer, online gateways).",
+          "Check your Mal3aby platform subscription status (free trial, paid plan) and renewal date."
+        ]
+      }
     }
   }
 }

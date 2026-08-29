@@ -29,6 +29,7 @@ import {
   ShieldCheck,
   IdCard,
   ShoppingCart,
+  HelpCircle,
 } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 
@@ -125,6 +126,11 @@ const navSections: NavSection[] = [
       { to: '/app/whatsapp', labelKey: 'nav.whatsapp', icon: MessageCircle, domain: 'whatsapp' },
       { to: '/app/audit-log', labelKey: 'nav.auditLog', icon: ShieldCheck, domain: 'settings' },
       { to: '/app/settings', labelKey: 'nav.settings', icon: Settings, domain: 'settings' },
+      // "شرح الأداة" help guide (2026-08-29): domain 'today' so every
+      // role sees it (matches its route's own gating, HelpGuidePage has
+      // no permission boundary -- it's reference content). Placed last,
+      // lowest-frequency item in the lowest-frequency section.
+      { to: '/app/help', labelKey: 'nav.help', icon: HelpCircle, domain: 'today' },
     ],
   },
 ]

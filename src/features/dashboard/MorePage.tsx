@@ -2,7 +2,7 @@ import { Link } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { PageHeader } from '@/components/ui/page-header'
 import { Card, CardContent } from '@/components/ui/card'
-import { Users, Receipt, BarChart3, UserCog, Settings, ChevronRight, Building2, ShieldCheck, MessageCircle, LogOut, IdCard, ShoppingCart } from 'lucide-react'
+import { Users, Receipt, BarChart3, UserCog, Settings, ChevronRight, Building2, ShieldCheck, MessageCircle, LogOut, IdCard, ShoppingCart, HelpCircle } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 import { useAuth } from '@/app/providers/AuthProvider'
 import { canSeeNavDomain, type NavDomain } from '@/lib/domain/navigation'
@@ -70,6 +70,9 @@ const ITEMS: MoreItem[] = [
   { to: '/app/staff', labelKey: 'nav.staff', descriptionKey: 'dashboard.more.staffDesc', icon: UserCog, domain: 'staff' },
   { to: '/app/audit-log', labelKey: 'nav.auditLog', descriptionKey: 'dashboard.more.auditLogDesc', icon: ShieldCheck, domain: 'settings' },
   { to: '/app/settings', labelKey: 'nav.settings', descriptionKey: 'dashboard.more.settingsDesc', icon: Settings, domain: 'settings' },
+  // "شرح الأداة" help guide (2026-08-29) -- same 'today' domain as the
+  // desktop sidebar entry, so every role sees it here too.
+  { to: '/app/help', labelKey: 'nav.help', descriptionKey: 'dashboard.more.helpDesc', icon: HelpCircle, domain: 'today' },
 ]
 
 export function MorePage() {
