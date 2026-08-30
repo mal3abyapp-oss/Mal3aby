@@ -85,6 +85,31 @@ directive). Documented here rather than silently ignored, per the
 ACCEPTED LIMITATION at the DataTable-component level, not a printing
 defect.
 
+## 2b2. Document states note (Section 19)
+
+`src/lib/domain/billing.ts`'s `PaymentStatus` type + `PAYMENT_STATUS_LABELS`/
+`PAYMENT_STATUS_TONE` is the single authoritative source consumed by both
+the invoice document and the payment-status badge — confirmed it covers
+all 7 required states with distinct labels and tones: draft, void
+(ملغاة), unpaid (غير مدفوعة, danger), partially_paid (مدفوعة جزئيًا,
+warning), paid (مدفوعة بالكامل, success), partially_refunded (مستردة
+جزئيًا, warning), refunded (مستردة بالكامل, neutral). No contradictory
+label combinations possible since it's a single Record keyed by the
+authoritative server-computed `paymentStatus` field (from
+`get_invoice_payment_summary()`), not independently derived per-screen.
+
+## 2c. Print error handling note (Section 23)
+
+Confirmed: BillingPage.tsx (`isDetailError` branch, line 860-861) and
+ShopInvoiceDocument.tsx (lines 458, 534) both use `ErrorState` +
+`translateSupabaseError()` with a localized fallback message and a
+`onRetry` action for document-not-found/load-failure states — never a
+raw RPC error string. `ExpenseVoucherDialog`/`CashShiftSummaryDialog`
+are built entirely from already-loaded row data passed as props (no
+independent fetch of their own), so there is no load-failure state to
+handle in those two — not a gap, a different (simpler) data-flow shape.
+
 ## 3. Acceptance matrix (final gate — see directive Section 30)
 
-Not yet evaluated — populated at closure.
+Not yet evaluated — populated at closure, pending the running
+subagent's RTL/QR/logo/pagination sweep and the final regression gate.
