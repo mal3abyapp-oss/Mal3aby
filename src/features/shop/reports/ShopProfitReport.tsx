@@ -109,6 +109,21 @@ export function ReportShopGrossProfitContent() {
           </div>
         )}
 
+        {/* COMPREHENSIVE REPORTS ACCEPTANCE (2026-08-30), R2 -- directive
+            Section 7 (report semantics): get_shop_gross_profit() sums
+            shop_sale_items.line_total (gross of any invoice-level
+            discount), while get_shop_sales_kpis() (Sales Summary's
+            "Total Sales") sums invoices.total (net of discount). Both
+            are correct for what they measure, but a discount-bearing
+            sale makes the two figures differ by the discount amount
+            with nothing on screen explaining why -- exactly the "same
+            label, different calculation" risk the directive warns
+            against. Not a calculation bug (verified live: revenue
+            6,078.50 here vs 6,008.50 in Sales Summary, difference
+            exactly matches the 70.00 EGP total of all invoice
+            discounts in the period) -- fixed by clarifying the label,
+            not silently changing either formula. */}
+        <p className="mb-2 text-xs text-text-secondary">{t('shop.reports.gp.revenueScopeNote')}</p>
         <p className="mb-1.5 text-xs font-medium text-text-secondary">{t('shop.reports.gp.grossSectionLabel')}</p>
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-4" data-testid="report-gross-profit-stats">
           <StatCard label={t('shop.reports.gp.revenue')} value={<span data-testid="report-gross-profit-revenue"><MoneyDisplay amount={Number(data?.revenue_known_cost ?? 0)} size="md" /></span>} icon={DollarSign} />

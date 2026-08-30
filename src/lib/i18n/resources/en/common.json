@@ -4832,7 +4832,8 @@
       },
       "inventoryOnHand": {
         "title": "Inventory On Hand",
-        "reorderLevel": "Reorder Level"
+        "reorderLevel": "Reorder Level",
+        "empty": "No stock recorded yet"
       },
       "lowStock": {
         "title": "Low Stock",
@@ -4844,13 +4845,15 @@
         "empty": "No out-of-stock items"
       },
       "stockMovementLedger": {
-        "title": "Stock Movement Ledger"
+        "title": "Stock Movement Ledger",
+        "empty": "No stock movements recorded in this period"
       },
       "stockValuation": {
         "title": "Stock Valuation",
         "lineValue": "Line Value",
         "totalValue": "Total Value",
-        "unknownCostNote": "{{count}} item(s) have on-hand stock with no known cost yet and are excluded from the total."
+        "unknownCostNote": "{{count}} item(s) have on-hand stock with no known cost yet and are excluded from the total.",
+        "empty": "No stock recorded yet"
       },
       "gp": {
         "title": "Gross Profit / Margin",
@@ -4864,6 +4867,7 @@
         "honestyNoticeWithGap": "{{lines}} sale line(s) totaling EGP {{revenue}} in revenue have no recorded cost (sold before cost tracking began, or the item was never received through Receive Stock) and are excluded from every figure below -- never estimated.",
         "honestyNoticeNoGap": "Every sale line in this range has a known cost -- no lines were excluded.",
         "coverageNote": "{{known}} line(s) included in the figures above; {{unknown}} line(s) excluded for lacking a known cost.",
+        "revenueScopeNote": "Revenue here is calculated from gross line prices before any invoice-level discount, so it may differ from \"Total Sales\" in the Sales Summary report (which is calculated after discount).",
         "grossSectionLabel": "Gross (before returns)",
         "netSectionLabel": "Net (after returns)",
         "netRevenue": "Revenue (net of returns)",
@@ -4878,7 +4882,8 @@
         "receiptCount": "Receipts",
         "totalQuantity": "Total Quantity",
         "totalCostValue": "Total Cost Value",
-        "lastReceipt": "Last Receipt"
+        "lastReceipt": "Last Receipt",
+        "empty": "No stock receipts recorded in this period"
       },
       "stockCountVariance": {
         "title": "Stock Count Variance",
@@ -4886,7 +4891,8 @@
         "systemQty": "System Qty",
         "countedQty": "Counted Qty",
         "variance": "Variance",
-        "nonzeroOnly": "Non-zero variance only"
+        "nonzeroOnly": "Non-zero variance only",
+        "empty": "No completed stock counts in this period"
       },
       "permissionDenied": "You do not have permission to view profitability data for this report. Ask a club owner to grant the \"View profit reports\" permission."
     }

@@ -73,7 +73,7 @@ export function ReportShopInventoryOnHandContent() {
       <div className="mb-3 flex justify-end print:hidden"><ReportHeaderActions hasRows={rows.length > 0} /></div>
       <div className="print-target visible-for-print">
         <ReportPrintHeader reportName={t('shop.reports.inventoryOnHand.title')} />
-        <BalancesTable rows={rows} isLoading={isLoading} emptyKey="reports.shop.emptyTitle" />
+        <BalancesTable rows={rows} isLoading={isLoading} emptyKey="shop.reports.inventoryOnHand.empty" />
       </div>
     </div>
   )
@@ -220,7 +220,7 @@ export function ReportShopStockMovementLedgerContent() {
       <div className="print-target visible-for-print">
         <ReportPrintHeader reportName={t('shop.reports.stockMovementLedger.title')} />
         <FullPrintNote fullCount={fullRows?.length ?? null} truncated={truncated} screenLimit={REPORT_PAGE_SIZE} />
-        <DataTable columns={columns} rows={printed} rowKey={(r) => r.movementId} isLoading={isLoading} emptyTitle={t('reports.shop.emptyTitle')} />
+        <DataTable columns={columns} rows={printed} rowKey={(r) => r.movementId} isLoading={isLoading} emptyTitle={t('shop.reports.stockMovementLedger.empty')} />
         {fullRows === null && <PagerControls offset={offset} pageSize={REPORT_PAGE_SIZE} rowCount={rows.length} onPrev={() => setOffset(Math.max(0, offset - REPORT_PAGE_SIZE))} onNext={() => setOffset(offset + REPORT_PAGE_SIZE)} />}
       </div>
     </div>
@@ -282,7 +282,7 @@ export function ReportShopStockValuationContent() {
       </div>
       <div className="print-target visible-for-print">
         <ReportPrintHeader reportName={t('shop.reports.stockValuation.title')} />
-        <DataTable columns={columns} rows={rows} rowKey={(r) => `${r.locationId}-${r.productId}-${r.variantId ?? 'none'}`} isLoading={isLoading} emptyTitle={t('reports.shop.emptyTitle')} />
+        <DataTable columns={columns} rows={rows} rowKey={(r) => `${r.locationId}-${r.productId}-${r.variantId ?? 'none'}`} isLoading={isLoading} emptyTitle={t('shop.reports.stockValuation.empty')} />
       </div>
     </div>
   )
@@ -341,7 +341,7 @@ export function ReportShopSupplierActivityContent() {
       </div>
       <div className="print-target visible-for-print">
         <ReportPrintHeader reportName={t('shop.reports.supplierActivity.title')} />
-        <DataTable columns={columns} rows={rows} rowKey={(r) => r.supplierId ?? '__none__'} isLoading={isLoading} emptyTitle={t('reports.shop.emptyTitle')} />
+        <DataTable columns={columns} rows={rows} rowKey={(r) => r.supplierId ?? '__none__'} isLoading={isLoading} emptyTitle={t('shop.reports.supplierActivity.empty')} />
       </div>
     </div>
   )
@@ -424,7 +424,7 @@ export function ReportShopStockCountVarianceContent() {
       <div className="print-target visible-for-print">
         <ReportPrintHeader reportName={t('shop.reports.stockCountVariance.title')} />
         <FullPrintNote fullCount={fullRows?.length ?? null} truncated={truncated} screenLimit={REPORT_PAGE_SIZE} />
-        <DataTable columns={columns} rows={printed} rowKey={(r) => `${r.stockCountId}-${r.productNameAr}-${r.variantLabel ?? ''}`} isLoading={isLoading} emptyTitle={t('reports.shop.emptyTitle')} />
+        <DataTable columns={columns} rows={printed} rowKey={(r) => `${r.stockCountId}-${r.productNameAr}-${r.variantLabel ?? ''}`} isLoading={isLoading} emptyTitle={t('shop.reports.stockCountVariance.empty')} />
         {fullRows === null && <PagerControls offset={offset} pageSize={REPORT_PAGE_SIZE} rowCount={rows.length} onPrev={() => setOffset(Math.max(0, offset - REPORT_PAGE_SIZE))} onNext={() => setOffset(offset + REPORT_PAGE_SIZE)} />}
       </div>
     </div>
