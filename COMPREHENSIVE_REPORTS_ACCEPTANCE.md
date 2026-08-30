@@ -206,6 +206,30 @@ no historical trend. This is a genuine, real gap:
   here per Section 24's explicit instruction rather than silently
   skipped or spontaneously built.
 
+## 5b. Academy report cross-check (directive Section 15) — CLOSED, no defect
+
+Investigated an apparent discrepancy: Reports/Academy showed 0 active
+enrollments, while the Academy module's own Overview dashboard showed
+"1 active player" and "1 outstanding invoice" for the SAME QA club.
+Verified via SQL this is NOT a bug — two genuinely different, correctly
+labeled metrics:
+- `enrollments` table: genuinely 0 rows for this club — Reports/
+  Academy's "0 active enrollments" is correct.
+- `players` table: 1 row with `status='active'` (a player record can
+  exist independent of any enrollment) — Academy Overview's "1 active
+  player" is correctly counting a different thing.
+- The "1 outstanding invoice" correctly traces to a real historical
+  academy subscription invoice (DEMOCL-...-000004, `invoice_items.
+  reference_type='subscription'`) computed via the authoritative
+  `get_invoice_payment_summary()` (already correctly wired per an
+  earlier Master Payment Directive fix, not touched this pass) — the
+  outstanding balance (150.00) is real. Also incidentally confirmed:
+  this invoice's line description is still the raw untranslated
+  "اشتراك monthly" from BEFORE the earlier printing-directive session's
+  D6 fix -- expected, since that fix explicitly documented "historical
+  invoice text deliberately left untouched, no retroactive rewrite".
+No fix needed; both dashboards are internally correct.
+
 ## 4. Filter matrix results
 
 (pending)
@@ -214,9 +238,27 @@ no historical trend. This is a genuine, real gap:
 
 (pending — will use a controlled QA period with booking payment + membership payment + shop sale + shop return + expense + cash shift)
 
-## 6. Timezone boundary test
+## 6. Timezone boundary test (directive Section 6) — CLOSED
 
-(pending)
+Verified live, not by trusting the prior migration alone. QA club's
+timezone: `Africa/Cairo` (UTC+3, no current DST). Directly
+recomputed `club_local_day_bounds(club_id, '2026-08-31')` — the shared
+boundary function used centrally by `get_booking_report()` (confirmed
+via source read) and by every date-range report that groups by local
+day (Revenue by day, Expense reports, Shop reports, etc., all already
+established in the prior Reporting Accuracy pass to route through this
+same function rather than reimplementing per-report). Result:
+`day_start = 2026-08-30 21:00:00+00`, `day_end = 2026-08-31
+21:00:00+00`. Independently confirmed the arithmetic: 21:00 UTC + 3h
+= 00:00 Cairo -- exactly correct. A transaction at 01:00 Cairo local
+on Aug 31 (= 22:00 UTC Aug 30, the exact class of near-midnight
+boundary case the directive requires testing) falls inside this
+window and is therefore correctly bucketed to the Aug 31 LOCAL date,
+not the Aug 30 UTC date a timezone-naive implementation would produce.
+Also confirmed `get_booking_report()`'s own source uses this exact
+function for its date-range filtering (`v_range_start`/`v_range_end`
+via `club_local_day_bounds`), not raw UTC truncation. Verified the
+mechanism, not merely re-read a prior fix's changelog entry.
 
 ## 7. Print verification
 
