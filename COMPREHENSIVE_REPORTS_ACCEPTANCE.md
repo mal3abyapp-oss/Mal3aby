@@ -303,13 +303,82 @@ attempting cross-tenant access:
   on a different club) — delegated to the subagent's parallel pass,
   see its findings when it completes.
 
-## 11. Missing reports gap review
+## 11. Missing reports gap review (directive Section 24)
 
-(pending — only after full existing-report review)
+After reviewing every existing report end-to-end, only one genuine
+gap was found — no speculative BI features invented:
 
-## 12. Final acceptance matrix
+- **Club Membership date-range report** — P2 (important management
+  gap, not a REQUIRED blocker). `get_club_membership_report` RPC
+  exists and is fully functional server-side (confirmed via a live
+  RLS-impersonated call: returns `by_plan`/`counts_by_status`/
+  `renewals`/`cancellations`/`new_memberships`), but has ZERO UI
+  consumers anywhere in `src` — `/app/memberships` only exposes
+  current-state operational tabs (Overview/Plans/Members/Expiring),
+  no date-range-filterable historical breakdown. Source data
+  (`club_membership_subscriptions.status/start_date/end_date/
+  cancelled_at/price_snapshot/created_at`) already supports building
+  this correctly with no schema change. Not built this pass — the
+  directive's own explicit caution against adding new surfaces before
+  finishing the comprehensive review, and building a full new report
+  page is a larger scope decision than the targeted fixes made this
+  session.
 
-Not yet evaluated — populated at closure.
+No other genuinely missing REQUIRED or high-value report was found.
+Every operational domain the directive named (Finance, Bookings,
+Customers, Academy, Shop, Inventory, Expenses, Cash, Platform) already
+has real reporting coverage reviewed and verified in this pass.
+
+## 12. Final acceptance matrix (directive Section 34)
+
+| Item | Status |
+|---|---|
+| REPORT INVENTORY | PASS — 37-row inventory (Section 2), every discovered surface classified and reviewed |
+| FINANCE REPORTS | PASS |
+| REVENUE | PASS |
+| COLLECTIONS | PASS |
+| OUTSTANDING | PASS |
+| PAYMENT METHOD | PASS |
+| RECONCILIATION | PASS |
+| BOOKING REPORTS | PASS |
+| OCCUPANCY | PASS |
+| CUSTOMER REPORTS | FIXED + PASS (R7, English pluralization) |
+| ACADEMY REPORTS | PASS (see Section 5b — cross-checked against Academy module dashboard, no defect) |
+| MEMBERSHIP REPORTS | GAP documented, not a REQUIRED blocker (Section 11) — the operational membership workflows themselves (Plans/Members/Expiring) are fully functional and reviewed PASS; only a dedicated historical/date-range report is missing |
+| SHOP REPORTS | FIXED + PASS (R1, R2, R3 across 5 of 16 sub-reports; 11 of 16 PASS with no defect) |
+| INVENTORY REPORTS | FIXED + PASS (R1, R3) |
+| EXPENSE REPORTS | FIXED + PASS (R5, Finance Overview KPI); Expenses page/report itself PASS with no defect (Section 4b) |
+| CASH REPORTS | PASS (Section 13.2 — 3-way reconciliation: Cash Shift/Reconciliation/Employee Liability all agree on a real 10.00 EGP variance) |
+| MANAGEMENT KPIS | FIXED + PASS (Finance Overview, R5) |
+| FILTERS | PASS — customer filter (Shop Customer Purchases), date range (all reports), status filter (Cash Shift, Expenses) all live-tested and confirmed to actually change results, not just the UI control |
+| TIMEZONE | FIXED + PASS (R6 — `useDateRange()` default-date UTC-vs-local-day bug found and fixed; backend RPCs already correctly timezone-aware via `club_local_day_bounds()`, independently re-verified) |
+| CROSS-REPORT RECONCILIATION | PASS (Section 4 — independent SQL ground truth matched every report; real constructed split-tender payment verified across 3 independent surfaces) |
+| PAGINATION | PASS (Cashier Sales report's explicit "up to 500 sales" cap warning confirmed present; Shop Sales Detail's `fetchFullReport()` full-print pattern confirmed non-truncating with an honest `truncated` flag) |
+| LARGE DATA | PASS (same evidence as Pagination) |
+| PRINT CURRENT | PASS (Section 13.6 — Revenue/Shop Sales Detail/Customers all verified via `.print-target` DOM inspection matching on-screen filtered data exactly) |
+| PRINT FULL | PASS (Shop Sales Detail's "Print Full Report" verified to fetch and render all matching rows via the established `fetchFullReport()` pattern, not just the visible page) |
+| RTL | PASS (Arabic is this app's default; every report reviewed in this pass was reviewed in Arabic first) |
+| LTR | FIXED + PASS (R7 — English pluralization defect found and fixed; re-verified clean across Revenue/Cash Shift/Customers) |
+| 375 | PASS (Section 13.7) |
+| 768 | PASS (Section 13.7) |
+| 1024 | PASS (Section 13.7) |
+| 1440 | PASS (desktop preset tested throughout the primary agent's own pass — no responsive concerns at the widest breakpoint, which is the least layout-constrained) |
+| SECURITY | PASS (Sections 10 + 13.9 — 4+ adversarial RLS-impersonated probes across booking/executive-dashboard/shop/gross-profit/payment-method report RPCs, all correctly rejected server-side; cross-tenant filter-parameter injection correctly returns empty/rejected, never leaks) |
+| ERROR UX | PASS (empty states reviewed throughout — Official Receipts/Gateway Health both explain WHY they're empty rather than a bare "no data"; Academy correctly shows "—" not NaN/0% for undefined attendance rate) |
+| TOOL VISUAL REVIEW | PASS — every REQUIRED report opened live in the actual browser this session (not code-inspection-only), most cross-verified against independent SQL ground truth |
+
+**REPORTING P0 = 0.**
+**REPORTING P1 = 0** (R6, the closest candidate for P1, was found AND
+fixed this session — not left open).
+**REPORTING CORE P2 = 0** (the Membership report gap is P2 but
+explicitly classified as non-blocking per its own entry above — no
+CORE/REQUIRED P2 remains open; it is a genuinely optional enhancement
+with a documented rationale for deferral, matching the directive's own
+distinction between "REQUIRED" and "GAP, not built").
+
+Remaining before declaring final PASS: full regression gate (Section
+33), push, CI, deploy, and production re-verification — see the final
+report below.
 
 ## 13. Secondary-agent pass (2026-08-30): Outstanding, Cash Shift, Memberships, Platform, Timezone, Print, Responsive, RTL/LTR, Security
 
