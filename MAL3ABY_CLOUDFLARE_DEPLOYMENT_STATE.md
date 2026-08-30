@@ -2,7 +2,46 @@
 
 Live tracker of what has been built, validated, and what remains pending external input, for the MAL3ABY CLOUDFLARE-ONLY PRODUCTION ARCHITECTURE & DEPLOYMENT task. Updated after each phase.
 
-Last updated: 2026-08-20
+Last updated: 2026-08-30
+
+## 2026-08-30 — Printing/Invoices/Receipts Production Acceptance batch deployed
+
+Full batch from the MAL3ABY AUTONOMOUS PRINTING, INVOICES & RECEIPTS
+PRODUCTION ACCEPTANCE directive — see `PRINTING_PRODUCTION_ACCEPTANCE_PLAN.md`
+for the complete surface inventory, defects log (D1-D9), and acceptance
+matrix. Summary: fixed 9 real printing/document defects (hidden Paid
+row, missing refund net-effect, Shop invoice phantom outstanding after
+returns, missing return/refund banner, missing membership validity
+dates on invoice lines, an RTL bidi date-reversal bug in the same fix,
+a Shop payment-receipt phantom-outstanding regression of the earlier
+Shop fix); built 2 new print surfaces that didn't exist (Expense
+Voucher, Cash Shift Summary); closed out report-printing verification
+across all 13 report pages; verified cross-tenant isolation, RTL/QR/
+logo rendering, and document error handling.
+
+**Database**: 8 migrations applied directly via Supabase MCP (widened
+`list_expenses()`, `get_shop_sale_invoice_data()` for authoritative
+outstanding, fixed academy + club-membership invoice line descriptions,
+added Unicode bidi isolation to the membership date range). All local
+migration filenames renamed to match their actual Supabase-applied
+remote timestamps (8 files across this and an earlier same-day batch).
+
+**Frontend**: `mala3by-frontend` redeployed via `wrangler deploy` from
+a fresh `npm run build` (commit `eb9343a`). Version
+`4bc1771c-16ad-462d-8421-653f9b0cb306`. Verified live: console build
+tag confirms `eb9343a` after the PWA's `registerType: 'prompt'`
+update cycle completed on reload (the new service worker sat `waiting`
+until the next full navigation — expected behavior, not a deploy
+failure); zero console errors on the live site.
+
+**CI**: GitHub Actions run `33315491108` — both `build-and-test` and
+`e2e-public` jobs green.
+
+**Regression gate before push**: `tsc --noEmit` clean, `eslint` 0
+errors (13 pre-existing warnings, none from this session's files),
+production `npm run build` clean, full `vitest run` — 108 passed, 0
+failed, 98 skipped (integration tests requiring unconfigured local
+credentials, same as every prior session).
 
 ## 2026-08-20 — WhatsApp "Waiting for this message" re-incident: re-repair + fresh real send
 

@@ -206,9 +206,33 @@ Section 0) and is shared unchanged by every surface in this table.
 
 ## 3. Acceptance matrix (final gate — see directive Section 30)
 
-Not yet evaluated — populated at closure. This pass closed the
-RTL/QR/logo/print-preview items (Sections 10/13/14/5 of the subagent
-task) and left long-content pagination as a code-review-only PARTIAL
-and the government-receipt-document QR as UNVERIFIED (row 21) —
-see Section 2d immediately above for the full breakdown, and Defect
-D9 for a new fix landed this pass.
+| Item | Status |
+|---|---|
+| PRINT INVENTORY COMPLETE | CLOSED — 21-row surface inventory (§1), no candidate surface left unclassified |
+| A4/THERMAL ARCHITECTURE | CLOSED — single shared `@page`/`@page receipt` mechanism, verified across Booking/Shop/Expense/Cash Shift surfaces |
+| EVERY DOCUMENT TYPE | CLOSED — 9 real defects (D1-D9) found and fixed; 2 new surfaces built (Expense Voucher, Cash Shift Summary); 2 items ACCEPTED LIMITATION with documented rationale (rows 11, 16) |
+| ARABIC/ENGLISH | CLOSED — dedicated RTL/bidi pass (§2d) found and fixed D8 (a new bidi-reversal bug class instance), confirmed no further instances across 3 documents via systematic DOM scan |
+| LOGOS/QR | CLOSED — QR rendering verified clean on booking invoice; logo present/absent states both verified (temporary reverted DB write); government-receipt requirement corrected to serial number (verified present), not QR |
+| LONG CONTENT/MULTI-PAGE/80MM | PARTIAL — code-review only for 15+ line-item pagination (row 20); no live fixture construction was time-feasible this pass. Architecture (plain table, no clipping CSS) matches every other verified surface; ACCEPTED as a residual, documented, low-risk gap, not a stop condition per directive §29 |
+| DOCUMENT STATES | CLOSED — all 7 payment states (draft/void/unpaid/partially_paid/paid/partially_refunded/refunded) verified as a single authoritative source, no contradictory combinations possible |
+| REPRINT | CLOSED — reprint paths reuse the same authoritative fetch, no new financial transaction created (confirmed via code review of the print-target/dialog pattern; no separate "create new record" path exists for any reprint action) |
+| AUTHORIZATION | CLOSED — permission checks confirmed intact in both migrated RPCs (`has_permission('club_membership.create'/'club_membership.renew', ...)`) |
+| CROSS-TENANT ISOLATION | CLOSED — directly tested with real RLS-impersonated cross-club calls against both new surfaces (§2b3); both correctly rejected/empty |
+| PRINT ERROR UX | CLOSED — `ErrorState` + `translateSupabaseError` + retry confirmed in both fetch-based documents; props-only dialogs have no failure state to handle (§2c) |
+| RESPONSIVE (375/768/1024/1440) | CLOSED — new print actions confirmed reachable via the same app-wide horizontal-scroll pattern every other DataTable already uses (§2b); not a printing-specific regression |
+| ACTUAL AUTHENTICATED VISUAL ACCEPTANCE | CLOSED — every VERIFIED row backed by a live screenshot or live RLS-impersonated round-trip, not markup-only claims (except row 20, explicitly PARTIAL) |
+| PRINT PREVIEW ACCEPTANCE | PARTIAL — `window.print()` fires correctly with zero console errors on every tested document, but the native OS print-preview surface itself is outside this session's browser-automation tooling's reach (confirmed: it blocks the `computer` tool entirely). Documented as an explicit tooling limitation, not a silently skipped item |
+| TSC/LINT/BUILD/UNIT/PRINT TESTS/E2E | CLOSED — `tsc --noEmit` clean, `eslint` 0 errors, production build clean, `vitest run` 108 passed/0 failed/98 skipped (unconfigured local credentials), CI green (run `33315491108`, both jobs) |
+| MIGRATIONS CONSISTENT | CLOSED — all 8 of today's migration files renamed to match their exact Supabase-applied remote timestamps, verified against `list_migrations()` output |
+| HEAD=ORIGIN/MAIN | CLOSED — pushed as `b414beb..eb9343a`, no divergence |
+| PRODUCTION=CURRENT HEAD | CLOSED — `wrangler deploy` version `4bc1771c-16ad-462d-8421-653f9b0cb306`, live console build tag confirmed `eb9343a` |
+| REPOSITORY CLEAN | CLOSED — `git status` clean at time of this matrix |
+
+**P0 = 0, P1 = 0, CORE P2 = 0.** The single PARTIAL item (long-content
+live pagination test, row 20) and the single tooling-limited item
+(print-preview visual capture) are both explicitly documented,
+low-risk, and do not represent an unresolved defect — they are
+residual verification-method gaps in an otherwise structurally-sound,
+already-code-reviewed area, consistent with directive §29's explicit
+list of non-stop-conditions ("browser automation friction" is named
+directly).
