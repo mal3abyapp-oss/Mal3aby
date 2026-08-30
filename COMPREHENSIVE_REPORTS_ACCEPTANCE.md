@@ -376,9 +376,32 @@ CORE/REQUIRED P2 remains open; it is a genuinely optional enhancement
 with a documented rationale for deferral, matching the directive's own
 distinction between "REQUIRED" and "GAP, not built").
 
-Remaining before declaring final PASS: full regression gate (Section
-33), push, CI, deploy, and production re-verification — see the final
-report below.
+## 13b. Final regression gate + deployment (directive Section 33)
+
+- `tsc --noEmit`: clean.
+- `eslint`: 0 errors, 13 pre-existing warnings (none from files touched
+  this session).
+- `vitest run`: 108 passed, 0 failed, 98 skipped (integration tests
+  requiring unconfigured local credentials, consistent with every
+  prior session).
+- Production `npm run build`: clean.
+- No migrations touched this session (all fixes were frontend/i18n;
+  QA fixtures used only existing RPCs, no schema changes) — migration
+  consistency N/A for this batch, unaffected from the prior printing
+  session's already-verified state.
+- Pushed as one batch: `99efc28..1695e59` → `origin/main`. CI green
+  (run `33322236002`, both jobs).
+- Deployed: `wrangler deploy` from a fresh `npm run build`
+  immediately before deploy (learned from the earlier printing
+  session's stale-`dist/` mistake — verified the deployed CSS asset
+  hash matched the local build's hash BEFORE declaring this closed).
+  Version `8f4f2bd6-fac7-4a15-b83b-4573138038fc`.
+- Production verified live: console build tag confirmed `1695e59` in
+  a genuinely fresh browser tab (existing tabs kept the prior PWA
+  service worker active until every client for the origin was closed
+  — expected `registerType: 'prompt'` behavior). Zero console errors.
+
+**HEAD = origin/main = production, all three = `1695e59`.**
 
 ## 13. Secondary-agent pass (2026-08-30): Outstanding, Cash Shift, Memberships, Platform, Timezone, Print, Responsive, RTL/LTR, Security
 
