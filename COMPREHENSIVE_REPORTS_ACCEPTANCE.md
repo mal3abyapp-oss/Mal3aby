@@ -171,6 +171,22 @@ same figures:
   report's own honesty notice — would need a sale predating cost
   tracking, not safely reproducible without backdating real data).
 
+## 4b. Expense reports deep review (directive Section 11) — CLOSED
+
+Constructed the full required matrix live: cash expense (50.00,
+recorded), card expense (35.00, recorded), voided card expense (25.00,
+voided — pre-existing from an earlier session). Verified:
+- Expenses page: total 85.00 EGP, count 2 — voided correctly excluded
+  from both total and count by the default "مسجّل" (Recorded) status
+  filter.
+- Finance Overview's expense KPI (R5 fix): updated to 85.00 EGP
+  immediately, matching the Expenses page exactly.
+- Category breakdown ("مستلزمات"/Supplies) correctly shown for both
+  non-voided expenses.
+- Branch column correctly populated for both.
+This closes directive Section 11 with real constructed data, not
+assumed from a single pre-existing row.
+
 ## 5. Membership reports gap (directive Section 14/24)
 
 Reviewed `/app/memberships` live: Overview tab shows only current-state
