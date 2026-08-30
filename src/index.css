@@ -83,6 +83,25 @@
    target (dialog chrome, buttons, nav) is hidden via .print:hidden
    utility classes already applied at the call sites. */
 @media print {
+  /* PRINTING PRODUCTION ACCEPTANCE (2026-08-30), Section 12: without
+     this, browsers omit background-color entirely when printing
+     unless the user has manually enabled "background graphics" in
+     their print dialog -- most don't. The RETURNED/PARTIALLY RETURNED
+     banner, the expense-voucher VOIDED banner, and the cash-shift
+     "still open" notice all rely on a tinted background for
+     at-a-glance visibility; forcing it on ensures a printed document
+     looks the same as the on-screen preview instead of silently
+     losing its most important visual cue. Scoped to .print-target
+     only (never the whole page) -- deliberately not a blanket
+     print-everything-with-backgrounds rule, since most of this app's
+     surfaces are screens, not documents. */
+  .print-target,
+  .print-target * {
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+    color-adjust: exact;
+  }
+
   @page {
     size: A4;
     margin: 12mm;
