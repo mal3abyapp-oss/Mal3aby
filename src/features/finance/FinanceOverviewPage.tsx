@@ -103,6 +103,29 @@ async function fetchOfficialReceiptsCount(clubId: string, startDate: string, end
   return count ?? 0
 }
 
+// COMPREHENSIVE REPORTS ACCEPTANCE (2026-08-30), R5: this card
+// previously hardcoded finance.overview.notApplicable regardless of
+// whether real expense data existed -- confirmed live, a club with
+// real recorded expenses still showed "N/A" here. Same
+// no-new-RPC pattern as fetchEmployeeLiabilitiesOutstanding/
+// fetchOfficialReceiptsCount above: a direct filtered read of the
+// existing `expenses` table (RLS-scoped to the caller's club,
+// verified via a live anon-role adversarial test that RLS actually
+// blocks unauthenticated access despite the table's broad GRANTs),
+// excluding voided expenses -- matching FinanceExpensesPage.tsx's own
+// void-exclusion semantics (a voided expense is not real spend).
+async function fetchExpensesTotal(clubId: string, startDate: string, endDate: string) {
+  const { data, error } = await supabase
+    .from('expenses')
+    .select('amount')
+    .eq('club_id', clubId)
+    .neq('status', 'voided')
+    .gte('expense_date', startDate)
+    .lte('expense_date', endDate)
+  if (error) throw error
+  return (data ?? []).reduce((sum, r) => sum + Number(r.amount ?? 0), 0)
+}
+
 export function FinanceOverviewPage() {
   const { t } = useTranslation()
   const { locale } = useDirection()
@@ -143,6 +166,11 @@ export function FinanceOverviewPage() {
   const { data: officialReceiptsCount = 0 } = useQuery({
     queryKey: ['finance-overview-official-receipts', currentClubId, startDate, endDate],
     queryFn: () => fetchOfficialReceiptsCount(currentClubId!, startDate, endDate),
+    enabled: !!currentClubId,
+  })
+  const { data: expensesTotal = 0 } = useQuery({
+    queryKey: ['finance-overview-expenses-total', currentClubId, startDate, endDate],
+    queryFn: () => fetchExpensesTotal(currentClubId!, startDate, endDate),
     enabled: !!currentClubId,
   })
 
@@ -248,7 +276,7 @@ export function FinanceOverviewPage() {
           />
           <StatCard
             label={t('finance.overview.expenses')}
-            value={t('finance.overview.notApplicable')}
+            value={formatMoney(expensesTotal, 'EGP', locale)}
             icon={Clock}
             to="/app/finance/expenses"
           />

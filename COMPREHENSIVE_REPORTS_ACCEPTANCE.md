@@ -91,7 +91,50 @@ Not yet located in routing, to confirm during live tour:
 
 ## 3. Defects log (fill in as found; REPRODUCE → ROOT CAUSE → FIX → VERIFY)
 
-(none yet — starting live tour)
+- R1 (P2): Shop Inventory On Hand + Stock Valuation tables called
+  `t('shop.products.stockCount')` bare (no `count` interpolation arg)
+  for the "on hand" column header — that key is an interpolation
+  template (`"{{count}} متوفر"`), so the literal `{{count}}` placeholder
+  leaked into the UI. FIXED: switched both to the correct existing
+  static key `shop.dashboard.columns.onHand`. Live-verified in both
+  reports; Stock Valuation total (28,034.00 EGP) independently
+  reconciled against the sum of all line values.
+- R2 (P3, report semantics — directive Section 7): Gross Profit's
+  "Revenue (known cost)" (sums `shop_sale_items.line_total`, gross of
+  invoice-level discount) and Sales Summary's "Total Sales" (sums
+  `invoices.total`, net of discount) showed different figures for the
+  identical period (6,078.50 vs 6,008.50, gap = exact discount total)
+  with no on-screen explanation. Not a calculation bug — both are
+  internally correct for what they measure. FIXED: added a clarifying
+  note above the Gross Profit stats explaining the discount-scope
+  difference, per directive's explicit "fix labels, don't silently
+  change formulas" instruction.
+- R3 (P2): 5 Shop reports (Inventory On Hand, Stock Movement Ledger,
+  Stock Valuation, Supplier Activity, Stock Count Variance) all shared
+  one generic empty-state key whose text is "No sales yet" — wrong for
+  all 5, none of which are sales reports. Reproduced live: Stock Count
+  Variance with zero completed counts showed "No sales yet". FIXED:
+  added a dedicated correctly-worded empty key to each report's own
+  i18n namespace (matching the pattern Low Stock/Out of Stock already
+  used correctly) and updated all 5 call sites.
+
+Cross-report reconciliation checks performed so far, all correct:
+- Finance Reports hub: Revenue (card 1,920 + cash 430 = 2,350 total) ✓
+- Payment Methods reconciliation: (1,920-150)+(430-290) = 1,910 net ✓
+- Exceptions refunds (150+140+150=440) match Payment Methods refund
+  total (150 card + 290 cash = 440) ✓
+- Reconciliation's 10.00 EGP cash shortage matches Employee Cash
+  Liability's outstanding 10.00 EGP for the same staff member ✓
+- Shop Sales Detail invoice totals (5,578.50+280+150=6,008.50) match
+  Sales Summary's gross total exactly ✓
+- Shop Returns (140+150=290) match Sales Summary's refund total ✓
+- Shop Gross Profit's independently-recomputed math (3,252.50 gross
+  profit, 53.5% margin, 3,152.50 net profit, 54.6% net margin) all
+  verified correct via independent calculation ✓
+- Shop Stock Valuation total (28,034.00) independently reconciled
+  against sum of 21 line values ✓
+- Customer Purchases filter correctly scoped to selected customer,
+  showing exactly the 20 line items from that customer's real invoice ✓
 
 ## 4. Filter matrix results
 
