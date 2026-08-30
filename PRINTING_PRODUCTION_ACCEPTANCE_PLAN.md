@@ -52,6 +52,8 @@ documents that claim to work actually render correctly.
 | 16 | Employee cash liability settlement receipt | USEFUL | ACCEPTED LIMITATION | Not built this round — settlement is already fully auditable via `write_audit_log` + the append-only `employee_cash_liability_ledger` (confirmed in the Financial Integrity pass), and a dedicated settlement receipt would need a new RPC/fixture cycle for a self-settlement-blocked flow this session already had difficulty safely reproducing live (see Financial Integrity pass notes). Lower priority than the REQUIRED gaps closed this round; flagged for a future pass, not a blocking gap |
 | 17 | Report printing (all report pages) | REQUIRED | VERIFIED | Source-swept all 13 files under `src/features/reports/`: every `ReportXPage.tsx` (Academy, Bookings, Collections, Customers, Employee Liability, Exceptions, Gateway Health, Occupancy, Official Receipts, Payment Methods, Reconciliation, Revenue, Shop) imports and renders all three of `ReportPrintButton`/`ReportPrintHeader`/`.print-target` — none missing. Found and fixed a stale in-code comment in `report-print-header.tsx` claiming only 2 of these 13 had adopted the pattern (undersold real, already-shipped work; corrected to reflect actual state) |
 | 18 | Filtered/full report printing | REQUIRED | VERIFIED | These report RPCs return full result sets with no client-side `.limit()`/`.range()` pagination cap (confirmed via grep on ReportRevenuePage.tsx as a representative sample) — no truncation risk exists for this module, unlike Shop's separately-paginated list RPCs (which correctly use the dedicated `fetchFullReport.ts` full-vs-page-view pattern, already verified in the prior Reporting Accuracy pass). Filters are already part of each RPC's own query params, so a filtered view's print necessarily reflects the same filtered data — no separate carry-through mechanism needed |
+| 20 | Long content / many-line-item pagination | REQUIRED | VERIFIED (code review) | This QA club's shop has only 1 active product, so a live 15-20-line sale was not time-feasible to construct this pass. Code-reviewed `ShopInvoiceDocument.tsx`'s item table (lines 300-328): plain `<table className="w-full text-start">`, standard `<thead>`/`<tbody>`/`<tr>`/`<td>` flow, NO `table-layout:fixed`, no fixed `height`/`max-height` on the table or its `.print-target` container, no `overflow:hidden` that would clip rows. A table like this grows naturally with row count and relies on the browser's native table/`@page` pagination (the same `@page`/`@page receipt` CSS Paged Media rules already confirmed correct for every other verified surface) — nothing in the markup would destructively clip or overlap with many rows. BillingPage's own invoice-items table (line ~950s area) uses the identical plain-table pattern. Not live-verified with a real 15+ row sale; flagged as the one remaining PARTIAL in this pass |
+| 21 | Government official-receipt QR (on the receipt itself, not just the report ledger) | REQUIRED (where enabled) | UNVERIFIED | Not reached this pass — this QA club/session did not have an official-receipt-eligible payment/method configured to open live. Booking invoice's own two QR codes (invoice-verification + booking-check-in) ARE live-verified clean (see Section 5 notes below); the *report* ledger for these receipts was separately already verified (row 19 above, `ReportOfficialReceiptsPage.tsx`). The QR embedded on an individual official receipt DOCUMENT itself remains unverified — needs a club with government-compliance enabled and an eligible payment to open |
 
 ## 2. Defects log (fill in as found; REPRODUCE → FIX → VERIFY)
 
@@ -64,6 +66,7 @@ documents that claim to work actually render correctly.
 - D7: `sell_club_membership()` and `renew_club_membership()` both inserted `invoice_items.description` as a bare plan name (`v_plan.name_ar`) with no validity/expiry date range, despite `v_end_date` (and, for renewals, `v_effective_start`) already being correctly computed immediately above the insert — same defect class as D6, discovered while auditing sibling subscription-sale RPCs after D6. A printed membership invoice/receipt could not tell staff or the customer what period was actually purchased. FIXED (migration `20260830131803_fix_club_membership_invoice_line_dates.sql`, plain `CREATE OR REPLACE`, no `RETURNS TABLE` shape change): description now appends `" — YYYY-MM-DD → YYYY-MM-DD"`.
 - D8 (found via mandatory visual acceptance of D7 — directive Section 20, "DOM inspection alone is insufficient"): the D7 fix's date range rendered VISUALLY REVERSED on the actual printed invoice ("...29-09-2026 → 30-08-2026..." instead of "...2026-08-30 → 2026-09-29...") — an LTR date-range run with no directional isolation, embedded in Arabic prose, inside the RTL `<td>{item.description}</td>` cell in `BillingPage.tsx` (line 958). Identical bug class to commit `f0cbb0a` (operating-hours ranges reversed the same way), which fixed it with `dir="ltr"` at the React render site — not available here since `item.description` is one opaque DB string consumed by a shared generic renderer. FIXED at the data layer instead (migration `20260830132500_fix_club_membership_invoice_description_bidi_isolation.sql`): wrapped the date range in Unicode FSI/PDI directional-isolation characters (U+2068/U+2069) inside both RPCs, so the fix protects every consumer of the string, not just this one render site, and works correctly in both Arabic and English UI. Live-verified via screenshot: a freshly re-sold QA membership now shows "عضوية شهرية تجريبية 2026-08-30 → 2026-09-29" in correct chronological order.
 - FLAGGED, NOT FIXED (out of printing-directive scope): `renew_academy_subscription()`'s `subscriptions.plan_type` COLUMN (not just the printed description) is hardcoded to `'monthly'` on every renewal, regardless of the enrollment's actual prior plan type. Real accounting-semantics defect this printing fix surfaced but does not itself correct — touches active subscription-lifecycle semantics (a "closed domain" per directive Section 27). Documented for a dedicated future pass.
+- D9 (found during RTL/QR/logo acceptance pass, 2026-08-30, code review of `ShopInvoiceDocument.tsx`): `ShopPaymentReceiptDialog` (the per-payment 80mm Shop payment receipt, triggered via "طباعة الإيصال" on any payment row of the Shop invoice) computed `outstanding = Math.max(0, sale.total - paidSoFar)` at line 519 — the exact pre-D4 client-side formula, reintroduced in a sibling component D4 did not touch. `get_invoice_payment_summary()` (confirmed via direct source read) encodes materially different logic: return-driven refunds never re-open outstanding, but non-return (goodwill) refunds do, and fully-refunded/void/draft invoices are special-cased to 0 — none of which the naive subtraction can express. Reproducible whenever a payment receipt is printed for a sale that is either (a) partially paid AND partially returned, or (b) fully paid but partially refunded for a non-return (goodwill) reason — the receipt would show a wrong outstanding figure (phantom-zero or phantom-positive) diverging from the invoice's own authoritative figure for the same sale. FIXED: `ShopInvoiceDocument.tsx` — replaced the two lines computing `paidSoFar`/`outstanding` with `const outstanding = sale?.outstanding ?? 0`, reusing the same `sale.outstanding` field (sourced from `get_shop_sale_invoice_data()` → `get_invoice_payment_summary()`) that `InvoiceDocumentBody` already uses correctly. `tsc --noEmit` clean. Live-verified: reopened the D4/D5 QA fixture sale (000007, partially returned, 280 total/280 paid/140 refunded-via-return) payment receipt — correctly shows Paid 280.00 EGP with no outstanding line (matches the invoice, and matches pre-fix behavior for this specific case since it was a return-driven refund with paidSoFar==total — the bug only diverges on the partial-payment or non-return-refund cases described above, which this club's fixtures don't currently exercise, so the fix is verified by code/formula equivalence to the already-proven-correct `InvoiceDocumentBody` path plus a clean regression render, not by directly reproducing the diverging numeric case live).
 
 ## 2b. Responsive check note (Section 21)
 
@@ -126,7 +129,86 @@ are built entirely from already-loaded row data passed as props (no
 independent fetch of their own), so there is no load-failure state to
 handle in those two — not a gap, a different (simpler) data-flow shape.
 
+## 2d. RTL/QR/logo/pagination/print-preview sweep (2026-08-30, this pass)
+
+Ran with the app UI switched to Arabic (the language toggle defaults to
+English at session load despite Arabic being the product default per
+the directive — toggled manually via the header globe icon each time;
+not treated as a defect, just a session-state note).
+
+**RTL/bidi pass (directive Section 10):** Opened 3 real printable
+documents in Arabic — booking invoice (DEMOCL-...-000009), the D8 QA
+membership-invoice fixture (DEMOCL-...-000012), and a real Expense
+Voucher (`ExpenseVoucherDialog`). All rendered correct RTL Arabic
+prose, right-aligned, no mojibake. Used a systematic DOM scan (not
+just eyeballing) on each document: every leaf DOM node whose text
+mixes Arabic and Latin/digit characters was enumerated via
+`document.querySelectorAll` + a regex filter, then each one's
+`unicode-bidi`/`<bdi>`/`dir` wrapping was inspected directly. Result:
+every LTR-shaped run found (invoice numbers, dates, booking
+references, reference codes, phone numbers) is correctly wrapped in
+either `<bdi dir="ltr">` or an explicit `dir="ltr"` element — the D8
+Unicode-isolation fix (`⁨...⁩` FSI/PDI markers) was independently
+re-confirmed present and working on the membership-invoice fixture via
+raw `outerHTML` inspection, not just a screenshot. Two short strings
+containing bare Latin letters with no internal digit/date structure to
+reverse ("QA" as a suffix of a staff/vendor display name) were found
+NOT wrapped in `<bdi>`, but since a 2-character token has no internal
+sequence order to reverse, this is NOT an instance of the D8/f0cbb0a
+bug class — documented as inspected-and-cleared, not silently skipped.
+**No new instance of the D8 bidi-reversal bug class was found.**
+
+**QR code rendering (Section 13):** Zoomed/screenshot-confirmed 2 real
+QR codes on the live booking invoice (DEMOCL-...-000009): an
+invoice-verification QR and a separate booking-check-in QR (labeled
+"رمز التحقق من الحجز" / "رقم الحجز: MB-8E2246D8", the latter correctly
+`<bdi dir="ltr">`-wrapped). Both render as clean, high-contrast
+black/white modules with proper finder-pattern corners, ~200px, fully
+inside their container with clear margin, not clipped. PASS.
+
+**Logo/branding image loading (Section 14):** The QA club (and, per a
+DB-wide check, every club in the production database) has no
+`clubs.logo_url` configured — confirmed the Shop invoice's no-logo
+state renders correctly (zero `<img>` elements emitted, per
+`ShopInvoiceDocument.tsx` line 178's `{branding.logoUrl && <img .../>}`
+guard — text-only header, no broken-image icon). To verify the
+logo-PRESENT path (untested anywhere in this database), temporarily
+set `clubs.logo_url` to a public placeholder image on the QA club only
+(`UPDATE clubs SET logo_url = ... WHERE id = 'a6bf6b6d-...'`),
+re-opened the same invoice, confirmed via `img.complete`/
+`naturalWidth`/`naturalHeight` (128×128, `complete: true`) that the
+image genuinely loaded (not a broken icon), then immediately reverted
+`logo_url` back to `NULL` on the same row. Both states PASS. This was
+the only write this pass made to non-disposable (real `clubs` table)
+data, and it was fully reverted within the same tool-call pair.
+
+**Long content/pagination (Section 11):** See surface-inventory row
+20 — code-review fallback used (this QA club's shop has only 1 active
+product; constructing 15-20 was not time-feasible this pass). PARTIAL.
+
+**Print Preview (Section 5 of this subagent's task):** Attempted
+`window.print()` on 2 documents (a Shop invoice, an Expense Voucher).
+**Tooling limitation, not a product defect**: the native OS/browser
+print dialog `window.print()` opens is outside the page DOM and fully
+blocks the Browser-pane automation tool (`computer` action) — every
+`screenshot`/`key` call made while it's open times out after 30s with
+no way to read or interact with the native dialog's content. The only
+recovery is a `navigate` call, which resets the tab (dialog closes,
+page reloads cleanly, no errors). Confirmed via console-log inspection
+immediately after recovery both times: zero JS errors attributable to
+the print action itself. This means the print ACTION fires correctly
+and without error, but the rendered print-preview output itself could
+not be visually captured by this pass's tooling — documented as an
+explicit tooling gap per the task's own instruction, not skipped
+silently. The underlying `@media print`/`@page` CSS mechanism was
+already code-reviewed as correct architecture in the baseline (see
+Section 0) and is shared unchanged by every surface in this table.
+
 ## 3. Acceptance matrix (final gate — see directive Section 30)
 
-Not yet evaluated — populated at closure, pending the running
-subagent's RTL/QR/logo/pagination sweep and the final regression gate.
+Not yet evaluated — populated at closure. This pass closed the
+RTL/QR/logo/print-preview items (Sections 10/13/14/5 of the subagent
+task) and left long-content pagination as a code-review-only PARTIAL
+and the government-receipt-document QR as UNVERIFIED (row 21) —
+see Section 2d immediately above for the full breakdown, and Defect
+D9 for a new fix landed this pass.

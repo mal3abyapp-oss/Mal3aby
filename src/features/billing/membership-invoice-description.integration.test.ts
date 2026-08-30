@@ -41,7 +41,7 @@ describeIfConfigured('Club membership invoice line description (live integration
   let clubId: string
   let branchId: string
   let planId: string
-  let createdCustomerIds: string[] = []
+  const createdCustomerIds: string[] = []
 
   beforeAll(async () => {
     client = createClient(SUPABASE_URL!, SUPABASE_ANON_KEY!)

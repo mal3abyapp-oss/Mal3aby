@@ -515,8 +515,14 @@ export function ShopPaymentReceiptDialog({
   })
 
   const payment = sale?.payments.find((p) => p.paymentId === paymentId) ?? null
-  const paidSoFar = sale?.payments.reduce((sum, p) => sum + p.amount, 0) ?? 0
-  const outstanding = sale ? Math.max(0, sale.total - paidSoFar) : 0
+  // PRINTING PRODUCTION ACCEPTANCE (2026-08-30), follow-up: this mirrored
+  // InvoiceDocumentBody's pre-D4 bug -- Math.max(0, total - paid) ignores
+  // refunds (including the return/non-return distinction
+  // get_invoice_payment_summary() already encodes) entirely. sale.outstanding
+  // is already fetched via fetchSaleInvoiceData() -> get_shop_sale_invoice_data()
+  // -> get_invoice_payment_summary(), the same authoritative source
+  // InvoiceDocumentBody uses -- reuse it here instead of recomputing.
+  const outstanding = sale?.outstanding ?? 0
 
   return (
     <Dialog open onOpenChange={(open) => { if (!open) onClose() }}>
