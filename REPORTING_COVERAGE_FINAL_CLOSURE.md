@@ -83,7 +83,33 @@ updated to use it). Fixed as part of this closure — see Section 2.
 | # | Item | Status |
 |---|---|---|
 | 1 | Club Membership Lifecycle & Revenue report | FIXED + PASS |
-| 2 | Secondary coverage gap check | IN PROGRESS |
+| 2 | Secondary coverage gap check | COMPLETE — 0 P1, 0 built |
+
+### Secondary coverage gap review (Section 16)
+
+Bounded review across Bookings/Academy/Club Memberships/Shop/
+Inventory/Expenses/Cash/Customers/Finance (product-explorer subagent,
+read-only, no nested delegation):
+
+| Domain | Existing reporting | Gap | Priority |
+|---|---|---|---|
+| Bookings | ReportBookingsPage + ReportOccupancyPage | none | — |
+| Academy | ReportAcademyPage | none | — |
+| Club Memberships | MembershipReportSection (this session) | — | out of scope, already reviewed |
+| Shop | Sales/Summary/Profit/Returns/Inventory reports | none | — |
+| Inventory | Covered by Shop inventory reports (no separate facility-asset domain exists) | none | — |
+| Expenses | FinanceExpensesPage (ledger + 2 KPIs, filterable) | no category/branch breakdown view | P3 |
+| Cash | Shift history + Reconciliation + Employee Liability | none | — |
+| Customers | ReportCustomersPage (new-customer count + top spenders) | no lapsed/inactive-customer win-back list | P2 |
+| Finance | Full hub (Revenue/Collections/Payment Methods/Exceptions/Receipts/Reconciliation/Gateway Health/Liability) | none | — |
+
+**Result: 0 P1 gaps.** Reporting coverage across all 9 domains is
+materially complete. The one P2 (lapsed-customer report) requires a
+net-new RPC/aggregation — not "obvious low-risk" wiring — so per
+Section 16 it is explicitly NOT built this phase; it is a standalone
+future feature candidate if the business prioritizes it. The one P3
+(expense breakdown) is a convenience, not a missing capability — not
+built. No P0/P1/core-P2 reporting gaps remain.
 
 ## 3. Defects log
 
