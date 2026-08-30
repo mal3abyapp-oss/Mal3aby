@@ -769,7 +769,10 @@
   },
   "routing": {
     "noClubAccess": "This account has no club staff access. If you're a customer, use the customer portal instead. If you believe this is a mistake, contact your club owner.",
-    "signOut": "Sign out"
+    "signOut": "Sign out",
+    "moduleActivateNow": "Activate now",
+    "moduleActivating": "Activating...",
+    "moduleActivateError": "Couldn't activate it. Try again or contact support."
   },
   "masterAdmin": {
     "banner": {
@@ -4115,7 +4118,7 @@
     "moduleNotActive": {
       "title": "Shop isn't available yet",
       "notEntitled": "This club's plan doesn't include the Shop module yet. Contact support to enable it.",
-      "notActivated": "The Shop module has been unlocked for this club but hasn't been turned on yet. Turn it on from Shop settings."
+      "notActivated": "The Shop module has been unlocked for this club but hasn't been turned on yet."
     },
     "pos": {
       "title": "Sell",
@@ -4526,6 +4529,13 @@
     "settings": {
       "title": "Shop settings",
       "description": "Inventory locations and shop configuration",
+      "moduleStatusTitle": "Shop module status",
+      "moduleStatusActiveHint": "Shop is currently active -- staff with shop permissions can use the POS and manage inventory.",
+      "moduleStatusDeactivateWarning": "Deactivating Shop immediately blocks any new sale or inventory change. All existing products, sales, and invoices stay fully preserved and reviewable, and you can reactivate anytime without losing anything.",
+      "deactivateModule": "Deactivate Shop",
+      "deactivateModuleConfirm": "Deactivate Shop? Staff won't be able to sell or edit inventory until you reactivate it. Existing data stays preserved.",
+      "reactivateModule": "Reactivate",
+      "moduleStatusError": "Couldn't change the module status.",
       "locationsTitle": "Inventory locations",
       "locationNamePlaceholder": "Location name",
       "addLocation": "Add location",

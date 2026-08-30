@@ -86,6 +86,83 @@ async function uploadClubLogo(clubId: string, file: File): Promise<string> {
   return data.publicUrl
 }
 
+// Real gap found in live QA (2026-08-30): this page's own header
+// comment (below, unchanged) always claimed to own "club-owner-
+// controlled module activation", but no such control was ever built
+// here -- the only way to turn Shop off/on was a raw SQL update or a
+// Platform Owner action. set_club_module_active()'s live permission
+// check already allows any holder of club.update on this club (the
+// same permission every other control on this page is gated on), so
+// this needed a UI, not a backend change. Deactivation is real and
+// immediate (blocks new sales/inventory writes at the RPC layer, per
+// _shop_module_active() -- unchanged, already existed), so it gets
+// the same "type-to-understand, then a second explicit click" shape
+// as other real-consequence actions in this codebase, without
+// introducing a new dialog primitive: an inline warning that expands
+// before the actual confirm button appears.
+function ShopModuleStatusSection() {
+  const { t } = useTranslation()
+  const { currentClubId, currentMembership } = useAuth()
+  const queryClient = useQueryClient()
+  const canManage = currentMembership?.permissionKeys.includes('club.update') ?? false
+  const [confirming, setConfirming] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  const setActiveMutation = useMutation({
+    mutationFn: async (active: boolean) => {
+      const { error: err } = await supabase.rpc('set_club_module_active', {
+        p_club_id: currentClubId as string,
+        p_module_key: 'shop',
+        p_active: active,
+      })
+      if (err) throw err
+    },
+    onSuccess: () => {
+      setError(null)
+      setConfirming(false)
+      // Deactivating flips the RequireShopModule guard on this exact
+      // route -- invalidate its query key too so the change is
+      // reflected immediately, not just on the next hard navigation.
+      void queryClient.invalidateQueries({ queryKey: ['shop-module-state', currentClubId] })
+    },
+    onError: (err) => setError(translateSupabaseError(err, t('shop.settings.moduleStatusError'))),
+  })
+
+  if (!canManage) return null
+
+  return (
+    <section className="rounded-md border border-border p-4">
+      <h2 className="mb-1 text-base font-semibold">{t('shop.settings.moduleStatusTitle')}</h2>
+      <p className="mb-3 text-xs text-text-secondary">{t('shop.settings.moduleStatusActiveHint')}</p>
+
+      {!confirming ? (
+        <Button variant="outline" size="sm" className="text-status-danger" onClick={() => setConfirming(true)}>
+          {t('shop.settings.deactivateModule')}
+        </Button>
+      ) : (
+        <div className="flex flex-col gap-3 rounded-md border border-status-danger/30 bg-status-danger/5 p-3">
+          <p className="text-sm text-text-primary">{t('shop.settings.deactivateModuleConfirm')}</p>
+          <div className="flex items-center gap-2">
+            <Button
+              size="sm"
+              variant="outline"
+              className="border-status-danger text-status-danger hover:bg-status-danger/10"
+              disabled={setActiveMutation.isPending}
+              onClick={() => setActiveMutation.mutate(false)}
+            >
+              {setActiveMutation.isPending ? t('shop.settings.saving') : t('shop.settings.deactivateModule')}
+            </Button>
+            <Button size="sm" variant="ghost" disabled={setActiveMutation.isPending} onClick={() => setConfirming(false)}>
+              {t('common.cancel')}
+            </Button>
+          </div>
+        </div>
+      )}
+      {error && <p role="alert" className="mt-2 text-sm text-status-danger">{error}</p>}
+    </section>
+  )
+}
+
 function ShopPrintSettingsSection() {
   const { t } = useTranslation()
   const { currentClubId, currentMembership } = useAuth()
@@ -287,6 +364,8 @@ export function ShopSettingsPage() {
       <PageHeader title={t('shop.settings.title')} description={t('shop.settings.description')} />
 
       <div className="flex flex-col gap-6">
+        <ShopModuleStatusSection />
+
         <section className="rounded-md border border-border p-4">
           <h2 className="mb-3 text-base font-semibold">{t('shop.settings.locationsTitle')}</h2>
           <div className="flex flex-col gap-2">

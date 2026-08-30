@@ -1,11 +1,12 @@
 import { Navigate, Outlet, useLocation } from 'react-router-dom'
-import { lazy, Suspense, type ReactNode } from 'react'
+import { lazy, Suspense, useState, type ReactNode } from 'react'
 import { useTranslation } from 'react-i18next'
-import { useQuery, useQueryClient } from '@tanstack/react-query'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useAuth } from '@/app/providers/AuthProvider'
 import { canSeeNavDomain, type NavDomain } from '@/lib/domain/navigation'
 import { Button } from '@/components/ui/button'
 import { supabase } from '@/lib/supabase/client'
+import { translateSupabaseError } from '@/lib/errors'
 
 // Real production bug report (2026-08-29): a user with a genuinely
 // valid, non-expired session navigated back to "/" (the marketing
@@ -242,6 +243,56 @@ export function RequirePortalCustomer({ children }: { children: ReactNode }) {
   return children
 }
 
+// Real gap found in live QA (2026-08-30), confirmed against
+// set_club_module_active()'s actual live permission check before
+// building this (has_permission('club.update', p_club_id) alone is
+// already sufficient -- no backend change needed, this UI was simply
+// missing): a club whose module is entitled but not yet ACTIVE showed
+// this exact "not activated" screen telling the owner to go activate
+// it -- but that instruction was unreachable, since this screen IS
+// what replaces the entire /app/shop (or /app/academy, /app/fields,
+// /app/memberships) subtree, including that module's own Settings
+// page, whenever active=false. A club owner had no way to reach any
+// activation control at all without a Platform Owner or a raw SQL
+// call. This button closes that loop directly from the blocked screen
+// itself -- gated on the same club.update permission the RPC already
+// requires, so a staff member without that permission simply doesn't
+// see it (still correctly told to contact their owner).
+function ActivateModuleButton({ moduleKey, queryKey }: { moduleKey: string; queryKey: readonly unknown[] }) {
+  const { t } = useTranslation()
+  const { currentClubId, currentMembership } = useAuth()
+  const queryClient = useQueryClient()
+  const [error, setError] = useState<string | null>(null)
+  const canActivate = currentMembership?.permissionKeys.includes('club.update') ?? false
+
+  const activateMutation = useMutation({
+    mutationFn: async () => {
+      const { error: err } = await supabase.rpc('set_club_module_active', {
+        p_club_id: currentClubId as string,
+        p_module_key: moduleKey,
+        p_active: true,
+      })
+      if (err) throw err
+    },
+    onSuccess: () => {
+      setError(null)
+      void queryClient.invalidateQueries({ queryKey })
+    },
+    onError: (err) => setError(translateSupabaseError(err, t('routing.moduleActivateError'))),
+  })
+
+  if (!canActivate) return null
+
+  return (
+    <div className="mt-2 flex flex-col items-center gap-2">
+      <Button size="sm" disabled={activateMutation.isPending} onClick={() => activateMutation.mutate()}>
+        {activateMutation.isPending ? t('routing.moduleActivating') : t('routing.moduleActivateNow')}
+      </Button>
+      {error && <p role="alert" className="text-xs text-status-danger">{error}</p>}
+    </div>
+  )
+}
+
 // COMMERCIAL MODULE (2026-08-26) -- guards every /app/shop/* route.
 // canSeeNavDomain('shop', ...) (RequireNavDomain, already applied at
 // the route level) only checks the shop.view PERMISSION -- a
@@ -276,6 +327,9 @@ function RequireShopModule({ children }: { children: ReactNode }) {
         <p className="max-w-sm text-sm text-text-secondary">
           {!data || !data.entitled ? t('shop.moduleNotActive.notEntitled') : t('shop.moduleNotActive.notActivated')}
         </p>
+        {data?.entitled && !data.active && (
+          <ActivateModuleButton moduleKey="shop" queryKey={['shop-module-state', currentClubId]} />
+        )}
       </div>
     )
   }
@@ -321,6 +375,9 @@ function RequireModule({ moduleKey, titleKey, notEntitledKey, notActivatedKey, c
         <p className="max-w-sm text-sm text-text-secondary">
           {!data || !data.entitled ? t(notEntitledKey) : t(notActivatedKey)}
         </p>
+        {data?.entitled && !data.active && (
+          <ActivateModuleButton moduleKey={moduleKey} queryKey={['module-state', moduleKey, currentClubId]} />
+        )}
       </div>
     )
   }
