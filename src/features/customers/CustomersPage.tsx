@@ -129,6 +129,19 @@ export function CustomersPage() {
   // answer -- no pre-selected default, same pattern as the government-
   // affiliation question at onboarding.
   const [whatsappConsent, setWhatsappConsent] = useState<WhatsappConsentAnswer>(null)
+  // Acceptance-sweep fix (2026-08-30): the required-consent-answer gate
+  // below applied unconditionally whenever a valid phone was present --
+  // including on EDIT, where the customer's phone is usually unchanged
+  // and consent was already asked and recorded at creation time (or a
+  // prior edit). That silently disabled Save on every edit until staff
+  // re-answered a question that had nothing to do with what they were
+  // actually changing (e.g. just fixing an email typo), with no visible
+  // explanation for why the button wouldn't respond -- confirmed live.
+  // Tracking the phone value as it was when the dialog opened lets the
+  // gate apply only when the phone is actually being changed to a
+  // different number, which is the only case a fresh consent answer is
+  // truly needed.
+  const [originalMobile, setOriginalMobile] = useState('')
 
   const { data: clubCountry } = useQuery({
     queryKey: ['club-country', currentClubId],
@@ -176,6 +189,7 @@ export function CustomersPage() {
     setEditingCustomer(null)
     setFullName('')
     setMobile('')
+    setOriginalMobile('')
     setMobileCountry((clubCountry as CountryCode) ?? 'EG')
     setEmail('')
     setFormError(null)
@@ -188,6 +202,7 @@ export function CustomersPage() {
     setEditingCustomer(c)
     setFullName(c.fullName)
     setMobile(c.mobileDisplay ?? '')
+    setOriginalMobile(c.mobileDisplay ?? '')
     setMobileCountry((clubCountry as CountryCode) ?? 'EG')
     setWhatsappConsent(null)
     setEmail(c.email ?? '')
@@ -195,6 +210,11 @@ export function CustomersPage() {
     setDuplicateCustomerId(null)
     setDialogOpen(true)
   }
+
+  // Only a genuinely new/changed phone number needs a fresh consent
+  // answer -- editing an unrelated field (name, email) with the same
+  // phone must not re-require it.
+  const phoneChanged = mobile.trim() !== originalMobile.trim()
 
   const saveMutation = useMutation({
     mutationFn: async () => {
@@ -345,7 +365,7 @@ export function CustomersPage() {
                   }}
                   onValidChange={(r) => setPhoneValid(r.valid)}
                 />
-                {mobile.trim() && phoneValid && (
+                {mobile.trim() && phoneValid && phoneChanged && (
                   <WhatsappConsentQuestion value={whatsappConsent} onChange={setWhatsappConsent} />
                 )}
                 <div className="flex flex-col gap-1.5">
@@ -378,7 +398,7 @@ export function CustomersPage() {
                   disabled={
                     saveMutation.isPending ||
                     (mobile.trim().length > 0 && !phoneValid) ||
-                    (mobile.trim().length > 0 && phoneValid && whatsappConsent === null)
+                    (mobile.trim().length > 0 && phoneValid && phoneChanged && whatsappConsent === null)
                   }
                 >
                   {saveMutation.isPending ? t('common.saving') : editingCustomer ? t('customers.saveChanges') : t('common.add')}
