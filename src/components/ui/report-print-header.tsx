@@ -17,14 +17,16 @@ import { Button } from '@/components/ui/button'
 // because both read from the SAME already-fetched report data --
 // nothing is recalculated for print.
 //
-// Scope note (honest, not silent): this pattern was wired into
-// Revenue (Finance) and Shop (Commercial) reports as the two
-// representative implementations this session. Every other report
-// page (Bookings, Collections, Payment Methods, Academy, Occupancy,
-// Exceptions, Reconciliation, Employee Liability, Official Receipts,
-// Customers) can adopt the identical two-component pattern below
-// without new print CSS -- not done for all twelve in this closure,
-// tracked as a deliberate scope decision.
+// Scope note (updated 2026-08-30, PRINTING PRODUCTION ACCEPTANCE):
+// this pattern was originally wired into Revenue (Finance) and Shop
+// (Commercial) reports as the two representative implementations.
+// It has since been adopted by all other report pages (Bookings,
+// Collections, Payment Methods, Academy, Occupancy, Exceptions,
+// Reconciliation, Employee Liability, Official Receipts, Customers,
+// Gateway Health) -- confirmed via source sweep: every ReportXPage.tsx
+// under src/features/reports/ imports and renders all three of
+// ReportPrintButton, ReportPrintHeader, and .print-target. No report
+// page is missing this pattern any more.
 
 export function ReportPrintButton() {
   const { t } = useTranslation()
