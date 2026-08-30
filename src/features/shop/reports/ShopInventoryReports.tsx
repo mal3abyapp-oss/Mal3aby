@@ -59,7 +59,7 @@ function BalancesTable({ rows, isLoading, emptyKey }: { rows: BalanceRow[]; isLo
   const columns: DataTableColumn<BalanceRow>[] = [
     { key: 'product', header: t('reports.shop.columns.product'), render: (r) => r.productNameAr + (r.variantLabel ? ` (${r.variantLabel})` : '') },
     { key: 'location', header: t('shop.inventory.columns.location'), render: (r) => r.locationName },
-    { key: 'onHand', header: t('shop.products.stockCount'), render: (r) => r.onHand },
+    { key: 'onHand', header: t('shop.dashboard.columns.onHand'), render: (r) => r.onHand },
     { key: 'reorderLevel', header: t('shop.reports.inventoryOnHand.reorderLevel'), render: (r) => r.reorderLevel ?? '—' },
   ]
   return <DataTable columns={columns} rows={rows} rowKey={(r) => `${r.locationId}-${r.productId}-${r.variantId ?? 'none'}`} isLoading={isLoading} emptyTitle={t(emptyKey)} />
@@ -262,7 +262,7 @@ export function ReportShopStockValuationContent() {
   const columns: DataTableColumn<ValuationRow>[] = [
     { key: 'product', header: t('reports.shop.columns.product'), render: (r) => r.productNameAr + (r.variantLabel ? ` (${r.variantLabel})` : '') },
     { key: 'location', header: t('shop.inventory.columns.location'), render: (r) => r.locationName },
-    { key: 'onHand', header: t('shop.products.stockCount'), render: (r) => r.onHand },
+    { key: 'onHand', header: t('shop.dashboard.columns.onHand'), render: (r) => r.onHand },
     { key: 'unitCost', header: t('shop.reports.gp.unitCost'), render: (r) => r.unitCost !== null ? <MoneyDisplay amount={r.unitCost} size="sm" /> : t('shop.reports.gp.costUnavailable') },
     { key: 'lineValue', header: t('shop.reports.stockValuation.lineValue'), render: (r) => r.lineValue !== null ? <MoneyDisplay amount={r.lineValue} size="sm" /> : t('shop.reports.gp.costUnavailable') },
   ]
