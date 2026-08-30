@@ -4650,7 +4650,12 @@
       "discount": "الخصم",
       "taxNumber": "الرقم الضريبي",
       "commercialRegistration": "رقم السجل التجاري",
-      "thankYou": "شكرًا لتسوقكم معنا"
+      "thankYou": "شكرًا لتسوقكم معنا",
+      "statusReturned": "مرتجع — تم استرجاع الأصناف ورد المبلغ",
+      "statusPartiallyReturned": "مرتجع جزئيًا",
+      "returnedQuantityNote": "تم استرجاع {{count}}",
+      "refunded": "المسترد",
+      "fullySettledAfterReturn": "تمت التسوية بالكامل — لا يوجد مبلغ مستحق."
     },
     "settings": {
       "title": "إعدادات المتجر",

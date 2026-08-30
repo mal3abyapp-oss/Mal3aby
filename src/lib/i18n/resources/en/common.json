@@ -4644,7 +4644,12 @@
       "discount": "Discount",
       "taxNumber": "Tax No.",
       "commercialRegistration": "Commercial Reg. No.",
-      "thankYou": "Thank you for your purchase"
+      "thankYou": "Thank you for your purchase",
+      "statusReturned": "RETURNED — items given back, refund issued",
+      "statusPartiallyReturned": "PARTIALLY RETURNED",
+      "returnedQuantityNote": "{{count}} returned",
+      "refunded": "Refunded",
+      "fullySettledAfterReturn": "Fully settled — nothing further is owed."
     },
     "settings": {
       "title": "Shop settings",

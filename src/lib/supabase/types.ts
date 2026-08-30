@@ -8635,7 +8635,11 @@ export type Database = {
           invoice_number: string
           invoice_status: string
           location_name: string
+          outstanding: number
+          paid: number
+          payment_status: string
           payments: Json
+          refunded: number
           sale_id: string
           sale_status: string
           sold_by_name: string

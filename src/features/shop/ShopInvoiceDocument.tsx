@@ -67,6 +67,15 @@ interface SaleInvoiceData {
   total: number
   invoiceStatus: string
   payments: SalePaymentRow[]
+  // PRINTING PRODUCTION ACCEPTANCE (2026-08-30): saleStatus/refunded/
+  // outstanding now come straight from get_shop_sale_invoice_data(),
+  // which itself calls get_invoice_payment_summary() internally --
+  // the single authoritative source of truth (already fixed twice
+  // this session) -- never recomputed client-side. See directive
+  // Section 16 and the migration header for the exact bug this closes.
+  saleStatus: 'completed' | 'partially_returned' | 'returned' | 'cancelled' | string
+  refunded: number
+  outstanding: number
 }
 
 interface SaleItemRow {
@@ -123,6 +132,9 @@ async function fetchSaleInvoiceData(saleId: string): Promise<SaleInvoiceData> {
       receivedAt: p.received_at,
       receivedByName: p.received_by_name,
     })),
+    saleStatus: data.sale_status,
+    refunded: Number(data.refunded),
+    outstanding: Number(data.outstanding),
   }
 }
 
@@ -238,7 +250,16 @@ function InvoiceDocumentBody({
 }) {
   const { t } = useTranslation()
   const paid = sale.payments.reduce((sum, p) => sum + p.amount, 0)
-  const outstanding = Math.max(0, sale.total - paid)
+  // PRINTING PRODUCTION ACCEPTANCE (2026-08-30): outstanding/refunded
+  // now come straight from sale.outstanding/sale.refunded, sourced by
+  // get_shop_sale_invoice_data() from get_invoice_payment_summary()
+  // (the authoritative source of truth) -- never recomputed here.
+  // The prior `Math.max(0, sale.total - paid)` formula ignored refunds
+  // entirely and could show a phantom outstanding balance for
+  // merchandise already returned. See this migration's header for the
+  // exact reproduction.
+  const outstanding = sale.outstanding
+  const isReturned = sale.saleStatus === 'returned' || sale.saleStatus === 'partially_returned'
   const isThermal = printSize === '80mm'
 
   return (
@@ -248,6 +269,16 @@ function InvoiceDocumentBody({
       className={`print-target rounded-md border border-border p-4 text-sm print:border-0 ${visibleForPrint ? 'visible-for-print' : ''} ${isThermal ? 'text-xs' : ''}`}
     >
       <DocumentHeader branding={branding} locale={locale} />
+
+      {/* PRINTING PRODUCTION ACCEPTANCE (2026-08-30), Section 8: a
+          returned/partially-returned sale must not visually look like
+          an ordinary positive sale. Unmistakable even skimmed -- a
+          bordered banner, not just a status word buried in the header. */}
+      {isReturned && (
+        <p className="mb-3 rounded-md border border-status-danger bg-status-danger/5 p-2 text-center text-xs font-bold text-status-danger">
+          {sale.saleStatus === 'returned' ? t('shop.invoice.statusReturned') : t('shop.invoice.statusPartiallyReturned')}
+        </p>
+      )}
 
       <div className="mb-3 flex flex-wrap items-start justify-between gap-2">
         <div>
@@ -281,6 +312,11 @@ function InvoiceDocumentBody({
             <tr key={item.itemId} className="border-b border-border">
               <td className="p-1">
                 {item.productNameAr}{item.variantLabel ? ` (${item.variantLabel})` : ''}
+                {item.returnedQuantity > 0 && (
+                  <span className="block text-xs font-medium text-status-danger">
+                    {t('shop.invoice.returnedQuantityNote', { count: item.returnedQuantity })}
+                  </span>
+                )}
               </td>
               {!isThermal && <td className="p-1 tabular-nums" dir="ltr">{item.sku ?? '—'}</td>}
               <td className="p-1 tabular-nums">{item.quantity}</td>
@@ -314,11 +350,20 @@ function InvoiceDocumentBody({
             <MoneyDisplay amount={paid} size="sm" tone="success" />
           </div>
         )}
+        {sale.refunded > 0 && (
+          <div className="flex items-center gap-2">
+            <span className="text-xs text-text-secondary">{t('shop.invoice.refunded')}</span>
+            <MoneyDisplay amount={sale.refunded} size="sm" tone="danger" />
+          </div>
+        )}
         {outstanding > 0 && (
           <div className="flex items-center gap-2">
             <span className="text-xs text-text-secondary">{t('billing.detail.outstanding')}</span>
             <MoneyDisplay amount={outstanding} size="sm" tone="danger" />
           </div>
+        )}
+        {sale.refunded > 0 && outstanding <= 0 && (
+          <p className="text-xs text-status-success">{t('shop.invoice.fullySettledAfterReturn')}</p>
         )}
       </div>
 
