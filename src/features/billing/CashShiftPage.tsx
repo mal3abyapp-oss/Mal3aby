@@ -19,7 +19,8 @@ import {
 import { formatMoney } from '@/lib/domain/billing'
 import { translateSupabaseError } from '@/lib/errors'
 import { useDirection } from '@/app/providers/DirectionProvider'
-import { Wallet } from 'lucide-react'
+import { Wallet, Printer } from 'lucide-react'
+import { CashShiftSummaryDialog } from './CashShiftSummaryDialog'
 
 // Gate 13 #62 (lean V1) + Master Payment Directive Phase 1: cash shift /
 // drawer reconciliation. One open shift per branch at a time (enforced
@@ -223,6 +224,7 @@ export function CashShiftPage() {
   const [settlingLiabilityId, setSettlingLiabilityId] = useState<string | null>(null)
   const [settleAmount, setSettleAmount] = useState('')
   const [settleReason, setSettleReason] = useState('')
+  const [printingShift, setPrintingShift] = useState<ShiftHistoryRow | null>(null)
 
   const settleMutation = useMutation({
     mutationFn: async () => {
@@ -354,6 +356,15 @@ export function CashShiftPage() {
           </div>
         )
       },
+    },
+    {
+      key: 'print',
+      header: '',
+      render: (s) => (
+        <Button size="sm" variant="ghost" onClick={() => setPrintingShift(s)} aria-label={t('billing.cashShift.summary.print')}>
+          <Printer className="size-4" aria-hidden="true" />
+        </Button>
+      ),
     },
   ]
 
@@ -551,6 +562,25 @@ export function CashShiftPage() {
           />
         </CardContent>
       </Card>
+
+      {printingShift && (
+        <CashShiftSummaryDialog
+          shift={{
+            id: printingShift.id,
+            branchName: printingShift.branch_name,
+            openedByName: printingShift.opened_by_name,
+            closedByName: printingShift.closed_by_name,
+            openedAt: printingShift.opened_at,
+            closedAt: printingShift.closed_at,
+            openingFloat: printingShift.opening_float,
+            expectedCash: printingShift.expected_cash,
+            closingCount: printingShift.closing_count,
+            variance: printingShift.variance,
+            status: printingShift.status,
+          }}
+          onClose={() => setPrintingShift(null)}
+        />
+      )}
     </div>
   )
 }

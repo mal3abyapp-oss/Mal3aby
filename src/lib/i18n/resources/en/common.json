@@ -2424,6 +2424,24 @@
         "settleReasonLabel": "Reason (optional)",
         "settleReasonPlaceholder": "e.g. payroll deduction, cash payment",
         "confirmSettle": "Confirm settlement"
+      },
+      "summary": {
+        "print": "Print summary",
+        "dialogTitle": "Cash shift summary",
+        "title": "Cash shift summary",
+        "branch": "Branch",
+        "openedBy": "Opened by",
+        "openedAt": "Opened at",
+        "closedBy": "Closed by",
+        "closedAt": "Closed at",
+        "openingFloat": "Opening float",
+        "expectedCash": "Expected cash",
+        "countedCash": "Counted cash",
+        "variance": "Variance",
+        "varianceBalanced": "Drawer balanced — no shortage or overage.",
+        "varianceShortage": "Shortage — the drawer had less cash than expected.",
+        "varianceOverage": "Overage — the drawer had more cash than expected.",
+        "stillOpen": "This shift is still open — figures shown are as of now, not a final close."
       }
     }
   },

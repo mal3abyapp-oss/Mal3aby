@@ -2437,6 +2437,24 @@
         "settleReasonLabel": "السبب (اختياري)",
         "settleReasonPlaceholder": "مثال: خصم من الراتب، دفعة نقدية",
         "confirmSettle": "تأكيد التسوية"
+      },
+      "summary": {
+        "print": "طباعة الملخص",
+        "dialogTitle": "ملخص الوردية النقدية",
+        "title": "ملخص الوردية النقدية",
+        "branch": "الفرع",
+        "openedBy": "فتحها",
+        "openedAt": "وقت الفتح",
+        "closedBy": "أغلقها",
+        "closedAt": "وقت الإغلاق",
+        "openingFloat": "الرصيد الافتتاحي",
+        "expectedCash": "النقد المتوقع",
+        "countedCash": "النقد المعدود",
+        "variance": "الفرق",
+        "varianceBalanced": "الخزينة متوازنة — لا يوجد عجز أو زيادة.",
+        "varianceShortage": "عجز — النقد الفعلي أقل من المتوقع.",
+        "varianceOverage": "زيادة — النقد الفعلي أكثر من المتوقع.",
+        "stillOpen": "هذه الوردية ما زالت مفتوحة — الأرقام المعروضة كما هي الآن، وليست إغلاقًا نهائيًا."
       }
     }
   },
