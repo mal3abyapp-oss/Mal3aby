@@ -89,7 +89,16 @@ test.describe('Login button visibility regression guard (Phase 15 fix)', () => {
 
   test('mobile hero login button text color differs from its background color', async ({ page }) => {
     await page.goto('/')
-    const loginLink = page.getByRole('link', { name: /تسجيل الدخول|login|sign in/i }).first()
+    // QA sweep (2026-08-30): this was matching zero elements -- the
+    // regex required the exact substring "تسجيل الدخول", but the
+    // hero's actual Arabic copy (publicSite.home.customerLink) reads
+    // "...سجّل الدخول لرؤية حجوزاتك..." (imperative "سجّل", with a
+    // shadda -- a different word form from the noun "تسجيل" the regex
+    // was built against). The English copy ("...Sign in to see your
+    // bookings...") already matched via the "sign in" alternative, so
+    // this only broke default-locale (Arabic) runs. Broadened to match
+    // either verb form instead of hardcoding one exact phrase.
+    const loginLink = page.getByRole('link', { name: /سجّل الدخول|سجل الدخول|تسجيل الدخول|login|sign in/i }).first()
     await expect(loginLink).toBeVisible()
     const { color, backgroundColor } = await loginLink.evaluate((el) => {
       const style = window.getComputedStyle(el)
