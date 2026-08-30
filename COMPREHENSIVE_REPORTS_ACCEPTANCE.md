@@ -135,6 +135,60 @@ Cross-report reconciliation checks performed so far, all correct:
   against sum of 21 line values ✓
 - Customer Purchases filter correctly scoped to selected customer,
   showing exactly the 20 line items from that customer's real invoice ✓
+- R5 (P2): Finance Overview's Expenses KPI card hardcoded "N/A"
+  unconditionally regardless of real data. FIXED (see below); after
+  fix, verified against raw SQL: expenses table sum = 50.00 EGP,
+  Finance Overview card = 50.00 EGP, Expenses page = 50.00 EGP — three-
+  way match ✓
+
+## 4. Cross-report reconciliation (directive Section 8) — CLOSED
+
+Independent ground-truth SQL against the full QA period
+(2026-07-31–2026-08-30), verified against every report claiming the
+same figures:
+- `sum(payments.amount)` = 2,350.00 (pre-split-test) → matched Revenue,
+  Collections, Finance Overview exactly.
+- `sum(refunds.amount) where status='completed'` = 440.00 → matched
+  Exceptions, Payment Methods reconciliation exactly.
+- `sum(expenses.amount) where status != 'voided'` = 50.00 → matched
+  Finance Overview (after R5 fix) and the Expenses page exactly.
+- Constructed a real split-tender payment (invoice 000013: initial
+  card payment 1,000.00 + a second `record_payment()` call in
+  `bank_transfer`, 500.00, on the SAME invoice) — verified split
+  tender renders as two DISTINCT payment lines (never collapsed) in
+  the actual invoice document, with independent print/refund actions
+  per line. Verified the new bank_transfer row appears correctly in
+  the Payment Methods report (500.00, 1 payment) and total collected
+  updated to 2,850.00 — independently re-confirmed via
+  `sum(payments.amount)` = 2,850.00 in raw SQL. This satisfies
+  directive Section 9's explicit split-payment requirement.
+- Full sale + discount + partial payment (000013), partially-returned
+  sale (000007), fully-returned sale (000006), and now split-tender
+  (000013) are all present as real distinct scenarios in this QA
+  period — satisfying most of Section 9's required Shop scenario
+  matrix. Not yet constructed live: "unknown historical cost" (all 22
+  sale lines in this period have known cost per the Gross Profit
+  report's own honesty notice — would need a sale predating cost
+  tracking, not safely reproducible without backdating real data).
+
+## 5. Membership reports gap (directive Section 14/24)
+
+Reviewed `/app/memberships` live: Overview tab shows only current-state
+counts (Active/Scheduled/Frozen/Expiring-in-7-days) — no date-range
+filterable new/renewed/cancelled breakdown, no revenue-by-plan figures,
+no historical trend. This is a genuine, real gap:
+- **Classification: P2** (important management gap, not a REQUIRED
+  blocker — the underlying operational workflows, Members/Plans/
+  Expiring tabs, are functional; this is a missing analytics layer).
+- **Source data DOES support building this correctly**:
+  `club_membership_subscriptions` already has `status`, `start_date`,
+  `end_date`, `cancelled_at`, `price_snapshot`, `created_at` — no
+  schema change needed.
+- Not built this pass (directive's own explicit caution: review what
+  exists comprehensively before adding new surfaces; a full new report
+  page is a larger scope decision than a targeted fix). Documented
+  here per Section 24's explicit instruction rather than silently
+  skipped or spontaneously built.
 
 ## 4. Filter matrix results
 
