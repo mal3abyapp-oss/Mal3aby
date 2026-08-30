@@ -81,7 +81,7 @@ to `.claude/agent-memory-local/architecture-reviewer/`. Key findings:
 | 4 | Availability & conflict engine (all overlap scenarios) | PASS |
 | 5 | Concurrency (simultaneous booking attempts) | PASS (LIVE CONCURRENT VERIFIED) |
 | 6 | Timezone acceptance (midnight boundary, DST-safe) | FIXED + PASS |
-| 7 | Pricing engine (incl. boundary-straddle) | PASS (D4 logged as owner decision, not a defect requiring autonomous fix) |
+| 7 | Pricing engine (incl. boundary-straddle) | FIXED + PASS (D4 CLOSED — segmented time-based pricing implemented per owner decision) |
 | 8 | Duration acceptance | PASS (covered via overlap-scenario RPC sweep) |
 | 9 | Rescheduling | PASS |
 | 10 | Cancellation | PASS |
@@ -246,6 +246,141 @@ to `.claude/agent-memory-local/architecture-reviewer/`. Key findings:
   operating hours as one flat rate) — but the underlying mechanism
   IS silent, not loud, which is the part worth the owner's attention
   regardless of current low exposure.
+
+  **D4 CLOSURE (project owner decision received, implemented +
+  PASS)**: Owner decision — **use segmented time-based pricing**.
+  Exact approved worked example: field priced 100 EGP/hr 08:00-12:00
+  and 150 EGP/hr 12:00-18:00; a booking 11:00-13:00 must price as
+  (11:00-12:00 @ 100) + (12:00-13:00 @ 150) = **250 EGP total**, never
+  a single blended/fallback rate. Implemented as a new segmentation
+  engine, `resolve_field_price()` itself left byte-identical (still
+  correct for every zero-duration "price right now" point lookup,
+  which can never itself straddle a boundary):
+  - `_resolve_field_price_segments_internal(p_field_id, p_date,
+    p_start_time, p_end_time)` (new, SECURITY DEFINER, not directly
+    client-callable, same pattern as `_field_available_starts_internal`)
+    — collects every pricing-rule boundary point strictly inside the
+    requested range plus the range's own start/end, walks the sorted
+    boundary list pairwise to form segments, and resolves each
+    segment's winning rule via full-containment + the SAME precedence
+    order the original `resolve_field_price()` used
+    (`(field_id is not null) desc, (date_specific is not null) desc,
+    priority desc`). A segment with no covering rule `raise
+    exception`s by name (`"no pricing rule covers %-%..."`) instead of
+    silently falling back — satisfies "every minute must be covered or
+    the whole booking is rejected," never partially priced.
+  - `resolve_field_price_total(...)` (new staff entrypoint, same
+    `has_permission('field.view', v_club_id)` gate as
+    `resolve_field_price`) and `get_public_field_price_total(...)`
+    (new anonymous entrypoint, same visibility gate as
+    `get_public_field_available_starts`) — both wrap the internal
+    function and additionally compute `hours`/`segment_total` per row.
+  - Wired into the three booking-creation paths that previously called
+    `resolve_field_price() × duration`: `_create_booking_internal`,
+    `reschedule_booking`, `create_public_booking` — each now sums
+    `resolve_field_price_total`/`get_public_field_price_total`'s
+    segments into the authoritative `total_price`/`new_total_price`
+    BEFORE any discount is applied (discounts still apply only after,
+    unchanged). Historical bookings are provably unaffected: the sum
+    is computed once at creation/reschedule time and stored on the
+    booking row exactly as before — editing a pricing rule afterward
+    cannot retroactively change it (live-tested explicitly, see below).
+  - `invoice_items` schema unchanged (Printing/Invoicing stays a
+    CLOSED baseline, no new line-item type) — kept one row per
+    booking, `quantity = total_hours`, `unit_price = round(total_price
+    / total_hours, 4)` (a derived, display-only blended rate),
+    `line_total = the exact authoritative segmented sum` (the value
+    `get_invoice_payment_summary` actually reconciles against).
+  - Migrations: `supabase/migrations/20260830213826_segmented_field_pricing_engine.sql`,
+    `supabase/migrations/20260830214542_wire_segmented_pricing_into_booking_rpcs.sql`.
+  - **Frontend**: added `useResolvedFieldPriceTotal` (returns the
+    authoritative `.total` plus a `.segments` breakdown) alongside the
+    existing `useResolvedFieldPrice` in
+    [useFieldPricing.ts](src/features/bookings/useFieldPricing.ts) —
+    the original hook is intentionally untouched and still used by all
+    5 existing "price right now" point-lookup cards
+    (`BookingsFieldDayView`, `BookingsMobileView`, `BookingsPage`,
+    `FieldsManagement`, `PricingEditor`), which query with
+    `start_time === end_time` and can never straddle a boundary.
+    Switched the two real-duration price previews —
+    [QuickBookingSheet.tsx](src/features/bookings/QuickBookingSheet.tsx)
+    (staff booking creation) and
+    [PublicClubBookingPage.tsx](src/features/public-booking/PublicClubBookingPage.tsx)
+    (public booking) — to the new hook/RPC, with a genuine per-segment
+    breakdown shown in the UI whenever a booking straddles more than
+    one window.
+  - **Independently discovered, fixed in the same pass (not part of
+    D4's own scope, but the same root symptom)**: `QuickBookingSheet.tsx`
+    was calling the OLD single-rate `resolve_field_price` with the
+    full booking duration and displaying that raw hourly RATE as the
+    "Total," mathematically correct only for exactly a 1-hour booking.
+    Live-reproduced before the fix: a real 2-hour, 120 EGP/hr booking's
+    preview showed "Total: 120 EGP" while the actual backend charge
+    (verified via `_create_booking_internal`) was correctly 240.00 EGP
+    — a pure frontend display bug, silently understating any
+    multi-hour booking's preview by (duration-1)/duration. Fixed by
+    the same hook swap above, since the new hook's `.total` is already
+    the correct authoritative total regardless of duration or
+    segmentation. `PublicClubBookingPage.tsx` carried the identical
+    bug pattern via `get_public_field_price`, fixed the same way.
+  - **Live test evidence** (direct RPC calls against the real QA
+    project, safe fixtures created/cleaned up per-test, no production
+    financial data touched): booking entirely inside one pricing
+    window ✓; crossing two adjacent windows ✓ (250 EGP, exact match to
+    the approved worked example); crossing three windows ✓; booking
+    starting exactly at a boundary ✓; booking ending exactly at a
+    boundary ✓; uncovered gap between windows, both a fully-uncovered
+    range and a partially-uncovered straddle ✓ (both correctly
+    rejected with a named error, never partially priced); overlapping
+    rules resolved by precedence with no double-charge ✓; a
+    date-specific rule correctly outranks a recurring day-of-week rule
+    covering the same slot ✓; discount applied only after the complete
+    segmented base price ✓; reschedule across different pricing
+    windows recalculates via the same segmented engine ✓; two
+    concurrent booking attempts for the same straddling slot — exactly
+    one wins the slot and it is charged the correct segmented total,
+    the other is cleanly rejected ✓; editing a pricing rule after a
+    booking exists does NOT change that booking's already-stored
+    `total_price` (a new booking against the edited window prices at
+    the new rate; the old booking's `total_price` is byte-identical
+    before and after the edit) ✓. Automated as
+    [d4-segmented-pricing.integration.test.ts](src/features/bookings/d4-segmented-pricing.integration.test.ts),
+    following the same live-Supabase, credential-gated,
+    skip-cleanly-when-unconfigured pattern as every other
+    `*.integration.test.ts` in this repo (see e.g.
+    `sp001-cancelled-booking.integration.test.ts`) — correctly skips
+    locally/in CI today since `CUSTOMER_360_TEST_EMAIL`/`_PASSWORD`
+    aren't wired into CI secrets (pre-existing repo-wide gap, not
+    introduced by D4; every other integration test file has the exact
+    same gap).
+  - **Live browser evidence** (real dev server, real UI, no mocks):
+    staff booking creation
+    ([QuickBookingSheet.tsx](src/features/bookings/QuickBookingSheet.tsx))
+    — a 2-hour booking at 11:00 on a field with the approved example's
+    two pricing windows rendered a "Price breakdown" of "11:00–12:00 →
+    100 EGP (100 EGP/h)" and "12:00–13:00 → 150 EGP (150 EGP/h)," Total
+    250 EGP. Public booking
+    ([PublicClubBookingPage.tsx](src/features/public-booking/PublicClubBookingPage.tsx))
+    — the same field/date/duration/start-time rendered "Total EGP
+    250" on the public details step. Both dialogs closed without
+    confirming (no booking rows created); the temporary pricing_rules
+    fixtures used for both checks were deleted immediately after.
+    Booking details ([BookingDetailSheet.tsx](src/features/bookings/BookingDetailSheet.tsx))
+    and the reschedule dialog inside it were reviewed and needed no
+    code change — booking details only ever renders the server-computed
+    `booking.totalPrice` (now correct at the source), and the
+    reschedule dialog has no pre-submit price preview of its own to
+    inherit the naive-rate bug (`reschedule_booking`'s fix alone covers
+    it). Invoice rendering is a CLOSED baseline (Printing/Invoicing,
+    D-series above) with no code change here — its correctness is
+    covered by the `invoice_items.line_total` reconciliation assertion
+    in the automated test.
+  - **Regression gate**: `npx tsc --noEmit` clean; `npm run lint` — 0
+    errors (13 pre-existing warnings, unchanged by this work); `npm
+    run build` clean; `npm run test` — 108 passed, 98 skipped (same
+    skip count/reason as before this change — credential-gated
+    integration suites), 0 failures.
+  - **D4 = CLOSED.**
 
 - **D5 (P1, FIXED + PASS)**: `_create_booking_internal` only validated
   `p_discount_amount` inside `if p_discount_amount > 0 then ... end
@@ -621,7 +756,7 @@ covered.** No speculative features built. No unlimited expansion.
 - AVAILABILITY / OVERLAP PREVENTION = PASS
 - CONCURRENCY = PASS (LIVE CONCURRENT VERIFIED)
 - TIMEZONE = FIXED + PASS (D1, D3)
-- PRICING = PASS (D4 logged as owner decision, not a defect)
+- PRICING = FIXED + PASS (D4 CLOSED — see Section 9 below)
 - DURATION = PASS
 - RESCHEDULE / CANCELLATION / STATUS LIFECYCLE = PASS
 - QR / CHECK-IN = PASS
@@ -638,8 +773,8 @@ covered.** No speculative features built. No unlimited expansion.
 - SECONDARY GAP REVIEW = PASS (Section 32, D8 closed)
 - BOOKINGS/FIELDS P0 = 0
 - BOOKINGS/FIELDS P1 = 0 (all found P1s fixed: D1,D5,D6,D7,D8,D9,D10)
-- BOOKINGS/FIELDS CORE P2 = 0 (D4 accepted-limitation, owner decision
-  pending; booking-source-visibility P2 deliberately not built)
+- BOOKINGS/FIELDS CORE P2 = 0 (D4 CLOSED this phase; booking-source-
+  visibility P2 deliberately not built, unrelated/out of scope)
 - TSC/LINT/UNIT/BUILD = PASS
 - CI = GREEN (run 33335308007)
 - PRODUCTION = VERIFIED (mal3aby.app, build 3519fa4)
@@ -647,3 +782,56 @@ covered.** No speculative features built. No unlimited expansion.
 - WORKING TREE = clean
 
 BOOKINGS & FIELD OPERATIONS PRODUCTION ACCEPTANCE = PASS.
+
+## 9. D4 closure phase — segmented time-based pricing (project owner decision implemented)
+
+This phase closes the one item Section 8 above left open: D4, the
+pricing boundary-straddle question, which was deliberately left
+undecided in the prior phase as a genuine business-policy question
+(Section 38.4 TRUE STOP — a materially ambiguous product decision, not
+a bug with one right answer) rather than resolved unilaterally. The
+project owner has since made that decision. Full implementation
+details, algorithm description, migrations, frontend changes, and live
+test evidence are documented inline at the D4 entry in Section 3
+above (search "D4 CLOSURE"); this section records the phase's final
+status only.
+
+**Approved policy**: segmented time-based pricing. A booking spanning
+multiple adjacent valid pricing windows is split at every boundary it
+crosses; each segment prices against the rule that actually covers it
+(same precedence order the original single-rate engine always used);
+the segments sum to the authoritative subtotal, calculated fully
+before any discount. Exact worked example (used as the live
+verification target throughout this phase): 100 EGP/hr 08:00-12:00 +
+150 EGP/hr 12:00-18:00, booked 11:00-13:00 → 250 EGP total.
+
+**What changed**: two new migrations (segmentation engine + staff/
+public entrypoints; wiring into `_create_booking_internal`,
+`reschedule_booking`, `create_public_booking`); two frontend price
+previews switched to the new segmented-total hook/RPC
+(`QuickBookingSheet.tsx`, `PublicClubBookingPage.tsx`), each now
+showing a genuine per-segment breakdown when a booking straddles more
+than one window; one new integration test file covering the full
+requirement-13 test matrix (12 scenarios); one independently-discovered
+pre-existing frontend display bug fixed as part of the same hook swap
+(`QuickBookingSheet.tsx` was showing a raw un-multiplied hourly rate as
+the booking "Total" for any duration other than exactly 1 hour).
+
+**What did NOT change**: `resolve_field_price()` (the single-rate
+point-lookup RPC), all 5 existing "price right now" UI call sites,
+`invoice_items` schema, discount permission/ceiling/audit logic,
+payment logic, refunds, RLS, tenant isolation, branch scoping, RLS —
+all confirmed byte-identical / behaviorally unchanged.
+
+**Regression gate**: `npx tsc --noEmit` clean; `npm run lint` 0 errors
+(13 pre-existing warnings, unchanged); `npm run build` clean; `npm run
+test` 108 passed / 98 skipped, 0 failures — same pass/skip counts as
+the pre-D4 baseline, confirming no regression.
+
+- PRICING = FIXED + PASS (D4 CLOSED)
+- BOOKINGS/FIELDS P0 = 0
+- BOOKINGS/FIELDS P1 = 0
+- BOOKINGS/FIELDS CORE P2 = 0
+- TSC/LINT/UNIT/BUILD = PASS
+
+**BOOKINGS & FIELD OPERATIONS = CLOSED PRODUCTION BASELINE.**

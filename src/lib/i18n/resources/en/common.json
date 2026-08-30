@@ -1001,6 +1001,8 @@
       "pricePerBooking": "Price per booking",
       "total": "Total",
       "priceError": "Couldn't calculate the price for this slot.",
+      "priceBreakdown": "Price breakdown",
+      "segmentRange": "{{start}}–{{end}}",
       "recurringWeekly": "Recurring weekly",
       "occurrenceCount": "Number of occurrences",
       "recurringHint": "A booking will be created every week on the same day and time, starting from this date.",

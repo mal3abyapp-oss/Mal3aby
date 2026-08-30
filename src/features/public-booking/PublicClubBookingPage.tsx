@@ -297,20 +297,33 @@ export function PublicClubBookingPage() {
     enabled: !!selectedFieldId && !!dateKey && !!club && (step === 'time' || step === 'date'),
   })
 
+  // BOOKINGS/FIELDS PRODUCTION ACCEPTANCE, D4 CLOSURE: this used to call
+  // get_public_field_price() (a single hourly RATE) with the full
+  // selected duration and show that raw rate as the booking's "Total"
+  // -- correct only by coincidence for exactly 1-hour bookings, and
+  // WRONG for any booking whose time range crosses a pricing-rule
+  // boundary (D4's own straddling-window scenario) or that simply
+  // lasts more/less than 1 hour. The actual charge was always correct
+  // server-side (create_public_booking's returned total_price, shown
+  // post-submit as confirmedTotal) -- this was a pre-submit display
+  // bug only, now fixed by summing the real segmented total via
+  // get_public_field_price_total(), the same engine used everywhere
+  // else duration-based pricing is shown.
   const { data: price } = useQuery({
-    queryKey: ['public-field-price', selectedFieldId, dateKey, selectedTime, selectedDuration],
+    queryKey: ['public-field-price-total', selectedFieldId, dateKey, selectedTime, selectedDuration],
     queryFn: async () => {
       const [h, m] = selectedTime!.split(':').map(Number)
       const endMinutes = (h ?? 0) * 60 + (m ?? 0) + selectedDuration
       const endTime = `${String(Math.floor(endMinutes / 60) % 24).padStart(2, '0')}:${String(endMinutes % 60).padStart(2, '0')}`
-      const { data, error } = await supabase.rpc('get_public_field_price', {
+      const { data, error } = await supabase.rpc('get_public_field_price_total', {
         p_field_id: selectedFieldId!,
         p_date: dateKey!,
         p_start_time: `${selectedTime}:00`,
         p_end_time: `${endTime}:00`,
       })
       if (error) throw error
-      return data as number
+      const total = (data ?? []).reduce((sum, row) => sum + Number(row.segment_total), 0)
+      return Math.round(total * 100) / 100
     },
     enabled: !!selectedFieldId && !!dateKey && !!selectedTime && step === 'details' && !isTodaySelected,
   })

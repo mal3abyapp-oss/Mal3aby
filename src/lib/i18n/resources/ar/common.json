@@ -1001,6 +1001,8 @@
       "pricePerBooking": "سعر كل حجز",
       "total": "الإجمالي",
       "priceError": "تعذّر حساب السعر لهذا الموعد.",
+      "priceBreakdown": "تفصيل السعر",
+      "segmentRange": "{{start}}–{{end}}",
       "recurringWeekly": "حجز متكرر أسبوعيًا",
       "occurrenceCount": "عدد المرات",
       "recurringHint": "سيتم إنشاء حجز كل أسبوع في نفس اليوم والوقت، بدءًا من هذا التاريخ.",

@@ -54,6 +54,58 @@ export function useResolvedFieldPrice(fieldId: string | null, date: string | nul
   })
 }
 
+export interface PriceSegment {
+  segmentStart: string
+  segmentEnd: string
+  pricePerHour: number
+  hours: number
+  segmentTotal: number
+}
+
+export interface ResolvedFieldPriceTotal {
+  total: number
+  segments: PriceSegment[]
+}
+
+// BOOKINGS/FIELDS PRODUCTION ACCEPTANCE, D4 CLOSURE: real duration
+// pricing (as opposed to useResolvedFieldPrice's single-instant "price
+// right now" point lookup above) must go through the segmented pricing
+// engine (resolve_field_price_total), never resolve_field_price() x
+// duration -- that naive multiplication is exactly what silently
+// broke on a booking spanning two adjacent pricing windows, AND (found
+// live this session, independent of D4) was already displaying a
+// mathematically wrong total for any duration other than exactly 1
+// hour, since resolve_field_price() only ever returns a single hourly
+// rate, never multiplied by duration -- the frontend was showing that
+// raw rate as if it were already the total. Used by QuickBookingSheet
+// (staff booking creation) wherever a real chosen duration -- not a
+// zero-duration "now" instant -- needs a price.
+export function useResolvedFieldPriceTotal(fieldId: string | null, date: string | null, startTime: string | null, endTime: string | null) {
+  return useQuery({
+    queryKey: ['resolve-field-price-total', fieldId, date, startTime, endTime],
+    queryFn: async (): Promise<ResolvedFieldPriceTotal> => {
+      const { data, error } = await supabase.rpc('resolve_field_price_total', {
+        p_field_id: fieldId!,
+        p_date: date!,
+        p_start_time: startTime!,
+        p_end_time: endTime!,
+      })
+      if (error) throw error
+      const segments: PriceSegment[] = (data ?? []).map((row) => ({
+        segmentStart: row.segment_start,
+        segmentEnd: row.segment_end,
+        pricePerHour: Number(row.price_per_hour),
+        hours: Number(row.hours),
+        segmentTotal: Number(row.segment_total),
+      }))
+      const total = segments.reduce((sum, s) => sum + s.segmentTotal, 0)
+      return { total: Math.round(total * 100) / 100, segments }
+    },
+    enabled: !!fieldId && !!date && !!startTime && !!endTime,
+    retry: false,
+  })
+}
+
 export interface FieldOperatingHoursToday {
   openTime: string | null
   closeTime: string | null

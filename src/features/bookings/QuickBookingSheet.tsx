@@ -15,15 +15,30 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { CustomerSelector, type SelectedCustomer } from '@/components/ui/customer-selector'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { useResolvedFieldPrice, useClubTimezone } from './useFieldPricing'
+import { useResolvedFieldPriceTotal, useClubTimezone } from './useFieldPricing'
 import { toInstant } from '@/lib/domain/time'
 import { useDirection } from '@/app/providers/DirectionProvider'
 import { useOfficialReceipt, OfficialCollectionReceiptFields, translateReceiptError } from '@/components/ui/official-collection-receipt-fields'
 import { PAYMENT_METHOD_LABELS } from '@/lib/domain/billing'
 
 // Section E3 — Quick Booking: a right-side drawer opened from an empty
-// calendar slot. Price is ALWAYS server-resolved (resolve_field_price)
-// and shown before confirmation -- never guessed client-side.
+// calendar slot. Price is ALWAYS server-resolved and shown before
+// confirmation -- never guessed client-side.
+//
+// BOOKINGS/FIELDS PRODUCTION ACCEPTANCE, D4 CLOSURE: this used to call
+// resolve_field_price() (a single hourly RATE, not a total) and
+// display its raw return value as the booking's "Total" -- correct
+// only by coincidence for exactly 1-hour bookings, silently WRONG
+// (understated) for any other duration, since the value was never
+// actually multiplied by the duration anywhere in this component.
+// Live-reproduced: a real 2-hour, 120 EGP/hr booking's preview showed
+// "Total: 120 EGP" (the raw hourly rate) instead of the real 240 EGP
+// the backend actually charged. Now uses
+// useResolvedFieldPriceTotal(), which calls the new segmented pricing
+// engine (resolve_field_price_total) and returns the real,
+// already-summed total -- correct for both a straddling-pricing-
+// window booking (D4's own scenario) and this pre-existing multi-hour
+// display bug, in one fix.
 
 export interface QuickBookingSlot {
   fieldId: string
@@ -163,12 +178,13 @@ export function QuickBookingSheet({
     return `${String(endH).padStart(2, '0')}:${String(endM).padStart(2, '0')}`
   }, [slot, duration])
 
-  const { data: resolvedPrice, isLoading: priceLoading } = useResolvedFieldPrice(
+  const { data: resolvedPrice, isLoading: priceLoading } = useResolvedFieldPriceTotal(
     slot?.fieldId ?? null,
     slot?.date ?? null,
     slot?.startTime ? `${slot.startTime}:00` : null,
     endTime ? `${endTime}:00` : null,
   )
+  const resolvedTotal = resolvedPrice?.total ?? null
 
   const bookMutation = useMutation({
     mutationFn: async () => {
@@ -224,7 +240,7 @@ export function QuickBookingSheet({
         p_start_at: startAt,
         p_end_at: endAt,
         p_record_payment: payNow,
-        p_payment_amount: payNow ? resolvedPrice ?? undefined : undefined,
+        p_payment_amount: payNow ? resolvedTotal ?? undefined : undefined,
         p_payment_method: payNow ? paymentMethod : undefined,
         ...(receiptPayload ?? {}),
       })
@@ -303,23 +319,48 @@ export function QuickBookingSheet({
               <CustomerSelector clubId={clubId} value={selectedCustomer} onSelect={setSelectedCustomer} />
             </div>
 
-            {/* Price -- server resolved, always visible before confirmation */}
+            {/* Price -- server resolved, always visible before confirmation.
+                BOOKINGS/FIELDS PRODUCTION ACCEPTANCE, D4 CLOSURE: this now
+                reads resolvedPrice.total, the authoritative sum from the
+                segmented pricing engine (resolve_field_price_total) --
+                correct whether the slot sits inside one pricing window or
+                straddles several. When it straddles more than one, the
+                per-segment breakdown is shown so staff can see exactly how
+                the total was built, instead of one blended average rate. */}
             <div className="rounded-lg border border-accent/30 bg-accent/5 p-3">
               {priceLoading ? (
                 <p className="text-sm text-text-secondary">{t('bookings.quick.calculatingPrice')}</p>
               ) : resolvedPrice != null ? (
                 <div className="flex flex-col gap-1 text-sm">
-                  <div className="flex justify-between">
-                    <span className="text-text-secondary">{t('bookings.quick.pricePerHour')}</span>
-                    <span className="tabular-nums">{(resolvedPrice / Number(duration)).toFixed(0)} {t('common.currency')}</span>
-                  </div>
+                  {resolvedPrice.segments.length > 1 ? (
+                    <>
+                      <span className="text-text-secondary">{t('bookings.quick.priceBreakdown')}</span>
+                      {resolvedPrice.segments.map((seg) => (
+                        <div key={`${seg.segmentStart}-${seg.segmentEnd}`} className="flex justify-between">
+                          <span className="text-text-secondary tabular-nums">
+                            {t('bookings.quick.segmentRange', { start: seg.segmentStart.slice(0, 5), end: seg.segmentEnd.slice(0, 5) })}
+                          </span>
+                          <span className="tabular-nums">
+                            {seg.segmentTotal.toFixed(0)} {t('common.currency')} ({seg.pricePerHour.toFixed(0)} {t('common.currency')}/h)
+                          </span>
+                        </div>
+                      ))}
+                    </>
+                  ) : (
+                    <div className="flex justify-between">
+                      <span className="text-text-secondary">{t('bookings.quick.pricePerHour')}</span>
+                      <span className="tabular-nums">
+                        {(resolvedPrice.segments[0]?.pricePerHour ?? resolvedPrice.total / Number(duration)).toFixed(0)} {t('common.currency')}
+                      </span>
+                    </div>
+                  )}
                   <div className="flex justify-between">
                     <span className="text-text-secondary">{t('bookings.quick.duration')}</span>
                     <span className="tabular-nums">{t('bookings.quick.duration_hours', { count: Number(duration) })}</span>
                   </div>
                   <div className="mt-1 flex justify-between border-t border-accent/20 pt-1 font-semibold">
                     <span>{isRecurring ? t('bookings.quick.pricePerBooking') : t('bookings.quick.total')}</span>
-                    <span className="tabular-nums">{resolvedPrice.toFixed(0)} {t('common.currency')}</span>
+                    <span className="tabular-nums">{resolvedPrice.total.toFixed(0)} {t('common.currency')}</span>
                   </div>
                 </div>
               ) : (
@@ -418,7 +459,7 @@ export function QuickBookingSheet({
           <Button
             className="w-full"
             data-testid="quick-booking-confirm"
-            disabled={!selectedCustomer || !resolvedPrice || !clubTimezone || bookMutation.isPending || !!recurringResult || (isRecurring && (!occurrenceCount || Number(occurrenceCount) < 1 || Number(occurrenceCount) > 52)) || (payNow && !isRecurring && !receipt.isValid)}
+            disabled={!selectedCustomer || !resolvedTotal || !clubTimezone || bookMutation.isPending || !!recurringResult || (isRecurring && (!occurrenceCount || Number(occurrenceCount) < 1 || Number(occurrenceCount) > 52)) || (payNow && !isRecurring && !receipt.isValid)}
             onClick={() => bookMutation.mutate()}
           >
             {bookMutation.isPending ? t('bookings.quick.booking') : isRecurring ? t('bookings.quick.confirmRecurring') : t('bookings.quick.confirmBooking')}

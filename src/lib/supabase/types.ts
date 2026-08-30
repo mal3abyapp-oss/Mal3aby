@@ -7192,6 +7192,20 @@ export type Database = {
         Args: { p_club_id: string }
         Returns: string
       }
+      _resolve_field_price_segments_internal: {
+        Args: {
+          p_date: string
+          p_end_time: string
+          p_field_id: string
+          p_start_time: string
+        }
+        Returns: {
+          price_per_hour: number
+          rule_id: string
+          segment_end: string
+          segment_start: string
+        }[]
+      }
       _shop_module_active: { Args: { p_club_id: string }; Returns: boolean }
       activate_subscription_if_due: {
         Args: { p_subscription_id: string }
@@ -8512,6 +8526,21 @@ export type Database = {
         }
         Returns: number
       }
+      get_public_field_price_total: {
+        Args: {
+          p_date: string
+          p_end_time: string
+          p_field_id: string
+          p_start_time: string
+        }
+        Returns: {
+          hours: number
+          price_per_hour: number
+          segment_end: string
+          segment_start: string
+          segment_total: number
+        }[]
+      }
       get_public_payment_methods_for_booking: {
         Args: { p_booking_id: string }
         Returns: {
@@ -9814,6 +9843,21 @@ export type Database = {
           p_start_time: string
         }
         Returns: number
+      }
+      resolve_field_price_total: {
+        Args: {
+          p_date: string
+          p_end_time: string
+          p_field_id: string
+          p_start_time: string
+        }
+        Returns: {
+          hours: number
+          price_per_hour: number
+          segment_end: string
+          segment_start: string
+          segment_total: number
+        }[]
       }
       restore_club_membership_plan: {
         Args: { p_plan_id: string }
