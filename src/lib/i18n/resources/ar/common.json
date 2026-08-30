@@ -3512,8 +3512,69 @@
       "tabLiability": "مديونية الموظفين"
     },
     "expenses": {
-      "notBuiltTitle": "تتبع المصروفات غير متاح بعد",
-      "notBuiltDescription": "لا يوجد لهذا النادي سجل مصروفات تشغيلية داخل ملعبي حتى الآن. لا توجد بيانات مخفية — هذه الميزة ببساطة غير موجودة في النظام بعد."
+      "title": "المصروفات",
+      "description": "سجّل وتابع مصروفات النادي التشغيلية، مصنّفة حسب الفرع والتصنيف وطريقة الدفع",
+      "recordExpense": "تسجيل مصروف",
+      "manageCategories": "إدارة التصنيفات",
+      "totalInRange": "إجمالي المصروفات",
+      "countInRange": "عدد المصروفات",
+      "uncategorized": "بدون تصنيف",
+      "noCategoriesYet": "لا توجد تصنيفات بعد.",
+      "categoryNameAr": "اسم التصنيف (بالعربية)",
+      "categoryNameEn": "اسم التصنيف (بالإنجليزية)",
+      "addCategory": "إضافة تصنيف",
+      "historyHeading": "سجل المصروفات",
+      "emptyTitle": "لا توجد مصروفات في هذه الفترة.",
+      "statusRecorded": "مسجّل",
+      "statusVoided": "ملغى",
+      "void": "إلغاء",
+      "confirmVoid": "تأكيد الإلغاء",
+      "voidReasonLabel": "سبب الإلغاء",
+      "voidReasonPlaceholder": "اكتب سبب إلغاء هذا المصروف...",
+      "columns": {
+        "date": "التاريخ",
+        "description": "الوصف",
+        "category": "التصنيف",
+        "branch": "الفرع",
+        "paidTo": "المدفوع له",
+        "method": "طريقة الدفع",
+        "amount": "المبلغ",
+        "status": "الحالة"
+      },
+      "filters": {
+        "from": "من",
+        "to": "إلى",
+        "branch": "الفرع",
+        "allBranches": "كل الفروع",
+        "category": "التصنيف",
+        "allCategories": "كل التصنيفات",
+        "status": "الحالة",
+        "allStatuses": "كل الحالات"
+      },
+      "form": {
+        "branch": "الفرع",
+        "branchPlaceholder": "اختر فرعًا",
+        "category": "التصنيف",
+        "amount": "المبلغ",
+        "method": "طريقة الدفع",
+        "date": "تاريخ المصروف",
+        "paidTo": "المدفوع له",
+        "paidToPlaceholder": "اسم المورّد أو الجهة (اختياري)",
+        "reference": "المرجع",
+        "referencePlaceholder": "رقم فاتورة أو إيصال (اختياري)",
+        "description": "الوصف",
+        "descriptionPlaceholder": "ما هو هذا المصروف؟",
+        "submit": "تسجيل المصروف",
+        "cashHint": "المصروفات النقدية تُخصم تلقائيًا من الوردية النقدية المفتوحة عند إغلاقها."
+      },
+      "errors": {
+        "selectBranch": "اختر الفرع أولاً.",
+        "invalidAmount": "أدخل مبلغًا أكبر من صفر.",
+        "descriptionRequired": "الوصف مطلوب.",
+        "categoryNameRequired": "اسم التصنيف مطلوب.",
+        "voidReasonRequired": "سبب الإلغاء مطلوب.",
+        "genericError": "حدث خطأ. حاول مرة أخرى."
+      }
     },
     "reportsPage": {
       "revenue": "الإيرادات",
@@ -3743,6 +3804,22 @@
     "payment.methods.manage": {
       "label": "إدارة طرق الدفع",
       "description": "إنشاء أو تعديل أو تعطيل طرق الدفع"
+    },
+    "expense.view": {
+      "label": "عرض المصروفات",
+      "description": "رؤية سجل مصروفات النادي وتقاريرها"
+    },
+    "expense.create": {
+      "label": "تسجيل مصروف",
+      "description": "إضافة مصروف جديد للنادي"
+    },
+    "expense.void": {
+      "label": "إلغاء مصروف",
+      "description": "إلغاء مصروف مسجّل بالخطأ (بسجل كامل، بدون حذف)"
+    },
+    "expense.category.manage": {
+      "label": "إدارة تصنيفات المصروفات",
+      "description": "إنشاء أو أرشفة تصنيفات المصروفات"
     },
     "club_membership.plan.view": {
       "label": "عرض خطط العضوية",

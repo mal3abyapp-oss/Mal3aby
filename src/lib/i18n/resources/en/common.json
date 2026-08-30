@@ -3506,8 +3506,69 @@
       "tabLiability": "Employee liability"
     },
     "expenses": {
-      "notBuiltTitle": "Expenses tracking is not built yet",
-      "notBuiltDescription": "This club doesn't have an operating-expenses ledger in Mal3aby yet. Nothing has been recorded or hidden — this feature simply doesn't exist in the system yet."
+      "title": "Expenses",
+      "description": "Record and track the club's operating expenses, broken down by branch, category, and payment method",
+      "recordExpense": "Record expense",
+      "manageCategories": "Manage categories",
+      "totalInRange": "Total expenses",
+      "countInRange": "Expense count",
+      "uncategorized": "Uncategorized",
+      "noCategoriesYet": "No categories yet.",
+      "categoryNameAr": "Category name (Arabic)",
+      "categoryNameEn": "Category name (English)",
+      "addCategory": "Add category",
+      "historyHeading": "Expense history",
+      "emptyTitle": "No expenses in this period.",
+      "statusRecorded": "Recorded",
+      "statusVoided": "Voided",
+      "void": "Void",
+      "confirmVoid": "Confirm void",
+      "voidReasonLabel": "Void reason",
+      "voidReasonPlaceholder": "Why are you voiding this expense?",
+      "columns": {
+        "date": "Date",
+        "description": "Description",
+        "category": "Category",
+        "branch": "Branch",
+        "paidTo": "Paid to",
+        "method": "Payment method",
+        "amount": "Amount",
+        "status": "Status"
+      },
+      "filters": {
+        "from": "From",
+        "to": "To",
+        "branch": "Branch",
+        "allBranches": "All branches",
+        "category": "Category",
+        "allCategories": "All categories",
+        "status": "Status",
+        "allStatuses": "All statuses"
+      },
+      "form": {
+        "branch": "Branch",
+        "branchPlaceholder": "Select a branch",
+        "category": "Category",
+        "amount": "Amount",
+        "method": "Payment method",
+        "date": "Expense date",
+        "paidTo": "Paid to",
+        "paidToPlaceholder": "Supplier or payee name (optional)",
+        "reference": "Reference",
+        "referencePlaceholder": "Invoice or receipt number (optional)",
+        "description": "Description",
+        "descriptionPlaceholder": "What is this expense for?",
+        "submit": "Record expense",
+        "cashHint": "Cash expenses are automatically deducted from the open cash shift when it's closed."
+      },
+      "errors": {
+        "selectBranch": "Select a branch first.",
+        "invalidAmount": "Enter an amount greater than zero.",
+        "descriptionRequired": "Description is required.",
+        "categoryNameRequired": "Category name is required.",
+        "voidReasonRequired": "A void reason is required.",
+        "genericError": "Something went wrong. Try again."
+      }
     },
     "reportsPage": {
       "revenue": "Revenue",
@@ -3737,6 +3798,22 @@
     "payment.methods.manage": {
       "label": "Manage payment methods",
       "description": "Create, edit, or disable payment methods"
+    },
+    "expense.view": {
+      "label": "View expenses",
+      "description": "See the club's expense ledger and reports"
+    },
+    "expense.create": {
+      "label": "Record expense",
+      "description": "Add a new club expense"
+    },
+    "expense.void": {
+      "label": "Void expense",
+      "description": "Void a mistakenly recorded expense (full audit trail, never deleted)"
+    },
+    "expense.category.manage": {
+      "label": "Manage expense categories",
+      "description": "Create or archive expense categories"
     },
     "club_membership.plan.view": {
       "label": "View membership plans",

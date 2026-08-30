@@ -192,6 +192,13 @@ export const ACTION_LABELS: Record<string, string> = {
   'staff.invite_resent': 'إعادة إرسال دعوة موظف',
   'subscription.renew': 'تجديد اشتراك أكاديمية',
   'qa.test_action': 'إجراء اختبار (QA)',
+
+  // EXPENSES FEATURE (2026-08-30) -- see
+  // 20260830010000_expenses_feature.sql for the RPCs that write these.
+  'expense.create': 'تسجيل مصروف',
+  'expense.void': 'إلغاء مصروف',
+  'expense_category.created': 'إنشاء تصنيف مصروفات',
+  'expense_category.status_changed': 'تغيير حالة تصنيف مصروفات',
 }
 
 export const ENTITY_LABELS: Record<string, string> = {
@@ -263,6 +270,10 @@ export const ENTITY_LABELS: Record<string, string> = {
   shop_stock_count: 'جرد مخزون',
   shop_transfer: 'نقل مخزون',
   qa_test_entity: 'كيان اختبار (QA)',
+
+  // EXPENSES FEATURE (2026-08-30)
+  expense: 'مصروف',
+  expense_category: 'تصنيف مصروفات',
 }
 
 // English mirror of ACTION_LABELS above -- same keys, same order, kept as
@@ -418,6 +429,12 @@ export const ACTION_LABELS_EN: Record<string, string> = {
   'staff.invite_resent': 'Resend staff invite',
   'subscription.renew': 'Renew academy subscription',
   'qa.test_action': 'QA test action',
+
+  // EXPENSES FEATURE (2026-08-30), English mirror.
+  'expense.create': 'Record expense',
+  'expense.void': 'Void expense',
+  'expense_category.created': 'Create expense category',
+  'expense_category.status_changed': 'Change expense category status',
 }
 
 export const ENTITY_LABELS_EN: Record<string, string> = {
@@ -485,6 +502,10 @@ export const ENTITY_LABELS_EN: Record<string, string> = {
   shop_stock_count: 'Stock count',
   shop_transfer: 'Inventory transfer',
   qa_test_entity: 'QA test entity',
+
+  // EXPENSES FEATURE (2026-08-30)
+  expense: 'Expense',
+  expense_category: 'Expense category',
 }
 
 /** Looks up a label, falling back to the raw value if genuinely unmapped -- never throws, matches the existing safe-fallback convention used throughout the app's other label maps. Defaults to 'ar' so any caller that hasn't been updated yet keeps its previous behavior. */

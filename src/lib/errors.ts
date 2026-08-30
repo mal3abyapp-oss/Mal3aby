@@ -64,6 +64,11 @@ const MESSAGE_RULES: Array<[RegExp, string, string]> = [
   // one below, since both can appear in the same underlying exception
   // text shape.
   [/cash collection requires an active cash shift/i, 'التحصيل النقدي يتطلب وردية نقدية مفتوحة — يجب فتح وردية قبل التحصيل.', 'Cash collection requires an active cash shift — open one before collecting cash.'],
+  // Expenses feature (2026-08-30): record_expense()'s own cash-custody
+  // gate, same pattern as the cash-collection rule above -- mapped
+  // proactively (confirmed missing via live UI QA of the Expenses page,
+  // which showed the generic fallback error instead of this message).
+  [/cash expenses require an active cash shift/i, 'المصروفات النقدية تتطلب وردية نقدية مفتوحة — يجب فتح وردية قبل تسجيل مصروف نقدي.', 'Cash expenses require an active cash shift — open one before recording a cash expense.'],
   [/cash collection requires a branch-scoped booking/i, 'التحصيل النقدي يتطلب حجزًا مرتبطًا بفرع محدد.', 'Cash collection requires a branch-scoped booking.'],
   [/official collection receipt required/i, 'هذا النادي/الملعب يتطلب إيصال تحصيل رسمي لهذه الطريقة.', 'This club/field requires an official government collection receipt for this payment method.'],
   [/official collection receipt not found, not active/i, 'رقم الإيصال غير موجود أو غير نشط أو لا يخص هذا النادي.', 'The official receipt was not found, is not active, or does not belong to this club.'],

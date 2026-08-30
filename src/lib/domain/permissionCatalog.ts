@@ -156,6 +156,14 @@ export const PERMISSION_GROUPS: PermissionGroup[] = [
       { key: 'payment.refund', sensitive: true, requires: ['payment.view'] },
       { key: 'payment.methods.view' },
       { key: 'payment.methods.manage', sensitive: true, requires: ['payment.methods.view'] },
+      // EXPENSES FEATURE (2026-08-30) -- see
+      // 20260830010000_expenses_feature.sql for the server-side seed
+      // this mirrors (club_owner/club_manager/branch_manager/accountant
+      // by default).
+      { key: 'expense.view' },
+      { key: 'expense.create', sensitive: true, requires: ['expense.view'] },
+      { key: 'expense.void', sensitive: true, requires: ['expense.view'] },
+      { key: 'expense.category.manage', requires: ['expense.view'] },
     ],
   },
   {
