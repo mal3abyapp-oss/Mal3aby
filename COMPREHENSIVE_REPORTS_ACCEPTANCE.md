@@ -272,9 +272,36 @@ mechanism, not merely re-read a prior fix's changelog entry.
 
 (pending)
 
-## 10. Security verification
+## 10. Security verification (directive Section 23) — primary agent's portion CLOSED
 
-(pending — cross-tenant, branch-scope, direct RPC calls)
+Direct RLS-impersonated adversarial SQL tests (not UI-hidden-button
+trust) against real report RPCs, using the QA club owner identity
+attempting cross-tenant access:
+- `get_booking_report()` with a foreign `p_club_id` → rejected
+  server-side with `not authorized`.
+- `get_executive_dashboard()` (Finance Overview/Revenue's own RPC)
+  with a foreign `p_club_id` → rejected server-side with
+  `not authorized`.
+- `get_shop_sales_kpis()` called with the CORRECT `p_club_id` but a
+  `p_customer_id` belonging to a DIFFERENT club (cross-tenant filter
+  parameter injection attempt) → returned all-zero results, not an
+  error and not the other club's data. Correct: the RPC's own
+  `club_id = p_club_id AND customer_id = p_customer_id` combination
+  means a foreign customer_id simply matches nothing real, revealing
+  neither that customer's existence nor any data.
+- Branch-scope enforcement: confirmed via source read that
+  `get_booking_report()` explicitly calls
+  `caller_accessible_branch_ids(p_club_id)` and rejects any
+  `p_branch_id` outside that set — this exact mechanism was the
+  subject of a dedicated prior-session fix
+  (`branch_scope_reporting_leak_cash_shifts_inventory` migration,
+  referenced in this session's own baseline notes), so not re-audited
+  from scratch here per directive Section 32 ("do not reopen closed
+  domains without concrete new evidence") — no new evidence of a
+  regression was found. A live multi-branch-restricted-staff UI test
+  was not performed (would require constructing a new staff identity
+  on a different club) — delegated to the subagent's parallel pass,
+  see its findings when it completes.
 
 ## 11. Missing reports gap review
 
