@@ -14,7 +14,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { StatusBadge } from '@/components/ui/status-badge'
 import { Separator } from '@/components/ui/separator'
-import { BOOKING_STATUS_LABELS, BOOKING_STATUS_TONE, type BookingRow } from '@/lib/domain/booking'
+import { BOOKING_STATUS_LABELS, BOOKING_STATUS_TONE, BOOKING_SOURCE_LABELS, type BookingRow } from '@/lib/domain/booking'
 import { formatInstant, fromInstant } from '@/lib/domain/time'
 import { fetchInvoicePaymentSummaries, PAYMENT_METHOD_LABELS, PAYMENT_STATUS_LABELS, type InvoicePaymentSummary } from '@/lib/domain/billing'
 import { translateSupabaseError } from '@/lib/errors'
@@ -168,6 +168,11 @@ export function BookingDetailSheet({
   // no undo UI) and had none. Mirrors that exact existing pattern
   // rather than introducing a new confirmation-dialog component.
   const [showNoShowConfirm, setShowNoShowConfirm] = useState(false)
+  // Same reveal-then-confirm pattern as showNoShowConfirm above --
+  // completion is equally consequential (a terminal status, no
+  // reversal workflow exists) and deserves the same one-misclick
+  // protection.
+  const [showCompleteConfirm, setShowCompleteConfirm] = useState(false)
   const [qrDataUrl, setQrDataUrl] = useState<string | null>(null)
   const [actionError, setActionError] = useState<string | null>(null)
   // IA restructuring (Phase 9, Booking 360): confirmed in the audit --
@@ -359,6 +364,36 @@ export function BookingDetailSheet({
     onError: () => setActionError(t('bookings.detail.noShowError')),
   })
 
+  // FINAL BOOKINGS UX & LIFECYCLE GAP CLOSURE, Section B3: manual
+  // completion, mirroring noShowMutation's exact shape -- same
+  // confirm-then-mutate pattern, same RPC-error-to-localized-message
+  // handling. mark_booking_completed() itself is the enforcement
+  // boundary (status in ('confirmed','checked_in') AND end_at has
+  // passed); this UI only mirrors that gate to avoid showing an
+  // action that would just error (see the button's own condition
+  // below), never trusts the client-side mirror as authoritative.
+  const completeMutation = useMutation({
+    mutationFn: async () => {
+      if (!booking) throw new Error('no booking selected')
+      const { error } = await supabase.rpc('mark_booking_completed', { p_booking_id: booking.id })
+      if (error) throw error
+    },
+    onSuccess: () => {
+      setShowCompleteConfirm(false)
+      onOpenChange(false)
+      onChanged()
+    },
+    onError: (error) => {
+      // The RPC raises a distinct, already-localizable message for the
+      // "hasn't ended yet" case (see mark_booking_completed's own
+      // RAISE) -- surface that specific copy instead of the generic
+      // fallback whenever it's the actual cause, same pattern as
+      // rescheduleMutation's translateSupabaseError usage above.
+      const message = error instanceof Error ? error.message : ''
+      setActionError(message.includes('has not ended yet') ? t('bookings.detail.completeTooEarlyError') : t('bookings.detail.completeError'))
+    },
+  })
+
   const outstanding = invoiceSummary ? invoiceSummary.outstanding : booking?.totalPrice ?? 0
 
   const collectPaymentMutation = useMutation({
@@ -456,6 +491,18 @@ export function BookingDetailSheet({
               <span className="text-xs text-text-secondary tabular-nums">
                 {formatInstant(booking.startAt, clubTimezone, { day: 'numeric', month: 'long' }, locale)}
               </span>
+            </div>
+
+            {/* FINAL BOOKINGS UX & LIFECYCLE GAP CLOSURE, Sections B8/
+                C2: quiet operational metadata -- source and (once
+                completed) how/when -- deliberately small/secondary
+                text, not a badge, so it doesn't compete visually with
+                the actual status above. */}
+            <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-text-secondary">
+              <span>{t('bookings.detail.source')}: {t(`bookings.sourceLabels.${booking.source}`, { defaultValue: BOOKING_SOURCE_LABELS[booking.source] ?? booking.source })}</span>
+              {booking.status === 'completed' && booking.completionSource && (
+                <span>{t(`bookings.completionSourceLabels.${booking.completionSource}`)}</span>
+              )}
             </div>
 
             <div className="rounded-lg border border-border p-3">
@@ -560,7 +607,17 @@ export function BookingDetailSheet({
                 balance is real accounting information (still shown
                 above), but staff should never be invited to collect
                 MORE money for a booking that isn't happening. */}
-            {booking.invoiceId && outstanding > 0.01 && booking.status !== 'cancelled' && booking.status !== 'no_show' && (
+            {/* FINAL BOOKINGS UX & LIFECYCLE GAP CLOSURE, Section B8:
+                'completed' is now a real, reachable status (it wasn't
+                before this closure -- no RPC ever set it) -- this
+                condition already excluded cancelled/no_show but not
+                completed, meaning staff could still be invited to
+                collect money for a booking whose service has already
+                concluded and been marked done. Excluded for the same
+                reasoning as the cancelled/no_show exclusions above:
+                the booking isn't an open, in-progress commitment
+                anymore. */}
+            {booking.invoiceId && outstanding > 0.01 && booking.status !== 'cancelled' && booking.status !== 'no_show' && booking.status !== 'completed' && (
               showCollectForm ? (
                 <div className="flex flex-col gap-2 rounded-lg border border-border p-3">
                   <div className="grid grid-cols-2 gap-2">
@@ -812,6 +869,30 @@ export function BookingDetailSheet({
               ) : (
                 <Button variant="outline" size="sm" onClick={() => setShowNoShowConfirm(true)}>
                   {t('bookings.detail.markNoShow')}
+                </Button>
+              )
+            )}
+
+            {/* FINAL BOOKINGS UX & LIFECYCLE GAP CLOSURE, Section B3:
+                same eligible-statuses set as no-show (confirmed/
+                checked_in) PLUS the RPC's own "end_at has passed"
+                gate, mirrored here so the action doesn't even appear
+                for a booking that would just error -- the RPC itself
+                remains the real enforcement boundary regardless. */}
+            {(booking.status === 'confirmed' || booking.status === 'checked_in') && new Date(booking.endAt) <= new Date() && (
+              showCompleteConfirm ? (
+                <div className="flex flex-col gap-2">
+                  <p className="text-sm text-text-secondary">{t('bookings.detail.confirmCompleteMessage')}</p>
+                  <div className="flex gap-2">
+                    <Button size="sm" disabled={completeMutation.isPending} onClick={() => completeMutation.mutate()}>
+                      {completeMutation.isPending ? t('bookings.detail.recordingComplete') : t('bookings.detail.confirmComplete')}
+                    </Button>
+                    <Button variant="ghost" size="sm" onClick={() => setShowCompleteConfirm(false)}>{t('bookings.detail.undo')}</Button>
+                  </div>
+                </div>
+              ) : (
+                <Button variant="outline" size="sm" onClick={() => setShowCompleteConfirm(true)}>
+                  {t('bookings.detail.markComplete')}
                 </Button>
               )
             )}

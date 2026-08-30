@@ -859,7 +859,13 @@
       "other": "أخرى"
     },
     "change": "تغيير",
-    "done": "تم"
+    "done": "تم",
+    "calendar": {
+      "previousMonth": "الشهر السابق",
+      "nextMonth": "الشهر التالي",
+      "openPicker": "اختر تاريخًا",
+      "outsideWindow": "خارج نطاق الحجز المسموح به"
+    }
   },
   "bookings": {
     "moduleNotActive": {
@@ -874,6 +880,15 @@
       "completed": "مكتمل",
       "cancelled": "ملغي",
       "no_show": "لم يحضر"
+    },
+    "sourceLabels": {
+      "staff": "الموظف",
+      "club_public_link": "رابط الحجز العام",
+      "club_qr": "رمز QR للنادي"
+    },
+    "completionSourceLabels": {
+      "manual": "أنهاه الموظف يدويًا",
+      "automatic": "اكتمل تلقائيًا"
     },
     "fieldBlockTypeLabels": {
       "maintenance": "صيانة",
@@ -928,6 +943,14 @@
       "recordingNoShow": "جارٍ التسجيل...",
       "confirmNoShow": "تأكيد عدم الحضور",
       "markNoShow": "تسجيل عدم حضور",
+      "confirmCompleteMessage": "تأكيد اكتمال هذا الحجز؟",
+      "recordingComplete": "جارٍ التسجيل...",
+      "confirmComplete": "تأكيد الاكتمال",
+      "markComplete": "تسجيل كمكتمل",
+      "completeTooEarlyError": "لم ينتهِ هذا الحجز بعد -- لا يمكن تسجيله كمكتمل قبل موعد انتهائه.",
+      "completeError": "تعذّر تسجيل هذا الحجز كمكتمل.",
+      "source": "مصدر الحجز",
+      "completedAt": "اكتمل في",
       "rescheduleBooking": "تعديل الموعد / الملعب",
       "rescheduleTitle": "تعديل موعد الحجز",
       "rescheduleCurrent": "الحالي",

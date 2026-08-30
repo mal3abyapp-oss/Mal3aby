@@ -14,7 +14,8 @@ import { CheckCircle2, MapPin, ChevronLeft, ChevronRight, Phone, MessageCircle, 
 import { PaymentMethodsPanel } from './PaymentMethodsPanel'
 import { HoldCountdown } from './HoldCountdown'
 import { normalizePhone } from '@/lib/domain/phone'
-import { toInstant } from '@/lib/domain/time'
+import { toInstant, fromInstant } from '@/lib/domain/time'
+import { DatePickerButton } from '@/components/ui/date-picker-button'
 
 /**
  * PublicClubBookingPage -- the Public Club Booking Page.
@@ -263,10 +264,23 @@ export function PublicClubBookingPage() {
   // tomorrow -- Today is always shown (contact experience), Tomorrow/
   // day-after are only shown if inside the club's configured window
   // (directive: "do not show dates beyond the allowed window").
+  // FINAL BOOKINGS UX & LIFECYCLE GAP CLOSURE, Section A4/G: `today`
+  // here used to be computed via raw browser `new Date()` +
+  // `setHours(0,0,0,0)` -- the CUSTOMER'S BROWSER-LOCAL midnight, not
+  // the club's real timezone, unlike every other date computation in
+  // this codebase (BookingsPage/BookingsMobileView both correctly use
+  // fromInstant(new Date(), clubTimezone).date). A customer browsing
+  // from a different timezone than the club could see a wrong "Today"
+  // boundary -- e.g. a club in Cairo (UTC+3) at 01:00 local (still
+  // "today" for the club) could show a customer browsing from UTC-5
+  // (still "yesterday" there) the wrong starting date. Fixed to derive
+  // `today` from the club's own timezone, matching the staff-side
+  // idiom exactly.
+  const clubTodayKey = club ? fromInstant(new Date(), club.timezone).date : null
+
   const dateOptions = useMemo(() => {
-    if (!club) return []
-    const today = new Date()
-    today.setHours(0, 0, 0, 0)
+    if (!club || !clubTodayKey) return []
+    const today = new Date(`${clubTodayKey}T12:00:00`)
     const options: Array<{ date: Date; daysOut: number; isToday: boolean; isOnlineBookable: boolean }> = [
       { date: today, daysOut: 0, isToday: true, isOnlineBookable: club.sameDayOnlineBookingEnabled },
     ]
@@ -275,7 +289,20 @@ export function PublicClubBookingPage() {
       options.push({ date: addDays(today, d), daysOut: d, isToday: false, isOnlineBookable: true })
     }
     return options
-  }, [club])
+  }, [club, clubTodayKey])
+
+  // The calendar's authoritative bounds, derived from the SAME
+  // club_booking_policy fields dateOptions itself uses -- directive
+  // A2/G: never invent a new booking horizon, and dates outside this
+  // range render disabled. Min is always "today" (day 0 is always
+  // offered, even if only as the "contact the club" experience);
+  // max is the policy's own last online-bookable day.
+  const publicMinDateKey = clubTodayKey
+  const publicMaxDateKey = useMemo(() => {
+    if (!club || !clubTodayKey) return null
+    const lastWindowDay = club.onlineBookingStartOffsetDays + club.onlineBookingWindowDays - 1
+    return toDateKey(addDays(new Date(`${clubTodayKey}T12:00:00`), lastWindowDay))
+  }, [club, clubTodayKey])
 
   const selectedDateOption = useMemo(
     () => dateOptions.find((o) => dateKey && toDateKey(o.date) === dateKey) ?? null,
@@ -515,7 +542,36 @@ export function PublicClubBookingPage() {
 
         {step === 'date' && (
           <div className="flex flex-col gap-3">
-            <h1 className="text-lg font-semibold">{t('publicBooking.chooseDate')}</h1>
+            <div className="flex items-center justify-between gap-2">
+              <h1 className="text-lg font-semibold">{t('publicBooking.chooseDate')}</h1>
+              {/* FINAL BOOKINGS UX & LIFECYCLE GAP CLOSURE, Section
+                  A2/G: the calendar is bounded to EXACTLY the same
+                  [today, today+window] range dateOptions itself uses
+                  (publicMinDateKey/publicMaxDateKey), derived from the
+                  real club_booking_policy -- never a wider, invented
+                  horizon. With the current default policy (2-day
+                  window) this mostly mirrors the 3 day-cards below;
+                  if the club owner later configures a 30/60/90-day
+                  window, this same DateCalendar (and its maxDate
+                  bound) already supports it with zero code change --
+                  only the day-cards above would need to grow into a
+                  scroll/paginated list, which is exactly what the
+                  calendar is here to make unnecessary. */}
+              {publicMinDateKey && publicMaxDateKey && (
+                <DatePickerButton
+                  label={t('common.calendar.openPicker')}
+                  value={dateKey ?? publicMinDateKey}
+                  todayDate={publicMinDateKey}
+                  minDate={publicMinDateKey}
+                  maxDate={publicMaxDateKey}
+                  onSelect={(key) => {
+                    setSelectedDate(new Date(`${key}T12:00:00`))
+                    setStep('time')
+                  }}
+                  className="flex items-center gap-1.5 rounded-md border border-border bg-surface px-2.5 py-1.5 text-xs font-medium text-text-secondary transition-colors hover:bg-page-bg"
+                />
+              )}
+            </div>
             <div className="grid grid-cols-3 gap-2">
               {dateOptions.map((opt) => (
                 <button

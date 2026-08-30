@@ -16,6 +16,14 @@ export interface BookingRow {
   bookingSeriesId: string | null
   invoiceId: string | null
   notes: string | null
+  /** FINAL BOOKINGS UX & LIFECYCLE GAP CLOSURE, Section C: which
+   *  channel created this booking -- 'staff' | 'club_public_link' |
+   *  'club_qr' (see bookings_source_check). Was already written by
+   *  every booking-creation RPC but never selected/rendered anywhere
+   *  in the frontend until now. */
+  source: string
+  /** Section B: only set once status = 'completed'. */
+  completionSource: 'manual' | 'automatic' | null
 }
 
 export interface FieldBlockRow {
@@ -51,4 +59,15 @@ export const FIELD_BLOCK_TYPE_LABELS: Record<string, string> = {
   maintenance: 'صيانة',
   manual: 'إغلاق يدوي',
   holiday: 'إجازة',
+}
+
+// FINAL BOOKINGS UX & LIFECYCLE GAP CLOSURE, Section C1: mirrors the
+// BOOKING_STATUS_LABELS Arabic-fallback pattern above -- t('bookings.
+// sourceLabels.<value>') is the primary lookup, this is only the
+// defaultValue fallback if a key is somehow missing. Matches the real
+// values allowed by bookings_source_check exactly.
+export const BOOKING_SOURCE_LABELS: Record<string, string> = {
+  staff: 'الموظف',
+  club_public_link: 'رابط الحجز العام',
+  club_qr: 'رمز QR للنادي',
 }

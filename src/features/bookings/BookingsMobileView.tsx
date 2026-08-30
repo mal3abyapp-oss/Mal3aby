@@ -10,7 +10,8 @@ import { StatusBadge } from '@/components/ui/status-badge'
 import { useResolvedFieldPrice } from './useFieldPricing'
 import { fromInstant, formatInstant } from '@/lib/domain/time'
 import { useDirection } from '@/app/providers/DirectionProvider'
-import { formatNumber } from '@/lib/i18n/config'
+import { formatNumber, formatDate } from '@/lib/i18n/config'
+import { DatePickerButton } from '@/components/ui/date-picker-button'
 import type { QuickBookingSlot } from './QuickBookingSheet'
 
 // BOOKING CALENDAR UX PHASE (2026-08-23) -- full rewrite of the mobile
@@ -152,13 +153,32 @@ export function BookingsMobileView({
 
   return (
     <div className="flex flex-col gap-3">
-      {/* Date nav */}
+      {/* Date nav -- Previous/Today/Next are UNCHANGED (Today jumps to
+          the club-local today, matching the desktop toolbar's own D3
+          fix). FINAL BOOKINGS UX & LIFECYCLE GAP CLOSURE, Section A1:
+          a calendar icon button is an ADDITION alongside them, opening
+          the same DateCalendar used on desktop, so reaching a date
+          weeks/months ahead on mobile doesn't require dozens of taps.
+          Also fixes a real pre-existing bug found while touching this
+          code: the date label used to call raw `toLocaleDateString`
+          (the *browser's* local timezone), inconsistent with every
+          other date computation in this file which correctly uses the
+          club's real timezone via fromInstant/formatDate -- a
+          receptionist viewing from outside the club's own timezone
+          could have seen a mislabeled weekday/date here. */}
       <div className="flex items-center gap-2">
         <Button variant="outline" size="icon" aria-label={t('bookings.page.previousDay')} onClick={() => shiftDate(-1)}><ChevronLeft className="size-4 rtl:rotate-180" /></Button>
         <Button variant="outline" size="sm" className="flex-1" onClick={() => onDateChange(fromInstant(new Date(), clubTimezone).date)}>
-          {isToday ? t('common.today') : new Date(`${date}T12:00:00`).toLocaleDateString(locale === 'en' ? 'en-US' : 'ar-EG', { weekday: 'long', day: 'numeric', month: 'long' })}
+          {isToday ? t('common.today') : formatDate(new Date(`${date}T12:00:00`), locale, clubTimezone, { weekday: 'long', day: 'numeric', month: 'long' })}
         </Button>
         <Button variant="outline" size="icon" aria-label={t('bookings.page.nextDay')} onClick={() => shiftDate(1)}><ChevronRight className="size-4 rtl:rotate-180" /></Button>
+        <DatePickerButton
+          label=""
+          value={date}
+          onSelect={onDateChange}
+          todayDate={fromInstant(new Date(), clubTimezone).date}
+          className="flex size-9 items-center justify-center rounded-md border border-border bg-surface text-text-secondary transition-colors hover:bg-page-bg"
+        />
       </div>
 
       {/* Field chips -- primary field-first selector (directive section 4) */}

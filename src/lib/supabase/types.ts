@@ -329,6 +329,9 @@ export type Database = {
           cancelled_by: string | null
           cancelled_reason: string | null
           club_id: string
+          completed_at: string | null
+          completed_by: string | null
+          completion_source: string | null
           created_at: string
           created_by: string | null
           customer_id: string
@@ -355,6 +358,9 @@ export type Database = {
           cancelled_by?: string | null
           cancelled_reason?: string | null
           club_id: string
+          completed_at?: string | null
+          completed_by?: string | null
+          completion_source?: string | null
           created_at?: string
           created_by?: string | null
           customer_id: string
@@ -381,6 +387,9 @@ export type Database = {
           cancelled_by?: string | null
           cancelled_reason?: string | null
           club_id?: string
+          completed_at?: string | null
+          completed_by?: string | null
+          completion_source?: string | null
           created_at?: string
           created_by?: string | null
           customer_id?: string
@@ -7238,6 +7247,7 @@ export type Database = {
         Args: { p_field_id: string; p_reason?: string; p_rule_ids: string[] }
         Returns: undefined
       }
+      auto_complete_past_bookings: { Args: never; Returns: number }
       caller_accessible_branch_ids: {
         Args: { p_club_id: string }
         Returns: string[]
@@ -9473,6 +9483,10 @@ export type Database = {
       mark_attendance: {
         Args: { p_player_id: string; p_session_id: string; p_status: string }
         Returns: string
+      }
+      mark_booking_completed: {
+        Args: { p_booking_id: string; p_reason?: string }
+        Returns: undefined
       }
       mark_booking_no_show: {
         Args: { p_booking_id: string; p_reason?: string }

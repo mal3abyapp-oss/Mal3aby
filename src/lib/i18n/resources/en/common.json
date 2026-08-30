@@ -859,7 +859,13 @@
       "other": "Other"
     },
     "change": "Change",
-    "done": "Done"
+    "done": "Done",
+    "calendar": {
+      "previousMonth": "Previous month",
+      "nextMonth": "Next month",
+      "openPicker": "Choose a date",
+      "outsideWindow": "Outside the allowed booking window"
+    }
   },
   "bookings": {
     "moduleNotActive": {
@@ -874,6 +880,15 @@
       "completed": "Completed",
       "cancelled": "Cancelled",
       "no_show": "No-show"
+    },
+    "sourceLabels": {
+      "staff": "Staff",
+      "club_public_link": "Public booking link",
+      "club_qr": "Club QR"
+    },
+    "completionSourceLabels": {
+      "manual": "Marked completed by staff",
+      "automatic": "Completed automatically"
     },
     "fieldBlockTypeLabels": {
       "maintenance": "Maintenance",
@@ -928,6 +943,14 @@
       "recordingNoShow": "Recording...",
       "confirmNoShow": "Confirm no-show",
       "markNoShow": "Mark no-show",
+      "confirmCompleteMessage": "Mark this booking as completed?",
+      "recordingComplete": "Recording...",
+      "confirmComplete": "Confirm completion",
+      "markComplete": "Mark completed",
+      "completeTooEarlyError": "This booking hasn't ended yet -- it can't be marked completed before its scheduled end time.",
+      "completeError": "Couldn't mark this booking as completed.",
+      "source": "Booking source",
+      "completedAt": "Completed",
       "rescheduleBooking": "Reschedule / change field",
       "rescheduleTitle": "Reschedule booking",
       "rescheduleCurrent": "Current",

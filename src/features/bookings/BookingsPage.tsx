@@ -22,7 +22,9 @@ import { BookingsMobileView } from './BookingsMobileView'
 import { BookingsFieldDayView } from './BookingsFieldDayView'
 import { resolveHoursForDay, useResolvedFieldPrice, useClubTimezone } from './useFieldPricing'
 import { toInstant, fromInstant } from '@/lib/domain/time'
-import { formatNumber } from '@/lib/i18n/config'
+import { formatNumber, formatDate } from '@/lib/i18n/config'
+import { DatePickerButton } from '@/components/ui/date-picker-button'
+import { useDirection } from '@/app/providers/DirectionProvider'
 
 // Section F: mobile gets a dedicated layout, not a squeezed desktop
 // grid. Matches the app's own mobile breakpoint (md: 768px, see
@@ -97,7 +99,7 @@ async function fetchBookingsForDay(clubId: string, date: string, timezone: strin
   const dayEnd = toInstant(date, '23:59:59', timezone)
   const { data, error } = await supabase
     .from('bookings')
-    .select('id, field_id, branch_id, customer_id, start_at, end_at, status, total_price, discount_amount, booking_series_id, invoice_id, notes, customers(full_name, mobile_display)')
+    .select('id, field_id, branch_id, customer_id, start_at, end_at, status, total_price, discount_amount, booking_series_id, invoice_id, notes, source, completion_source, customers(full_name, mobile_display)')
     .eq('club_id', clubId)
     .gte('start_at', dayStart)
     .lte('start_at', dayEnd)
@@ -118,6 +120,8 @@ async function fetchBookingsForDay(clubId: string, date: string, timezone: strin
     bookingSeriesId: b.booking_series_id,
     invoiceId: b.invoice_id,
     notes: b.notes,
+    source: b.source,
+    completionSource: b.completion_source as 'manual' | 'automatic' | null,
   }))
 }
 
@@ -132,7 +136,7 @@ async function fetchBookingsForDay(clubId: string, date: string, timezone: strin
 async function fetchBookingById(clubId: string, bookingId: string): Promise<BookingRow | null> {
   const { data, error } = await supabase
     .from('bookings')
-    .select('id, field_id, branch_id, customer_id, start_at, end_at, status, total_price, discount_amount, booking_series_id, invoice_id, notes, customers(full_name, mobile_display)')
+    .select('id, field_id, branch_id, customer_id, start_at, end_at, status, total_price, discount_amount, booking_series_id, invoice_id, notes, source, completion_source, customers(full_name, mobile_display)')
     .eq('club_id', clubId)
     .eq('id', bookingId)
     .maybeSingle()
@@ -152,6 +156,8 @@ async function fetchBookingById(clubId: string, bookingId: string): Promise<Book
     bookingSeriesId: data.booking_series_id,
     invoiceId: data.invoice_id,
     notes: data.notes,
+    source: data.source,
+    completionSource: data.completion_source as 'manual' | 'automatic' | null,
   }
 }
 
@@ -220,6 +226,7 @@ function FieldColumnHeader({ field, clubId, date, clubTimezone }: { field: Field
 
 export function BookingsPage() {
   const { t } = useTranslation()
+  const { locale } = useDirection()
   const { currentClubId } = useAuth()
   const queryClient = useQueryClient()
   const isMobile = useIsMobile()
@@ -232,7 +239,24 @@ export function BookingsPage() {
   // right after useClubTimezone. Never left as browser-UTC permanently:
   // that would silently show the wrong calendar day to any staff member
   // near local midnight whenever the club's timezone differs from UTC.
-  const [date, setDate] = useState(() => new Date().toISOString().slice(0, 10))
+  // FINAL BOOKINGS UX & LIFECYCLE GAP CLOSURE, Section D: the selected
+  // date is now representable in the URL as ?date=YYYY-MM-DD, reusing
+  // the same useSearchParams() already wired into this page for
+  // newBookingCustomer/booking deep-links. A date present in the URL
+  // on mount wins over the browser-UTC placeholder outright (no need
+  // for the club-timezone "today" correction effect below to touch
+  // it) -- refreshing a URL that already encodes an intentional date
+  // must not throw the user back to Today.
+  const initialDateParam = new URLSearchParams(window.location.search).get('date')
+  const [date, setDateState] = useState(() => initialDateParam ?? new Date().toISOString().slice(0, 10))
+  function setDate(next: string) {
+    setDateState(next)
+    setSearchParams((prev) => {
+      const params = new URLSearchParams(prev)
+      params.set('date', next)
+      return params
+    }, { replace: true })
+  }
   const [branchId, setBranchId] = useState<string | null>(null)
   const [slotSelection, setSlotSelection] = useState<QuickBookingSlot | null>(null)
   const [selectedBooking, setSelectedBooking] = useState<BookingRow | null>(null)
@@ -280,8 +304,15 @@ export function BookingsPage() {
   useEffect(() => {
     if (!clubTimezone || didCorrectInitialDateRef.current) return
     didCorrectInitialDateRef.current = true
+    // A date already present in the URL on mount (initialDateParam)
+    // represents deliberate user intent (a deep link, a refresh, a
+    // shared URL) and must never be silently overridden by "today" --
+    // only the browser-UTC placeholder (used when no ?date= was
+    // present at all) gets corrected to the real club-local today.
+    if (initialDateParam) return
     const clubLocalToday = fromInstant(new Date(), clubTimezone).date
-    setDate((current) => (current === initialBrowserUtcDateRef.current ? clubLocalToday : current))
+    if (date === initialBrowserUtcDateRef.current) setDate(clubLocalToday)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [clubTimezone])
 
   useEffect(() => {
@@ -469,11 +500,22 @@ export function BookingsPage() {
               {t('common.today')}
             </Button>
             <Button variant="outline" size="icon" aria-label={t('bookings.page.nextDay')} onClick={() => shiftDate(1)}><ChevronRight className="size-4 rtl:rotate-180" /></Button>
-            <input
-              type="date"
+            {/* FINAL BOOKINGS UX & LIFECYCLE GAP CLOSURE, Section A1:
+                replaces the bare native <input type="date"> -- reaching
+                a date 30+ days ahead meant either 30 clicks on "next
+                day" or fighting the native OS date-input widget's own
+                (non-brand, inconsistent-across-browsers) month
+                navigation. Previous/Today/Next above are UNCHANGED --
+                this is an addition, not a replacement of them. No
+                staff-side max horizon exists in _create_booking_internal
+                today (confirmed by reading its source), so no maxDate
+                is passed here -- staff can navigate arbitrarily far
+                ahead, matching directive A3. */}
+            <DatePickerButton
+              label={formatDate(new Date(`${date}T12:00:00`), locale, clubTimezone ?? 'UTC', { day: 'numeric', month: 'long', year: 'numeric' })}
               value={date}
-              onChange={(e) => setDate(e.target.value)}
-              className="h-9 rounded-md border border-border bg-background px-2 text-sm"
+              onSelect={setDate}
+              todayDate={clubTimezone ? fromInstant(new Date(), clubTimezone).date : new Date().toISOString().slice(0, 10)}
             />
           </div>
         }

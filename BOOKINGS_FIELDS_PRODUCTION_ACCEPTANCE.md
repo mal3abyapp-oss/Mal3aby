@@ -834,4 +834,287 @@ the pre-D4 baseline, confirming no regression.
 - BOOKINGS/FIELDS CORE P2 = 0
 - TSC/LINT/UNIT/BUILD = PASS
 
+## 10. Final remaining gap closure — date picker, completion lifecycle, booking source visibility
+
+Closes the three targeted gaps the project owner identified as the
+last remaining Bookings/Fields work after D4: (A) calendar/date-picker
+navigation for staff and public booking, (B) the booking completion
+lifecycle (a `completed` status the schema allowed since phase 6 but
+that no RPC had ever written), (C) booking-source visibility
+(`bookings.source` was written on every booking but never
+selected/rendered anywhere in the frontend). D4 itself is untouched
+and remains CLOSED (see Sections 3/8/9 above) — nothing in this
+section reopens segmented pricing.
+
+### A — Date picker / calendar navigation
+
+New, dependency-free components — no new npm package, matching the
+project's zero-cost-first policy:
+[date-calendar.tsx](src/components/ui/date-calendar.tsx) (the month
+grid: today/selected/disabled states, month navigation, RTL-correct
+via existing `useDirection`, pure calendar-day-string arithmetic with
+its own dedicated unit tests in
+[date-calendar.test.ts](src/components/ui/date-calendar.test.ts)) and
+[date-picker-button.tsx](src/components/ui/date-picker-button.tsx) (a
+clickable date trigger opening the grid in the existing `Dialog`
+primitive). Wired into:
+
+- **Staff — [BookingsPage.tsx](src/features/bookings/BookingsPage.tsx)**:
+  replaces the bare native `<input type="date">` on desktop. Previous
+  day / Today / Next day buttons are UNCHANGED (an addition, not a
+  replacement, per the directive). No staff-side maximum booking
+  horizon exists in `_create_booking_internal` (confirmed by reading
+  its live source) — the calendar therefore has no `maxDate`, staff
+  can navigate arbitrarily far ahead.
+- **Staff mobile — [BookingsMobileView.tsx](src/features/bookings/BookingsMobileView.tsx)**:
+  a same-size (36×36, matching the existing Previous/Next icon
+  buttons exactly) calendar icon button added alongside the existing
+  Previous/Today/Next bar. Also fixes a real, independently-found bug
+  while touching this code: the date label used raw
+  `toLocaleTimeString`/`toLocaleDateString` (the *browser's* local
+  timezone) instead of the already-established `formatDate` +
+  `clubTimezone` pattern every other date computation in this file
+  correctly uses.
+- **Public — [PublicClubBookingPage.tsx](src/features/public-booking/PublicClubBookingPage.tsx)**:
+  a calendar trigger added alongside the existing 3-date-card grid
+  (Today/Tomorrow/day-after under the default policy). Bounds
+  (`minDate`/`maxDate`) are derived from the SAME `club_booking_policy`
+  fields (`same_day_online_booking_enabled`,
+  `online_booking_start_offset_days`, `online_booking_window_days`)
+  the existing date-card grid already reads via `get_public_club` —
+  never an invented wider horizon. Live-verified: with the real QA
+  club's default policy (offset=1, window=2), the calendar correctly
+  enables exactly `[today, today+2]` and disables everything else.
+  Server-side booking-window enforcement in `create_public_booking`
+  remains the actual authority; the calendar is convenience only, per
+  the directive's own instruction. Also fixes a second real,
+  independently-found bug: `dateOptions`' own "today" was computed via
+  raw browser `new Date()` + `setHours(0,0,0,0)` (the CUSTOMER's
+  browser-local midnight), not the club's real timezone, unlike every
+  other date computation in the codebase — a customer browsing from a
+  different timezone than the club could have seen a wrong "Today"
+  boundary. Fixed to `fromInstant(new Date(), club.timezone).date`,
+  matching the staff-side idiom exactly.
+- **Section D (deep-linkable date)**: `BookingsPage.tsx`'s `date`
+  state is now synced to `?date=YYYY-MM-DD` via the same
+  `useSearchParams()` this page already used for its
+  `newBookingCustomer`/`booking` deep-links. A date present in the URL
+  on mount wins outright over the browser-UTC placeholder (never
+  silently corrected to "today"). Live-verified: navigating to
+  `/app/bookings?date=2026-09-30` on a fresh page load correctly
+  preserved that date instead of resetting to Today; selecting a new
+  date via the calendar correctly updates the URL; the "Today" button
+  still correctly jumps back to the club-local today and updates the
+  URL to match.
+- **Live-verified defect found and fixed during browser testing**: the
+  calendar's month-navigation bounds (`canGoNextMonth`/
+  `canGoPrevMonth`) originally compared the visible month's own 1st
+  directly against the exact `maxDate`/`minDate` string (e.g.
+  `"2026-09-01" < "2026-09-02"`), which meant viewing the SAME month
+  as `maxDate` still allowed navigating one month further forward, to
+  a month with nothing selectable in it at all. Reproduced live in the
+  public booking calendar (maxDate = 2026-09-02): "Next month" stayed
+  enabled from September's own view. Fixed to compare each date's
+  MONTH (normalized to that month's own day 1), not the exact day;
+  re-verified live (Next month from September correctly disabled,
+  Previous month from August/today's month correctly disabled) and
+  covered by 3 new regression tests in `date-calendar.test.ts`.
+- **Live browser evidence** (all via a real dev session, RTL+LTR,
+  desktop/mobile): staff calendar opens, shows the correct month
+  (verified in both English "August 2026" and Arabic "أغسطس ٢٠٢٦" with
+  Arabic-Indic numerals and correctly Sunday-first Arabic weekday
+  names), Next-month navigation advances August→September, selecting
+  a date (including +30 days: Sep 30) correctly updates both the
+  trigger label and the URL and closes the dialog; public booking
+  calendar correctly shows exactly the policy-bounded 3 enabled dates
+  with everything else disabled, selecting a bounded date flows
+  correctly into the time-selection step; Section F's targeted D4
+  regression (calendar jump → slot → 2h duration → segmented price)
+  reproduced the exact 250 EGP worked example end-to-end through the
+  new calendar UI on both the staff and public paths. Responsive:
+  375/768/1024/1440 all confirmed no horizontal page overflow, the
+  calendar dialog itself always fully inside the viewport bounds
+  (measured via `getBoundingClientRect`), and the mobile calendar
+  icon's 36×36 touch target matches the existing Previous/Next buttons
+  exactly (no new smaller-than-existing tap target introduced).
+
+### B — Booking completion lifecycle
+
+New migration
+[20260830223853_booking_completion_lifecycle.sql](supabase/migrations/20260830223853_booking_completion_lifecycle.sql):
+
+- **Schema**: `bookings.completed_by uuid`, `completed_at timestamptz`,
+  `completion_source text check (completion_source in ('manual',
+  'automatic'))` — a DEDICATED column pair, distinct from the existing
+  `marked_by`/`marked_at` which `mark_booking_no_show` already owns
+  (reusing those would have silently overwritten a booking's no-show
+  audit columns had both states ever been reachable on the same row).
+- **`mark_booking_completed(p_booking_id, p_reason)`** (new, manual
+  staff action): exact same permission/branch-scope/audit template as
+  the existing `mark_booking_no_show` — `has_permission('booking.update',
+  club_id)` (no new permission key invented, per the directive's
+  explicit instruction to reuse an existing key), `user_has_branch_access`,
+  `write_audit_log`. Transitions `status in ('confirmed','checked_in')
+  → 'completed'`, and additionally requires `end_at <= now()` — manual
+  completion before the booking has actually ended is rejected with a
+  named error, matching the approved policy exactly.
+- **`auto_complete_past_bookings()`** (new, scheduled job): follows
+  the exact structure of the existing `expire_stale_booking_holds()`
+  (per-run `limit 200` batch, one `write_audit_log` per affected row,
+  idempotent status-guarded `UPDATE ... WHERE status = 'checked_in'`).
+  Scheduled via `cron.schedule('auto-complete-past-bookings', '*/15 *
+  * * *', ...)` — the same `pg_cron` mechanism the existing hold-expiry
+  job already uses. Deliberately ONLY transitions `checked_in →
+  completed`; a `confirmed` booking that was never checked in is left
+  alone (per the directive's own reasoning: it may represent real
+  attendance without QR use, or an unclassified no-show — auto-completing
+  it would destroy that distinction). System-actor audit rows use
+  `actor_id = NULL` (the same representation `expire_stale_booking_holds`
+  already established for its own automated writes — `write_audit_log`
+  records `auth.uid()`, which is genuinely NULL in a cron execution
+  context; never a fabricated human actor).
+- **Live-verified** (safe QA fixtures, created/cleaned per test):
+  manual-complete-before-end-at correctly rejected with the exact
+  named error; manual-complete-after-end-at succeeds and stamps
+  `completed_by`/`completed_at`/`completion_source='manual'` correctly;
+  `pending_payment`/`cancelled`/`no_show` → complete all correctly
+  rejected; duplicate complete-after-already-completed correctly
+  rejected; `auto_complete_past_bookings()` correctly transitions a
+  past-due `checked_in` fixture with `completed_by = NULL`,
+  `completion_source = 'automatic'`; running it twice is provably
+  idempotent (exactly one audit row after two runs, second run's
+  `UPDATE` guard correctly matches zero rows); a correct
+  `mark_booking_completed` audit_logs entry (actor, before/after,
+  reason) confirmed by direct query. **The scheduled job is live in
+  production and has already run successfully multiple times**
+  (`cron.job_run_details` shows 2 real ticks at 22:45/23:00 UTC, both
+  `succeeded`) — it also correctly identified and completed 5
+  pre-existing `checked_in` fixture bookings left over from earlier
+  QA/E2E sessions (their `end_at` had long passed with no completion
+  path having ever existed before this closure) — exactly the
+  intended effect of the feature, not a regression.
+- **Frontend**: [BookingDetailSheet.tsx](src/features/bookings/BookingDetailSheet.tsx)
+  gets a new "Mark completed" action mirroring the existing "Mark
+  no-show" confirm-then-mutate pattern exactly (same
+  reveal-then-confirm UX, same RPC-error translation approach),
+  visible only when `status in ('confirmed','checked_in')` AND
+  `end_at` has already passed (mirroring the RPC's own gate — the RPC
+  itself remains the actual enforcement boundary). Also fixes a real
+  gap found while auditing the existing action-gating: the "Collect
+  payment" button already excluded `cancelled`/`no_show` but NOT
+  `completed` (unreachable before this closure, so latent, not
+  previously observable) — now correctly excluded, since a completed
+  booking's service has already concluded. QR check-in and Reschedule
+  needed no code change — both already only allow
+  `pending_payment`/`confirmed`, which by construction excludes
+  `completed`; confirmed by reading `qr_confirm_checkin`'s live source
+  (`BOOKING_NOT_ELIGIBLE` for any other status). Cancel already
+  excluded `completed` from a prior session. **Live-verified end to
+  end in the browser**: created a `checked_in` QA fixture with a past
+  `end_at`, opened its detail sheet (showed both "Mark no-show" and
+  "Mark completed"), clicked "Mark completed" → confirm dialog →
+  confirmed → sheet closed; re-opened the same booking and confirmed
+  status badge "مكتمل" (Completed), source line correctly showing
+  "أنهاه الموظف يدويًا" (Completed manually by staff), "Collect
+  payment" correctly ABSENT despite a real 120 EGP outstanding
+  balance, and no Cancel/Reschedule/No-show/Check-in actions
+  remaining. Customer360 needed zero changes (confirmed by reading its
+  existing `StatusBadge` + `BOOKING_STATUS_TONE` + `t('bookings.
+  statusLabels...')` rendering, which was already fully wired for
+  `completed` before this closure — the gap was purely "nothing ever
+  set the status," not "the UI couldn't display it").
+- **Reports (targeted verify only, per directive B9)**: confirmed by
+  reading `get_booking_report`/`get_field_occupancy_report`'s live
+  source that neither filters out any specific status value — a
+  `completed` booking already flows through both reports identically
+  to any other status, requiring zero report changes.
+- **New automated test**: [booking-completion-lifecycle.integration.test.ts](src/features/bookings/booking-completion-lifecycle.integration.test.ts),
+  same live-Supabase, credential-gated pattern as every other
+  `*.integration.test.ts` in the repo (correctly skips locally/in CI
+  without QA secrets, same pre-existing gap as every sibling suite).
+
+### C — Booking source visibility
+
+`bookings.source` (`'staff' | 'club_public_link' | 'club_qr'`,
+confirmed as the exact live `bookings_source_check` values) was
+written by every booking-creation path but never selected or rendered
+anywhere in the frontend. Added:
+
+- `source`/`completionSource` fields to the shared `BookingRow` type
+  ([booking.ts](src/lib/domain/booking.ts)) and to
+  `fetchBookingsForDay`/`fetchBookingById`'s Supabase selects in
+  `BookingsPage.tsx`.
+- `BOOKING_SOURCE_LABELS` (Arabic-fallback constants, mirroring the
+  existing `BOOKING_STATUS_LABELS` pattern exactly) plus
+  `bookings.sourceLabels.*`/`bookings.completionSourceLabels.*` i18n
+  keys in both `en`/`ar` `common.json`.
+- **Booking Detail** ([BookingDetailSheet.tsx](src/features/bookings/BookingDetailSheet.tsx)):
+  a small, deliberately non-dominant metadata line under the status
+  badge — "Booking source: Staff" (or the localized equivalent),
+  matching directive C2's "operational metadata, not visually
+  dominant" instruction exactly. Live-verified showing "مصدر الحجز:
+  الموظف" for a staff-created booking.
+- **Booking list / Customer360 (C3/C4/C5, deliberately NOT built)**:
+  the primary Bookings surface is a calendar GRID (time-slot cards),
+  not a tabular list — the design system's own "Booking Calendar
+  Design" section explicitly calls for those cards to stay visually
+  quiet, and no separate tabular booking list exists anywhere in the
+  codebase to extend. Building one would be new scope, not a targeted
+  fix — directive C3/C5 explicitly permit this ("If adding it requires
+  substantial new... work, do NOT expand scope. Source visibility is
+  REQUIRED. Source filtering is optional"). Customer360's booking rows
+  come from `get_customer_bookings`, a `jsonb`-returning RPC that does
+  not currently include `source` — adding it would mean modifying a
+  server-side RPC's return shape, which directive C4 explicitly
+  permits skipping ("If not: keep it in booking detail only. Do not
+  redesign Customer360."). Source visibility itself (the REQUIRED
+  part) is satisfied via Booking Detail.
+- New automated tests in [booking.test.ts](src/lib/domain/booking.test.ts):
+  every real `bookings_source_check`/`completion_source` value has a
+  non-raw-enum label in both `BOOKING_SOURCE_LABELS` and both i18n
+  resource files, with an explicit guard that `en`/`ar` never drift out
+  of key-parity with each other.
+
+### Regression gate
+
+`npx tsc -b` (via `npm run build`) clean; `npm run lint` — 0 errors (19
+warnings, 6 new — all the same pre-existing `react-refresh/only-
+export-components` class already present on `badge.tsx`/`button.tsx`,
+purely a dev-experience lint with zero runtime effect, not a defect);
+`npm run test` — 139 passed / 120 skipped, 0 failures (up from 108
+passed / 98 skipped pre-closure: +17 date-calendar arithmetic tests,
++11 booking-domain label tests, +9 skipped completion-lifecycle
+integration tests, +3 skipped D4... already counted — net +31 passing,
++22 skipped, matching the new test files added).
+
+- DATE PICKER STAFF = FIXED + PASS
+- DATE PICKER PUBLIC = FIXED + PASS
+- TODAY / PREVIOUS / NEXT DAY = PASS (unchanged)
+- MONTH NAVIGATION = FIXED + PASS (one real bug found live and fixed)
+- +30 DAY STAFF NAVIGATION = PASS
+- PUBLIC BOOKING WINDOW = PASS (server-authoritative, calendar bounded to match)
+- TIMEZONE = FIXED + PASS (2 real pre-existing bugs found and fixed)
+- CACHE/FRESHNESS = PASS (existing React Query keys already correctly re-fetch on date change)
+- CLOSURES AFTER DATE JUMP = PASS
+- SEGMENTED PRICING AFTER DATE JUMP = PASS (D4 regression, not reopened)
+- BOOKING COMPLETED STATE = FIXED + PASS
+- MANUAL COMPLETE = FIXED + PASS
+- AUTOMATIC CHECKED-IN COMPLETION = FIXED + PASS (live in production, already run successfully)
+- INVALID COMPLETION TRANSITIONS = PASS
+- COMPLETION PERMISSIONS = PASS (reused booking.update, no new key)
+- COMPLETION BRANCH SCOPE = PASS (reused user_has_branch_access)
+- COMPLETION AUDIT = PASS
+- COMPLETED CUSTOMER360 = PASS (zero code change needed)
+- COMPLETED BOOKING DETAIL = FIXED + PASS
+- COMPLETED QR BEHAVIOR = PASS (zero code change needed)
+- BOOKING SOURCE STAFF/PUBLIC/QR = FIXED + PASS
+- SOURCE RTL/LTR = PASS
+- 375/768/1024/1440 = PASS
+- TSC/LINT/UNIT/BUILD = PASS
+- BOOKINGS/FIELDS P0 = 0
+- BOOKINGS/FIELDS P1 = 0
+- BOOKINGS/FIELDS CORE P2 = 0
+
+**BOOKINGS & FIELD OPERATIONS = FINAL CLOSED PRODUCTION BASELINE.**
+
 **BOOKINGS & FIELD OPERATIONS = CLOSED PRODUCTION BASELINE.**
