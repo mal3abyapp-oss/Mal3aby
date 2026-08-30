@@ -1999,9 +1999,31 @@
       "tabHours": "Operating hours",
       "tabPricing": "Pricing",
       "tabDetails": "Details",
+      "tabClosures": "Closures",
       "statusLabel": "Status",
       "maintenance": "Maintenance",
       "branchImmutableHint": "A field's branch cannot be changed after creation because historical bookings and finance remain scoped to the original branch."
+    },
+    "fieldClosures": {
+      "hint": "Close this field for a period (maintenance, weather, a private event, a holiday). Existing bookings are not automatically cancelled — you'll be warned about any that overlap after adding a closure.",
+      "loading": "Loading...",
+      "empty": "No closures recorded for this field",
+      "past": "Past",
+      "delete": "Delete",
+      "addLabel": "Add a new closure",
+      "reasonPlaceholder": "Reason (optional)",
+      "adding": "Adding...",
+      "add": "Add closure",
+      "addError": "Couldn't add the closure",
+      "startBeforeEndError": "Start time must be before end time",
+      "conflictWarning": "Note: {{count}} existing booking(s) overlap this closure — they were not automatically cancelled, please review them manually.",
+      "types": {
+        "maintenance": "Maintenance",
+        "weather": "Weather",
+        "private_event": "Private event",
+        "manual": "Manual closure",
+        "holiday": "Holiday"
+      }
     },
     "pricingEditor": {
       "allWeekDays": "All week",

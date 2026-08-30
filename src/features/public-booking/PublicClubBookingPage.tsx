@@ -14,6 +14,7 @@ import { CheckCircle2, MapPin, ChevronLeft, ChevronRight, Phone, MessageCircle, 
 import { PaymentMethodsPanel } from './PaymentMethodsPanel'
 import { HoldCountdown } from './HoldCountdown'
 import { normalizePhone } from '@/lib/domain/phone'
+import { toInstant } from '@/lib/domain/time'
 
 /**
  * PublicClubBookingPage -- the Public Club Booking Page.
@@ -330,8 +331,15 @@ export function PublicClubBookingPage() {
       const [h, m] = selectedTime.split(':').map(Number)
       const endMinutes = (h ?? 0) * 60 + (m ?? 0) + selectedDuration
       const endTime = `${String(Math.floor(endMinutes / 60) % 24).padStart(2, '0')}:${String(endMinutes % 60).padStart(2, '0')}`
-      const startAt = new Date(`${dateKey}T${selectedTime}:00`).toISOString()
-      const endAt = new Date(`${dateKey}T${endTime}:00`).toISOString()
+      // BOOKINGS/FIELDS ACCEPTANCE, D1: previously built via
+      // `new Date(`${dateKey}T${selectedTime}:00`).toISOString()`, which
+      // parses the date/time string in the *browser's* local timezone --
+      // silently wrong whenever the customer's browser timezone differs
+      // from the club's venue timezone. toInstant() is the shared,
+      // correct helper (see src/lib/domain/time.ts), already used by
+      // every other booking-write surface (e.g. QuickBookingSheet.tsx).
+      const startAt = toInstant(dateKey, selectedTime, club!.timezone)
+      const endAt = toInstant(dateKey, endTime, club!.timezone)
 
       const phoneResult = normalizePhone(customerMobile, customerPhoneCountry)
       if (!phoneResult.valid || !phoneResult.e164) {
@@ -786,8 +794,14 @@ export function PublicClubBookingPage() {
                     clubName: club.clubName,
                     fieldName: selectedField.name,
                     address: club.address,
-                    startAt: new Date(`${dateKey}T${selectedTime}:00`),
-                    endAt: new Date(new Date(`${dateKey}T${selectedTime}:00`).getTime() + selectedDuration * 60000),
+                    // D1 fix (same as bookMutation above): the previous
+                    // `new Date(`${dateKey}T${selectedTime}:00`)` parsed
+                    // in the browser's local timezone, so a customer
+                    // outside the venue's timezone got a calendar event
+                    // at the wrong wall-clock time. toInstant() resolves
+                    // the true instant in the club's venue timezone first.
+                    startAt: new Date(toInstant(dateKey, selectedTime, club.timezone)),
+                    endAt: new Date(new Date(toInstant(dateKey, selectedTime, club.timezone)).getTime() + selectedDuration * 60000),
                     bookingRef: confirmedRef,
                   })}
                   download={`${confirmedRef ?? 'booking'}.ics`}

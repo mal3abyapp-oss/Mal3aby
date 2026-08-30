@@ -224,6 +224,14 @@ export function BookingsPage() {
   const queryClient = useQueryClient()
   const isMobile = useIsMobile()
   const [searchParams, setSearchParams] = useSearchParams()
+  // BOOKINGS/FIELDS ACCEPTANCE, timezone section: the initial value here
+  // can't yet know the club's timezone (clubTimezone loads async below),
+  // so it starts from the browser's own UTC date as a same-day-in-most-
+  // cases placeholder, then a useEffect corrects it to the real club-
+  // local "today" the moment clubTimezone resolves -- see the effect
+  // right after useClubTimezone. Never left as browser-UTC permanently:
+  // that would silently show the wrong calendar day to any staff member
+  // near local midnight whenever the club's timezone differs from UTC.
   const [date, setDate] = useState(() => new Date().toISOString().slice(0, 10))
   const [branchId, setBranchId] = useState<string | null>(null)
   const [slotSelection, setSlotSelection] = useState<QuickBookingSlot | null>(null)
@@ -257,6 +265,24 @@ export function BookingsPage() {
   const consumedDeepLinkRef = useRef<string | null>(null)
 
   const { data: clubTimezone } = useClubTimezone(currentClubId)
+
+  // BOOKINGS/FIELDS ACCEPTANCE, D3: `date`'s initial value can only use
+  // the browser's own UTC date (clubTimezone isn't known yet at mount).
+  // The moment clubTimezone resolves, correct it to the real club-local
+  // "today" -- but only if the user hasn't already navigated away from
+  // that initial placeholder (a manual date pick, or the deep-link
+  // effect below, must win). Runs at most once per clubTimezone load,
+  // guarded by the ref so it never fights a later user-driven date
+  // change. Without this, staff near local midnight in a timezone that
+  // differs from UTC would land on the wrong calendar day on page load.
+  const didCorrectInitialDateRef = useRef(false)
+  const initialBrowserUtcDateRef = useRef(new Date().toISOString().slice(0, 10))
+  useEffect(() => {
+    if (!clubTimezone || didCorrectInitialDateRef.current) return
+    didCorrectInitialDateRef.current = true
+    const clubLocalToday = fromInstant(new Date(), clubTimezone).date
+    setDate((current) => (current === initialBrowserUtcDateRef.current ? clubLocalToday : current))
+  }, [clubTimezone])
 
   useEffect(() => {
     if (!deepLinkBooking || !clubTimezone || !deepLinkBookingId) return
@@ -432,7 +458,16 @@ export function BookingsPage() {
                 base/rotated icons swapped (rtl:rotate-180 only helps if
                 the UNROTATED state is already correct for LTR). */}
             <Button variant="outline" size="icon" aria-label={t('bookings.page.previousDay')} onClick={() => shiftDate(-1)}><ChevronLeft className="size-4 rtl:rotate-180" /></Button>
-            <Button variant="outline" size="sm" onClick={() => setDate(new Date().toISOString().slice(0, 10))}>{t('common.today')}</Button>
+            <Button
+              variant="outline"
+              size="sm"
+              // D3 fix: club-local "today" via fromInstant, not the
+              // browser's raw UTC date -- see the mount-time correction
+              // effect above for the same reasoning.
+              onClick={() => setDate(clubTimezone ? fromInstant(new Date(), clubTimezone).date : new Date().toISOString().slice(0, 10))}
+            >
+              {t('common.today')}
+            </Button>
             <Button variant="outline" size="icon" aria-label={t('bookings.page.nextDay')} onClick={() => shiftDate(1)}><ChevronRight className="size-4 rtl:rotate-180" /></Button>
             <input
               type="date"

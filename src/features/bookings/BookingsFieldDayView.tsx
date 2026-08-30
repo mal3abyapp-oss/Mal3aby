@@ -75,8 +75,12 @@ export function BookingsFieldDayView({
   const activeFieldId = selectedFieldId ?? fields[0]?.id ?? null
   const activeField = fields.find((f) => f.id === activeFieldId)
 
-  const isToday = date === new Date().toISOString().slice(0, 10)
-  const nowTime = new Date().toTimeString().slice(0, 5)
+  // BOOKINGS/FIELDS ACCEPTANCE, D3: club-local "today"/"now", not the
+  // browser's own UTC date / local wall-clock -- clubTimezone is
+  // already a required prop here, so there's no reason to use the
+  // browser's timezone for either check.
+  const isToday = date === fromInstant(new Date(), clubTimezone).date
+  const nowTime = fromInstant(new Date(), clubTimezone).time
   const { data: currentPrice } = useResolvedFieldPrice(activeFieldId, date, `${nowTime}:00`, `${nowTime}:00`)
 
   const { data: availableStarts, isLoading: availabilityLoading } = useQuery({

@@ -26,6 +26,7 @@ import { type FieldRow, type PricingRuleRow, type OperatingHoursRow } from '@/li
 import { OperatingHoursEditor } from './OperatingHoursEditor'
 import { PricingEditor } from './PricingEditor'
 import { resolveHoursForDay, useResolvedFieldPrice } from '@/features/bookings/useFieldPricing'
+import { FieldClosuresEditor } from './FieldClosuresEditor'
 import { formatNumber } from '@/lib/i18n/config'
 
 // V1 Implementation Gap Audit (2026-08-16): field_operating_hours had
@@ -153,7 +154,7 @@ export function FieldsManagement() {
   const [fieldSport, setFieldSport] = useState('')
   const [fieldBranchId, setFieldBranchId] = useState('')
   const [manageField, setManageField] = useState<FieldRow | null>(null)
-  const [manageTab, setManageTab] = useState<'details' | 'hours' | 'pricing'>('details')
+  const [manageTab, setManageTab] = useState<'details' | 'hours' | 'pricing' | 'closures'>('details')
   const [manageError, setManageError] = useState<string | null>(null)
 
   const { data: fields = [], isLoading } = useQuery({
@@ -385,6 +386,12 @@ export function FieldsManagement() {
             >
               {t('clubs.fieldsManagement.tabPricing')}
             </button>
+            <button
+              className={`px-3 py-2 text-sm font-medium ${manageTab === 'closures' ? 'border-b-2 border-accent text-text-primary' : 'text-text-secondary'}`}
+              onClick={() => setManageTab('closures')}
+            >
+              {t('clubs.fieldsManagement.tabClosures')}
+            </button>
           </div>
 
           {manageTab === 'details' && manageField && (
@@ -431,6 +438,12 @@ export function FieldsManagement() {
           {manageTab === 'pricing' && manageField && (
             <div className="pt-2">
               <PricingEditor fieldId={manageField.id} pricingRules={pricingRules} />
+            </div>
+          )}
+
+          {manageTab === 'closures' && manageField && (
+            <div className="pt-2">
+              <FieldClosuresEditor fieldId={manageField.id} />
             </div>
           )}
         </DialogContent>

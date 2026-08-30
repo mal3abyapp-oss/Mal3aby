@@ -208,25 +208,36 @@ export function Customer360Page() {
     enabled: !!currentClubId && !!customerId,
   })
 
-  const { data: bookings } = useQuery({
+  // BOOKINGS/FIELDS ACCEPTANCE (Customer360 spot-check, real defect
+  // found + fixed): these 4 tab-scoped queries never exposed
+  // `isLoading` to their DataTable, which falls back to its own
+  // empty-state message for `rows: []` -- indistinguishable from a
+  // genuinely empty result. Live-reproduced: opening a customer with
+  // real booking history and switching to the Bookings tab showed
+  // "No bookings yet" for ~2-3 seconds (while the summary card above
+  // it simultaneously displayed the correct non-zero count) before
+  // the real rows appeared. Fixed by destructuring and passing
+  // isLoading through to each DataTable below, matching how `summary`
+  // already does it above.
+  const { data: bookings, isLoading: bookingsLoading } = useQuery({
     queryKey: ['customer-360-bookings', currentClubId, customerId],
     queryFn: () => fetchBookings(currentClubId!, customerId!),
     enabled: !!currentClubId && !!customerId && activeTab === 'bookings',
   })
 
-  const { data: players } = useQuery({
+  const { data: players, isLoading: playersLoading } = useQuery({
     queryKey: ['customer-360-academy', currentClubId, customerId],
     queryFn: () => fetchAcademyPlayers(currentClubId!, customerId!),
     enabled: !!currentClubId && !!customerId && activeTab === 'academy',
   })
 
-  const { data: clubMemberships } = useQuery({
+  const { data: clubMemberships, isLoading: clubMembershipsLoading } = useQuery({
     queryKey: ['customer-360-club-memberships', currentClubId, customerId],
     queryFn: () => fetchClubMemberships(currentClubId!, customerId!),
     enabled: !!currentClubId && !!customerId && activeTab === 'clubMembership',
   })
 
-  const { data: shopPurchases } = useQuery({
+  const { data: shopPurchases, isLoading: shopPurchasesLoading } = useQuery({
     queryKey: ['customer-360-shop-purchases', currentClubId, customerId],
     queryFn: () => fetchShopPurchases(currentClubId!, customerId!),
     enabled: !!currentClubId && !!customerId && activeTab === 'products',
@@ -475,6 +486,7 @@ export function Customer360Page() {
               ] as DataTableColumn<BookingRow>[]}
               rows={bookings?.rows ?? []}
               rowKey={(b) => b.id}
+              isLoading={bookingsLoading}
               emptyTitle={t('customers.detail.noBookingsYet')}
             />
           </div>
@@ -506,6 +518,7 @@ export function Customer360Page() {
               ] as DataTableColumn<PlayerRow>[]}
               rows={players ?? []}
               rowKey={(p) => p.player_id}
+              isLoading={playersLoading}
               emptyTitle={t('academy.players.emptyTitle')}
               emptyDescription={t('academy.players.emptyDescription')}
             />
@@ -536,6 +549,7 @@ export function Customer360Page() {
               ] as DataTableColumn<ClubMembershipRow>[]}
               rows={clubMemberships ?? []}
               rowKey={(m) => m.membership_subscription_id}
+              isLoading={clubMembershipsLoading}
               emptyTitle={t('clubMemberships.members.emptyTitle')}
               emptyDescription={t('clubMemberships.members.emptyDescription')}
             />
@@ -569,6 +583,7 @@ export function Customer360Page() {
               ] as DataTableColumn<ShopPurchaseRow>[]}
               rows={shopPurchases ?? []}
               rowKey={(r) => `${r.sale_id}-${r.product_name_ar}-${r.variant_label}`}
+              isLoading={shopPurchasesLoading}
               emptyTitle={t('customers.detail.noProductsYet')}
             />
           </div>

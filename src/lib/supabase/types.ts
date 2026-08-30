@@ -7696,6 +7696,10 @@ export type Database = {
         Returns: undefined
       }
       delete_club_role: { Args: { p_club_role_id: string }; Returns: undefined }
+      delete_field_block: {
+        Args: { p_block_id: string; p_reason?: string }
+        Returns: undefined
+      }
       delete_platform_custom_role: {
         Args: { p_role_id: string }
         Returns: undefined

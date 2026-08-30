@@ -77,8 +77,10 @@ export function BookingsMobileView({
   const activeFieldId = selectedFieldId ?? fields[0]?.id ?? null
   const activeField = fields.find((f) => f.id === activeFieldId)
 
-  const isToday = date === new Date().toISOString().slice(0, 10)
-  const nowTime = new Date().toTimeString().slice(0, 5)
+  // BOOKINGS/FIELDS ACCEPTANCE, D3: club-local "today"/"now" (same fix
+  // as BookingsFieldDayView.tsx's desktop counterpart).
+  const isToday = date === fromInstant(new Date(), clubTimezone).date
+  const nowTime = fromInstant(new Date(), clubTimezone).time
   const { data: currentPrice } = useResolvedFieldPrice(activeFieldId, date, `${nowTime}:00`, `${nowTime}:00`)
 
   // Section 21-24: the ONLY source of truth for what's bookable today --
@@ -153,7 +155,7 @@ export function BookingsMobileView({
       {/* Date nav */}
       <div className="flex items-center gap-2">
         <Button variant="outline" size="icon" aria-label={t('bookings.page.previousDay')} onClick={() => shiftDate(-1)}><ChevronLeft className="size-4 rtl:rotate-180" /></Button>
-        <Button variant="outline" size="sm" className="flex-1" onClick={() => onDateChange(new Date().toISOString().slice(0, 10))}>
+        <Button variant="outline" size="sm" className="flex-1" onClick={() => onDateChange(fromInstant(new Date(), clubTimezone).date)}>
           {isToday ? t('common.today') : new Date(`${date}T12:00:00`).toLocaleDateString(locale === 'en' ? 'en-US' : 'ar-EG', { weekday: 'long', day: 'numeric', month: 'long' })}
         </Button>
         <Button variant="outline" size="icon" aria-label={t('bookings.page.nextDay')} onClick={() => shiftDate(1)}><ChevronRight className="size-4 rtl:rotate-180" /></Button>
