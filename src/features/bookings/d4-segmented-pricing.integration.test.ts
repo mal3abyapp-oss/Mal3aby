@@ -120,7 +120,7 @@ describeIfConfigured('D4: segmented time-based pricing (live integration)', () =
     })
     expect(error).toBeNull()
     expect(data).toHaveLength(2)
-    const total = (data ?? []).reduce((sum, row) => sum + Number(row.segment_total), 0)
+    const total = (data ?? []).reduce((sum: number, row: { segment_total: number }) => sum + Number(row.segment_total), 0)
     expect(total).toBe(250) // (11:00-12:00 @ 100) + (12:00-13:00 @ 150)
   })
 
@@ -139,7 +139,7 @@ describeIfConfigured('D4: segmented time-based pricing (live integration)', () =
     })
     expect(error).toBeNull()
     expect(data).toHaveLength(3)
-    const total = (data ?? []).reduce((sum, row) => sum + Number(row.segment_total), 0)
+    const total = (data ?? []).reduce((sum: number, row: { segment_total: number }) => sum + Number(row.segment_total), 0)
     // (11-12 @100=100) + (12-18 @150=900) + (18-19 @200=200) = 1200
     expect(total).toBe(1200)
   })
@@ -203,10 +203,10 @@ describeIfConfigured('D4: segmented time-based pricing (live integration)', () =
     // -- never 2 segments (which would mean the overlap was ignored) and
     // never overlapping/duplicated segments (which would double-charge).
     expect(data).toHaveLength(3)
-    const total = (data ?? []).reduce((sum, row) => sum + Number(row.segment_total), 0)
+    const total = (data ?? []).reduce((sum: number, row: { segment_total: number }) => sum + Number(row.segment_total), 0)
     // (08-09 @100=100) + (09-10 @500=500) + (10-11 @100=100) = 700
     expect(total).toBe(700)
-    const overrideSegment = (data ?? []).find((row) => row.segment_start === '09:00:00')
+    const overrideSegment = (data ?? []).find((row: { segment_start: string }) => row.segment_start === '09:00:00')
     expect(Number(overrideSegment?.price_per_hour)).toBe(500)
   })
 
