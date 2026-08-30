@@ -969,7 +969,7 @@ export function BillingPage() {
                     <MoneyDisplay amount={Number(detail.total)} size="lg" />
                   </div>
                   {paymentSummary && paymentSummary.paid > 0 && (
-                    <div className="flex items-center gap-2 print:hidden">
+                    <div className="flex items-center gap-2">
                       <span className="text-xs text-text-secondary">{t('billing.detail.paid')}</span>
                       <MoneyDisplay amount={paymentSummary.paid} size="sm" tone="success" />
                     </div>
@@ -1263,8 +1263,29 @@ export function BillingPage() {
                   <p>{t('billing.refund.receiptDate', { date: new Date(refundReceipt.refundedAt).toLocaleString(locale === 'en' ? 'en-US' : 'ar-EG') })}</p>
                   <p>{t('billing.refund.receiptProcessedBy', { name: refundReceipt.processedByName })}</p>
                 </div>
-                <div className="mt-3 flex justify-end">
-                  <MoneyDisplay amount={refundReceipt.refundAmount} size="lg" tone="danger" />
+                <div className="mt-3 flex flex-col items-end gap-1">
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs text-text-secondary">{t('billing.refund.receiptAmountLabel')}</span>
+                    <MoneyDisplay amount={refundReceipt.refundAmount} size="lg" tone="danger" />
+                  </div>
+                  {/* Net financial effect (directive: printing must never
+                      let a refund receipt imply refunded money is still
+                      collectible). Reads the live paymentSummary --
+                      invalidateDetail() in the refund mutation's onSuccess
+                      already triggers a refetch, so by the time this
+                      dialog renders, paymentSummary reflects the
+                      POST-refund outstanding balance, not a stale
+                      snapshot -- same authoritative-server-data principle
+                      as every other printed total on this page. */}
+                  {paymentSummary && paymentSummary.outstanding > 0 && (
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs text-text-secondary">{t('billing.refund.receiptRemainingOutstanding')}</span>
+                      <MoneyDisplay amount={paymentSummary.outstanding} size="sm" tone="danger" />
+                    </div>
+                  )}
+                  {paymentSummary && paymentSummary.outstanding <= 0 && (
+                    <p className="text-xs text-status-success">{t('billing.refund.receiptFullySettled')}</p>
+                  )}
                 </div>
               </div>
               <div className="flex items-center gap-2 print:hidden">

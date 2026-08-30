@@ -2182,7 +2182,10 @@
       "receiptOriginalMethod": "طريقة الدفع الأصلية: {{method}}",
       "receiptReason": "السبب: {{reason}}",
       "receiptDate": "التاريخ: {{date}}",
-      "receiptProcessedBy": "تمت المعالجة بواسطة {{name}}"
+      "receiptProcessedBy": "تمت المعالجة بواسطة {{name}}",
+      "receiptAmountLabel": "المبلغ المسترجَع",
+      "receiptRemainingOutstanding": "المتبقي المستحق على هذه الفاتورة",
+      "receiptFullySettled": "تمت تسوية هذه الفاتورة بالكامل — لا يوجد مبلغ مستحق."
     },
     "reviewClaim": {
       "genericError": "تعذّر مراجعة طلب الدفع."
@@ -3594,6 +3597,26 @@
         "categoryNameRequired": "اسم التصنيف مطلوب.",
         "voidReasonRequired": "سبب الإلغاء مطلوب.",
         "genericError": "حدث خطأ. حاول مرة أخرى."
+      },
+      "voucher": {
+        "print": "طباعة السند",
+        "dialogTitle": "سند مصروف",
+        "title": "سند مصروف",
+        "voidedTitle": "سند مصروف (ملغى)",
+        "reference": "المرجع",
+        "date": "التاريخ",
+        "branch": "الفرع",
+        "category": "التصنيف",
+        "paidTo": "المدفوع له",
+        "description": "الوصف",
+        "method": "طريقة الدفع",
+        "amount": "المبلغ",
+        "recordedBy": "سجّله",
+        "cashShiftReference": "الوردية النقدية",
+        "voidedBanner": "ملغى — لا يُحتسب هذا المصروف ضمن أي إجمالي",
+        "voidedBy": "أُلغي بواسطة {{name}}",
+        "voidedAt": "تاريخ الإلغاء: {{date}}",
+        "voidReason": "سبب الإلغاء: {{reason}}"
       }
     },
     "reportsPage": {

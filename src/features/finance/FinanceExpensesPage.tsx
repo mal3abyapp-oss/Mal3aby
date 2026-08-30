@@ -20,7 +20,8 @@ import {
 import { formatMoney } from '@/lib/domain/billing'
 import { translateSupabaseError } from '@/lib/errors'
 import { useDirection } from '@/app/providers/DirectionProvider'
-import { Receipt, Plus, Tags } from 'lucide-react'
+import { Receipt, Plus, Tags, Printer } from 'lucide-react'
+import { ExpenseVoucherDialog, type ExpenseVoucherData } from './ExpenseVoucherDialog'
 
 // EXPENSES FEATURE (2026-08-30): replaces the old permanent stub
 // (see git history for FinanceExpensesPage.tsx's prior "not built yet"
@@ -49,6 +50,10 @@ interface ExpenseRow {
   expenseDate: string
   status: 'recorded' | 'voided'
   voidReason: string | null
+  recordedByName: string | null
+  voidedByName: string | null
+  voidedAt: string | null
+  cashShiftReference: string | null
 }
 
 async function fetchBranches(clubId: string): Promise<BranchRow[]> {
@@ -80,6 +85,10 @@ async function fetchExpenses(clubId: string, startDate: string, endDate: string)
     expenseDate: r.expense_date,
     status: r.status as 'recorded' | 'voided',
     voidReason: r.void_reason,
+    recordedByName: r.recorded_by_name,
+    voidedByName: r.voided_by_name,
+    voidedAt: r.voided_at,
+    cashShiftReference: r.cash_shift_reference,
   }))
 }
 
@@ -128,6 +137,7 @@ export function FinanceExpensesPage() {
 
   const [voidingId, setVoidingId] = useState<string | null>(null)
   const [voidReason, setVoidReason] = useState('')
+  const [voucherExpenseId, setVoucherExpenseId] = useState<string | null>(null)
 
   const { data: branches = [] } = useQuery({
     queryKey: ['branches-for-expenses', currentClubId],
@@ -237,15 +247,41 @@ export function FinanceExpensesPage() {
     {
       key: 'actions',
       header: '',
-      render: (e) => e.status === 'recorded' ? (
-        <Button size="sm" variant="ghost" className="text-status-danger" onClick={() => { setVoidingId(e.id); setVoidReason(''); setFormError(null) }}>
-          {t('finance.expenses.void')}
-        </Button>
-      ) : (
-        <span className="text-xs text-text-secondary" title={e.voidReason ?? ''}>{e.voidReason}</span>
+      render: (e) => (
+        <div className="flex items-center justify-end gap-1">
+          <Button size="sm" variant="ghost" onClick={() => setVoucherExpenseId(e.id)} aria-label={t('finance.expenses.voucher.print')}>
+            <Printer className="size-4" aria-hidden="true" />
+          </Button>
+          {e.status === 'recorded' ? (
+            <Button size="sm" variant="ghost" className="text-status-danger" onClick={() => { setVoidingId(e.id); setVoidReason(''); setFormError(null) }}>
+              {t('finance.expenses.void')}
+            </Button>
+          ) : (
+            <span className="text-xs text-text-secondary" title={e.voidReason ?? ''}>{e.voidReason}</span>
+          )}
+        </div>
       ),
     },
   ]
+
+  const voucherExpense = expenses.find((e) => e.id === voucherExpenseId) ?? null
+  const voucherData: ExpenseVoucherData | null = voucherExpense ? {
+    id: voucherExpense.id,
+    branchName: voucherExpense.branchName,
+    categoryName: voucherExpense.categoryId ? voucherExpense.categoryName : null,
+    amount: voucherExpense.amount,
+    paymentMethod: voucherExpense.paymentMethod,
+    description: voucherExpense.description,
+    reference: voucherExpense.reference,
+    paidTo: voucherExpense.paidTo,
+    expenseDate: voucherExpense.expenseDate,
+    status: voucherExpense.status,
+    recordedByName: voucherExpense.recordedByName,
+    voidedByName: voucherExpense.voidedByName,
+    voidedAt: voucherExpense.voidedAt,
+    voidReason: voucherExpense.voidReason,
+    cashShiftReference: voucherExpense.cashShiftReference,
+  } : null
 
   return (
     <div>
@@ -440,6 +476,10 @@ export function FinanceExpensesPage() {
           />
         </CardContent>
       </Card>
+
+      {voucherData && (
+        <ExpenseVoucherDialog expense={voucherData} onClose={() => setVoucherExpenseId(null)} />
+      )}
     </div>
   )
 }

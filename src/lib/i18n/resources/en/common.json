@@ -2169,7 +2169,10 @@
       "receiptOriginalMethod": "Original payment method: {{method}}",
       "receiptReason": "Reason: {{reason}}",
       "receiptDate": "Date: {{date}}",
-      "receiptProcessedBy": "Processed by {{name}}"
+      "receiptProcessedBy": "Processed by {{name}}",
+      "receiptAmountLabel": "Amount refunded",
+      "receiptRemainingOutstanding": "Remaining outstanding on this invoice",
+      "receiptFullySettled": "This invoice is now fully settled — nothing further is owed."
     },
     "reviewClaim": {
       "genericError": "Couldn't review the payment claim."
@@ -3588,6 +3591,26 @@
         "categoryNameRequired": "Category name is required.",
         "voidReasonRequired": "A void reason is required.",
         "genericError": "Something went wrong. Try again."
+      },
+      "voucher": {
+        "print": "Print voucher",
+        "dialogTitle": "Expense voucher",
+        "title": "Expense voucher",
+        "voidedTitle": "Expense voucher (voided)",
+        "reference": "Reference",
+        "date": "Date",
+        "branch": "Branch",
+        "category": "Category",
+        "paidTo": "Paid to",
+        "description": "Description",
+        "method": "Payment method",
+        "amount": "Amount",
+        "recordedBy": "Recorded by",
+        "cashShiftReference": "Cash shift",
+        "voidedBanner": "VOIDED — this expense does not count toward any total",
+        "voidedBy": "Voided by {{name}}",
+        "voidedAt": "Voided at {{date}}",
+        "voidReason": "Void reason: {{reason}}"
       }
     },
     "reportsPage": {

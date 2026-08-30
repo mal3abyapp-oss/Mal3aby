@@ -8992,6 +8992,8 @@ export type Database = {
           amount: number
           branch_id: string
           branch_name: string
+          cash_shift_id: string
+          cash_shift_reference: string
           category_id: string
           category_name: string
           created_at: string
@@ -9001,9 +9003,12 @@ export type Database = {
           id: string
           paid_to: string
           payment_method: string
+          recorded_by_name: string
           reference: string
           status: string
           void_reason: string
+          voided_at: string
+          voided_by_name: string
         }[]
       }
       list_held_shop_sales: {
