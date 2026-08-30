@@ -52,7 +52,7 @@ documents that claim to work actually render correctly.
 | 16 | Employee cash liability settlement receipt | USEFUL | ACCEPTED LIMITATION | Not built this round — settlement is already fully auditable via `write_audit_log` + the append-only `employee_cash_liability_ledger` (confirmed in the Financial Integrity pass), and a dedicated settlement receipt would need a new RPC/fixture cycle for a self-settlement-blocked flow this session already had difficulty safely reproducing live (see Financial Integrity pass notes). Lower priority than the REQUIRED gaps closed this round; flagged for a future pass, not a blocking gap |
 | 17 | Report printing (all report pages) | REQUIRED | VERIFIED | Source-swept all 13 files under `src/features/reports/`: every `ReportXPage.tsx` (Academy, Bookings, Collections, Customers, Employee Liability, Exceptions, Gateway Health, Occupancy, Official Receipts, Payment Methods, Reconciliation, Revenue, Shop) imports and renders all three of `ReportPrintButton`/`ReportPrintHeader`/`.print-target` — none missing. Found and fixed a stale in-code comment in `report-print-header.tsx` claiming only 2 of these 13 had adopted the pattern (undersold real, already-shipped work; corrected to reflect actual state) |
 | 18 | Filtered/full report printing | REQUIRED | VERIFIED | These report RPCs return full result sets with no client-side `.limit()`/`.range()` pagination cap (confirmed via grep on ReportRevenuePage.tsx as a representative sample) — no truncation risk exists for this module, unlike Shop's separately-paginated list RPCs (which correctly use the dedicated `fetchFullReport.ts` full-vs-page-view pattern, already verified in the prior Reporting Accuracy pass). Filters are already part of each RPC's own query params, so a filtered view's print necessarily reflects the same filtered data — no separate carry-through mechanism needed |
-| 20 | Long content / many-line-item pagination | REQUIRED | VERIFIED (code review) | This QA club's shop has only 1 active product, so a live 15-20-line sale was not time-feasible to construct this pass. Code-reviewed `ShopInvoiceDocument.tsx`'s item table (lines 300-328): plain `<table className="w-full text-start">`, standard `<thead>`/`<tbody>`/`<tr>`/`<td>` flow, NO `table-layout:fixed`, no fixed `height`/`max-height` on the table or its `.print-target` container, no `overflow:hidden` that would clip rows. A table like this grows naturally with row count and relies on the browser's native table/`@page` pagination (the same `@page`/`@page receipt` CSS Paged Media rules already confirmed correct for every other verified surface) — nothing in the markup would destructively clip or overlap with many rows. BillingPage's own invoice-items table (line ~950s area) uses the identical plain-table pattern. Not live-verified with a real 15+ row sale; flagged as the one remaining PARTIAL in this pass |
+| 20 | Long content / many-line-item pagination | REQUIRED | VERIFIED (LIVE, real native print output) | **Superseded a prior code-review-only PARTIAL claim after the owner correctly rejected it.** Built a real 20-line-item QA fixture end-to-end through legitimate RPCs (20 real `create_shop_product` calls, `receive_shop_stock_batch` for real inventory, `create_shop_sale` with 20 line items + a discount + a long customer name — invoice `DEMOCL-7e1f8a-MAIN-2026-000013`). D10 FOUND AND FIXED (see Defects Log) — the DOM-level "no clipping" claim in the code review was correct but incomplete: it missed that every print-target lives inside a Radix Dialog whose `position: fixed; max-height: 90vh; overflow-y: auto` was never neutralized for print, silently truncating any document taller than the on-screen modal viewport. Confirmed via a REAL saved print-to-PDF file from the owner's own machine (`4444444444.pdf`, 14.4KB, 1 page, only ~1.5 of 20 rows rendered — everything else silently gone, no page 2) before the fix, and a second REAL saved print-to-PDF (`333333333333.pdf`, 215KB, 2 pages, all 20 rows + full header + full totals block correctly present, clean page break between rows, no clipping/overlap) after the fix. Also live DOM-measured zero real cell-overlap and zero clipped leaf text nodes across all 102 text-bearing elements at true 80mm width (302px) via `scrollWidth`/`clientWidth` comparison, and confirmed the thermal-specific SKU-column-hidden behavior is genuinely working. This is now CODE VERIFIED + AUTOMATED VERIFIED + LIVE VISUALLY VERIFIED + NATIVE PRINT PREVIEW VERIFIED (the strongest evidence tier — an actual rendered PDF file, not a screenshot or DOM inspection) |
 | 21 | Government official-receipt serial (on the receipt itself, not just the report ledger) | REQUIRED (where enabled) | VERIFIED | Re-checked against the actual schema (`20260819200000_government_collection_compliance_schema.sql`): the government compliance requirement is the receipt SERIAL NUMBER, not a QR code — no QR field exists anywhere in this feature's schema. The serial is already rendered directly on the payment receipt document, confirmed via source (`BillingPage.tsx` lines 1017-1019, 1212-1213: `{t('governmentCompliance.title')}: <bdi className="tabular-nums">{...officialReceiptSerial}</bdi>`), correctly `<bdi>`-wrapped for the same bidi-safety reason as D8. The earlier framing of this row as an "unverified QR" was based on a mistaken assumption about the requirement, corrected here — the actual required field (serial) is verified present and correctly rendered. Booking invoice's own two (unrelated) QR codes were separately live-verified clean this pass; the Official Receipts report ledger was verified in row 17 |
 
 ## 2. Defects log (fill in as found; REPRODUCE → FIX → VERIFY)
@@ -67,6 +67,7 @@ documents that claim to work actually render correctly.
 - D8 (found via mandatory visual acceptance of D7 — directive Section 20, "DOM inspection alone is insufficient"): the D7 fix's date range rendered VISUALLY REVERSED on the actual printed invoice ("...29-09-2026 → 30-08-2026..." instead of "...2026-08-30 → 2026-09-29...") — an LTR date-range run with no directional isolation, embedded in Arabic prose, inside the RTL `<td>{item.description}</td>` cell in `BillingPage.tsx` (line 958). Identical bug class to commit `f0cbb0a` (operating-hours ranges reversed the same way), which fixed it with `dir="ltr"` at the React render site — not available here since `item.description` is one opaque DB string consumed by a shared generic renderer. FIXED at the data layer instead (migration `20260830132500_fix_club_membership_invoice_description_bidi_isolation.sql`): wrapped the date range in Unicode FSI/PDI directional-isolation characters (U+2068/U+2069) inside both RPCs, so the fix protects every consumer of the string, not just this one render site, and works correctly in both Arabic and English UI. Live-verified via screenshot: a freshly re-sold QA membership now shows "عضوية شهرية تجريبية 2026-08-30 → 2026-09-29" in correct chronological order.
 - FLAGGED, NOT FIXED (out of printing-directive scope): `renew_academy_subscription()`'s `subscriptions.plan_type` COLUMN (not just the printed description) is hardcoded to `'monthly'` on every renewal, regardless of the enrollment's actual prior plan type. Real accounting-semantics defect this printing fix surfaced but does not itself correct — touches active subscription-lifecycle semantics (a "closed domain" per directive Section 27). Documented for a dedicated future pass.
 - D9 (found during RTL/QR/logo acceptance pass, 2026-08-30, code review of `ShopInvoiceDocument.tsx`): `ShopPaymentReceiptDialog` (the per-payment 80mm Shop payment receipt, triggered via "طباعة الإيصال" on any payment row of the Shop invoice) computed `outstanding = Math.max(0, sale.total - paidSoFar)` at line 519 — the exact pre-D4 client-side formula, reintroduced in a sibling component D4 did not touch. `get_invoice_payment_summary()` (confirmed via direct source read) encodes materially different logic: return-driven refunds never re-open outstanding, but non-return (goodwill) refunds do, and fully-refunded/void/draft invoices are special-cased to 0 — none of which the naive subtraction can express. Reproducible whenever a payment receipt is printed for a sale that is either (a) partially paid AND partially returned, or (b) fully paid but partially refunded for a non-return (goodwill) reason — the receipt would show a wrong outstanding figure (phantom-zero or phantom-positive) diverging from the invoice's own authoritative figure for the same sale. FIXED: `ShopInvoiceDocument.tsx` — replaced the two lines computing `paidSoFar`/`outstanding` with `const outstanding = sale?.outstanding ?? 0`, reusing the same `sale.outstanding` field (sourced from `get_shop_sale_invoice_data()` → `get_invoice_payment_summary()`) that `InvoiceDocumentBody` already uses correctly. `tsc --noEmit` clean. Live-verified: reopened the D4/D5 QA fixture sale (000007, partially returned, 280 total/280 paid/140 refunded-via-return) payment receipt — correctly shows Paid 280.00 EGP with no outstanding line (matches the invoice, and matches pre-fix behavior for this specific case since it was a return-driven refund with paidSoFar==total — the bug only diverges on the partial-payment or non-return-refund cases described above, which this club's fixtures don't currently exercise, so the fix is verified by code/formula equivalence to the already-proven-correct `InvoiceDocumentBody` path plus a clean regression render, not by directly reproducing the diverging numeric case live).
+- D10 (P0-class, found via the owner's own real print-to-PDF output during the mandatory native-print-preview evidence pass, 2026-08-30 — the exact class of defect a DOM-inspection-only or code-review-only pass CANNOT catch): every `.print-target` document lives inside a Radix `<Dialog>` (`src/components/ui/dialog.tsx`'s `DialogContent`: `position: fixed; max-height: 90vh; overflow-y: auto` for on-screen scrollable-modal behavior). None of that was ever neutralized for `@media print`. The prior `.print-target.visible-for-print { position: absolute; top: 0 }` rule anchored against that still-`fixed`, still-height-constrained, still-`overflow: auto` ancestor — so any document taller than the on-screen modal's viewport-relative height was **silently truncated at print time**, not just visually scrolled (confirmed: the browser's print pagination never saw the clipped content at all, so it never flowed onto a page 2 either — it was simply gone). Reproducible on ANY document long enough to exceed ~90vh of on-screen dialog height — confirmed live with a real 20-line-item Shop invoice: the owner's own saved print-to-PDF (`4444444444.pdf`, 14.4KB) was a SINGLE PAGE containing only ~1.5 of 20 rows, with the header, QR, and full totals block entirely absent, no page 2. This is likely the single most severe defect this entire directive has found — any real invoice/receipt with enough content to exceed the on-screen modal's height would print an incomplete, financially-misleading document with no visible error to the operator (the on-screen dialog itself scrolls fine; only the PRINTED/saved output was broken). FIXED: added a `[role="dialog"] { position: static !important; max-height: none !important; max-width: none !important; width: auto !important; height: auto !important; overflow: visible !important; transform: none !important; }` rule inside the existing `@media print` block in `src/index.css`, forcing every Dialog ancestor of a print-target back to normal document flow before the print-target's own `position: absolute` is applied — this lets the print-target's true full height participate in the browser's real page-pagination algorithm instead of being clipped to a fixed viewport-relative box. Scoped to `@media print` only (verified live: zero on-screen visual regression, the modal still scrolls normally on screen). VERIFIED with a second real saved print-to-PDF from the same owner machine after the fix (`333333333333.pdf`, 215KB, 2 pages) — all 20 rows present across both pages with a clean page break between rows (no row split mid-content), full header on page 1, full totals block + footer on page 2, matching the invoice's real data exactly (Total 5,578.50, Paid 1,000.00, discount reason shown). This is the strongest evidence tier obtained in this entire directive: an actual native-print-generated PDF file, not a screenshot, not DOM inspection, not a code review.
 
 ## 2b. Responsive check note (Section 21)
 
@@ -206,33 +207,88 @@ Section 0) and is shared unchanged by every surface in this table.
 
 ## 3. Acceptance matrix (final gate — see directive Section 30)
 
+**Revision note**: a prior version of this matrix declared PASS with
+two evidence gaps (long-content live pagination, native print-preview)
+closed only via code review / DOM inspection. The owner correctly
+rejected that as insufficient and required real evidence. Closing
+those gaps properly **found and fixed D10**, a P0-class defect that
+the code-review-only pass had missed entirely — printed/saved
+documents taller than a Dialog's on-screen scroll height were being
+silently truncated, with no visible error to the operator. This is
+the reason the owner's insistence on real evidence over automated/
+code-review claims mattered here, not a formality.
+
 | Item | Status |
 |---|---|
 | PRINT INVENTORY COMPLETE | CLOSED — 21-row surface inventory (§1), no candidate surface left unclassified |
 | A4/THERMAL ARCHITECTURE | CLOSED — single shared `@page`/`@page receipt` mechanism, verified across Booking/Shop/Expense/Cash Shift surfaces |
-| EVERY DOCUMENT TYPE | CLOSED — 9 real defects (D1-D9) found and fixed; 2 new surfaces built (Expense Voucher, Cash Shift Summary); 2 items ACCEPTED LIMITATION with documented rationale (rows 11, 16) |
+| EVERY DOCUMENT TYPE | CLOSED — 10 real defects (D1-D10) found and fixed; 2 new surfaces built (Expense Voucher, Cash Shift Summary); 2 items ACCEPTED LIMITATION with documented rationale (rows 11, 16) |
 | ARABIC/ENGLISH | CLOSED — dedicated RTL/bidi pass (§2d) found and fixed D8 (a new bidi-reversal bug class instance), confirmed no further instances across 3 documents via systematic DOM scan |
 | LOGOS/QR | CLOSED — QR rendering verified clean on booking invoice; logo present/absent states both verified (temporary reverted DB write); government-receipt requirement corrected to serial number (verified present), not QR |
-| LONG CONTENT/MULTI-PAGE/80MM | PARTIAL — code-review only for 15+ line-item pagination (row 20); no live fixture construction was time-feasible this pass. Architecture (plain table, no clipping CSS) matches every other verified surface; ACCEPTED as a residual, documented, low-risk gap, not a stop condition per directive §29 |
+| LONG CONTENT/MULTI-PAGE/80MM | CLOSED — LIVE, real native print output (see row 20, D10). A real 20-line-item invoice was built via legitimate RPCs and actually printed to PDF twice on the owner's own machine: before the fix (`4444444444.pdf`) it was destructively truncated to 1 page / ~1.5 rows; after the fix (`333333333333.pdf`) all 20 rows + header + full totals correctly spanned 2 pages with a clean break. Additionally DOM-measured zero clipped text across 102 leaf nodes at true 80mm (302px) width |
 | DOCUMENT STATES | CLOSED — all 7 payment states (draft/void/unpaid/partially_paid/paid/partially_refunded/refunded) verified as a single authoritative source, no contradictory combinations possible |
 | REPRINT | CLOSED — reprint paths reuse the same authoritative fetch, no new financial transaction created (confirmed via code review of the print-target/dialog pattern; no separate "create new record" path exists for any reprint action) |
 | AUTHORIZATION | CLOSED — permission checks confirmed intact in both migrated RPCs (`has_permission('club_membership.create'/'club_membership.renew', ...)`) |
 | CROSS-TENANT ISOLATION | CLOSED — directly tested with real RLS-impersonated cross-club calls against both new surfaces (§2b3); both correctly rejected/empty |
 | PRINT ERROR UX | CLOSED — `ErrorState` + `translateSupabaseError` + retry confirmed in both fetch-based documents; props-only dialogs have no failure state to handle (§2c) |
 | RESPONSIVE (375/768/1024/1440) | CLOSED — new print actions confirmed reachable via the same app-wide horizontal-scroll pattern every other DataTable already uses (§2b); not a printing-specific regression |
-| ACTUAL AUTHENTICATED VISUAL ACCEPTANCE | CLOSED — every VERIFIED row backed by a live screenshot or live RLS-impersonated round-trip, not markup-only claims (except row 20, explicitly PARTIAL) |
-| PRINT PREVIEW ACCEPTANCE | PARTIAL — `window.print()` fires correctly with zero console errors on every tested document, but the native OS print-preview surface itself is outside this session's browser-automation tooling's reach (confirmed: it blocks the `computer` tool entirely). Documented as an explicit tooling limitation, not a silently skipped item |
-| TSC/LINT/BUILD/UNIT/PRINT TESTS/E2E | CLOSED — `tsc --noEmit` clean, `eslint` 0 errors, production build clean, `vitest run` 108 passed/0 failed/98 skipped (unconfigured local credentials), CI green (run `33315491108`, both jobs) |
-| MIGRATIONS CONSISTENT | CLOSED — all 8 of today's migration files renamed to match their exact Supabase-applied remote timestamps, verified against `list_migrations()` output |
-| HEAD=ORIGIN/MAIN | CLOSED — pushed as `b414beb..eb9343a`, no divergence |
-| PRODUCTION=CURRENT HEAD | CLOSED — `wrangler deploy` version `4bc1771c-16ad-462d-8421-653f9b0cb306`, live console build tag confirmed `eb9343a` |
-| REPOSITORY CLEAN | CLOSED — `git status` clean at time of this matrix |
+| ACTUAL AUTHENTICATED VISUAL ACCEPTANCE | CLOSED — every VERIFIED row backed by a live screenshot, a live RLS-impersonated round-trip, or (for row 20) a real saved native-print PDF file |
+| NATIVE PRINT PREVIEW ACCEPTANCE | CLOSED — genuinely inspectable this session: the native print pipeline opened as a real PDF in the owner's own PDF application (outside this pane's DOM, so the automation tooling could not screenshot it directly, but the owner saved and shared the actual output file twice, which was read and verified directly). This is the strongest evidence tier obtained anywhere in this directive — an actual rendered document, not DOM inspection |
+| TSC/LINT/BUILD/UNIT/PRINT TESTS/E2E | CLOSED — re-run after the D10 fix: `tsc --noEmit` clean, `eslint` 0 errors, production build clean, `vitest run` 108 passed/0 failed/98 skipped (unconfigured local credentials) |
+| MIGRATIONS CONSISTENT | See precise breakdown below — do not read as "local and remote migration history are identical," which is false and was never the actual requirement |
+| HEAD=ORIGIN/MAIN | See precise breakdown below |
+| PRODUCTION=CURRENT HEAD | See precise breakdown below |
+| REPOSITORY CLEAN | Re-verify at time of next push (D10 fix is a pending local change as of this matrix revision, not yet pushed) |
 
-**P0 = 0, P1 = 0, CORE P2 = 0.** The single PARTIAL item (long-content
-live pagination test, row 20) and the single tooling-limited item
-(print-preview visual capture) are both explicitly documented,
-low-risk, and do not represent an unresolved defect — they are
-residual verification-method gaps in an otherwise structurally-sound,
-already-code-reviewed area, consistent with directive §29's explicit
-list of non-stop-conditions ("browser automation friction" is named
-directly).
+### Migration consistency — precise claim
+
+- **CURRENT REQUIRED MIGRATIONS PRESENT**: TRUE. Every migration this
+  session authored and applied via `apply_migration` has a
+  corresponding local `.sql` file, and the live schema/RPC behavior
+  matches what those files define (spot-verified live for
+  `sell_club_membership`/`renew_club_membership` this session).
+- **CURRENT SCHEMA STATE CONSISTENT**: TRUE. No drift observed between
+  what the repo's migrations define and what is actually running.
+- **HISTORICAL REMOTE VERSION LIST IDENTICAL TO LOCAL FILENAMES**: **NOT
+  IDENTICAL, and not expected to be.** Supabase's `list_migrations()`
+  records every `apply_migration` call ever made, including versions
+  later superseded by a corrected re-apply (e.g. the Expense Voucher
+  work this session hit two live ambiguous-column errors and reapplied
+  three times before landing — remote shows all three timestamps,
+  the repo intentionally keeps only the final correct file, matching
+  the standing convention already used for every prior intermediate-
+  fix-then-final-apply pattern in this codebase's history). What was
+  renamed this session (8 files total) were filenames using
+  placeholder/round-number timestamps instead of their real
+  Supabase-applied timestamp for the *final, currently-live* version of
+  each migration — not an attempt to make the two lists byte-identical,
+  which is neither the actual requirement nor achievable without
+  fabricating historical files for superseded intermediate states that
+  correctly no longer exist in the repo.
+
+### HEAD / production — precise claim
+
+- **REPOSITORY HEAD**: `9c2ba38` at the time of the original PASS
+  report; a new local commit exists on top of it now for the D10 fix
+  (not yet pushed as of this matrix revision).
+- **PRODUCTION CODE BUILD**: was `eb9343a` (deployed via `wrangler
+  deploy` before the two documentation-only commits `47e813a`→`9c2ba38`
+  landed).
+- **PRIOR HEAD→PRODUCTION DELTA (`eb9343a`→`9c2ba38`)**: DOCS ONLY.
+  Confirmed via `git diff --stat eb9343a 9c2ba38` limited to
+  `PRINTING_PRODUCTION_ACCEPTANCE_PLAN.md` and
+  `MAL3ABY_CLOUDFLARE_DEPLOYMENT_STATE.md` — no `src/`, no
+  `supabase/migrations/` changes. Runtime code was identical; no
+  redeploy was performed for that delta, correctly, since it would not
+  have changed anything a user could observe.
+- **CURRENT STATE**: the D10 fix is a genuine runtime code change
+  (`src/index.css`) — this DOES require a fresh build + redeploy once
+  committed, unlike the prior docs-only delta. See the final regression
+  gate below for the plan to close this precisely, not by habit.
+
+**P0 = 0 as of this revision** (D10 was P0-class and is now fixed and
+verified with the strongest evidence tier available). Verdict below
+reflects the current true state — not re-declared PASS until the
+runtime delta above is actually pushed, deployed, and reverified live,
+per the owner's explicit instruction not to claim PRODUCTION=FINAL HEAD
+unless literally true.

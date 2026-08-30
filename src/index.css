@@ -129,6 +129,39 @@
     visibility: visible;
   }
 
+  /* PRINTING PRODUCTION ACCEPTANCE (2026-08-30) — D10 fix: every
+     print-target lives inside a Radix Dialog, and DialogContent is
+     `position: fixed; max-height: 90vh; overflow-y: auto` (see
+     src/components/ui/dialog.tsx) for its on-screen scrollable-modal
+     behavior. None of that was ever overridden for print. A long
+     document (e.g. a 20-line-item invoice) would get silently
+     clipped to whatever fit inside that fixed 90vh viewport-height
+     box — content past the first "page" of the dialog's own on-screen
+     scroll area was NEVER RENDERED AT ALL, not just visually
+     scrolled off — confirmed via a real printed PDF: a 20-row
+     invoice produced a single page with only ~1.5 rows, everything
+     else silently gone, no page 2. `position: fixed` also anchors
+     an element to the *viewport*, not the page box, which independently
+     breaks browser print pagination — a fixed-position ancestor with
+     `overflow: hidden`/`auto` clips its descendants' rendered content
+     to its own box on every page, since a fixed element doesn't
+     repeat/reflow across print pages the way normal-flow content does.
+     Fix: force every DialogContent ancestor of a print-target back to
+     normal flow, unbounded height/width, and visible overflow for
+     print only — the print-target's own `position: absolute` (kept
+     below) then anchors correctly against the page box instead of a
+     clipped fixed ancestor, and long content can genuinely paginate
+     across multiple physical pages via the @page rules above. */
+  [role='dialog'] {
+    position: static !important;
+    max-height: none !important;
+    max-width: none !important;
+    width: auto !important;
+    height: auto !important;
+    overflow: visible !important;
+    transform: none !important;
+  }
+
   .print-target.visible-for-print {
     position: absolute;
     inset-inline-start: 0;
