@@ -587,3 +587,63 @@ operational capability with real source data but no usable workflow?"
 **Result: 1 P1 gap found and closed (D8), 1 P2 noted and deliberately
 not built (booking source/channel display), everything else already
 covered.** No speculative features built. No unlimited expansion.
+
+## 7. Final regression gate & deployment record
+
+- `npx tsc --noEmit`: PASS (0 errors).
+- `npm run lint`: PASS (0 errors, 13 pre-existing warnings unrelated
+  to this session's files).
+- `npm run test` (vitest): PASS — 108/108 tests, 98 skipped
+  (pre-existing integration suites requiring QA credentials).
+- `npm run build`: PASS, clean production build.
+- Local commit: `3519fa4` on top of baseline `0110db5`.
+- Pushed to `origin/main`: `0110db5..3519fa4`.
+- CI run [33335308007](https://github.com/mal3abyapp-oss/Mal3aby/actions/runs/33335308007):
+  GREEN — build-and-test + e2e-public both passed.
+- Deployed to production: `cd cloudflare/frontend-worker && wrangler
+  deploy` (Worker `mala3by-frontend`, version
+  `a08589b3-06c3-42e3-9698-c75d90251e16`) — rebuilt at the correct
+  final HEAD first (confirmed via new asset hash `index-Iks2grya.js`
+  before deploying, per Section 35's explicit "do not deploy a stale
+  dist" requirement).
+- Production verified live on a genuinely fresh tab:
+  `https://mal3aby.app`, console confirms `build 3519fa4`, zero
+  console errors. D9 fix specifically re-verified live in production:
+  `/app/fields` stays correctly on itself after 6+ seconds of idle
+  wait (the exact window that previously reproduced the bad
+  navigation before the fix).
+
+## 8. Final status
+
+- BOOKING ARCHITECTURE = PASS
+- STAFF BOOKING CREATION = PASS
+- NEW/EXISTING CUSTOMER BOOKING = PASS
+- AVAILABILITY / OVERLAP PREVENTION = PASS
+- CONCURRENCY = PASS (LIVE CONCURRENT VERIFIED)
+- TIMEZONE = FIXED + PASS (D1, D3)
+- PRICING = PASS (D4 logged as owner decision, not a defect)
+- DURATION = PASS
+- RESCHEDULE / CANCELLATION / STATUS LIFECYCLE = PASS
+- QR / CHECK-IN = PASS
+- PUBLIC BOOKING = FIXED + PASS (D1)
+- FIELDS (CREATE/EDIT/STATUS/CLOSURES) = FIXED + PASS (D7, D8)
+- BRANCH SCOPING = FIXED + PASS (D6)
+- CUSTOMER360 = FIXED + PASS (D10)
+- FINANCE INTEGRATION = PASS (FIXED + PASS on D5)
+- PRINT / REPORT REGRESSION = PASS (verify only, untouched)
+- PERMISSIONS / SECURITY = PASS
+- AUDIT = PASS
+- ERROR UX = PASS
+- RESPONSIVE / RTL-LTR = PASS
+- SECONDARY GAP REVIEW = PASS (Section 32, D8 closed)
+- BOOKINGS/FIELDS P0 = 0
+- BOOKINGS/FIELDS P1 = 0 (all found P1s fixed: D1,D5,D6,D7,D8,D9,D10)
+- BOOKINGS/FIELDS CORE P2 = 0 (D4 accepted-limitation, owner decision
+  pending; booking-source-visibility P2 deliberately not built)
+- TSC/LINT/UNIT/BUILD = PASS
+- CI = GREEN (run 33335308007)
+- PRODUCTION = VERIFIED (mal3aby.app, build 3519fa4)
+- REPOSITORY HEAD = origin/main = 3519fa4
+- WORKING TREE = clean
+
+BOOKINGS & FIELD OPERATIONS PRODUCTION ACCEPTANCE = PASS.
