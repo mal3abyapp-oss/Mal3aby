@@ -250,6 +250,46 @@ current data model without inventing a formula (Section 10) |
 | Console errors on fresh load | PASS (investigated one transient,
 confirmed non-reproducing) |
 
-Pending before final closure: Section 16 secondary bounded coverage
-review, final regression gate (tsc/lint/unit/build), commit, push, CI,
-deploy, production verify.
+## 6. Final regression gate & deployment record
+
+- `npx tsc --noEmit`: PASS (0 errors).
+- `npm run lint`: PASS (0 errors, 13 pre-existing warnings unrelated
+  to this session's files).
+- `npm run test` (vitest): PASS — 108/108 tests, 98 skipped (pre-
+  existing integration suites requiring QA credentials, unchanged).
+- `npm run build` (`tsc -b && vite build`): PASS, clean production
+  build.
+- Local commits: `6f2d93e` (report feature) + `975a174` (secondary
+  coverage doc) on top of baseline `1b0036f`.
+- Pushed to `origin/main`: `1b0036f..975a174`.
+- CI run [33327412670](https://github.com/mal3abyapp-oss/Mal3aby/actions/runs/33327412670):
+  GREEN — build-and-test + e2e-public (39 Playwright tests) both
+  passed.
+- Deployed to production: `cd cloudflare/frontend-worker && wrangler
+  deploy` (Worker `mala3by-frontend`, version
+  `73d421cb-6998-40c9-a2da-b4147958445b`). First deploy attempt used a
+  `dist/` built before the final commit (stale build SHA baked in via
+  `vite.config.ts`'s `define`); caught via console build-tag
+  mismatch, fixed by rebuilding at the correct HEAD and redeploying.
+- Production verified live: `https://mal3aby.app`, fresh-tab console
+  confirms `build 975a174`, zero console errors, Membership Report
+  tab loads with the same correct, reconciled data as local
+  verification (same Supabase backend/club).
+- Docs corrected: `docs/PROJECT_STATE.md` and `README.md` both
+  contained a stale "Phase 18 not authorized" claim, superseded by
+  `MAL3ABY_DEPLOYMENT_RUNBOOK.md`'s "DONE, live" status since
+  2026-08-18 but never updated at the source. Corrected both to point
+  to the runbook as the authoritative deployment record.
+
+## 7. Final status
+
+- MEMBERSHIP LIFECYCLE REPORT = PASS
+- SECONDARY COVERAGE REVIEW = PASS (0 P1 gaps)
+- REPORTING COVERAGE P0/P1/CORE P2 = 0
+- TSC/LINT/UNIT/BUILD = PASS
+- CI = GREEN (run 33327412670)
+- PRODUCTION = VERIFIED (mal3aby.app, build 975a174)
+- REPOSITORY HEAD = origin/main = 975a174
+- WORKING TREE = clean (pending this doc's own commit)
+
+REPORTING SYSTEM = COMPLETE PRODUCTION BASELINE.

@@ -31,12 +31,12 @@ No `organizations` layer above clubs (fully removed, not a placeholder — see [
 
 - **Frontend:** React, TypeScript, Vite, Tailwind CSS, shadcn/ui, TanStack Query
 - **Backend:** Supabase (Postgres, Auth, Storage, RLS, RPC) — no custom server
-- **Deployment:** Cloudflare Pages (target end-state — not yet authorized, see Git Policy below)
+- **Deployment:** Cloudflare Workers Static Assets — live at [mal3aby.app](https://mal3aby.app), Worker `mala3by-frontend`, deployed via `cd cloudflare/frontend-worker && wrangler deploy`. See [MAL3ABY_DEPLOYMENT_RUNBOOK.md](MAL3ABY_DEPLOYMENT_RUNBOOK.md).
 - **Source control:** Git, hosted on GitHub ([mal3abyapp-oss/Mal3aby](https://github.com/mal3abyapp-oss/Mal3aby))
 
 ## Git Policy
 
-**Phase 17 (GitHub release) complete:** the repository is pushed to GitHub with its full local commit and migration history preserved, no rewriting. **Phase 18 (Cloudflare + production deployment) is still blocked** until a separate, explicit go-ahead — no Cloudflare Pages connection, no production Supabase project, no DNS/domain changes, no deployment secrets. See [docs/PROJECT_RULES.md](docs/PROJECT_RULES.md) rule 5b.
+**Phase 17 (GitHub release) complete:** the repository is pushed to GitHub with its full local commit and migration history preserved, no rewriting. **Phase 18 (Cloudflare + production deployment) is complete and live**, authorized 2026-08-18 — production frontend serving real traffic at `mal3aby.app`/`www.mal3aby.app`, production Supabase project `gxkrtlvpjwxhcqdisyob`. See [MAL3ABY_DEPLOYMENT_RUNBOOK.md](MAL3ABY_DEPLOYMENT_RUNBOOK.md) for the current architecture and deploy procedure; `docs/PROJECT_RULES.md` rule 5b's "local-only" language predates this authorization and no longer reflects current state for push/deploy (it remains correct for anything genuinely not yet authorized).
 
 ## Documentation
 
