@@ -4637,8 +4637,10 @@
       "locationNamePlaceholder": "Location name",
       "addLocation": "Add location",
       "locationCreateError": "Couldn't add the location.",
-      "noLocationsYet": "No locations yet — add a warehouse or use a branch location",
-      "locationsHint": "Branch locations are set up automatically; add a warehouse here if you need one.",
+      "noLocationsYet": "No locations yet — set up a branch location below, or add a warehouse.",
+      "locationsHint": "A location is where stock is tracked -- Sell, Receive stock, and Inventory all need at least one before they'll work.",
+      "branchesMissingLocationHint": "These branches don't have an inventory location yet -- set one up to start selling or receiving stock there.",
+      "setUpBranchLocation": "Set up",
       "locationKind": {
         "branch": "Branch",
         "warehouse": "Warehouse"

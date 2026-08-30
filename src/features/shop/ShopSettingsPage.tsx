@@ -22,12 +22,35 @@ import { Upload, X } from 'lucide-react'
 // module activation (directive Section 3 -- separate from platform
 // entitlement, which lives on Platform Clubs/Club Detail, not here) and
 // inventory location management.
-interface LocationRow { locationId: string; kind: string; name: string; status: string }
+interface LocationRow { locationId: string; kind: string; branchId: string | null; name: string; status: string }
 
 async function fetchLocations(clubId: string): Promise<LocationRow[]> {
   const { data, error } = await supabase.rpc('list_shop_inventory_locations', { p_club_id: clubId })
   if (error) throw error
-  return (data ?? []).map((r) => ({ locationId: r.location_id, kind: r.kind, name: r.name, status: r.status }))
+  return (data ?? []).map((r) => ({ locationId: r.location_id, kind: r.kind, branchId: r.branch_id, name: r.name, status: r.status }))
+}
+
+// Acceptance-sweep fix (2026-08-30): this page's own copy has always
+// claimed "Branch locations are set up automatically" (locationsHint
+// below), but nothing anywhere in the codebase ever created one --
+// manage_branch() never touches shop_inventory_locations, and
+// activating the Shop module doesn't either. Confirmed live: a club
+// with a real, active branch (created before Shop existed -- true for
+// every club, since Shop is a later addition) had zero inventory
+// locations and the "Add location" form only ever offered "Warehouse"
+// as a kind, with no way to create a branch-linked one -- Receive
+// stock, Sell, and Inventory were all genuinely unusable, the exact
+// core Commerce path this module exists for. Reusing the existing
+// direct-insert pattern this page already uses for the warehouse path
+// (RLS already permits it: inventory.receive + shop module active),
+// this fetches active branches and offers one real button per branch
+// that doesn't yet have a location, finally making the page's own
+// claim true instead of fixing the copy to describe the gap.
+interface BranchRow { id: string; name: string }
+async function fetchBranchesForLocations(clubId: string): Promise<BranchRow[]> {
+  const { data, error } = await supabase.from('branches').select('id, name').eq('club_id', clubId).eq('status', 'active').order('name')
+  if (error) throw error
+  return data ?? []
 }
 
 // COMMERCE PRO C4 (2026-08-28) -- Club branding / print settings.
@@ -344,6 +367,15 @@ export function ShopSettingsPage() {
     enabled: !!currentClubId,
   })
 
+  const { data: branches = [] } = useQuery({
+    queryKey: ['shop-settings-branches', currentClubId],
+    queryFn: () => fetchBranchesForLocations(currentClubId as string),
+    enabled: !!currentClubId,
+  })
+
+  const branchIdsWithLocation = new Set(locations.map((l) => l.branchId).filter((id): id is string => !!id))
+  const branchesMissingLocation = branches.filter((b) => !branchIdsWithLocation.has(b.id))
+
   const createLocationMutation = useMutation({
     mutationFn: async () => {
       const { error: err } = await supabase.from('shop_inventory_locations').insert({
@@ -353,6 +385,20 @@ export function ShopSettingsPage() {
     },
     onSuccess: () => {
       setNewLocationName('')
+      setError(null)
+      void queryClient.invalidateQueries({ queryKey: ['shop-settings-locations'] })
+    },
+    onError: (err) => setError(translateSupabaseError(err, t('shop.settings.locationCreateError'))),
+  })
+
+  const createBranchLocationMutation = useMutation({
+    mutationFn: async (branch: BranchRow) => {
+      const { error: err } = await supabase.from('shop_inventory_locations').insert({
+        club_id: currentClubId as string, kind: 'branch', branch_id: branch.id, name: branch.name,
+      })
+      if (err) throw err
+    },
+    onSuccess: () => {
       setError(null)
       void queryClient.invalidateQueries({ queryKey: ['shop-settings-locations'] })
     },
@@ -377,6 +423,26 @@ export function ShopSettingsPage() {
             ))}
             {locations.length === 0 && <p className="text-sm text-text-secondary">{t('shop.settings.noLocationsYet')}</p>}
           </div>
+
+          {branchesMissingLocation.length > 0 && (
+            <div className="mt-3 flex flex-col gap-2 rounded-md border border-status-warning/40 bg-status-warning/5 p-3">
+              <p className="text-sm text-status-warning">{t('shop.settings.branchesMissingLocationHint')}</p>
+              {branchesMissingLocation.map((b) => (
+                <div key={b.id} className="flex items-center justify-between gap-2 text-sm">
+                  <span>{b.name}</span>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    disabled={createBranchLocationMutation.isPending}
+                    onClick={() => createBranchLocationMutation.mutate(b)}
+                  >
+                    {t('shop.settings.setUpBranchLocation')}
+                  </Button>
+                </div>
+              ))}
+            </div>
+          )}
+
           <div className="mt-3 flex flex-wrap gap-2">
             <Input placeholder={t('shop.settings.locationNamePlaceholder')} value={newLocationName} onChange={(e) => setNewLocationName(e.target.value)} className="max-w-xs" />
             <Select value={newLocationKind} onValueChange={setNewLocationKind}>
