@@ -1941,6 +1941,150 @@ export type Database = {
           },
         ]
       }
+      expense_categories: {
+        Row: {
+          club_id: string
+          created_at: string
+          created_by: string | null
+          display_order: number
+          id: string
+          name_ar: string
+          name_en: string | null
+          status: string
+        }
+        Insert: {
+          club_id: string
+          created_at?: string
+          created_by?: string | null
+          display_order?: number
+          id?: string
+          name_ar: string
+          name_en?: string | null
+          status?: string
+        }
+        Update: {
+          club_id?: string
+          created_at?: string
+          created_by?: string | null
+          display_order?: number
+          id?: string
+          name_ar?: string
+          name_en?: string | null
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "expense_categories_club_id_fkey"
+            columns: ["club_id"]
+            isOneToOne: false
+            referencedRelation: "clubs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "expense_categories_club_id_fkey"
+            columns: ["club_id"]
+            isOneToOne: false
+            referencedRelation: "commercial_entitlements_usage"
+            referencedColumns: ["club_id"]
+          },
+        ]
+      }
+      expenses: {
+        Row: {
+          amount: number
+          branch_id: string
+          cash_shift_id: string | null
+          category_id: string | null
+          club_id: string
+          created_at: string
+          created_by: string
+          description: string
+          expense_date: string
+          id: string
+          paid_to: string | null
+          payment_method: string
+          reference: string | null
+          status: string
+          void_reason: string | null
+          voided_at: string | null
+          voided_by: string | null
+        }
+        Insert: {
+          amount: number
+          branch_id: string
+          cash_shift_id?: string | null
+          category_id?: string | null
+          club_id: string
+          created_at?: string
+          created_by: string
+          description: string
+          expense_date?: string
+          id?: string
+          paid_to?: string | null
+          payment_method: string
+          reference?: string | null
+          status?: string
+          void_reason?: string | null
+          voided_at?: string | null
+          voided_by?: string | null
+        }
+        Update: {
+          amount?: number
+          branch_id?: string
+          cash_shift_id?: string | null
+          category_id?: string | null
+          club_id?: string
+          created_at?: string
+          created_by?: string
+          description?: string
+          expense_date?: string
+          id?: string
+          paid_to?: string | null
+          payment_method?: string
+          reference?: string | null
+          status?: string
+          void_reason?: string | null
+          voided_at?: string | null
+          voided_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "expenses_branch_id_fkey"
+            columns: ["branch_id"]
+            isOneToOne: false
+            referencedRelation: "branches"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "expenses_cash_shift_id_fkey"
+            columns: ["cash_shift_id"]
+            isOneToOne: false
+            referencedRelation: "cash_shifts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "expenses_category_id_fkey"
+            columns: ["category_id"]
+            isOneToOne: false
+            referencedRelation: "expense_categories"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "expenses_club_id_fkey"
+            columns: ["club_id"]
+            isOneToOne: false
+            referencedRelation: "clubs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "expenses_club_id_fkey"
+            columns: ["club_id"]
+            isOneToOne: false
+            referencedRelation: "commercial_entitlements_usage"
+            referencedColumns: ["club_id"]
+          },
+        ]
+      }
       field_blocks: {
         Row: {
           club_id: string
@@ -7317,6 +7461,10 @@ export type Database = {
           subscription_id: string
         }[]
       }
+      create_expense_category: {
+        Args: { p_club_id: string; p_name_ar: string; p_name_en?: string }
+        Returns: string
+      }
       create_field_block: {
         Args: {
           p_end_at: string
@@ -7882,6 +8030,15 @@ export type Database = {
       }
       get_executive_dashboard: {
         Args: { p_club_id: string; p_end_date: string; p_start_date: string }
+        Returns: Json
+      }
+      get_expense_report: {
+        Args: {
+          p_branch_id?: string
+          p_club_id: string
+          p_end_date: string
+          p_start_date: string
+        }
         Returns: Json
       }
       get_field_available_starts: {
@@ -8812,6 +8969,43 @@ export type Database = {
           updated_at: string
         }[]
       }
+      list_expense_categories: {
+        Args: { p_club_id: string; p_include_archived?: boolean }
+        Returns: {
+          display_order: number
+          id: string
+          name_ar: string
+          name_en: string
+          status: string
+        }[]
+      }
+      list_expenses: {
+        Args: {
+          p_branch_id?: string
+          p_category_id?: string
+          p_club_id: string
+          p_end_date: string
+          p_start_date: string
+          p_status?: string
+        }
+        Returns: {
+          amount: number
+          branch_id: string
+          branch_name: string
+          category_id: string
+          category_name: string
+          created_at: string
+          created_by: string
+          description: string
+          expense_date: string
+          id: string
+          paid_to: string
+          payment_method: string
+          reference: string
+          status: string
+          void_reason: string
+        }[]
+      }
       list_held_shop_sales: {
         Args: { p_club_id: string }
         Returns: {
@@ -9382,6 +9576,20 @@ export type Database = {
         }
         Returns: string
       }
+      record_expense: {
+        Args: {
+          p_amount: number
+          p_branch_id: string
+          p_category_id?: string
+          p_club_id: string
+          p_description: string
+          p_expense_date?: string
+          p_paid_to?: string
+          p_payment_method: string
+          p_reference?: string
+        }
+        Returns: string
+      }
       record_gateway_payment_service: {
         Args: {
           p_confirmed_amount: number
@@ -9741,6 +9949,10 @@ export type Database = {
       }
       set_customer_whatsapp_consent: {
         Args: { p_club_id: string; p_consented: boolean; p_customer_id: string }
+        Returns: undefined
+      }
+      set_expense_category_status: {
+        Args: { p_category_id: string; p_status: string }
         Returns: undefined
       }
       set_plan_publish_status: {
@@ -10190,6 +10402,10 @@ export type Database = {
       verify_portal_invite_secret: {
         Args: { p_entered_secret: string; p_raw_token: string }
         Returns: boolean
+      }
+      void_expense: {
+        Args: { p_expense_id: string; p_reason: string }
+        Returns: undefined
       }
       void_invoice: {
         Args: { p_invoice_id: string; p_reason: string }
