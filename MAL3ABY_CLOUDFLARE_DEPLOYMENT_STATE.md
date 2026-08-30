@@ -8,8 +8,9 @@ Last updated: 2026-08-30
 
 Full batch from the MAL3ABY AUTONOMOUS PRINTING, INVOICES & RECEIPTS
 PRODUCTION ACCEPTANCE directive — see `PRINTING_PRODUCTION_ACCEPTANCE_PLAN.md`
-for the complete surface inventory, defects log (D1-D9), and acceptance
-matrix. Summary: fixed 9 real printing/document defects (hidden Paid
+for the complete surface inventory, defects log (D1-D10, see the
+correction entry below for D10), and acceptance matrix. Summary: fixed
+9 real printing/document defects in this first pass (hidden Paid
 row, missing refund net-effect, Shop invoice phantom outstanding after
 returns, missing return/refund banner, missing membership validity
 dates on invoice lines, an RTL bidi date-reversal bug in the same fix,
@@ -42,6 +43,41 @@ errors (13 pre-existing warnings, none from this session's files),
 production `npm run build` clean, full `vitest run` — 108 passed, 0
 failed, 98 skipped (integration tests requiring unconfigured local
 credentials, same as every prior session).
+
+## 2026-08-30 (same day, later) — D10 correction: real evidence found a real P0
+
+The owner explicitly rejected the PASS verdict above and required real
+native-print-preview and long-content-pagination evidence instead of
+code review / DOM inspection. Closing those two gaps properly **found
+a genuine P0 defect (D10)** the earlier pass had missed: every print
+document lives inside a Radix Dialog whose `position: fixed;
+max-height: 90vh; overflow-y: auto` was never neutralized for
+`@media print`, so any document taller than the on-screen modal's
+height was silently truncated at print time — confirmed via a real
+20-line-item Shop invoice, saved to an actual PDF by the owner on their
+own machine: before the fix, a single 1-page/1.5-row PDF with the
+header, QR, and totals entirely missing; after the fix, a correct
+2-page/20-row PDF with a clean page break.
+
+**Fix**: `src/index.css` — added a `[role="dialog"]` override inside
+the existing `@media print` block, forcing every Dialog ancestor back
+to normal flow/unbounded height before the print-target's own
+`position: absolute` is applied.
+
+**Frontend redeployed**: `wrangler deploy` from commit `c6167dc`.
+**A real mistake was caught mid-deploy**: the first `wrangler deploy`
+call shipped a stale `dist/` (asset hash mismatch against what was
+actually committed, caught by comparing hashes rather than trusting
+the deploy success message) — corrected by re-running `npm run build`
+immediately before a second `wrangler deploy`. Final version
+`da7442e4-e73d-4b49-97ae-50be2b9bbc1b`, live console build tag
+confirmed `c6167dc` in a fresh browser tab (existing tabs kept the
+prior PWA service worker active until every client for the origin was
+closed — expected `registerType: 'prompt'` behavior).
+
+**CI**: GitHub Actions run `33317245991` green.
+
+**HEAD = origin/main = production, all three = `c6167dc`.**
 
 ## 2026-08-20 — WhatsApp "Waiting for this message" re-incident: re-repair + fresh real send
 

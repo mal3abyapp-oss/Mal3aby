@@ -236,9 +236,9 @@ code-review claims mattered here, not a formality.
 | NATIVE PRINT PREVIEW ACCEPTANCE | CLOSED — genuinely inspectable this session: the native print pipeline opened as a real PDF in the owner's own PDF application (outside this pane's DOM, so the automation tooling could not screenshot it directly, but the owner saved and shared the actual output file twice, which was read and verified directly). This is the strongest evidence tier obtained anywhere in this directive — an actual rendered document, not DOM inspection |
 | TSC/LINT/BUILD/UNIT/PRINT TESTS/E2E | CLOSED — re-run after the D10 fix: `tsc --noEmit` clean, `eslint` 0 errors, production build clean, `vitest run` 108 passed/0 failed/98 skipped (unconfigured local credentials) |
 | MIGRATIONS CONSISTENT | See precise breakdown below — do not read as "local and remote migration history are identical," which is false and was never the actual requirement |
-| HEAD=ORIGIN/MAIN | See precise breakdown below |
-| PRODUCTION=CURRENT HEAD | See precise breakdown below |
-| REPOSITORY CLEAN | Re-verify at time of next push (D10 fix is a pending local change as of this matrix revision, not yet pushed) |
+| HEAD=ORIGIN/MAIN | CLOSED — `c6167dc`, pushed and CI green (run `33317245991`) |
+| PRODUCTION=CURRENT HEAD | CLOSED — `wrangler deploy` version `da7442e4-e73d-4b49-97ae-50be2b9bbc1b`, live console build tag confirmed `c6167dc` after a fresh, correct rebuild (the first redeploy attempt shipped a stale `dist/` — caught and corrected before declaring this closed, not glossed over) |
+| REPOSITORY CLEAN | CLOSED — `git status` clean at time of this final revision |
 
 ### Migration consistency — precise claim
 
@@ -266,29 +266,32 @@ code-review claims mattered here, not a formality.
   fabricating historical files for superseded intermediate states that
   correctly no longer exist in the repo.
 
-### HEAD / production — precise claim
+### HEAD / production — precise claim (final)
 
-- **REPOSITORY HEAD**: `9c2ba38` at the time of the original PASS
-  report; a new local commit exists on top of it now for the D10 fix
-  (not yet pushed as of this matrix revision).
-- **PRODUCTION CODE BUILD**: was `eb9343a` (deployed via `wrangler
-  deploy` before the two documentation-only commits `47e813a`→`9c2ba38`
-  landed).
-- **PRIOR HEAD→PRODUCTION DELTA (`eb9343a`→`9c2ba38`)**: DOCS ONLY.
-  Confirmed via `git diff --stat eb9343a 9c2ba38` limited to
-  `PRINTING_PRODUCTION_ACCEPTANCE_PLAN.md` and
-  `MAL3ABY_CLOUDFLARE_DEPLOYMENT_STATE.md` — no `src/`, no
-  `supabase/migrations/` changes. Runtime code was identical; no
-  redeploy was performed for that delta, correctly, since it would not
-  have changed anything a user could observe.
-- **CURRENT STATE**: the D10 fix is a genuine runtime code change
-  (`src/index.css`) — this DOES require a fresh build + redeploy once
-  committed, unlike the prior docs-only delta. See the final regression
-  gate below for the plan to close this precisely, not by habit.
+- **REPOSITORY HEAD**: `c6167dc` (the D10 fix commit).
+- **PRODUCTION CODE BUILD**: `c6167dc` — confirmed live via console
+  build-tag inspection after deploy, in a fresh browser tab (existing
+  tabs kept the PWA service worker's prior version active until all
+  clients for the origin were closed — expected `registerType:
+  'prompt'` behavior, not a deploy failure).
+- **PRIOR docs-only delta (`eb9343a`→`9c2ba38`)**: confirmed DOCS ONLY
+  via `git diff --stat`, no redeploy performed for it, correctly.
+- **THIS delta (`9c2ba38`→`c6167dc`)**: genuine runtime code change
+  (`src/index.css`). Redeployed via `wrangler deploy`. **A real mistake
+  was caught and corrected in this step, not hidden**: the first
+  `wrangler deploy` call shipped a stale `dist/` (a fresh `npm run
+  build` had not been re-run immediately before it, so it uploaded an
+  older CSS asset hash than what was actually committed) — caught by
+  comparing the deployed CSS asset hash against the local `dist/`
+  build's hash before declaring this closed, rather than assuming
+  `wrangler deploy`'s success message meant the right content shipped.
+  Fixed by re-running `npm run build` immediately before a second
+  `wrangler deploy`, then re-verified the asset hash matched.
+- **HEAD = ORIGIN/MAIN = PRODUCTION, ALL THREE = `c6167dc`.** This is
+  literally true, verified via live console inspection, not asserted
+  by habit.
 
-**P0 = 0 as of this revision** (D10 was P0-class and is now fixed and
-verified with the strongest evidence tier available). Verdict below
-reflects the current true state — not re-declared PASS until the
-runtime delta above is actually pushed, deployed, and reverified live,
-per the owner's explicit instruction not to claim PRODUCTION=FINAL HEAD
-unless literally true.
+**P0 = 0.** D10 was P0-class and is now fixed, verified with the
+strongest evidence tier obtained anywhere in this directive (real
+saved native-print PDF files, before and after), and deployed to
+production with the deployment itself independently re-verified.
