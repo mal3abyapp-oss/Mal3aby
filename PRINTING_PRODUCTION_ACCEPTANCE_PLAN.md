@@ -98,6 +98,23 @@ label combinations possible since it's a single Record keyed by the
 authoritative server-computed `paymentStatus` field (from
 `get_invoice_payment_summary()`), not independently derived per-screen.
 
+## 2b3. Cross-tenant isolation note (Section 18)
+
+Directly tested (not just "button hidden") against both new print
+surfaces added this session, using a real RLS-impersonated session for
+the QA club owner attempting to reach a DIFFERENT club they are not a
+member of:
+- `list_expenses()` called with a foreign `p_club_id` → rejected
+  server-side with `not authorized` (explicit permission check inside
+  the RPC, confirmed via live SQL).
+- `cash_shifts` table (read directly by `CashShiftPage.tsx`, no new RPC)
+  queried with `club_id != <own club>` under the QA owner's real RLS
+  session → 0 rows visible (RLS policy enforced, not merely a
+  client-side filter).
+Both surfaces are genuinely server-side tenant-isolated, matching the
+directive's explicit requirement to test cross-club IDs directly rather
+than trusting a hidden UI element.
+
 ## 2c. Print error handling note (Section 23)
 
 Confirmed: BillingPage.tsx (`isDetailError` branch, line 860-861) and
