@@ -1,5 +1,5 @@
-import { useRef, useState } from 'react'
-import { Link } from 'react-router-dom'
+import { useEffect, useRef, useState } from 'react'
+import { Link, useSearchParams } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import QRCode from 'qrcode'
@@ -172,6 +172,30 @@ export function PlayersSection() {
     queryFn: () => fetchPlayersWithContext(currentClubId!, search),
     enabled: !!currentClubId,
   })
+
+  // Acceptance-sweep fix (2026-08-30): Player360Page's own "Subscribe
+  // to membership" button has always navigated here with
+  // ?subscribePlayer=<id>, but this page never read that param -- it
+  // silently landed on the plain Academy Overview tab with no player
+  // selected, forcing staff to search for the same player again by
+  // hand in a completely different tab. Once the player list loads,
+  // auto-select and open the wizard for the requested player, then
+  // clear the param so it doesn't re-trigger on a later navigation
+  // back to this same URL.
+  const [searchParams, setSearchParams] = useSearchParams()
+  useEffect(() => {
+    const requestedId = searchParams.get('subscribePlayer')
+    if (!requestedId || players.length === 0) return
+    const match = players.find((p) => p.id === requestedId)
+    if (match) {
+      setSelectedPlayer(match)
+      setSubscribeOpen(true)
+    }
+    const next = new URLSearchParams(searchParams)
+    next.delete('subscribePlayer')
+    setSearchParams(next, { replace: true })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [players])
 
   const visiblePlayers = players.filter((p) => {
     if (filter === 'all') return true

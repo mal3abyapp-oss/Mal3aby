@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useSearchParams } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { useAuth } from '@/app/providers/AuthProvider'
 import { PageHeader } from '@/components/ui/page-header'
@@ -13,7 +13,18 @@ import { AcademyOverview } from '@/features/academy/AcademyOverview'
 export function AcademyPage() {
   const { t } = useTranslation()
   const { currentMembership } = useAuth()
-  const [activeTab, setActiveTab] = useState<'overview' | 'players' | 'memberships' | 'attendance'>('overview')
+  // Acceptance-sweep fix (2026-08-30): Player360Page's "Subscribe to
+  // membership" button navigates here with ?subscribePlayer=<id>,
+  // expecting to land on the Players tab so PlayersSection's own
+  // param-driven auto-open (see PlayersSection.tsx) can find and select
+  // that player. activeTab always defaulted to 'overview' regardless of
+  // the URL, so PlayersSection was never even mounted -- confirmed
+  // live: the button silently dropped staff back on the plain Overview
+  // tab with no player selected.
+  const [searchParams] = useSearchParams()
+  const [activeTab, setActiveTab] = useState<'overview' | 'players' | 'memberships' | 'attendance'>(
+    searchParams.has('subscribePlayer') ? 'players' : 'overview',
+  )
 
   if (currentMembership?.roleKey === 'coach') {
     return <CoachTodayView />
