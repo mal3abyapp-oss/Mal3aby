@@ -2830,7 +2830,8 @@
       "description": "Customers report -- new customers and top spenders",
       "newCustomers": "New customers",
       "topSpenders": "Top spenders",
-      "bookingCountSuffix": "{{count}} bookings",
+      "bookingCountSuffix_one": "{{count}} booking",
+      "bookingCountSuffix_other": "{{count}} bookings",
       "csvHeader": {
         "customer": "Customer",
         "totalSpend": "Total spend",

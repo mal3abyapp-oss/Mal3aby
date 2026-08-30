@@ -47,43 +47,43 @@ Commerce core. WhatsApp untouched.
 
 | # | Report | Route/Location | Classification | Status |
 |---|---|---|---|---|
-| 1 | Reports Overview (landing) | `/app/reports` | REQUIRED | PENDING |
-| 2 | Bookings report | `/app/reports/bookings` | REQUIRED | PENDING |
-| 3 | Occupancy report | `/app/reports/occupancy` | REQUIRED | PENDING |
-| 4 | Revenue report | `/app/reports/revenue` (+ `/app/finance/reports?tab=revenue`) | REQUIRED | PENDING |
-| 5 | Collections report | `/app/reports/collections` (+ finance hub) | REQUIRED | PENDING |
-| 6 | Payment Methods report | `/app/reports/payment-methods` (+ finance hub) | REQUIRED | PENDING |
-| 7 | Exceptions report | `/app/reports/exceptions` (+ finance hub) | REQUIRED | PENDING |
-| 8 | Official Receipts report | `/app/reports/official-receipts` (+ finance hub) | REQUIRED (where enabled) | PENDING |
-| 9 | Reconciliation report | `/app/reports/reconciliation` (+ finance hub) | REQUIRED | PENDING |
-| 10 | Gateway Health report | `/app/reports/gateway-health` (+ finance hub) | REQUIRED | PENDING |
-| 11 | Employee Cash Liability report | `/app/reports/employee-liability` (+ finance hub) | REQUIRED | PENDING |
-| 12 | Academy report | `/app/reports/academy` | REQUIRED | PENDING |
-| 13 | Customers report | `/app/reports/customers` | REQUIRED | PENDING |
-| 14 | Shop: Sales Summary | `/app/reports/shop?tab=sales-summary` | REQUIRED | PENDING |
-| 15 | Shop: Sales Detail | `/app/reports/shop?tab=sales-detail` | REQUIRED | PENDING |
-| 16 | Shop: Product Sales | `/app/reports/shop?tab=product-sales` | REQUIRED | PENDING |
-| 17 | Shop: Category Sales | `/app/reports/shop?tab=category-sales` | REQUIRED | PENDING |
-| 18 | Shop: Payment Method Sales | `/app/reports/shop?tab=payment-method-sales` | REQUIRED | PENDING |
-| 19 | Shop: Cashier Sales | `/app/reports/shop?tab=cashier-sales` | REQUIRED | PENDING |
-| 20 | Shop: Customer Purchases | `/app/reports/shop?tab=customer-purchases` | REQUIRED | PENDING |
-| 21 | Shop: Returns | `/app/reports/shop?tab=returns` | REQUIRED | PENDING |
-| 22 | Shop: Inventory On Hand | `/app/reports/shop?tab=inventory-on-hand` | REQUIRED | PENDING |
-| 23 | Shop: Stock Movement Ledger | `/app/reports/shop?tab=stock-movement-ledger` | REQUIRED | PENDING |
-| 24 | Shop: Low Stock | `/app/reports/shop?tab=low-stock` | REQUIRED | PENDING |
-| 25 | Shop: Out of Stock | `/app/reports/shop?tab=out-of-stock` | REQUIRED | PENDING |
-| 26 | Shop: Stock Valuation | `/app/reports/shop?tab=stock-valuation` | REQUIRED | PENDING |
-| 27 | Shop: Gross Profit | `/app/reports/shop?tab=gross-profit` | REQUIRED | PENDING |
-| 28 | Shop: Supplier Activity | `/app/reports/shop?tab=supplier-activity` | REQUIRED | PENDING |
-| 29 | Shop: Stock Count Variance | `/app/reports/shop?tab=stock-count-variance` | REQUIRED | PENDING |
-| 30 | Finance Overview | `/app/finance` (FinanceOverviewPage) | REQUIRED | PENDING |
-| 31 | Finance Invoices | `/app/finance/invoices` | USEFUL | PENDING |
-| 32 | Finance Payments | `/app/finance/payments` | USEFUL | PENDING |
-| 33 | Outstanding page | `OutstandingPage.tsx` (billing) | REQUIRED | PENDING — need to locate route |
-| 34 | Cash Shift history/report | `/app/finance/cash` (CashShiftPage/FinanceCashPage) | REQUIRED | PENDING |
-| 35 | Expense reports | `/app/finance/expenses` (FinanceExpensesPage) | REQUIRED | PENDING |
-| 36 | Club Membership report | `club_membership_report` RPC — need to locate UI surface | REQUIRED | PENDING |
-| 37 | Platform Reports | `/platform/reports` (platform owner) | REQUIRED (platform scope) | PENDING |
+| 1 | Reports Overview (landing) | `/app/reports` | REQUIRED | PASS |
+| 2 | Bookings report | `/app/reports/bookings` | REQUIRED | PASS |
+| 3 | Occupancy report | `/app/reports/occupancy` | REQUIRED | PASS |
+| 4 | Revenue report | `/app/reports/revenue` (+ `/app/finance/reports?tab=revenue`) | REQUIRED | PASS |
+| 5 | Collections report | `/app/reports/collections` (+ finance hub) | REQUIRED | PASS |
+| 6 | Payment Methods report | `/app/reports/payment-methods` (+ finance hub) | REQUIRED | PASS |
+| 7 | Exceptions report | `/app/reports/exceptions` (+ finance hub) | REQUIRED | PASS |
+| 8 | Official Receipts report | `/app/reports/official-receipts` (+ finance hub) | REQUIRED (where enabled) | PASS (correct empty state; no compliance module enabled for this QA club) |
+| 9 | Reconciliation report | `/app/reports/reconciliation` (+ finance hub) | REQUIRED | PASS |
+| 10 | Gateway Health report | `/app/reports/gateway-health` (+ finance hub) | REQUIRED | PASS (correct empty state; no gateway connected for this QA club) |
+| 11 | Employee Cash Liability report | `/app/reports/employee-liability` (+ finance hub) | REQUIRED | PASS |
+| 12 | Academy report | `/app/reports/academy` | REQUIRED | PASS (see section 5b) |
+| 13 | Customers report | `/app/reports/customers` | REQUIRED | FIXED + PASS (English pluralization defect found and fixed) |
+| 14 | Shop: Sales Summary | `/app/reports/shop?tab=sales-summary` | REQUIRED | PASS |
+| 15 | Shop: Sales Detail | `/app/reports/shop?tab=sales-detail` | REQUIRED | PASS |
+| 16 | Shop: Product Sales | `/app/reports/shop?tab=product-sales` | REQUIRED | PASS |
+| 17 | Shop: Category Sales | `/app/reports/shop?tab=category-sales` | REQUIRED | PASS |
+| 18 | Shop: Payment Method Sales | `/app/reports/shop?tab=payment-method-sales` | REQUIRED | PASS |
+| 19 | Shop: Cashier Sales | `/app/reports/shop?tab=cashier-sales` | REQUIRED | PASS |
+| 20 | Shop: Customer Purchases | `/app/reports/shop?tab=customer-purchases` | REQUIRED | PASS |
+| 21 | Shop: Returns | `/app/reports/shop?tab=returns` | REQUIRED | PASS |
+| 22 | Shop: Inventory On Hand | `/app/reports/shop?tab=inventory-on-hand` | REQUIRED | FIXED + PASS (R1, R3) |
+| 23 | Shop: Stock Movement Ledger | `/app/reports/shop?tab=stock-movement-ledger` | REQUIRED | FIXED + PASS (R3) |
+| 24 | Shop: Low Stock | `/app/reports/shop?tab=low-stock` | REQUIRED | PASS |
+| 25 | Shop: Out of Stock | `/app/reports/shop?tab=out-of-stock` | REQUIRED | PASS |
+| 26 | Shop: Stock Valuation | `/app/reports/shop?tab=stock-valuation` | REQUIRED | FIXED + PASS (R1, R3) |
+| 27 | Shop: Gross Profit | `/app/reports/shop?tab=gross-profit` | REQUIRED | FIXED + PASS (R2) |
+| 28 | Shop: Supplier Activity | `/app/reports/shop?tab=supplier-activity` | REQUIRED | FIXED + PASS (R3) |
+| 29 | Shop: Stock Count Variance | `/app/reports/shop?tab=stock-count-variance` | REQUIRED | FIXED + PASS (R3) |
+| 30 | Finance Overview | `/app/finance` (FinanceOverviewPage) | REQUIRED | FIXED + PASS (R5) |
+| 31 | Finance Invoices | `/app/finance/invoices` | USEFUL | PASS (spot-checked via Outstanding/deep-link flows) |
+| 32 | Finance Payments | `/app/finance/payments` | USEFUL | PASS (spot-checked via Outstanding/split-payment flows) |
+| 33 | Outstanding page | `OutstandingPage.tsx`, rendered as `/app/finance/payments?status=outstanding` sub-tab | REQUIRED | PASS |
+| 34 | Cash Shift history/report | `/app/finance/cash` (CashShiftPage/FinanceCashPage) | REQUIRED | PASS |
+| 35 | Expense reports | `/app/finance/expenses` (FinanceExpensesPage) | REQUIRED | PASS (see section 4b) |
+| 36 | Club Membership report | `get_club_membership_report` RPC — confirmed fully functional server-side, ZERO UI consumers anywhere in `src` | REQUIRED | GAP (documented, not built) |
+| 37 | Platform Reports | `/platform/reports` (platform owner) | REQUIRED (platform scope) | BLOCKED — no platform-owner browser session this pass; see section 13 |
 
 Not yet located in routing, to confirm during live tour:
 - Membership-specific report UI (new/renewed/cancelled/active/expired) — may live inside the Club Memberships module itself, not `/app/reports/*`.
@@ -310,3 +310,322 @@ attempting cross-tenant access:
 ## 12. Final acceptance matrix
 
 Not yet evaluated — populated at closure.
+
+## 13. Secondary-agent pass (2026-08-30): Outstanding, Cash Shift, Memberships, Platform, Timezone, Print, Responsive, RTL/LTR, Security
+
+Scope: directive items not yet covered by the primary agent (Reports
+Overview/Bookings/Occupancy/Finance-hub-8-tabs/Academy/Customers/16
+Shop reports already done). This section reports PASS/FAIL/BLOCKED for
+each of the 9 assigned items with exact evidence.
+
+### 13.1 Outstanding page — PASS
+
+Route confirmed via source (`FinancePaymentsPage.tsx`): `OutstandingPage`
+renders when `subTab==='outstanding'`, reached at
+`/app/finance/payments?status=outstanding`. Live-loaded: 5 outstanding
+invoices (150/300/300/300/4,578.50 = 5,628.50 EGP total), CSV export
+button present. The component already carries two prior real fixes
+documented inline (an owner-level finding that the underlying
+`outstanding_invoices` view has no `outstanding > 0` filter by design,
+fixed at this page's fetch boundary; and honest degradation of the
+Due Date column/filter dropdown since `invoices.due_date` is NULL on
+every row in production — both confirmed still correct live: no due-
+date filter UI shown, since `hasAnyDueDate` is false for this dataset).
+Invoice-number click correctly deep-links to
+`/app/finance/payments?invoice=<id>` and opens the exact right invoice
+dialog (verified DEMOCL-...-000004, showed total 500/paid 350/refunded
+150/outstanding 150 — reconciles exactly with the Outstanding page's
+own 150.00 row). BillingPage's summary cards, once fully loaded,
+reconcile exactly: total outstanding 5,628.50 EGP matches the sum of
+all 5 Outstanding-page rows precisely.
+
+### 13.2 Cash Shift history / Cash reports — PASS
+
+`/app/finance/cash`, "الورديات" (Shifts) tab: shift history table shows
+Branch/Opened by/Opened at/Closed at/Opening float/Expected/Counted/
+Variance/Status/Shortage-Surplus columns. Live data: one closed shift
+by staff "دليل الاستخدام QA" with Expected 390.00, Counted 380.00,
+Variance -10.00 EGP, Status "مغلقة" (Closed), Shortage badge "المستحق:
+10.00 EGP". Status filter tested live: selecting "مفتوحة" (Open)
+correctly returns empty state "لا توجد ورديات بعد" (both real shifts
+are closed) with a "مسح الفلاتر" (Clear filters) button that correctly
+restores both rows on click. Three-way cross-report reconciliation,
+all exact matches:
+- Cash Shift: -10.00 EGP variance, staff "دليل الاستخدام QA".
+- Reconciliation tab (same page): "إجمالي العجز" (Total shortage)
+  10.00 EGP, "2 وردية مغلقة في هذه الفترة" (2 closed shifts in period).
+- Employee Liability tab (same page): staff "دليل الاستخدام QA",
+  type "عجز" (Shortage), original amount 10.00, outstanding 10.00,
+  status "مستحق" (Due).
+This matches the primary agent's own prior finding of this same 10.00
+EGP figure via a different surface — now independently re-confirmed
+via the Cash Shift page itself, closing the loop on all 3 surfaces
+that reference this one real shortage.
+
+### 13.3 Club Membership reports — GAP (documented, not built)
+
+`/app/memberships` has 4 tabs (Overview/Plans/Members/Expiring Soon),
+all current-state operational views — no date-range report, no
+new/renewed/cancelled/active/expired breakdown, no export. Grepped
+`club_membership_report` per the task brief; the actual RPC name is
+`get_club_membership_report` (`p_club_id, p_start_date, p_end_date` →
+`jsonb`). Confirmed via direct RLS-impersonated call for the QA club,
+2026-08-01–2026-08-31:
+```
+{"by_plan":[{"plan_id":"a3c612db-...","is_active":true,
+  "plan_name_ar":"عضوية شهرية تجريبية","plan_name_en":"QA Monthly Plan",
+  "total_membership_count":4,"active_membership_count":1}],
+ "counts_by_status":{"active":1,"pending_payment":3},
+ "renewals_in_range":1,"expiring_within_range":[],
+ "cancellations_in_range":0,"new_memberships_in_range":3}
+```
+This is a fully working, well-shaped backend capability (exactly the
+new/renewed/cancelled/active/expired breakdown the directive describes)
+with **zero UI consumers anywhere in `src`** (grepped
+`get_club_membership_report` project-wide — only hit is the generated
+`types.ts` schema definition). Classic backend-capability-with-no-
+reachable-UI gap. Per this session's constraints (don't spontaneously
+build new report surfaces; document don't guess), this is reported as
+a genuine gap, not fixed. Same conclusion, independently reached, as
+the primary agent's section 5 finding on this same module from the
+operational-UI side — this section adds the RPC-level confirmation
+that a ready-made backend report already exists and is simply
+unwired.
+
+### 13.4 Platform Owner reports — BLOCKED (role not accessible this pass)
+
+`/platform/reports` requires `RequirePlatformOwner` route guard
+(confirmed in `router.tsx`). The active browser session is the club
+owner (`ecf9b9f3-...`) with no platform-owner identity available —
+navigating to `/platform/reports` silently redirected back to `/app`
+(the club dashboard), consistent with the guard rejecting the role
+rather than erroring. No platform-owner credentials were provided for
+this pass. Not guessed or worked around.
+
+Supplementary, NOT new work this pass — a prior session (2026-08-29,
+one day before this one) already did a DB/code-level verification of
+`PlatformReportsPage.tsx` specifically when browser access was also
+unavailable that day (see local memory
+`project_platform_owner_reports_audit_alerts_owners_overview_2026-08.md`):
+confirmed Growth tab correctly maps `clubs.status` via
+`CLUB_STATUS_LABELS`, Revenue tab has real monthly aggregation
+(`monthlyTotals`) and a real club link via
+`platform_payments -> platform_invoices.club_id` join. That same
+memory also documents a still-open, unrelated defect in this area
+(audit.ts action/entity label-coverage drift) which is out of this
+task's assigned scope (items 1-9) and not re-verified here.
+
+**Recommendation**: this item needs either real platform-owner browser
+credentials or an explicit approval to re-run the same
+RLS-impersonation SQL pattern used successfully elsewhere in this
+session, in a future pass, to get a live (not one-day-old) PASS.
+
+### 13.5 Timezone boundary test — PARTIAL, one genuine backend-adjacent defect found (not fixed, see reasoning)
+
+Club timezone: `Africa/Cairo`. Checked all 11 existing invoices for
+this QA club — none straddle the UTC/Cairo day boundary (all created
+Cairo-daytime hours), so no existing transaction could be used for a
+literal spot-check the way the primary agent did for
+`club_local_day_bounds()`/`get_booking_report()` (see section 6 above,
+which this section does not duplicate).
+
+Read the actual RPC source for `get_revenue_report` and
+`get_expense_report` (`execute_sql` against
+`information_schema.routines`):
+- `get_revenue_report` is correctly timezone-aware: computes
+  `v_range_start`/`v_range_end` via `club_local_day_bounds(p_club_id,
+  p_start_date/p_end_date)` and buckets `by_day` via
+  `(p.received_at at time zone v_timezone)::date`. Correct pattern,
+  confirms the primary agent's section 6 finding generalizes to this
+  RPC too.
+- `get_expense_report` filters on `expenses.expense_date`, which is a
+  plain `date` column (confirmed via `information_schema.columns`) set
+  explicitly by the client at entry time, not a `timestamptz` needing
+  conversion — no backend timezone bug possible here by construction.
+
+**Real defect found — frontend default-date helpers use UTC, not
+club-local, "today"**: `src/features/reports/hooks/useDateRangeReport.ts`
+`useDateRange()` (the shared default-date-range hook used by **20**
+report screens across Reports/Finance/Shop) and
+`src/features/finance/FinanceExpensesPage.tsx` `todayIso()` both compute
+"today" via `new Date().toISOString().slice(0,10)` — the browser's
+**UTC** date, not the club's `Africa/Cairo` local date. Precisely
+demonstrated: for the instant `2026-08-30T23:30:00Z` (which is
+`2026-08-31 01:30` in Africa/Cairo, i.e. already "tomorrow" locally),
+`toISOString().slice(0,10)` returns `2026-08-30` while the correct
+Cairo-local date is `2026-08-31`. Impact: for roughly a 2-hour window
+each day (UTC 22:00–23:59, Cairo-local 00:00–01:59), every report's
+default end-date-range and the expense-entry default date (and its
+`max=` cap, which would actively BLOCK entering today's real local
+date during that window) resolve to yesterday relative to the club's
+actual calendar day. This does not corrupt any stored data or any
+RPC's calculation (the RPCs themselves are correctly timezone-aware;
+a user can always manually correct the date picker), so it is a
+default-value/UX edge case, not a Finance-calculation-semantics bug.
+
+**FIXED by the primary agent after this subagent pass** — the blast
+radius concern above was real but addressable: since all 19 report
+screens call `useDateRange()` with the exact same zero-argument
+signature, the fix lands entirely inside the ONE shared hook with zero
+call-site changes required, which is exactly the bounded/low-risk
+pattern directive Section 27 authorizes for a systemic sweep (same
+pattern, proven, multiple real occurrences, fix bounded).
+`useDateRange()` in `src/features/reports/hooks/useDateRangeReport.ts`
+now fetches `clubs.timezone` (same query shape/fallback as
+`BillingPage.tsx`'s own established fix for this exact bug class) and
+corrects the initial browser-UTC default to the club-local date via
+`fromInstant()` — this subagent's own suggested primitive, reused
+exactly as suggested rather than hand-rolling a parallel
+`Intl.DateTimeFormat` call. A `useEffect` applies the correction the
+moment the timezone resolves, and a ref-tracked "user has edited"
+guard ensures the correction never overwrites a date the user already
+picked. Deterministically verified (not clock-dependent): for the
+instant `2026-08-30T22:00:00Z` (Cairo-local `2026-08-31 01:00`, the
+exact boundary case), the old formula produced `2026-08-30` and the
+fixed one produces `2026-08-31` — confirmed via both a standalone
+Node reproduction of `fromInstant()`'s logic and live in-browser
+`tsc`/lint/full-build/full-test-suite regression (108 passed, 0
+failed, build clean). `FinanceExpensesPage.tsx`'s separate `todayIso()`
+(used for the expense-entry form's default/max date, not a report
+default) was deliberately left untouched — it's expense-entry UX, not
+a report, and needs its own independent fix using the same pattern in
+a future pass focused on that module specifically.
+
+### 13.6 Print verification — PASS
+
+Native OS print dialog is confirmed unusable for this tooling (clicking
+the real Print button hung the tab behind a blocking dialog; recovered
+by closing that tab and opening a fresh one). Switched to the
+directive-sanctioned DOM/print-target inspection instead, stubbing
+`window.print` before triggering "Print Full Report" flows so they
+complete without hanging.
+- **Revenue report**: `.print-target` DOM content (2,850.00 total
+  revenue, 440.00 refunds, by-payment-method and by-day breakdowns)
+  matches the on-screen filtered view exactly. The hidden
+  `print:block` header element (confirmed present via
+  `querySelector('.print\\:block')`) correctly renders report title,
+  club label "نادي النموذج", the exact applied filter
+  "2026-07-31 → 2026-08-30", and a generation timestamp.
+- **Shop Sales Detail**: regular `.print-target` matches the 3 visible
+  rows exactly (all 8 columns: invoice/customer/cashier/date/total/
+  discount/refund/status). "طباعة التقرير الكامل" (Print Full Report)
+  tested with `window.print` stubbed: correctly fetched and rendered
+  "عرض جميع الصفوف المطابقة وعددها 3" (showing all 3 matching rows) —
+  matches `fetchFullReport()`'s source-confirmed behavior (pages
+  through the same filtered RPC in bounded chunks, 200/page, 40-page/
+  8000-row hard safety cap, honest `truncated` flag never silently
+  dropping rows).
+- **Customers report**: `.print-target` matches on-screen exactly (5
+  new customers; 3-row top-spenders list with identical amounts).
+
+### 13.7 Responsive verification — PASS
+
+Tested Revenue report and Shop Sales Detail (table-heavy, 8 columns —
+worst case for horizontal-scroll regressions) and Cash Shift (form-
+heavy) at 375/768/1024:
+- 375px: KPI cards stack cleanly in a 2-column grid, no overlap;
+  date-range filters and print buttons stack full-width; wide tables
+  scroll ONLY within their own bounded container — confirmed via JS:
+  the table wrapper (`w-full overflow-x-auto rounded-md border
+  border-border`) has `scrollWidth:1646` vs `clientWidth:342`, while
+  `document.body.scrollWidth === window.innerWidth === 375` exactly
+  (i.e. the page itself never scrolls horizontally, only the table
+  does — the correct pattern). Cash Shift's "open new shift" form
+  fields stack correctly full-width with no clipped controls.
+- 768px: sidebar renders in full alongside content, filter bar and
+  print-button row lay out side-by-side correctly, table retains its
+  own scrollbar.
+- 1024px: report-category top nav becomes horizontally scrollable
+  (by design, `overflow-x-auto` nav), no overlap anywhere, table
+  scroll behavior unchanged and correct.
+No KPI-card overlap, no unusable filter controls, no page-level
+horizontal scroll found at any breakpoint tested.
+
+### 13.8 RTL/LTR verification — PASS, one real defect found and fixed
+
+Switched UI language to English via the sidebar toggle and re-checked
+Revenue, Cash Shift, and Customers reports (all already reviewed in
+Arabic by the primary agent or by section 13.1/13.2 above):
+- Full LTR re-layout confirmed clean on all 3: sidebar moves to the
+  left, all currency figures render in standard Western digits
+  (`2,850.00 EGP`, not Arabic-Indic), date-range labels/values correct,
+  no broken layout, no leftover Arabic UI chrome. Real user-entered
+  data (staff name "دليل الاستخدام QA", customer name "أحمد محمد")
+  correctly stays in its originally-entered script — expected, not a
+  bug, since these are proper nouns, not translation keys.
+
+**Real defect found**: Customers report's top-spenders row used a
+single flat i18n key `bookingCountSuffix: "{{count}} bookings"` with
+no plural variant, so a customer with exactly 1 booking rendered
+"1 bookings" (grammatically wrong) in English. Confirmed this
+project's own i18n convention already supports and uses `_one`/`_other`
+suffixed keys elsewhere in the same file (`day_one`/`day_other`,
+`month_one`/`month_other`, `year_one`/`year_other`,
+`whatsappFailed_other`) — i18next resolves these automatically via
+`Intl.PluralRules`, no extra plugin needed. **FIXED**:
+`src/lib/i18n/resources/en/common.json` — replaced the flat
+`reports.customers.bookingCountSuffix` key with
+`bookingCountSuffix_one: "{{count}} booking"` /
+`bookingCountSuffix_other: "{{count}} bookings"`. Live-verified after
+fix: "أحمد محمد" (1 booking) now correctly renders "1 booking"
+(singular), other rows with 0 bookings still correctly render
+"0 bookings". Arabic key (`"{{count}} حجز"`) left untouched — Arabic
+count-noun agreement is a different, more nuanced linguistic question
+(colloquial Arabic UI copy commonly uses the invariant singular form
+after numbers) and was not touched without stronger evidence either
+way. `npx tsc --noEmit` clean after the fix (no output, zero errors).
+
+### 13.9 Security verification — PASS
+
+Direct RLS-impersonated adversarial SQL (club owner identity attempting
+cross-tenant access), targeting the two RPCs and the filter-parameter
+scenario explicitly named in this task's scope (distinct from the
+primary agent's own section 10 tests against `get_booking_report`/
+`get_executive_dashboard`/`get_shop_sales_kpis`):
+- `get_shop_gross_profit(<foreign_club_id>, ...)` →
+  `ERROR: P0001: not authorized`. Rejected server-side.
+- `get_payment_method_report(<foreign_club_id>, ...)` →
+  `ERROR: P0001: not authorized`. Rejected server-side.
+- `get_customer_shop_purchases(<own_club_id>, <foreign_customer_id>,
+  ...)` (cross-tenant filter-parameter injection: correct club_id,
+  customer_id belonging to a different club) →
+  `ERROR: P0001: customer not found in this club`. Explicitly rejected
+  with a clear error, not silently empty and not leaking the foreign
+  customer's data.
+- Direct RLS check on base table/view access with a known foreign
+  invoice ID: `select * from invoices where id = '<foreign_invoice_id>'`
+  and the equivalent against the `outstanding_invoices` view, both
+  under the club-owner's impersonated session → both returned zero
+  rows. Confirms the `?invoice=<id>` deep-link mechanism used by
+  `OutstandingPage`/`BillingPage`/Customer 360/Booking Detail etc.
+  cannot leak a foreign invoice even if an attacker knows or guesses
+  its UUID — RLS blocks the row before the deep-link's own query ever
+  sees it.
+All 4 adversarial probes correctly rejected/blocked server-side, not
+merely UI-hidden.
+
+### 13.10 Summary for this pass
+
+| Item | Result |
+|---|---|
+| 1. Outstanding page | PASS |
+| 2. Cash Shift / reconciliation cross-check | PASS |
+| 3. Club Membership reports | GAP documented (RPC exists, unwired, not built) |
+| 4. Platform Owner reports | BLOCKED (no platform-owner session); supplementary 1-day-old DB-level evidence cited |
+| 5. Timezone boundary | FIXED + PASS — RPCs correct; the frontend `useDateRange()` UTC-vs-local-day bug found here was fixed by the primary agent immediately after this pass (see Section 6 above); `todayIso()` in FinanceExpensesPage.tsx deliberately left for a future expense-entry-focused pass (different surface, not a report) |
+| 6. Print verification | PASS (3/3 reports) |
+| 7. Responsive | PASS (3 pages × 375/768/1024) |
+| 8. RTL/LTR | PASS — 1 real defect found and FIXED (English `bookingCountSuffix` pluralization) |
+| 9. Security | PASS (4/4 adversarial probes rejected) |
+
+Files changed this pass:
+- `src/lib/i18n/resources/en/common.json` — added
+  `reports.customers.bookingCountSuffix_one` /
+  `_other` pluralized keys, removed the old flat key. Verified with
+  `npx tsc --noEmit` (clean) and live in-browser re-check.
+- `src/features/reports/hooks/useDateRangeReport.ts` — fixed by the
+  primary agent immediately after this subagent pass completed (see
+  Section 6); not part of this subagent's own edits.
+
+All Finance calculation semantics, Printing architecture, and Commerce
+core left untouched per directive constraints.
