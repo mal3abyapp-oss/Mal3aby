@@ -302,11 +302,24 @@ function PlanFormDialog({
       <div className="flex flex-col gap-3">
         <div className="grid grid-cols-2 gap-2">
           <div className="flex flex-col gap-1">
-            <label className="text-xs text-text-secondary">{t('clubMemberships.plans.nameAr')}</label>
+            {/* Acceptance-sweep fix (2026-08-30): create_club_membership_plan()
+                genuinely requires a non-empty name_en (raises an
+                exception otherwise), and canSubmit below already gated
+                Save on name_ar/name_en/price/durationValue all being
+                filled -- but none of those four labels showed any
+                required indicator. Confirmed live: filled name (Arabic),
+                price, and duration, left name (English) blank (nothing
+                marked it as needed), clicked Save -- the button had been
+                silently disabled the whole time, no plan was created,
+                no error shown (canSubmit blocks the mutation from ever
+                firing, so there was nothing for the mutation's own error
+                handling to catch). Added a plain required marker to all
+                four fields the form already treats as mandatory. */}
+            <label className="text-xs text-text-secondary">{t('clubMemberships.plans.nameAr')} *</label>
             <Input value={nameAr} onChange={(e) => setNameAr(e.target.value)} dir="rtl" />
           </div>
           <div className="flex flex-col gap-1">
-            <label className="text-xs text-text-secondary">{t('clubMemberships.plans.nameEn')}</label>
+            <label className="text-xs text-text-secondary">{t('clubMemberships.plans.nameEn')} *</label>
             <Input value={nameEn} onChange={(e) => setNameEn(e.target.value)} dir="ltr" />
           </div>
         </div>
@@ -323,11 +336,11 @@ function PlanFormDialog({
 
         <div className="grid grid-cols-3 gap-2">
           <div className="flex flex-col gap-1">
-            <label className="text-xs text-text-secondary">{t('clubMemberships.plans.price')}</label>
+            <label className="text-xs text-text-secondary">{t('clubMemberships.plans.price')} *</label>
             <Input type="number" min={0} step="0.01" value={price} onChange={(e) => setPrice(e.target.value)} />
           </div>
           <div className="flex flex-col gap-1">
-            <label className="text-xs text-text-secondary">{t('clubMemberships.plans.durationValue')}</label>
+            <label className="text-xs text-text-secondary">{t('clubMemberships.plans.durationValue')} *</label>
             <Input type="number" min={1} value={durationValue} onChange={(e) => setDurationValue(e.target.value)} />
           </div>
           <div className="flex flex-col gap-1">
