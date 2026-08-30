@@ -1038,6 +1038,7 @@ export function BillingPage() {
                             onClick={() => {
                               refundIdempotencyKeyRef.current = crypto.randomUUID()
                               setRefundPaymentId(p.id)
+                              setFormError(null)
                             }}
                           >
                             {t('billing.detail.refund')}

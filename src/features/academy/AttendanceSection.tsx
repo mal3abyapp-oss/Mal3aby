@@ -199,14 +199,14 @@ export function AttendanceSection() {
   return (
     <div className="mt-6 flex flex-col gap-4">
       <div className="flex items-center gap-2">
-        <Input type="date" value={date} onChange={(e) => { setDate(e.target.value); setSelectedSession(null) }} className="w-48" />
+        <Input type="date" value={date} onChange={(e) => { setDate(e.target.value); setSelectedSession(null); setOpenError(null); setMarkError(null) }} className="w-48" />
       </div>
 
       {isLoading && <p className="text-sm text-text-secondary">{t('academy.loading')}</p>}
 
       <div className="flex flex-col gap-2">
         {sessions.map((s) => (
-          <Card key={s.id} className="cursor-pointer" onClick={() => setSelectedSession(s)}>
+          <Card key={s.id} className="cursor-pointer" onClick={() => { setSelectedSession(s); setMarkError(null) }}>
             <CardContent className="flex items-center justify-between p-4">
               <p className="font-semibold">{s.groupName}</p>
               <p className="text-sm text-text-secondary tabular-nums"><bdi>{s.startTime.slice(0, 5)} - {s.endTime.slice(0, 5)}</bdi></p>
@@ -224,7 +224,7 @@ export function AttendanceSection() {
         <div className="flex items-end gap-2 rounded-lg border border-dashed border-border p-3">
           <div className="flex flex-1 flex-col gap-1">
             <label className="text-xs text-text-secondary">{t('academy.attendance.recordForMembership')}</label>
-            <Select value={pickMembershipId} onValueChange={setPickMembershipId}>
+            <Select value={pickMembershipId} onValueChange={(v) => { setPickMembershipId(v); setOpenError(null) }}>
               <SelectTrigger><SelectValue placeholder={t('academy.memberships.name')} /></SelectTrigger>
               <SelectContent>{memberships.map((m) => <SelectItem key={m.id} value={m.id}>{m.name}</SelectItem>)}</SelectContent>
             </Select>

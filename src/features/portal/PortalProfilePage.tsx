@@ -167,7 +167,7 @@ export function PortalProfilePage() {
       {records.length > 1 && (
         <div className="flex flex-col gap-1.5">
           <label className="text-sm font-medium text-text-secondary">{t('portal.profilePage.clubLabel')}</label>
-          <Select value={record?.club_id ?? ''} onValueChange={setSelectedClubId}>
+          <Select value={record?.club_id ?? ''} onValueChange={(v) => { setSelectedClubId(v); setFormError(null); setSaved(false) }}>
             <SelectTrigger><SelectValue /></SelectTrigger>
             <SelectContent>
               {records.map((r) => (

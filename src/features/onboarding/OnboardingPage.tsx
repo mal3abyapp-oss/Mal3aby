@@ -224,7 +224,7 @@ export function OnboardingPage() {
                 </p>
               )}
               <div className="flex gap-2">
-                <Button variant="outline" onClick={() => setStep(2)}>{t('onboarding.wizard.step3.back')}</Button>
+                <Button variant="outline" onClick={() => { setStep(2); setSubmitError(null) }}>{t('onboarding.wizard.step3.back')}</Button>
                 <Button
                   onClick={() => onboardMutation.mutate()}
                   disabled={onboardMutation.isPending || !branchName.trim() || !city.trim() || !phone.trim() || !phoneValid || governmentAffiliated === null}

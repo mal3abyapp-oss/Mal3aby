@@ -594,7 +594,7 @@ function AccessTab({
         </div>
         <Select
           value={roleValue ?? (access.role.is_custom ? `custom:${access.role.id}` : access.role.key ?? '')}
-          onValueChange={(v) => { setRoleValue(v); roleMutation.mutate(v) }}
+          onValueChange={(v) => { setRoleValue(v); setError(null); roleMutation.mutate(v) }}
         >
           <SelectTrigger className="max-w-xs"><SelectValue /></SelectTrigger>
           <SelectContent>
@@ -615,7 +615,7 @@ function AccessTab({
             <input
               type="checkbox"
               checked={currentBranchIds.length === 0}
-              onChange={(e) => { const next = e.target.checked ? [] : access.all_club_branches.map((b) => b.id); setBranchSelection(next); branchMutation.mutate(next) }}
+              onChange={(e) => { const next = e.target.checked ? [] : access.all_club_branches.map((b) => b.id); setBranchSelection(next); setError(null); branchMutation.mutate(next) }}
             />
             {t('staff.allBranches')}
           </label>
@@ -627,6 +627,7 @@ function AccessTab({
                 onChange={(e) => {
                   const next = e.target.checked ? [...currentBranchIds, b.id] : currentBranchIds.filter((id) => id !== b.id)
                   setBranchSelection(next)
+                  setError(null)
                   branchMutation.mutate(next)
                 }}
               />

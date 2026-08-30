@@ -702,10 +702,10 @@ function SubscribePlayerWizard({
           </div>
 
           <div className="flex gap-2">
-            <Button type="button" size="sm" variant={collectNow ? 'default' : 'outline'} onClick={() => setCollectNow(true)} className="flex-1">
+            <Button type="button" size="sm" variant={collectNow ? 'default' : 'outline'} onClick={() => { setCollectNow(true); setWizardError(null) }} className="flex-1">
               {t('academy.memberships.collectNow')}
             </Button>
-            <Button type="button" size="sm" variant={!collectNow ? 'default' : 'outline'} onClick={() => setCollectNow(false)} className="flex-1">
+            <Button type="button" size="sm" variant={!collectNow ? 'default' : 'outline'} onClick={() => { setCollectNow(false); setWizardError(null) }} className="flex-1">
               {t('academy.memberships.collectLater')}
             </Button>
           </div>

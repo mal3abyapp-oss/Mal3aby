@@ -178,11 +178,11 @@ export function MemberDetailDialog({
 
             <div className="flex flex-wrap gap-2 border-t border-border pt-3">
               {canRenew && canRenewThis && (
-                <Button size="sm" onClick={() => setRenewOpen(true)}>{t('common.renew')}</Button>
+                <Button size="sm" onClick={() => { setRenewOpen(true); setActionError(null) }}>{t('common.renew')}</Button>
               )}
               {canFreeze && detail.effective_status === 'active' && (
                 planFlags?.allow_freeze ? (
-                  <Button size="sm" variant="outline" onClick={() => setFreezeOpen(true)}>{t('clubMemberships.detail.freezeAction')}</Button>
+                  <Button size="sm" variant="outline" onClick={() => { setFreezeOpen(true); setActionError(null) }}>{t('clubMemberships.detail.freezeAction')}</Button>
                 ) : (
                   <span title={t('clubMemberships.detail.freezeNotAllowedTooltip')}>
                     <Button size="sm" variant="outline" disabled>{t('clubMemberships.detail.freezeAction')}</Button>
@@ -195,7 +195,7 @@ export function MemberDetailDialog({
                 </Button>
               )}
               {canCancel && !isCancelled && (
-                <Button size="sm" variant="outline" className="border-status-danger/40 text-status-danger hover:bg-status-danger/10" onClick={() => setCancelOpen(true)}>
+                <Button size="sm" variant="outline" className="border-status-danger/40 text-status-danger hover:bg-status-danger/10" onClick={() => { setCancelOpen(true); setActionError(null) }}>
                   {t('clubMemberships.detail.cancelAction')}
                 </Button>
               )}

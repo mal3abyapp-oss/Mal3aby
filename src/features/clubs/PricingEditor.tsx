@@ -143,6 +143,7 @@ export function PricingEditor({
 
   function toggleDay(day: number) {
     setNewDays((prev) => (prev.includes(day) ? prev.filter((d) => d !== day) : [...prev, day]))
+    setFormError(null)
   }
 
   return (
@@ -216,10 +217,10 @@ export function PricingEditor({
           ))}
         </div>
         <div className="flex gap-2">
-          <Input type="time" value={newStart} onChange={(e) => setNewStart(e.target.value)} />
-          <Input type="time" value={newEnd} onChange={(e) => setNewEnd(e.target.value)} />
+          <Input type="time" value={newStart} onChange={(e) => { setNewStart(e.target.value); setFormError(null) }} />
+          <Input type="time" value={newEnd} onChange={(e) => { setNewEnd(e.target.value); setFormError(null) }} />
         </div>
-        <Input type="number" min="0" step="0.01" placeholder={t('clubs.pricingEditor.pricePerHourPlaceholder')} value={newPrice} onChange={(e) => setNewPrice(e.target.value)} />
+        <Input type="number" min="0" step="0.01" placeholder={t('clubs.pricingEditor.pricePerHourPlaceholder')} value={newPrice} onChange={(e) => { setNewPrice(e.target.value); setFormError(null) }} />
         {showAdvanced && (
           <div className="flex flex-col gap-1">
             <label className="text-xs text-text-secondary">{t('clubs.pricingEditor.priorityLabel')}</label>
@@ -243,8 +244,8 @@ export function PricingEditor({
       <div className="flex flex-col gap-2 border-t border-border pt-3">
         <label className="text-sm font-medium text-text-secondary">{t('clubs.pricingEditor.specialPriceLabel')}</label>
         <div className="flex gap-2">
-          <Input type="date" value={specialDate} onChange={(e) => setSpecialDate(e.target.value)} className="flex-1" />
-          <Input type="number" min="0" step="0.01" placeholder={t('clubs.pricingEditor.pricePlaceholder')} value={specialPrice} onChange={(e) => setSpecialPrice(e.target.value)} className="flex-1" />
+          <Input type="date" value={specialDate} onChange={(e) => { setSpecialDate(e.target.value); setFormError(null) }} className="flex-1" />
+          <Input type="number" min="0" step="0.01" placeholder={t('clubs.pricingEditor.pricePlaceholder')} value={specialPrice} onChange={(e) => { setSpecialPrice(e.target.value); setFormError(null) }} className="flex-1" />
         </div>
         <Button
           size="sm"

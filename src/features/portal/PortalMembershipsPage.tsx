@@ -329,7 +329,7 @@ function BrowsePlansDialog({ clubId, onClose, onPurchased }: { clubId: string; o
 
           {plans.length > 0 && (
             <>
-              <Select value={selectedPlanId} onValueChange={(v) => { setSelectedPlanId(v); setBranchId('') }}>
+              <Select value={selectedPlanId} onValueChange={(v) => { setSelectedPlanId(v); setBranchId(''); setError(null) }}>
                 <SelectTrigger><SelectValue placeholder={t('clubMemberships.membershipPlan')} /></SelectTrigger>
                 <SelectContent>
                   {plans.map((p) => (

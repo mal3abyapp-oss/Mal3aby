@@ -955,7 +955,7 @@ function ReturnDialog({ sale, onClose }: { sale: SaleRow; onClose: () => void })
           {refundEnabled && needsPaymentChoice && (
             <div className="flex flex-col gap-1.5">
               <label className="text-sm font-medium text-text-secondary">{t('shop.sales.refundPaymentChoiceLabel')}</label>
-              <Select value={selectedPaymentId} onValueChange={setSelectedPaymentId}>
+              <Select value={selectedPaymentId} onValueChange={(v) => { setSelectedPaymentId(v); setError(null) }}>
                 <SelectTrigger data-testid="return-refund-payment-select"><SelectValue placeholder={t('shop.sales.refundPaymentChoicePlaceholder')} /></SelectTrigger>
                 <SelectContent>
                   {payments.map((p) => (

@@ -120,6 +120,7 @@ export function ClaimAccountPage({ onClaimed }: { onClaimed: () => void }) {
               onChange={(e) => {
                 setClubId(e.target.value)
                 setMatches(null)
+                setSearchError(null)
               }}
             >
               <option value="">{t('portal.claimAccountPage.clubPlaceholder')}</option>

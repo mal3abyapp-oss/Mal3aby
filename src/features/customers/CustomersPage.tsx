@@ -341,6 +341,7 @@ export function CustomersPage() {
                     setMobile(v.raw)
                     setMobileCountry(v.country)
                     setDuplicateCustomerId(null)
+                    setFormError(null)
                   }}
                   onValidChange={(r) => setPhoneValid(r.valid)}
                 />

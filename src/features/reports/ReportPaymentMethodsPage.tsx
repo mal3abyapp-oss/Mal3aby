@@ -109,7 +109,12 @@ export function ReportPaymentMethodsContent() {
   return (
     <div>
       <div className="flex flex-wrap items-center justify-between gap-2 print:hidden">
-        <DateRangeFilter startDate={startDate} endDate={endDate} onStart={setStartDate} onEnd={setEndDate} />
+        <DateRangeFilter
+          startDate={startDate}
+          endDate={endDate}
+          onStart={(v) => { setStartDate(v); setReconcileError(null) }}
+          onEnd={(v) => { setEndDate(v); setReconcileError(null) }}
+        />
         {data && <ReportPrintButton />}
       </div>
       {isLoading && <p className="text-sm text-text-secondary">{t('reports.loading')}</p>}

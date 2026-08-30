@@ -535,7 +535,7 @@ export function StaffPage() {
                     required
                     dir="ltr"
                     value={email}
-                    onChange={(e) => setEmail(e.target.value)}
+                    onChange={(e) => { setEmail(e.target.value); setFormError(null) }}
                   />
                   {addMode === 'existing' && (
                     <p className="text-xs text-text-secondary">{t('staff.existingAccountHint')}</p>

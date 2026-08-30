@@ -687,14 +687,14 @@ export function BookingDetailSheet({
                           type="date"
                           value={rescheduleDate}
                           min={fromInstant(new Date(), clubTimezone).date}
-                          onChange={(e) => { setRescheduleDate(e.target.value); setRescheduleStart(null) }}
+                          onChange={(e) => { setRescheduleDate(e.target.value); setRescheduleStart(null); setActionError(null) }}
                         />
                       </div>
                       <div className="flex flex-col gap-1">
                         <label className="text-xs text-text-secondary">{t('bookings.detail.rescheduleField')}</label>
                         <Select
                           value={rescheduleFieldId || booking.fieldId}
-                          onValueChange={(v) => { setRescheduleFieldId(v); setRescheduleStart(null) }}
+                          onValueChange={(v) => { setRescheduleFieldId(v); setRescheduleStart(null); setActionError(null) }}
                         >
                           <SelectTrigger><SelectValue /></SelectTrigger>
                           <SelectContent>
@@ -708,7 +708,7 @@ export function BookingDetailSheet({
 
                     <div className="flex flex-col gap-1">
                       <label className="text-xs text-text-secondary">{t('bookings.detail.rescheduleDuration')}</label>
-                      <Select value={rescheduleDuration} onValueChange={(v) => { setRescheduleDuration(v); setRescheduleStart(null) }}>
+                      <Select value={rescheduleDuration} onValueChange={(v) => { setRescheduleDuration(v); setRescheduleStart(null); setActionError(null) }}>
                         <SelectTrigger><SelectValue /></SelectTrigger>
                         <SelectContent>
                           {RESCHEDULE_DURATION_VALUES.map((v) => (

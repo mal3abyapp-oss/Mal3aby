@@ -164,10 +164,10 @@ export function PendingPaymentsPage() {
                     {p.mimeType === 'application/pdf' ? <FileText className="me-1 size-4" /> : <ImageIcon className="me-1 size-4" />}
                     {t('billing.pendingPayments.viewReceipt')}
                   </Button>
-                  <Button size="sm" variant="outline" onClick={() => setRejectingProof(p)}>
+                  <Button size="sm" variant="outline" onClick={() => { setRejectingProof(p); setActionError(null) }}>
                     {t('billing.pendingPayments.reject')}
                   </Button>
-                  <Button size="sm" disabled={approveMutation.isPending} onClick={() => approveMutation.mutate(p.id)}>
+                  <Button size="sm" disabled={approveMutation.isPending} onClick={() => { setActionError(null); approveMutation.mutate(p.id) }}>
                     {t('billing.pendingPayments.approve')}
                   </Button>
                 </div>

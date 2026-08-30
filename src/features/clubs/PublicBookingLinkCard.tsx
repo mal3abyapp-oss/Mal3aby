@@ -207,7 +207,7 @@ export function PublicBookingLinkCard() {
               <div className="flex gap-2">
                 <Input
                   value={desiredSlug}
-                  onChange={(e) => setDesiredSlug(e.target.value)}
+                  onChange={(e) => { setDesiredSlug(e.target.value); setFormError(null) }}
                   placeholder={club.publicSlug}
                   dir="ltr"
                   className="flex-1"

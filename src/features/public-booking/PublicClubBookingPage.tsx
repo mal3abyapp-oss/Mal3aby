@@ -694,6 +694,7 @@ export function PublicClubBookingPage() {
               onChange={(v) => {
                 setCustomerMobile(v.raw)
                 setCustomerPhoneCountry(v.country)
+                setFormError(null)
               }}
               onValidChange={(r) => setPhoneValid(r.valid)}
             />

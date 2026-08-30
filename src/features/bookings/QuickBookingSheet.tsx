@@ -361,10 +361,10 @@ export function QuickBookingSheet({
               <div className="flex flex-col gap-2">
                 <label className="text-sm font-medium text-text-secondary">{t('bookings.quick.payment')}</label>
                 <div className="flex gap-2">
-                  <Button type="button" variant={payNow ? 'default' : 'outline'} size="sm" onClick={() => setPayNow(true)}>
+                  <Button type="button" variant={payNow ? 'default' : 'outline'} size="sm" onClick={() => { setPayNow(true); setFormError(null) }}>
                     {t('bookings.quick.payNow')}
                   </Button>
-                  <Button type="button" variant={!payNow ? 'default' : 'outline'} size="sm" onClick={() => setPayNow(false)}>
+                  <Button type="button" variant={!payNow ? 'default' : 'outline'} size="sm" onClick={() => { setPayNow(false); setFormError(null) }}>
                     {t('bookings.quick.awaitingPayment')}
                   </Button>
                 </div>
@@ -382,7 +382,7 @@ export function QuickBookingSheet({
                         the two methods this Select was missing
                         entirely (wallet/other) so every method staff
                         can select elsewhere is selectable here too. */}
-                    <Select value={paymentMethod} onValueChange={setPaymentMethod}>
+                    <Select value={paymentMethod} onValueChange={(v) => { setPaymentMethod(v); setFormError(null) }}>
                       <SelectTrigger><SelectValue /></SelectTrigger>
                       <SelectContent>
                         {Object.entries(PAYMENT_METHOD_LABELS).map(([value, label]) => (
