@@ -446,7 +446,7 @@ function OpenAsMasterAdminDialog({ club, onClose }: { club: { id: string; name_a
           )}
           <div className="flex justify-end gap-2">
             <Button variant="outline" onClick={onClose}>{t('masterAdmin.openDialog.cancel')}</Button>
-            <Button disabled={openMutation.isPending} onClick={() => openMutation.mutate()}>
+            <Button disabled={openMutation.isPending || !reason.trim()} onClick={() => openMutation.mutate()}>
               {openMutation.isPending ? t('masterAdmin.openDialog.opening') : t('masterAdmin.openDialog.open')}
             </Button>
           </div>

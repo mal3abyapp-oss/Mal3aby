@@ -66,6 +66,12 @@ export function PlatformPlansPage() {
   const [editDefaultBranchLimit, setEditDefaultBranchLimit] = useState('')
   const [editDefaultFieldLimit, setEditDefaultFieldLimit] = useState('')
   const [editDefaultAcademyLimit, setEditDefaultAcademyLimit] = useState('')
+  // Acceptance-sweep fix (2026-08-30), platform-owner acceptance
+  // finding #4: this sent a hardcoded literal reason
+  // ("Commercial plan definition updated") to update_platform_plan on
+  // every edit -- the RPC fully supports and audits a real reason with
+  // a before/after snapshot; the UI just never collected one.
+  const [editReason, setEditReason] = useState('')
 
   const toggleMutation = useMutation({
     mutationFn: async ({ id, isPublic }: { id: string; isPublic: boolean }) => {
@@ -83,7 +89,7 @@ export function PlatformPlansPage() {
         p_plan_id: editingPlan.id,
         p_name_ar: editName.trim(),
         p_price: Number(editPrice),
-        p_reason: 'Commercial plan definition updated',
+        p_reason: editReason.trim(),
         p_default_modules: editDefaultModules.length > 0 ? editDefaultModules : undefined,
         p_default_branch_limit: toLimit(editDefaultBranchLimit) ?? undefined,
         p_default_field_limit: toLimit(editDefaultFieldLimit) ?? undefined,
@@ -93,6 +99,7 @@ export function PlatformPlansPage() {
     },
     onSuccess: () => {
       setEditingPlan(null)
+      setEditReason('')
       void queryClient.invalidateQueries({ queryKey: ['platform-plans-all'] })
     },
   })
@@ -112,6 +119,7 @@ export function PlatformPlansPage() {
             setEditDefaultBranchLimit(p.default_branch_limit?.toString() ?? '')
             setEditDefaultFieldLimit(p.default_field_limit?.toString() ?? '')
             setEditDefaultAcademyLimit(p.default_academy_limit?.toString() ?? '')
+            setEditReason('')
           }}
         >
           {p.name_ar}
@@ -204,7 +212,11 @@ export function PlatformPlansPage() {
                 <Input type="number" min="0" value={editDefaultAcademyLimit} onChange={(e) => setEditDefaultAcademyLimit(e.target.value)} placeholder={t('platform.clubDetailPage.limitsCard.unlimitedPlaceholder')} />
               </div>
             </div>
-            <Button disabled={!editName.trim() || !editPrice || Number(editPrice) <= 0 || updatePlanMutation.isPending} onClick={() => updatePlanMutation.mutate()}>
+            <div className="flex flex-col gap-1.5 border-t border-border pt-3">
+              <label className="text-sm font-medium text-text-secondary">{t('platform.plansPage.editDialog.reasonLabel')}</label>
+              <Input value={editReason} onChange={(e) => setEditReason(e.target.value)} placeholder={t('platform.clubDetailPage.reasonDialog.reasonPlaceholder')} />
+            </div>
+            <Button disabled={!editName.trim() || !editPrice || Number(editPrice) <= 0 || !editReason.trim() || updatePlanMutation.isPending} onClick={() => updatePlanMutation.mutate()}>
               {updatePlanMutation.isPending ? t('platform.plansPage.editDialog.saving') : t('platform.plansPage.editDialog.save')}
             </Button>
           </div>

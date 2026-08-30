@@ -228,8 +228,11 @@ export function PlatformOwnersPage() {
           <Button
             size="sm"
             variant="outline"
-            disabled={isSending || !o.email}
-            onClick={() => sendResetMutation.mutate(o)}
+            disabled={sendResetMutation.isPending || !o.email}
+            onClick={() => {
+              setResetError(null)
+              sendResetMutation.mutate(o)
+            }}
           >
             {justSent
               ? t('platform.ownersPage.resetSent')

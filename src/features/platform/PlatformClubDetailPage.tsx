@@ -116,7 +116,17 @@ export function PlatformClubDetailPage() {
   const { locale } = useDirection()
   const { clubId } = useParams<{ clubId: string }>()
   const queryClient = useQueryClient()
-  const [reasonDialogAction, setReasonDialogAction] = useState<null | 'cancel' | 'reverse' | 'suspend' | 'changePlan'>(null)
+  const [reasonDialogAction, setReasonDialogAction] = useState<null | 'cancel' | 'reverse' | 'suspend' | 'changePlan' | 'payments'>(null)
+  // Acceptance-sweep fix (2026-08-30): the payments kill switch used to
+  // fire immediately on click with a hardcoded literal reason
+  // ("Disabled from Club Detail" / "Re-enabled from Club Detail") and
+  // no confirmation -- same bug class as ProviderPolicyPanel's fix just
+  // above and PlatformPlansPage.tsx's hardcoded reason (documented in
+  // the platform-owner acceptance pass). Disabling this immediately
+  // blocks every future checkout attempt for a real paying club, so it
+  // gets the same confirm-with-reason treatment as suspend/cancel, via
+  // the page's existing shared reasonDialogAction dialog.
+  const [paymentsToggleTarget, setPaymentsToggleTarget] = useState<boolean | null>(null)
   const [reasonTarget, setReasonTarget] = useState<string | null>(null)
   const [reasonText, setReasonText] = useState('')
   // Phase D directive (D2): "Extend grace" used to be a literal 14-day
@@ -148,6 +158,10 @@ export function PlatformClubDetailPage() {
   // matching every other commercial-change dialog on this page, now
   // that limit changes are audited (see set_commercial_entitlements()).
   const [limitReasonInput, setLimitReasonInput] = useState('')
+  // Per-request optional reason for the commercial-upgrade-request
+  // approve/dismiss action fixed in this sweep -- keyed by request id
+  // since multiple pending requests can render at once.
+  const [upgradeRequestReasons, setUpgradeRequestReasons] = useState<Record<string, string>>({})
 
   const { data: club, isError: clubError } = useQuery({ queryKey: ['platform-club', clubId], queryFn: () => fetchClub(clubId!), enabled: !!clubId })
   // Phase C directive (Club 360): the audit's core test -- "if a club
@@ -537,28 +551,48 @@ export function PlatformClubDetailPage() {
   // credentials/connections; only gates NEW checkout attempts via
   // start_gateway_checkout()'s own server-side check.
   const setPaymentsEnabledMutation = useMutation({
-    mutationFn: async (enabled: boolean) => {
+    mutationFn: async ({ enabled, reason }: { enabled: boolean; reason: string }) => {
       const { error } = await supabase.rpc('set_club_payments_enabled', {
         p_club_id: clubId!,
         p_enabled: enabled,
-        p_reason: enabled ? 'Re-enabled from Club Detail' : 'Disabled from Club Detail',
+        p_reason: reason,
       })
       if (error) throw error
     },
-    onSuccess: invalidateEntitlements,
+    onSuccess: () => {
+      invalidateEntitlements()
+      setReasonDialogAction(null)
+      setReasonText('')
+      setPaymentsToggleTarget(null)
+    },
     onError: () => setActionError(t('platform.clubDetailPage.errors.setPaymentsEnabled')),
   })
 
+  // Acceptance-sweep fix (2026-08-30), platform-owner acceptance
+  // finding #2: this was a direct client-side .from().update() with no
+  // audit trail -- same bug class as the P0 fix applied the same day in
+  // 20260829040000_revoke_unaudited_platform_owner_direct_writes.sql,
+  // which this table was missed by. Now routed through
+  // resolve_commercial_upgrade_request(), which writes a real
+  // audit_logs entry (before/after status + the request's own
+  // limit_type/current_limit/current_usage). Reason stays optional here
+  // (unlike suspend/kill-switch/support-session) -- this action is a
+  // routine, reversible-by-a-new-request triage decision, not a
+  // consequential one; the existing limitsCard.reasonLabel key already
+  // said "(optional)" anticipating this wiring.
   const resolveUpgradeRequestMutation = useMutation({
-    mutationFn: async ({ requestId, status }: { requestId: string; status: 'approved' | 'dismissed' }) => {
-      const { data: userData } = await supabase.auth.getUser()
-      const { error } = await supabase
-        .from('commercial_upgrade_requests')
-        .update({ status, reviewed_at: new Date().toISOString(), reviewed_by: userData.user?.id })
-        .eq('id', requestId)
+    mutationFn: async ({ requestId, status, reason }: { requestId: string; status: 'approved' | 'dismissed'; reason: string }) => {
+      const { error } = await supabase.rpc('resolve_commercial_upgrade_request', {
+        p_request_id: requestId,
+        p_status: status,
+        p_reason: reason.trim() || undefined,
+      })
       if (error) throw error
     },
-    onSuccess: invalidateEntitlements,
+    onSuccess: () => {
+      invalidateEntitlements()
+      setUpgradeRequestReasons({})
+    },
     onError: () => setActionError(t('platform.clubDetailPage.errors.updateRequestStatus')),
   })
 
@@ -1079,7 +1113,7 @@ export function PlatformClubDetailPage() {
             <div className="flex flex-col gap-2 rounded-lg border border-status-warning/40 bg-status-warning/10 p-3">
               <p className="text-sm font-medium text-status-warning">{t('platform.clubDetailPage.limitsCard.pendingRequestsHeading', { count: pendingRequests.length })}</p>
               {pendingRequests.map((r) => (
-                <div key={r.id} className="flex flex-wrap items-center justify-between gap-2 rounded-md bg-surface p-2 text-sm">
+                <div key={r.id} className="flex flex-col gap-2 rounded-md bg-surface p-2 text-sm sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
                   <span>
                     {t('platform.clubDetailPage.limitsCard.requestSummary', {
                       label: limitTypeLabel[r.limit_type] ?? r.limit_type,
@@ -1088,10 +1122,16 @@ export function PlatformClubDetailPage() {
                     })}
                     {r.note && <span className="text-text-secondary"> — {r.note}</span>}
                   </span>
-                  <div className="flex gap-2">
+                  <div className="flex flex-wrap gap-2">
+                    <Input
+                      className="h-8 w-40 text-xs"
+                      value={upgradeRequestReasons[r.id] ?? ''}
+                      onChange={(e) => setUpgradeRequestReasons((prev) => ({ ...prev, [r.id]: e.target.value }))}
+                      placeholder={t('platform.clubDetailPage.limitsCard.reasonLabel')}
+                    />
                     <Button
                       size="sm"
-                      onClick={() => resolveUpgradeRequestMutation.mutate({ requestId: r.id, status: 'approved' })}
+                      onClick={() => resolveUpgradeRequestMutation.mutate({ requestId: r.id, status: 'approved', reason: upgradeRequestReasons[r.id] ?? '' })}
                       disabled={resolveUpgradeRequestMutation.isPending}
                     >
                       {t('platform.clubDetailPage.limitsCard.approve')}
@@ -1099,7 +1139,7 @@ export function PlatformClubDetailPage() {
                     <Button
                       size="sm"
                       variant="outline"
-                      onClick={() => resolveUpgradeRequestMutation.mutate({ requestId: r.id, status: 'dismissed' })}
+                      onClick={() => resolveUpgradeRequestMutation.mutate({ requestId: r.id, status: 'dismissed', reason: upgradeRequestReasons[r.id] ?? '' })}
                       disabled={resolveUpgradeRequestMutation.isPending}
                     >
                       {t('platform.clubDetailPage.limitsCard.reject')}
@@ -1136,7 +1176,12 @@ export function PlatformClubDetailPage() {
               size="sm"
               variant={entitlements?.payments_platform_disabled ? 'default' : 'destructive'}
               disabled={setPaymentsEnabledMutation.isPending}
-              onClick={() => setPaymentsEnabledMutation.mutate(!!entitlements?.payments_platform_disabled)}
+              onClick={() => {
+                setPaymentsToggleTarget(!!entitlements?.payments_platform_disabled)
+                setReasonTarget(clubId ?? 'payments')
+                setReasonText('')
+                setReasonDialogAction('payments')
+              }}
             >
               {entitlements?.payments_platform_disabled ? t('platform.clubDetailPage.paymentsCard.enable') : t('platform.clubDetailPage.paymentsCard.disable')}
             </Button>
@@ -1234,7 +1279,9 @@ export function PlatformClubDetailPage() {
                   ? t('platform.clubDetailPage.reasonDialog.suspendTitle')
                   : reasonDialogAction === 'changePlan'
                     ? t('platform.clubDetailPage.reasonDialog.changePlanTitle')
-                    : t('platform.clubDetailPage.reasonDialog.reverseTitle')}
+                    : reasonDialogAction === 'payments'
+                      ? (paymentsToggleTarget ? t('platform.clubDetailPage.paymentsCard.enableDialogTitle') : t('platform.clubDetailPage.paymentsCard.disableDialogTitle'))
+                      : t('platform.clubDetailPage.reasonDialog.reverseTitle')}
             </DialogTitle>
           </DialogHeader>
           <div className="flex flex-col gap-3">
@@ -1251,16 +1298,22 @@ export function PlatformClubDetailPage() {
                 })}
               </p>
             )}
+            {reasonDialogAction === 'payments' && paymentsToggleTarget === false && (
+              <p className="text-sm text-status-danger">{t('platform.clubDetailPage.paymentsCard.disableDialogWarning')}</p>
+            )}
             <Input value={reasonText} onChange={(e) => setReasonText(e.target.value)} placeholder={t('platform.clubDetailPage.reasonDialog.reasonPlaceholder')} />
             <Button
-              variant={reasonDialogAction === 'suspend' ? 'destructive' : 'default'}
-              disabled={!reasonText.trim() || cancelMutation.isPending || reverseMutation.isPending || suspendMutation.isPending || changePlanMutation.isPending}
+              variant={reasonDialogAction === 'suspend' || (reasonDialogAction === 'payments' && paymentsToggleTarget === false) ? 'destructive' : 'default'}
+              disabled={!reasonText.trim() || cancelMutation.isPending || reverseMutation.isPending || suspendMutation.isPending || changePlanMutation.isPending || setPaymentsEnabledMutation.isPending}
               onClick={() => {
                 if (!reasonTarget) return
                 if (reasonDialogAction === 'cancel') cancelMutation.mutate(reasonText)
                 else if (reasonDialogAction === 'suspend') suspendMutation.mutate(reasonText)
                 else if (reasonDialogAction === 'changePlan') changePlanMutation.mutate(reasonText)
-                else reverseMutation.mutate({ paymentId: reasonTarget, reason: reasonText })
+                else if (reasonDialogAction === 'payments') {
+                  if (paymentsToggleTarget === null) return
+                  setPaymentsEnabledMutation.mutate({ enabled: paymentsToggleTarget, reason: reasonText })
+                } else reverseMutation.mutate({ paymentId: reasonTarget, reason: reasonText })
               }}
             >
               {reasonDialogAction === 'suspend' ? t('platform.clubDetailPage.reasonDialog.confirmSuspend') : t('platform.clubDetailPage.reasonDialog.confirm')}
@@ -1581,6 +1634,17 @@ async function fetchGatewayOverview(clubId: string): Promise<ProviderPolicyRow[]
 function ProviderPolicyPanel({ clubId }: { clubId: string }) {
   const { t } = useTranslation()
   const queryClient = useQueryClient()
+  // Acceptance-sweep fix (2026-08-30): this mutation used to send a
+  // hardcoded literal reason ("Blocked from Club Detail" / "Restored
+  // from Club Detail") -- same bug class as PlatformPlansPage.tsx's
+  // hardcoded plan-update reason (documented in the platform-owner
+  // acceptance pass). set_club_gateway_provider_policy() fully supports
+  // and audits a real reason; the UI just never collected one. Now
+  // mirrors ModulesPanel's confirm-dialog-with-reason pattern exactly,
+  // and the fetched policyReason/policyUpdatedAt (already returned by
+  // get_platform_club_gateway_overview but previously never rendered)
+  // is shown on a blocked provider.
+  const [policyTarget, setPolicyTarget] = useState<{ providerKey: string; providerDisplayName: string; status: 'allowed' | 'policy_blocked'; reason: string } | null>(null)
 
   const { data: rows = [], isLoading } = useQuery({
     queryKey: ['platform-club-gateway-overview', clubId],
@@ -1588,16 +1652,19 @@ function ProviderPolicyPanel({ clubId }: { clubId: string }) {
   })
 
   const policyMutation = useMutation({
-    mutationFn: async ({ providerKey, status }: { providerKey: string; status: 'allowed' | 'policy_blocked' }) => {
+    mutationFn: async ({ providerKey, status, reason }: { providerKey: string; status: 'allowed' | 'policy_blocked'; reason: string }) => {
       const { error } = await supabase.rpc('set_club_gateway_provider_policy', {
         p_club_id: clubId,
         p_provider_key: providerKey,
         p_status: status,
-        p_reason: status === 'policy_blocked' ? 'Blocked from Club Detail' : 'Restored from Club Detail',
+        p_reason: reason.trim() || undefined,
       })
       if (error) throw error
     },
-    onSuccess: () => void queryClient.invalidateQueries({ queryKey: ['platform-club-gateway-overview', clubId] }),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ['platform-club-gateway-overview', clubId] })
+      setPolicyTarget(null)
+    },
   })
 
   if (isLoading) return null
@@ -1618,15 +1685,22 @@ function ProviderPolicyPanel({ clubId }: { clubId: string }) {
                 label={r.policyStatus === 'policy_blocked' ? t('platform.clubDetailPage.providerPolicy.blocked') : t('platform.clubDetailPage.providerPolicy.allowed')}
               />
             </div>
+            {r.policyStatus === 'policy_blocked' && (
+              <p className="mt-1 text-xs text-text-secondary">
+                {r.policyReason ? t('platform.clubDetailPage.providerPolicy.blockedReason', { reason: r.policyReason }) : t('platform.clubDetailPage.providerPolicy.blockedReasonMissing')}
+              </p>
+            )}
           </div>
           <Button
             size="sm"
             variant={r.policyStatus === 'policy_blocked' ? 'default' : 'outline'}
             disabled={policyMutation.isPending}
             onClick={() =>
-              policyMutation.mutate({
+              setPolicyTarget({
                 providerKey: r.providerKey,
+                providerDisplayName: r.providerDisplayName,
                 status: r.policyStatus === 'policy_blocked' ? 'allowed' : 'policy_blocked',
+                reason: '',
               })
             }
           >
@@ -1634,6 +1708,41 @@ function ProviderPolicyPanel({ clubId }: { clubId: string }) {
           </Button>
         </div>
       ))}
+
+      <Dialog open={policyTarget !== null} onOpenChange={(open) => !open && setPolicyTarget(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>
+              {policyTarget &&
+                (policyTarget.status === 'policy_blocked'
+                  ? t('platform.clubDetailPage.providerPolicy.blockDialog.title', { provider: policyTarget.providerDisplayName })
+                  : t('platform.clubDetailPage.providerPolicy.restoreDialog.title', { provider: policyTarget.providerDisplayName }))}
+            </DialogTitle>
+          </DialogHeader>
+          <div className="flex flex-col gap-3">
+            {policyTarget?.status === 'policy_blocked' && (
+              <p className="text-sm text-status-warning">{t('platform.clubDetailPage.providerPolicy.blockDialog.impact')}</p>
+            )}
+            <Input
+              value={policyTarget?.reason ?? ''}
+              onChange={(e) => setPolicyTarget((prev) => (prev ? { ...prev, reason: e.target.value } : prev))}
+              placeholder={t('platform.clubDetailPage.reasonDialog.reasonPlaceholder')}
+            />
+            <Button
+              variant={policyTarget?.status === 'policy_blocked' ? 'destructive' : 'default'}
+              disabled={policyMutation.isPending}
+              onClick={() => {
+                if (!policyTarget) return
+                policyMutation.mutate({ providerKey: policyTarget.providerKey, status: policyTarget.status, reason: policyTarget.reason })
+              }}
+            >
+              {policyTarget?.status === 'policy_blocked'
+                ? t('platform.clubDetailPage.providerPolicy.blockDialog.confirm')
+                : t('platform.clubDetailPage.providerPolicy.restoreDialog.confirm')}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

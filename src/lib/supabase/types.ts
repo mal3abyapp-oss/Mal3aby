@@ -9758,6 +9758,10 @@ export type Database = {
           price_changed: boolean
         }[]
       }
+      resolve_commercial_upgrade_request: {
+        Args: { p_reason?: string; p_request_id: string; p_status: string }
+        Returns: undefined
+      }
       resolve_customer_notification_email: {
         Args: { p_customer_id: string }
         Returns: string

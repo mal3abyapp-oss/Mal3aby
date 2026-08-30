@@ -52,12 +52,28 @@ interface Filters {
   entityType: string
   from: string
   to: string
+  actorId: string
 }
 
+// Acceptance-sweep fix (2026-08-30), platform-owner acceptance
+// finding #5: get_platform_audit_log() has supported p_actor_id and
+// p_club_id since it was first written, but this page's own Filters
+// interface only ever wired action/entityType/from/to -- despite this
+// file's own header comment (line 30) already claiming "server-side
+// filters (actor/action/entity/date range)" existed. p_club_id stays
+// unwired here deliberately: club-scoped audit is already solved on
+// PlatformClubDetailPage's own Audit tab (fetchClubAudit), and this
+// global page's existing clickable club-name link already gets a
+// platform owner there in one click. p_actor_id had no equivalent path
+// at all -- "did this specific staff member do anything unusual across
+// every club" was unanswerable -- so actor is now filterable the same
+// way club already was: click a name in the table to filter by them
+// (actor_id is already present on every row, no new lookup UI needed).
 async function fetchAudit(offset: number, filters: Filters): Promise<{ rows: AuditRow[]; hasMore: boolean }> {
   const { data, error } = await supabase.rpc('get_platform_audit_log', {
     p_limit: PAGE_SIZE,
     p_offset: offset,
+    p_actor_id: filters.actorId || undefined,
     p_action: filters.action || undefined,
     p_entity_type: filters.entityType || undefined,
     p_from: filters.from ? new Date(filters.from).toISOString() : undefined,
@@ -118,10 +134,11 @@ export function PlatformAuditPage() {
   const [entityFilter, setEntityFilter] = useState('')
   const [fromDate, setFromDate] = useState('')
   const [toDate, setToDate] = useState('')
+  const [actorFilter, setActorFilter] = useState<{ id: string; label: string } | null>(null)
 
   const filters: Filters = useMemo(
-    () => ({ action: actionFilter, entityType: entityFilter, from: fromDate, to: toDate }),
-    [actionFilter, entityFilter, fromDate, toDate],
+    () => ({ action: actionFilter, entityType: entityFilter, from: fromDate, to: toDate, actorId: actorFilter?.id ?? '' }),
+    [actionFilter, entityFilter, fromDate, toDate, actorFilter],
   )
 
   const { data, isLoading, isFetching } = useQuery({
@@ -143,12 +160,25 @@ export function PlatformAuditPage() {
     {
       key: 'actor',
       header: t('platform.auditPage.actor'),
-      render: (r) => (
-        <div className="flex flex-col">
-          <span className="text-text-primary">{r.actor_name ?? t('platform.auditPage.systemActor')}</span>
-          {r.actor_email && <span className="text-xs text-text-secondary">{r.actor_email}</span>}
-        </div>
-      ),
+      render: (r) =>
+        r.actor_id ? (
+          <button
+            type="button"
+            className="flex flex-col text-start hover:underline"
+            title={t('platform.auditPage.filterByThisActor')}
+            onClick={() => {
+              setActorFilter({ id: r.actor_id!, label: r.actor_name ?? r.actor_email ?? r.actor_id! })
+              resetToFirstPage()
+            }}
+          >
+            <span className="text-accent-foreground">{r.actor_name ?? t('platform.auditPage.systemActor')}</span>
+            {r.actor_email && <span className="text-xs text-text-secondary">{r.actor_email}</span>}
+          </button>
+        ) : (
+          <div className="flex flex-col">
+            <span className="text-text-primary">{t('platform.auditPage.systemActor')}</span>
+          </div>
+        ),
     },
     {
       key: 'club',
@@ -171,6 +201,22 @@ export function PlatformAuditPage() {
   return (
     <div>
       <PageHeader title={t('platform.auditPage.title')} description={t('platform.auditPage.description')} />
+
+      {actorFilter && (
+        <div className="mb-3 flex items-center gap-2 rounded-md border border-accent-foreground/30 bg-accent/5 p-2 text-sm">
+          <span>{t('platform.auditPage.filteredByActor', { name: actorFilter.label })}</span>
+          <Button
+            size="sm"
+            variant="ghost"
+            onClick={() => {
+              setActorFilter(null)
+              resetToFirstPage()
+            }}
+          >
+            {t('platform.auditPage.clearActorFilter')}
+          </Button>
+        </div>
+      )}
 
       <div className="mb-4 grid grid-cols-2 gap-3 md:grid-cols-4">
         <Input

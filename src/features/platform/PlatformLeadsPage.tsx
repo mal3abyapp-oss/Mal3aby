@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
 import { supabase } from '@/lib/supabase/client'
@@ -42,6 +43,13 @@ export function PlatformLeadsPage() {
   const { locale } = useDirection()
   const queryClient = useQueryClient()
   const { data: leads = [], isLoading } = useQuery({ queryKey: ['platform-leads'], queryFn: fetchLeads })
+  // Acceptance-sweep fix (2026-08-30): this mutation had no onError at
+  // all -- a failed status update (RLS rejection, network blip) left
+  // the Select silently reverting to the stale server value on the
+  // next refetch with zero indication anything went wrong, the sole
+  // mutation on this page (and one of very few in the whole Platform
+  // Owner console) with no error surfacing.
+  const [statusError, setStatusError] = useState<string | null>(null)
 
   const statusLabel: Record<string, string> = {
     new: t('platform.leadsPage.statusLabels.new'),
@@ -55,7 +63,11 @@ export function PlatformLeadsPage() {
       const { error } = await supabase.from('contact_requests').update({ status }).eq('id', id)
       if (error) throw error
     },
-    onSuccess: () => void queryClient.invalidateQueries({ queryKey: ['platform-leads'] }),
+    onSuccess: () => {
+      setStatusError(null)
+      void queryClient.invalidateQueries({ queryKey: ['platform-leads'] })
+    },
+    onError: () => setStatusError(t('platform.leadsPage.statusUpdateError')),
   })
 
   const columns: DataTableColumn<LeadRow>[] = [
@@ -89,7 +101,7 @@ export function PlatformLeadsPage() {
       render: (l) => (
         <div className="flex items-center gap-2">
           <StatusBadge tone={STATUS_TONE[l.status] ?? 'neutral'} label={statusLabel[l.status] ?? l.status} />
-          <Select value={l.status} onValueChange={(status) => updateStatusMutation.mutate({ id: l.id, status })}>
+          <Select value={l.status} onValueChange={(status) => { setStatusError(null); updateStatusMutation.mutate({ id: l.id, status }) }}>
             <SelectTrigger className="h-7 w-32 text-xs"><SelectValue /></SelectTrigger>
             <SelectContent>
               {Object.entries(statusLabel).map(([key, label]) => (
@@ -105,6 +117,7 @@ export function PlatformLeadsPage() {
   return (
     <div>
       <PageHeader title={t('platform.leadsPage.title')} description={t('platform.leadsPage.description')} />
+      {statusError && <p role="alert" className="mb-3 text-sm text-status-danger">{statusError}</p>}
       <DataTable columns={columns} rows={leads} rowKey={(l) => l.id} isLoading={isLoading} emptyTitle={t('platform.leadsPage.emptyTitle')} />
     </div>
   )

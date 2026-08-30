@@ -206,6 +206,9 @@
       "time": "Time",
       "actor": "Actor",
       "systemActor": "System",
+      "filterByThisActor": "Filter by this person",
+      "filteredByActor": "Filtered by: {{name}}",
+      "clearActorFilter": "Clear filter",
       "club": "Club",
       "platformLevel": "Platform level",
       "clubFallback": "Club",
@@ -379,7 +382,10 @@
         "disabled": "Disabled by platform",
         "hint": "A kill switch independent of club suspension -- disabling blocks new online-payment checkouts only. Historical payments, refunds, and cash/manual payments are unaffected.",
         "enable": "Re-enable payments",
-        "disable": "Disable payments"
+        "disable": "Disable payments",
+        "disableDialogTitle": "Disable online payments for this club",
+        "enableDialogTitle": "Re-enable online payments for this club",
+        "disableDialogWarning": "Every new online-payment checkout attempt for this club will be rejected immediately. Historical payments, refunds, and cash/manual payments are unaffected, and no existing gateway connection is disconnected."
       },
       "providerPolicy": {
         "title": "Payment provider policy",
@@ -390,7 +396,19 @@
         "allowed": "Allowed",
         "blocked": "Policy-blocked",
         "block": "Block",
-        "restore": "Restore"
+        "restore": "Restore",
+        "blockedReason": "Reason: {{reason}}",
+        "blockedReasonMissing": "No reason was recorded for this block",
+        "policyUpdatedAt": "Policy last updated: {{date}}",
+        "blockDialog": {
+          "title": "Block \"{{provider}}\" for this club",
+          "impact": "This club will not be able to connect or re-enable this provider until you restore it. This never disconnects an existing, currently-enabled connection.",
+          "confirm": "Confirm block"
+        },
+        "restoreDialog": {
+          "title": "Restore \"{{provider}}\" for this club",
+          "confirm": "Confirm restore"
+        }
       },
       "tabs": {
         "history": "Subscription history",
@@ -544,7 +562,8 @@
         "converted": "Converted",
         "closed": "Closed"
       },
-      "emptyTitle": "No leads yet"
+      "emptyTitle": "No leads yet",
+      "statusUpdateError": "Couldn't update the request's status. Try again."
     },
     "overviewPage": {
       "title": "Overview",
@@ -660,6 +679,7 @@
         "nameLabel": "Plan name",
         "priceLabel": "Price ({{currency}})",
         "priceChangeNote": "Changing the price doesn't affect any subscription already created at the previous price -- it only applies to new subscriptions.",
+        "reasonLabel": "Reason for this change",
         "defaultModulesLabel": "Default modules (optional)",
         "defaultModulesHint": "Seeded onto a club's Modules only when that club has no existing entitlement for a module yet -- never overwrites an existing configuration.",
         "defaultBranchLimitLabel": "Default branch limit (optional)",
@@ -788,7 +808,7 @@
       "modeLabel": "Access mode",
       "modeView": "View only — inspect without changing anything",
       "modeManage": "Full management — make changes on behalf of this club",
-      "reasonLabel": "Support reason (optional)",
+      "reasonLabel": "Support reason",
       "reasonPlaceholder": "e.g. Fix role permissions, resolve a booking issue...",
       "cancel": "Cancel",
       "open": "Open club",
