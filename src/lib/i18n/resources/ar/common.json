@@ -1585,7 +1585,8 @@
       "overview": "نظرة عامة",
       "plans": "الخطط",
       "members": "الأعضاء",
-      "expiring": "قريبة الانتهاء"
+      "expiring": "قريبة الانتهاء",
+      "report": "التقرير"
     },
     "statusLabels": {
       "pending_payment": "بانتظار الدفع",
@@ -1594,6 +1595,39 @@
       "frozen": "مجمّدة",
       "expired": "منتهية",
       "cancelled": "ملغاة"
+    },
+    "report": {
+      "title": "تقرير دورة حياة العضويات والإيرادات",
+      "lifecycleSectionLabel": "دورة الحياة خلال الفترة",
+      "newMemberships": "عضويات جديدة",
+      "renewals": "تجديدات",
+      "cancellations": "إلغاءات",
+      "statusSectionLabel": "الحالة الحالية (كل العضويات)",
+      "financialsSectionLabel": "الماليات (المُنشأة خلال الفترة)",
+      "grossRevenue": "إجمالي الإيرادات",
+      "collected": "المُحصَّل",
+      "refunded": "المسترد",
+      "outstanding": "المستحق",
+      "averageValue": "متوسط قيمة العضوية",
+      "topPlans": "أفضل الخطط",
+      "newInRange": "جديد خلال الفترة",
+      "activeNow": "نشطة الآن",
+      "expiringInRange": "عضويات تنتهي خلال الفترة",
+      "lifecycleTable": "سجل العضويات",
+      "columns": {
+        "event": "الحدث",
+        "total": "الإجمالي",
+        "paid": "المدفوع",
+        "refunded": "المسترد",
+        "outstanding": "المتبقي"
+      },
+      "event": {
+        "new": "جديدة",
+        "renewal": "تجديد",
+        "cancelled": "ملغاة"
+      },
+      "emptyTitle": "لا توجد عضويات في هذه الفترة",
+      "emptyDescription": "جرّب توسيع نطاق التاريخ أو مسح الفلاتر."
     },
     "durationUnits": {
       "day": "يوم/أيام",

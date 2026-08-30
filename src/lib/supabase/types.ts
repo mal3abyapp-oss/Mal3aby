@@ -7881,7 +7881,13 @@ export type Database = {
         Returns: string
       }
       get_club_membership_report: {
-        Args: { p_club_id: string; p_end_date: string; p_start_date: string }
+        Args: {
+          p_branch_id?: string
+          p_club_id: string
+          p_end_date: string
+          p_plan_id?: string
+          p_start_date: string
+        }
         Returns: Json
       }
       get_club_modules: {
@@ -8943,6 +8949,19 @@ export type Database = {
       }
       list_club_membership_plans: {
         Args: { p_club_id: string; p_include_archived?: boolean }
+        Returns: Json
+      }
+      list_club_membership_report_rows: {
+        Args: {
+          p_branch_id?: string
+          p_club_id: string
+          p_end_date: string
+          p_page?: number
+          p_page_size?: number
+          p_plan_id?: string
+          p_start_date: string
+          p_status?: string
+        }
         Returns: Json
       }
       list_club_membership_subscriptions: {
