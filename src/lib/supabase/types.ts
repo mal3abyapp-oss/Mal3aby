@@ -2010,6 +2010,7 @@ export type Database = {
           description: string
           expense_date: string
           id: string
+          idempotency_key: string | null
           paid_to: string | null
           payment_method: string
           reference: string | null
@@ -2029,6 +2030,7 @@ export type Database = {
           description: string
           expense_date?: string
           id?: string
+          idempotency_key?: string | null
           paid_to?: string | null
           payment_method: string
           reference?: string | null
@@ -2048,6 +2050,7 @@ export type Database = {
           description?: string
           expense_date?: string
           id?: string
+          idempotency_key?: string | null
           paid_to?: string | null
           payment_method?: string
           reference?: string | null
@@ -9659,6 +9662,7 @@ export type Database = {
           p_club_id: string
           p_description: string
           p_expense_date?: string
+          p_idempotency_key?: string
           p_paid_to?: string
           p_payment_method: string
           p_reference?: string

@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '@/lib/supabase/client'
@@ -129,6 +129,16 @@ export function FinanceExpensesPage() {
   const [formReference, setFormReference] = useState('')
   const [formDate, setFormDate] = useState(todayIso())
   const [formError, setFormError] = useState<string | null>(null)
+  // STAFF OPERATIONS ACCEPTANCE (2026-08-31) Section 39: record_expense()
+  // previously had no server-side idempotency protection -- a double-
+  // click or client retry could insert two expense rows. One key per
+  // "form session" (rotated in onSuccess so the NEXT entry gets a fresh
+  // key, matching the disposable-per-attempt convention already used by
+  // PortalPaymentsPage.tsx's claim dialog and PortalMembershipsPage.tsx's
+  // renew mutation) -- not per component mount, since this form toggles
+  // open/closed repeatedly within the same page instance rather than
+  // being a dialog that remounts fresh each time.
+  const expenseIdempotencyKeyRef = useRef(crypto.randomUUID())
 
   const [showCategoryForm, setShowCategoryForm] = useState(false)
   const [newCategoryAr, setNewCategoryAr] = useState('')
@@ -179,12 +189,14 @@ export function FinanceExpensesPage() {
         p_reference: formReference.trim() || undefined,
         p_paid_to: formPaidTo.trim() || undefined,
         p_expense_date: formDate,
+        p_idempotency_key: expenseIdempotencyKeyRef.current,
       })
       if (error) throw error
     },
     onSuccess: () => {
       setFormAmount(''); setFormDescription(''); setFormPaidTo(''); setFormReference('')
       setFormCategoryId(''); setShowForm(false); setFormError(null)
+      expenseIdempotencyKeyRef.current = crypto.randomUUID()
       void queryClient.invalidateQueries({ queryKey: ['expenses', currentClubId] })
       void queryClient.invalidateQueries({ queryKey: ['expense-report', currentClubId] })
     },
