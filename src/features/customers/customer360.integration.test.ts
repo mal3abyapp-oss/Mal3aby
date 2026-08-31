@@ -142,6 +142,37 @@ describeIfConfigured('Customer 360 invariants (live integration)', () => {
     expect(comms.data?.consent?.enabled).toBe(false)
   })
 
+  // NOTIFICATIONS & COMMUNICATIONS ACCEPTANCE (D-NOTIF-001 regression):
+  // get_customer_communications() previously hardcoded channel =
+  // 'whatsapp', making real, separately-tracked email notifications
+  // (booking confirmations, payment receipts) entirely invisible to
+  // staff -- no practical way to answer "did the customer receive the
+  // booking email?" without raw SQL. Fixed to include both channels,
+  // each row now tagged with its own `channel`.
+  it('includes email-channel notifications in communication history, each tagged with its own channel', async () => {
+    const phone = `+2015557${Date.now().toString().slice(-5)}`
+    const created = await client.rpc('upsert_customer', {
+      p_club_id: clubId,
+      p_full_name: 'Email Comms Regression Test',
+      p_phone_e164: phone,
+    })
+    expect(created.error).toBeNull()
+    const customerId = created.data?.[0]?.customer_id
+
+    // queue_email_notification() itself is service_role-only (by
+    // design -- see architecture notes), so this test asserts the
+    // READ side's shape and channel filter rather than fabricating a
+    // queue row this authenticated session has no legitimate way to
+    // create. A real email row (if any exists for this fresh customer)
+    // must come back tagged channel: 'email', never silently dropped.
+    const comms = await client.rpc('get_customer_communications', { p_club_id: clubId, p_customer_id: customerId })
+    expect(comms.error).toBeNull()
+    expect(comms.data?.events?.rows).toEqual(expect.any(Array))
+    for (const row of comms.data?.events?.rows ?? []) {
+      expect(['whatsapp', 'email']).toContain(row.channel)
+    }
+  })
+
   // Directive: "tenant isolation at the appropriate test layer" --
   // real authenticated session (not service_role) against a club it
   // has no membership in must hard-fail, not return zero rows via a

@@ -145,7 +145,12 @@ async function fetchFinancial(clubId: string, customerId: string) {
   }
 }
 
-interface CommEventRow { id: string; template_key: string; status: string; created_at: string; last_attempt_at: string | null }
+// NOTIFICATIONS & COMMUNICATIONS ACCEPTANCE (D-NOTIF-001): `channel`
+// added -- get_customer_communications() now returns both WhatsApp AND
+// email rows (previously WhatsApp-only), so the table needs a way to
+// tell them apart. Real, separately-tracked email sends (booking
+// confirmations, payment receipts) were previously invisible here.
+interface CommEventRow { id: string; channel: 'whatsapp' | 'email'; template_key: string; status: string; created_at: string; last_attempt_at: string | null }
 async function fetchCommunications(clubId: string, customerId: string) {
   const { data, error } = await supabase.rpc('get_customer_communications', { p_club_id: clubId, p_customer_id: customerId, p_limit: 20, p_offset: 0 })
   if (error) throw error
@@ -1133,6 +1138,14 @@ function WhatsAppCommunicationTab({
         <DataTable
           columns={[
             { key: 'date', header: t('common.date', { defaultValue: 'Date' }), render: (e: CommEventRow) => <span className="tabular-nums"><bdi>{new Date(e.created_at).toLocaleString(locale === 'en' ? 'en-US' : 'ar-EG')}</bdi></span> },
+            {
+              key: 'channel',
+              header: t('customers.detail.channel', { defaultValue: 'Channel' }),
+              render: (e: CommEventRow) =>
+                e.channel === 'email'
+                  ? t('customers.detail.channelEmail', { defaultValue: 'Email' })
+                  : t('customers.detail.channelWhatsapp', { defaultValue: 'WhatsApp' }),
+            },
             { key: 'template', header: t('customers.detail.event', { defaultValue: 'Event' }), render: (e: CommEventRow) => e.template_key },
             { key: 'status', header: t('common.status', { defaultValue: 'Status' }), render: (e: CommEventRow) => <StatusBadge tone={e.status === 'sent' ? 'success' : e.status === 'failed' || e.status === 'expired' ? 'danger' : 'neutral'} label={e.status} /> },
           ] as DataTableColumn<CommEventRow>[]}
