@@ -7219,6 +7219,7 @@ export type Database = {
         }[]
       }
       _shop_module_active: { Args: { p_club_id: string }; Returns: boolean }
+      activate_my_invited_memberships: { Args: never; Returns: number }
       activate_subscription_if_due: {
         Args: { p_subscription_id: string }
         Returns: boolean

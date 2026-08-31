@@ -78,6 +78,23 @@ export function LoginPage() {
       return
     }
 
+    // FULL PRODUCT E2E ACCEPTANCE (D-E2E-001, P0 fix, 2026-08-31): a
+    // staff member created via the real staff-invite path
+    // (create_club_staff_membership_service) starts in club_memberships.
+    // status = 'invited' -- the introducing migration's own comment
+    // documented "flipped to active on first login" as the intended
+    // design, but no code anywhere ever performed that flip, so every
+    // invited staff member who actually signed in fell straight through
+    // hasAnyActiveMembership() below (which correctly excludes
+    // 'invited') and landed on /onboarding (create a brand-new club)
+    // instead of reaching their real invited club -- a total block on
+    // the "add staff" capability. activate_my_invited_memberships() is
+    // strictly self-scoped to the caller's own auth.uid() (cannot touch
+    // another user's membership) and idempotent (a no-op returning 0
+    // once nothing is left invited), so it is safe to call
+    // unconditionally on every successful login, not just the first.
+    await supabase.rpc('activate_my_invited_memberships')
+
     // P1 production bug (real account report, 2026-08-19): a platform_owner
     // who is ALSO a club_owner (a real, supported multi-role account --
     // see AuthProvider's own dedupe comment) landed on /app instead of
