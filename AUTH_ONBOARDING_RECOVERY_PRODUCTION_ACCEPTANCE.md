@@ -359,6 +359,69 @@ genuinely available and functioning.**
 TSC clean · Lint 0 errors (19 pre-existing warnings) · 164/164 unit tests
 passing (157 prior + 7 new) · Build succeeds.
 
+### Deployment & production verification (2026-08-31, closure)
+
+- `e2e/auth/route-guards.spec.ts` corrected before commit: the two
+  `/portal`-related redirect assertions previously read the substring-
+  ambiguous `/\/login/`, which happened to still match the new
+  `/portal/login` destination and was silently passing for the wrong
+  reason. Tightened to `/\/portal\/login$/`, plus a new render-smoke
+  test for `/portal/login` itself. 11/11 targeted E2E passing.
+- Committed as `cc4d7fa84b055561b082ae6ca793be4f7f614ea1`, pushed once to
+  `origin/main`. CI run `33395113756`: **success** (`build-and-test` +
+  `e2e-public`, 40/40 zero-credential E2E including the corrected suite
+  above).
+- `origin/main` confirmed to match local HEAD exactly post-CI. Clean
+  rebuild (`rm -rf dist && npm run build`) from that exact HEAD; bundle
+  confirmed to embed `cc4d7fa` (`grep -o "cc4d7fa[a-f0-9]*"
+  dist/assets/index-*.js`).
+- Deployed once via the existing `mala3by-frontend` Cloudflare Worker
+  (`cd cloudflare/frontend-worker && npx wrangler deploy`) — no Pages,
+  no new Worker, no DNS change. Live on `mal3aby.app`,
+  `www.mal3aby.app`, and the `workers.dev` route.
+- **LIVE VISUALLY VERIFIED** on a genuinely fresh browser session
+  (service worker unregistered, caches and `localStorage` cleared before
+  reload): console `[Mal3aby] build cc4d7fa` confirms
+  **SOURCE CODE HEAD = BUILD SHA = DEPLOYED RUNTIME SHA**.
+- **LIVE VISUALLY VERIFIED**: unauthenticated `/portal` → `/portal/login`
+  in production; the customer Email OTP page renders correctly (email
+  field, "إرسال رمز الدخول" submit, staff/owner cross-link to `/login`).
+- **LIVE VERIFIED**: submitting the OTP-request form against a real
+  address reached Supabase Auth's live endpoint in production and
+  correctly rendered this phase's new translated, non-raw rate-limit
+  copy (the same address had already been rate-limited during this
+  phase's earlier infrastructure-reachability test) — confirms the
+  request path is wired end-to-end in the deployed build, not just in
+  local/CI tests.
+- **LIVE VISUALLY VERIFIED**: `/login` (staff/tenant-owner/platform-owner
+  password auth) renders unchanged in production — email/password
+  fields, "نسيت كلمة المرور؟", and a cross-link to `/portal` for
+  customers who land there by mistake. No credentials were typed or
+  submitted (standing project rule).
+- **SERVER VERIFIED** (live SQL against production, no mutation):
+  exactly one `claim_customer_self_service` overload exists
+  (`p_club_id uuid, p_customer_id uuid, p_normalized_mobile text`, the
+  hardened 3-arg version); `EXECUTE` is granted only to `postgres`,
+  `authenticated`, `service_role` (no `anon`/`public`); no duplicate
+  `auth.users` row exists for any address used in this phase's testing
+  (each distinct plus-addressed variant maps 1:1 to a single row, and
+  both of this phase's own test addresses were correctly rate-limited
+  with zero rows created, as already established pre-deployment).
+- Confirmed via `git diff cc4d7fa~1 cc4d7fa --stat` that no
+  WhatsApp-related file and no `ClaimAccountPage.tsx` line was touched
+  by this phase's commit.
+- Working tree clean at final state; the three pre-existing untracked
+  artifacts (`.tmp_audit/`, `local_only.txt`, `remote_only.txt`) were
+  not created, modified, or referenced by this phase.
+
+**RUNTIME CODE HEAD**: `cc4d7fa84b055561b082ae6ca793be4f7f614ea1` (the
+commit whose code is what's actually deployed and running in
+production). Any later documentation-only commit updates the
+**REPOSITORY HEAD** without changing this — and does not require
+redeployment.
+
+**CUSTOMER EMAIL OTP AUTHENTICATION = CLOSED PRODUCTION BASELINE.**
+
 ## Notes
 
 - Bookings & Fields, Academy Operations, Customer/Parent Experience, Staff
