@@ -50,3 +50,17 @@ qa_signin_temp.mjs
 /playwright-report/
 /blob-report/
 /playwright/.cache/
+
+# Production database backups (Controlled Commercial Launch Gate,
+# Phase 1/2) -- real schema/data dumps of the live production database.
+# NEVER commit these: they contain real customer/financial/audit data
+# once real tenants exist. See BACKUP_RUNBOOK.md for the real storage
+# location (never solely inside this repo/machine either -- this
+# .gitignore entry only prevents the catastrophic case of accidentally
+# committing one to a public/shared Git history).
+# The reusable operator scripts (extract_result.py, make_manifest.py,
+# verify_manifest.py) are legitimate committed tooling, not backup data
+# -- explicitly un-ignored below. Only the timestamped dump directories
+# (e.g. backups/20260831T163434Z/) stay excluded.
+/backups/*
+!/backups/*.py
