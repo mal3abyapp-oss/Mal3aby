@@ -123,7 +123,17 @@ ACADEMY P1 = 0 (AC1, AC3, AC4, AC8 were P1 -- all FIXED + PASS)
 ACADEMY CORE P2 = 0 (AC2, AC5, AC6 were Core P2 -- all FIXED + PASS)
 ACADEMY P3 DEFERRED = 2 (AC7: portal effective-end-date display; the `academy.program.manage`/`academy.group.manage` permission-key inconsistency)
 
-**ACADEMY OPERATIONS = CLOSED PRODUCTION BASELINE** (pending final commit/push/CI/deploy/production-verify, recorded below once complete).
+## 8. Deployment record
+
+- Commit: `d2e6162e6e3e07614bd62382d048d8f31380c935`
+- CI run: green (build-and-test + e2e-public, both passed, only pre-existing warnings)
+- Build SHA baked into `dist/`: `d2e6162` (confirmed via grep against the built bundle before deploy)
+- Deployed via the existing canonical Cloudflare Worker (`mala3by-frontend`), no new Worker/Pages/DNS
+- Production verified on a genuinely fresh tab (service worker + caches cleared first): console shows `[Mal3aby] build d2e6162` -- **SOURCE HEAD = BUILD SHA = DEPLOYED RUNTIME SHA confirmed**
+- `/app/academy` loads correctly in production with real live data (Overview stats, no critical console errors beyond two known pre-existing, unrelated artifacts: a Cloudflare Insights beacon CSP block, and a transient ServiceWorker `InvalidStateError` from the verification tab's own SW-clear step)
+- Working tree: clean
+
+**ACADEMY OPERATIONS = CLOSED PRODUCTION BASELINE.**
 
 ## 3. Not defects (verified correct, no action)
 
