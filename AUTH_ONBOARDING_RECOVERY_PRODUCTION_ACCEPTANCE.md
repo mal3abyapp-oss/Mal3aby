@@ -70,18 +70,20 @@ implemented architecture is:
 
 (populated after live verification)
 
-## Phase — Final regression
+## Phase — Final regression (for the P0 security fix batch, committed/deployed immediately per severity)
 
 | Item | Status | Evidence |
 |---|---|---|
-| TSC | PENDING | |
-| LINT | PENDING | |
-| UNIT | PENDING | |
-| BUILD | PENDING | |
-| TARGETED AUTH TESTS | PENDING | |
-| TARGETED E2E | PENDING | |
-| CI | PENDING | |
-| PRODUCTION | PENDING | |
+| TSC | PASS | Clean at HEAD `897101f`. |
+| LINT | PASS | 0 errors, 19 pre-existing warnings (unrelated files). |
+| UNIT | PASS | 157/157 passing. |
+| BUILD | PASS | Clean. |
+| TARGETED AUTH TESTS | PASS (SERVER VERIFIED live; new integration test ENVIRONMENT-BLOCKED locally) | See DL1 — live-tested wrong-phone rejection + correct-phone success, both before and after the fix, both cleaned up. |
+| TARGETED E2E | PASS | 10/10 unauthenticated route-guard tests. |
+| CI | PASS | Run [33389101124](https://github.com/mal3abyapp-oss/Mal3aby/actions/runs/33389101124): both jobs green, incl. migration filename sanity check. |
+| PRODUCTION | PASS | SOURCE HEAD = BUILD SHA = DEPLOYED RUNTIME SHA, all `897101facd26a2272128fe7f3f7bd12a040d74ef`. Cloudflare Worker `mala3by-frontend` version `732bf48d-15f6-4396-8eb6-10c78207399d`. Fresh-tab production console confirmed `build 897101f`, Today dashboard rendered correctly, no application errors. Function signature confirmed final-state correct directly against the live database post-deploy. |
+
+**Remaining directive sections (6-74) continue below — this batch was pushed/deployed ahead of full sweep completion due to the P0 security severity, per the directive's own "do not stop after... committing/pushing/CI/deploying" instruction and Section 80's true-stop conditions (a live account-takeover vulnerability warranted immediate remediation rather than batching behind further exploratory work).**
 
 ## Defect Log
 
