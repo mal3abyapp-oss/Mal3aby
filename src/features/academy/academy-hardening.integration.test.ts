@@ -180,4 +180,70 @@ describeIfConfigured('Academy operations hardening (live integration)', () => {
     expect(error).toBeNull()
     expect(data?.capacity).toBe(6)
   })
+
+  it('AC7: deterministic subscription selection surfaces the current subscription, not a stale historical one (via get_customer_academy_players, which get_my_portal_academy mirrors exactly)', async () => {
+    const enrolled = await client.rpc('create_enrollment_with_subscription', {
+      p_player_id: playerId, p_group_id: groupId, p_guardian_id: guardianId,
+      p_plan_type: 'monthly', p_start_date: new Date(Date.now() - 40 * 86400000).toISOString().slice(0, 10),
+      p_end_date: new Date(Date.now() - 10 * 86400000).toISOString().slice(0, 10),
+      p_price: 150, p_discount: 0,
+    })
+    expect(enrolled.error).toBeNull()
+    const enrollmentId = enrolled.data?.[0]?.enrollment_id as string
+    createdEnrollmentIds.push(enrollmentId)
+    const oldSubscriptionId = enrolled.data?.[0]?.subscription_id as string
+
+    // Cancel the old subscription (real terminal transition), then
+    // renew -- the enrollment now has 2 subscription rows: an old
+    // cancelled one and a new pending one. get_customer_academy_players
+    // (and get_my_portal_academy, which uses the identical `left join
+    // lateral (... order by created_at desc limit 1)` pattern) must
+    // surface the NEW one, never the stale cancelled row -- this is
+    // exactly the AC7 bug class (an unordered join could have
+    // surfaced either row non-deterministically).
+    const cancelled = await client.rpc('cancel_subscription', { p_subscription_id: oldSubscriptionId, p_reason: 'AC7 test setup' })
+    expect(cancelled.error).toBeNull()
+
+    const newEndDate = new Date(Date.now() + 60 * 86400000).toISOString().slice(0, 10)
+    const renewed = await client.rpc('renew_academy_subscription', {
+      p_enrollment_id: enrollmentId, p_start_date: new Date().toISOString().slice(0, 10),
+      p_end_date: newEndDate, p_price: 150, p_discount: 0,
+    })
+    expect(renewed.error).toBeNull()
+
+    const players = await client.rpc('get_customer_academy_players', { p_club_id: clubId, p_customer_id: guardianId })
+    expect(players.error).toBeNull()
+    const row = (players.data as Array<{ player_id: string; enrollment_status: string; subscription_status: string; end_date: string }>).find((p) => p.player_id === playerId)
+    expect(row?.subscription_status).toBe('pending') // the NEW subscription's status, not 'cancelled'
+    expect(row?.end_date).toBe(newEndDate) // the NEW subscription's end_date, not the old one's
+  })
+
+  it('AC7: get_subscription_effective_end_date correctly adds an extends_expiry freeze duration on top of the raw end_date', async () => {
+    const enrolled = await client.rpc('create_enrollment_with_subscription', {
+      p_player_id: playerId, p_group_id: groupId, p_guardian_id: guardianId,
+      p_plan_type: 'monthly', p_start_date: new Date().toISOString().slice(0, 10),
+      p_end_date: new Date(Date.now() + 30 * 86400000).toISOString().slice(0, 10),
+      p_price: 150, p_discount: 0,
+    })
+    expect(enrolled.error).toBeNull()
+    const enrollmentId = enrolled.data?.[0]?.enrollment_id as string
+    createdEnrollmentIds.push(enrollmentId)
+    const subscriptionId = enrolled.data?.[0]?.subscription_id as string
+
+    await client.from('subscriptions').update({ status: 'active' }).eq('id', subscriptionId) // requires no RLS bypass -- subscription.update is held by this QA staff account
+    const rawBefore = await client.from('subscriptions').select('end_date').eq('id', subscriptionId).single()
+
+    const freeze = await client.rpc('freeze_subscription', {
+      p_subscription_id: subscriptionId, p_start_date: new Date(Date.now() + 86400000).toISOString().slice(0, 10),
+      p_end_date: new Date(Date.now() + 11 * 86400000).toISOString().slice(0, 10), p_reason: 'AC7 effective-date test',
+    })
+    expect(freeze.error).toBeNull()
+
+    const effective = await client.rpc('get_subscription_effective_end_date', { p_subscription_id: subscriptionId })
+    expect(effective.error).toBeNull()
+    const rawDate = new Date(rawBefore.data!.end_date as string)
+    const effectiveDate = new Date(effective.data as string)
+    const diffDays = Math.round((effectiveDate.getTime() - rawDate.getTime()) / 86400000)
+    expect(diffDays).toBe(10) // the freeze's own duration (11 days - 1 day = 10)
+  })
 })
