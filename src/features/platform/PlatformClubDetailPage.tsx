@@ -599,7 +599,7 @@ export function PlatformClubDetailPage() {
   const invoiceColumns: DataTableColumn<(typeof invoices)[number]>[] = [
     { key: 'number', header: t('platform.clubDetailPage.invoiceColumns.number'), render: (i) => <bdi>{i.invoice_number}</bdi> },
     { key: 'amount', header: t('platform.clubDetailPage.invoiceColumns.amount'), render: (i) => <MoneyDisplay amount={Number(i.amount)} size="sm" /> },
-    { key: 'due', header: t('platform.clubDetailPage.invoiceColumns.due'), render: (i) => new Date(i.due_date).toLocaleDateString(locale === 'en' ? 'en-US' : 'ar-EG') },
+    { key: 'due', header: t('platform.clubDetailPage.invoiceColumns.due'), render: (i) => <bdi>{new Date(i.due_date).toLocaleDateString(locale === 'en' ? 'en-US' : 'ar-EG')}</bdi> },
     {
       key: 'status',
       header: t('platform.clubDetailPage.invoiceColumns.status'),
@@ -1215,8 +1215,8 @@ export function PlatformClubDetailPage() {
             columns={[
               { key: 'kind', header: t('platform.clubDetailPage.historyColumns.kind'), render: (s: (typeof subscriptions)[number]) => t(`platform.ownersPage.subscriptionKindLabels.${s.subscription_kind}`, { defaultValue: SUBSCRIPTION_KIND_LABELS[s.subscription_kind] ?? s.subscription_kind }) },
               { key: 'plan', header: t('platform.clubDetailPage.historyColumns.plan'), render: (s: (typeof subscriptions)[number]) => s.plan_name_snapshot ?? '—' },
-              { key: 'start', header: t('platform.clubDetailPage.historyColumns.start'), render: (s: (typeof subscriptions)[number]) => new Date(s.start_at).toLocaleDateString(locale === 'en' ? 'en-US' : 'ar-EG') },
-              { key: 'end', header: t('platform.clubDetailPage.historyColumns.end'), render: (s: (typeof subscriptions)[number]) => new Date(s.end_at).toLocaleDateString(locale === 'en' ? 'en-US' : 'ar-EG') },
+              { key: 'start', header: t('platform.clubDetailPage.historyColumns.start'), render: (s: (typeof subscriptions)[number]) => <bdi>{new Date(s.start_at).toLocaleDateString(locale === 'en' ? 'en-US' : 'ar-EG')}</bdi> },
+              { key: 'end', header: t('platform.clubDetailPage.historyColumns.end'), render: (s: (typeof subscriptions)[number]) => <bdi>{new Date(s.end_at).toLocaleDateString(locale === 'en' ? 'en-US' : 'ar-EG')}</bdi> },
               { key: 'status', header: t('platform.clubDetailPage.historyColumns.status'), render: (s: (typeof subscriptions)[number]) => t(`platform.reportsPage.lifecycleStatusLabels.${s.lifecycle_status}`, { defaultValue: LIFECYCLE_STATUS_LABELS[s.lifecycle_status] ?? s.lifecycle_status }) },
             ]}
             rows={subscriptions}
@@ -1234,7 +1234,7 @@ export function PlatformClubDetailPage() {
               { key: 'limit', header: t('platform.clubDetailPage.requestsColumns.limitAtRequest'), render: (r: (typeof upgradeRequests)[number]) => r.current_limit ?? t('platform.clubDetailPage.limitsCard.requestUnlimited') },
               { key: 'usage', header: t('platform.clubDetailPage.requestsColumns.usageAtRequest'), render: (r: (typeof upgradeRequests)[number]) => r.current_usage },
               { key: 'note', header: t('platform.clubDetailPage.requestsColumns.note'), render: (r: (typeof upgradeRequests)[number]) => r.note ?? '—' },
-              { key: 'created', header: t('platform.clubDetailPage.requestsColumns.createdAt'), render: (r: (typeof upgradeRequests)[number]) => new Date(r.created_at).toLocaleDateString(locale === 'en' ? 'en-US' : 'ar-EG') },
+              { key: 'created', header: t('platform.clubDetailPage.requestsColumns.createdAt'), render: (r: (typeof upgradeRequests)[number]) => <bdi>{new Date(r.created_at).toLocaleDateString(locale === 'en' ? 'en-US' : 'ar-EG')}</bdi> },
               {
                 key: 'status',
                 header: t('platform.clubDetailPage.requestsColumns.status'),
@@ -1256,7 +1256,7 @@ export function PlatformClubDetailPage() {
             columns={[
               { key: 'action', header: t('platform.clubDetailPage.auditColumns.action'), render: (a: (typeof auditRows)[number]) => actionLabel(a.action, locale) },
               { key: 'entity', header: t('platform.clubDetailPage.auditColumns.entity'), render: (a: (typeof auditRows)[number]) => entityLabel(a.entity_type, locale) },
-              { key: 'time', header: t('platform.clubDetailPage.auditColumns.time'), render: (a: (typeof auditRows)[number]) => new Date(a.created_at).toLocaleString(locale === 'en' ? 'en-US' : 'ar-EG') },
+              { key: 'time', header: t('platform.clubDetailPage.auditColumns.time'), render: (a: (typeof auditRows)[number]) => <bdi>{new Date(a.created_at).toLocaleString(locale === 'en' ? 'en-US' : 'ar-EG')}</bdi> },
               { key: 'reason', header: t('platform.clubDetailPage.auditColumns.reason'), render: (a: (typeof auditRows)[number]) => a.reason ?? '—' },
             ]}
             rows={auditRows}
@@ -1339,8 +1339,14 @@ export function PlatformClubDetailPage() {
             </div>
             {currentSub && graceDaysInput.trim() !== '' && !Number.isNaN(Number(graceDaysInput)) && (
               <p className="text-sm text-text-secondary">
+                {/* PLATFORM OWNER SAAS ACCEPTANCE (2026-08-31): same RTL bidi
+                    gap as CashShiftPage.tsx's "Opened by {name} — {date}"
+                    fix -- an i18next-interpolated date can't be wrapped in
+                    JSX <bdi>, so it's isolated with the LRI/PDI Unicode
+                    isolate pair (U+2067/U+2069) directly around the
+                    interpolated value instead. */}
                 {t('platform.clubDetailPage.graceDialog.resultingDate', {
-                  date: new Date(new Date(currentSub.end_at).getTime() + Number(graceDaysInput) * 86400000).toLocaleDateString(locale === 'en' ? 'en-US' : 'ar-EG'),
+                  date: `⁧${new Date(new Date(currentSub.end_at).getTime() + Number(graceDaysInput) * 86400000).toLocaleDateString(locale === 'en' ? 'en-US' : 'ar-EG')}⁩`,
                 })}
               </p>
             )}
@@ -1476,6 +1482,7 @@ const EFFECTIVE_STATE_TONE: Record<ModuleEffectiveState, 'success' | 'warning' |
 
 function ModulesPanel({ clubId, subscriptionAccess }: { clubId: string; subscriptionAccess: string | null }) {
   const { t } = useTranslation()
+  const { locale } = useDirection()
   const queryClient = useQueryClient()
   const [deactivateTarget, setDeactivateTarget] = useState<{ moduleKey: string; reason: string } | null>(null)
 
@@ -1530,7 +1537,7 @@ function ModulesPanel({ clubId, subscriptionAccess }: { clubId: string; subscrip
               </div>
               {m.updatedAt && (
                 <p className="mt-1 text-xs text-text-secondary">
-                  {t('platform.clubDetailPage.modulesLastChanged', { date: new Date(m.updatedAt).toLocaleString() })}
+                  {t('platform.clubDetailPage.modulesLastChanged', { date: `⁧${new Date(m.updatedAt).toLocaleString(locale === 'en' ? 'en-US' : 'ar-EG')}⁩` })}
                 </p>
               )}
             </div>
