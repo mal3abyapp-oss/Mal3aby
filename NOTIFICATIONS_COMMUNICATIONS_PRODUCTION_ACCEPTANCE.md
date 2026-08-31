@@ -225,9 +225,9 @@ recipient, only their resolved guardian customer can.
 | UNIT | PASS | see regression gate below |
 | INTEGRATION | PASS | `templates.test.ts` (13/13, cloudflare/email-worker's own suite) + `customer360.integration.test.ts` (8/8 skip cleanly, no live creds — new D-NOTIF-001 regression test included) |
 | TARGETED E2E | PASS | see regression gate below |
-| CI | PENDING | |
-| PRODUCTION | PENDING | |
-| SOURCE=BUILD=RUNTIME | PENDING | |
+| CI | PASS | run [33404887040](https://github.com/mal3abyapp-oss/Mal3aby/actions/runs/33404887040), green |
+| PRODUCTION | PASS | LIVE VISUALLY VERIFIED, fresh session, console build tag matches deployed HEAD |
+| SOURCE=BUILD=RUNTIME | PASS | `dcd7c61` = `dcd7c61` = `dcd7c61` |
 
 ## Defect register
 
