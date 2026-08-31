@@ -101,9 +101,9 @@ Closure threshold: P0 = 0, P1 = 0, CORE P2 = 0.
 | LINT | PASS | 0 errors, 19 pre-existing warnings (unrelated files, unchanged). |
 | UNIT | PASS | 157/157 passing. |
 | BUILD | PASS | Clean. |
-| TARGETED E2E | PENDING | |
-| CI | PENDING | |
-| PRODUCTION | PENDING | |
+| TARGETED E2E | PASS | 10/10 unauthenticated route-guard tests passing (`auth/route-guards.spec.ts`). Authenticated Platform Owner E2E suite ENVIRONMENT-BLOCKED (no service-role key). |
+| CI | PASS | Run [33381261607](https://github.com/mal3abyapp-oss/Mal3aby/actions/runs/33381261607): both `build-and-test` and `e2e-public` green, incl. migration filename sanity check. |
+| PRODUCTION | PASS | SOURCE HEAD = BUILD SHA = DEPLOYED RUNTIME SHA, all `5848b35cee90ff57371fbc013e9fdf269a1fbddd`. Cloudflare Worker `mala3by-frontend` version `089b21a2-d036-4c44-a993-3f037bfd37b9`. Fresh-tab production console confirmed `build 5848b35`, Today dashboard rendered correctly with real data, no application console errors. |
 
 ## Defect Log
 
