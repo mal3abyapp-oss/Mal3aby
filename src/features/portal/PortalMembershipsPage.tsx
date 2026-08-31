@@ -12,6 +12,7 @@ import { Input } from '@/components/ui/input'
 import { usePortalClub } from '@/app/providers/PortalClubProvider'
 import { CLUB_MEMBERSHIP_STATUS_TONE, daysRemaining, previewClubMembershipEndDate } from '@/lib/domain/clubMembership'
 import { MembershipCard } from '@/features/memberships/MembershipCard'
+import { useClubTimezone } from '@/features/bookings/useFieldPricing'
 
 // Customer Portal -- "My Memberships". Mirrors PortalAcademyPage.tsx's
 // structure (PageHeader, loading/error/empty states, useQuery +
@@ -81,6 +82,7 @@ async function fetchBranches(clubId: string): Promise<BranchRow[]> {
 export function PortalMembershipsPage() {
   const { t, i18n } = useTranslation()
   const { activeClubId, isLoading: clubLoading } = usePortalClub()
+  const { data: clubTimezone } = useClubTimezone(activeClubId)
   const queryClient = useQueryClient()
   const [cardMembership, setCardMembership] = useState<PortalMembership | null>(null)
   const [browsePlansOpen, setBrowsePlansOpen] = useState(false)
@@ -122,7 +124,13 @@ export function PortalMembershipsPage() {
   const clubName = (m: PortalMembership) => i18n.language === 'en' ? (m.club_name ?? m.club_name_ar) : (m.club_name_ar ?? m.club_name)
 
   function renderCard(m: PortalMembership) {
-    const remaining = daysRemaining(m.effective_end_date)
+    // STAFF OPERATIONS ACCEPTANCE Phase A: daysRemaining() now requires
+    // the club's own IANA timezone (see clubMembership.ts's doc comment
+    // for the off-by-one this closes) -- clubTimezone can be briefly
+    // undefined on first render before useClubTimezone resolves, in
+    // which case remaining degrades to null (hides the days-remaining
+    // line for one tick) rather than falling back to any guessed zone.
+    const remaining = clubTimezone ? daysRemaining(m.effective_end_date, clubTimezone) : null
     const canRenew = m.allow_renewal && ['active', 'scheduled', 'expired'].includes(m.effective_status)
     return (
       <div key={m.membership_subscription_id} className="flex flex-col gap-2 rounded-lg border border-border bg-surface p-3">
