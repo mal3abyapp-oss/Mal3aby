@@ -150,7 +150,11 @@ export function ClaimAccountPage({ onClaimed }: { onClaimed: () => void }) {
                 <div key={m.id} className="flex items-center justify-between gap-2 rounded-md bg-muted/30 p-2">
                   <div>
                     <p className="font-medium">{m.full_name}</p>
-                    <p className="text-xs text-text-secondary tabular-nums">{m.mobile_display}</p>
+                    {/* QA acceptance fix (2026-08-31): same RTL bidi bug class as
+                        PortalProfilePage.tsx's WhatsApp field -- mobile_display can
+                        carry a leading '+' (E164 display), which reverses under this
+                        page's default RTL context without an explicit direction. */}
+                    <p dir="ltr" className="text-xs text-text-secondary tabular-nums">{m.mobile_display}</p>
                   </div>
                   <Button size="sm" onClick={() => claimMutation.mutate(m.id)} disabled={claimMutation.isPending}>
                     {claimMutation.isPending ? t('portal.claimAccountPage.claiming') : t('portal.claimAccountPage.confirmClaim')}
