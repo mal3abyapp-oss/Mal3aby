@@ -88,9 +88,19 @@ export function ClaimAccountPage({ onClaimed }: { onClaimed: () => void }) {
 
   const claimMutation = useMutation({
     mutationFn: async (customerId: string) => {
+      // SECURITY FIX (2026-08-31): claim_customer_self_service() now
+      // re-verifies the same phone corroboration find_claimable_customer
+      // already checked, independently of this UI's own lookup step --
+      // closes a live-confirmed account-takeover gap where the claim RPC
+      // trusted any caller-supplied p_customer_id with no verification of
+      // its own. Recompute the same normalization handleSearch() uses,
+      // since the raw mobile input (not the normalized form) is what's
+      // held in component state.
+      const normalized = mobile.replace(/\D/g, '').replace(/^0+/, '')
       const { error } = await supabase.rpc('claim_customer_self_service', {
         p_club_id: clubId,
         p_customer_id: customerId,
+        p_normalized_mobile: normalized,
       })
       if (error) throw error
     },

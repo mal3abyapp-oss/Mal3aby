@@ -7305,7 +7305,11 @@ export type Database = {
         }[]
       }
       claim_customer_self_service: {
-        Args: { p_club_id: string; p_customer_id: string }
+        Args: {
+          p_club_id: string
+          p_customer_id: string
+          p_normalized_mobile: string
+        }
         Returns: string
       }
       claim_manual_payment: {
