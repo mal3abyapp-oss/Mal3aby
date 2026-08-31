@@ -107,3 +107,28 @@ export function daysRemaining(
   if (Number.isNaN(endMs) || Number.isNaN(todayMs)) return null
   return Math.max(0, Math.round((endMs - todayMs) / (1000 * 60 * 60 * 24)))
 }
+
+/**
+ * Same as daysRemaining(), but for a caller whose end value is an
+ * absolute Instant (a timestamptz, e.g. a platform subscription's
+ * end_at) rather than an already-club-local business date. Resolves
+ * the instant to its club-local calendar date via fromInstant (the
+ * same Gate 1 conversion every booking/Academy timestamp goes
+ * through) before delegating to daysRemaining() -- never a second,
+ * duplicated date-math implementation.
+ *
+ * STAFF OPERATIONS ACCEPTANCE post-closure cleanup (2026-08-31):
+ * extracted from AppLayout.tsx's own platform-subscription trial
+ * banner, which had the exact same browser/UTC-vs-club-local defect
+ * class as daysRemaining()'s own original bug -- Date.now() compared
+ * directly against end_at's raw UTC instant, ignoring the club's own
+ * timezone entirely.
+ */
+export function daysRemainingFromInstant(
+  endInstant: string | null,
+  ianaTimeZone: string,
+  today?: string,
+): number | null {
+  if (!endInstant) return null
+  return daysRemaining(fromInstant(endInstant, ianaTimeZone).date, ianaTimeZone, today)
+}

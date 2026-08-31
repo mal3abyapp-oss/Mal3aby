@@ -12,6 +12,8 @@ import { LanguageSwitcher } from '@/components/ui/language-switcher'
 import { MasterAdminBanner } from '@/components/ui/master-admin-banner'
 import { canSeeNavDomain, type NavDomain } from '@/lib/domain/navigation'
 import { usePendingPaymentsCount } from '@/features/billing/usePendingPaymentsCount'
+import { useClubTimezone } from '@/features/bookings/useFieldPricing'
+import { daysRemainingFromInstant } from '@/lib/domain/clubMembership'
 import {
   CalendarDays,
   GraduationCap,
@@ -181,8 +183,20 @@ export function AppLayout() {
   // being fetched by AuthProvider and simply never used here).
   const { data: pendingPaymentsCount = 0 } = usePendingPaymentsCount()
 
-  const daysRemaining = subSummary?.end_at
-    ? Math.ceil((new Date(subSummary.end_at).getTime() - Date.now()) / (24 * 60 * 60 * 1000))
+  // STAFF OPERATIONS ACCEPTANCE post-closure cleanup (2026-08-31): same
+  // browser/UTC-vs-club-local defect class as daysRemaining()'s own fix
+  // in lib/domain/clubMembership.ts -- this used to anchor "now" at the
+  // browser's own instant (Date.now()) and compare it directly against
+  // end_at's raw UTC representation, so a club owner viewing this trial
+  // banner from a different timezone than their club's (or simply any
+  // club not itself in UTC) could see an off-by-one day count, same as
+  // the customer-portal bug already fixed. daysRemainingFromInstant
+  // resolves end_at (a timestamptz) to its club-local calendar date via
+  // fromInstant before delegating to the canonical daysRemaining() -- no
+  // duplicated date-math implementation.
+  const clubTimezoneQuery = useClubTimezone(currentClubId)
+  const daysRemaining = clubTimezoneQuery.data
+    ? daysRemainingFromInstant(subSummary?.end_at ?? null, clubTimezoneQuery.data)
     : null
 
   const visibleNavSections = navSections
