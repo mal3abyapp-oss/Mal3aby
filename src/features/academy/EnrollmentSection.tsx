@@ -29,6 +29,8 @@ import {
   type SubscriptionRow,
   getAcademySubscriptionDisplayStatus,
 } from '@/lib/domain/academy'
+import { useClubTimezone } from '@/features/bookings/useFieldPricing'
+import { fromInstant } from '@/lib/domain/time'
 
 // Enrollment Wizard (guardian -> player -> group -> subscription ->
 // invoice -> payment, per USER_FLOWS.md) + freeze UI + a simple
@@ -100,6 +102,13 @@ async function fetchGuardiansForPlayer(playerId: string) {
 export function EnrollmentSection() {
   const { t } = useTranslation()
   const { currentClubId, currentMembership } = useAuth()
+  // ACADEMY OPERATIONS HARDENING (AC6): club-local "today" for the
+  // DUE/EXPIRED display-status derivation below -- never the
+  // browser's own timezone, matching the established
+  // fromInstant(new Date(), clubTimezone).date idiom used throughout
+  // the Bookings module.
+  const { data: clubTimezone } = useClubTimezone(currentClubId)
+  const clubLocalToday = clubTimezone ? fromInstant(new Date(), clubTimezone).date : undefined
 
   const SUBSCRIPTION_PLAN_LABELS: Record<string, string> = {
     monthly: t('academy.subscriptionPlanLabels.monthly'),
@@ -473,7 +482,7 @@ export function EnrollmentSection() {
                 // actually transitioned the stored status. Never
                 // overrides a terminal status (frozen/expired/cancelled
                 // display exactly as stored).
-                const displayStatus = getAcademySubscriptionDisplayStatus(subscription.status, subscription.endDate)
+                const displayStatus = getAcademySubscriptionDisplayStatus(subscription.status, subscription.endDate, clubLocalToday)
                 return (
                   <StatusBadge
                     tone={displayStatus === 'active' ? 'success' : displayStatus === 'due' || displayStatus === 'frozen' ? 'warning' : displayStatus === 'expired' ? 'danger' : 'neutral'}

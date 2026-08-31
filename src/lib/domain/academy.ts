@@ -50,8 +50,21 @@ export interface AgeGroupRow {
  * this exact rule has real test coverage instead of only being
  * exercised implicitly through a rendered component.
  *
- * `today` is an injectable ISO date string (YYYY-MM-DD) so callers/
- * tests can pin a fixed "now" instead of depending on the real clock.
+ * ACADEMY OPERATIONS HARDENING (AC6): `today`'s default used to be
+ * `new Date().toISOString().slice(0, 10)` -- the BROWSER's local
+ * timezone, not the club's. A staff member viewing this badge from a
+ * timezone that differs from the club's own (e.g. anywhere west of
+ * UTC, viewing a UTC+3 club near midnight) could see a wrong DUE/
+ * EXPIRED label for up to a day, purely from where their browser
+ * happened to be, not the club's real wall-clock day. Every real call
+ * site now passes an explicit club-local `today` (see
+ * EnrollmentSection.tsx's useClubTimezone + fromInstant usage) --
+ * the browser-clock default remains ONLY as a last-resort fallback
+ * for a caller that genuinely cannot reach the club's timezone yet
+ * (e.g. before it has loaded), matching the same defensive-fallback
+ * pattern already established elsewhere in this codebase (see
+ * useResolvedFieldPrice's retry:false handling for an analogous
+ * "correct at rest, gracefully degraded loading" case).
  */
 export function getAcademySubscriptionDisplayStatus(
   status: string,
