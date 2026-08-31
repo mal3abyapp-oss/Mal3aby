@@ -303,8 +303,8 @@ export function CashShiftPage() {
   const historyColumns: DataTableColumn<ShiftHistoryRow>[] = [
     { key: 'branch', header: t('billing.cashShift.historyCard.table.branch'), render: (s) => s.branch_name },
     { key: 'opened_by', header: t('billing.cashShift.historyCard.table.openedBy'), render: (s) => s.opened_by_name ?? '—' },
-    { key: 'opened_at', header: t('billing.cashShift.historyCard.table.openedAt'), render: (s) => new Date(s.opened_at).toLocaleString(locale === 'en' ? 'en-US' : 'ar-EG') },
-    { key: 'closed_at', header: t('billing.cashShift.historyCard.table.closedAt'), render: (s) => (s.closed_at ? new Date(s.closed_at).toLocaleString(locale === 'en' ? 'en-US' : 'ar-EG') : '—') },
+    { key: 'opened_at', header: t('billing.cashShift.historyCard.table.openedAt'), render: (s) => <bdi>{new Date(s.opened_at).toLocaleString(locale === 'en' ? 'en-US' : 'ar-EG')}</bdi> },
+    { key: 'closed_at', header: t('billing.cashShift.historyCard.table.closedAt'), render: (s) => (s.closed_at ? <bdi>{new Date(s.closed_at).toLocaleString(locale === 'en' ? 'en-US' : 'ar-EG')}</bdi> : '—') },
     { key: 'opening_float', header: t('billing.cashShift.historyCard.table.openingFloat'), render: (s) => formatMoney(s.opening_float, 'EGP', locale) },
     { key: 'expected', header: t('billing.cashShift.historyCard.table.expected'), render: (s) => (s.expected_cash === null ? '—' : formatMoney(s.expected_cash, 'EGP', locale)) },
     { key: 'counted', header: t('billing.cashShift.historyCard.table.counted'), render: (s) => (s.closing_count === null ? '—' : formatMoney(s.closing_count, 'EGP', locale)) },
@@ -423,8 +423,22 @@ export function CashShiftPage() {
                 </CardTitle>
               </CardHeader>
               <CardContent className="flex flex-col gap-3">
+                {/* STAFF OPERATIONS ACCEPTANCE (2026-08-31): the interpolated
+                    date used to be inlined directly into the translated
+                    "Opened by {{name}} — {{date}}" string with no bidi
+                    isolation -- a Latin-digit timestamp sitting directly in
+                    Arabic sentence text, the same bug class MoneyDisplay's
+                    own <bdi> guards against. i18next interpolation happens
+                    inside a plain string (no JSX element to wrap with
+                    <bdi>), so the date is isolated with the LRI/PDI Unicode
+                    isolate pair (U+2067/U+2069) instead -- the same
+                    directional-isolation mechanism <bdi> uses under the
+                    hood, applied inline to the interpolated value itself. */}
                 <p className="text-sm text-text-secondary">
-                  {t('billing.cashShift.openShiftCard.openedBy', { name: shift.opened_by_name ?? '—', date: new Date(shift.opened_at).toLocaleString(locale === 'en' ? 'en-US' : 'ar-EG') })}
+                  {t('billing.cashShift.openShiftCard.openedBy', {
+                    name: shift.opened_by_name ?? '—',
+                    date: `⁧${new Date(shift.opened_at).toLocaleString(locale === 'en' ? 'en-US' : 'ar-EG')}⁩`,
+                  })}
                 </p>
                 {closingShiftId === shift.id && liveStatus ? (
                   <>

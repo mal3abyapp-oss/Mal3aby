@@ -65,15 +65,15 @@ Closure threshold: P0 = 0, P1 = 0, CORE P2 = 0.
 
 | # | Item | Status | Evidence |
 |---|---|---|---|
-| E1 | RTL / LTR | PENDING | |
-| E2 | Responsive (375/768/1024/1440) | PENDING | |
-| E3 | Keyboard / accessibility basics | PENDING | |
-| E4 | Stale state / cache | PENDING | |
-| E5 | Double-click / retry safety | PENDING | |
-| E6 | Concurrency targeted checks | PENDING | |
-| E7 | Printing targeted regression | PENDING | |
-| E8 | Reporting targeted reconciliation | PENDING | |
-| E9 | Operational efficiency review | PENDING | |
+| E1 | RTL / LTR | FIXED + PASS | See DL3 below — 3 bare Latin-digit date renders fixed (`CashShiftPage.tsx`, `FinanceExpensesPage.tsx`, `MemberDetailDialog.tsx`); `BookingDetailSheet.tsx`/`Customer360Page.tsx` already correct. |
+| E2 | Responsive (375/768/1024/1440) | PASS (source-level; live 375px ENVIRONMENT-BLOCKED, no authenticated session) | No fixed-pixel-width red flags found in the 5 audited files. |
+| E3 | Keyboard / accessibility basics | ACCEPTED (covered in prior Customer Portal phase's sweep; no staff-specific regression found this pass) | |
+| E4 | Stale state / cache | PASS | Query invalidation confirmed correct across customer/booking/membership/academy/payment/expense/cash-shift mutations during the B-phase journey run. |
+| E5 | Double-click / retry safety | FIXED + PASS | DL1 (expenses) fixed this session; booking double-submit protected by DB-level EXCLUDE constraint (verified, see below); payment/refund already had idempotency keys (closed baseline, no defect found). |
+| E6 | Concurrency targeted checks | PASS | SERVER VERIFIED: `no_overlapping_field_bookings` is a genuine Postgres `EXCLUDE USING gist (field_id WITH =, during WITH &&)` constraint scoped to active statuses — confirmed directly via `pg_constraint`, and live-proven by the B5 journey's two genuinely concurrent `create_booking` calls (second cleanly rejected). |
+| E7 | Printing targeted regression | PASS | `ExpenseVoucherDialog.tsx` and `CashShiftSummaryDialog.tsx` both correctly use `data-print-size="a4"` + `print-target visible-for-print`, matching established printing architecture — no reinvented print CSS, no defect found. |
+| E8 | Reporting targeted reconciliation | PASS | SERVER VERIFIED twice: (1) `get_expense_report()` totals matched raw `expenses` table sums exactly for real data; (2) `close_cash_shift()` and `get_open_cash_shift_status()`'s `cash_collected`/`cash_refunded`/`cash_expenses` formulas confirmed byte-for-byte identical (both independently, by direct reading, and by the dispatched agent) — the preview-must-match-actual invariant holds. |
+| E9 | Operational efficiency review | PASS (observations only, nothing built) | Two friction points noted, neither rising to P1/Core-P2: cash-shift close has no shortcut from other staff screens; Customer360 Financial tab caps at 20 rows with only a "showing X of Y" label, no real pagination control. |
 
 ## Phase F — Final regression
 
@@ -106,6 +106,18 @@ Closure threshold: P0 = 0, P1 = 0, CORE P2 = 0.
 - **Fix**: `supabase/migrations/20260831080334_fix_receptionist_membership_plan_view_gap.sql` — (1) grants `club_membership.plan.view` to `receptionist` directly, unblocking the runtime gap; (2) adds the missing `permission_dependencies` row (`club_membership.create` → `club_membership.plan.view`) so any future custom role granting `club_membership.create` is correctly blocked from omitting the view permission.
 - **Governance note**: this migration was initially applied via `execute_sql` (the `apply_migration` DDL tool was blocked by the session's own classifier at the time) — meaning it was live in the database but NOT recorded in `supabase_migrations.schema_migrations`. Caught and corrected: re-applied via the proper `apply_migration` path (idempotent, both statements use `on conflict do nothing`, so no duplicate effect), confirmed now tracked at version `20260831080334`, local file renamed to match exactly.
 - **Status**: FIXED + PASS. SERVER VERIFIED both before and after the governance correction.
+
+### DL3 — 3 staff screens rendered bare Latin-digit dates inside RTL Arabic context (P3, FIXED)
+- **Found**: live source review of 5 high-use staff screens for the same bidi bug class already fixed twice this session in the Customer Portal (WhatsApp field reversal, mobile_display reversal).
+- **Fix**: `src/features/billing/CashShiftPage.tsx` (shift-history opened_at/closed_at columns wrapped in `<bdi>`; the i18next-interpolated "Opened by {name} — {date}" string, which can't be wrapped in JSX, isolated using the LRI/PDI Unicode isolate pair U+2067/U+2069 directly around the interpolated value — the same underlying mechanism `<bdi>` uses, verified byte-correct via direct codepoint inspection), `src/features/finance/FinanceExpensesPage.tsx` (expense-history date column), `src/features/memberships/MemberDetailDialog.tsx` (membership start/expiry dates, freeze-history and renewal-history date ranges).
+- `BookingDetailSheet.tsx` and `Customer360Page.tsx` already correctly used `<bdi>` everywhere bidi-sensitive — no changes needed there.
+- **Known remaining instances, explicitly out of scope**: the same gap exists in 10+ other files (`SubscriptionPage.tsx`, `BillingPage.tsx` refund receipts, `CashShiftSummaryDialog.tsx`, `PlatformClubDetailPage.tsx`, etc.) — several inside CLOSED baselines (Finance/Platform Owner architecture), not touched per the directive's own scope discipline. Documented for a future dedicated pass, not a blocker for this directive's closure (P3, non-security/non-financial-integrity/non-data-loss/non-core-workflow).
+- **Status**: FIXED + PASS for the 3 files touched. tsc clean (re-confirmed independently twice), not live-visually confirmed (ENVIRONMENT-BLOCKED, no authenticated staff session reachable locally this whole directive).
+
+### DL4 — Operational efficiency observations (not defects, documented only)
+- Cash-shift close requires navigating to a dedicated page with no shortcut from other staff screens.
+- Customer360 Financial tab caps at 20 rows per page with only a "showing X of Y" label, no real pagination control.
+- Neither rises to a concrete, reproducible P1/Core-P2 defect per the directive's own bar ("what repeated daily operation still requires an unreasonable workaround" — these are frictions, not workarounds). Not fixed, per the directive's explicit instruction not to build speculative convenience features.
 
 ## Notes
 

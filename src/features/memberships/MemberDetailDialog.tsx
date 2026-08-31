@@ -163,8 +163,8 @@ export function MemberDetailDialog({
             </div>
 
             <div className="grid grid-cols-2 gap-3 text-sm">
-              <div><p className="text-text-secondary">{t('clubMemberships.startDate')}</p><p className="tabular-nums">{detail.start_date}</p></div>
-              <div><p className="text-text-secondary">{t('clubMemberships.expiryDate')}</p><p className="tabular-nums">{detail.effective_end_date}</p></div>
+              <div><p className="text-text-secondary">{t('clubMemberships.startDate')}</p><p className="tabular-nums"><bdi>{detail.start_date}</bdi></p></div>
+              <div><p className="text-text-secondary">{t('clubMemberships.expiryDate')}</p><p className="tabular-nums"><bdi>{detail.effective_end_date}</bdi></p></div>
               <div><p className="text-text-secondary">{t('clubMemberships.branch')}</p><p>{detail.branch_name}</p></div>
               <div><p className="text-text-secondary">{t('clubMemberships.detail.price')}</p><p className="tabular-nums">{detail.price.toFixed(0)} {t('common.currency')}</p></div>
             </div>
@@ -233,7 +233,7 @@ export function MemberDetailDialog({
               <p className="mb-2 text-sm font-medium text-text-secondary">{t('clubMemberships.detail.freezeHistory')}</p>
               <DataTable
                 columns={[
-                  { key: 'range', header: t('clubMemberships.detail.freezeRange'), render: (f: FreezeRow) => <span className="tabular-nums">{f.start_date} — {f.end_date}</span> },
+                  { key: 'range', header: t('clubMemberships.detail.freezeRange'), render: (f: FreezeRow) => <span className="tabular-nums"><bdi>{f.start_date} — {f.end_date}</bdi></span> },
                   { key: 'days', header: t('clubMemberships.detail.freezeDays'), render: (f: FreezeRow) => <span className="tabular-nums">{f.freeze_days}</span> },
                   { key: 'reason', header: t('clubMemberships.detail.freezeReason'), render: (f: FreezeRow) => f.reason ?? '—' },
                 ] as DataTableColumn<FreezeRow>[]}
@@ -248,7 +248,7 @@ export function MemberDetailDialog({
               <DataTable
                 columns={[
                   { key: 'number', header: t('clubMemberships.membershipNumber'), render: (r: RenewalRow) => <span className="tabular-nums"><bdi>{r.membership_number}</bdi></span> },
-                  { key: 'range', header: t('clubMemberships.detail.freezeRange'), render: (r: RenewalRow) => <span className="tabular-nums">{r.start_date} — {r.end_date}</span> },
+                  { key: 'range', header: t('clubMemberships.detail.freezeRange'), render: (r: RenewalRow) => <span className="tabular-nums"><bdi>{r.start_date} — {r.end_date}</bdi></span> },
                   { key: 'status', header: t('common.status', { defaultValue: 'Status' }), render: (r: RenewalRow) => <StatusBadge tone={CLUB_MEMBERSHIP_STATUS_TONE[r.status] ?? 'neutral'} label={t(`clubMemberships.statusLabels.${r.status}`, { defaultValue: r.status })} /> },
                   { key: 'price', header: t('clubMemberships.detail.price'), render: (r: RenewalRow) => <span className="tabular-nums">{r.price.toFixed(0)} {t('common.currency')}</span> },
                 ] as DataTableColumn<RenewalRow>[]}

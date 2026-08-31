@@ -242,7 +242,7 @@ export function FinanceExpensesPage() {
   )
 
   const columns: DataTableColumn<ExpenseRow>[] = [
-    { key: 'date', header: t('finance.expenses.columns.date'), render: (e) => new Date(e.expenseDate).toLocaleDateString(locale === 'en' ? 'en-US' : 'ar-EG') },
+    { key: 'date', header: t('finance.expenses.columns.date'), render: (e) => <bdi>{new Date(e.expenseDate).toLocaleDateString(locale === 'en' ? 'en-US' : 'ar-EG')}</bdi> },
     { key: 'description', header: t('finance.expenses.columns.description'), render: (e) => e.description },
     { key: 'category', header: t('finance.expenses.columns.category'), render: (e) => e.categoryName || t('finance.expenses.uncategorized') },
     { key: 'branch', header: t('finance.expenses.columns.branch'), render: (e) => e.branchName },
