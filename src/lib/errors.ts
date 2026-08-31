@@ -134,6 +134,18 @@ const MESSAGE_RULES: Array<[RegExp, string, string]> = [
   // string) so the shopper at least sees a clear, specific reason
   // rather than "something went wrong".
   [/insufficient stock/i, 'الكمية المتاحة في المخزون غير كافية لإتمام هذه العملية.', 'Not enough stock is available to complete this.'],
+  // CUSTOMER EMAIL OTP (2026-08-31): Supabase Auth's own GoTrue errors
+  // (AuthError, not a PostgREST/RPC error -- distinct shape, but this
+  // function already handles both safely via the same message-pattern
+  // match) -- live-confirmed via a real signInWithOtp() call against
+  // this project that hitting the send-rate-limit is a genuine,
+  // reachable scenario (Supabase's own per-project/per-email OTP send
+  // limits), not just a theoretical one. Falling through to the fully
+  // generic "couldn't send the code" fallback would be technically safe
+  // but unhelpfully vague for a scenario a real customer can genuinely
+  // hit (e.g. tapping "send code" repeatedly).
+  [/email rate limit exceeded|over_email_send_rate_limit/i, 'لقد طلبت رمز الدخول عدة مرات. يرجى الانتظار قليلاً قبل المحاولة مرة أخرى.', "You've requested a login code too many times. Please wait a bit before trying again."],
+  [/email_address_invalid|email address .* is invalid/i, 'صيغة البريد الإلكتروني غير صحيحة.', "That email address isn't valid."],
 ]
 
 const CODE_RULES: Record<string, [string, string]> = {

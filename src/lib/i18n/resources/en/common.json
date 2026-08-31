@@ -1081,6 +1081,20 @@
       "updateError": "Couldn't update the password. Try requesting a new reset link.",
       "saving": "Saving...",
       "savePassword": "Save password"
+    },
+    "portalLogin": {
+      "title": "Sign in to your account",
+      "emailStageDescription": "Enter your email and we'll send you a one-time login code.",
+      "sendCode": "Send login code",
+      "sending": "Sending...",
+      "requestError": "Couldn't send the login code. Check the email address and try again.",
+      "staffLoginLink": "Staff or club owner? Sign in here",
+      "otpStageDescription": "Enter the 6-digit code sent to {{email}}",
+      "codeLabel": "Login code",
+      "verify": "Verify and sign in",
+      "verifying": "Verifying...",
+      "verifyError": "That code is incorrect or has expired. Check it or request a new one.",
+      "changeEmail": "Change email"
     }
   },
   "account": {

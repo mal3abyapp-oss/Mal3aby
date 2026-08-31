@@ -43,14 +43,31 @@ test.describe('Unauthenticated route guards redirect correctly', () => {
     await expect(page).toHaveURL(/\/login/)
   })
 
-  test('/portal redirects to /login when unauthenticated (RequirePortalAuth)', async ({ page }) => {
+  // CUSTOMER EMAIL OTP (2026-08-31): RequirePortalAuth now redirects an
+  // unauthenticated /portal/* visit to /portal/login (the new customer
+  // Email OTP entry point) rather than the shared staff/tenant-owner/
+  // platform-owner /login page -- this assertion used to read /\/login/,
+  // which happened to still match /portal/login as a loose substring and
+  // silently kept passing without actually proving the real destination.
+  // Asserting the exact path now so this can't silently drift again.
+  test('/portal redirects to /portal/login when unauthenticated (RequirePortalAuth)', async ({ page }) => {
     await page.goto('/portal')
-    await expect(page).toHaveURL(/\/login/)
+    await expect(page).toHaveURL(/\/portal\/login$/)
   })
 
-  test('/portal/bookings redirects to /login when unauthenticated', async ({ page }) => {
+  test('/portal/bookings redirects to /portal/login when unauthenticated', async ({ page }) => {
     await page.goto('/portal/bookings')
-    await expect(page).toHaveURL(/\/login/)
+    await expect(page).toHaveURL(/\/portal\/login$/)
+  })
+
+  test('/portal/login itself renders the OTP email-entry form without requiring auth', async ({ page }) => {
+    await page.goto('/portal/login')
+    await expect(page).toHaveURL(/\/portal\/login$/)
+    // Locator by input type/attribute, not label text -- the app's real
+    // runtime default locale is Arabic (unlike the jsdom unit-test env,
+    // which resolves to English), matching the established pattern used
+    // by the other tests in this same file (e.g. line 92/166 below).
+    await expect(page.locator('input[type="email"]').first()).toBeVisible()
   })
 
   // RequireAuth passes `state: { from: location }` to the redirect --

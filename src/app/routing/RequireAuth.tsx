@@ -177,6 +177,13 @@ export function RequireNavDomain({ domain, children }: { domain: NavDomain; chil
 // club_membership row (that would incorrectly grant staff-side RLS
 // access). The real boundary is still RLS: customers_self_service_*
 // policies scoped to customers.user_id = auth.uid().
+//
+// AUTH ARCHITECTURE RECONCILIATION (2026-08-31): redirects to
+// /portal/login (the customer Email OTP entry point), not /login (the
+// shared staff/tenant-owner/platform-owner password login) -- the two
+// personas now have genuinely separate entry points, per the approved
+// customer-auth policy. LoginPage.tsx itself is otherwise completely
+// unchanged; this is the only edit anywhere in this file.
 export function RequirePortalAuth() {
   const { session, loading } = useAuth()
   const location = useLocation()
@@ -184,7 +191,7 @@ export function RequirePortalAuth() {
   if (loading) return null
 
   if (!session) {
-    return <Navigate to="/login" state={{ from: location }} replace />
+    return <Navigate to="/portal/login" state={{ from: location }} replace />
   }
 
   return <Outlet />

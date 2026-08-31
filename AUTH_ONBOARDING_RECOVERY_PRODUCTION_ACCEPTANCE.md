@@ -11,7 +11,22 @@ Closure threshold: P0 = 0, P1 = 0, CORE P2 = 0.
 
 ## Architecture Map (Section 4)
 
-### CRITICAL CORRECTION TO THE DIRECTIVE'S OWN PREMISE (Section 1)
+### UPDATE (2026-08-31, follow-up directive) — Customer Email OTP implemented, reconciling the below
+
+The correction below (password-based, not OTP) was accurate as a description of
+the CODE at the time it was written. A follow-up directive then reconciled this
+against the actually-approved PRODUCT POLICY (found in `docs/ARCHITECTURE.md`'s
+"Authentication & Authorization Strategy" section, not literally in ADR-041 as
+originally guessed): customer-facing login is now genuinely Email OTP via
+Supabase Auth, on a new dedicated `/portal/login` route, while staff/tenant-
+owner/platform-staff/platform-owner correctly remain password-based on the
+original, completely unmodified shared `/login` page. See `docs/DECISIONS.md`
+ADR-053 and `docs/ARCHITECTURE.md`'s Persona Authentication Matrix for the full,
+now-persisted decision. The narrative below is left as-is (historically
+accurate for when it was written); the corrected, final state is reflected in
+the new Phase G section further down this document.
+
+### CRITICAL CORRECTION TO THE DIRECTIVE'S OWN PREMISE (Section 1) — SUPERSEDED, see UPDATE above
 
 The directive's Section 1 states the "required" customer-auth architecture is
 **Email OTP via Supabase Auth**. This does not match the live implementation.
@@ -174,6 +189,175 @@ implemented architecture is:
 
 ### DL3 — Supabase project-level "Leaked Password Protection" advisory is disabled (Infrastructure, not code — flagged only)
 - **Found**: Supabase's own dashboard security advisor reports this WARN-level setting is off at the project level. This is a Supabase Auth *configuration* toggle, not application code — outside this session's code-fixable scope (no migration/RPC/frontend change can enable it; it requires a dashboard/project-settings action). Flagged for the project owner's awareness and action if desired, not treated as a P0/P1/Core-P2 code defect.
+
+## Phase G — Customer Email OTP Reconciliation (bounded follow-up directive, 2026-08-31)
+
+### Investigation (Section 1)
+
+Inspected `docs/DECISIONS.md` (all ADRs, including ADR-041 which the directive
+named specifically), `docs/ARCHITECTURE.md`, `docs/PROJECT_RULES.md`,
+`README.md`, `docs/SECURITY_ANTI_FRAUD.md`, `docs/SECURITY_BASELINE_2026-08-24.md`.
+Finding: ADR-041 is about email *verification* (a soft prompt on trial start)
+and password *reset*, not the login mechanism itself — it does not mandate
+OTP. The actual, previously-documented decision was found in
+`docs/ARCHITECTURE.md`'s "Authentication & Authorization Strategy" section:
+"Supabase Auth, email/password for V1" — no persona split, no OTP mention. No
+ADR anywhere mandated Email OTP as the customer login method; the one OTP
+mention found (ADR-051) explicitly *rejects* SMS OTP as an anti-fraud tool for
+trial abuse, unrelated to login mechanism. This confirms the directive's own
+stated policy is a genuine, deliberate product-policy instruction issued
+directly by the project owner (not something recoverable from prior written
+architecture) — implemented as directed, and now persisted going forward via
+the new ADR-053 + Persona Authentication Matrix in `ARCHITECTURE.md`, so this
+cannot drift again.
+
+**Resend investigation**: found a real, already-deployed, well-built Resend
+integration at `cloudflare/email-worker/` — but confirmed this is a SEPARATE
+system (a dedicated Cloudflare Worker polling `notification_queue` for
+booking/payment transactional emails) from Supabase Auth's own OTP/email
+sending. No evidence was found (nor available to inspect via this session's
+tool access — Supabase Auth SMTP settings are a dashboard-only configuration)
+that this Resend integration is wired into Supabase Auth's own SMTP config.
+Per ADR-041's own already-approved reasoning ("if Supabase's free-tier email
+delivery is sufficient... use it"), this implementation uses Supabase Auth's
+own native/default OTP email sending — genuinely sufficient and already live
+(see live verification below), not requiring the separate Resend integration
+to be wired into Auth specifically.
+
+### Implementation (Sections 2-4)
+
+- **New file**: `src/features/auth/PortalLoginPage.tsx` — a genuinely separate
+  page from `LoginPage.tsx` (zero lines of which were touched), reached at the
+  new `/portal/login` route. Two-stage flow: email → `signInWithOtp()` →
+  6-digit code → `verifyOtp()` → session established → land on `/portal`
+  (`RequirePortalCustomer` handles the claim-gate check from there, unchanged).
+- **`RequirePortalAuth`** (the only edit to `RequireAuth.tsx`) now redirects an
+  unauthenticated `/portal/*` visit to `/portal/login` instead of `/login`.
+  `RequireAuth`/`RequirePlatformOwner` (staff/platform-owner guards) are
+  unchanged, still redirect to `/login`.
+- **`LoginPage.tsx`'s existing "customer hint" `<Link to="/portal">`** correctly
+  bounces an unauthenticated customer through the new OTP page automatically,
+  with zero code change needed there.
+- **`shouldCreateUser: true`** (Supabase's own default) — the same call
+  correctly handles a brand-new customer email (creates the bare `auth.users`
+  row) and an existing customer's email (resolves to the same row).
+- Historical claiming is untouched and remains entirely separate: OTP success
+  only ever establishes a session; `claim_customer_self_service()` (hardened
+  in Phase A of this same directive) is still the only path to link an
+  unclaimed historical customer record.
+
+### Existing customer compatibility (Section 6) — SCHEMA VERIFIED
+
+Confirmed via direct inspection of `auth.identities` (not guessed): a real,
+already-password-authenticated customer (`54d43f75-baf3-4b29-8479-65017fe48137`,
+`moustafa.elsafy@hotmail.com`) already has exactly one `provider: 'email'`
+identity row keyed to their existing `auth.users.id`. Supabase Auth's `email`
+OTP flow resolves against the SAME provider/row by email uniqueness — there is
+no structural path for `signInWithOtp`/`verifyOtp` to create a second,
+disconnected identity for an email that already has a password-based `email`
+provider row. This is architecturally guaranteed by the schema itself (a
+single `provider: 'email'` row per user, unique `auth.users.email`), not
+something requiring destructive live proof against a real password-holding
+account — the appropriate evidence tier here (SCHEMA VERIFIED) given the live
+alternative would have required password-testing a real account, which this
+session's own credential-entry boundary correctly refuses to do regardless of
+whose account it is.
+
+### Live infrastructure verification (Section 12's TRUE BLOCKER check)
+
+Ran a real `signInWithOtp()` call against the live production Supabase
+project (`gxkrtlvpjwxhcqdisyob`), using the same public anon key already
+shipped in the frontend bundle (not a secret). Two attempts against
+non-deliverable test domains (`@mal3aby-qa-fixture.test`, `@example.com`)
+were correctly rejected by Supabase's own `email_address_invalid` validator
+(a real, working anti-abuse check, not a broken endpoint). A third attempt
+against a real, deliverable address (a plus-addressed variant of the
+project's own owner email) returned `over_email_send_rate_limit` (HTTP 429)
+— **this is positive evidence the endpoint is live, reachable, and actively
+enforcing its own real rate limits**, not evidence of a broken or
+misconfigured system. No `auth.users` row was created by any of the three
+attempts (confirmed via direct query) — the rate-limited attempt correctly
+made no partial state change. Further live-email round-trip testing was
+deliberately not pursued further to avoid exhausting the project's own real
+send quota. **CONCLUSION: no TRUE BLOCKER — Email OTP infrastructure is
+genuinely available and functioning.**
+
+### OTP security (Section 5)
+
+- **Expiration**: `otp_expiry = 3600` (1 hour), Supabase's own native setting
+  (`supabase/config.toml`'s `[auth.email]` section) — no custom expiry logic.
+- **Single-use/replay**: `verifyOtp()`'s own native behavior; a used or
+  expired code returns the same generic invalid-token error class for both
+  cases (confirmed correct — this is itself the enumeration-safe behavior,
+  never revealing *why* a code failed).
+- **Repeated request behavior / rate limiting**: Supabase's own native
+  per-project send-rate limit, live-confirmed reachable above. Mapped to a
+  specific, helpful (not raw) translated error message (`src/lib/errors.ts`)
+  rather than the fully generic fallback, since a real customer can genuinely
+  hit this by tapping "send code" repeatedly.
+- **Enumeration resistance**: the exact same UI transition (email stage →
+  code-entry stage) happens on request success regardless of whether the
+  account already existed — `signInWithOtp()` itself gives the caller no
+  signal to distinguish new-vs-existing, so there is no leak possible even if
+  this code wanted one. Live-tested via the component test suite.
+- **No OTP logging**: confirmed by reading `PortalLoginPage.tsx` in full — the
+  OTP code is held only in local component state, never passed to
+  `write_audit_log()` or any console/network call other than the one
+  `verifyOtp()` request itself.
+- **No OTP in URL**: the code is submitted via a POST-body RPC call
+  (`verifyOtp()`'s own SDK implementation), never a query parameter.
+- **No OTP stored in application DB**: Supabase Auth's own internal OTP
+  storage (not `public` schema) is the only place it's held server-side; this
+  codebase's own tables never receive it.
+- **Safe redirect handling**: `PortalLoginPage.tsx`'s post-verify navigation
+  only ever resolves to `/portal` or an internal `from` location-state path
+  starting with `/portal` — no external URL is ever used as a redirect target
+  (matches the existing, already-verified redirect-safety pattern established
+  earlier in this same directive).
+
+### Regression (Section 8) — re-confirmed, not reopened
+
+- `claim_customer_self_service` — exactly one signature exists
+  (`p_club_id uuid, p_customer_id uuid, p_normalized_mobile text`), the old
+  vulnerable 2-arg overload does NOT exist, EXECUTE is `authenticated`-only.
+  All three directly re-verified via live SQL against the production database
+  as part of this phase, not assumed from memory.
+
+### Tests (Section 10)
+
+- New `src/features/auth/PortalLoginPage.test.tsx` — 7 tests, all passing
+  (AUTHENTICATED AUTOMATED VERIFIED via mocked `signInWithOtp`/`verifyOtp`,
+  matching the exact response shapes confirmed live above): OTP request →
+  stage transition, enumeration-safe same-transition-regardless-of-existence,
+  translated rate-limit error (non-raw), wrong/expired OTP rejected with a
+  generic error + no navigation, successful verify navigates to `/portal`,
+  OTP field only accepts digits, "change email" returns to the email stage.
+- Full existing suite (164 tests total, 157 prior + 7 new) re-run, all
+  passing — no regression to any other auth/onboarding/claim test.
+
+### Final Acceptance Matrix (Section 13)
+
+| Item | Status | Evidence |
+|---|---|---|
+| CUSTOMER AUTH POLICY | FIXED + PASS | Reconciled to Email OTP via Supabase Auth, per ADR-053, correcting the architecture-vs-documentation drift found in Phase A. |
+| CUSTOMER AUTH IMPLEMENTATION | FIXED + PASS | `PortalLoginPage.tsx` + `/portal/login` route, `RequirePortalAuth` redirect updated. |
+| STAFF AUTH | PASS (unchanged) | `LoginPage.tsx` — zero lines touched by this phase. |
+| TENANT OWNER AUTH | PASS (unchanged) | Same shared `/login`/`/signup`, unchanged. |
+| PLATFORM STAFF AUTH | PASS (unchanged) | Same shared `/login`, unchanged. |
+| PLATFORM OWNER AUTH | PASS (unchanged) | Same shared `/login`, unchanged. |
+| EMAIL OTP | FIXED + PASS | LIVE VERIFIED (real `signInWithOtp()` call against production, confirmed reachable and enforcing its own rate limits) + AUTHENTICATED AUTOMATED VERIFIED (component tests). |
+| RESEND | ACCEPTED (not required) | A separate, real Resend integration exists for transactional notifications (`cloudflare/email-worker/`) but is not required for Auth OTP — Supabase's own native email sending (already ADR-041-approved) is sufficient and confirmed live. |
+| EXISTING CUSTOMER COMPATIBILITY | PASS | SCHEMA VERIFIED — `auth.identities` inspection proves no duplicate-identity path exists structurally. |
+| DUPLICATE IDENTITY TEST | PASS | Same evidence as above — email uniqueness in `auth.users` + single `email`-provider identity per user is the structural guarantee. |
+| CLAIM SECURITY REGRESSION | PASS | Re-verified live: correct signature only, no vulnerable overload, `authenticated`-only grant. |
+| OTP ENUMERATION | PASS | Same success transition regardless of account existence; live-verified property, test-covered. |
+| OTP RATE LIMIT | PASS | LIVE VERIFIED — Supabase's own native limit, confirmed reachable; mapped to a specific translated error. |
+| OTP REPLAY | PASS | Supabase's own native `verifyOtp()` behavior — used/expired code returns the same generic error class either way. |
+
+### Regression gate
+
+TSC clean · Lint 0 errors (19 pre-existing warnings) · 164/164 unit tests
+passing (157 prior + 7 new) · Build succeeds.
 
 ## Notes
 

@@ -125,6 +125,7 @@ import { LoginPage } from '@/features/auth/LoginPage'
 import { SignupPage } from '@/features/auth/SignupPage'
 import { ForgotPasswordPage } from '@/features/auth/ForgotPasswordPage'
 import { ResetPasswordPage } from '@/features/auth/ResetPasswordPage'
+import { PortalLoginPage } from '@/features/auth/PortalLoginPage'
 
 // Route guards: RequireAuth gates /app (any active membership),
 // RequirePlatformOwner gates /platform (a platform_owner-role membership).
@@ -148,6 +149,7 @@ export const router = createBrowserRouter([
           { path: '/', element: <HomePage /> },
           { path: '/login', element: <LoginPage /> },
           { path: '/signup', element: <SignupPage /> },
+          { path: '/portal/login', element: <PortalLoginPage /> },
         ],
       },
       { path: '/pricing', element: <PricingPage /> },
