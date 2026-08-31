@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { useSearchParams } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
@@ -90,12 +90,35 @@ export function PortalQrPage() {
   // of a dead-end error, per this audit's own deep-link requirement.
   const [wrongClubBookingId, setWrongClubBookingId] = useState<string | null>(null)
   const { customerMemberships, setActiveClubId } = usePortalClub()
+  // QA acceptance fix (2026-08-31): `bookings` is `allBookings.filter(...)`
+  // recomputed fresh on every render (a new array reference each time),
+  // and it was previously in this effect's own dependency array. Since
+  // handleSelect's setState calls (setSelectedId/setLoadingQr/
+  // setQrDataUrl) each trigger a re-render, that re-render always
+  // produced a new `bookings` reference, which re-ran this effect, which
+  // called handleSelect again -- an unbounded render loop with no
+  // termination condition. Live-reproduced: opening a booking's QR via
+  // the ?bookingId= deep link from PortalBookingsPage fired
+  // ensure_booking_qr() ~70 times/second, permanently stuck the page on
+  // its "generating..." state (a later loop iteration's setLoadingQr(true)
+  // always raced ahead of any single iteration's setLoadingQr(false)),
+  // and minted a fresh real qr_credentials row on every single firing --
+  // over 6,700 rows for one booking in a few seconds of an open tab, a
+  // genuine unbounded-write/resource-exhaustion bug, not merely a UI
+  // glitch. Fix: track which bookingId this effect has already
+  // auto-selected and only act again when the deep link itself changes
+  // (or the resolved match for it changes), never merely because
+  // `bookings`/`customerMemberships` were recomputed with new but
+  // equivalent content.
+  const autoSelectedBookingIdRef = useRef<string | null>(null)
 
   useEffect(() => {
     if (isLoading) return
     const bookingId = searchParams.get('bookingId')
     if (!bookingId) return
+    if (autoSelectedBookingIdRef.current === bookingId) return
     if (bookings.some((b) => b.id === bookingId)) {
+      autoSelectedBookingIdRef.current = bookingId
       setWrongClubBookingId(null)
       void handleSelect(bookingId)
       return
@@ -106,6 +129,7 @@ export function PortalQrPage() {
       // invalid -- RLS still guarantees this lookup can only ever
       // resolve to a club this same auth.uid() actually has a linked
       // customer record in.
+      autoSelectedBookingIdRef.current = bookingId
       void supabase.from('bookings').select('club_id').eq('id', bookingId).maybeSingle().then(({ data }) => {
         if (data?.club_id && customerMemberships.some((m) => m.clubId === data.club_id)) {
           setWrongClubBookingId(bookingId)
@@ -114,6 +138,7 @@ export function PortalQrPage() {
         }
       })
     } else {
+      autoSelectedBookingIdRef.current = bookingId
       setPreselectNotFound(true)
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps

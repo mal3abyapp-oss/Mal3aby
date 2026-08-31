@@ -198,7 +198,19 @@ export function PortalProfilePage() {
           />
           <div className="flex flex-col gap-1.5">
             <label className="text-sm font-medium text-text-secondary">{t('portal.profilePage.whatsappLabel')}</label>
-            <Input value={whatsapp} onChange={(e) => setWhatsapp(e.target.value)} />
+            {/* QA acceptance fix (2026-08-31): live-reproduced RTL bidi
+                bug -- a plain Input with no dir attribute renders a
+                leading "+" (e.g. "+201000000831") reversed to trailing
+                ("201000000831+") under the page's default RTL context,
+                same defect class as the operating-hours-range bidi fix.
+                The PhoneInput field two rows above already forces
+                dir="ltr" internally; this raw Input needs the same
+                explicit direction since it's free-text (WhatsApp number
+                can differ from the phone number), matching the
+                established dir="ltr" convention already used for every
+                other phone/email/secret input in this portal (see
+                ActivateAccountPage.tsx). */}
+            <Input dir="ltr" value={whatsapp} onChange={(e) => setWhatsapp(e.target.value)} />
           </div>
           <div className="flex flex-col gap-1.5">
             <label className="text-sm font-medium text-text-secondary">{t('portal.profilePage.emailLabel')}</label>
