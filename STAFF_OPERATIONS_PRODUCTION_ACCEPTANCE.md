@@ -79,13 +79,13 @@ Closure threshold: P0 = 0, P1 = 0, CORE P2 = 0.
 
 | Item | Status | Evidence |
 |---|---|---|
-| TSC | PENDING | |
-| LINT | PENDING | |
-| UNIT | PENDING | |
-| BUILD | PENDING | |
-| TARGETED E2E | PENDING | |
-| CI | PENDING | |
-| PRODUCTION | PENDING | |
+| TSC | PASS | Clean at HEAD `512f87b`. |
+| LINT | PASS | 0 errors, 19 pre-existing warnings (unrelated files, unchanged this session). |
+| UNIT | PASS | 149/149 passing, 129 skipped (integration suites, ENVIRONMENT-BLOCKED — no local Supabase service-role/integration creds). |
+| BUILD | PASS | Clean build at HEAD `512f87b`. |
+| TARGETED E2E | PASS (10/10 unauthenticated) / ENVIRONMENT-BLOCKED (authenticated suite) | `auth/route-guards.spec.ts` 10/10 passing. Authenticated E2E suite (447 tests, 17 files) requires `SUPABASE_SERVICE_ROLE_KEY` to mint sessions via `npm run e2e:setup` — not present locally, by design (never meant to be in this environment). |
+| CI | PASS | Run [33372234645](https://github.com/mal3abyapp-oss/Mal3aby/actions/runs/33372234645): both `build-and-test` and `e2e-public` jobs green, incl. migration filename sanity check. |
+| PRODUCTION | PASS | SOURCE HEAD = BUILD SHA = DEPLOYED RUNTIME SHA, all `512f87b8454f645a550842a2769e7e8adcfc5d59`. Cloudflare Worker `mala3by-frontend` version `186e2a34-ba5d-4611-9744-1437c890af6e`. Fresh-tab production load confirmed console build-SHA log line matches, real staff Today dashboard rendered correctly with real data (1 booking, outstanding totals, financial exceptions) in Arabic RTL with the LRI/PDI bidi-isolated money values (`⁦٠٫٠٠ EGP⁩`) visibly correct in the live DOM text — direct visual confirmation the DL3 fix is live and working, not just deployed. No application console errors (only the pre-existing, unrelated CSP-blocked Cloudflare Insights analytics beacon). |
 
 ## Defect Log
 
