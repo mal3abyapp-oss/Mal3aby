@@ -41,7 +41,12 @@ async function fetchOverview(): Promise<OverviewData> {
     { count: newLeads, error: leadsError },
     { data: whatsappHealth, error: whatsappError },
   ] = await Promise.all([
-    supabase.from('clubs').select('id, status, created_at, flagged_duplicate'),
+    // Controlled Commercial Launch Gate, Phase 6 follow-up: exclude QA/
+    // test/demo tenant fixtures from platform-level aggregate counts by
+    // default, so this dashboard reflects real business activity once
+    // real tenants exist rather than being permanently inflated/skewed
+    // by disposable fixtures. See QA_DATA_ISOLATION.md.
+    supabase.from('clubs').select('id, status, created_at, flagged_duplicate, is_test_fixture').eq('is_test_fixture', false),
     supabase
       .from('platform_subscriptions')
       .select('id, club_id, subscription_kind, lifecycle_status, end_at')

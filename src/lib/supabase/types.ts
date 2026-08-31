@@ -1334,6 +1334,7 @@ export type Database = {
           flagged_duplicate_reason: string | null
           id: string
           invoice_settings: Json | null
+          is_test_fixture: boolean
           logo_url: string | null
           maps_url: string | null
           name: string
@@ -1366,6 +1367,7 @@ export type Database = {
           flagged_duplicate_reason?: string | null
           id?: string
           invoice_settings?: Json | null
+          is_test_fixture?: boolean
           logo_url?: string | null
           maps_url?: string | null
           name: string
@@ -1398,6 +1400,7 @@ export type Database = {
           flagged_duplicate_reason?: string | null
           id?: string
           invoice_settings?: Json | null
+          is_test_fixture?: boolean
           logo_url?: string | null
           maps_url?: string | null
           name?: string
@@ -9942,6 +9945,7 @@ export type Database = {
         Args: {
           p_access?: string
           p_flagged_only?: boolean
+          p_include_test_fixtures?: boolean
           p_limit?: number
           p_offset?: number
           p_reason?: string

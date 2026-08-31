@@ -67,6 +67,7 @@ async function searchClubs(params: {
   access: AccessFilter
   reason: ReasonFilter
   flaggedOnly: boolean
+  includeTestFixtures: boolean
   page: number
 }): Promise<{ rows: ClubRow[]; totalCount: number }> {
   const { data, error } = await supabase.rpc('search_platform_clubs', {
@@ -77,6 +78,12 @@ async function searchClubs(params: {
     p_flagged_only: params.flaggedOnly,
     p_limit: PAGE_SIZE,
     p_offset: params.page * PAGE_SIZE,
+    // Controlled Commercial Launch Gate, Phase 6 follow-up: QA/test/
+    // demo tenant fixtures are excluded from this list by default
+    // (server-side default false) so they don't clutter reports once
+    // real tenants exist. Explicit opt-in via this toggle for support/
+    // QA use -- see QA_DATA_ISOLATION.md.
+    p_include_test_fixtures: params.includeTestFixtures,
   })
   if (error) throw error
   const rows: ClubRow[] = (data ?? []).map((r) => ({
@@ -137,6 +144,7 @@ export function PlatformClubsPage() {
   const accessFilter = (searchParams.get('access') as AccessFilter) || 'all'
   const reasonFilter = (searchParams.get('reason') as ReasonFilter) || 'all'
   const flaggedOnly = searchParams.get('flagged') === '1'
+  const includeTestFixtures = searchParams.get('testFixtures') === '1'
 
   function updateParam(key: string, value: string) {
     const next = new URLSearchParams(searchParams)
@@ -147,8 +155,8 @@ export function PlatformClubsPage() {
   }
 
   const { data, isLoading, isFetching, isError, error, refetch } = useQuery({
-    queryKey: ['platform-clubs-search', debouncedSearch, statusFilter, accessFilter, reasonFilter, flaggedOnly, page],
-    queryFn: () => searchClubs({ search: debouncedSearch, status: statusFilter, access: accessFilter, reason: reasonFilter, flaggedOnly, page }),
+    queryKey: ['platform-clubs-search', debouncedSearch, statusFilter, accessFilter, reasonFilter, flaggedOnly, includeTestFixtures, page],
+    queryFn: () => searchClubs({ search: debouncedSearch, status: statusFilter, access: accessFilter, reason: reasonFilter, flaggedOnly, includeTestFixtures, page }),
     placeholderData: (prev) => prev,
   })
   const clubs = data?.rows ?? []
@@ -255,7 +263,7 @@ export function PlatformClubsPage() {
     },
   ]
 
-  const hasActiveFilters = statusFilter !== 'all' || accessFilter !== 'all' || reasonFilter !== 'all' || flaggedOnly
+  const hasActiveFilters = statusFilter !== 'all' || accessFilter !== 'all' || reasonFilter !== 'all' || flaggedOnly || includeTestFixtures
 
   return (
     <div>
@@ -353,6 +361,14 @@ export function PlatformClubsPage() {
           onClick={() => updateParam('flagged', flaggedOnly ? 'all' : '1')}
         >
           {t('platform.clubsPage.filters.flaggedOnly')}
+        </Button>
+        <Button
+          variant={includeTestFixtures ? 'default' : 'outline'}
+          size="sm"
+          onClick={() => updateParam('testFixtures', includeTestFixtures ? 'all' : '1')}
+          title={t('platform.clubsPage.filters.includeTestFixturesHint')}
+        >
+          {t('platform.clubsPage.filters.includeTestFixtures')}
         </Button>
         {hasActiveFilters && (
           <Button variant="outline" size="sm" onClick={() => setSearchParams({})}>

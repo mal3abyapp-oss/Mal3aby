@@ -530,6 +530,8 @@
           "active": "Active subscription"
         },
         "flaggedOnly": "Possible duplicates only",
+        "includeTestFixtures": "Show QA/test clubs",
+        "includeTestFixturesHint": "Internal QA/demo fixtures, never real customers — hidden by default",
         "clear": "Clear filters"
       },
       "emptyTitle": "No clubs yet",
