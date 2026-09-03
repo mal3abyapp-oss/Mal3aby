@@ -5305,6 +5305,855 @@ export type Database = {
         }
         Relationships: []
       }
+      sales_campaign_leads: {
+        Row: {
+          added_at: string
+          campaign_id: string
+          lead_id: string
+        }
+        Insert: {
+          added_at?: string
+          campaign_id: string
+          lead_id: string
+        }
+        Update: {
+          added_at?: string
+          campaign_id?: string
+          lead_id?: string
+        }
+        Relationships: []
+      }
+      sales_campaigns: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          criteria: Json
+          description: string | null
+          id: string
+          name: string
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          criteria?: Json
+          description?: string | null
+          id?: string
+          name: string
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          criteria?: Json
+          description?: string | null
+          id?: string
+          name?: string
+          status?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      sales_conversion_records: {
+        Row: {
+          club_id: string
+          converted_at: string
+          converted_by: string | null
+          copied_fields: Json
+          id: string
+          lead_id: string
+        }
+        Insert: {
+          club_id: string
+          converted_at?: string
+          converted_by?: string | null
+          copied_fields?: Json
+          id?: string
+          lead_id: string
+        }
+        Update: {
+          club_id?: string
+          converted_at?: string
+          converted_by?: string | null
+          copied_fields?: Json
+          id?: string
+          lead_id?: string
+        }
+        Relationships: []
+      }
+      sales_demo_events: {
+        Row: {
+          completed_at: string | null
+          created_at: string
+          id: string
+          lead_id: string
+          notes: string | null
+          outcome: string | null
+          owner_id: string | null
+          scheduled_at: string | null
+        }
+        Insert: {
+          completed_at?: string | null
+          created_at?: string
+          id?: string
+          lead_id: string
+          notes?: string | null
+          outcome?: string | null
+          owner_id?: string | null
+          scheduled_at?: string | null
+        }
+        Update: {
+          completed_at?: string | null
+          created_at?: string
+          id?: string
+          lead_id?: string
+          notes?: string | null
+          outcome?: string | null
+          owner_id?: string | null
+          scheduled_at?: string | null
+        }
+        Relationships: []
+      }
+      sales_discovery_jobs: {
+        Row: {
+          attempts: number
+          created_at: string
+          created_by: string | null
+          discovered_count: number
+          duplicate_count: number
+          enriched_count: number
+          error_class: string | null
+          failed_count: number
+          finished_at: string | null
+          id: string
+          last_error: string | null
+          new_count: number
+          next_page_token: string | null
+          search_params: Json
+          skipped_count: number
+          source_id: string
+          started_at: string | null
+          status: string
+        }
+        Insert: {
+          attempts?: number
+          created_at?: string
+          created_by?: string | null
+          discovered_count?: number
+          duplicate_count?: number
+          enriched_count?: number
+          error_class?: string | null
+          failed_count?: number
+          finished_at?: string | null
+          id?: string
+          last_error?: string | null
+          new_count?: number
+          next_page_token?: string | null
+          search_params?: Json
+          skipped_count?: number
+          source_id: string
+          started_at?: string | null
+          status?: string
+        }
+        Update: {
+          attempts?: number
+          created_at?: string
+          created_by?: string | null
+          discovered_count?: number
+          duplicate_count?: number
+          enriched_count?: number
+          error_class?: string | null
+          failed_count?: number
+          finished_at?: string | null
+          id?: string
+          last_error?: string | null
+          new_count?: number
+          next_page_token?: string | null
+          search_params?: Json
+          skipped_count?: number
+          source_id?: string
+          started_at?: string | null
+          status?: string
+        }
+        Relationships: []
+      }
+      sales_followups: {
+        Row: {
+          completed_at: string | null
+          created_at: string
+          created_by: string | null
+          id: string
+          last_action: string | null
+          lead_id: string
+          owner_id: string | null
+          reason: string
+          scheduled_at: string
+          status: string
+        }
+        Insert: {
+          completed_at?: string | null
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          last_action?: string | null
+          lead_id: string
+          owner_id?: string | null
+          reason: string
+          scheduled_at: string
+          status?: string
+        }
+        Update: {
+          completed_at?: string | null
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          last_action?: string | null
+          lead_id?: string
+          owner_id?: string | null
+          reason?: string
+          scheduled_at?: string
+          status?: string
+        }
+        Relationships: []
+      }
+      sales_lead_activities: {
+        Row: {
+          activity_type: string
+          actor_id: string | null
+          created_at: string
+          detail: Json
+          id: string
+          lead_id: string
+        }
+        Insert: {
+          activity_type: string
+          actor_id?: string | null
+          created_at?: string
+          detail?: Json
+          id?: string
+          lead_id: string
+        }
+        Update: {
+          activity_type?: string
+          actor_id?: string | null
+          created_at?: string
+          detail?: Json
+          id?: string
+          lead_id?: string
+        }
+        Relationships: []
+      }
+      sales_lead_contacts: {
+        Row: {
+          created_at: string
+          email: string | null
+          full_name: string | null
+          id: string
+          is_primary: boolean
+          lead_id: string
+          phone: string | null
+          role_title: string | null
+          source_url: string | null
+        }
+        Insert: {
+          created_at?: string
+          email?: string | null
+          full_name?: string | null
+          id?: string
+          is_primary?: boolean
+          lead_id: string
+          phone?: string | null
+          role_title?: string | null
+          source_url?: string | null
+        }
+        Update: {
+          created_at?: string
+          email?: string | null
+          full_name?: string | null
+          id?: string
+          is_primary?: boolean
+          lead_id?: string
+          phone?: string | null
+          role_title?: string | null
+          source_url?: string | null
+        }
+        Relationships: []
+      }
+      sales_lead_dedup_fingerprints: {
+        Row: {
+          created_at: string
+          fingerprint_type: string
+          fingerprint_value: string
+          id: string
+          lead_id: string
+        }
+        Insert: {
+          created_at?: string
+          fingerprint_type: string
+          fingerprint_value: string
+          id?: string
+          lead_id: string
+        }
+        Update: {
+          created_at?: string
+          fingerprint_type?: string
+          fingerprint_value?: string
+          id?: string
+          lead_id?: string
+        }
+        Relationships: []
+      }
+      sales_lead_enrichment_runs: {
+        Row: {
+          attempts: number
+          created_at: string
+          error_class: string | null
+          finished_at: string | null
+          id: string
+          last_error: string | null
+          lead_id: string
+          run_type: string
+          source_id: string | null
+          started_at: string | null
+          status: string
+        }
+        Insert: {
+          attempts?: number
+          created_at?: string
+          error_class?: string | null
+          finished_at?: string | null
+          id?: string
+          last_error?: string | null
+          lead_id: string
+          run_type: string
+          source_id?: string | null
+          started_at?: string | null
+          status?: string
+        }
+        Update: {
+          attempts?: number
+          created_at?: string
+          error_class?: string | null
+          finished_at?: string | null
+          id?: string
+          last_error?: string | null
+          lead_id?: string
+          run_type?: string
+          source_id?: string | null
+          started_at?: string | null
+          status?: string
+        }
+        Relationships: []
+      }
+      sales_lead_locations: {
+        Row: {
+          address: string | null
+          area: string | null
+          branch_name: string | null
+          city: string | null
+          created_at: string
+          id: string
+          latitude: number | null
+          lead_id: string
+          longitude: number | null
+          source_url: string | null
+        }
+        Insert: {
+          address?: string | null
+          area?: string | null
+          branch_name?: string | null
+          city?: string | null
+          created_at?: string
+          id?: string
+          latitude?: number | null
+          lead_id: string
+          longitude?: number | null
+          source_url?: string | null
+        }
+        Update: {
+          address?: string | null
+          area?: string | null
+          branch_name?: string | null
+          city?: string | null
+          created_at?: string
+          id?: string
+          latitude?: number | null
+          lead_id?: string
+          longitude?: number | null
+          source_url?: string | null
+        }
+        Relationships: []
+      }
+      sales_lead_notes: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          id: string
+          lead_id: string
+          note: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          lead_id: string
+          note: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          lead_id?: string
+          note?: string
+        }
+        Relationships: []
+      }
+      sales_lead_scores: {
+        Row: {
+          computed_at: string
+          dimension_breakdown: Json
+          explanation_ar: string
+          explanation_en: string
+          id: string
+          lead_id: string
+          score: number
+          score_band: string
+        }
+        Insert: {
+          computed_at?: string
+          dimension_breakdown?: Json
+          explanation_ar: string
+          explanation_en: string
+          id?: string
+          lead_id: string
+          score: number
+          score_band: string
+        }
+        Update: {
+          computed_at?: string
+          dimension_breakdown?: Json
+          explanation_ar?: string
+          explanation_en?: string
+          id?: string
+          lead_id?: string
+          score?: number
+          score_band?: string
+        }
+        Relationships: []
+      }
+      sales_lead_signals: {
+        Row: {
+          confidence: string
+          created_at: string
+          enrichment_run_id: string | null
+          evidence: Json
+          id: string
+          is_active: boolean
+          lead_id: string
+          retrieved_at: string
+          signal_key: string
+          source_url: string | null
+        }
+        Insert: {
+          confidence: string
+          created_at?: string
+          enrichment_run_id?: string | null
+          evidence?: Json
+          id?: string
+          is_active?: boolean
+          lead_id: string
+          retrieved_at?: string
+          signal_key: string
+          source_url?: string | null
+        }
+        Update: {
+          confidence?: string
+          created_at?: string
+          enrichment_run_id?: string | null
+          evidence?: Json
+          id?: string
+          is_active?: boolean
+          lead_id?: string
+          retrieved_at?: string
+          signal_key?: string
+          source_url?: string | null
+        }
+        Relationships: []
+      }
+      sales_lead_social_links: {
+        Row: {
+          discovered_at: string
+          followers_estimate: number | null
+          id: string
+          lead_id: string
+          platform: string
+          source_url: string | null
+          url: string
+        }
+        Insert: {
+          discovered_at?: string
+          followers_estimate?: number | null
+          id?: string
+          lead_id: string
+          platform: string
+          source_url?: string | null
+          url: string
+        }
+        Update: {
+          discovered_at?: string
+          followers_estimate?: number | null
+          id?: string
+          lead_id?: string
+          platform?: string
+          source_url?: string | null
+          url?: string
+        }
+        Relationships: []
+      }
+      sales_lead_sources: {
+        Row: {
+          created_at: string
+          id: string
+          is_active: boolean
+          key: string
+          name_ar: string
+          name_en: string
+          requires_credential: boolean
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          key: string
+          name_ar: string
+          name_en: string
+          requires_credential?: boolean
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          key?: string
+          name_ar?: string
+          name_en?: string
+          requires_credential?: boolean
+        }
+        Relationships: []
+      }
+      sales_lead_status_history: {
+        Row: {
+          changed_at: string
+          changed_by: string | null
+          from_status: string | null
+          id: string
+          lead_id: string
+          reason: string | null
+          to_status: string
+        }
+        Insert: {
+          changed_at?: string
+          changed_by?: string | null
+          from_status?: string | null
+          id?: string
+          lead_id: string
+          reason?: string | null
+          to_status: string
+        }
+        Update: {
+          changed_at?: string
+          changed_by?: string | null
+          from_status?: string | null
+          id?: string
+          lead_id?: string
+          reason?: string | null
+          to_status?: string
+        }
+        Relationships: []
+      }
+      sales_leads: {
+        Row: {
+          address: string | null
+          area: string | null
+          booking_provider_detected: string | null
+          branch_count_estimate: number | null
+          business_name: string
+          business_type: string | null
+          city: string | null
+          converted_at: string | null
+          converted_club_id: string | null
+          country: string | null
+          created_at: string
+          created_by: string | null
+          current_score: number | null
+          current_score_band: string | null
+          data_confidence: string
+          dedup_fingerprint: string
+          facility_count_estimate: number | null
+          first_discovered_at: string
+          governorate_state: string | null
+          has_academy_presence: boolean | null
+          has_online_booking: boolean | null
+          id: string
+          last_verified_at: string | null
+          latitude: number | null
+          longitude: number | null
+          merged_into_lead_id: string | null
+          normalized_name: string
+          opening_hours: Json | null
+          primary_source_id: string | null
+          public_email: string | null
+          public_phone: string | null
+          rating: number | null
+          review_count: number | null
+          source_place_id: string | null
+          sport_types: string[]
+          status: string
+          status_reason: string | null
+          updated_at: string
+          website: string | null
+          whatsapp_public_number: string | null
+        }
+        Insert: {
+          address?: string | null
+          area?: string | null
+          booking_provider_detected?: string | null
+          branch_count_estimate?: number | null
+          business_name: string
+          business_type?: string | null
+          city?: string | null
+          converted_at?: string | null
+          converted_club_id?: string | null
+          country?: string | null
+          created_at?: string
+          created_by?: string | null
+          current_score?: number | null
+          current_score_band?: string | null
+          data_confidence?: string
+          dedup_fingerprint: string
+          facility_count_estimate?: number | null
+          first_discovered_at?: string
+          governorate_state?: string | null
+          has_academy_presence?: boolean | null
+          has_online_booking?: boolean | null
+          id?: string
+          last_verified_at?: string | null
+          latitude?: number | null
+          longitude?: number | null
+          merged_into_lead_id?: string | null
+          normalized_name: string
+          opening_hours?: Json | null
+          primary_source_id?: string | null
+          public_email?: string | null
+          public_phone?: string | null
+          rating?: number | null
+          review_count?: number | null
+          source_place_id?: string | null
+          sport_types?: string[]
+          status?: string
+          status_reason?: string | null
+          updated_at?: string
+          website?: string | null
+          whatsapp_public_number?: string | null
+        }
+        Update: {
+          address?: string | null
+          area?: string | null
+          booking_provider_detected?: string | null
+          branch_count_estimate?: number | null
+          business_name?: string
+          business_type?: string | null
+          city?: string | null
+          converted_at?: string | null
+          converted_club_id?: string | null
+          country?: string | null
+          created_at?: string
+          created_by?: string | null
+          current_score?: number | null
+          current_score_band?: string | null
+          data_confidence?: string
+          dedup_fingerprint?: string
+          facility_count_estimate?: number | null
+          first_discovered_at?: string
+          governorate_state?: string | null
+          has_academy_presence?: boolean | null
+          has_online_booking?: boolean | null
+          id?: string
+          last_verified_at?: string | null
+          latitude?: number | null
+          longitude?: number | null
+          merged_into_lead_id?: string | null
+          normalized_name?: string
+          opening_hours?: Json | null
+          primary_source_id?: string | null
+          public_email?: string | null
+          public_phone?: string | null
+          rating?: number | null
+          review_count?: number | null
+          source_place_id?: string | null
+          sport_types?: string[]
+          status?: string
+          status_reason?: string | null
+          updated_at?: string
+          website?: string | null
+          whatsapp_public_number?: string | null
+        }
+        Relationships: []
+      }
+      sales_outreach_messages: {
+        Row: {
+          approved_at: string | null
+          approved_by: string | null
+          body: string
+          campaign_id: string | null
+          channel: string
+          created_at: string
+          created_by: string | null
+          grounding: Json
+          id: string
+          language: string
+          last_error: string | null
+          lead_id: string
+          message_type: string
+          provider_reference: string | null
+          sent_at: string | null
+          status: string
+          subject: string | null
+        }
+        Insert: {
+          approved_at?: string | null
+          approved_by?: string | null
+          body: string
+          campaign_id?: string | null
+          channel: string
+          created_at?: string
+          created_by?: string | null
+          grounding?: Json
+          id?: string
+          language: string
+          last_error?: string | null
+          lead_id: string
+          message_type: string
+          provider_reference?: string | null
+          sent_at?: string | null
+          status?: string
+          subject?: string | null
+        }
+        Update: {
+          approved_at?: string | null
+          approved_by?: string | null
+          body?: string
+          campaign_id?: string | null
+          channel?: string
+          created_at?: string
+          created_by?: string | null
+          grounding?: Json
+          id?: string
+          language?: string
+          last_error?: string | null
+          lead_id?: string
+          message_type?: string
+          provider_reference?: string | null
+          sent_at?: string | null
+          status?: string
+          subject?: string | null
+        }
+        Relationships: []
+      }
+      sales_possible_duplicates: {
+        Row: {
+          confidence: string
+          created_at: string
+          id: string
+          lead_id_a: string
+          lead_id_b: string
+          match_signals: Json
+          resolved_at: string | null
+          resolved_by: string | null
+          status: string
+        }
+        Insert: {
+          confidence: string
+          created_at?: string
+          id?: string
+          lead_id_a: string
+          lead_id_b: string
+          match_signals?: Json
+          resolved_at?: string | null
+          resolved_by?: string | null
+          status?: string
+        }
+        Update: {
+          confidence?: string
+          created_at?: string
+          id?: string
+          lead_id_a?: string
+          lead_id_b?: string
+          match_signals?: Json
+          resolved_at?: string | null
+          resolved_by?: string | null
+          status?: string
+        }
+        Relationships: []
+      }
+      sales_provider_configs: {
+        Row: {
+          config: Json
+          daily_cap: number
+          enabled: boolean
+          provider_key: string
+          secret_vault_id: string | null
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          config?: Json
+          daily_cap?: number
+          enabled?: boolean
+          provider_key: string
+          secret_vault_id?: string | null
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          config?: Json
+          daily_cap?: number
+          enabled?: boolean
+          provider_key?: string
+          secret_vault_id?: string | null
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: []
+      }
+      sales_quota_usage: {
+        Row: {
+          daily_cap: number
+          id: string
+          provider_key: string
+          request_count: number
+          updated_at: string
+          usage_date: string
+        }
+        Insert: {
+          daily_cap?: number
+          id?: string
+          provider_key: string
+          request_count?: number
+          updated_at?: string
+          usage_date?: string
+        }
+        Update: {
+          daily_cap?: number
+          id?: string
+          provider_key?: string
+          request_count?: number
+          updated_at?: string
+          usage_date?: string
+        }
+        Relationships: []
+      }
       seasons: {
         Row: {
           club_id: string
@@ -7086,6 +7935,255 @@ export type Database = {
       }
     }
     Functions: {
+      sales_add_lead_note: { Args: { p_lead_id: string; p_note: string }; Returns: string }
+      sales_add_leads_to_campaign: {
+        Args: { p_campaign_id: string; p_lead_ids: string[] }
+        Returns: number
+      }
+      sales_approve_outreach_message: { Args: { p_message_id: string }; Returns: undefined }
+      sales_change_lead_status: {
+        Args: { p_lead_id: string; p_new_status: string; p_reason?: string | null }
+        Returns: undefined
+      }
+      sales_check_and_increment_quota: {
+        Args: { p_provider_key: string }
+        Returns: { allowed: boolean; current_count: number; daily_cap: number }[]
+      }
+      sales_claim_discovery_job: {
+        Args: Record<PropertyKey, never>
+        Returns: {
+          attempts: number
+          job_id: string
+          next_page_token: string | null
+          search_params: Json
+          source_key: string
+        }[]
+      }
+      sales_claim_queued_outreach_message: {
+        Args: Record<PropertyKey, never>
+        Returns: {
+          body: string
+          language: string
+          lead_id: string
+          message_id: string
+          recipient_email: string | null
+          subject: string | null
+        }[]
+      }
+      sales_compute_lead_score: { Args: { p_lead_id: string }; Returns: number }
+      sales_complete_followup: {
+        Args: { p_followup_id: string; p_last_action: string }
+        Returns: undefined
+      }
+      sales_create_campaign: {
+        Args: { p_criteria: Json; p_description?: string | null; p_name: string }
+        Returns: string
+      }
+      sales_create_discovery_job: {
+        Args: { p_search_params: Json; p_source_key: string }
+        Returns: string
+      }
+      sales_find_duplicate_candidates: {
+        Args: {
+          p_city: string | null
+          p_domain: string | null
+          p_email: string | null
+          p_lat: number | null
+          p_lng: number | null
+          p_normalized_name: string | null
+          p_phone: string | null
+          p_place_id: string | null
+        }
+        Returns: { candidate_lead_id: string; confidence: string; matched_signals: string[] }[]
+      }
+      sales_finish_discovery_job: {
+        Args: {
+          p_discovered_count: number
+          p_duplicate_count: number
+          p_error_class?: string | null
+          p_failed_count: number
+          p_job_id: string
+          p_last_error?: string | null
+          p_new_count: number
+          p_next_page_token?: string | null
+          p_skipped_count: number
+          p_status: string
+        }
+        Returns: undefined
+      }
+      sales_generate_outreach_message: {
+        Args: {
+          p_body: string
+          p_campaign_id?: string | null
+          p_channel: string
+          p_grounding: Json
+          p_language: string
+          p_lead_id: string
+          p_message_type: string
+          p_subject: string | null
+        }
+        Returns: string
+      }
+      sales_mark_outreach_sent: {
+        Args: {
+          p_error?: string | null
+          p_message_id: string
+          p_provider_reference?: string | null
+          p_success: boolean
+        }
+        Returns: undefined
+      }
+      sales_normalize_domain: { Args: { p_url: string }; Returns: string }
+      sales_normalize_name: { Args: { p_name: string }; Returns: string }
+      sales_normalize_phone: { Args: { p_phone: string }; Returns: string }
+      sales_queue_outreach_message: { Args: { p_message_id: string }; Returns: undefined }
+      sales_record_signal: {
+        Args: {
+          p_confidence: string
+          p_enrichment_run_id?: string | null
+          p_evidence: Json
+          p_lead_id: string
+          p_signal_key: string
+          p_source_url?: string | null
+        }
+        Returns: string
+      }
+      sales_schedule_followup: {
+        Args: {
+          p_lead_id: string
+          p_owner_id?: string | null
+          p_reason: string
+          p_scheduled_at: string
+        }
+        Returns: string
+      }
+      sales_upsert_discovered_lead: {
+        Args: {
+          p_address?: string | null
+          p_area?: string | null
+          p_business_name: string
+          p_business_type?: string | null
+          p_city?: string | null
+          p_country?: string | null
+          p_email?: string | null
+          p_lat?: number | null
+          p_lng?: number | null
+          p_phone?: string | null
+          p_place_id?: string | null
+          p_rating?: number | null
+          p_review_count?: number | null
+          p_source_key: string
+          p_website?: string | null
+        }
+        Returns: { lead_id: string; outcome: string }[]
+      }
+      get_sales_provider_status: {
+        Args: Record<PropertyKey, never>
+        Returns: {
+          config: Json
+          daily_cap: number
+          enabled: boolean
+          is_configured: boolean
+          provider_key: string
+        }[]
+      }
+      set_sales_provider_secret: {
+        Args: { p_enabled?: boolean; p_provider_key: string; p_secret_vault_id: string }
+        Returns: undefined
+      }
+      get_sales_funnel_stats: {
+        Args: Record<PropertyKey, never>
+        Returns: { lead_count: number; stage: string }[]
+      }
+      get_sales_dashboard_summary: {
+        Args: Record<PropertyKey, never>
+        Returns: {
+          avg_days_to_conversion: number | null
+          cold_leads: number
+          contact_ready: number
+          contacted: number
+          converted: number
+          demo_rate: number | null
+          demos_scheduled: number
+          hot_leads: number
+          reply_rate: number | null
+          total_leads: number
+          warm_leads: number
+          win_rate: number | null
+        }[]
+      }
+      get_sales_stats_by_dimension: {
+        Args: { p_dimension: string }
+        Returns: { dimension_value: string; lead_count: number; won_count: number }[]
+      }
+      get_sales_stats_by_source: {
+        Args: Record<PropertyKey, never>
+        Returns: {
+          lead_count: number
+          source_key: string
+          source_name_en: string
+          won_count: number
+        }[]
+      }
+      get_pending_followups: {
+        Args: { p_limit?: number }
+        Returns: {
+          business_name: string
+          followup_id: string
+          is_overdue: boolean
+          lead_id: string
+          owner_id: string | null
+          reason: string
+          scheduled_at: string
+        }[]
+      }
+      get_lead_full_profile: { Args: { p_lead_id: string }; Returns: Json }
+      get_campaign_stats: {
+        Args: { p_campaign_id: string }
+        Returns: {
+          contacted: number
+          demos: number
+          lost: number
+          queued: number
+          replied: number
+          target_count: number
+          won: number
+        }[]
+      }
+      search_sales_leads: {
+        Args: {
+          p_business_type?: string | null
+          p_city?: string | null
+          p_country?: string | null
+          p_exclude_do_not_contact?: boolean
+          p_has_online_booking?: boolean | null
+          p_has_website?: boolean | null
+          p_limit?: number
+          p_min_score?: number | null
+          p_offset?: number
+          p_score_band?: string | null
+          p_search?: string | null
+          p_signal_key?: string | null
+          p_status?: string | null
+          p_uncontacted_only?: boolean
+        }
+        Returns: {
+          business_name: string
+          business_type: string | null
+          city: string | null
+          country: string | null
+          current_score: number | null
+          current_score_band: string | null
+          first_discovered_at: string
+          lead_id: string
+          public_phone: string | null
+          rating: number | null
+          review_count: number | null
+          status: string
+          total_count: number
+          website: string | null
+        }[]
+      }
       _academy_module_active: { Args: { p_club_id: string }; Returns: boolean }
       _activate_club_membership_if_due_internal: {
         Args: { p_membership_subscription_id: string }

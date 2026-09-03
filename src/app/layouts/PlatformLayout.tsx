@@ -24,6 +24,12 @@ import {
   UserCog,
   KeyRound,
   History,
+  Radar,
+  ListChecks,
+  Kanban,
+  Megaphone,
+  CalendarClock,
+  SlidersHorizontal,
 } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 
@@ -98,6 +104,21 @@ const navSections: NavSection[] = [
       { to: '/platform/roles', labelKey: 'platform.nav.platformRoles', icon: KeyRound },
     ],
   },
+  // Sales Intelligence (ADR-054, 2026-09-04) -- its own nav section,
+  // matching the same "genuinely separate bounded context gets its own
+  // section" convention already used for Staff & Access above.
+  {
+    titleKey: 'platform.nav.sectionSalesIntelligence',
+    items: [
+      { to: '/platform/sales', labelKey: 'platform.nav.salesDashboard', icon: Radar },
+      { to: '/platform/sales/discover', labelKey: 'platform.nav.salesDiscover', icon: Sparkles },
+      { to: '/platform/sales/leads', labelKey: 'platform.nav.salesLeads', icon: ListChecks },
+      { to: '/platform/sales/pipeline', labelKey: 'platform.nav.salesPipeline', icon: Kanban },
+      { to: '/platform/sales/campaigns', labelKey: 'platform.nav.salesCampaigns', icon: Megaphone },
+      { to: '/platform/sales/followups', labelKey: 'platform.nav.salesFollowups', icon: CalendarClock },
+      { to: '/platform/sales/settings', labelKey: 'platform.nav.salesSettings', icon: SlidersHorizontal },
+    ],
+  },
   {
     titleKey: null,
     items: [{ to: '/platform/settings', labelKey: 'platform.nav.settings', icon: Settings }],
@@ -117,7 +138,7 @@ function PlatformNavList({ onNavigate }: { onNavigate?: () => void }) {
             <NavLink
               key={item.to}
               to={item.to}
-              end={item.to === '/platform'}
+              end={item.to === '/platform' || item.to === '/platform/sales'}
               onClick={onNavigate}
               className={({ isActive }) =>
                 cn(
