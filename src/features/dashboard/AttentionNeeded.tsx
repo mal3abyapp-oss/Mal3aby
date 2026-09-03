@@ -10,6 +10,7 @@ import { StatusBadge } from '@/components/ui/status-badge'
 import { Button } from '@/components/ui/button'
 import { fetchInvoicePaymentSummaries } from '@/lib/domain/billing'
 import { translateSupabaseError } from '@/lib/errors'
+import { DASHBOARD_POLL_INTERVAL_MS } from '@/lib/query/dashboardPolling'
 
 // Section D1 "ATTENTION NEEDED": a receptionist/manager must be able to
 // see, in one place, everything that needs a decision right now --
@@ -203,7 +204,10 @@ export function AttentionNeeded() {
     queryKey: ['attention-needed', currentClubId, locale],
     queryFn: () => fetchAttentionItems(currentClubId!, t, locale),
     enabled: !!currentClubId,
-    refetchInterval: 60_000,
+    // PERF-04: shared with TodayPage/OwnerFinanceTransparency so the
+    // three same-screen loops share one source of truth for cadence.
+    refetchInterval: DASHBOARD_POLL_INTERVAL_MS,
+    staleTime: DASHBOARD_POLL_INTERVAL_MS,
   })
 
   if (isLoading) return null

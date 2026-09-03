@@ -262,8 +262,17 @@ async function fetchCategories(clubId: string): Promise<FilterOption[]> {
   return (data ?? []).map((c) => ({ id: c.category_id, label: c.name_ar }))
 }
 
+// PERF-05 (production audit remediation, 2026-09-03): list_shop_products
+// now defaults to 50 rows (p_limit/p_offset, see that RPC's own
+// migration comment). This call site populates the sales-history product
+// FILTER dropdown -- it must offer every product, not just the first 50,
+// so it passes an explicit, generous, still-bounded limit instead of
+// inheriting the new display-page-size default. Same reasoning as
+// ShopInventoryPage.tsx's PRODUCT_PICKER_LIMIT.
+const PRODUCT_PICKER_LIMIT = 1000
+
 async function fetchProducts(clubId: string): Promise<FilterOption[]> {
-  const { data, error } = await supabase.rpc('list_shop_products', { p_club_id: clubId, p_status: undefined })
+  const { data, error } = await supabase.rpc('list_shop_products', { p_club_id: clubId, p_status: undefined, p_limit: PRODUCT_PICKER_LIMIT })
   if (error) throw error
   return (data ?? []).map((p) => ({ id: p.product_id, label: p.name_ar }))
 }

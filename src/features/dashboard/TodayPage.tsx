@@ -16,6 +16,7 @@ import { OwnerFinanceTransparency } from '@/features/dashboard/OwnerFinanceTrans
 import { CoachTodayView } from '@/features/academy/CoachTodayView'
 import { BOOKING_STATUS_LABELS } from '@/lib/domain/booking'
 import { CalendarDays, CheckCircle2, Landmark, Wallet, CalendarPlus, ScanLine, UserPlus, GraduationCap } from 'lucide-react'
+import { DASHBOARD_POLL_INTERVAL_MS } from '@/lib/query/dashboardPolling'
 
 // Today / Ops Center -- three role-driven variants per Section D:
 // D1 Reception (NOW/NEXT + quick actions + attention needed), D2
@@ -158,7 +159,10 @@ export function TodayPage() {
     queryKey: ['today-dashboard', currentClubId],
     queryFn: () => fetchDashboard(currentClubId!),
     enabled: !!currentClubId && !isCoach,
-    refetchInterval: 60_000,
+    // PERF-04: shared with AttentionNeeded/OwnerFinanceTransparency so
+    // the three same-screen loops share one source of truth for cadence.
+    refetchInterval: DASHBOARD_POLL_INTERVAL_MS,
+    staleTime: DASHBOARD_POLL_INTERVAL_MS,
   })
 
   const { data: academyRisk } = useQuery({

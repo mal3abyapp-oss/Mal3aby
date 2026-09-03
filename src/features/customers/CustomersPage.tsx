@@ -1,4 +1,4 @@
-import { useState, type FormEvent } from 'react'
+import { useEffect, useState, type FormEvent } from 'react'
 import type { CountryCode } from 'libphonenumber-js'
 import { useSearchParams, useNavigate } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
@@ -25,13 +25,25 @@ import { normalizePhone, convertArabicDigits } from '@/lib/domain/phone'
 // Phase 4: search, create, edit customers. Guardian linking (from the
 // player side) lives in AcademyPage's Player Profile per SCREEN_MAP.md
 // (Player Profile route = academy, not customers).
-async function fetchCustomers(clubId: string, search: string) {
+//
+// PERF-05/correctness fix (production audit remediation, 2026-09-03):
+// this previously had a hard .limit(50) with no offset -- a club with
+// more than 50 customers could never reach anyone past result #50, in
+// search results or in the plain unfiltered list, with no indication
+// that anything was missing. .range() now pages through real results
+// instead of silently dropping them; CUSTOMERS_PAGE_SIZE stays 50 (the
+// existing bound) so a club under that size sees no behavior change at
+// all, and a "Load more" control (see CustomersPage below) makes the
+// rest reachable instead of losing them.
+const CUSTOMERS_PAGE_SIZE = 50
+
+async function fetchCustomers(clubId: string, search: string, offset: number) {
   let query = supabase
     .from('customers')
     .select('id, full_name, mobile_display, phone_e164, email, whatsapp')
     .eq('club_id', clubId)
     .order('full_name')
-    .limit(50)
+    .range(offset, offset + CUSTOMERS_PAGE_SIZE - 1)
 
   const trimmedSearch = search.trim()
   if (trimmedSearch) {
@@ -89,7 +101,7 @@ async function fetchCustomers(clubId: string, search: string) {
     }
   }
 
-  return (data ?? []).map<CustomerRow>((row) => ({
+  const rows = (data ?? []).map<CustomerRow>((row) => ({
     id: row.id,
     fullName: row.full_name,
     mobileDisplay: row.mobile_display,
@@ -97,6 +109,7 @@ async function fetchCustomers(clubId: string, search: string) {
     whatsapp: row.whatsapp,
     outstanding: outstandingByCustomer.get(row.id) ?? 0,
   }))
+  return { rows, hasMore: rows.length === CUSTOMERS_PAGE_SIZE }
 }
 
 async function fetchClubCountry(clubId: string): Promise<CountryCode | null> {
@@ -116,6 +129,12 @@ export function CustomersPage() {
   // empty list the manager has to re-search by hand.
   const [searchParams] = useSearchParams()
   const [search, setSearch] = useState(() => searchParams.get('q') ?? '')
+  // PERF-05/correctness fix: pages of CUSTOMERS_PAGE_SIZE loaded so far --
+  // "Load more" increments this (same accumulation pattern as
+  // PlatformOwnersPage.tsx's owner list) so a search or the plain list
+  // can actually reach a customer past result #50 instead of it being
+  // silently unreachable.
+  const [pages, setPages] = useState(1)
   const [dialogOpen, setDialogOpen] = useState(false)
   const [fullName, setFullName] = useState('')
   const [mobile, setMobile] = useState('')
@@ -171,11 +190,24 @@ export function CustomersPage() {
   // instead of an insert.
   const [editingCustomer, setEditingCustomer] = useState<CustomerRow | null>(null)
 
-  const { data: customers = [], isLoading } = useQuery({
-    queryKey: ['customers', currentClubId, search],
-    queryFn: () => fetchCustomers(currentClubId!, search),
+  // A new search term must restart pagination at page 1 -- otherwise a
+  // stale `pages` count from a previous, larger result set would fetch
+  // pages that don't apply to the new search.
+  useEffect(() => { setPages(1) }, [search])
+
+  const { data, isLoading, isFetching } = useQuery({
+    queryKey: ['customers', currentClubId, search, pages],
+    queryFn: async () => {
+      const clubId = currentClubId as string
+      const results = await Promise.all(
+        Array.from({ length: pages }, (_, i) => fetchCustomers(clubId, search, i * CUSTOMERS_PAGE_SIZE)),
+      )
+      const lastPage = results.at(-1)
+      return { rows: results.flatMap((r) => r.rows), hasMore: lastPage?.hasMore ?? false }
+    },
     enabled: !!currentClubId,
   })
+  const customers = data?.rows ?? []
 
   // Phase G (G2/G7): "outstanding only" is the single highest-value
   // filter beyond the existing name/phone search -- lets a
@@ -431,6 +463,19 @@ export function CustomersPage() {
         emptyTitle={t('customers.emptyTitle')}
         emptyDescription={t('customers.emptyDescription')}
       />
+
+      {/* PERF-05/correctness fix: makes customers past result #50
+          reachable instead of the previous silent truncation. Based on
+          the server's hasMore, not the client-side outstandingOnly
+          filter's count -- filtering is orthogonal to whether more rows
+          exist to load. */}
+      {!isLoading && data?.hasMore && (
+        <div className="mt-4 flex justify-center">
+          <Button variant="outline" onClick={() => setPages((p) => p + 1)} disabled={isFetching}>
+            {isFetching ? t('customers.loadingMore') : t('customers.loadMore')}
+          </Button>
+        </div>
+      )}
     </div>
   )
 }

@@ -8,6 +8,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { translateSupabaseError } from '@/lib/errors'
+import { WHATSAPP_SAFETY_POLL_INTERVAL_MS } from '@/lib/query/dashboardPolling'
 
 // Safe Messaging / Anti-Abuse Control Layer -- Part S (admin safety
 // settings) and Part T (diagnostics), combined in one card since both
@@ -175,18 +176,25 @@ export function MessagingSafetyCard() {
     enabled: !!currentClubId,
   })
 
+  // PERF-04: queue diagnostics (RLS-gated view) and account health
+  // (manage_whatsapp_connection-gated RPC) sit behind different
+  // authorization checks, so they're kept as separate calls rather than
+  // merged -- see dashboardPolling.ts for the full reasoning. Both share
+  // one interval constant so the two 15s timers can't drift apart.
   const { data: diagnostics } = useQuery({
     queryKey: ['whatsapp-queue-diagnostics', currentClubId],
     queryFn: () => fetchDiagnostics(currentClubId!),
     enabled: !!currentClubId,
-    refetchInterval: 15000,
+    refetchInterval: WHATSAPP_SAFETY_POLL_INTERVAL_MS,
+    staleTime: WHATSAPP_SAFETY_POLL_INTERVAL_MS,
   })
 
   const { data: accountHealth } = useQuery({
     queryKey: ['whatsapp-account-health', currentClubId],
     queryFn: () => fetchAccountHealth(currentClubId!),
     enabled: !!currentClubId,
-    refetchInterval: 15000,
+    refetchInterval: WHATSAPP_SAFETY_POLL_INTERVAL_MS,
+    staleTime: WHATSAPP_SAFETY_POLL_INTERVAL_MS,
   })
 
   const toggleCategoryMutation = useMutation({

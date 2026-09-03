@@ -9,6 +9,8 @@
 > **Added 2026-08-15 (final pre-implementation)** per the Final Pre-Implementation Directive. `booking_series` and `outstanding_invoices` (view) added to the matrix. See [SECURITY_ANTI_FRAUD.md](SECURITY_ANTI_FRAUD.md) for the full abuse-test catalogue and Security Gate checklist that this matrix's Verification Checklist below now explicitly cross-references.
 >
 > **Corrected 2026-08-15 (final two decisions)** per the Final Two Decisions Closure. Verification Checklist items for `complete_new_club_onboarding()` corrected: a user with an existing club membership calling it again now **succeeds** at club creation (only the automatic trial grant is skipped) — the prior checklist wording implying full rejection was stale and has been fixed. `automatic_trial_entitlements` added to the matrix.
+>
+> **Corrected 2026-09-03 (production audit remediation, M-11)** the Policy Pattern template below was illustrative pseudocode written against an `auth.*` namespace that was never actually used — every helper function (`user_club_ids`, `has_permission`, `is_platform_owner`, `user_has_branch_access`, `club_write_allowed`) has always lived in `public.*` on the live schema (independently re-verified against every migration that defines or redefines them). Template corrected to `public.*`, updated to the real, currently-used branch-scope helper signature (`user_has_branch_access(p_club_id, p_branch_id)`, AND-across-memberships since the 2026-08-29 multi-membership fix — the matrix's original `has_branch_access(p_membership_id, p_branch_id)` still exists but is no longer what any live branch-scoped policy calls), and `is_platform_owner()`/`club_write_allowed()` added to the template since the row-by-row matrix already relies on both. Row-by-row matrix re-spot-checked against live policies for tables touched by this remediation pass's own P0/P1 fixes: `clubs` updated to reflect M-1's new `is_test_fixture`/`flagged_duplicate` column protection (previously only `status` was documented as protected); M-9 (QR identity-match) and M-2 (QA-fixture aggregate filtering) confirmed to add no new RLS policy or access-grant change, so no other row required an update for those.
 
 ## Policy Pattern
 
@@ -16,21 +18,21 @@ Every tenant-scoped table follows this shape. See [ARCHITECTURE.md](ARCHITECTURE
 
 ```sql
 -- membership helper
-create or replace function auth.user_club_ids() returns setof uuid
+create or replace function public.user_club_ids() returns setof uuid
 language sql security definer stable
 set search_path = public, pg_temp as $$
-  select club_id from club_memberships
+  select club_id from public.club_memberships
   where user_id = auth.uid() and status = 'active'
 $$;
 
 -- permission helper
-create or replace function auth.has_permission(p_key text, p_club_id uuid) returns boolean
+create or replace function public.has_permission(p_key text, p_club_id uuid) returns boolean
 language sql security definer stable
 set search_path = public, pg_temp as $$
   select exists (
-    select 1 from club_memberships cm
-    join role_permissions rp on rp.role_id = cm.role_id
-    join permissions p on p.id = rp.permission_id
+    select 1 from public.club_memberships cm
+    join public.role_permissions rp on rp.role_id = cm.role_id
+    join public.permissions p on p.id = rp.permission_id
     where cm.user_id = auth.uid()
       and cm.club_id = p_club_id
       and cm.status = 'active'
@@ -38,44 +40,82 @@ set search_path = public, pg_temp as $$
   )
 $$;
 
--- branch-scope helper: true if the membership has no explicit branch rows (all branches)
--- or an explicit row matching the target branch
-create or replace function auth.has_branch_access(p_membership_id uuid, p_branch_id uuid) returns boolean
+-- platform-owner helper: true for an active membership holding the platform_owner role,
+-- with no club_id scoping at all
+create or replace function public.is_platform_owner() returns boolean
 language sql security definer stable
 set search_path = public, pg_temp as $$
-  select
-    not exists (select 1 from membership_branches where membership_id = p_membership_id)
-    or exists (
-      select 1 from membership_branches
-      where membership_id = p_membership_id and branch_id = p_branch_id
+  select exists (
+    select 1 from public.club_memberships cm
+    join public.roles r on r.id = cm.role_id
+    where cm.user_id = auth.uid()
+      and cm.status = 'active'
+      and r.key = 'platform_owner'
+  )
+$$;
+
+-- branch-scope helper: true if the platform owner, or every one of the caller's active
+-- memberships on this club agrees the branch is in scope (an explicitly branch-restricted
+-- membership excludes a branch; zero rows in membership_branches means "all branches" for
+-- that membership) — see the 2026-08-29 fix note below for why this is AND-across-memberships,
+-- not the single-membership OR shape an earlier draft of this helper used
+create or replace function public.user_has_branch_access(p_club_id uuid, p_branch_id uuid) returns boolean
+language sql security definer stable
+set search_path = public, pg_temp as $$
+  select public.is_platform_owner()
+    or (
+      exists (
+        select 1 from public.club_memberships cm
+        where cm.user_id = auth.uid() and cm.club_id = p_club_id and cm.status = 'active'
+      )
+      and not exists (
+        select 1 from public.club_memberships cm
+        where cm.user_id = auth.uid() and cm.club_id = p_club_id and cm.status = 'active'
+          and exists (select 1 from public.membership_branches mb where mb.membership_id = cm.id)
+          and not exists (
+            select 1 from public.membership_branches mb
+            where mb.membership_id = cm.id and p_branch_id is not null and mb.branch_id = p_branch_id
+          )
+      )
     )
+$$;
+
+-- access-aware helper: wraps get_club_platform_access(club_id) ('full' | 'grace' | 'blocked')
+create or replace function public.club_write_allowed(p_club_id uuid, p_action_category text) returns boolean
+language sql security definer stable
+set search_path = public, pg_temp as $$
+  select case public.get_club_platform_access(p_club_id)
+    when 'full' then true
+    when 'grace' then p_action_category in ('settle_existing', 'operational_continuity')
+    else false
+  end
 $$;
 
 -- SELECT: club membership is sufficient
 create policy "select_own_club" on <table>
-  for select using (club_id in (select auth.user_club_ids()));
+  for select using (club_id in (select public.user_club_ids()));
 
 -- INSERT/UPDATE: membership + specific permission
 create policy "insert_with_permission" on <table>
-  for insert with check (auth.has_permission('<table>.create', club_id));
+  for insert with check (public.has_permission('<table>.create', club_id));
 
 create policy "update_with_permission" on <table>
-  for update using (auth.has_permission('<table>.update', club_id));
+  for update using (public.has_permission('<table>.update', club_id));
 
 -- DELETE: no policy at all on financial/operational tables — hard delete is impossible via RLS
 
--- access-aware INSERT, for tables affected by auth.club_write_allowed (bookings,
+-- access-aware INSERT, for tables affected by public.club_write_allowed (bookings,
 -- enrollments, subscriptions, payments, payment_allocations, refunds, attendance):
 create policy "insert_with_permission_and_platform_access" on <table>
   for insert with check (
-    auth.has_permission('<table>.create', club_id)
-    and auth.club_write_allowed(club_id, '<new_commitment | settle_existing | operational_continuity>')
+    public.has_permission('<table>.create', club_id)
+    and public.club_write_allowed(club_id, '<new_commitment | settle_existing | operational_continuity>')
   );
 ```
 
-**Branch-scoped roles** (Branch Manager, Receptionist) add a check against `auth.has_branch_access()` using the relevant `club_memberships.id` and the row's `branch_id`, resolving zero-rows-in-`membership_branches` as "all branches" per [DECISIONS.md ADR-015](DECISIONS.md#adr-015--membership-branch-scope-is-a-join-table-not-a-single-column). Platform Owner uses a separate bypass policy checked against a platform-level permission key, not `user_club_ids()`, and is never subject to `auth.club_write_allowed()` regardless of any club's own status.
+**Branch-scoped roles** (Branch Manager, Receptionist) add a check against `public.user_has_branch_access()` using the row's `club_id`/`branch_id`, resolving zero-rows-in-`membership_branches` as "all branches" per [DECISIONS.md ADR-015](DECISIONS.md#adr-015--membership-branch-scope-is-a-join-table-not-a-single-column). Platform Owner uses a separate bypass checked via `public.is_platform_owner()` against a platform-level role key, not `user_club_ids()`, and is never subject to `public.club_write_allowed()` regardless of any club's own status.
 
-**Access-aware tables** (`bookings`, `enrollments`, `subscriptions`, `groups`, `programs` = `'new_commitment'`; `payments`, `payment_allocations`, `refunds` = `'settle_existing'`; `attendance` = `'operational_continuity'`) additionally gate every INSERT/UPDATE policy through `auth.club_write_allowed()`, which wraps `get_club_platform_access(club_id)` — see [ARCHITECTURE.md](ARCHITECTURE.md#platform-access-strategy) for both function definitions and [DECISIONS.md ADR-033](DECISIONS.md#adr-033--platform-access-is-full--grace--blocked-derived-by-one-centralized-db-function) for the single-source-of-truth reasoning. `SELECT` is never gated by this helper. **Note this is now driven by the club's derived subscription status, not by `clubs.status` — a `suspended`/`closed` club is blocked via `clubs.status` directly (see [RLS Strategy](ARCHITECTURE.md#rls-strategy)), while an `active` club with a lapsed subscription is blocked via this separate mechanism.**
+**Access-aware tables** (`bookings`, `enrollments`, `subscriptions`, `groups`, `programs` = `'new_commitment'`; `payments`, `payment_allocations`, `refunds` = `'settle_existing'`; `attendance` = `'operational_continuity'`) additionally gate every INSERT/UPDATE policy through `public.club_write_allowed()`, which wraps `public.get_club_platform_access(club_id)` — see [ARCHITECTURE.md](ARCHITECTURE.md#platform-access-strategy) for both function definitions and [DECISIONS.md ADR-033](DECISIONS.md#adr-033--platform-access-is-full--grace--blocked-derived-by-one-centralized-db-function) for the single-source-of-truth reasoning. `SELECT` is never gated by this helper. **Note this is now driven by the club's derived subscription status, not by `clubs.status` — a `suspended`/`closed` club is blocked via `clubs.status` directly (see [RLS Strategy](ARCHITECTURE.md#rls-strategy)), while an `active` club with a lapsed subscription is blocked via this separate mechanism.**
 
 **Test requirement:** every table below ships with a pgTAP test proving User A (Club A member) cannot SELECT/INSERT/UPDATE a Club B row through any path — including a raw PostgREST call, not just the UI. See [TEST_PLAN.md](TEST_PLAN.md).
 
@@ -104,7 +144,7 @@ Legend: **S**=Select, **I**=Insert, **U**=Update, **D**=Void/Reverse (status tra
 
 | Table | Platform Owner | Club Owner | Club Manager | Branch Manager | Receptionist | Accountant | Academy Manager | Coach | Scanner |
 |---|---|---|---|---|---|---|---|---|---|
-| `clubs` (`status`: `active`\|`suspended`\|`closed` — no `grace_period` value) | S,I,U | S,U (own, excl. `status`) | S | S | S | S | S | – | – |
+| `clubs` (`status`: `active`\|`suspended`\|`closed` — no `grace_period` value) | S,I,U | S,U (own, excl. `status`, `is_test_fixture`, `flagged_duplicate` — `trg_protect_club_status` reverts any of the three if changed by a non-platform-owner) | S | S | S | S | S | – | – |
 | `platform_plans` (base table, incl. `is_public`/`display_order`) / `platform_subscriptions` / `platform_invoices` / `platform_payments` | S,I,U | S (own club summary only, via restricted view — not these tables directly) | – | – | – | – | – | – | – |
 | `platform_settings` | S,U | – (own club's `default_trial_days` reference only via signup RPC, not direct read) | – | – | – | – | – | – | – |
 | `contact_requests` | S,U (progress `status`) | – | – | – | – | – | – | – | – |

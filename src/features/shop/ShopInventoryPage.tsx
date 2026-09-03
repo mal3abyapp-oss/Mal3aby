@@ -125,8 +125,22 @@ async function fetchLocations(clubId: string): Promise<LocationOption[]> {
   return (data ?? []).map((r) => ({ locationId: r.location_id, name: r.name }))
 }
 
+// PERF-05 (production audit remediation, 2026-09-03): list_shop_products
+// now takes p_limit/p_offset and defaults to 50 (see that RPC's own
+// migration comment, 20260903160000_paginate_list_shop_products.sql).
+// This call site is a product-PICKER for the Receive/Transfer/Adjust
+// dialogs' <Select> -- every active product must remain selectable here
+// (unlike ShopProductsPage.tsx's catalog view, this is not itself a
+// paginated display list), so silently inheriting the RPC's new 50-row
+// default would trade "unbounded but slow" for "bounded but silently
+// missing products past #50" -- the same class of correctness gap this
+// finding explicitly calls out for CustomersPage. PRODUCT_PICKER_LIMIT
+// is a generous, explicit, still-bounded cap (never truly unbounded)
+// rather than the display page size.
+const PRODUCT_PICKER_LIMIT = 1000
+
 async function fetchProducts(clubId: string): Promise<ProductOption[]> {
-  const { data, error } = await supabase.rpc('list_shop_products', { p_club_id: clubId, p_status: 'active' })
+  const { data, error } = await supabase.rpc('list_shop_products', { p_club_id: clubId, p_status: 'active', p_limit: PRODUCT_PICKER_LIMIT })
   if (error) throw error
   return (data ?? []).map((r) => ({
     productId: r.product_id, nameAr: r.name_ar, hasVariants: r.has_variants,
@@ -1174,7 +1188,17 @@ function ProductDetailDialog({ clubId, productId, onClose }: { clubId: string; p
   const { data: product } = useQuery({
     queryKey: ['shop-inv-product-detail', clubId, productId],
     queryFn: async () => {
-      const { data, error } = await supabase.rpc('list_shop_products', { p_club_id: clubId })
+      // PERF-05 (production audit remediation, 2026-09-03):
+      // list_shop_products now defaults to 50 rows (p_limit/p_offset,
+      // see that RPC's own migration comment). This dialog fetches the
+      // full list and finds one product client-side by id -- with no
+      // explicit limit here, a product past #50 would silently fail to
+      // be found (the dialog would render as if the product doesn't
+      // exist). Same PRODUCT_PICKER_LIMIT treatment as this file's other
+      // picker call sites; p_status intentionally left unset (unchanged
+      // from before this fix) so the RPC's own 'active' default still
+      // applies here.
+      const { data, error } = await supabase.rpc('list_shop_products', { p_club_id: clubId, p_limit: PRODUCT_PICKER_LIMIT })
       if (error) throw error
       return (data ?? []).find((p) => p.product_id === productId) ?? null
     },

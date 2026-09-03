@@ -793,7 +793,11 @@
     "viewSubscription": "View subscription",
     "trialExpired": "Free trial expired — contact us to activate your subscription",
     "subscriptionExpired": "Subscription expired — contact us to activate your subscription",
-    "subscriptionGrace": "Your subscription is in grace period — new operations are temporarily paused"
+    "subscriptionGrace": "Your subscription is in grace period — new operations are temporarily paused",
+    "clubSwitcher": {
+      "label": "Club",
+      "roleLabel": "Role: {{role}}"
+    }
   },
   "routing": {
     "noClubAccess": "This account has no club staff access. If you're a customer, use the customer portal instead. If you believe this is a mistake, contact your club owner.",
@@ -2574,6 +2578,8 @@
     "saveChanges": "Save changes",
     "searchPlaceholder": "Search by name or phone number",
     "outstandingOnlyFilter": "Outstanding balance only",
+    "loadingMore": "Loading...",
+    "loadMore": "Load more",
     "emptyTitle": "No customers",
     "emptyDescription": "Add your first customer to start managing the club's customer base",
     "outstanding": "Outstanding",
@@ -4532,7 +4538,9 @@
       "viewList": "List",
       "primaryImageLabel": "Primary image",
       "lowStock": "Low stock",
-      "stockCount": "{{count}} in stock"
+      "stockCount": "{{count}} in stock",
+      "loadingMore": "Loading...",
+      "loadMore": "Load more"
     },
     "categories": {
       "manageTitle": "Manage categories",

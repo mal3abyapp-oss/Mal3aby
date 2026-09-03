@@ -6,6 +6,7 @@ import { useAuth } from '@/app/providers/AuthProvider'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { formatMoney } from '@/lib/domain/billing'
 import { useDirection } from '@/app/providers/DirectionProvider'
+import { DASHBOARD_POLL_INTERVAL_MS } from '@/lib/query/dashboardPolling'
 
 // Gate 13 #61: an owner finance transparency section, right on the page
 // they land on daily -- not another report they have to remember to open.
@@ -58,7 +59,10 @@ export function OwnerFinanceTransparency() {
     queryKey: ['owner-finance-transparency', currentClubId],
     queryFn: () => fetchTodayFinance(currentClubId!),
     enabled: !!currentClubId,
-    refetchInterval: 60_000,
+    // PERF-04: shared with TodayPage/AttentionNeeded so the three
+    // same-screen loops share one source of truth for cadence.
+    refetchInterval: DASHBOARD_POLL_INTERVAL_MS,
+    staleTime: DASHBOARD_POLL_INTERVAL_MS,
   })
 
   if (isLoading || !data) return null

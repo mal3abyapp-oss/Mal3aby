@@ -9342,6 +9342,8 @@ export type Database = {
         Args: {
           p_category_id?: string
           p_club_id: string
+          p_limit?: number
+          p_offset?: number
           p_search?: string
           p_status?: string
         }
@@ -9361,6 +9363,7 @@ export type Database = {
           reorder_level: number
           sku: string
           status: string
+          total_count: number
         }[]
       }
       list_shop_recent_returns: {

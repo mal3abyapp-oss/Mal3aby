@@ -793,7 +793,11 @@
     "viewSubscription": "عرض الاشتراك",
     "trialExpired": "انتهت التجربة المجانية — تواصل معنا لتفعيل الاشتراك",
     "subscriptionExpired": "الاشتراك منتهٍ — تواصل معنا لتفعيل الاشتراك",
-    "subscriptionGrace": "اشتراكك في فترة السماح — العمليات الجديدة موقوفة مؤقتًا"
+    "subscriptionGrace": "اشتراكك في فترة السماح — العمليات الجديدة موقوفة مؤقتًا",
+    "clubSwitcher": {
+      "label": "النادي",
+      "roleLabel": "الدور: {{role}}"
+    }
   },
   "routing": {
     "noClubAccess": "لا يملك هذا الحساب صلاحية دخول إدارة نادٍ. إذا كنت عميلًا، استخدم بوابة العملاء بدلًا من ذلك. إذا كنت تعتقد أن هذا خطأ، تواصل مع مالك النادي.",
@@ -2587,6 +2591,8 @@
     "saveChanges": "حفظ التعديلات",
     "searchPlaceholder": "بحث بالاسم أو رقم الهاتف",
     "outstandingOnlyFilter": "أصحاب مستحقات فقط",
+    "loadingMore": "جارٍ التحميل...",
+    "loadMore": "تحميل المزيد",
     "emptyTitle": "لا يوجد عملاء",
     "emptyDescription": "أضف أول عميل لبدء إدارة قاعدة عملاء النادي",
     "outstanding": "المستحق",
@@ -4537,7 +4543,9 @@
       "viewList": "قائمة",
       "primaryImageLabel": "الصورة الرئيسية",
       "lowStock": "مخزون منخفض",
-      "stockCount": "{{count}} متوفر"
+      "stockCount": "{{count}} متوفر",
+      "loadingMore": "جارٍ التحميل...",
+      "loadMore": "تحميل المزيد"
     },
     "categories": {
       "manageTitle": "إدارة الفئات",

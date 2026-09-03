@@ -109,12 +109,22 @@ interface CartLine {
   imageUrl: string | null
 }
 
+// PERF-05 (production audit remediation, 2026-09-03): list_shop_products
+// now defaults to 50 rows (p_limit/p_offset, see that RPC's own
+// migration comment). The POS product grid must never silently drop
+// products past #50 -- a cashier scanning a barcode or searching for an
+// item needs the full active catalog reachable, not a truncated page --
+// so this passes an explicit, generous, still-bounded limit instead of
+// inheriting the new display-page-size default. Same reasoning as
+// ShopInventoryPage.tsx's PRODUCT_PICKER_LIMIT.
+const PRODUCT_PICKER_LIMIT = 1000
+
 async function fetchProducts(clubId: string, search: string): Promise<ProductOption[]> {
   // Unfiltered by category here -- the category strip filters
   // client-side (see filteredProducts below) so switching chips is
   // instant with no extra round-trip, and so the same fetched list can
   // power the "count per category" chip labels without an N+1 query.
-  const { data, error } = await supabase.rpc('list_shop_products', { p_club_id: clubId, p_search: search || undefined, p_status: 'active' })
+  const { data, error } = await supabase.rpc('list_shop_products', { p_club_id: clubId, p_search: search || undefined, p_status: 'active', p_limit: PRODUCT_PICKER_LIMIT })
   if (error) throw error
   return (data ?? []).map((r) => ({
     productId: r.product_id, nameAr: r.name_ar, nameEn: r.name_en, categoryId: r.category_id, hasVariants: r.has_variants,

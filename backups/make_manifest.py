@@ -17,6 +17,7 @@ richer than what this script produces alone. If re-running this script
 against an existing manifest, merge rather than blindly overwrite those
 richer fields (this script intentionally does not fabricate them from
 nothing -- they require reading real counts from the backup content).
+"""
 import hashlib
 import json
 import os
