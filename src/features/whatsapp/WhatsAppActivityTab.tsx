@@ -299,9 +299,21 @@ async function fetchFailedActivity(clubId: string): Promise<ActivityRow[]> {
   }))
 }
 
+// Production audit finding H-1 (RTL-bidi gap): this local helper (also
+// duplicated in WhatsAppConnectionCard.tsx and MessagingSafetyCard.tsx)
+// returns a plain string with no bidi isolation, same defect class as
+// lib/i18n/config.ts's formatDate(). Every call site here needs a
+// string (DetailRow's value prop, template-literal concatenation with
+// the attempts count), not a React node, so this follows the same
+// FSI/PDI convention formatMoney()/formatDateIsolated() already use for
+// exactly that constraint rather than switching call sites to a
+// component they can't actually accept.
+const DATETIME_FSI = '⁦'
+const DATETIME_PDI = '⁩'
 function formatDateTime(iso: string | null, locale: string): string {
   if (!iso) return '—'
-  return new Date(iso).toLocaleString(locale === 'ar' ? 'ar-EG' : 'en-US', { dateStyle: 'medium', timeStyle: 'short' })
+  const formatted = new Date(iso).toLocaleString(locale === 'ar' ? 'ar-EG' : 'en-US', { dateStyle: 'medium', timeStyle: 'short' })
+  return `${DATETIME_FSI}${formatted}${DATETIME_PDI}`
 }
 
 // Translates a subset of known raw error strings into operational
@@ -346,7 +358,13 @@ export function WhatsAppActivityTab({
 
   const isFailedView = statusFilter === 'failed'
 
-  const { data: rows = [], isLoading } = useQuery({
+  // Finding H-2 (frozen production audit): this list previously
+  // destructured only `data = [], isLoading` -- a failed fetch silently
+  // rendered as "no messages" (or, in the failed-only view, the
+  // actively misleading "everything is sending normally"),
+  // indistinguishable from a genuinely clean queue. isError is now
+  // surfaced as a distinct inline message.
+  const { data: rows = [], isLoading, isError } = useQuery({
     queryKey: ['whatsapp-activity', currentClubId, statusFilter, templateFilter],
     queryFn: () => (isFailedView ? fetchFailedActivity(currentClubId!) : fetchActivity(currentClubId!, statusFilter, templateFilter)),
     enabled: !!currentClubId,
@@ -409,12 +427,13 @@ export function WhatsAppActivityTab({
       {retryError && <p role="alert" className="text-sm text-status-danger">{retryError}</p>}
 
       {isLoading && <p className="text-sm text-text-secondary">{t('common.loading')}</p>}
-      {!isLoading && rows.length === 0 && (
+      {isError && <p className="text-sm text-status-danger">{t('whatsapp.page.activityTab.loadError')}</p>}
+      {!isLoading && !isError && rows.length === 0 && (
         <p className="text-sm text-text-secondary">
           {isFailedView ? t('whatsapp.page.activityTab.emptyFailed') : t('whatsapp.page.activityTab.emptyTitle')}
         </p>
       )}
-      {!isLoading && rows.length > 0 && (
+      {!isLoading && !isError && rows.length > 0 && (
         <div className="overflow-x-auto">
           <table className="w-full text-start text-sm">
             <thead>

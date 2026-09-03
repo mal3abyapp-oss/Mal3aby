@@ -109,6 +109,12 @@ export function RolesPage() {
   // view instead of doing nothing when clicked -- see
   // SystemRoleViewDialog below.
   const [viewingSystemRole, setViewingSystemRole] = useState<RoleRow | null>(null)
+  // Production audit finding H-3: delete previously fired
+  // deleteMutation directly on click with zero confirmation. Same
+  // reveal-then-confirm pattern as StaffPage.tsx's deactivate fix and
+  // BookingDetailSheet's cancel/no-show/complete flows -- per-row
+  // state since this is a table action, not a single-instance sheet.
+  const [confirmingDeleteId, setConfirmingDeleteId] = useState<string | null>(null)
 
   const { data: roles = [], isLoading } = useQuery({
     queryKey: ['club-roles', currentClubId],
@@ -123,7 +129,10 @@ export function RolesPage() {
       const { error } = await supabase.rpc('delete_club_role', { p_club_role_id: roleId })
       if (error) throw error
     },
-    onSuccess: () => void queryClient.invalidateQueries({ queryKey: ['club-roles', currentClubId] }),
+    onSuccess: () => {
+      setConfirmingDeleteId(null)
+      void queryClient.invalidateQueries({ queryKey: ['club-roles', currentClubId] })
+    },
   })
 
   const copyMutation = useMutation({
@@ -144,10 +153,11 @@ export function RolesPage() {
 
   const [deleteError, setDeleteError] = useState<string | null>(null)
 
-  function handleDelete(role: RoleRow) {
+  function handleConfirmDelete(role: RoleRow) {
     setDeleteError(null)
     if (role.employeeCount > 0) {
       setDeleteError(t('roles.deleteBlockedInUse', { count: role.employeeCount }))
+      setConfirmingDeleteId(null)
       return
     }
     deleteMutation.mutate(role.id, { onError: () => setDeleteError(t('roles.deleteError')) })
@@ -216,6 +226,16 @@ export function RolesPage() {
               {t('roles.copy')}
             </Button>
           </div>
+        ) : confirmingDeleteId === r.id ? (
+          <div className="flex items-center gap-2">
+            <span className="text-xs text-text-secondary">{t('roles.confirmDeleteMessage')}</span>
+            <Button variant="destructive" size="sm" onClick={() => handleConfirmDelete(r)} disabled={deleteMutation.isPending}>
+              {deleteMutation.isPending ? t('roles.deleting') : t('roles.confirmDelete')}
+            </Button>
+            <Button variant="ghost" size="sm" onClick={() => setConfirmingDeleteId(null)}>
+              {t('common.cancel')}
+            </Button>
+          </div>
         ) : (
           <div className="flex gap-2">
             <Button variant="ghost" size="sm" onClick={() => { setEditingRoleId(r.id); setEditorOpen(true) }}>
@@ -224,7 +244,7 @@ export function RolesPage() {
             <Button variant="ghost" size="sm" onClick={() => { setCopyingRole(r); setCopyName({ ar: '', en: '' }) }}>
               {t('roles.copy')}
             </Button>
-            <Button variant="ghost" size="sm" onClick={() => handleDelete(r)} disabled={deleteMutation.isPending}>
+            <Button variant="ghost" size="sm" onClick={() => { setDeleteError(null); setConfirmingDeleteId(r.id) }}>
               {t('roles.delete')}
             </Button>
           </div>

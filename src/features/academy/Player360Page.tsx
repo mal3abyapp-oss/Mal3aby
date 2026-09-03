@@ -134,6 +134,11 @@ export function Player360Page() {
   const [activeTab, setActiveTab] = useState<TabKey>('overview')
   const [editOpen, setEditOpen] = useState(false)
   const [addGuardianOpen, setAddGuardianOpen] = useState(false)
+  // Production audit finding M-related note (native window.confirm()
+  // swap, trivial while in this area for H-3): same reveal-then-confirm
+  // pattern as StaffPage.tsx/RolesPage.tsx's H-3 fixes -- per-row state
+  // keyed by guardian_link_id since this is a DataTable row action.
+  const [confirmingUnlinkId, setConfirmingUnlinkId] = useState<string | null>(null)
 
   const { data: summary, isLoading, isError } = useQuery({
     queryKey: ['player-360-summary', currentClubId, playerId],
@@ -179,7 +184,10 @@ export function Player360Page() {
       const { error } = await supabase.rpc('unlink_guardian_from_player', { p_guardian_link_id: guardianLinkId })
       if (error) throw error
     },
-    onSuccess: invalidateAll,
+    onSuccess: () => {
+      setConfirmingUnlinkId(null)
+      invalidateAll()
+    },
   })
 
   if (isError) {
@@ -293,9 +301,27 @@ export function Player360Page() {
                 ) },
                 {
                   key: 'actions', header: '', render: (g: Guardian) => (
-                    <Button size="sm" variant="outline" disabled={unlinkMutation.isPending} onClick={() => { if (confirm(t('academy.players.confirmUnlinkGuardian', { defaultValue: 'Remove this guardian relationship?' }))) unlinkMutation.mutate(g.guardian_link_id) }}>
-                      {t('common.delete', { defaultValue: 'Remove' })}
-                    </Button>
+                    confirmingUnlinkId === g.guardian_link_id ? (
+                      <div className="flex items-center gap-2">
+                        <Button
+                          size="sm"
+                          variant="destructive"
+                          disabled={unlinkMutation.isPending}
+                          onClick={() => unlinkMutation.mutate(g.guardian_link_id)}
+                        >
+                          {unlinkMutation.isPending
+                            ? t('academy.players.removingGuardian', { defaultValue: 'Removing...' })
+                            : t('academy.players.confirmUnlinkGuardianButton', { defaultValue: 'Confirm remove' })}
+                        </Button>
+                        <Button size="sm" variant="ghost" onClick={() => setConfirmingUnlinkId(null)}>
+                          {t('common.cancel')}
+                        </Button>
+                      </div>
+                    ) : (
+                      <Button size="sm" variant="outline" onClick={() => setConfirmingUnlinkId(g.guardian_link_id)}>
+                        {t('common.delete', { defaultValue: 'Remove' })}
+                      </Button>
+                    )
                   ),
                 },
               ] as DataTableColumn<Guardian>[]}

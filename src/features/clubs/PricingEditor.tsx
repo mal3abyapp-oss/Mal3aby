@@ -7,7 +7,7 @@ import { Input } from '@/components/ui/input'
 import { translateSupabaseError } from '@/lib/errors'
 import { type PricingRuleRow } from '@/lib/domain/fields'
 import { useResolvedFieldPrice } from '@/features/bookings/useFieldPricing'
-import { formatNumber } from '@/lib/i18n/config'
+import { formatNumberIsolated } from '@/lib/i18n/config'
 
 // P1-6 (critical usability fix pass, 2026-08-16): the old pricing UX
 // exposed raw day_of_week integers, a numeric "priority" as the primary
@@ -77,6 +77,13 @@ export function PricingEditor({
   const [specialPrice, setSpecialPrice] = useState('')
 
   const [formError, setFormError] = useState<string | null>(null)
+  // Production audit finding H-3: delete previously fired
+  // deleteMutation directly on click with zero confirmation. Same
+  // reveal-then-confirm pattern as FieldClosuresEditor.tsx's delete fix
+  // and BookingDetailSheet's cancel/no-show/complete flows. Keyed by
+  // the group's own ruleIds array joined into a string since a weekly
+  // group's "row" spans multiple underlying rule ids, not one.
+  const [confirmingDeleteKey, setConfirmingDeleteKey] = useState<string | null>(null)
 
   const today = new Date().toISOString().slice(0, 10)
   const nowTime = new Date().toTimeString().slice(0, 5)
@@ -136,6 +143,7 @@ export function PricingEditor({
       if (error) throw error
     },
     onSuccess: () => {
+      setConfirmingDeleteKey(null)
       void queryClient.invalidateQueries({ queryKey: ['pricing-rules', fieldId] })
       void queryClient.invalidateQueries({ queryKey: ['resolve-field-price'] })
     },
@@ -154,7 +162,7 @@ export function PricingEditor({
         {currentPriceLoading ? (
           <span>{t('clubs.pricingEditor.calculating')}</span>
         ) : currentPrice != null ? (
-          <span className="font-semibold tabular-nums">{t('clubs.pricingEditor.pricePerHour', { price: formatNumber(Math.round(currentPrice), i18n.language.startsWith('ar') ? 'ar' : 'en') })}</span>
+          <span className="font-semibold tabular-nums">{t('clubs.pricingEditor.pricePerHour', { price: formatNumberIsolated(Math.round(currentPrice), i18n.language.startsWith('ar') ? 'ar' : 'en') })}</span>
         ) : (
           <span className="text-status-danger">{t('clubs.pricingEditor.noApprovedPrice')}</span>
         )}
@@ -175,9 +183,24 @@ export function PricingEditor({
               <span>{formatDayRange(g.days, dayNames, t)} — {g.startTime.slice(0, 5)}–{g.endTime.slice(0, 5)}</span>
               <div className="flex items-center gap-2">
                 <span className="font-medium tabular-nums">{t('clubs.pricingEditor.price', { price: g.price })}</span>
-                <button className="text-xs text-status-danger hover:underline" onClick={() => deleteMutation.mutate(g.ruleIds)} disabled={deleteMutation.isPending}>
-                  {t('clubs.pricingEditor.delete')}
-                </button>
+                {confirmingDeleteKey === g.ruleIds.join(',') ? (
+                  <>
+                    <button
+                      className="text-xs font-medium text-status-danger hover:underline"
+                      onClick={() => deleteMutation.mutate(g.ruleIds)}
+                      disabled={deleteMutation.isPending}
+                    >
+                      {deleteMutation.isPending ? t('clubs.pricingEditor.deleting') : t('clubs.pricingEditor.confirmDelete')}
+                    </button>
+                    <button className="text-xs text-text-secondary hover:underline" onClick={() => setConfirmingDeleteKey(null)}>
+                      {t('common.cancel')}
+                    </button>
+                  </>
+                ) : (
+                  <button className="text-xs text-status-danger hover:underline" onClick={() => setConfirmingDeleteKey(g.ruleIds.join(','))}>
+                    {t('clubs.pricingEditor.delete')}
+                  </button>
+                )}
               </div>
             </div>
           ))}
@@ -192,9 +215,24 @@ export function PricingEditor({
               <span>{r.dateSpecific}</span>
               <div className="flex items-center gap-2">
                 <span className="font-medium tabular-nums">{t('clubs.pricingEditor.price', { price: r.pricePerHour })}</span>
-                <button className="text-xs text-status-danger hover:underline" onClick={() => deleteMutation.mutate([r.id])} disabled={deleteMutation.isPending}>
-                  {t('clubs.pricingEditor.delete')}
-                </button>
+                {confirmingDeleteKey === r.id ? (
+                  <>
+                    <button
+                      className="text-xs font-medium text-status-danger hover:underline"
+                      onClick={() => deleteMutation.mutate([r.id])}
+                      disabled={deleteMutation.isPending}
+                    >
+                      {deleteMutation.isPending ? t('clubs.pricingEditor.deleting') : t('clubs.pricingEditor.confirmDelete')}
+                    </button>
+                    <button className="text-xs text-text-secondary hover:underline" onClick={() => setConfirmingDeleteKey(null)}>
+                      {t('common.cancel')}
+                    </button>
+                  </>
+                ) : (
+                  <button className="text-xs text-status-danger hover:underline" onClick={() => setConfirmingDeleteKey(r.id)}>
+                    {t('clubs.pricingEditor.delete')}
+                  </button>
+                )}
               </div>
             </div>
           ))}

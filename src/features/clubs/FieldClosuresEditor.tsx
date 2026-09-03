@@ -99,6 +99,12 @@ export function FieldClosuresEditor({ fieldId }: { fieldId: string }) {
   const [reason, setReason] = useState('')
   const [formError, setFormError] = useState<string | null>(null)
   const [conflictNotice, setConflictNotice] = useState<number | null>(null)
+  // Production audit finding H-3: delete previously fired
+  // deleteMutation directly on click with zero confirmation. Same
+  // reveal-then-confirm pattern as BookingDetailSheet's cancel/no-show/
+  // complete flows -- per-row state since this is a list of blocks, not
+  // a single-instance sheet.
+  const [confirmingDeleteId, setConfirmingDeleteId] = useState<string | null>(null)
 
   const createMutation = useMutation({
     mutationFn: async () => {
@@ -131,6 +137,7 @@ export function FieldClosuresEditor({ fieldId }: { fieldId: string }) {
       if (error) throw error
     },
     onSuccess: () => {
+      setConfirmingDeleteId(null)
       void queryClient.invalidateQueries({ queryKey: ['field-blocks', fieldId] })
       void queryClient.invalidateQueries({ queryKey: ['fields-active-blocks'] })
     },
@@ -166,14 +173,33 @@ export function FieldClosuresEditor({ fieldId }: { fieldId: string }) {
                   </span>
                   {b.reason && <span className="text-xs text-text-secondary">{b.reason}</span>}
                 </div>
-                <button
-                  type="button"
-                  className="shrink-0 text-xs text-status-danger hover:underline"
-                  onClick={() => deleteMutation.mutate(b.id)}
-                  disabled={deleteMutation.isPending}
-                >
-                  {t('clubs.fieldClosures.delete')}
-                </button>
+                {confirmingDeleteId === b.id ? (
+                  <div className="flex shrink-0 items-center gap-2">
+                    <button
+                      type="button"
+                      className="text-xs font-medium text-status-danger hover:underline"
+                      onClick={() => deleteMutation.mutate(b.id)}
+                      disabled={deleteMutation.isPending}
+                    >
+                      {deleteMutation.isPending ? t('clubs.fieldClosures.deleting') : t('clubs.fieldClosures.confirmDelete')}
+                    </button>
+                    <button
+                      type="button"
+                      className="text-xs text-text-secondary hover:underline"
+                      onClick={() => setConfirmingDeleteId(null)}
+                    >
+                      {t('common.cancel')}
+                    </button>
+                  </div>
+                ) : (
+                  <button
+                    type="button"
+                    className="shrink-0 text-xs text-status-danger hover:underline"
+                    onClick={() => setConfirmingDeleteId(b.id)}
+                  >
+                    {t('clubs.fieldClosures.delete')}
+                  </button>
+                )}
               </div>
             )
           })}

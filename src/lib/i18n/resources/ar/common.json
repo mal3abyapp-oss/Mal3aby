@@ -79,6 +79,7 @@
       "title": "حجوزاتي",
       "description": "جميع حجوزاتك للملاعب",
       "loading": "جارٍ التحميل...",
+      "loadError": "تعذّر تحميل حجوزاتك. حاول مرة أخرى.",
       "emptyTitle": "لا توجد حجوزات بعد.",
       "upcoming": "القادمة",
       "past": "السابقة",
@@ -90,6 +91,7 @@
       "title": "مدفوعاتي",
       "description": "فواتيرك وحالة السداد وطرق الدفع",
       "loading": "جارٍ التحميل...",
+      "loadError": "تعذّر تحميل فواتيرك. حاول مرة أخرى.",
       "invoiceNotFound": "لم يتم العثور على الفاتورة المطلوبة. تصفح فواتيرك أدناه.",
       "wrongClubInvoice": "هذه الفاتورة تخص ناديًا آخر مرتبطًا بحسابك.",
       "switchClubAction": "التبديل إلى ذلك النادي",
@@ -139,6 +141,7 @@
       "title": "رمزي",
       "description": "رمز QR لتسجيل الحضور عند الوصول",
       "loading": "جارٍ التحميل...",
+      "loadError": "تعذّر تحميل حجوزاتك. حاول مرة أخرى.",
       "bookingNotFound": "لم يتم العثور على الحجز المطلوب — قد يكون قد انتهى أو أُلغي. اختر حجزًا من القائمة أدناه.",
       "wrongClubBooking": "هذا الحجز يخص ناديًا آخر مرتبطًا بحسابك.",
       "switchClubAction": "التبديل إلى ذلك النادي",
@@ -243,7 +246,8 @@
       "statusActive": "نشطة",
       "statusExpired": "منتهية الصلاحية",
       "statusEnded": "أُنهيت",
-      "emptyTitle": "لا توجد جلسات دعم بعد"
+      "emptyTitle": "لا توجد جلسات دعم بعد",
+      "loadError": "تعذّر تحميل سجل جلسات الدعم. هذا لا يعني عدم وجود جلسات دعم."
     },
     "clubDetailPage": {
       "loadingTitle": "...",
@@ -565,6 +569,7 @@
         "closed": "مغلق"
       },
       "emptyTitle": "لا توجد طلبات تواصل بعد",
+      "loadError": "تعذّر تحميل قائمة طلبات التواصل.",
       "statusUpdateError": "تعذّر تحديث حالة الطلب. حاول مرة أخرى."
     },
     "overviewPage": {
@@ -779,7 +784,8 @@
       "statusCancelled": "ملغاة",
       "statusActive": "نشطة",
       "statusExpired": "منتهية",
-      "emptyTitle": "لا توجد تجارب مجانية بعد"
+      "emptyTitle": "لا توجد تجارب مجانية بعد",
+      "loadError": "تعذّر تحميل قائمة التجارب المجانية."
     }
   },
   "appShell": {
@@ -1210,6 +1216,7 @@
       "overviewTab": {
         "title": "حالة واتساب",
         "loading": "جارٍ التحميل...",
+        "loadError": "تعذّر تحميل حالة واتساب. قد تكون حالة الاتصال والأعداد أدناه غير صحيحة أو قديمة.",
         "connectionLabel": "الاتصال:",
         "pending": "قيد الانتظار",
         "failedFinal": "فشلت نهائيًا",
@@ -1260,6 +1267,7 @@
         "providerAcceptedAtLabel": "استلمها واتساب",
         "noConsentDetail": "الموافقة غير موجودة أو ملغاة أو تخص رقم هاتف مختلفًا.",
         "loading": "جارٍ التحميل...",
+        "loadError": "تعذّر تحميل سجل الرسائل. حاول مرة أخرى.",
         "emptyTitle": "لا توجد رسائل واتساب في هذا النطاق بعد.",
         "emptyFailed": "لا توجد رسائل فشلت نهائيًا -- كل شيء يُرسل بشكل طبيعي.",
         "columns": {
@@ -1425,6 +1433,7 @@
       "adding": "جارٍ الإضافة...",
       "add": "إضافة",
       "addError": "تعذّرت الإضافة، حاول مرة أخرى.",
+      "loadError": "تعذّر تحميل قائمة اللاعبين.",
       "emptyTitle": "لا يوجد لاعبون",
       "emptyDescription": "أضف أول لاعب لبدء إدارة الأكاديمية",
       "saving": "جارٍ الحفظ...",
@@ -1462,6 +1471,8 @@
       "saveError": "تعذّر حفظ بيانات اللاعب.",
       "setPrimary": "تعيين كأساسي",
       "confirmUnlinkGuardian": "هل تريد إزالة علاقة ولي الأمر هذا؟",
+      "confirmUnlinkGuardianButton": "تأكيد الإزالة",
+      "removingGuardian": "جارٍ الإزالة...",
       "linkGuardianError": "تعذّرت إضافة ولي الأمر هذا."
     },
     "enrollments": {
@@ -1743,6 +1754,7 @@
     "members": {
       "searchPlaceholder": "ابحث بالاسم أو الجوال أو رقم العضوية...",
       "allStatuses": "كل الحالات",
+      "loadError": "تعذّر تحميل قائمة العضويات.",
       "emptyTitle": "لا توجد عضويات نادٍ بعد",
       "emptyDescription": "بيع عضوية لتظهر هنا."
     },
@@ -2064,6 +2076,8 @@
       "empty": "لا توجد إغلاقات مسجلة لهذا الملعب",
       "past": "منتهي",
       "delete": "حذف",
+      "confirmDelete": "تأكيد الحذف",
+      "deleting": "جارٍ الحذف...",
       "addLabel": "إضافة إغلاق جديد",
       "reasonPlaceholder": "السبب (اختياري)",
       "adding": "جارٍ الإضافة...",
@@ -2089,6 +2103,8 @@
       "weeklyPricesHeading": "الأسعار الأسبوعية",
       "price": "{{price}} ج.م",
       "delete": "حذف",
+      "confirmDelete": "تأكيد الحذف",
+      "deleting": "جارٍ الحذف...",
       "specialPricesHeading": "أسعار خاصة (تواريخ محددة)",
       "addWeeklyPriceLabel": "إضافة سعر أسبوعي",
       "pricePerHourPlaceholder": "السعر بالساعة (ج.م)",
@@ -2387,6 +2403,10 @@
       "rejectDialogTitle": "رفض هذا الإيصال",
       "rejectReasonPlaceholder": "سبب الرفض",
       "confirmReject": "تأكيد الرفض",
+      "approveDialogTitle": "اعتماد هذا الدفع",
+      "approveDialogHint": "سيتم تسجيل دفعة حقيقية على فاتورة العميل، ولا يمكن التراجع عن هذا من هنا.",
+      "confirmApprove": "تأكيد الاعتماد",
+      "approving": "جارٍ الاعتماد...",
       "approveError": "تعذّر اعتماد هذا الدفع.",
       "rejectError": "تعذّر رفض هذا الدفع."
     },
@@ -3187,6 +3207,7 @@
       "reason": "السبب"
     },
     "searchPlaceholder": "بحث بنوع الإجراء",
+    "loadError": "تعذّر تحميل سجل التدقيق. هذا لا يعني عدم وجود إجراءات حساسة.",
     "emptyTitle": "لا يوجد سجلات",
     "emptyDescription": "ستظهر الإجراءات الحساسة هنا فور حدوثها",
     "unknownUser": "مستخدم غير معروف",
@@ -3228,6 +3249,9 @@
     "custodyEnabled": "يتعامل مع النقدية",
     "custodyDisabled": "لا صلاحية نقدية",
     "deactivate": "إلغاء التفعيل",
+    "confirmDeactivateMessage": "هل تريد إلغاء تفعيل هذا الموظف؟",
+    "confirmDeactivate": "تأكيد إلغاء التفعيل",
+    "deactivating": "جارٍ إلغاء التفعيل...",
     "emptyTitle": "لا يوجد موظفون بعد",
     "emptyDescription": "أضف أول موظف لبدء إدارة صلاحيات النادي",
     "roles": {
@@ -3780,6 +3804,9 @@
     "saveError": "تعذّر حفظ هذا الدور. تأكد من أنك لا تحاول منح صلاحية لا تملكها بنفسك.",
     "copyError": "تعذّر نسخ هذا الدور.",
     "deleteError": "تعذّر حذف هذا الدور.",
+    "confirmDeleteMessage": "هل تريد حذف هذا الدور؟",
+    "confirmDelete": "تأكيد الحذف",
+    "deleting": "جارٍ الحذف...",
     "deleteBlockedInUse": "هذا الدور مُسند إلى {{count}} موظف نشط — أعد إسنادهم أو عطّلهم أولًا.",
     "save": "حفظ",
     "saving": "جارٍ الحفظ...",
@@ -4150,6 +4177,7 @@
     "changeRole": "تغيير الدور",
     "resetPassword": "إعادة تعيين كلمة المرور",
     "deactivate": "تعطيل",
+    "loadError": "تعذّر تحميل قائمة موظفي المنصة.",
     "emptyTitle": "لا يوجد موظفو منصة بعد",
     "emptyDescription": "أضف أول موظف للمنصة وحدد له دورًا",
     "fullNameLabel": "الاسم الكامل",
@@ -4193,6 +4221,9 @@
     "nameRequired": "الاسم بالعربية والإنجليزية مطلوبان.",
     "saveError": "تعذر حفظ هذا الدور. تأكد من أنك لا تمنح صلاحية لا تملكها بنفسك.",
     "deleteError": "تعذر حذف هذا الدور.",
+    "confirmDeleteMessage": "هل تريد حذف هذا الدور؟",
+    "confirmDelete": "تأكيد الحذف",
+    "deleting": "جارٍ الحذف...",
     "deleteBlockedInUse": "هذا الدور مُسند إلى {{count}} موظف منصة نشط -- أعد إسنادهم أولاً.",
     "save": "حفظ",
     "saving": "جارٍ الحفظ...",
@@ -4462,6 +4493,7 @@
       "description": "إدارة المنتجات التي يبيعها ناديك",
       "searchPlaceholder": "ابحث عن منتج",
       "addProduct": "إضافة منتج",
+      "loadError": "تعذّر تحميل قائمة المنتجات.",
       "creating": "جاري الإنشاء...",
       "createError": "تعذّر إنشاء المنتج.",
       "saving": "جاري الحفظ...",
@@ -4665,6 +4697,7 @@
     "sales": {
       "title": "المبيعات والمرتجعات",
       "description": "سجل المبيعات والمرتجعات",
+      "loadError": "تعذّر تحميل قائمة المبيعات.",
       "emptyTitle": "لا توجد مبيعات بعد",
       "emptyDescription": "ستظهر المبيعات المكتملة هنا",
       "processReturn": "معالجة إرجاع",
@@ -4823,6 +4856,7 @@
       "notesLabel": "ملاحظات",
       "continue": "متابعة",
       "view": "عرض",
+      "loadError": "تعذّر تحميل قائمة عمليات الجرد.",
       "emptyTitle": "لا توجد عمليات جرد بعد",
       "addProductLabel": "إضافة منتج",
       "addLine": "إضافة",

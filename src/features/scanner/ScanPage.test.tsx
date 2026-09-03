@@ -1,8 +1,20 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach, beforeAll } from 'vitest'
 import { render, screen, waitFor, act } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
-import i18n from '@/lib/i18n/config'
+import i18n, { initI18n } from '@/lib/i18n/config'
 import { ScanPage } from './ScanPage'
+
+// i18n/config.ts (PERF-03 lazy-load fix) no longer self-initializes at
+// import time -- this suite asserts against REAL translated i18n.t()
+// output (unlike LoginPage.test.tsx/PortalLoginPage.test.tsx, which
+// deliberately never initialize i18next and assert against raw keys
+// via react-i18next's NO_I18NEXT_INSTANCE fallback), so it needs a real
+// instance ready before any of this file's beforeEach hooks call
+// i18n.changeLanguage(). Runs once for the whole file; initI18n() is
+// memoized so this is a no-op if something else already initialized it.
+beforeAll(async () => {
+  await initI18n()
+})
 
 // Scanner Result UI -- COMPONENT RENDER VERIFICATION (Club Memberships E2E
 // closure, scanner gap). Camera hardware is environment-blocked in every
@@ -98,6 +110,16 @@ const CANCELLED_ROW = {
 const NOT_STARTED_ROW = {
   ...ACTIVE_ROW, result: 'invalid', display_subtitle: 'خطة اختبار E2E — MEM-000003',
   subscription_status: 'NOT_STARTED', diagnostic_code: 'MEMBERSHIP_NOT_STARTED',
+}
+// M-9 fix: qr_validate's booking branch now also returns display_photo_url
+// (customers.photo_url), matching the club_membership branch's existing
+// pattern -- migration 20260903140000_qr_identity_match_booking_photo_and_
+// confirmation_record.sql. Row shape matches the real RPC's booking-branch
+// return exactly.
+const BOOKING_SUCCESS_ROW = {
+  result: 'success', credential_id: 'cred-booking-1', reference_type: 'booking', reference_id: 'booking-1', club_id: 'club-1',
+  display_name: 'Ahmed Test Customer', display_photo_url: 'https://example.test/photo.jpg', display_subtitle: 'Field 1 — 18:00',
+  subscription_status: null, diagnostic_code: 'SUCCESS', amount_due: 0,
 }
 const NO_MEMBERSHIP_ROW = {
   result: 'invalid', credential_id: null, reference_type: 'club_membership', reference_id: 'cust-2', club_id: 'club-1',
@@ -241,6 +263,88 @@ describe('ScanPage — Scanner Result UI (component render verification)', () =>
     expect(screen.queryByText('QA E2E Phone Test')).not.toBeInTheDocument()
     expect(screen.queryByText(/MEM-\d+/)).not.toBeInTheDocument()
     assertNoPii()
+  })
+})
+
+// M-9 fix regression coverage: (a) a booking QR's identity card now
+// renders the customer's photo (qr_validate's booking branch no longer
+// hardcodes display_photo_url to null), and (b) Confirm Check-in is
+// gated behind an explicit staff tap on that identity card, which is
+// passed through to qr_confirm_checkin as p_identity_confirmed -- the
+// persisted "Identity Match" system record this fix introduces.
+describe('ScanPage — M-9 identity confirmation step (booking check-in)', () => {
+  beforeEach(() => {
+    mockRpc.mockReset()
+    decodeCallback = null
+    void i18n.changeLanguage('en')
+  })
+
+  it('renders the booking customer photo on the identity card (booking QRs are no longer photo-less)', async () => {
+    await renderScanner()
+    await scanAndSettle('tok-booking-1', BOOKING_SUCCESS_ROW)
+
+    await waitFor(() => expect(screen.getByText('Ahmed Test Customer')).toBeInTheDocument())
+    const photo = screen.getByAltText('Ahmed Test Customer') as HTMLImageElement
+    expect(photo.src).toBe(BOOKING_SUCCESS_ROW.display_photo_url)
+  })
+
+  it('Confirm check-in is disabled until staff taps the identity card to confirm the match', async () => {
+    await renderScanner()
+    await scanAndSettle('tok-booking-2', BOOKING_SUCCESS_ROW)
+
+    await waitFor(() => expect(screen.getByText('Ahmed Test Customer')).toBeInTheDocument())
+    const confirmButton = screen.getByRole('button', { name: i18n.t('scanner.confirmCheckin') })
+    expect(confirmButton).toBeDisabled()
+    expect(screen.getByText(i18n.t('scanner.identityConfirmRequiredHint'))).toBeInTheDocument()
+
+    const identityToggle = screen.getByRole('button', { name: i18n.t('scanner.identityConfirmPrompt') })
+    act(() => {
+      identityToggle.click()
+    })
+
+    expect(confirmButton).not.toBeDisabled()
+    expect(screen.getByText(i18n.t('scanner.identityConfirmed'))).toBeInTheDocument()
+    expect(screen.queryByText(i18n.t('scanner.identityConfirmRequiredHint'))).not.toBeInTheDocument()
+  })
+
+  it('calls qr_confirm_checkin with p_identity_confirmed=true only after the identity tap', async () => {
+    await renderScanner()
+    await scanAndSettle('tok-booking-3', BOOKING_SUCCESS_ROW)
+
+    await waitFor(() => expect(screen.getByText('Ahmed Test Customer')).toBeInTheDocument())
+    const identityToggle = screen.getByRole('button', { name: i18n.t('scanner.identityConfirmPrompt') })
+    act(() => {
+      identityToggle.click()
+    })
+
+    mockRpc.mockResolvedValueOnce({ data: [{ result: 'success', booking_id: 'booking-1', diagnostic_code: 'SUCCESS' }], error: null })
+    const confirmButton = screen.getByRole('button', { name: i18n.t('scanner.confirmCheckin') })
+    act(() => {
+      confirmButton.click()
+    })
+
+    await waitFor(() =>
+      expect(mockRpc).toHaveBeenCalledWith('qr_confirm_checkin', { p_token: 'tok-booking-3', p_identity_confirmed: true }),
+    )
+  })
+
+  it('a fresh scan resets identity confirmation (cannot carry over a prior confirmation to a new QR)', async () => {
+    await renderScanner()
+    await scanAndSettle('tok-booking-4', BOOKING_SUCCESS_ROW)
+
+    await waitFor(() => expect(screen.getByText('Ahmed Test Customer')).toBeInTheDocument())
+    act(() => {
+      screen.getByRole('button', { name: i18n.t('scanner.identityConfirmPrompt') }).click()
+    })
+    expect(screen.getByRole('button', { name: i18n.t('scanner.confirmCheckin') })).not.toBeDisabled()
+
+    act(() => {
+      screen.getByText(i18n.t('scanner.scanAnother')).click()
+    })
+    await scanAndSettle('tok-booking-5', BOOKING_SUCCESS_ROW)
+
+    await waitFor(() => expect(screen.getByText('Ahmed Test Customer')).toBeInTheDocument())
+    expect(screen.getByRole('button', { name: i18n.t('scanner.confirmCheckin') })).toBeDisabled()
   })
 })
 

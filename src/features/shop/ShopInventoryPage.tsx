@@ -3,8 +3,7 @@ import { useTranslation } from 'react-i18next'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '@/lib/supabase/client'
 import { useAuth } from '@/app/providers/AuthProvider'
-import { useDirection } from '@/app/providers/DirectionProvider'
-import { formatDate, type SupportedLocale } from '@/lib/i18n/config'
+import { FormattedDate } from '@/components/ui/formatted-date'
 import { PageHeader } from '@/components/ui/page-header'
 import { DataTable, type DataTableColumn } from '@/components/ui/data-table'
 import { Button } from '@/components/ui/button'
@@ -215,7 +214,6 @@ function StockStatusBadge({ status }: { status: 'out' | 'low' | 'in' }) {
 export function ShopInventoryPage() {
   const { t } = useTranslation()
   const { currentClubId } = useAuth()
-  const { locale } = useDirection()
   const queryClient = useQueryClient()
   const [lowStockOnly, setLowStockOnly] = useState(false)
   const [receiveOpen, setReceiveOpen] = useState(false)
@@ -344,7 +342,7 @@ export function ShopInventoryPage() {
   ]
 
   const movementColumns: DataTableColumn<MovementRow>[] = [
-    { key: 'date', header: t('shop.inventory.columns.date'), render: (m) => formatDate(m.createdAt, locale as SupportedLocale, 'Africa/Cairo', { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) },
+    { key: 'date', header: t('shop.inventory.columns.date'), render: (m) => <FormattedDate value={m.createdAt} timeZone="Africa/Cairo" options={{ year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }} /> },
     { key: 'product', header: t('shop.inventory.columns.product'), render: (m) => m.productNameAr + (m.variantLabel ? ` (${m.variantLabel})` : '') },
     { key: 'location', header: t('shop.inventory.columns.location'), render: (m) => m.locationName },
     { key: 'type', header: t('shop.inventory.columns.movementType'), render: (m) => t(`shop.inventory.movementTypes.${m.movementType}`, { defaultValue: m.movementType }) },
@@ -355,7 +353,7 @@ export function ShopInventoryPage() {
   const recentColumns: DataTableColumn<MovementRow>[] = [
     { key: 'product', header: t('shop.inventory.columns.product'), render: (m) => m.productNameAr + (m.variantLabel ? ` (${m.variantLabel})` : '') },
     { key: 'quantity', header: t('shop.inventory.columns.quantity'), render: (m) => m.quantity },
-    { key: 'date', header: t('shop.inventory.columns.date'), render: (m) => formatDate(m.createdAt, locale as SupportedLocale, 'Africa/Cairo', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) },
+    { key: 'date', header: t('shop.inventory.columns.date'), render: (m) => <FormattedDate value={m.createdAt} timeZone="Africa/Cairo" options={{ month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }} /> },
   ]
 
   return (
@@ -1171,7 +1169,6 @@ type DetailTab = 'general' | 'stock' | 'movements' | 'sales' | 'returns' | 'supp
 
 function ProductDetailDialog({ clubId, productId, onClose }: { clubId: string; productId: string; onClose: () => void }) {
   const { t } = useTranslation()
-  const { locale } = useDirection()
   const [tab, setTab] = useState<DetailTab>('general')
 
   const { data: product } = useQuery({
@@ -1317,7 +1314,7 @@ function ProductDetailDialog({ clubId, productId, onClose }: { clubId: string; p
               <tbody>
                 {movementRows.map((m) => (
                   <tr key={m.movement_id} className="border-b border-border last:border-0">
-                    <td className="p-2">{formatDate(m.created_at, locale as SupportedLocale, 'Africa/Cairo', { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}</td>
+                    <td className="p-2"><FormattedDate value={m.created_at} timeZone="Africa/Cairo" options={{ year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }} /></td>
                     <td className="p-2">{t(`shop.inventory.movementTypes.${m.movement_type}`, { defaultValue: m.movement_type })}</td>
                     <td className="p-2">{Number(m.quantity)}</td>
                     <td className="p-2">{m.location_name}</td>
@@ -1343,7 +1340,7 @@ function ProductDetailDialog({ clubId, productId, onClose }: { clubId: string; p
               <tbody>
                 {salesRows.map((s) => (
                   <tr key={s.sale_id} className="border-b border-border last:border-0">
-                    <td className="p-2">{formatDate(s.created_at, locale as SupportedLocale, 'Africa/Cairo', { year: 'numeric', month: 'short', day: 'numeric' })}</td>
+                    <td className="p-2"><FormattedDate value={s.created_at} timeZone="Africa/Cairo" options={{ year: 'numeric', month: 'short', day: 'numeric' }} /></td>
                     <td className="p-2">{s.invoice_number}</td>
                     <td className="p-2">{s.customer_name ?? t('shop.dashboard.walkIn')}</td>
                     <td className="p-2">{Number(s.quantity)}</td>
@@ -1369,7 +1366,7 @@ function ProductDetailDialog({ clubId, productId, onClose }: { clubId: string; p
               <tbody>
                 {returnRows.map((r) => (
                   <tr key={r.return_id} className="border-b border-border last:border-0">
-                    <td className="p-2">{formatDate(r.created_at, locale as SupportedLocale, 'Africa/Cairo', { year: 'numeric', month: 'short', day: 'numeric' })}</td>
+                    <td className="p-2"><FormattedDate value={r.created_at} timeZone="Africa/Cairo" options={{ year: 'numeric', month: 'short', day: 'numeric' }} /></td>
                     <td className="p-2">{r.invoice_number}</td>
                     <td className="p-2">{Number(r.quantity)}</td>
                     <td className="p-2 text-text-secondary">{r.reason}</td>

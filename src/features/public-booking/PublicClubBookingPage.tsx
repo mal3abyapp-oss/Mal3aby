@@ -5,7 +5,9 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
 import { supabase } from '@/lib/supabase/client'
 import { useDirection } from '@/app/providers/DirectionProvider'
-import { formatCurrency, formatDate, type SupportedLocale } from '@/lib/i18n/config'
+import { formatDate, type SupportedLocale } from '@/lib/i18n/config'
+import { FormattedDate } from '@/components/ui/formatted-date'
+import { FormattedCurrency } from '@/components/ui/formatted-currency'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { PhoneInput } from '@/components/ui/phone-input'
@@ -584,9 +586,9 @@ export function PublicClubBookingPage() {
                   }}
                 >
                   <p className="font-medium">
-                    {opt.isToday ? t('publicBooking.today') : formatDate(opt.date, locale as SupportedLocale, club.timezone, { weekday: 'short' })}
+                    {opt.isToday ? t('publicBooking.today') : <FormattedDate value={opt.date} timeZone={club.timezone} options={{ weekday: 'short' }} />}
                   </p>
-                  <p className="text-text-secondary">{formatDate(opt.date, locale as SupportedLocale, club.timezone, { day: 'numeric', month: 'short' })}</p>
+                  <p className="text-text-secondary"><FormattedDate value={opt.date} timeZone={club.timezone} options={{ day: 'numeric', month: 'short' }} /></p>
                   {opt.isToday && (
                     <span className="rounded-full bg-info/10 px-2 py-0.5 text-[11px] font-medium text-info">
                       {t('publicBooking.todayContactBadge')}
@@ -601,7 +603,7 @@ export function PublicClubBookingPage() {
         {step === 'time' && (
           <div className="flex flex-col gap-3">
             <h1 className="text-lg font-semibold">{t('publicBooking.chooseTime')}</h1>
-            {selectedDate && <p className="text-sm text-text-secondary">{formatDate(selectedDate, locale as SupportedLocale, club.timezone, { day: 'numeric', month: 'long', year: 'numeric' })}</p>}
+            {selectedDate && <p className="text-sm text-text-secondary"><FormattedDate value={selectedDate} timeZone={club.timezone} options={{ day: 'numeric', month: 'long', year: 'numeric' }} /></p>}
 
             {/* BOOKING ENGINE / AVAILABILITY directive section 3: duration
                 is a real, separate choice from the 30-minute availability
@@ -738,7 +740,7 @@ export function PublicClubBookingPage() {
               {selectedDate && (
                 <div className="flex justify-between py-1">
                   <span className="text-text-secondary">{t('publicBooking.date')}</span>
-                  <span className="font-medium">{formatDate(selectedDate, locale as SupportedLocale, club.timezone, { day: 'numeric', month: 'long' })}</span>
+                  <span className="font-medium"><FormattedDate value={selectedDate} timeZone={club.timezone} options={{ day: 'numeric', month: 'long' }} /></span>
                 </div>
               )}
               <div className="flex justify-between py-1">
@@ -748,7 +750,7 @@ export function PublicClubBookingPage() {
               {price != null && (
                 <div className="mt-1 flex justify-between border-t border-border pt-2 font-semibold">
                   <span>{t('publicBooking.total')}</span>
-                  <span className="tabular-nums">{formatCurrency(price, locale as SupportedLocale, club.currency)}</span>
+                  <span className="tabular-nums"><FormattedCurrency value={price} currencyCode={club.currency} /></span>
                 </div>
               )}
             </div>
@@ -824,7 +826,7 @@ export function PublicClubBookingPage() {
                 </p>
               )}
               {confirmedTotal != null && (
-                <p className="text-sm font-semibold">{formatCurrency(confirmedTotal, locale as SupportedLocale, club.currency)}</p>
+                <p className="text-sm font-semibold"><FormattedCurrency value={confirmedTotal} currencyCode={club.currency} /></p>
               )}
             </div>
 

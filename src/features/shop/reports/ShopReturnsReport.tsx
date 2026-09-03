@@ -3,8 +3,7 @@ import { useTranslation } from 'react-i18next'
 import { useMutation, useQuery } from '@tanstack/react-query'
 import { supabase } from '@/lib/supabase/client'
 import { useAuth } from '@/app/providers/AuthProvider'
-import { useDirection } from '@/app/providers/DirectionProvider'
-import { formatDate, type SupportedLocale } from '@/lib/i18n/config'
+import { FormattedDate } from '@/components/ui/formatted-date'
 import { DataTable, type DataTableColumn } from '@/components/ui/data-table'
 import { MoneyDisplay } from '@/components/ui/money-display'
 import { Input } from '@/components/ui/input'
@@ -42,7 +41,6 @@ const REFUND_FILTER_ALL = '__all__'
 export function ReportShopReturnsContent() {
   const { t } = useTranslation()
   const { currentClubId } = useAuth()
-  const { locale } = useDirection()
   const { startDate, setStartDate, endDate, setEndDate } = useDateRange()
   const { offset, setOffset, reset } = useOffsetPager()
   const [refundedOnly, setRefundedOnly] = useState<string>(REFUND_FILTER_ALL)
@@ -69,7 +67,7 @@ export function ReportShopReturnsContent() {
 
   const columns: DataTableColumn<ReturnRow>[] = [
     { key: 'invoice', header: t('shop.sales.columns.invoice'), render: (r) => <bdi>{r.invoiceNumber}</bdi> },
-    { key: 'date', header: t('shop.sales.columns.date'), render: (r) => formatDate(r.createdAt, locale as SupportedLocale, 'Africa/Cairo', { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) },
+    { key: 'date', header: t('shop.sales.columns.date'), render: (r) => <FormattedDate value={r.createdAt} timeZone="Africa/Cairo" options={{ year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }} /> },
     { key: 'processedBy', header: t('shop.reports.returns.processedBy'), render: (r) => r.processedByName ?? '—' },
     { key: 'reason', header: t('shop.sales.reasonLabel'), render: (r) => r.reason },
     { key: 'restock', header: t('shop.sales.restockLabel'), render: (r) => (r.restock ? t('common.yes') : t('common.no')) },

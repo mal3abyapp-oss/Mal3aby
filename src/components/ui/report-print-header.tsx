@@ -1,7 +1,7 @@
 import { useTranslation } from 'react-i18next'
 import { useAuth } from '@/app/providers/AuthProvider'
 import { useDirection } from '@/app/providers/DirectionProvider'
-import { formatDate } from '@/lib/i18n/config'
+import { FormattedDate } from '@/components/ui/formatted-date'
 import { Printer } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 
@@ -56,7 +56,7 @@ export function ReportPrintHeader({
       {clubLabel && <p className="text-sm text-text-secondary">{clubLabel}</p>}
       {filterSummary && <p className="text-xs text-text-secondary">{filterSummary}</p>}
       <p className="text-xs text-text-secondary">
-        {t('reports.generatedAt')}: {formatDate(new Date().toISOString(), locale, 'Africa/Cairo', { day: 'numeric', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
+        {t('reports.generatedAt')}: <FormattedDate value={new Date()} timeZone="Africa/Cairo" options={{ day: 'numeric', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit' }} />
       </p>
     </div>
   )

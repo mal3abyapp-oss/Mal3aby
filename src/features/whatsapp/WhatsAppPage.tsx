@@ -92,7 +92,14 @@ function OverviewTab({ onReviewFailures }: { onReviewFailures: () => void }) {
     error: t('whatsapp.statusLabels.error'),
   }
   const { currentClubId } = useAuth()
-  const { data, isLoading } = useQuery({
+  // Finding H-2 (frozen production audit): this dashboard card
+  // previously destructured only `data, isLoading` -- a failed fetch
+  // silently rendered as "Disconnected / 0 pending / 0 failed" (the
+  // same fallback values as a genuinely healthy idle queue), the wrong
+  // failure mode for the one card meant to show whether WhatsApp is
+  // actually working. isError is now surfaced as a compact inline
+  // notice in place of the status card's normal content.
+  const { data, isLoading, isError } = useQuery({
     queryKey: ['whatsapp-quick-health', currentClubId],
     queryFn: () => fetchQuickHealth(currentClubId!),
     enabled: !!currentClubId,
@@ -110,6 +117,8 @@ function OverviewTab({ onReviewFailures }: { onReviewFailures: () => void }) {
       <CardContent>
         {isLoading ? (
           <p className="text-sm text-text-secondary">{t('whatsapp.page.overviewTab.loading')}</p>
+        ) : isError ? (
+          <p className="text-sm text-status-danger">{t('whatsapp.page.overviewTab.loadError')}</p>
         ) : (
           <div className="flex flex-col gap-3 text-sm">
             <div className="flex items-center gap-2">

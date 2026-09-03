@@ -4,8 +4,7 @@ import { Link } from 'react-router-dom'
 import { useMutation, useQuery } from '@tanstack/react-query'
 import { supabase } from '@/lib/supabase/client'
 import { useAuth } from '@/app/providers/AuthProvider'
-import { useDirection } from '@/app/providers/DirectionProvider'
-import { formatDate, type SupportedLocale } from '@/lib/i18n/config'
+import { FormattedDate } from '@/components/ui/formatted-date'
 import { DataTable, type DataTableColumn } from '@/components/ui/data-table'
 import { StatCard } from '@/components/ui/stat-card'
 import { MoneyDisplay } from '@/components/ui/money-display'
@@ -123,7 +122,6 @@ const STATUS_TONE: Record<string, 'success' | 'neutral' | 'warning' | 'danger'> 
 export function ReportShopSalesDetailContent() {
   const { t } = useTranslation()
   const { currentClubId } = useAuth()
-  const { locale } = useDirection()
   const { startDate, setStartDate, endDate, setEndDate } = useDateRange()
   const { offset, setOffset, reset } = useOffsetPager()
 
@@ -150,7 +148,7 @@ export function ReportShopSalesDetailContent() {
     { key: 'invoice', header: t('shop.sales.columns.invoice'), render: (r) => <bdi>{r.invoiceNumber}</bdi> },
     { key: 'customer', header: t('shop.sales.columns.customer'), render: (r) => r.customerName ?? '—' },
     { key: 'cashier', header: t('shop.sales.columns.cashier'), render: (r) => r.soldByName ?? '—' },
-    { key: 'date', header: t('shop.sales.columns.date'), render: (r) => formatDate(r.createdAt, locale as SupportedLocale, 'Africa/Cairo', { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) },
+    { key: 'date', header: t('shop.sales.columns.date'), render: (r) => <FormattedDate value={r.createdAt} timeZone="Africa/Cairo" options={{ year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }} /> },
     { key: 'total', header: t('shop.sales.columns.total'), render: (r) => <MoneyDisplay amount={r.total} size="sm" /> },
     { key: 'discount', header: t('shop.sales.columns.discount'), render: (r) => (r.discountAmount > 0 ? <MoneyDisplay amount={r.discountAmount} size="sm" tone="danger" /> : '—') },
     { key: 'refund', header: t('shop.sales.columns.refund'), render: (r) => (r.refundAmount > 0 ? <MoneyDisplay amount={r.refundAmount} size="sm" tone="danger" /> : '—') },

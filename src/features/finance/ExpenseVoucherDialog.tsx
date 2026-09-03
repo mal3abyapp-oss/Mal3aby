@@ -1,6 +1,7 @@
 import { useTranslation } from 'react-i18next'
 import { useDirection } from '@/app/providers/DirectionProvider'
-import { formatDate } from '@/lib/i18n/config'
+import { formatDateIsolated } from '@/lib/i18n/config'
+import { FormattedDate } from '@/components/ui/formatted-date'
 import { MoneyDisplay } from '@/components/ui/money-display'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
@@ -95,7 +96,7 @@ export function ExpenseVoucherDialog({
                 {t('finance.expenses.voucher.reference')}: <bdi className="tabular-nums">{expense.reference ?? expense.id.slice(0, 8).toUpperCase()}</bdi>
               </p>
               <p>
-                {t('finance.expenses.voucher.date')}: {formatDate(expense.expenseDate, locale === 'en' ? 'en' : 'ar', 'Africa/Cairo', { year: 'numeric', month: 'short', day: 'numeric' })}
+                {t('finance.expenses.voucher.date')}: <FormattedDate value={expense.expenseDate} timeZone="Africa/Cairo" options={{ year: 'numeric', month: 'short', day: 'numeric' }} />
               </p>
               <p>{t('finance.expenses.voucher.branch')}: {expense.branchName}</p>
               {expense.categoryName && <p>{t('finance.expenses.voucher.category')}: {expense.categoryName}</p>}
@@ -123,7 +124,7 @@ export function ExpenseVoucherDialog({
                 {expense.voidedAt && (
                   <p>
                     {t('finance.expenses.voucher.voidedAt', {
-                      date: formatDate(expense.voidedAt, locale === 'en' ? 'en' : 'ar', 'Africa/Cairo', { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }),
+                      date: formatDateIsolated(expense.voidedAt, locale === 'en' ? 'en' : 'ar', 'Africa/Cairo', { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }),
                     })}
                   </p>
                 )}

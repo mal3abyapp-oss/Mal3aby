@@ -8,7 +8,8 @@ import { StatusBadge } from '@/components/ui/status-badge'
 import { QrCodeViewer } from '@/components/ui/qr-code-viewer'
 import { PAYMENT_STATUS_TONE, type PaymentStatus } from '@/lib/domain/billing'
 import { useDirection } from '@/app/providers/DirectionProvider'
-import { formatCurrency, formatDate, type SupportedLocale } from '@/lib/i18n/config'
+import { FormattedDate } from '@/components/ui/formatted-date'
+import { FormattedCurrency } from '@/components/ui/formatted-currency'
 import { CheckCircle2, XCircle, Ticket, Ban } from 'lucide-react'
 
 // Task #86: public invoice verification page. Reachable with NO login
@@ -50,6 +51,14 @@ import { CheckCircle2, XCircle, Ticket, Ban } from 'lucide-react'
 // and the RPC re-validates the booking's own status server-side on
 // every click (cancelled/checked-in/not-eligible), so a stale or
 // tampered client can't force a QR for an invalid booking.
+//
+// Production audit finding H-1 (RTL-bidi gap): date/currency values
+// used to call formatDate()/formatCurrency() directly, returning plain
+// strings with no bidi isolation (unlike MoneyDisplay, which has always
+// wrapped its own output in <bdi>). Migrated to <FormattedDate>/
+// <FormattedCurrency> (src/components/ui/formatted-date.tsx,
+// formatted-currency.tsx) so every rendered date/amount on this public,
+// unauthenticated page is bidi-isolated the same way.
 
 interface OfficialReceipt {
   receiptSerial: string | null
@@ -226,25 +235,23 @@ export function VerifyInvoicePage() {
               <div className="flex justify-between py-1">
                 <span className="text-text-secondary">{t('verifyInvoice.issuedAt')}</span>
                 <span className="font-medium">
-                  {data.issuedAt
-                    ? formatDate(data.issuedAt, locale as SupportedLocale, 'Africa/Cairo', { day: 'numeric', month: 'long', year: 'numeric' })
-                    : '—'}
+                  <FormattedDate value={data.issuedAt} timeZone="Africa/Cairo" options={{ day: 'numeric', month: 'long', year: 'numeric' }} />
                 </span>
               </div>
               <div className="flex justify-between py-1">
                 <span className="text-text-secondary">{t('verifyInvoice.total')}</span>
-                <span className="font-medium">{data.total !== null ? formatCurrency(data.total, locale as SupportedLocale) : '—'}</span>
+                <span className="font-medium"><FormattedCurrency value={data.total} /></span>
               </div>
               {data.paid !== null && (
                 <div className="flex justify-between py-1">
                   <span className="text-text-secondary">{t('verifyInvoice.paid')}</span>
-                  <span className="font-medium text-status-success">{formatCurrency(data.paid, locale as SupportedLocale)}</span>
+                  <span className="font-medium text-status-success"><FormattedCurrency value={data.paid} /></span>
                 </div>
               )}
               {data.outstanding !== null && data.outstanding > 0 && (
                 <div className="flex justify-between py-1">
                   <span className="text-text-secondary">{t('verifyInvoice.outstanding')}</span>
-                  <span className="font-medium text-status-danger">{formatCurrency(data.outstanding, locale as SupportedLocale)}</span>
+                  <span className="font-medium text-status-danger"><FormattedCurrency value={data.outstanding} /></span>
                 </div>
               )}
               <div className="flex justify-between py-1">
@@ -273,15 +280,13 @@ export function VerifyInvoicePage() {
                       <div className="flex justify-between py-0.5">
                         <span className="text-text-secondary">{t('verifyInvoice.officialReceipts.date')}</span>
                         <span className="font-medium">
-                          {receipt.receiptDate
-                            ? formatDate(receipt.receiptDate, locale as SupportedLocale, 'Africa/Cairo', { day: 'numeric', month: 'long', year: 'numeric' })
-                            : '—'}
+                          <FormattedDate value={receipt.receiptDate} timeZone="Africa/Cairo" options={{ day: 'numeric', month: 'long', year: 'numeric' }} />
                         </span>
                       </div>
                       <div className="flex justify-between py-0.5">
                         <span className="text-text-secondary">{t('verifyInvoice.officialReceipts.amount')}</span>
                         <span className="font-medium">
-                          {receipt.receiptAmount !== null ? formatCurrency(receipt.receiptAmount, locale as SupportedLocale) : '—'}
+                          <FormattedCurrency value={receipt.receiptAmount} />
                         </span>
                       </div>
                     </div>
@@ -334,13 +339,13 @@ export function VerifyInvoicePage() {
                           <div className="flex justify-between py-1">
                             <span className="text-text-secondary">{t('verifyInvoice.qrAction.date')}</span>
                             <span className="font-medium">
-                              {formatDate(bookingQr.startAt, locale as SupportedLocale, 'Africa/Cairo', { day: 'numeric', month: 'long', year: 'numeric' })}
+                              <FormattedDate value={bookingQr.startAt} timeZone="Africa/Cairo" options={{ day: 'numeric', month: 'long', year: 'numeric' }} />
                             </span>
                           </div>
                           <div className="flex justify-between py-1">
                             <span className="text-text-secondary">{t('verifyInvoice.qrAction.time')}</span>
                             <span className="font-medium">
-                              {formatDate(bookingQr.startAt, locale as SupportedLocale, 'Africa/Cairo', { hour: 'numeric', minute: '2-digit' })}
+                              <FormattedDate value={bookingQr.startAt} timeZone="Africa/Cairo" options={{ hour: 'numeric', minute: '2-digit' }} />
                             </span>
                           </div>
                         </>

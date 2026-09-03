@@ -3,7 +3,8 @@ import { useTranslation } from 'react-i18next'
 import { useQuery } from '@tanstack/react-query'
 import { supabase } from '@/lib/supabase/client'
 import { useDirection } from '@/app/providers/DirectionProvider'
-import { formatDate } from '@/lib/i18n/config'
+import { formatDateIsolated } from '@/lib/i18n/config'
+import { FormattedDate } from '@/components/ui/formatted-date'
 import { MoneyDisplay } from '@/components/ui/money-display'
 import { Button } from '@/components/ui/button'
 import {
@@ -284,7 +285,7 @@ function InvoiceDocumentBody({
         <div>
           <p className="font-bold">{t('billing.detail.invoicePrefix')} <bdi>{sale.invoiceNumber}</bdi></p>
           <p className="text-xs text-text-secondary">
-            {formatDate(sale.createdAt, locale === 'en' ? 'en' : 'ar', 'Africa/Cairo', { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
+            <FormattedDate value={sale.createdAt} timeZone="Africa/Cairo" options={{ year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }} />
           </p>
           {!isThermal && (
             <p className="text-xs text-text-secondary">{sale.branchName} — {sale.locationName}</p>
@@ -551,7 +552,7 @@ export function ShopPaymentReceiptDialog({
               <div className="flex flex-col gap-1">
                 <p>{t('billing.detail.invoicePrefix')} <bdi>{sale.invoiceNumber}</bdi></p>
                 {sale.customerName && <p>{t('billing.refund.receiptCustomer', { name: sale.customerName })}</p>}
-                <p>{t('billing.refund.receiptDate', { date: formatDate(payment.receivedAt, locale === 'en' ? 'en' : 'ar', 'Africa/Cairo', { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) })}</p>
+                <p>{t('billing.refund.receiptDate', { date: formatDateIsolated(payment.receivedAt, locale === 'en' ? 'en' : 'ar', 'Africa/Cairo', { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) })}</p>
                 <p>{t('billing.refund.receiptOriginalMethod', { method: t(`common.paymentMethodLabels.${payment.method}`, { defaultValue: PAYMENT_METHOD_LABELS[payment.method] ?? payment.method }) })}</p>
                 {payment.receivedByName && <p>{t('billing.detail.collectedBy', { name: payment.receivedByName })}</p>}
               </div>

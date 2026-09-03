@@ -181,16 +181,22 @@ export function PlatformClubDetailPage() {
     enabled: !!clubId,
   })
   // Phase E directive (C8/E4): fills the WhatsApp health placeholder
-  // card added in Phase C. Reuses the same batched, platform-wide RPC
-  // Overview uses (no new N+1 surface) and filters to this one club --
-  // cheap at current scale, and keeps a single source of truth for
-  // WhatsApp health logic instead of a second per-club RPC.
+  // card added in Phase C. Reuses the same RPC Overview uses, and keeps
+  // a single source of truth for WhatsApp health logic instead of a
+  // second per-club RPC.
+  // Production audit remediation (M-2): get_platform_whatsapp_health()'s
+  // aggregate (no-argument) call now excludes QA/test-fixture clubs --
+  // passing p_club_id here opts this single-club lookup out of that
+  // filter, matching get_platform_club_360() above (a fixture club's
+  // own Detail page must still show its real data, including WhatsApp
+  // health, the same way a platform owner or support session can still
+  // open that page at all).
   const { data: whatsappHealthRow } = useQuery({
     queryKey: ['platform-whatsapp-health', clubId],
     queryFn: async () => {
-      const { data, error } = await supabase.rpc('get_platform_whatsapp_health')
+      const { data, error } = await supabase.rpc('get_platform_whatsapp_health', { p_club_id: clubId! })
       if (error) throw error
-      return (data ?? []).find((w) => w.club_id === clubId) ?? null
+      return data?.[0] ?? null
     },
     enabled: !!clubId,
   })

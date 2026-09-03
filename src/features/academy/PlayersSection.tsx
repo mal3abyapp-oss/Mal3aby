@@ -12,6 +12,7 @@ import { CustomerSelector, type SelectedCustomer } from '@/components/ui/custome
 import { StatusBadge } from '@/components/ui/status-badge'
 import { MoneyDisplay } from '@/components/ui/money-display'
 import { DataTable, type DataTableColumn } from '@/components/ui/data-table'
+import { ErrorState } from '@/components/ui/error-state'
 import {
   Select,
   SelectContent,
@@ -167,7 +168,13 @@ export function PlayersSection() {
   const [subscribeOpen, setSubscribeOpen] = useState(false)
   const [collectOpen, setCollectOpen] = useState(false)
 
-  const { data: players = [], isLoading } = useQuery({
+  // Finding H-2 (frozen production audit): this list previously
+  // destructured only `data = [], isLoading` -- a failed fetch silently
+  // rendered as "no players" via DataTable's own empty state,
+  // indistinguishable from an academy that genuinely has none.
+  // isError/error/refetch are now surfaced so a fetch failure shows an
+  // explicit error, never a false "empty academy" signal.
+  const { data: players = [], isLoading, isError, error, refetch } = useQuery({
     queryKey: ['academy-players', currentClubId, search],
     queryFn: () => fetchPlayersWithContext(currentClubId!, search),
     enabled: !!currentClubId,
@@ -284,14 +291,18 @@ export function PlayersSection() {
         ))}
       </div>
 
-      <DataTable
-        columns={columns}
-        rows={visiblePlayers}
-        rowKey={(p) => p.id}
-        isLoading={isLoading}
-        emptyTitle={t('academy.players.emptyTitle')}
-        emptyDescription={t('academy.players.emptyDescription')}
-      />
+      {isError ? (
+        <ErrorState message={translateSupabaseError(error, t('academy.players.loadError'))} onRetry={() => void refetch()} />
+      ) : (
+        <DataTable
+          columns={columns}
+          rows={visiblePlayers}
+          rowKey={(p) => p.id}
+          isLoading={isLoading}
+          emptyTitle={t('academy.players.emptyTitle')}
+          emptyDescription={t('academy.players.emptyDescription')}
+        />
+      )}
 
       {selectedPlayer && (
         <PlayerDetailDialog

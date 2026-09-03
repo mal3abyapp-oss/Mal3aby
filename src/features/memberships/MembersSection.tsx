@@ -3,10 +3,12 @@ import { useTranslation } from 'react-i18next'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '@/lib/supabase/client'
 import { useAuth } from '@/app/providers/AuthProvider'
+import { translateSupabaseError } from '@/lib/errors'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { StatusBadge } from '@/components/ui/status-badge'
 import { DataTable, type DataTableColumn } from '@/components/ui/data-table'
+import { ErrorState } from '@/components/ui/error-state'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Dialog, DialogTrigger } from '@/components/ui/dialog'
 import { CLUB_MEMBERSHIP_STATUS_TONE } from '@/lib/domain/clubMembership'
@@ -64,7 +66,13 @@ export function MembersSection() {
   const [sellOpen, setSellOpen] = useState(false)
   const [selectedId, setSelectedId] = useState<string | null>(null)
 
-  const { data, isLoading } = useQuery({
+  // Finding H-2 (frozen production audit): this list previously
+  // destructured only `data, isLoading` -- a failed fetch silently
+  // rendered as "no club memberships" via DataTable's own empty state,
+  // indistinguishable from a club that genuinely has none. isError/
+  // error/refetch are now surfaced so a fetch failure shows an explicit
+  // error, never a false "empty" signal.
+  const { data, isLoading, isError, error, refetch } = useQuery({
     queryKey: ['club-membership-members', currentClubId, search, status, page],
     queryFn: () => fetchMembers(currentClubId!, search, status, page),
     enabled: !!currentClubId,
@@ -130,16 +138,20 @@ export function MembersSection() {
         </Dialog>
       </div>
 
-      <DataTable
-        columns={columns}
-        rows={rows}
-        rowKey={(m) => m.membership_subscription_id}
-        isLoading={isLoading}
-        emptyTitle={t('clubMemberships.members.emptyTitle')}
-        emptyDescription={t('clubMemberships.members.emptyDescription')}
-      />
+      {isError ? (
+        <ErrorState message={translateSupabaseError(error, t('clubMemberships.members.loadError'))} onRetry={() => void refetch()} />
+      ) : (
+        <DataTable
+          columns={columns}
+          rows={rows}
+          rowKey={(m) => m.membership_subscription_id}
+          isLoading={isLoading}
+          emptyTitle={t('clubMemberships.members.emptyTitle')}
+          emptyDescription={t('clubMemberships.members.emptyDescription')}
+        />
+      )}
 
-      {totalPages > 1 && (
+      {totalPages > 1 && !isError && (
         <div className="flex items-center justify-between text-sm text-text-secondary">
           <Button size="sm" variant="outline" disabled={page <= 1} onClick={() => setPage((p) => p - 1)}>{t('common.previous', { defaultValue: 'Previous' })}</Button>
           <span>{t('common.pageOfTotal', { page, total: totalPages })}</span>

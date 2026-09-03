@@ -134,9 +134,18 @@ async function fetchAccountHealth(clubId: string): Promise<AccountHealth | null>
   }
 }
 
+// Production audit finding H-1 (RTL-bidi gap): matches the same fix
+// applied to WhatsAppActivityTab.tsx's/WhatsAppConnectionCard.tsx's own
+// copy of this helper -- FSI/PDI isolation marks, same convention as
+// formatMoney()/formatDateIsolated(). Kept as a plain string (not a
+// <FormattedDate>) because some call sites here interpolate it into a
+// t() string (lastSuccessfulSend), which only accepts a string.
+const DATETIME_FSI = '⁦'
+const DATETIME_PDI = '⁩'
 function formatDateTime(iso: string | null, locale: 'ar' | 'en'): string {
   if (!iso) return '—'
-  return new Date(iso).toLocaleString(locale === 'en' ? 'en-US' : 'ar-EG', { dateStyle: 'medium', timeStyle: 'short' })
+  const formatted = new Date(iso).toLocaleString(locale === 'en' ? 'en-US' : 'ar-EG', { dateStyle: 'medium', timeStyle: 'short' })
+  return `${DATETIME_FSI}${formatted}${DATETIME_PDI}`
 }
 
 export function MessagingSafetyCard() {

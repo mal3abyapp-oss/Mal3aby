@@ -195,6 +195,16 @@ export function StaffPage() {
   const [selectedBranchIds, setSelectedBranchIds] = useState<string[]>([])
   const [formError, setFormError] = useState<string | null>(null)
   const [setupLink, setSetupLink] = useState<string | null>(null)
+  // Production audit finding H-3: deactivate previously fired
+  // deactivateMutation directly on click with zero confirmation --
+  // same one-misclick risk class as BookingDetailSheet's no-show/
+  // complete actions before their own reveal-then-confirm fix (see
+  // that file's comments for the real production misclick incident
+  // that motivated the pattern). Reuses that exact same pattern here
+  // rather than introducing a new confirmation-dialog component:
+  // tracks which row is mid-confirm by membershipId since this is a
+  // per-row table action, not a single-instance sheet.
+  const [confirmingDeactivateId, setConfirmingDeactivateId] = useState<string | null>(null)
 
   const { data: staff = [], isLoading } = useQuery({
     queryKey: ['staff', currentClubId],
@@ -309,6 +319,7 @@ export function StaffPage() {
       if (error) throw error
     },
     onSuccess: () => {
+      setConfirmingDeactivateId(null)
       void queryClient.invalidateQueries({ queryKey: ['staff', currentClubId] })
     },
   })
@@ -413,12 +424,33 @@ export function StaffPage() {
       header: '',
       render: (r) => {
         if (r.status === 'active') {
+          // Reveal-then-confirm, same pattern as BookingDetailSheet's
+          // no-show/complete/cancel flows -- only this row's own confirm
+          // state opens, matching the one-misclick protection those
+          // flows exist for without adding a new dialog component.
+          if (confirmingDeactivateId === r.membershipId) {
+            return (
+              <div className="flex items-center gap-2">
+                <span className="text-xs text-text-secondary">{t('staff.confirmDeactivateMessage')}</span>
+                <Button
+                  variant="destructive"
+                  size="sm"
+                  onClick={() => deactivateMutation.mutate(r.membershipId)}
+                  disabled={deactivateMutation.isPending}
+                >
+                  {deactivateMutation.isPending ? t('staff.deactivating') : t('staff.confirmDeactivate')}
+                </Button>
+                <Button variant="ghost" size="sm" onClick={() => setConfirmingDeactivateId(null)}>
+                  {t('common.cancel')}
+                </Button>
+              </div>
+            )
+          }
           return (
             <Button
               variant="ghost"
               size="sm"
-              onClick={() => deactivateMutation.mutate(r.membershipId)}
-              disabled={deactivateMutation.isPending}
+              onClick={() => setConfirmingDeactivateId(r.membershipId)}
             >
               {t('staff.deactivate')}
             </Button>

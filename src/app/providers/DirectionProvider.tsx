@@ -1,8 +1,6 @@
 import { createContext, useContext, useEffect, useState, type ReactNode } from 'react'
-import { useTranslation } from 'react-i18next'
 import { DirectionProvider as RadixDirectionProvider } from '@radix-ui/react-direction'
-import '@/lib/i18n/config'
-import { LOCALE_STORAGE_KEY, type SupportedLocale } from '@/lib/i18n/config'
+import i18nInstance, { initI18n, isI18nReady, LOCALE_STORAGE_KEY, type SupportedLocale } from '@/lib/i18n/config'
 
 // RTL-first per docs/DESIGN_SYSTEM.md#rtl--internationalization — Arabic/RTL
 // is the default; English/LTR is a toggle, not the baseline the app is
@@ -32,7 +30,19 @@ function readInitialLocale(): Locale {
 }
 
 export function DirectionProvider({ children }: { children: ReactNode }) {
-  const { i18n } = useTranslation()
+  // Uses the module's own default-exported i18n singleton directly
+  // (imported above) rather than `const { i18n } = useTranslation()`:
+  // react-i18next's useTranslation() falls back to `{}` for `i18n` (see
+  // its own source) whenever no i18next instance has finished running
+  // initReactI18next's init hook yet (getI18n() is still undefined at
+  // that point) -- i18n/config.ts's PERF-03 lazy-load fix means that can
+  // genuinely be true on this component's very first render (e.g. a
+  // caller that renders DirectionProvider directly, in isolation,
+  // without main.tsx's own upfront `await initI18n()` -- see
+  // DirectionProvider.test.tsx). The default-exported singleton is
+  // always the real instance and always has a real changeLanguage;
+  // initI18n() below guarantees it becomes ready even when nothing
+  // upstream already awaited it.
   const [locale, setLocaleState] = useState<Locale>(readInitialLocale)
   const direction: Direction = locale === 'ar' ? 'rtl' : 'ltr'
 
@@ -42,8 +52,31 @@ export function DirectionProvider({ children }: { children: ReactNode }) {
   }, [direction, locale])
 
   useEffect(() => {
-    if (i18n.language !== locale) {
-      void i18n.changeLanguage(locale)
+    // Fast path: init already completed (the overwhelmingly common case
+    // -- production always has main.tsx's own upfront `await
+    // initI18n()` finished before App/DirectionProvider ever mounts).
+    // Calls changeLanguage() with the exact same timing/microtask shape
+    // it always had pre-lazy-load, which React Testing Library's
+    // render()/act() flush depends on to observe the result with no
+    // waitFor (see App.test.tsx, DirectionProvider.test.tsx).
+    if (isI18nReady()) {
+      if (i18nInstance.language !== locale) {
+        void i18nInstance.changeLanguage(locale)
+      }
+      return
+    }
+    // Slow path: nothing upstream has initialized i18next yet (a caller
+    // rendering DirectionProvider directly, without main.tsx's own
+    // init) -- initI18n() makes it ready, then syncs language exactly
+    // as above.
+    let cancelled = false
+    void initI18n().then(() => {
+      if (!cancelled && i18nInstance.language !== locale) {
+        void i18nInstance.changeLanguage(locale)
+      }
+    })
+    return () => {
+      cancelled = true
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [locale])

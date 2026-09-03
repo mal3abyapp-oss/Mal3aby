@@ -1,7 +1,8 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach, beforeAll } from 'vitest'
 import { render, screen, waitFor, fireEvent } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
 import { PortalLoginPage } from './PortalLoginPage'
+import { initI18n } from '@/lib/i18n/config'
 
 // CUSTOMER EMAIL OTP (2026-08-31) -- COMPONENT RENDER VERIFICATION.
 // signInWithOtp()/verifyOtp() themselves are mocked (a real OTP round
@@ -27,6 +28,16 @@ import { PortalLoginPage } from './PortalLoginPage'
 // regardless of the app's own runtime default of Arabic (see
 // i18n/config.ts's fallbackLng) -- matching what's actually rendered
 // rather than fighting the detector.
+//
+// PERF-03 lazy-load fix: i18n/config.ts no longer self-initializes at
+// import time (previously this suite got a real, ready i18n instance
+// only as an accidental side effect of PortalLoginPage.tsx transitively
+// importing lib/errors.ts, which imports i18n/config.ts). Explicit here
+// now so it doesn't depend on that import chain -- memoized, so this is
+// a cheap no-op if something else already initialized it.
+beforeAll(async () => {
+  await initI18n()
+})
 
 const mockSignInWithOtp = vi.fn()
 const mockVerifyOtp = vi.fn()

@@ -6,7 +6,9 @@ import { useDirection } from '@/app/providers/DirectionProvider'
 import { PageHeader } from '@/components/ui/page-header'
 import { StatCard } from '@/components/ui/stat-card'
 import { DataTable, type DataTableColumn } from '@/components/ui/data-table'
+import { ErrorState } from '@/components/ui/error-state'
 import { StatusBadge } from '@/components/ui/status-badge'
+import { translateSupabaseError } from '@/lib/errors'
 
 interface TrialRow {
   id: string
@@ -40,7 +42,13 @@ async function fetchTrials(): Promise<TrialRow[]> {
 export function PlatformTrialsPage() {
   const { t } = useTranslation()
   const { locale } = useDirection()
-  const { data: trials = [], isLoading } = useQuery({ queryKey: ['platform-trials'], queryFn: fetchTrials })
+  // Finding H-2 (frozen production audit): this list previously
+  // destructured only `data = [], isLoading` -- a failed fetch silently
+  // rendered as "no free trials" (both the DataTable empty state and
+  // the Active/Expired/Cancelled StatCards reading 0), indistinguishable
+  // from a platform genuinely running zero trials. isError/error/
+  // refetch are now surfaced.
+  const { data: trials = [], isLoading, isError, error, refetch } = useQuery({ queryKey: ['platform-trials'], queryFn: fetchTrials })
 
   const now = new Date()
   const active = trials.filter((t) => t.lifecycle_status !== 'cancelled' && new Date(t.end_at) > now)
@@ -83,11 +91,15 @@ export function PlatformTrialsPage() {
     <div>
       <PageHeader title={t('platform.trialsPage.title')} description={t('platform.trialsPage.description')} />
       <div className="mb-4 grid grid-cols-3 gap-4">
-        <StatCard label={t('platform.trialsPage.cards.active')} value={isLoading ? '—' : String(active.length)} />
-        <StatCard label={t('platform.trialsPage.cards.expired')} value={isLoading ? '—' : String(expired.length)} />
-        <StatCard label={t('platform.trialsPage.cards.cancelled')} value={isLoading ? '—' : String(cancelled.length)} />
+        <StatCard label={t('platform.trialsPage.cards.active')} value={isLoading || isError ? '—' : String(active.length)} />
+        <StatCard label={t('platform.trialsPage.cards.expired')} value={isLoading || isError ? '—' : String(expired.length)} />
+        <StatCard label={t('platform.trialsPage.cards.cancelled')} value={isLoading || isError ? '—' : String(cancelled.length)} />
       </div>
-      <DataTable columns={columns} rows={trials} rowKey={(row) => row.id} isLoading={isLoading} emptyTitle={t('platform.trialsPage.emptyTitle')} />
+      {isError ? (
+        <ErrorState message={translateSupabaseError(error, t('platform.trialsPage.loadError'))} onRetry={() => void refetch()} />
+      ) : (
+        <DataTable columns={columns} rows={trials} rowKey={(row) => row.id} isLoading={isLoading} emptyTitle={t('platform.trialsPage.emptyTitle')} />
+      )}
     </div>
   )
 }

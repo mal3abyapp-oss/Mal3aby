@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest'
-import i18n from './i18n/config'
+import i18n, { initI18n } from './i18n/config'
 import { translateSupabaseError } from './errors'
 
 // Dedicated automated tests for the error-translation rules covering
@@ -11,6 +11,14 @@ import { translateSupabaseError } from './errors'
 // unauthorized") instead of their real, actionable cause.
 describe('translateSupabaseError — cash shift + government receipt rules', () => {
   beforeEach(async () => {
+    // i18n/config.ts (PERF-03 lazy-load fix) no longer self-initializes
+    // at import time -- this suite needs a real, translated i18n.t()
+    // (unlike LoginPage.test.tsx/PortalLoginPage.test.tsx, which
+    // deliberately never initialize i18next and assert against raw
+    // keys), so it's responsible for its own initI18n() here. Safe to
+    // await every time: initI18n() is memoized and resolves instantly
+    // once already initialized.
+    await initI18n()
     await i18n.changeLanguage('ar')
   })
   afterEach(async () => {

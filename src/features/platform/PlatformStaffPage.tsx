@@ -4,6 +4,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '@/lib/supabase/client'
 import { PageHeader } from '@/components/ui/page-header'
 import { DataTable, type DataTableColumn } from '@/components/ui/data-table'
+import { ErrorState } from '@/components/ui/error-state'
 import { StatusBadge } from '@/components/ui/status-badge'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -104,7 +105,12 @@ export function PlatformStaffPage() {
   const [setupLink, setSetupLink] = useState<string | null>(null)
   const [actionError, setActionError] = useState<string | null>(null)
 
-  const { data: staff = [], isLoading } = useQuery({
+  // Finding H-2 (frozen production audit): this list previously
+  // destructured only `data = [], isLoading` -- a failed fetch silently
+  // rendered as "no platform staff" via DataTable's own empty state,
+  // indistinguishable from a platform that genuinely has none. isError/
+  // error/refetch are now surfaced.
+  const { data: staff = [], isLoading, isError, error, refetch } = useQuery({
     queryKey: ['platform-staff'],
     queryFn: fetchPlatformStaff,
   })
@@ -209,14 +215,18 @@ export function PlatformStaffPage() {
         <p role="alert" className="mb-3 text-sm text-status-danger">{actionError}</p>
       )}
 
-      <DataTable
-        columns={columns}
-        rows={staff}
-        rowKey={(r) => r.membershipId}
-        isLoading={isLoading}
-        emptyTitle={t('platformStaff.emptyTitle')}
-        emptyDescription={t('platformStaff.emptyDescription')}
-      />
+      {isError ? (
+        <ErrorState message={translateSupabaseError(error, t('platformStaff.loadError'))} onRetry={() => void refetch()} />
+      ) : (
+        <DataTable
+          columns={columns}
+          rows={staff}
+          rowKey={(r) => r.membershipId}
+          isLoading={isLoading}
+          emptyTitle={t('platformStaff.emptyTitle')}
+          emptyDescription={t('platformStaff.emptyDescription')}
+        />
+      )}
 
       {addOpen && (
         <AddPlatformEmployeeDialog

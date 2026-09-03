@@ -5,6 +5,7 @@ import { supabase } from '@/lib/supabase/client'
 import { useAuth } from '@/app/providers/AuthProvider'
 import { PageHeader } from '@/components/ui/page-header'
 import { DataTable, type DataTableColumn } from '@/components/ui/data-table'
+import { ErrorState } from '@/components/ui/error-state'
 import { StatusBadge } from '@/components/ui/status-badge'
 import { MoneyDisplay } from '@/components/ui/money-display'
 import { Button } from '@/components/ui/button'
@@ -594,7 +595,13 @@ export function ShopProductsPage() {
   // the input itself -- see ShopPOSPage.tsx's identical comment.
   const debouncedSearch = useDebouncedValue(search, 250)
 
-  const { data: products = [], isLoading } = useQuery({
+  // Finding H-2 (frozen production audit): this list previously
+  // destructured only `data = [], isLoading` -- a failed fetch silently
+  // rendered as "no products" via DataTable/ProductGrid's own empty
+  // state, indistinguishable from a club that genuinely has none.
+  // isError/error/refetch are now surfaced so a fetch failure shows an
+  // explicit error, never a false "empty catalog" signal.
+  const { data: products = [], isLoading, isError, error, refetch } = useQuery({
     queryKey: ['shop-products', currentClubId, debouncedSearch, categoryFilter],
     queryFn: () => fetchProducts(currentClubId as string, debouncedSearch, categoryFilter || undefined),
     enabled: !!currentClubId,
@@ -734,7 +741,9 @@ export function ShopProductsPage() {
         <ManageCategoriesDialog clubId={currentClubId} onClose={() => setManagingCategories(false)} />
       )}
 
-      {viewMode === 'grid' ? (
+      {isError ? (
+        <ErrorState message={translateSupabaseError(error, t('shop.products.loadError'))} onRetry={() => void refetch()} />
+      ) : viewMode === 'grid' ? (
         <ProductGrid
           products={products}
           isLoading={isLoading}

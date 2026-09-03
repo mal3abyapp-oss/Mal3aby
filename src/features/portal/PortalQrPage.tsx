@@ -55,7 +55,13 @@ export function PortalQrPage() {
   const { t } = useTranslation()
   const { locale } = useDirection()
   const { activeClubId, activeCustomerId, isLoading: clubLoading } = usePortalClub()
-  const { data: allBookings = [], isLoading } = useQuery({
+  // Finding H-2 (frozen production audit): this list previously
+  // destructured only `data = [], isLoading` -- a failed fetch silently
+  // rendered as "no upcoming bookings" (portal.qrPage.emptyTitle),
+  // indistinguishable from a customer with genuinely none. isError is
+  // now surfaced as a distinct inline message, matching the sibling
+  // PortalAcademyPage/PortalMembershipsPage pattern.
+  const { data: allBookings = [], isLoading, isError } = useQuery({
     queryKey: ['portal', 'qr-bookings'],
     queryFn: fetchUpcomingBookings,
     enabled: !!activeCustomerId,
@@ -164,8 +170,9 @@ export function PortalQrPage() {
       <PageHeader title={t('portal.qrPage.title')} description={t('portal.qrPage.description')} />
 
       {(isLoading || clubLoading) && <p className="text-sm text-text-secondary">{t('portal.qrPage.loading')}</p>}
+      {isError && <p className="text-sm text-status-danger">{t('portal.qrPage.loadError')}</p>}
 
-      {!isLoading && preselectNotFound && (
+      {!isLoading && !isError && preselectNotFound && (
         <p role="alert" className="rounded-lg border border-status-warning/30 bg-status-warning/5 p-3 text-sm text-status-warning">
           {t('portal.qrPage.bookingNotFound')}
         </p>
@@ -188,13 +195,13 @@ export function PortalQrPage() {
         </div>
       )}
 
-      {!isLoading && bookings.length === 0 && (
+      {!isLoading && !isError && bookings.length === 0 && (
         <p className="rounded-lg border border-dashed border-border p-6 text-center text-sm text-text-secondary">
           {t('portal.qrPage.emptyTitle')}
         </p>
       )}
 
-      {bookings.length > 0 && (
+      {!isError && bookings.length > 0 && (
         <Select value={selectedId} onValueChange={handleSelect}>
           <SelectTrigger>
             <SelectValue placeholder={t('portal.qrPage.choosePlaceholder')} />

@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button'
 import { StatCard } from '@/components/ui/stat-card'
 import { ErrorState } from '@/components/ui/error-state'
 import { formatMoney } from '@/lib/domain/billing'
-import { formatDate } from '@/lib/i18n/config'
+import { FormattedDate } from '@/components/ui/formatted-date'
 import { rowsToCsv, downloadCsv } from '@/lib/csv'
 import { translateSupabaseError } from '@/lib/errors'
 import { useDirection } from '@/app/providers/DirectionProvider'
@@ -109,7 +109,7 @@ export function ReportsOverviewPage() {
                       same calendar day Postgres bucketed it into, regardless of
                       the viewer's own browser timezone (avoids the classic
                       off-by-one-day bug from local-zone Date parsing). */}
-                  <span className="tabular-nums">{formatDate(d.date, locale, 'UTC', { month: 'short', day: 'numeric' })}</span>
+                  <span className="tabular-nums"><FormattedDate value={d.date} timeZone="UTC" options={{ month: 'short', day: 'numeric' }} /></span>
                   <span>{formatMoney(d.revenue, 'EGP', locale)}</span>
                 </li>
               ))}
