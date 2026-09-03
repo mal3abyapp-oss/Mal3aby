@@ -1,5 +1,13 @@
 # MAL3ABY_PRODUCTION_READINESS.md
 
+> **⚠️ SUPERSEDED (2026-09-03):** This document dates from 2026-08-18. A
+> full independent production audit + performance audit + master
+> remediation cycle (P0-P3, adversarial re-test, independent release
+> certification) ran on 2026-09-03 and is the current authoritative
+> readiness record. See
+> [PRODUCTION_AUDIT_REMEDIATION_2026-09-03.md](PRODUCTION_AUDIT_REMEDIATION_2026-09-03.md).
+> This file is retained for historical reference only.
+
 **نوع الوثيقة:** تقييم جاهزية إنتاج مُحدَّث بعد تنفيذ MAL3ABY FINAL AUTONOMOUS REMEDIATION & LAUNCH READINESS. هذا التحديث **لا يعتمد على تقييم 52/100 السابق** — أُعيد التقييم بالكامل بناءً على الحالة الحية الجديدة بعد إغلاق العوائق.
 
 **تاريخ التحديث:** 2026-08-18 (نفس اليوم، بعد جولة إصلاح مستقلة كاملة)
