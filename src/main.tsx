@@ -4,6 +4,7 @@ import './index.css'
 import { App } from './App'
 import './lib/version' // logs the real build SHA/time once on load -- see item D of the 2026-08-27 auth/cache bugfix directive.
 import { generateIncidentId, reportClientError } from './lib/errorReporting'
+import { initI18n } from './lib/i18n/config'
 
 // PRODUCTION MONITORING (Phase 3, 2026-08-28): ErrorBoundary only ever
 // catches errors thrown during React's own render/lifecycle -- it has
@@ -39,8 +40,18 @@ window.addEventListener('unhandledrejection', (event) => {
   })
 })
 
-createRoot(document.getElementById('root')!).render(
-  <StrictMode>
-    <App />
-  </StrictMode>,
-)
+// PERF-03: config.ts's i18n init is now async -- it dynamically imports
+// only the detected/stored locale's translation JSON instead of both
+// languages being bundled into main at module scope (was 126.5KB gzip,
+// 36% of the main chunk, on every load regardless of language). Awaiting
+// it here keeps React's render fully synchronous once it starts (no
+// Suspense boundary needed anywhere downstream) -- this only delays the
+// very first paint by one small same-origin chunk fetch, which is still
+// strictly less data than the old eager double-import.
+void initI18n().then(() => {
+  createRoot(document.getElementById('root')!).render(
+    <StrictMode>
+      <App />
+    </StrictMode>,
+  )
+})

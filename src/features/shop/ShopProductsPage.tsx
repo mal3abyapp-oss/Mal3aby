@@ -1,10 +1,11 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '@/lib/supabase/client'
 import { useAuth } from '@/app/providers/AuthProvider'
 import { PageHeader } from '@/components/ui/page-header'
 import { DataTable, type DataTableColumn } from '@/components/ui/data-table'
+import { ErrorState } from '@/components/ui/error-state'
 import { StatusBadge } from '@/components/ui/status-badge'
 import { MoneyDisplay } from '@/components/ui/money-display'
 import { Button } from '@/components/ui/button'
@@ -82,6 +83,15 @@ interface ProductRow {
   reorderLevel: number | null
 }
 
+// PERF-05 (production audit remediation, 2026-09-03): list_shop_products
+// now takes p_limit/p_offset and returns total_count (see this RPC's own
+// migration comment, 20260903160000_paginate_list_shop_products.sql) --
+// this page previously fetched the club's ENTIRE catalog on every load
+// with no bound at all. PRODUCTS_PAGE_SIZE matches the RPC's own
+// DEFAULT so an unpaged call elsewhere in the app still behaves
+// identically to before this fix.
+const PRODUCTS_PAGE_SIZE = 50
+
 interface CategoryOption {
   categoryId: string
   nameAr: string
@@ -112,19 +122,28 @@ function toStringArray(value: unknown): string[] {
   return value.filter((v): v is string => typeof v === 'string')
 }
 
-async function fetchProducts(clubId: string, search: string, categoryId?: string): Promise<ProductRow[]> {
+interface ProductPage {
+  rows: ProductRow[]
+  totalCount: number
+}
+
+async function fetchProducts(clubId: string, search: string, categoryId: string | undefined, offset: number): Promise<ProductPage> {
   const { data, error } = await supabase.rpc('list_shop_products', {
     p_club_id: clubId,
     p_search: search || undefined,
     p_category_id: categoryId || undefined,
     p_status: undefined,
+    p_limit: PRODUCTS_PAGE_SIZE,
+    p_offset: offset,
   })
   if (error) throw error
-  return (data ?? []).map((r) => ({
+  const rows = (data ?? []).map((r) => ({
     productId: r.product_id, nameAr: r.name_ar, nameEn: r.name_en, categoryId: r.category_id, categoryNameAr: r.category_name_ar,
     basePrice: Number(r.base_price), hasVariants: r.has_variants, sku: r.sku, barcode: r.barcode, status: r.status,
     imageUrl: r.image_url, imageUrls: toStringArray(r.image_urls), reorderLevel: r.reorder_level,
   }))
+  const totalCount = Number((data as unknown as { total_count?: number }[] | null)?.[0]?.total_count ?? 0)
+  return { rows, totalCount }
 }
 
 async function fetchCategories(clubId: string): Promise<CategoryOption[]> {
@@ -577,6 +596,11 @@ export function ShopProductsPage() {
   const canManageProducts = (currentMembership?.permissionKeys ?? []).includes('shop.product.manage')
   const [search, setSearch] = useState('')
   const [categoryFilter, setCategoryFilter] = useState('')
+  // PERF-05: pages of PRODUCTS_PAGE_SIZE loaded so far -- "Load more"
+  // increments this and the query below re-fetches every page up to it
+  // (same accumulation pattern as PlatformOwnersPage.tsx's owner list),
+  // rather than the previous single unbounded fetch of the whole catalog.
+  const [pages, setPages] = useState(1)
   const [addOpen, setAddOpen] = useState(false)
   const [editingProduct, setEditingProduct] = useState<ProductRow | null>(null)
   const [variantsFor, setVariantsFor] = useState<ProductRow | null>(null)
@@ -594,11 +618,43 @@ export function ShopProductsPage() {
   // the input itself -- see ShopPOSPage.tsx's identical comment.
   const debouncedSearch = useDebouncedValue(search, 250)
 
-  const { data: products = [], isLoading } = useQuery({
-    queryKey: ['shop-products', currentClubId, debouncedSearch, categoryFilter],
-    queryFn: () => fetchProducts(currentClubId as string, debouncedSearch, categoryFilter || undefined),
+  // PERF-05 (production audit remediation, 2026-09-03): search/category
+  // changes must restart pagination at page 1 -- otherwise a stale
+  // `pages` count from a previous, larger result set would fetch pages
+  // that don't apply to the new filter.
+  useEffect(() => { setPages(1) }, [debouncedSearch, categoryFilter])
+
+  // Finding H-2 (frozen production audit): this list previously
+  // destructured only `data = [], isLoading` -- a failed fetch silently
+  // rendered as "no products" via DataTable/ProductGrid's own empty
+  // state, indistinguishable from a club that genuinely has none.
+  // isError/error/refetch are now surfaced so a fetch failure shows an
+  // explicit error, never a false "empty catalog" signal.
+  //
+  // PERF-05: list_shop_products is now paginated (p_limit/p_offset, see
+  // that RPC's own migration comment) instead of fetching the entire
+  // catalog unbounded on every load. `pages` fetched in parallel and
+  // concatenated, mirroring PlatformOwnersPage.tsx's exact "Load more"
+  // accumulation pattern; hasMore is true whenever the last page came
+  // back full (page.length === PRODUCTS_PAGE_SIZE), matching that same
+  // page's own convention.
+  const { data, isLoading, isFetching, isError, error, refetch } = useQuery({
+    queryKey: ['shop-products', currentClubId, debouncedSearch, categoryFilter, pages],
+    queryFn: async () => {
+      const clubId = currentClubId as string
+      const category = categoryFilter || undefined
+      const results = await Promise.all(
+        Array.from({ length: pages }, (_, i) => fetchProducts(clubId, debouncedSearch, category, i * PRODUCTS_PAGE_SIZE)),
+      )
+      const lastPage = results.at(-1)
+      return {
+        rows: results.flatMap((r) => r.rows),
+        hasMore: (lastPage?.rows.length ?? 0) === PRODUCTS_PAGE_SIZE,
+      }
+    },
     enabled: !!currentClubId,
   })
+  const products = data?.rows ?? []
 
   const { data: filterCategories = [] } = useQuery({
     queryKey: ['shop-categories', currentClubId],
@@ -734,7 +790,9 @@ export function ShopProductsPage() {
         <ManageCategoriesDialog clubId={currentClubId} onClose={() => setManagingCategories(false)} />
       )}
 
-      {viewMode === 'grid' ? (
+      {isError ? (
+        <ErrorState message={translateSupabaseError(error, t('shop.products.loadError'))} onRetry={() => void refetch()} />
+      ) : viewMode === 'grid' ? (
         <ProductGrid
           products={products}
           isLoading={isLoading}
@@ -744,6 +802,18 @@ export function ShopProductsPage() {
         />
       ) : (
         <DataTable columns={columns} rows={products} rowKey={(p) => p.productId} isLoading={isLoading} emptyTitle={t('shop.products.emptyTitle')} emptyDescription={t('shop.products.emptyDescription')} />
+      )}
+
+      {/* PERF-05: list_shop_products is now paginated -- this replaces
+          the previous single unbounded fetch of the entire catalog.
+          hasMore is only known once the first page has loaded, so this
+          intentionally doesn't render during the initial isLoading. */}
+      {!isError && !isLoading && data?.hasMore && (
+        <div className="mt-4 flex justify-center">
+          <Button variant="outline" onClick={() => setPages((p) => p + 1)} disabled={isFetching}>
+            {isFetching ? t('shop.products.loadingMore') : t('shop.products.loadMore')}
+          </Button>
+        </div>
       )}
 
       {editingProduct && (

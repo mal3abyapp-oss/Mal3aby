@@ -1,5 +1,17 @@
 -- MAL3ABY FINAL REMEDIATION -- Security & Finance regression suite.
 --
+-- CI STATUS (2026-09-03, finding M-13): NOT wired into CI, and cannot be
+-- as-is -- every test below needs either a live RLS session impersonating a
+-- REAL fixture auth.users row, or hand-filled real fixture UUIDs from the
+-- live project. A CI-runnable STRUCTURAL SUBSET of this file (schema-shape
+-- assertions needing zero fixture data: constraint/trigger/grant presence,
+-- audit-coverage-gap detection) has been extracted to
+-- supabase/tests/structural_security_regression.sql. See docs/TEST_PLAN.md
+-- "CI regression gap" section for the full picture: what's automated now,
+-- what remains manual-only, and the specific pre-existing migration-history
+-- issue (auth.users fixture dependency) blocking full automation of this
+-- file even against a fresh local instance.
+--
 -- This is a real, re-runnable SQL regression test for the P0 fixes
 -- made in this remediation pass. It follows this project's own
 -- established live-verification pattern (set_config('request.jwt.claims',

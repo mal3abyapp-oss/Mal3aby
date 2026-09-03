@@ -6,6 +6,7 @@ import { supabase } from '@/lib/supabase/client'
 import { useAuth } from '@/app/providers/AuthProvider'
 import { PageHeader } from '@/components/ui/page-header'
 import { DataTable, type DataTableColumn } from '@/components/ui/data-table'
+import { ErrorState } from '@/components/ui/error-state'
 import { Input } from '@/components/ui/input'
 import {
   Dialog,
@@ -16,6 +17,7 @@ import {
 import { formatMoney } from '@/lib/domain/billing'
 import { actionLabel, entityLabel } from '@/lib/domain/audit'
 import { useDirection } from '@/app/providers/DirectionProvider'
+import { translateSupabaseError } from '@/lib/errors'
 
 // Gate 13 #60: this screen used to show the raw machine action string
 // ("booking.discount.apply"), the raw table name as "الكيان" ("booking"),
@@ -165,7 +167,14 @@ export function AuditLogSection() {
   const [search, setSearch] = useState('')
   const [selected, setSelected] = useState<AuditLogRow | null>(null)
 
-  const { data: logs = [], isLoading } = useQuery({
+  // Finding H-2 (frozen production audit): this security-sensitive
+  // screen previously destructured only `data = [], isLoading` -- a
+  // failed fetch silently rendered as "No logs yet" via DataTable's own
+  // empty state, indistinguishable from a genuinely clean history. That
+  // is exactly the wrong failure mode for an audit log: a suspicious
+  // owner reading a false "no sensitive actions" must never be misled
+  // by a fetch error. isError/error/refetch are now surfaced.
+  const { data: logs = [], isLoading, isError, error, refetch } = useQuery({
     queryKey: ['audit-logs', currentClubId, search],
     queryFn: () => fetchAuditLogs(currentClubId!, search),
     enabled: !!currentClubId,
@@ -175,7 +184,15 @@ export function AuditLogSection() {
     {
       key: 'time',
       header: t('auditLog.columns.time'),
-      render: (r) => <span className="tabular-nums">{new Date(r.createdAt).toLocaleString(locale === 'en' ? 'en-US' : 'ar-EG')}</span>,
+      // Production audit finding H-1 (RTL-bidi gap): this rendered
+      // timestamp had no bidi isolation, same defect class as an
+      // unwrapped formatDate() call site. Wrapped in <bdi> directly
+      // (matching MoneyDisplay's own established pattern) rather than
+      // routing through <FormattedDate> -- this column intentionally
+      // keeps the viewer's own browser-local timezone (no explicit
+      // IANA zone was ever passed here), which <FormattedDate> does not
+      // support, so changing that behavior is out of this fix's scope.
+      render: (r) => <span className="tabular-nums"><bdi>{new Date(r.createdAt).toLocaleString(locale === 'en' ? 'en-US' : 'ar-EG')}</bdi></span>,
     },
     {
       key: 'action',
@@ -214,14 +231,18 @@ export function AuditLogSection() {
         <Input placeholder={t('auditLog.searchPlaceholder')} value={search} onChange={(e) => setSearch(e.target.value)} className="max-w-sm" />
       </div>
 
-      <DataTable
-        columns={columns}
-        rows={logs}
-        rowKey={(r) => r.id}
-        isLoading={isLoading}
-        emptyTitle={t('auditLog.emptyTitle')}
-        emptyDescription={t('auditLog.emptyDescription')}
-      />
+      {isError ? (
+        <ErrorState message={translateSupabaseError(error, t('auditLog.loadError'))} onRetry={() => void refetch()} />
+      ) : (
+        <DataTable
+          columns={columns}
+          rows={logs}
+          rowKey={(r) => r.id}
+          isLoading={isLoading}
+          emptyTitle={t('auditLog.emptyTitle')}
+          emptyDescription={t('auditLog.emptyDescription')}
+        />
+      )}
 
       <Dialog open={!!selected} onOpenChange={(open) => !open && setSelected(null)}>
         <DialogContent className="max-w-2xl">
@@ -231,7 +252,7 @@ export function AuditLogSection() {
           {selected && (
             <div className="flex flex-col gap-4 text-sm">
               <p className="text-text-secondary">
-                {selected.actorName ?? t('auditLog.unknownUser')} — {new Date(selected.createdAt).toLocaleString(locale === 'en' ? 'en-US' : 'ar-EG')}
+                {selected.actorName ?? t('auditLog.unknownUser')} — <bdi>{new Date(selected.createdAt).toLocaleString(locale === 'en' ? 'en-US' : 'ar-EG')}</bdi>
               </p>
               {selected.reason && <p>{t('auditLog.reasonPrefix')} {selected.reason}</p>}
               <details>

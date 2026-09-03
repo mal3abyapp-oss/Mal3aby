@@ -1,11 +1,12 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, type ReactNode } from 'react'
 import { useParams, useSearchParams } from 'react-router-dom'
 import { useMutation, useQuery } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
 import QRCode from 'qrcode'
 import { supabase } from '@/lib/supabase/client'
 import { useDirection } from '@/app/providers/DirectionProvider'
-import { formatCurrency, formatDate, type SupportedLocale } from '@/lib/i18n/config'
+import { FormattedDate } from '@/components/ui/formatted-date'
+import { FormattedCurrency } from '@/components/ui/formatted-currency'
 import { LanguageSwitcher } from '@/components/ui/language-switcher'
 import { StatusBadge } from '@/components/ui/status-badge'
 import { QrCodeViewer } from '@/components/ui/qr-code-viewer'
@@ -42,6 +43,15 @@ import { CheckCircle2, XCircle, Clock, Ban } from 'lucide-react'
  * which are hardcoded to the 'ar-EG' locale regardless of language --
  * a real bug tracked separately for the broader localization sweep,
  * not reproduced in this new page.
+ *
+ * Production audit finding H-1 (RTL-bidi gap): the formatDate()/
+ * formatCurrency() calls below used to render their plain-string
+ * output directly, and this file's own InfoRow only isolated it in
+ * <bdi> when an explicit `bdi` prop was passed (inconsistently -- the
+ * date row had none, the time row and money rows were a mix). Migrated
+ * to <FormattedDate>/<FormattedCurrency> (src/components/ui/
+ * formatted-date.tsx, formatted-currency.tsx), which always wrap their
+ * output in <bdi>, so isolation is no longer a per-call-site opt-in.
  */
 
 type VerifyResult = 'valid' | 'expired' | 'cancelled' | 'already_used' | 'invalid'
@@ -278,14 +288,13 @@ export function SecureBookingPage() {
               {data.startAt && (
                 <InfoRow
                   label={t('secureBooking.date')}
-                  value={formatDate(data.startAt, locale, tz, { day: 'numeric', month: 'long', year: 'numeric' })}
+                  value={<FormattedDate value={data.startAt} timeZone={tz} options={{ day: 'numeric', month: 'long', year: 'numeric' }} />}
                 />
               )}
               {data.startAt && (
                 <InfoRow
                   label={t('secureBooking.time')}
-                  value={formatDate(data.startAt, locale, tz, { hour: '2-digit', minute: '2-digit' })}
-                  bdi
+                  value={<FormattedDate value={data.startAt} timeZone={tz} options={{ hour: '2-digit', minute: '2-digit' }} />}
                 />
               )}
               <InfoRow label={t('secureBooking.bookingRef')} value={data.bookingRef ?? '—'} bdi />
@@ -303,12 +312,12 @@ export function SecureBookingPage() {
             {data.total !== null && (
               <div className="w-full rounded-md border border-border p-4 text-start text-sm">
                 <p className="mb-2 text-xs font-medium text-text-secondary">{t('secureBooking.paymentSummary')}</p>
-                <InfoRow label={t('secureBooking.total')} value={formatCurrency(data.total, locale as SupportedLocale)} />
+                <InfoRow label={t('secureBooking.total')} value={<FormattedCurrency value={data.total} />} />
                 {data.paid !== null && (
-                  <InfoRow label={t('secureBooking.paid')} value={formatCurrency(data.paid, locale as SupportedLocale)} valueClassName="text-status-success" />
+                  <InfoRow label={t('secureBooking.paid')} value={<FormattedCurrency value={data.paid} />} valueClassName="text-status-success" />
                 )}
                 {data.outstanding !== null && data.outstanding > 0 && (
-                  <InfoRow label={t('secureBooking.outstanding')} value={formatCurrency(data.outstanding, locale as SupportedLocale)} valueClassName="text-status-danger" />
+                  <InfoRow label={t('secureBooking.outstanding')} value={<FormattedCurrency value={data.outstanding} />} valueClassName="text-status-danger" />
                 )}
                 {data.paymentStatus && (
                   <div className="flex items-center justify-between py-1">
@@ -372,7 +381,7 @@ function stateKey(result: VerifyResult): string {
   return result === 'already_used' ? 'alreadyUsed' : result
 }
 
-function InfoRow({ label, value, bdi, valueClassName }: { label: string; value: string; bdi?: boolean; valueClassName?: string }) {
+function InfoRow({ label, value, bdi, valueClassName }: { label: string; value: ReactNode; bdi?: boolean; valueClassName?: string }) {
   return (
     <div className="flex items-center justify-between py-1">
       <span className="text-text-secondary">{label}</span>

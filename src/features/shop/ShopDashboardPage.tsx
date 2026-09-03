@@ -3,8 +3,7 @@ import { Link } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { supabase } from '@/lib/supabase/client'
 import { useAuth } from '@/app/providers/AuthProvider'
-import { useDirection } from '@/app/providers/DirectionProvider'
-import { formatDate, type SupportedLocale } from '@/lib/i18n/config'
+import { FormattedDate } from '@/components/ui/formatted-date'
 import { PageHeader } from '@/components/ui/page-header'
 import { DataTable, type DataTableColumn } from '@/components/ui/data-table'
 import { StatCard } from '@/components/ui/stat-card'
@@ -238,7 +237,6 @@ async function fetchSalesByCashier(clubId: string, start: string, end: string): 
 export function ShopDashboardPage() {
   const { t } = useTranslation()
   const { currentClubId } = useAuth()
-  const { locale } = useDirection()
   const { start, end } = todayRange()
 
   const { data: kpis, isLoading: kpisLoading } = useQuery({
@@ -308,14 +306,14 @@ export function ShopDashboardPage() {
     { key: 'invoice', header: t('shop.dashboard.columns.invoice'), render: (s) => <Link to="/app/shop/sales" className="text-accent-foreground hover:underline">{s.invoiceNumber}</Link> },
     { key: 'customer', header: t('shop.dashboard.columns.customer'), render: (s) => s.customerName ?? t('shop.dashboard.walkIn') },
     { key: 'cashier', header: t('shop.dashboard.columns.cashier'), render: (s) => s.soldByName ?? '—' },
-    { key: 'time', header: t('shop.dashboard.columns.time'), render: (s) => formatDate(s.createdAt, locale as SupportedLocale, 'Africa/Cairo', { hour: '2-digit', minute: '2-digit' }) },
+    { key: 'time', header: t('shop.dashboard.columns.time'), render: (s) => <FormattedDate value={s.createdAt} timeZone="Africa/Cairo" options={{ hour: '2-digit', minute: '2-digit' }} /> },
     { key: 'total', header: t('shop.dashboard.columns.total'), render: (s) => <MoneyDisplay amount={s.total} size="sm" /> },
   ]
 
   const recentReturnsColumns: DataTableColumn<RecentReturnRow>[] = [
     { key: 'invoice', header: t('shop.dashboard.columns.invoice'), render: (r) => <Link to="/app/shop/sales" className="text-accent-foreground hover:underline">{r.invoiceNumber}</Link> },
     { key: 'reason', header: t('shop.dashboard.columns.reason'), render: (r) => r.reason },
-    { key: 'date', header: t('shop.dashboard.columns.date'), render: (r) => formatDate(r.createdAt, locale as SupportedLocale, 'Africa/Cairo', { year: 'numeric', month: 'short', day: 'numeric' }) },
+    { key: 'date', header: t('shop.dashboard.columns.date'), render: (r) => <FormattedDate value={r.createdAt} timeZone="Africa/Cairo" options={{ year: 'numeric', month: 'short', day: 'numeric' }} /> },
     {
       key: 'refund',
       header: t('shop.dashboard.columns.refund'),

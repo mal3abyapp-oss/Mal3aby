@@ -149,6 +149,15 @@ export function ScanPage() {
   const [confirmResult, setConfirmResult] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
   const [lastToken, setLastToken] = useState<string | null>(null)
+  // M-9 fix: "Identity Match" (per Doc 3's stated check-in rule -- "Valid
+  // QR + Correct Account + Verified Membership + Active Entitlement +
+  // Identity Match = Approved Check-in") must be an explicit staff
+  // action with a persisted system record (qr_scan_events.
+  // identity_confirmed), not merely a photo that happens to render on
+  // screen. Staff must tap the identity card to attest they visually
+  // compared the presenting person to the photo before Confirm Check-in
+  // becomes available; resets on every new scan/result.
+  const [identityConfirmed, setIdentityConfirmed] = useState(false)
   // Gate 6: qr_mark_attendance() (the academy membership check-in RPC)
   // already existed server-side but this scanner never called it at
   // all -- only the booking check-in path (qr_confirm_checkin) was
@@ -196,6 +205,7 @@ export function ScanPage() {
     }
     const row = data[0] as ValidateResult
     setValidated(row)
+    setIdentityConfirmed(false)
     if (row.reference_type === 'player_membership') {
       fetchOpenSessionsForCoach().then(setOpenSessions).catch(() => setOpenSessions([]))
     }
@@ -204,7 +214,10 @@ export function ScanPage() {
   async function handleConfirm() {
     if (!lastToken) return
     setBusy(true)
-    const { data, error } = await supabase.rpc('qr_confirm_checkin', { p_token: lastToken })
+    const { data, error } = await supabase.rpc('qr_confirm_checkin', {
+      p_token: lastToken,
+      p_identity_confirmed: identityConfirmed,
+    })
     setBusy(false)
     if (error || !data?.[0]) {
       setConfirmResult('invalid')
@@ -231,6 +244,7 @@ export function ScanPage() {
     setLastToken(null)
     setSelectedSessionId('')
     setOpenSessions([])
+    setIdentityConfirmed(false)
     setScanning(true)
   }
 
@@ -250,6 +264,13 @@ export function ScanPage() {
     : outcomeKey
       ? { label: t(OUTCOME_LABEL_KEYS[outcomeKey] ?? outcomeKey), tone: OUTCOME_TONES[outcomeKey] ?? 'danger' }
       : null
+
+  // M-9 fix: only the booking success path is gated on the identity-
+  // confirmation tap -- that is the only case where a further mutating
+  // "confirm" RPC (qr_confirm_checkin) follows this screen and where the
+  // identity card's photo is meaningful (a booking QR presents exactly
+  // one person to compare against).
+  const requiresIdentityConfirmation = validated?.result === 'success' && validated?.reference_type === 'booking'
 
   return (
     <div className="flex min-h-screen flex-col bg-dark-base text-white">
@@ -288,10 +309,37 @@ export function ScanPage() {
               verified photo, and see current membership/subscription
               standing, before approving entry. Previously this screen
               showed only a bare valid/invalid state with zero identity
-              context. */}
+              context.
+
+              M-9 fix: for a booking check-in specifically, Identity
+              Match is now a required, explicit staff action with a
+              persisted system record (qr_scan_events.identity_confirmed)
+              -- not just a photo rendering on screen. Tapping the photo
+              toggles identityConfirmed, which gates the Confirm
+              Check-in button below and is passed through to
+              qr_confirm_checkin as p_identity_confirmed. */}
           {validated.display_name && (
             <div className="flex flex-col items-center gap-2 rounded-xl border border-white/15 bg-white/5 p-4">
-              {validated.display_photo_url ? (
+              {requiresIdentityConfirmation ? (
+                <button
+                  type="button"
+                  aria-label={identityConfirmed ? t('scanner.identityConfirmed') : t('scanner.identityConfirmPrompt')}
+                  aria-pressed={identityConfirmed}
+                  onClick={() => setIdentityConfirmed((prev) => !prev)}
+                  className={`flex flex-col items-center gap-2 rounded-lg p-1 outline-none ${identityConfirmed ? 'ring-2 ring-status-success' : 'ring-2 ring-transparent'}`}
+                >
+                  {validated.display_photo_url ? (
+                    <img src={validated.display_photo_url} alt={validated.display_name} className="size-24 rounded-full object-cover" />
+                  ) : (
+                    <div className="flex size-24 items-center justify-center rounded-full bg-white/10 text-2xl font-semibold">
+                      {validated.display_name.charAt(0)}
+                    </div>
+                  )}
+                  <span className={`rounded-full px-3 py-1 text-xs font-medium ${identityConfirmed ? 'bg-status-success/20 text-status-success' : 'bg-white/10 text-white/70'}`}>
+                    {identityConfirmed ? t('scanner.identityConfirmed') : t('scanner.identityConfirmPrompt')}
+                  </span>
+                </button>
+              ) : validated.display_photo_url ? (
                 <img src={validated.display_photo_url} alt={validated.display_name} className="size-24 rounded-full object-cover" />
               ) : (
                 <div className="flex size-24 items-center justify-center rounded-full bg-white/10 text-2xl font-semibold">
@@ -338,9 +386,14 @@ export function ScanPage() {
 
           <div className="mt-4 flex w-full max-w-xs flex-col gap-2">
             {validated.result === 'success' && validated.reference_type === 'booking' && (
-              <Button size="lg" disabled={busy} onClick={() => void handleConfirm()}>
-                {busy ? t('scanner.confirming') : t('scanner.confirmCheckin')}
-              </Button>
+              <>
+                {!identityConfirmed && (
+                  <p className="text-sm text-white/60">{t('scanner.identityConfirmRequiredHint')}</p>
+                )}
+                <Button size="lg" disabled={busy || !identityConfirmed} onClick={() => void handleConfirm()}>
+                  {busy ? t('scanner.confirming') : t('scanner.confirmCheckin')}
+                </Button>
+              </>
             )}
             {validated.result === 'payment_required' && (
               <Button size="lg" onClick={() => navigate('/app/bookings')}>

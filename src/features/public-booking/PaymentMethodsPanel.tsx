@@ -3,6 +3,7 @@ import { useQuery } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
 import { supabase } from '@/lib/supabase/client'
 import { formatCurrency, type SupportedLocale } from '@/lib/i18n/config'
+import { FormattedCurrency } from '@/components/ui/formatted-currency'
 import { Button } from '@/components/ui/button'
 import { Copy, Check, MessageCircle, ChevronDown } from 'lucide-react'
 import { PaymentProofUpload } from './PaymentProofUpload'
@@ -159,7 +160,7 @@ export function PaymentMethodsPanel({
                   })}
                   {instructions && <p className="text-xs text-text-secondary">{instructions}</p>}
                   {total != null && (
-                    <p className="text-xs font-medium">{t('publicBooking.amountToPay')}: {formatCurrency(total, locale, currency)}</p>
+                    <p className="text-xs font-medium">{t('publicBooking.amountToPay')}: <FormattedCurrency value={total} currencyCode={currency} /></p>
                   )}
                 </div>
               )}

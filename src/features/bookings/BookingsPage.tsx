@@ -22,9 +22,9 @@ import { BookingsMobileView } from './BookingsMobileView'
 import { BookingsFieldDayView } from './BookingsFieldDayView'
 import { resolveHoursForDay, useResolvedFieldPrice, useClubTimezone } from './useFieldPricing'
 import { toInstant, fromInstant } from '@/lib/domain/time'
-import { formatNumber, formatDate } from '@/lib/i18n/config'
+import { formatNumberIsolated } from '@/lib/i18n/config'
+import { FormattedDate } from '@/components/ui/formatted-date'
 import { DatePickerButton } from '@/components/ui/date-picker-button'
-import { useDirection } from '@/app/providers/DirectionProvider'
 
 // Section F: mobile gets a dedicated layout, not a squeezed desktop
 // grid. Matches the app's own mobile breakpoint (md: 768px, see
@@ -218,7 +218,7 @@ function FieldColumnHeader({ field, clubId, date, clubTimezone }: { field: Field
         )}
       </p>
       <p className="text-xs font-medium text-accent tabular-nums">
-        {currentPrice != null ? t('bookings.page.pricePerHourNow', { price: formatNumber(Math.round(currentPrice), i18n.language.startsWith('ar') ? 'ar' : 'en') }) : t('bookings.page.priceVariesByTime')}
+        {currentPrice != null ? t('bookings.page.pricePerHourNow', { price: formatNumberIsolated(Math.round(currentPrice), i18n.language.startsWith('ar') ? 'ar' : 'en') }) : t('bookings.page.priceVariesByTime')}
       </p>
     </div>
   )
@@ -226,7 +226,6 @@ function FieldColumnHeader({ field, clubId, date, clubTimezone }: { field: Field
 
 export function BookingsPage() {
   const { t } = useTranslation()
-  const { locale } = useDirection()
   const { currentClubId } = useAuth()
   const queryClient = useQueryClient()
   const isMobile = useIsMobile()
@@ -512,7 +511,7 @@ export function BookingsPage() {
                 is passed here -- staff can navigate arbitrarily far
                 ahead, matching directive A3. */}
             <DatePickerButton
-              label={formatDate(new Date(`${date}T12:00:00`), locale, clubTimezone ?? 'UTC', { day: 'numeric', month: 'long', year: 'numeric' })}
+              label={<FormattedDate value={new Date(`${date}T12:00:00`)} timeZone={clubTimezone ?? 'UTC'} options={{ day: 'numeric', month: 'long', year: 'numeric' }} />}
               value={date}
               onSelect={setDate}
               todayDate={clubTimezone ? fromInstant(new Date(), clubTimezone).date : new Date().toISOString().slice(0, 10)}

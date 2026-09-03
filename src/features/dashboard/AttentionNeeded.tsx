@@ -7,7 +7,10 @@ import { useAuth } from '@/app/providers/AuthProvider'
 import { useDirection } from '@/app/providers/DirectionProvider'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { StatusBadge } from '@/components/ui/status-badge'
+import { Button } from '@/components/ui/button'
 import { fetchInvoicePaymentSummaries } from '@/lib/domain/billing'
+import { translateSupabaseError } from '@/lib/errors'
+import { DASHBOARD_POLL_INTERVAL_MS } from '@/lib/query/dashboardPolling'
 
 // Section D1 "ATTENTION NEEDED": a receptionist/manager must be able to
 // see, in one place, everything that needs a decision right now --
@@ -197,14 +200,44 @@ export function AttentionNeeded() {
     'whatsapp-failed': t('dashboard.attentionNeeded.chipLabels.whatsappFailed'),
   }
 
-  const { data: items = [], isLoading } = useQuery({
+  const { data: items = [], isLoading, isError, error, refetch } = useQuery({
     queryKey: ['attention-needed', currentClubId, locale],
     queryFn: () => fetchAttentionItems(currentClubId!, t, locale),
     enabled: !!currentClubId,
-    refetchInterval: 60_000,
+    // PERF-04: shared with TodayPage/OwnerFinanceTransparency so the
+    // three same-screen loops share one source of truth for cadence.
+    refetchInterval: DASHBOARD_POLL_INTERVAL_MS,
+    staleTime: DASHBOARD_POLL_INTERVAL_MS,
   })
 
   if (isLoading) return null
+
+  // Finding B-1 (frozen production audit): this panel used to
+  // destructure only `data = [], isLoading`, so a genuinely FAILED
+  // fetch silently defaulted `items` to [] and rendered byte-identical
+  // to "nothing needs attention" -- a receptionist/manager reading this
+  // "all clear" success state has no way to tell it apart from a real
+  // fetch error that hid unpaid bookings, expiring subscriptions, and
+  // pending payment proofs from them. isError is now checked BEFORE the
+  // empty-state branch so a failed fetch never renders the reassuring
+  // success copy. Weight matches this card's own placement (a compact
+  // in-card notice + retry, not a disruptive full-page error) since
+  // this is one card among several on Today, not its own dedicated page
+  // -- same judgment call the reports/ module makes with ErrorState,
+  // scaled down for a dashboard-card context.
+  if (isError) {
+    return (
+      <Card>
+        <CardHeader><CardTitle className="text-base">{t('dashboard.attentionNeeded.title')}</CardTitle></CardHeader>
+        <CardContent className="flex flex-col items-start gap-2">
+          <p className="text-sm text-status-danger">{translateSupabaseError(error, t('dashboard.attentionNeeded.loadError'))}</p>
+          <Button variant="outline" size="sm" onClick={() => void refetch()}>
+            {t('errorState.retry')}
+          </Button>
+        </CardContent>
+      </Card>
+    )
+  }
 
   if (items.length === 0) {
     return (

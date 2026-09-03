@@ -1,0 +1,24 @@
+-- Production Audit Remediation, PERF-06 (2026-09-03): get_revenue_report()
+-- (latest definition: 20260826030326_reject_cross_club_branch_id_in_
+-- reports.sql) filters payments on (club_id, status='completed',
+-- received_at BETWEEN ...) four times across its total/by_day/by_method/
+-- refunds aggregates, but no index supports the date-range predicate --
+-- idx_payments_club_id alone means Postgres pulls every payment row for
+-- a club into a Filter step to test the date range, rather than using
+-- an index to jump to it directly. Cheap today (137 total payment rows
+-- project-wide, confirmed via EXPLAIN during independent P2 verification:
+-- 1.66ms), but a club with 2-3 years of history generates thousands of
+-- rows to filter per report call, 4x per call.
+--
+-- Scope decision: index only, no CTE refactor of the function body.
+-- Independent P2 verification confirmed the composite index is the
+-- correct, low-risk fix; collapsing the four independent aggregate
+-- scans into one CTE was considered but is a materially riskier change
+-- (must preserve byte-identical output across all four aggregates,
+-- verified against real production data) for a function with no
+-- measurable current cost -- deferred as a separate, explicitly-scoped
+-- future change if/when payment volume actually makes it worth the
+-- regression risk. Matches this migration's own "index alone is an
+-- acceptable, safer scope" guidance.
+create index if not exists idx_payments_club_status_received_at
+  on public.payments (club_id, status, received_at);

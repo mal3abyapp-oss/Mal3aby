@@ -88,7 +88,13 @@ async function fetchOutstandingByInvoice(invoiceIds: string[]): Promise<Map<stri
 export function PortalBookingsPage() {
   const { t } = useTranslation()
   const { activeClubId, activeCustomerId, isLoading: clubLoading } = usePortalClub()
-  const { data: allBookings = [], isLoading } = useQuery({
+  // Finding H-2 (frozen production audit): this list previously
+  // destructured only `data = [], isLoading` -- a failed fetch silently
+  // rendered as "no bookings" (portal.bookingsPage.emptyTitle),
+  // indistinguishable from a customer with genuinely no bookings.
+  // isError is now surfaced as a distinct inline message, matching the
+  // sibling PortalAcademyPage/PortalMembershipsPage pattern.
+  const { data: allBookings = [], isLoading, isError } = useQuery({
     queryKey: ['portal', 'my-bookings'],
     queryFn: fetchMyBookings,
     enabled: !!activeCustomerId,
@@ -115,8 +121,9 @@ export function PortalBookingsPage() {
       <PageHeader title={t('portal.bookingsPage.title')} description={t('portal.bookingsPage.description')} />
 
       {(isLoading || clubLoading) && <p className="text-sm text-text-secondary">{t('portal.bookingsPage.loading')}</p>}
+      {isError && <p className="text-sm text-status-danger">{t('portal.bookingsPage.loadError')}</p>}
 
-      {!isLoading && !clubLoading && bookings.length === 0 && (
+      {!isLoading && !clubLoading && !isError && bookings.length === 0 && (
         <p className="rounded-lg border border-dashed border-border p-6 text-center text-sm text-text-secondary">
           {t('portal.bookingsPage.emptyTitle')}
         </p>

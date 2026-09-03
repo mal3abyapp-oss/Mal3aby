@@ -4,9 +4,11 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '@/lib/supabase/client'
 import { useAuth } from '@/app/providers/AuthProvider'
 import { useDirection } from '@/app/providers/DirectionProvider'
-import { formatDate, type SupportedLocale } from '@/lib/i18n/config'
+import { formatDateIsolated, type SupportedLocale } from '@/lib/i18n/config'
+import { FormattedDate } from '@/components/ui/formatted-date'
 import { PageHeader } from '@/components/ui/page-header'
 import { DataTable, type DataTableColumn } from '@/components/ui/data-table'
+import { ErrorState } from '@/components/ui/error-state'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
@@ -149,8 +151,18 @@ async function fetchLocations(clubId: string): Promise<LocationOption[]> {
   return (data ?? []).map((r) => ({ locationId: r.location_id, name: r.name }))
 }
 
+// PERF-05 (production audit remediation, 2026-09-03): list_shop_products
+// now defaults to 50 rows (p_limit/p_offset, see that RPC's own
+// migration comment). This call site is a product PICKER used to
+// cross-reference every active product's category while counting stock
+// -- it must not silently miss products past #50, so it passes an
+// explicit, generous, still-bounded limit instead of inheriting the new
+// display-page-size default. Same reasoning as ShopInventoryPage.tsx's
+// PRODUCT_PICKER_LIMIT.
+const PRODUCT_PICKER_LIMIT = 1000
+
 async function fetchProducts(clubId: string): Promise<ProductOption[]> {
-  const { data, error } = await supabase.rpc('list_shop_products', { p_club_id: clubId, p_status: 'active' })
+  const { data, error } = await supabase.rpc('list_shop_products', { p_club_id: clubId, p_status: 'active', p_limit: PRODUCT_PICKER_LIMIT })
   if (error) throw error
   return (data ?? []).map((r) => ({
     productId: r.product_id, nameAr: r.name_ar, hasVariants: r.has_variants,
@@ -204,12 +216,16 @@ function StatusBadge({ status }: { status: string }) {
 export function ShopStockCountPage() {
   const { t } = useTranslation()
   const { currentClubId } = useAuth()
-  const { locale } = useDirection()
   const queryClient = useQueryClient()
   const [startOpen, setStartOpen] = useState(false)
   const [detailId, setDetailId] = useState<string | null>(null)
 
-  const { data: counts = [], isLoading } = useQuery({
+  // Finding H-2 (frozen production audit): this list previously
+  // destructured only `data = [], isLoading` -- a failed fetch silently
+  // rendered as "no stock counts" via DataTable's own empty state,
+  // indistinguishable from a club that genuinely has none. isError/
+  // error/refetch are now surfaced.
+  const { data: counts = [], isLoading, isError, error, refetch } = useQuery({
     queryKey: ['shop-stock-counts', currentClubId],
     queryFn: () => fetchStockCounts(currentClubId as string),
     enabled: !!currentClubId,
@@ -230,7 +246,7 @@ export function ShopStockCountPage() {
       header: t('shop.stockCount.columns.variances'),
       render: (c) => (c.varianceItemCount > 0 ? <span className="font-semibold text-status-warning">{c.varianceItemCount}</span> : c.varianceItemCount),
     },
-    { key: 'started', header: t('shop.stockCount.columns.started'), render: (c) => (c.startedAt ? formatDate(c.startedAt, locale as SupportedLocale, 'Africa/Cairo', { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : '—') },
+    { key: 'started', header: t('shop.stockCount.columns.started'), render: (c) => (c.startedAt ? <FormattedDate value={c.startedAt} timeZone="Africa/Cairo" options={{ year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }} /> : '—') },
     {
       key: 'actions',
       header: '',
@@ -250,13 +266,17 @@ export function ShopStockCountPage() {
         actions={<Button data-testid="stock-count-start-new" onClick={() => setStartOpen(true)}>{t('shop.stockCount.startNew')}</Button>}
       />
 
-      <DataTable
-        columns={columns}
-        rows={counts}
-        rowKey={(c) => c.id}
-        isLoading={isLoading}
-        emptyTitle={t('shop.stockCount.emptyTitle')}
-      />
+      {isError ? (
+        <ErrorState message={translateSupabaseError(error, t('shop.stockCount.loadError'))} onRetry={() => void refetch()} />
+      ) : (
+        <DataTable
+          columns={columns}
+          rows={counts}
+          rowKey={(c) => c.id}
+          isLoading={isLoading}
+          emptyTitle={t('shop.stockCount.emptyTitle')}
+        />
+      )}
 
       {startOpen && (
         <StartStockCountDialog
@@ -551,8 +571,8 @@ function StockCountDetailDialog({ clubId, stockCountId, onClose, onChanged }: {
                 <ReportPrintHeader
                   reportName={`${t('shop.stockCount.title')} — ${detail.locationName}`}
                   filterSummary={[
-                    detail.startedAt ? `${t('shop.stockCount.printStartedAt')}: ${formatDate(detail.startedAt, locale as SupportedLocale, 'Africa/Cairo', { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}` : null,
-                    detail.completedAt ? `${t('shop.stockCount.printCompletedAt')}: ${formatDate(detail.completedAt, locale as SupportedLocale, 'Africa/Cairo', { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}` : null,
+                    detail.startedAt ? `${t('shop.stockCount.printStartedAt')}: ${formatDateIsolated(detail.startedAt, locale as SupportedLocale, 'Africa/Cairo', { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}` : null,
+                    detail.completedAt ? `${t('shop.stockCount.printCompletedAt')}: ${formatDateIsolated(detail.completedAt, locale as SupportedLocale, 'Africa/Cairo', { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}` : null,
                     detail.startedByName ? `${t('shop.stockCount.printStartedBy')}: ${detail.startedByName}` : null,
                     detail.completedByName ? `${t('shop.stockCount.printCompletedBy')}: ${detail.completedByName}` : null,
                   ].filter(Boolean).join(' — ')}

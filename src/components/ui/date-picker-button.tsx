@@ -2,7 +2,7 @@ import { CalendarDays } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { DateCalendar } from '@/components/ui/date-calendar'
-import { useState } from 'react'
+import { useState, type ReactNode } from 'react'
 
 // FINAL BOOKINGS UX & LIFECYCLE GAP CLOSURE, Section A1/A2: the
 // clickable "[ 31 August 2026 📅 ]" control the directive asks for,
@@ -10,9 +10,13 @@ import { useState } from 'react'
 // Public Booking -- one implementation, not two near-duplicates.
 export interface DatePickerButtonProps {
   /** Already-formatted display label for the trigger button (caller
-   *  formats via formatDate/formatInstant with the correct venue
-   *  timezone + locale -- this component never formats dates itself). */
-  label: string
+   *  formats via <FormattedDate> -- production audit finding H-1: this
+   *  used to be a plain string built from formatDate() with no bidi
+   *  isolation; ReactNode lets callers pass <FormattedDate> directly so
+   *  the label gets the same <bdi> isolation every other rendered date
+   *  in the app gets. A plain string still works -- this component
+   *  never formats dates itself either way). */
+  label: ReactNode
   value: string
   onSelect: (date: string) => void
   todayDate: string

@@ -1,0 +1,32 @@
+-- PERF-01: club_memberships had 2.2M+ sequential scans (confirmed live via
+-- pg_stat_user_tables on project gxkrtlvpjwxhcqdisyob: seq_scan=2,195,512,
+-- n_live_tup=38) because no index supports the RLS-critical lookup pattern
+--   select club_id from club_memberships where user_id = :x and status = 'active'
+-- used by user_club_ids(), is_platform_owner(), has_permission(),
+-- has_permission_as(), has_platform_permission_as(), caller_permission_keys(),
+-- user_has_branch_access(), and other SECURITY DEFINER RLS-support functions.
+--
+-- Existing indexes on club_memberships (re-confirmed live via pg_indexes
+-- immediately before writing this migration):
+--   club_memberships_pkey                            (id)
+--   club_memberships_user_club_custom_role_unique     (user_id, club_id, custom_role_id) WHERE custom_role_id IS NOT NULL
+--   club_memberships_user_id_club_id_role_id_key      (user_id, club_id, role_id)
+-- None of these has user_id as a leading key usable independently of club_id
+-- for a status-filtered, club_id-agnostic lookup, and none is partial on
+-- status, so none can serve this pattern. No redundant/overlapping index
+-- exists for this new index to duplicate.
+--
+-- Partial vs non-partial: every read-path query against club_memberships
+-- that filters on status in the live function definitions (user_club_ids,
+-- is_platform_owner, has_permission, has_permission_as,
+-- has_platform_permission_as, caller_permission_keys, user_has_branch_access,
+-- list_club_roles, and others) filters on status = 'active' exclusively.
+-- The only occurrences of the other status values ('invited', 'inactive')
+-- in the schema are as UPDATE/INSERT targets, never as a read-path WHERE
+-- filter. A non-partial (user_id, status) index would therefore carry dead
+-- weight for status values nothing ever looks up by, with no offsetting
+-- benefit. A partial index on status = 'active' is smaller, cheaper to
+-- maintain, and exactly matches the sole real query pattern.
+CREATE INDEX IF NOT EXISTS idx_club_memberships_user_id_active
+  ON public.club_memberships (user_id)
+  WHERE status = 'active';

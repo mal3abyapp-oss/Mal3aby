@@ -1,0 +1,21 @@
+-- Production Audit Remediation, M-9 follow-up (2026-09-03): independent
+-- P1 verification found that adding qr_confirm_checkin(text, boolean)
+-- (20260903140000_qr_identity_match_booking_photo_and_confirmation_
+-- record.sql) left the prior qr_confirm_checkin(text) single-arg
+-- overload live -- Postgres creates a new overload on a parameter-list
+-- change rather than replacing the old one. That overload's body has no
+-- concept of identity_confirmed, so every qr_scan_events row it inserts
+-- leaves that column NULL, and it remains callable by any authenticated
+-- staff caller (EXECUTE granted to authenticated/postgres/service_role,
+-- same as the new overload) -- silently bypassing the entire M-9
+-- identity-attestation control at the database layer regardless of
+-- what the frontend does.
+--
+-- Same defect class the codebase has already closed for exactly this
+-- reason before -- see 20260823010000_qr_diagnostic_codes.sql line 185
+-- (`drop function if exists public.qr_confirm_checkin(text);`) for an
+-- earlier signature change on this same function, and M-2's explicit
+-- handling of get_platform_whatsapp_health()'s old zero-arg overload
+-- in this same remediation pass. Dropping the stale overload here
+-- follows that established convention.
+drop function if exists public.qr_confirm_checkin(text);

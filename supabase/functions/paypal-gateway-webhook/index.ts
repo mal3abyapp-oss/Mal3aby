@@ -134,10 +134,10 @@ const CORS_HEADERS = {
   'Access-Control-Allow-Methods': 'POST, GET, OPTIONS',
 }
 
-function jsonResponse(body: unknown, status = 200) {
+function jsonResponse(body: unknown, status = 200, extraHeaders?: Record<string, string>) {
   return new Response(JSON.stringify(body), {
     status,
-    headers: { 'Content-Type': 'application/json', ...CORS_HEADERS },
+    headers: { 'Content-Type': 'application/json', ...CORS_HEADERS, ...extraHeaders },
   })
 }
 
@@ -194,6 +194,28 @@ Deno.serve(async (req) => {
   }
   if (req.method !== 'POST') {
     return jsonResponse({ error: 'method not allowed' }, 405)
+  }
+
+  // M-5: coarse per-provider rate limit, checked before any header
+  // validation or PayPal verify-webhook-signature call (an OUTBOUND
+  // API call to PayPal, materially more expensive than the other 4
+  // providers' local HMAC/signature checks -- so gating this early
+  // matters even more here). Never a permanent rejection of a valid
+  // delivery -- 429 + Retry-After, which PayPal retries on a non-2xx
+  // response. See migration
+  // 20260903150100_gateway_webhook_rate_limit_m5.sql for the full
+  // reasoning and money-safety discipline this follows.
+  const admin = createClient(SUPABASE_URL, SERVICE_ROLE_KEY)
+  const { data: rateLimitResult } = await admin.rpc('check_gateway_webhook_rate_limit', {
+    p_provider_key: 'paypal',
+  })
+  if (rateLimitResult && rateLimitResult.length > 0 && rateLimitResult[0].allowed === false) {
+    const retryAfter = rateLimitResult[0].retry_after_seconds ?? 30
+    return jsonResponse(
+      { error: 'rate limit exceeded, please retry' },
+      429,
+      { 'Retry-After': String(retryAfter) },
+    )
   }
 
   // The 5 required PayPal transmission headers -- fail closed BEFORE
@@ -260,7 +282,8 @@ Deno.serve(async (req) => {
 
   const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
-  const admin = createClient(SUPABASE_URL, SERVICE_ROLE_KEY)
+  // `admin` (the service-role client) was already created above for
+  // the M-5 rate-limit check -- reused here.
 
   type Candidate = {
     connectionId: string

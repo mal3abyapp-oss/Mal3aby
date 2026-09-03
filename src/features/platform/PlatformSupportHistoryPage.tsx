@@ -4,8 +4,10 @@ import { useTranslation } from 'react-i18next'
 import { supabase } from '@/lib/supabase/client'
 import { PageHeader } from '@/components/ui/page-header'
 import { DataTable, type DataTableColumn } from '@/components/ui/data-table'
+import { ErrorState } from '@/components/ui/error-state'
 import { StatusBadge } from '@/components/ui/status-badge'
 import { useDirection } from '@/app/providers/DirectionProvider'
+import { translateSupabaseError } from '@/lib/errors'
 
 // PLATFORM OWNER AUTONOMOUS COMPLETION -- Phase E (2026-08-29): directive
 // Section 22 -- "if backend data exists, build a practical read-only
@@ -40,7 +42,13 @@ export function PlatformSupportHistoryPage() {
   const { t } = useTranslation()
   const { locale } = useDirection()
 
-  const { data: rows = [], isLoading } = useQuery({
+  // Finding H-2 (frozen production audit): this security-sensitive
+  // screen previously destructured only `data = [], isLoading` -- a
+  // failed fetch silently rendered as "No support sessions yet" via
+  // DataTable's own empty state, indistinguishable from a genuinely
+  // clean history. isError/error/refetch are now surfaced so a fetch
+  // failure is never misread as "no support access occurred".
+  const { data: rows = [], isLoading, isError, error, refetch } = useQuery({
     queryKey: ['platform-support-session-history'],
     queryFn: fetchSupportHistory,
   })
@@ -103,13 +111,17 @@ export function PlatformSupportHistoryPage() {
   return (
     <div>
       <PageHeader title={t('platform.supportHistoryPage.title')} description={t('platform.supportHistoryPage.description')} />
-      <DataTable
-        columns={columns}
-        rows={rows}
-        rowKey={(r) => r.id}
-        isLoading={isLoading}
-        emptyTitle={t('platform.supportHistoryPage.emptyTitle')}
-      />
+      {isError ? (
+        <ErrorState message={translateSupabaseError(error, t('platform.supportHistoryPage.loadError'))} onRetry={() => void refetch()} />
+      ) : (
+        <DataTable
+          columns={columns}
+          rows={rows}
+          rowKey={(r) => r.id}
+          isLoading={isLoading}
+          emptyTitle={t('platform.supportHistoryPage.emptyTitle')}
+        />
+      )}
     </div>
   )
 }

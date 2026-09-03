@@ -152,9 +152,20 @@ Secret Leak runbook), Supabase project dashboard-level configuration.
     from information_schema.role_table_grants
     where table_schema = 'public' and grantee in ('anon','authenticated','service_role','postgres');
     ```
-11. **08_data.sql** — the real business/financial/customer/audit data.
+11. **08_data.sql** — the real business/financial/customer/audit data,
+    generated in FK-dependency-safe order (fixed — see "FK ordering fix"
+    below; this used to iterate `order by c.relname`, plain alphabetical,
+    which is what caused the now-resolved restore-ordering bug).
     This is a single self-contained `DO` block (loops over every table
-    server-side, no per-table round trips needed):
+    server-side, no per-table round trips needed), iterating an explicit
+    table array instead of an alphabetical query. **It also NULLs out
+    every nullable/self-referencing FK column at INSERT time** (a real
+    row can carry a populated value in a column like
+    `bookings.invoice_id` that points *forward* to a table which hasn't
+    been loaded yet in dependency order — nullability alone doesn't
+    save you if the row's actual stored value is non-NULL) **and emits
+    a second block of deferred `UPDATE` statements at the end of the
+    file** that restore those real values once every table exists:
     ```sql
     create or replace function pg_temp.sql_quote(v jsonb) returns text language sql as $$
       select case
@@ -168,35 +179,147 @@ Secret Leak runbook), Supabase project dashboard-level configuration.
 
     do $$
     declare
+      restore_order text[] := ARRAY[
+        -- Corrected 2026-09-03 (P2 remediation, M-14 follow-up): the
+        -- prior 112-table version of this array was already stale by
+        -- the time it was recorded -- attendance_history and
+        -- gateway_webhook_rate_limit_state were added to the live
+        -- schema by same-day migrations ~3 hours earlier. Both have
+        -- hard (NOT NULL) FK edges only, added below in valid
+        -- topological position; neither needs a defer_cols entry.
+        -- Regenerated via `python3 backups/topo_sort_tables.py --json`
+        -- against the live 114-table schema -- do not hand-edit.
+        'audit_logs','clubs','age_groups','automatic_trial_entitlements','branches',
+        'cash_shifts','club_booking_policy','club_membership_number_sequences',
+        'club_membership_plans','club_membership_plan_branches','club_memberships',
+        'club_modules','club_roles','commercial_entitlements',
+        'commercial_upgrade_requests','contact_requests',
+        'customer_photo_update_requests','customers','club_membership_subscriptions',
+        'club_membership_freezes','club_membership_sale_keys',
+        'employee_cash_liabilities','employee_cash_liability_ledger',
+        'employee_cash_liability_settlement_keys','expense_categories','expenses',
+        'field_operating_hours','fields','booking_series','bookings','field_blocks',
+        'government_collection_policies','groups','group_schedule_slots',
+        'invoice_number_sequences','invoices','invoice_items',
+        'invoice_verification_tokens','manual_payment_claims','membership_branches',
+        'messaging_safety_settings','notification_category_settings',
+        'notification_consent','notification_events','notification_queue',
+        'notification_suppressions','official_collection_receipts',
+        'payment_gateway_configs','payment_gateway_providers',
+        'club_gateway_connections','club_gateway_provider_policy',
+        'gateway_webhook_rate_limit_state','payment_gateway_transactions',
+        'payment_gateway_webhook_events','payment_method_configs','payment_proofs',
+        'payment_reconciliations','payments','payment_allocations','permissions',
+        'club_role_permissions','permission_dependencies','platform_custom_roles',
+        'platform_owner_pinned_clubs','platform_owner_recent_clubs',
+        'platform_permissions','platform_custom_role_permissions','platform_plans',
+        'platform_roles','platform_role_permissions','platform_settings',
+        'platform_staff_memberships','platform_subscriptions','platform_invoices',
+        'platform_payments','platform_support_sessions','players','enrollments',
+        'guardian_links','portal_invites','pricing_rules','profiles','programs',
+        'qr_credentials','qr_scan_events','refunds','roles','role_permissions',
+        'seasons','shop_categories','shop_held_sales','shop_inventory_locations',
+        'shop_products','shop_held_sale_items','shop_inventory_balances',
+        'shop_inventory_movements','shop_product_variants','shop_sales',
+        'shop_sale_items','shop_sale_returns','shop_sale_return_items',
+        'shop_stock_counts','shop_stock_count_items','shop_suppliers','subscriptions',
+        'subscription_freezes','training_sessions','attendance','attendance_history',
+        'whatsapp_accounts','whatsapp_connection_events','whatsapp_delivery_traces',
+        'whatsapp_incidents','whatsapp_root_cause_codes'
+      ];
+      -- table -> array of [pk_column, fk_column] pairs that must be
+      -- NULLed at INSERT and restored by a deferred UPDATE afterward.
+      -- This is the EXACT, machine-generated output of
+      -- `python3 backups/topo_sort_tables.py --defer-cols` against the
+      -- restore_order above -- do not hand-edit; regenerate instead.
+      -- It already excludes soft edges whose parent is earlier in
+      -- restore_order (e.g. audit_logs.club_id, expenses.category_id)
+      -- since those insert correctly in one pass and never need
+      -- deferral -- only genuine forward references are listed.
+      defer_cols jsonb := '{
+        "audit_logs": [["id","branch_id"],["id","club_id"],["id","support_session_id"]],
+        "bookings": [["id","invoice_id"]],
+        "club_membership_subscriptions": [["id","invoice_id"]],
+        "club_memberships": [["id","custom_role_id"],["id","role_id"]],
+        "customer_photo_update_requests": [["id","customer_id"],["id","player_id"]],
+        "customers": [["id","merged_into_customer_id"]],
+        "field_operating_hours": [["id","field_id"]],
+        "groups": [["id","program_id"],["id","season_id"]],
+        "manual_payment_claims": [["id","payment_method_config_id"],["id","resulting_payment_id"]],
+        "official_collection_receipts": [["id","payment_id"],["id","corrected_from_receipt_id"]],
+        "payment_gateway_transactions": [["id","payment_id"]],
+        "payment_proofs": [["id","resulting_payment_id"]],
+        "platform_subscriptions": [["id","previous_subscription_id"]],
+        "shop_held_sale_items": [["id","variant_id"]],
+        "shop_inventory_balances": [["id","variant_id"]],
+        "shop_inventory_movements": [["id","variant_id"]],
+        "whatsapp_incidents": [["id","root_cause_code"]]
+      }'::jsonb;
       r record; col_names text[]; export_sql text := ''; row_count integer; table_export text;
+      tname text; defer_pairs jsonb; deferred_updates text := '';
+      pk_col text; fk_col text; pair jsonb;
     begin
-      for r in
-        select c.relname as table_name from pg_class c
-        join pg_namespace n on n.oid = c.relnamespace
-        where n.nspname = 'public' and c.relkind = 'r' order by c.relname
+      foreach tname in array restore_order
       loop
-        execute format('select count(*) from public.%I', r.table_name) into row_count;
+        defer_pairs := coalesce(defer_cols -> tname, '[]'::jsonb);
+        execute format('select count(*) from public.%I', tname) into row_count;
         if row_count = 0 then
-          export_sql := export_sql || format(E'-- %s: no rows\n\n', r.table_name);
+          export_sql := export_sql || format(E'-- %s: no rows\n\n', tname);
         else
           select array_agg(a.attname order by a.attnum) into col_names
             from pg_attribute a
-            where a.attrelid = ('public.' || quote_ident(r.table_name))::regclass
+            where a.attrelid = ('public.' || quote_ident(tname))::regclass
               and a.attnum > 0 and not a.attisdropped;
           execute format(
             $f$select string_agg(format('INSERT INTO public.%%I (%%s) VALUES (%%s);', %L, array_to_string(%L::text[], ', '),
-              (select string_agg(pg_temp.sql_quote(to_jsonb(t) -> col), ', ') from unnest(%L::text[]) as col)), E'\n')
+              (select string_agg(
+                 case when col = any(%L::text[]) then 'NULL'
+                      else pg_temp.sql_quote(to_jsonb(t) -> col) end, ', ')
+               from unnest(%L::text[]) as col)), E'\n')
              from public.%I t$f$,
-            r.table_name, col_names, col_names, r.table_name
+            tname, col_names,
+            (select coalesce(array_agg(p->>1), array[]::text[]) from jsonb_array_elements(defer_pairs) p),
+            col_names, tname
           ) into table_export;
-          export_sql := export_sql || format(E'-- %s: %s row(s)\n', r.table_name, row_count) || coalesce(table_export, '') || E'\n\n';
+          export_sql := export_sql || format(E'-- %s: %s row(s)\n', tname, row_count) || coalesce(table_export, '') || E'\n\n';
+
+          -- Emit deferred UPDATEs for any real non-NULL values in the deferred columns
+          for pair in select * from jsonb_array_elements(defer_pairs)
+          loop
+            pk_col := pair ->> 0; fk_col := pair ->> 1;
+            execute format(
+              $u$select string_agg(format('UPDATE public.%%I SET %%I = %%s WHERE %%I = %%s;',
+                 %L, %L, pg_temp.sql_quote(to_jsonb(t) -> %L), %L, pg_temp.sql_quote(to_jsonb(t) -> %L)), E'\n')
+               from public.%I t where t.%I is not null$u$,
+              tname, fk_col, fk_col, pk_col, pk_col, tname, fk_col
+            ) into table_export;
+            if table_export is not null then
+              deferred_updates := deferred_updates || format(E'-- %s.%s deferred updates\n', tname, fk_col) || table_export || E'\n\n';
+            end if;
+          end loop;
         end if;
       end loop;
+      if deferred_updates <> '' then
+        export_sql := export_sql || E'-- ===== DEFERRED UPDATES (run only after every table above is loaded) =====\n\n' || deferred_updates;
+      end if;
       create temp table _final_export as select export_sql as content;
     end $$;
 
     select content from _final_export;
     ```
+
+    **`restore_order` and `defer_cols` above are both generated by
+    `backups/topo_sort_tables.py`** — `python3 backups/topo_sort_tables.py
+    --json` for `restore_order`, `python3 backups/topo_sort_tables.py
+    --defer-cols` for `defer_cols` (only the soft/self-ref edges that
+    are genuine forward references given the current order — the ones
+    that actually risk an INSERT failure with real data). Do not
+    hand-edit either; regenerate them. If the schema gains new
+    tables/FKs before the next backup: refresh the script's
+    `HARD_EDGES`/`SOFT_EDGES`/`SELF_REF_COLUMNS` lists per the query in
+    its own docstring, re-run `--verify` to confirm the edge set is
+    still a valid DAG, then regenerate both blocks above from the two
+    flags before backing up.
 12. **09_manifest.json**:
     ```bash
     python3 backups/make_manifest.py "backups/$TS"
@@ -280,32 +403,126 @@ backup.
    07_grants.sql
    08_data.sql           -- data last, once every constraint/policy exists
    ```
-3. **Known gap**: `08_data.sql`'s table order is alphabetical by table
-   name, NOT topologically sorted by foreign-key dependency. A restore
-   may hit FK violations if a child table's data loads before its
-   parent's. If this happens: re-run the specific failed `INSERT`
-   statements after their referenced parent rows exist (the file is
-   plain, greppable SQL — find the failing table's block and defer it
-   manually). This is a real, disclosed limitation of the
-   introspection-based generation method, not silently hidden.
+3. **FK ordering (fixed 2026-09-03, corrected same day per independent
+   P2 verification)**: `08_data.sql`'s `INSERT`
+   statements are generated in an explicit, verified topological order
+   (`backups/topo_sort_tables.py`'s `restore_order`, computed from every
+   NOT NULL foreign key in the live schema — 160 hard edges across the
+   114 tables, confirmed a valid DAG with zero cycles both by Kahn's
+   algorithm and an independent DFS cross-check). Nullable and
+   self-referencing FK columns whose real value could still point
+   forward to a not-yet-loaded table are inserted as `NULL` and
+   restored by a second block of deferred `UPDATE` statements appended
+   to the end of `08_data.sql`, run only after every table's `INSERT`
+   block above it has completed. Applying `08_data.sql` top-to-bottom
+   in one pass, in file order, should no longer hit an FK violation
+   from insert ordering. **This has been dry-run verified against the
+   live schema** (topological order computed and cross-checked, zero
+   FK-hard-edge violations in the resulting order) but **has not yet
+   been executed against a real restore target** — see "What has and
+   hasn't been rehearsed" below for the precise, current boundary. If a
+   future schema change reintroduces an FK cycle among NOT NULL
+   columns, `topo_sort_tables.py --verify` will fail loudly (exit 1)
+   rather than silently producing a broken order — treat that as a
+   schema-design problem to fix (e.g. make the new FK nullable or
+   deferrable), not something to route around in the backup script.
 4. Run the Post-Restore Verification checks in `INCIDENT_RUNBOOKS.md`.
+
+## What has and hasn't been rehearsed
+
+- **Verified (dry-run, against the live production schema, read-only,
+  2026-09-03, re-confirmed same day after correcting a stale 2-table
+  snapshot found by independent verification)**: the corrected
+  FK-dependency restore order is a valid
+  topological sort of all 114 tables' 160 NOT NULL foreign keys —
+  computed via Kahn's algorithm, independently cross-checked via DFS
+  cycle detection (different algorithm, same result: 0 cycles), and
+  confirmed to produce zero ordering violations against every hard
+  edge. The nullable/self-referencing nulled-then-deferred-UPDATE
+  design was checked against real row counts in production (142
+  `bookings.invoice_id`, 34 `subscriptions.invoice_id`, 12 each for
+  `club_membership_subscriptions.invoice_id` and `shop_sales.invoice_id`,
+  and smaller counts elsewhere — all genuinely non-NULL forward
+  references that would have broken a naive single-pass restore even
+  with the table order fixed, which is why the defer mechanism exists
+  and is not optional).
+- **NOT executed**: no actual `CREATE TABLE`/`INSERT`/`UPDATE` from any
+  backup has been run against any real Postgres target, in this repo's
+  history to date. The reason is a genuine environment constraint, not
+  a choice: this project's Supabase organization is confirmed on the
+  **`free`** plan (`get_organization`, re-confirmed live 2026-09-03),
+  and creating a disposable Supabase branch (the safe, standard way to
+  rehearse a restore without touching production or another real
+  project) requires the `create_branch` MCP tool's `confirm_cost_id` —
+  i.e. branching is a billable operation not available on the free
+  tier without a plan/cost decision. That decision belongs to the user
+  (see `BACKUP_RECOVERY_PLAN.md`'s standing, already-accepted Stop
+  Condition), not to an autonomous session. The only other Supabase
+  project reachable from this environment (`mat3amos-dev`) is a real,
+  separate, unrelated live application — restoring into it would
+  contaminate someone else's real project, not provide a disposable
+  target. A local Postgres instance was also unavailable (Docker
+  Desktop's Windows service confirmed `Stopped`, no standalone
+  `pg_dump`/`psql`/`postgres` binaries found on this machine — see
+  "Why this is NOT a plain `pg_dump`" above). **A true end-to-end
+  restore rehearsal (fresh target → apply all 9 files in order →
+  post-restore verification queries pass) remains genuinely
+  unperformed.** This is the one part of this finding that stays open;
+  it requires either a paid Supabase branch/project (user decision) or
+  a working local Postgres install becoming available in a future
+  session.
 
 ## What is NOT included? (repeated for visibility)
 
-`auth.users` (Supabase Auth identities — a restored database's users
-cannot log in with their old passwords without a separate Auth-level
-restore), Storage file contents, Cloudflare Worker secrets, Supabase
-project dashboard configuration. See `09_manifest.json`'s
-`not_captured` block for the authoritative, backup-specific list.
+`auth.users`/`auth.identities` (Supabase Auth identities), Storage file
+contents, Cloudflare Worker secrets, Supabase project dashboard
+configuration. See `09_manifest.json`'s `not_captured` block for the
+authoritative, backup-specific list.
 
-## What must be restored separately?
+## What must be restored separately? (precise operational boundary,
+re-verified 2026-09-03 against Supabase's own current documentation and
+this project's live database — not left vague)
 
-- **Auth users**: would need Supabase Auth's own export/import
-  mechanism (not available without `service_role`/dashboard access this
-  session doesn't have) — a genuinely separate, harder problem, honestly
-  disclosed rather than silently assumed solved.
+- **Auth users** (`auth.users`, 40 real users confirmed live in this
+  project): the SQL-introspection method this backup already uses
+  *could* technically read `auth.users` too — **corrected**: it is a
+  plain Postgres table like any other and IS reachable via the same
+  `execute_sql` tool this whole procedure runs on (`select * from
+  auth.users` succeeds; confirmed live, `40` rows). A prior version of
+  this document wrongly stated this needs `service_role`/dashboard
+  access unavailable to this session — that was inaccurate and has
+  been corrected here. **The real, still-unresolved boundary is
+  restore, not export**: Supabase's own documentation (Guides →
+  Self-Hosting → "Restore a Platform Project to Self-Hosted") confirms
+  `auth.users` restore is only supported via `supabase db dump`
+  (Docker-dependent — unavailable in this environment, see "Why this
+  is NOT a plain `pg_dump`" above) followed by a raw `psql` restore
+  with `session_replication_role = replica` to bypass triggers, run as
+  ONE step alongside `auth.identities`, `auth.sessions`, and every
+  other `auth.*` table together — GoTrue enforces invariants across
+  those tables (linked `identities` rows, specific `encrypted_password`
+  hash formats [bcrypt/Argon2 only], `instance_id`, MFA factor
+  consistency) that a partial, hand-assembled `INSERT` into `auth.users`
+  alone would not satisfy correctly. The supported *programmatic*
+  alternative for creating/restoring individual users outside a full
+  `pg_dump`/`psql` cycle is the Auth Admin API
+  (`supabase.auth.admin.createUser()`, accepting either a
+  `password_hash` or plaintext `password`) — but that requires the
+  `service_role` key (available to the connector/backend, not to this
+  MCP session) and would need to be run as 40 individual API calls,
+  not a SQL batch. **Conclusion**: `auth.users` CAN be exported today
+  (trivial to add to a future backup pass — was simply never added, not
+  blocked); it CANNOT be correctly restored by this repo's SQL-level
+  backup/restore tooling alone, by Supabase's own design, regardless of
+  Docker availability — a real database restore of business data would
+  leave every existing user needing to reset their password via normal
+  Supabase Auth password-reset flow (its own working, unaffected
+  mechanism) rather than losing access to the platform entirely.
 - **Storage files**: would need a separate bucket-level copy (Supabase
-  Storage API, `service_role`-authenticated) — not performed this pass.
+  Storage API, `service_role`-authenticated) — not performed this pass;
+  confirmed via Supabase's own self-hosted restore guide this is
+  never included in a database-level dump/restore, on any plan, by
+  design ("Transferring storage objects... is not covered").
 - **Secrets**: re-provisioned per `INCIDENT_RUNBOOKS.md`'s Secret Leak /
   Secret Rotation runbook — never stored in any backup file.
 
@@ -317,6 +534,15 @@ project dashboard configuration. See `09_manifest.json`'s
   SHA-256 checksums for a given backup directory.
 - `backups/verify_manifest.py` — re-checks those checksums against the
   files currently on disk.
+- `backups/topo_sort_tables.py` — computes the FK-dependency-safe table
+  restore order (`--json` for `restore_order`, `--defer-cols` for
+  `defer_cols`, `--verify` for a fast pass/fail DAG check) used to
+  generate `08_data.sql`'s table iteration order and deferred-update
+  column list (see step 11 above). Regenerate both blocks from this
+  script — never hand-edit them — whenever the schema's tables or
+  foreign keys change.
 
 No secrets are embedded in any of these scripts — they operate purely
-on already-extracted local files and take no credentials as arguments.
+on already-extracted local files (or, for `topo_sort_tables.py`, a
+static edge list refreshed from a read-only schema query) and take no
+credentials as arguments.

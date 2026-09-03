@@ -75,10 +75,10 @@ const CORS_HEADERS = {
   'Access-Control-Allow-Methods': 'POST, GET, OPTIONS',
 }
 
-function jsonResponse(body: unknown, status = 200) {
+function jsonResponse(body: unknown, status = 200, extraHeaders?: Record<string, string>) {
   return new Response(JSON.stringify(body), {
     status,
-    headers: { 'Content-Type': 'application/json', ...CORS_HEADERS },
+    headers: { 'Content-Type': 'application/json', ...CORS_HEADERS, ...extraHeaders },
   })
 }
 
@@ -193,6 +193,27 @@ Deno.serve(async (req) => {
     return jsonResponse({ error: 'missing hmac query parameter' }, 400)
   }
 
+  // M-5: coarse per-provider rate limit, checked BEFORE any signature
+  // verification or DB candidate-resolution work so cost stays bounded
+  // regardless of whether this request turns out to be genuinely
+  // signed. Never a permanent rejection of a valid delivery -- 429 +
+  // Retry-After, which Paymob (like every provider here) retries on a
+  // non-2xx response. See migration
+  // 20260903150100_gateway_webhook_rate_limit_m5.sql for the full
+  // reasoning and money-safety discipline this follows.
+  const admin = createClient(SUPABASE_URL, SERVICE_ROLE_KEY)
+  const { data: rateLimitResult } = await admin.rpc('check_gateway_webhook_rate_limit', {
+    p_provider_key: 'paymob',
+  })
+  if (rateLimitResult && rateLimitResult.length > 0 && rateLimitResult[0].allowed === false) {
+    const retryAfter = rateLimitResult[0].retry_after_seconds ?? 30
+    return jsonResponse(
+      { error: 'rate limit exceeded, please retry' },
+      429,
+      { 'Retry-After': String(retryAfter) },
+    )
+  }
+
   // CRITICAL ORDERING: read the raw body as TEXT first, exactly like
   // stripe-gateway-webhook -- we need the raw bytes both to compute a
   // durable payload_hash for dedup AND to parse the JSON safely once,
@@ -224,8 +245,6 @@ Deno.serve(async (req) => {
   const order = (obj.order ?? {}) as Record<string, unknown>
 
   const concatString = buildHmacConcatString(obj)
-
-  const admin = createClient(SUPABASE_URL, SERVICE_ROLE_KEY)
 
   // Candidate resolution, in priority order (see file header):
   //   1. merchant_order_id (= our special_reference = Mal3aby

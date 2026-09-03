@@ -2,7 +2,7 @@ import { Link } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { PageHeader } from '@/components/ui/page-header'
 import { Card, CardContent } from '@/components/ui/card'
-import { Users, Receipt, BarChart3, UserCog, Settings, ChevronRight, Building2, ShieldCheck, MessageCircle, LogOut, IdCard, ShoppingCart, HelpCircle } from 'lucide-react'
+import { Users, Receipt, BarChart3, UserCog, Settings, ChevronRight, Building2, ShieldCheck, MessageCircle, LogOut, IdCard, ShoppingCart, HelpCircle, Building } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 import { useAuth } from '@/app/providers/AuthProvider'
 import { canSeeNavDomain, type NavDomain } from '@/lib/domain/navigation'
@@ -76,8 +76,9 @@ const ITEMS: MoreItem[] = [
 ]
 
 export function MorePage() {
-  const { t } = useTranslation()
-  const { currentMembership, signOut } = useAuth()
+  const { t, i18n } = useTranslation()
+  const { memberships, currentMembership, setCurrentClubId, signOut } = useAuth()
+  const isEnglish = i18n.language === 'en'
   const visibleItems = ITEMS.filter((item) => canSeeNavDomain(currentMembership?.permissionKeys, item.domain))
   // HIGH-ROI UX PASS 01, Priority 3: a live, tenant-scoped count next to
   // "Pending Payments" -- previously a plain list row indistinguishable
@@ -89,6 +90,53 @@ export function MorePage() {
   return (
     <div>
       <PageHeader title={t('nav.more')} />
+
+      {/* FINDING H-4: the club/role switcher (a <select> plus role-name
+          label) previously existed only in AppLayout's desktop sidebar
+          (hidden md:flex) -- a multi-club staff member (e.g. an owner or
+          manager running several clubs) on mobile had no way at all to
+          switch which club they were acting on; the mobile header stays
+          deliberately minimal (brand + language switcher, matching every
+          other mobile-specific pattern in this app -- see the bottom nav
+          and this page's own list), so More is the natural home rather
+          than crowding that header. Same source of truth as the desktop
+          switcher (AuthProvider's memberships/currentMembership/
+          setCurrentClubId), same isEnglish-driven clubName/clubNameAr and
+          roleName/roleNameAr fallback logic, so desktop and mobile always
+          agree. Gated on memberships.length > 1 -- a single-club user has
+          nothing to switch to, so no switcher UI is shown at all (mirrors
+          the desktop sidebar's own `memberships.length > 0` gate, one
+          notch stricter since a lone membership offers no real choice). */}
+      {memberships.length > 1 && (
+        <Card className="mb-4">
+          <CardContent className="flex flex-col gap-2 p-4">
+            <label className="flex items-center gap-2 text-sm font-medium text-text-primary" htmlFor="more-club-switcher">
+              <Building className="size-4 shrink-0 text-text-secondary" />
+              {t('appShell.clubSwitcher.label')}
+            </label>
+            <select
+              id="more-club-switcher"
+              className="w-full rounded-md border border-border bg-surface px-3 py-2 text-sm text-text-primary"
+              value={currentMembership?.clubId ?? ''}
+              onChange={(e) => setCurrentClubId(e.target.value)}
+            >
+              {memberships.map((m) => (
+                <option key={m.clubId} value={m.clubId}>
+                  {isEnglish ? (m.clubName || m.clubNameAr) : m.clubNameAr}
+                </option>
+              ))}
+            </select>
+            {currentMembership && (
+              <p className="px-1 text-xs text-text-secondary">
+                {t('appShell.clubSwitcher.roleLabel', {
+                  role: isEnglish ? (currentMembership.roleName || currentMembership.roleNameAr) : currentMembership.roleNameAr,
+                })}
+              </p>
+            )}
+          </CardContent>
+        </Card>
+      )}
+
       <div className="flex flex-col gap-2">
         {visibleItems.map((item) => (
           <Link key={item.to} to={item.to}>

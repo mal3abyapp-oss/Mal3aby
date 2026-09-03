@@ -38,14 +38,15 @@ interface SubRow {
 }
 
 async function fetchSubscriptionReport(): Promise<SubRow[]> {
-  const { data, error } = await supabase
-    .from('platform_subscriptions')
-    .select('club_id, plan_name_snapshot, lifecycle_status, start_at, end_at, price_snapshot, clubs(name_ar)')
-    .order('start_at', { ascending: false })
+  // Production audit remediation (M-2): now reads through
+  // get_platform_subscription_report(), a QA-fixture-excluded
+  // (clubs.is_test_fixture) server-side RPC, instead of an unfiltered
+  // direct platform_subscriptions query.
+  const { data, error } = await supabase.rpc('get_platform_subscription_report')
   if (error) throw error
   return (data ?? []).map((r) => ({
     club_id: r.club_id,
-    club_name: (r.clubs as unknown as { name_ar: string } | null)?.name_ar ?? '—',
+    club_name: r.club_name ?? '—',
     plan_name_snapshot: r.plan_name_snapshot,
     lifecycle_status: r.lifecycle_status,
     start_at: r.start_at,
@@ -82,21 +83,23 @@ interface RevenueMonthTotal {
 // when real platform billing starts, not something that changes
 // today's empty state.)
 async function fetchRevenueReport(locale: 'ar' | 'en'): Promise<{ rows: RevenueRow[]; monthlyTotals: RevenueMonthTotal[] }> {
-  const { data, error } = await supabase
-    .from('platform_payments')
-    .select('amount, method, recorded_at, platform_invoices(club_id, clubs(name_ar))')
-    .is('reversed_at', null)
-    .order('recorded_at', { ascending: false })
+  // Production audit remediation (M-2): now reads through
+  // get_platform_revenue_report(), a QA-fixture-excluded
+  // (clubs.is_test_fixture) server-side RPC, instead of an unfiltered
+  // direct platform_payments -> platform_invoices -> clubs embed (a
+  // client-side filter could not have excluded fixtures here anyway --
+  // PostgREST embed filters shape the embedded object, not the outer
+  // row).
+  const { data, error } = await supabase.rpc('get_platform_revenue_report')
   if (error) throw error
 
   const rows = (data ?? []).map((r) => {
-    const invoice = r.platform_invoices as unknown as { club_id: string; clubs: { name_ar: string } | null } | null
     return {
       month: new Date(r.recorded_at).toLocaleDateString(locale === 'en' ? 'en-US' : 'ar-EG', { year: 'numeric', month: 'long' }),
       method: r.method,
       amount: Number(r.amount),
-      clubId: invoice?.club_id ?? null,
-      clubName: invoice?.clubs?.name_ar ?? null,
+      clubId: r.club_id ?? null,
+      clubName: r.club_name ?? null,
     }
   })
 
@@ -124,36 +127,46 @@ async function fetchRevenueReport(locale: 'ar' | 'en'): Promise<{ rows: RevenueR
 }
 
 async function fetchRenewalReport() {
-  const { data, error } = await supabase
-    .from('platform_subscriptions')
-    .select('club_id, subscription_kind, end_at, grace_period_days_snapshot, lifecycle_status, clubs(name_ar)')
-    .neq('lifecycle_status', 'cancelled')
-    .order('end_at')
+  // Production audit remediation (M-2): now reads through the same
+  // get_platform_subscription_report() RPC the Subscription tab uses
+  // (QA-fixture-excluded via clubs.is_test_fixture), instead of an
+  // unfiltered direct platform_subscriptions query. The RPC returns all
+  // lifecycle statuses (Subscription tab needs full history including
+  // cancelled); the neq('cancelled') and order-by-end_at this tab
+  // always applied are kept here, client-side, on the filtered rows.
+  const { data, error } = await supabase.rpc('get_platform_subscription_report')
   if (error) throw error
   const now = new Date()
-  return (data ?? []).map((r) => {
-    const end = new Date(r.end_at)
-    const daysLeft = Math.ceil((end.getTime() - now.getTime()) / (24 * 60 * 60 * 1000))
-    return {
-      club_id: r.club_id,
-      club_name: (r.clubs as unknown as { name_ar: string } | null)?.name_ar ?? '—',
-      subscription_kind: r.subscription_kind,
-      end_at: r.end_at,
-      daysLeft,
-      // Master IA/UX audit (Platform Owner phase): now uses the same
-      // canonical isSubscriptionExpiringSoon() Overview and Alerts use
-      // (trial:3d / paid:7d), instead of this tab's own flat 7-day
-      // bucketing with no trial distinction -- so a subscription never
-      // shows "expiring soon" here while Alerts/Overview disagree.
-      expiringSoon: isSubscriptionExpiringSoon(r.subscription_kind, r.end_at, now),
-    }
-  })
+  return (data ?? [])
+    .filter((r) => r.lifecycle_status !== 'cancelled')
+    .sort((a, b) => new Date(a.end_at).getTime() - new Date(b.end_at).getTime())
+    .map((r) => {
+      const end = new Date(r.end_at)
+      const daysLeft = Math.ceil((end.getTime() - now.getTime()) / (24 * 60 * 60 * 1000))
+      return {
+        club_id: r.club_id,
+        club_name: r.club_name ?? '—',
+        subscription_kind: r.subscription_kind,
+        end_at: r.end_at,
+        daysLeft,
+        // Master IA/UX audit (Platform Owner phase): now uses the same
+        // canonical isSubscriptionExpiringSoon() Overview and Alerts use
+        // (trial:3d / paid:7d), instead of this tab's own flat 7-day
+        // bucketing with no trial distinction -- so a subscription never
+        // shows "expiring soon" here while Alerts/Overview disagree.
+        expiringSoon: isSubscriptionExpiringSoon(r.subscription_kind, r.end_at, now),
+      }
+    })
 }
 
 async function fetchGrowthReport(locale: 'ar' | 'en') {
-  const { data, error } = await supabase.from('clubs').select('id, name_ar, status, created_at').order('created_at', { ascending: false })
+  // Production audit remediation (M-2): now reads through
+  // get_platform_growth_report(), a QA-fixture-excluded
+  // (clubs.is_test_fixture) server-side RPC, instead of an unfiltered
+  // direct clubs query.
+  const { data, error } = await supabase.rpc('get_platform_growth_report')
   if (error) throw error
-  const rows = data ?? []
+  const rows = (data ?? []).map((r) => ({ id: r.club_id, name_ar: r.club_name, status: r.status, created_at: r.created_at }))
 
   // Phase G directive (G3): Growth tab was just a raw club list with no
   // actual growth/trend metric -- add real time-grouping (new clubs per
@@ -174,21 +187,20 @@ async function fetchGrowthReport(locale: 'ar' | 'en') {
 }
 
 async function fetchUsageReport() {
-  const [{ data: clubs, error: clubsError }, { data: branches, error: branchesError }, { data: memberships, error: membershipsError }] =
-    await Promise.all([
-      supabase.from('clubs').select('id, name_ar'),
-      supabase.from('branches').select('id, club_id'),
-      supabase.from('club_memberships').select('id, club_id').eq('status', 'active'),
-    ])
-  if (clubsError) throw clubsError
-  if (branchesError) throw branchesError
-  if (membershipsError) throw membershipsError
+  // Production audit remediation (M-2): now reads through
+  // get_platform_usage_report(), a QA-fixture-excluded
+  // (clubs.is_test_fixture) server-side RPC that aggregates
+  // branch/staff counts server-side, instead of three unfiltered
+  // direct queries (clubs, branches, club_memberships) aggregated
+  // client-side.
+  const { data, error } = await supabase.rpc('get_platform_usage_report')
+  if (error) throw error
 
-  return (clubs ?? []).map((c) => ({
-    club_id: c.id,
-    club_name: c.name_ar,
-    branchCount: branches?.filter((b) => b.club_id === c.id).length ?? 0,
-    staffCount: memberships?.filter((m) => m.club_id === c.id).length ?? 0,
+  return (data ?? []).map((c) => ({
+    club_id: c.club_id,
+    club_name: c.club_name,
+    branchCount: Number(c.branch_count ?? 0),
+    staffCount: Number(c.staff_count ?? 0),
   }))
 }
 

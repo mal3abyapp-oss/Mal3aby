@@ -91,6 +91,11 @@ export function PlatformRolesPage() {
   const [editingRoleId, setEditingRoleId] = useState<string | null>(null)
   const [viewingSystemRole, setViewingSystemRole] = useState<PlatformRoleRow | null>(null)
   const [deleteError, setDeleteError] = useState<string | null>(null)
+  // Production audit finding H-3: same reveal-then-confirm fix as the
+  // club-side RolesPage.tsx twin -- see that file's comment for the
+  // pattern rationale (BookingDetailSheet's proven pattern, per-row
+  // state since this is a table action).
+  const [confirmingDeleteId, setConfirmingDeleteId] = useState<string | null>(null)
 
   const { data: roles = [], isLoading } = useQuery({
     queryKey: ['platform-roles'],
@@ -111,13 +116,17 @@ export function PlatformRolesPage() {
       const { error } = await supabase.rpc('delete_platform_custom_role', { p_role_id: roleId })
       if (error) throw error
     },
-    onSuccess: invalidate,
+    onSuccess: () => {
+      setConfirmingDeleteId(null)
+      invalidate()
+    },
   })
 
-  function handleDelete(role: PlatformRoleRow) {
+  function handleConfirmDelete(role: PlatformRoleRow) {
     setDeleteError(null)
     if (role.employeeCount > 0) {
       setDeleteError(t('platformRoles.deleteBlockedInUse', { count: role.employeeCount }))
+      setConfirmingDeleteId(null)
       return
     }
     deleteMutation.mutate(role.id, { onError: () => setDeleteError(t('platformRoles.deleteError')) })
@@ -172,12 +181,22 @@ export function PlatformRolesPage() {
           <Button variant="ghost" size="sm" onClick={() => setViewingSystemRole(r)}>
             {t('platformRoles.view')}
           </Button>
+        ) : confirmingDeleteId === r.id ? (
+          <div className="flex items-center gap-2">
+            <span className="text-xs text-text-secondary">{t('platformRoles.confirmDeleteMessage')}</span>
+            <Button variant="destructive" size="sm" onClick={() => handleConfirmDelete(r)} disabled={deleteMutation.isPending}>
+              {deleteMutation.isPending ? t('platformRoles.deleting') : t('platformRoles.confirmDelete')}
+            </Button>
+            <Button variant="ghost" size="sm" onClick={() => setConfirmingDeleteId(null)}>
+              {t('common.cancel')}
+            </Button>
+          </div>
         ) : (
           <div className="flex gap-2">
             <Button variant="ghost" size="sm" onClick={() => { setEditingRoleId(r.id); setEditorOpen(true) }}>
               {t('platformRoles.edit')}
             </Button>
-            <Button variant="ghost" size="sm" onClick={() => handleDelete(r)} disabled={deleteMutation.isPending}>
+            <Button variant="ghost" size="sm" onClick={() => { setDeleteError(null); setConfirmingDeleteId(r.id) }}>
               {t('platformRoles.delete')}
             </Button>
           </div>

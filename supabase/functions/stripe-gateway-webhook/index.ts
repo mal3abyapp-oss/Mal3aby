@@ -56,10 +56,10 @@ const CORS_HEADERS = {
   'Access-Control-Allow-Methods': 'POST, OPTIONS',
 }
 
-function jsonResponse(body: unknown, status = 200) {
+function jsonResponse(body: unknown, status = 200, extraHeaders?: Record<string, string>) {
   return new Response(JSON.stringify(body), {
     status,
-    headers: { 'Content-Type': 'application/json', ...CORS_HEADERS },
+    headers: { 'Content-Type': 'application/json', ...CORS_HEADERS, ...extraHeaders },
   })
 }
 
@@ -153,6 +153,26 @@ Deno.serve(async (req) => {
     return jsonResponse({ error: 'method not allowed' }, 405)
   }
 
+  // M-5: coarse per-provider rate limit, checked before any signature
+  // verification or body parsing so cost stays bounded regardless of
+  // whether this request turns out to be genuinely signed. Never a
+  // permanent rejection of a valid delivery -- 429 + Retry-After, which
+  // Stripe (like every provider here) retries on a non-2xx response.
+  // See migration 20260903150100_gateway_webhook_rate_limit_m5.sql for
+  // the full reasoning and money-safety discipline this follows.
+  const admin = createClient(SUPABASE_URL, SERVICE_ROLE_KEY)
+  const { data: rateLimitResult } = await admin.rpc('check_gateway_webhook_rate_limit', {
+    p_provider_key: 'stripe',
+  })
+  if (rateLimitResult && rateLimitResult.length > 0 && rateLimitResult[0].allowed === false) {
+    const retryAfter = rateLimitResult[0].retry_after_seconds ?? 30
+    return jsonResponse(
+      { error: 'rate limit exceeded, please retry' },
+      429,
+      { 'Retry-After': String(retryAfter) },
+    )
+  }
+
   // CRITICAL ORDERING: read the raw body as TEXT first, before any
   // JSON parsing. Stripe's signature is computed over the exact raw
   // bytes Stripe sent -- if we JSON.parse() first and later
@@ -188,12 +208,12 @@ Deno.serve(async (req) => {
     return jsonResponse({ error: 'timestamp outside replay window' }, 400)
   }
 
-  // service_role client -- required both to call get_vault_secret_service()
+  // service_role client `admin` (created above for the rate-limit check)
+  // is reused here -- required both to call get_vault_secret_service()
   // (service_role-only, reads vault.decrypted_secrets server-side --
   // NOT via PostgREST's .schema('vault'), which this project does not
   // expose; see that RPC's own migration comment) and to call the two
   // service_role-only payment-posting RPCs below.
-  const admin = createClient(SUPABASE_URL, SERVICE_ROLE_KEY)
 
   // Best-effort, READ-ONLY parse of the unverified body purely to
   // narrow which club/connections to try -- see the GAP UPDATE note at

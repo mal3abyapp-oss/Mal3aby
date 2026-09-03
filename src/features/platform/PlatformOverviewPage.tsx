@@ -47,19 +47,22 @@ async function fetchOverview(): Promise<OverviewData> {
     // real tenants exist rather than being permanently inflated/skewed
     // by disposable fixtures. See QA_DATA_ISOLATION.md.
     supabase.from('clubs').select('id, status, created_at, flagged_duplicate, is_test_fixture').eq('is_test_fixture', false),
-    supabase
-      .from('platform_subscriptions')
-      .select('id, club_id, subscription_kind, lifecycle_status, end_at')
-      .neq('lifecycle_status', 'cancelled'),
-    supabase
-      .from('platform_payments')
-      .select('amount, recorded_at')
-      .is('reversed_at', null),
+    // Production audit remediation (M-2): subscriptions and payments
+    // below were the two portions of this fetch that stayed unfiltered
+    // -- now both read through the same QA-fixture-excluded
+    // (clubs.is_test_fixture) RPCs PlatformReportsPage uses
+    // (get_platform_subscription_report / get_platform_revenue_report),
+    // one reliable source of truth instead of a third, separately
+    // ad hoc filtered query here.
+    supabase.rpc('get_platform_subscription_report'),
+    supabase.rpc('get_platform_revenue_report'),
     supabase.from('commercial_upgrade_requests').select('id', { count: 'exact', head: true }).eq('status', 'pending'),
     supabase.from('contact_requests').select('id', { count: 'exact', head: true }).eq('status', 'new'),
     // Phase E directive: the single largest operational gap the audit
     // found -- zero WhatsApp visibility anywhere in the platform console.
     // One batched RPC (not per-club), consistent with Phase A/C.
+    // Production audit remediation (M-2): get_platform_whatsapp_health()
+    // itself now excludes QA/test fixtures server-side too.
     supabase.rpc('get_platform_whatsapp_health'),
   ])
 
@@ -100,7 +103,13 @@ async function fetchOverview(): Promise<OverviewData> {
   // exception.
   const flaggedDuplicateClubs = clubs?.filter((c) => c.flagged_duplicate && c.status === 'active').length ?? 0
 
-  const trialCount = subs?.filter((s) => s.subscription_kind === 'trial').length ?? 0
+  // Production audit remediation (M-2): get_platform_subscription_report()
+  // returns full lifecycle history (Reports' Subscription tab needs
+  // cancelled rows too), so the neq('cancelled') this fetch always
+  // applied is now done here, client-side, on the filtered rows --
+  // same as Reports' Renewal tab does for the same RPC.
+  const activeSubs = subs?.filter((s) => s.lifecycle_status !== 'cancelled') ?? []
+  const trialCount = activeSubs.filter((s) => s.subscription_kind === 'trial').length
   // Master IA/UX audit (Platform Owner phase): was a flat 7-day window
   // regardless of subscription kind -- now uses the same canonical
   // definition Alerts and Reports' Renewal tab both use (3 days for
@@ -108,8 +117,7 @@ async function fetchOverview(): Promise<OverviewData> {
   // agree on which subscriptions count as "expiring soon". See
   // isSubscriptionExpiringSoon()'s own comment in labels.ts for the
   // full audit citation.
-  const expiringSoonCount =
-    subs?.filter((s) => isSubscriptionExpiringSoon(s.subscription_kind, s.end_at, now)).length ?? 0
+  const expiringSoonCount = activeSubs.filter((s) => isSubscriptionExpiringSoon(s.subscription_kind, s.end_at, now)).length
 
   const revenueThisMonth =
     payments

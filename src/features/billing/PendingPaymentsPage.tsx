@@ -4,8 +4,8 @@ import { useTranslation } from 'react-i18next'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '@/lib/supabase/client'
 import { useAuth } from '@/app/providers/AuthProvider'
-import { useDirection } from '@/app/providers/DirectionProvider'
-import { formatCurrency, formatDate, type SupportedLocale } from '@/lib/i18n/config'
+import { FormattedDate } from '@/components/ui/formatted-date'
+import { FormattedCurrency } from '@/components/ui/formatted-currency'
 import { PageHeader } from '@/components/ui/page-header'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -74,7 +74,6 @@ async function fetchProofs(clubId: string): Promise<ProofRow[]> {
 export function PendingPaymentsPage() {
   const { t } = useTranslation()
   const { currentClubId } = useAuth()
-  const { locale } = useDirection()
   const navigate = useNavigate()
   const queryClient = useQueryClient()
   const [previewProof, setPreviewProof] = useState<ProofRow | null>(null)
@@ -82,6 +81,16 @@ export function PendingPaymentsPage() {
   const [rejectingProof, setRejectingProof] = useState<ProofRow | null>(null)
   const [rejectReason, setRejectReason] = useState('')
   const [actionError, setActionError] = useState<string | null>(null)
+  // Production audit finding H-3: approval fired approveMutation
+  // directly on click with zero confirmation, while rejection (right
+  // next to it, same screen) was already correctly gated behind this
+  // exact Dialog. Approval is financially material -- it creates a
+  // real payment record via record_payment() inside
+  // approve_payment_proof() (see approveMutation's own comment above)
+  // -- so it gets a full confirm dialog matching BillingPage's
+  // refund/void dialog style, not the lighter reveal-then-confirm used
+  // for the moderate-risk staff/role actions elsewhere in this pass.
+  const [approvingProof, setApprovingProof] = useState<ProofRow | null>(null)
 
   const { data: proofs = [], isLoading } = useQuery({
     queryKey: ['payment-proofs', currentClubId],
@@ -106,6 +115,7 @@ export function PendingPaymentsPage() {
     },
     onSuccess: () => {
       setActionError(null)
+      setApprovingProof(null)
       void queryClient.invalidateQueries({ queryKey: ['payment-proofs', currentClubId] })
     },
     onError: (err) => setActionError(translateSupabaseError(err, t('billing.pendingPayments.approveError'))),
@@ -151,10 +161,10 @@ export function PendingPaymentsPage() {
                   <p className="font-medium">{p.customerName ?? '—'} {p.bookingRef && <span className="text-text-secondary">— {p.bookingRef}</span>}</p>
                   <p className="text-sm text-text-secondary">
                     {p.fieldName && <>{p.fieldName} · </>}
-                    {p.startAt && formatDate(p.startAt, locale as SupportedLocale, 'Africa/Cairo', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}
+                    {p.startAt && <FormattedDate value={p.startAt} timeZone="Africa/Cairo" options={{ day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }} />}
                   </p>
-                  <p className="mt-1 font-semibold">{formatCurrency(p.amount, locale as SupportedLocale, 'EGP')}</p>
-                  <p className="text-xs text-text-secondary">{formatDate(p.uploadedAt, locale as SupportedLocale, 'Africa/Cairo', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}</p>
+                  <p className="mt-1 font-semibold"><FormattedCurrency value={p.amount} /></p>
+                  <p className="text-xs text-text-secondary"><FormattedDate value={p.uploadedAt} timeZone="Africa/Cairo" options={{ day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }} /></p>
                 </div>
                 <div className="flex items-center gap-2">
                   <Button size="sm" variant="ghost" onClick={() => navigate(`/app/finance/payments?invoice=${p.invoiceId}`)}>
@@ -167,7 +177,7 @@ export function PendingPaymentsPage() {
                   <Button size="sm" variant="outline" onClick={() => { setRejectingProof(p); setActionError(null) }}>
                     {t('billing.pendingPayments.reject')}
                   </Button>
-                  <Button size="sm" disabled={approveMutation.isPending} onClick={() => { setActionError(null); approveMutation.mutate(p.id) }}>
+                  <Button size="sm" onClick={() => { setActionError(null); setApprovingProof(p) }}>
                     {t('billing.pendingPayments.approve')}
                   </Button>
                 </div>
@@ -183,7 +193,7 @@ export function PendingPaymentsPage() {
           <div className="flex flex-col gap-2">
             {decided.slice(0, 20).map((p) => (
               <div key={p.id} className="flex items-center justify-between rounded-md border border-border p-3 text-sm">
-                <span>{p.customerName ?? '—'} — {formatCurrency(p.amount, locale as SupportedLocale, 'EGP')}</span>
+                <span>{p.customerName ?? '—'} — <FormattedCurrency value={p.amount} /></span>
                 <StatusBadge
                   tone={p.status === 'approved' ? 'success' : 'danger'}
                   label={p.status === 'approved' ? t('billing.pendingPayments.approved') : t('billing.pendingPayments.rejected')}
@@ -205,6 +215,28 @@ export function PendingPaymentsPage() {
             ) : (
               <img src={previewUrl} alt={t('billing.pendingPayments.receiptTitle')} className="max-h-[70vh] w-full rounded-md object-contain" />
             )
+          )}
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={!!approvingProof} onOpenChange={(open) => { if (!open) setApprovingProof(null) }}>
+        <DialogContent>
+          <DialogHeader><DialogTitle>{t('billing.pendingPayments.approveDialogTitle')}</DialogTitle></DialogHeader>
+          {approvingProof && (
+            <div className="flex flex-col gap-3">
+              <p className="text-sm text-text-secondary">{t('billing.pendingPayments.approveDialogHint')}</p>
+              <div className="rounded-md border border-border p-3 text-sm">
+                <p className="font-medium">{approvingProof.customerName ?? '—'} {approvingProof.bookingRef && <span className="text-text-secondary">— {approvingProof.bookingRef}</span>}</p>
+                <p className="mt-1 font-semibold tabular-nums"><FormattedCurrency value={approvingProof.amount} /></p>
+              </div>
+              <Button
+                data-testid="approve-payment-confirm"
+                disabled={approveMutation.isPending}
+                onClick={() => approveMutation.mutate(approvingProof.id)}
+              >
+                {approveMutation.isPending ? t('billing.pendingPayments.approving') : t('billing.pendingPayments.confirmApprove')}
+              </Button>
+            </div>
           )}
         </DialogContent>
       </Dialog>

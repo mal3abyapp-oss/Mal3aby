@@ -5,6 +5,7 @@ import { supabase } from '@/lib/supabase/client'
 import { useDirection } from '@/app/providers/DirectionProvider'
 import { PageHeader } from '@/components/ui/page-header'
 import { DataTable, type DataTableColumn } from '@/components/ui/data-table'
+import { ErrorState } from '@/components/ui/error-state'
 import { StatusBadge } from '@/components/ui/status-badge'
 import {
   Select,
@@ -13,6 +14,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
+import { translateSupabaseError } from '@/lib/errors'
 
 interface LeadRow {
   id: string
@@ -42,7 +44,13 @@ export function PlatformLeadsPage() {
   const { t } = useTranslation()
   const { locale } = useDirection()
   const queryClient = useQueryClient()
-  const { data: leads = [], isLoading } = useQuery({ queryKey: ['platform-leads'], queryFn: fetchLeads })
+  // Finding H-2 (frozen production audit): this list previously
+  // destructured only `data = [], isLoading` -- a failed fetch silently
+  // rendered as "no leads" via DataTable's own empty state,
+  // indistinguishable from a genuinely empty inbox. isError/error/
+  // refetch are now surfaced so a fetch failure shows an explicit
+  // error.
+  const { data: leads = [], isLoading, isError, error, refetch } = useQuery({ queryKey: ['platform-leads'], queryFn: fetchLeads })
   // Acceptance-sweep fix (2026-08-30): this mutation had no onError at
   // all -- a failed status update (RLS rejection, network blip) left
   // the Select silently reverting to the stale server value on the
@@ -118,7 +126,11 @@ export function PlatformLeadsPage() {
     <div>
       <PageHeader title={t('platform.leadsPage.title')} description={t('platform.leadsPage.description')} />
       {statusError && <p role="alert" className="mb-3 text-sm text-status-danger">{statusError}</p>}
-      <DataTable columns={columns} rows={leads} rowKey={(l) => l.id} isLoading={isLoading} emptyTitle={t('platform.leadsPage.emptyTitle')} />
+      {isError ? (
+        <ErrorState message={translateSupabaseError(error, t('platform.leadsPage.loadError'))} onRetry={() => void refetch()} />
+      ) : (
+        <DataTable columns={columns} rows={leads} rowKey={(l) => l.id} isLoading={isLoading} emptyTitle={t('platform.leadsPage.emptyTitle')} />
+      )}
     </div>
   )
 }

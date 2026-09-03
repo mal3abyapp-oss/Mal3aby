@@ -22,24 +22,33 @@ interface AlertItem {
 }
 
 async function fetchAlerts(): Promise<AlertItem[]> {
-  const [{ data, error }, { data: clubs, error: clubsError }] = await Promise.all([
-    supabase
-      .from('platform_subscriptions')
-      .select('id, club_id, subscription_kind, lifecycle_status, end_at, grace_period_days_snapshot, clubs(name_ar)')
-      .neq('lifecycle_status', 'cancelled'),
-    supabase.from('clubs').select('id, name_ar'),
-  ])
-
+  // Production audit remediation (M-2): now reads through
+  // get_platform_alert_subscriptions(), a QA-fixture-excluded
+  // (clubs.is_test_fixture) server-side RPC, instead of two unfiltered
+  // direct queries (platform_subscriptions + clubs). One row per club,
+  // with the latest non-cancelled subscription (if any) already joined
+  // in -- has_subscription=false is the same "no subscription row at
+  // all" signal the client used to derive itself from set-difference.
+  const { data, error } = await supabase.rpc('get_platform_alert_subscriptions')
   if (error) throw error
-  if (clubsError) throw clubsError
 
   const now = new Date()
   const alerts: AlertItem[] = []
 
   for (const row of data ?? []) {
+    // Owner-level review finding (P2): a club with ZERO
+    // platform_subscriptions rows at all (never had a trial/paid
+    // subscription provisioned) is a real onboarding-failure shape --
+    // also the same club get_club_platform_access() correctly reports
+    // as 'blocked'. Surfaced as its own alert kind rather than silently
+    // skipped.
+    if (!row.has_subscription || !row.end_at) {
+      alerts.push({ id: `no-sub-${row.club_id}`, clubId: row.club_id, clubName: row.club_name, kind: 'no_subscription', daysLeft: null })
+      continue
+    }
+
     const end = new Date(row.end_at)
-    const graceEnd = new Date(end.getTime() + row.grace_period_days_snapshot * 24 * 60 * 60 * 1000)
-    const clubName = (row.clubs as unknown as { name_ar: string } | null)?.name_ar ?? '—'
+    const graceEnd = new Date(end.getTime() + (row.grace_period_days_snapshot ?? 0) * 24 * 60 * 60 * 1000)
     const daysToEnd = Math.ceil((end.getTime() - now.getTime()) / (24 * 60 * 60 * 1000))
 
     // Master IA/UX audit (Platform Owner phase): now calls the same
@@ -48,31 +57,15 @@ async function fetchAlerts(): Promise<AlertItem[]> {
     // here. This file's distinction was already the canonical one -- see
     // that function's comment in labels.ts for the full citation.
     if (now >= end && now < graceEnd) {
-      alerts.push({ id: row.id, clubId: row.club_id, clubName, kind: 'overdue_grace', daysLeft: Math.ceil((graceEnd.getTime() - now.getTime()) / (24 * 60 * 60 * 1000)) })
+      alerts.push({ id: row.subscription_id, clubId: row.club_id, clubName: row.club_name, kind: 'overdue_grace', daysLeft: Math.ceil((graceEnd.getTime() - now.getTime()) / (24 * 60 * 60 * 1000)) })
     } else if (isSubscriptionExpiringSoon(row.subscription_kind, row.end_at, now)) {
       alerts.push({
-        id: row.id,
+        id: row.subscription_id,
         clubId: row.club_id,
-        clubName,
+        clubName: row.club_name,
         kind: row.subscription_kind === 'trial' ? 'trial_ending' : 'expiring_soon',
         daysLeft: daysToEnd,
       })
-    }
-  }
-
-  // Owner-level review finding (P2): a club with ZERO
-  // platform_subscriptions rows at all (never had a trial/paid
-  // subscription provisioned -- a real onboarding-failure shape, found
-  // live during this review: 1 of 6 real clubs in this dataset has no
-  // subscription row whatsoever) was completely invisible here, since
-  // the loop above only ever iterates rows that already exist. It's
-  // also the same club get_club_platform_access() correctly reports as
-  // 'blocked' -- but until now, blocked-with-no-subscription-at-all had
-  // no rule-based alert surfacing it, only the new Overview KPI card.
-  const clubIdsWithSubscription = new Set((data ?? []).map((row) => row.club_id))
-  for (const club of clubs ?? []) {
-    if (!clubIdsWithSubscription.has(club.id)) {
-      alerts.push({ id: `no-sub-${club.id}`, clubId: club.id, clubName: club.name_ar, kind: 'no_subscription', daysLeft: null })
     }
   }
 

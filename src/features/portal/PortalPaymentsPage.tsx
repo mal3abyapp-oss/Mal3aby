@@ -255,7 +255,14 @@ export function PortalPaymentsPage() {
   const [wrongClubInvoiceId, setWrongClubInvoiceId] = useState<string | null>(null)
   const { activeCustomerId, isLoading: clubLoading, customerMemberships, setActiveClubId } = usePortalClub()
 
-  const { data: allInvoices = [], isLoading } = useQuery({
+  // Finding H-2 (frozen production audit): this list previously
+  // destructured only `data = [], isLoading` -- a failed fetch silently
+  // rendered as "no invoices" (portal.paymentsPage.emptyTitle),
+  // indistinguishable from a customer with genuinely no invoices, on a
+  // screen whose entire purpose is showing what a customer owes.
+  // isError is now surfaced as a distinct inline message, matching the
+  // sibling PortalAcademyPage/PortalMembershipsPage pattern.
+  const { data: allInvoices = [], isLoading, isError } = useQuery({
     queryKey: ['portal', 'my-invoices'],
     queryFn: fetchMyInvoices,
     enabled: !!activeCustomerId,
@@ -292,8 +299,9 @@ export function PortalPaymentsPage() {
       <PageHeader title={t('portal.paymentsPage.title')} description={t('portal.paymentsPage.description')} />
 
       {(isLoading || clubLoading) && <p className="text-sm text-text-secondary">{t('portal.paymentsPage.loading')}</p>}
+      {isError && <p className="text-sm text-status-danger">{t('portal.paymentsPage.loadError')}</p>}
 
-      {!isLoading && invoiceNotFound && (
+      {!isLoading && !isError && invoiceNotFound && (
         <p role="alert" className="rounded-lg border border-status-warning/30 bg-status-warning/5 p-3 text-sm text-status-warning">
           {t('portal.paymentsPage.invoiceNotFound')}
         </p>
@@ -316,14 +324,14 @@ export function PortalPaymentsPage() {
         </div>
       )}
 
-      {!isLoading && invoices.length === 0 && (
+      {!isLoading && !isError && invoices.length === 0 && (
         <p className="rounded-lg border border-dashed border-border p-6 text-center text-sm text-text-secondary">
           {t('portal.paymentsPage.emptyTitle')}
         </p>
       )}
 
       <div className="flex flex-col gap-2">
-        {invoices.map((inv) => (
+        {!isError && invoices.map((inv) => (
           <Card key={inv.id}>
             <CardContent className="flex flex-col gap-2 p-4">
               <div className="flex items-center justify-between">

@@ -8319,6 +8319,19 @@ export type Database = {
           reason: string
         }[]
       }
+      get_platform_alert_subscriptions: {
+        Args: never
+        Returns: {
+          club_id: string
+          club_name: string
+          end_at: string
+          grace_period_days_snapshot: number
+          has_subscription: boolean
+          lifecycle_status: string
+          subscription_id: string
+          subscription_kind: string
+        }[]
+      }
       get_platform_club_360: {
         Args: { p_club_id: string }
         Returns: {
@@ -8408,6 +8421,15 @@ export type Database = {
           total_collected: number
         }[]
       }
+      get_platform_growth_report: {
+        Args: never
+        Returns: {
+          club_id: string
+          club_name: string
+          created_at: string
+          status: string
+        }[]
+      }
       get_platform_owner_accounts: {
         Args: never
         Returns: {
@@ -8417,6 +8439,16 @@ export type Database = {
           full_name: string
           phone: string
           user_id: string
+        }[]
+      }
+      get_platform_revenue_report: {
+        Args: never
+        Returns: {
+          amount: number
+          club_id: string
+          club_name: string
+          method: string
+          recorded_at: string
         }[]
       }
       get_platform_role_permissions: {
@@ -8439,8 +8471,31 @@ export type Database = {
           status: string
         }[]
       }
-      get_platform_whatsapp_health: {
+      get_platform_subscription_report: {
         Args: never
+        Returns: {
+          club_id: string
+          club_name: string
+          end_at: string
+          grace_period_days_snapshot: number
+          lifecycle_status: string
+          plan_name_snapshot: string
+          price_snapshot: number
+          start_at: string
+          subscription_kind: string
+        }[]
+      }
+      get_platform_usage_report: {
+        Args: never
+        Returns: {
+          branch_count: number
+          club_id: string
+          club_name: string
+          staff_count: number
+        }[]
+      }
+      get_platform_whatsapp_health: {
+        Args: { p_club_id?: string }
         Returns: {
           circuit_breaker_open: boolean
           club_id: string
@@ -9287,6 +9342,8 @@ export type Database = {
         Args: {
           p_category_id?: string
           p_club_id: string
+          p_limit?: number
+          p_offset?: number
           p_search?: string
           p_status?: string
         }
@@ -9306,6 +9363,7 @@ export type Database = {
           reorder_level: number
           sku: string
           status: string
+          total_count: number
         }[]
       }
       list_shop_recent_returns: {

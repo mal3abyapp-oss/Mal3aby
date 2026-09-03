@@ -10,7 +10,8 @@ import { StatusBadge } from '@/components/ui/status-badge'
 import { useResolvedFieldPrice } from './useFieldPricing'
 import { fromInstant, formatInstant } from '@/lib/domain/time'
 import { useDirection } from '@/app/providers/DirectionProvider'
-import { formatNumber, formatDate } from '@/lib/i18n/config'
+import { formatNumberIsolated } from '@/lib/i18n/config'
+import { FormattedDate } from '@/components/ui/formatted-date'
 import { DatePickerButton } from '@/components/ui/date-picker-button'
 import type { QuickBookingSlot } from './QuickBookingSheet'
 
@@ -169,7 +170,7 @@ export function BookingsMobileView({
       <div className="flex items-center gap-2">
         <Button variant="outline" size="icon" aria-label={t('bookings.page.previousDay')} onClick={() => shiftDate(-1)}><ChevronLeft className="size-4 rtl:rotate-180" /></Button>
         <Button variant="outline" size="sm" className="flex-1" onClick={() => onDateChange(fromInstant(new Date(), clubTimezone).date)}>
-          {isToday ? t('common.today') : formatDate(new Date(`${date}T12:00:00`), locale, clubTimezone, { weekday: 'long', day: 'numeric', month: 'long' })}
+          {isToday ? t('common.today') : <FormattedDate value={new Date(`${date}T12:00:00`)} timeZone={clubTimezone} options={{ weekday: 'long', day: 'numeric', month: 'long' }} />}
         </Button>
         <Button variant="outline" size="icon" aria-label={t('bookings.page.nextDay')} onClick={() => shiftDate(1)}><ChevronRight className="size-4 rtl:rotate-180" /></Button>
         <DatePickerButton
@@ -228,7 +229,7 @@ export function BookingsMobileView({
         <div className="rounded-lg border border-accent/30 bg-accent/5 p-2.5 text-sm">
           <span className="text-text-secondary">{t('bookings.mobile.priceNow')}</span>
           {currentPrice != null ? (
-            <span className="font-semibold tabular-nums">{t('bookings.mobile.pricePerHour', { price: formatNumber(Math.round(currentPrice), i18n.language.startsWith('ar') ? 'ar' : 'en') })}</span>
+            <span className="font-semibold tabular-nums">{t('bookings.mobile.pricePerHour', { price: formatNumberIsolated(Math.round(currentPrice), i18n.language.startsWith('ar') ? 'ar' : 'en') })}</span>
           ) : (
             <span className="text-status-danger">{t('bookings.mobile.noApprovedPrice')}</span>
           )}

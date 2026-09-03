@@ -27,7 +27,7 @@ import { OperatingHoursEditor } from './OperatingHoursEditor'
 import { PricingEditor } from './PricingEditor'
 import { resolveHoursForDay, useResolvedFieldPrice } from '@/features/bookings/useFieldPricing'
 import { FieldClosuresEditor } from './FieldClosuresEditor'
-import { formatNumber } from '@/lib/i18n/config'
+import { formatNumberIsolated } from '@/lib/i18n/config'
 
 // V1 Implementation Gap Audit (2026-08-16): field_operating_hours had
 // full RLS CRUD in place since Phase 5 but no UI at all -- a manager had
@@ -137,7 +137,7 @@ function FieldCurrentPriceCell({ fieldId, date }: { fieldId: string; date: strin
   const { data: price, isLoading } = useResolvedFieldPrice(fieldId, date, `${nowTime}:00`, `${nowTime}:00`)
   if (isLoading) return <span className="text-text-secondary">...</span>
   if (price == null) return <span className="text-status-danger">{t('clubs.fieldsManagement.noPrice')}</span>
-  return <span className="font-medium tabular-nums">{t('clubs.fieldsManagement.pricePerHour', { price: formatNumber(Math.round(price), i18n.language.startsWith('ar') ? 'ar' : 'en') })}</span>
+  return <span className="font-medium tabular-nums">{t('clubs.fieldsManagement.pricePerHour', { price: formatNumberIsolated(Math.round(price), i18n.language.startsWith('ar') ? 'ar' : 'en') })}</span>
 }
 
 export function FieldsManagement() {

@@ -8,6 +8,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { translateSupabaseError } from '@/lib/errors'
+import { WHATSAPP_SAFETY_POLL_INTERVAL_MS } from '@/lib/query/dashboardPolling'
 
 // Safe Messaging / Anti-Abuse Control Layer -- Part S (admin safety
 // settings) and Part T (diagnostics), combined in one card since both
@@ -134,9 +135,18 @@ async function fetchAccountHealth(clubId: string): Promise<AccountHealth | null>
   }
 }
 
+// Production audit finding H-1 (RTL-bidi gap): matches the same fix
+// applied to WhatsAppActivityTab.tsx's/WhatsAppConnectionCard.tsx's own
+// copy of this helper -- FSI/PDI isolation marks, same convention as
+// formatMoney()/formatDateIsolated(). Kept as a plain string (not a
+// <FormattedDate>) because some call sites here interpolate it into a
+// t() string (lastSuccessfulSend), which only accepts a string.
+const DATETIME_FSI = '⁦'
+const DATETIME_PDI = '⁩'
 function formatDateTime(iso: string | null, locale: 'ar' | 'en'): string {
   if (!iso) return '—'
-  return new Date(iso).toLocaleString(locale === 'en' ? 'en-US' : 'ar-EG', { dateStyle: 'medium', timeStyle: 'short' })
+  const formatted = new Date(iso).toLocaleString(locale === 'en' ? 'en-US' : 'ar-EG', { dateStyle: 'medium', timeStyle: 'short' })
+  return `${DATETIME_FSI}${formatted}${DATETIME_PDI}`
 }
 
 export function MessagingSafetyCard() {
@@ -166,18 +176,25 @@ export function MessagingSafetyCard() {
     enabled: !!currentClubId,
   })
 
+  // PERF-04: queue diagnostics (RLS-gated view) and account health
+  // (manage_whatsapp_connection-gated RPC) sit behind different
+  // authorization checks, so they're kept as separate calls rather than
+  // merged -- see dashboardPolling.ts for the full reasoning. Both share
+  // one interval constant so the two 15s timers can't drift apart.
   const { data: diagnostics } = useQuery({
     queryKey: ['whatsapp-queue-diagnostics', currentClubId],
     queryFn: () => fetchDiagnostics(currentClubId!),
     enabled: !!currentClubId,
-    refetchInterval: 15000,
+    refetchInterval: WHATSAPP_SAFETY_POLL_INTERVAL_MS,
+    staleTime: WHATSAPP_SAFETY_POLL_INTERVAL_MS,
   })
 
   const { data: accountHealth } = useQuery({
     queryKey: ['whatsapp-account-health', currentClubId],
     queryFn: () => fetchAccountHealth(currentClubId!),
     enabled: !!currentClubId,
-    refetchInterval: 15000,
+    refetchInterval: WHATSAPP_SAFETY_POLL_INTERVAL_MS,
+    staleTime: WHATSAPP_SAFETY_POLL_INTERVAL_MS,
   })
 
   const toggleCategoryMutation = useMutation({

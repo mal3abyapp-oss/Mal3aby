@@ -86,9 +86,17 @@ async function fetchQr(clubId: string): Promise<string | null> {
   return data?.[0]?.qr_payload ?? null
 }
 
+// Production audit finding H-1 (RTL-bidi gap): matches the same fix
+// applied to WhatsAppActivityTab.tsx's/MessagingSafetyCard.tsx's own
+// copy of this helper -- FSI/PDI isolation marks, same convention as
+// formatMoney()/formatDateIsolated(), so this rendered timestamp can't
+// be visually reordered by the surrounding Arabic label text.
+const DATETIME_FSI = '⁦'
+const DATETIME_PDI = '⁩'
 function formatDateTime(iso: string | null, locale: 'ar' | 'en'): string {
   if (!iso) return '—'
-  return new Date(iso).toLocaleString(locale === 'en' ? 'en-US' : 'ar-EG', { dateStyle: 'medium', timeStyle: 'short' })
+  const formatted = new Date(iso).toLocaleString(locale === 'en' ? 'en-US' : 'ar-EG', { dateStyle: 'medium', timeStyle: 'short' })
+  return `${DATETIME_FSI}${formatted}${DATETIME_PDI}`
 }
 
 // How long we tolerate "connecting/qr_required with no QR yet" before

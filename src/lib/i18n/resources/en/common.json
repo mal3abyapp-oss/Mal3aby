@@ -79,6 +79,7 @@
       "title": "My Bookings",
       "description": "All your field bookings",
       "loading": "Loading...",
+      "loadError": "Couldn't load your bookings. Please try again.",
       "emptyTitle": "No bookings yet.",
       "upcoming": "Upcoming",
       "past": "Past",
@@ -90,6 +91,7 @@
       "title": "My Payments",
       "description": "Your invoices, payment status, and payment methods",
       "loading": "Loading...",
+      "loadError": "Couldn't load your invoices. Please try again.",
       "invoiceNotFound": "The requested invoice wasn't found. Browse your invoices below.",
       "wrongClubInvoice": "This invoice belongs to a different club you're linked to.",
       "switchClubAction": "Switch to that club",
@@ -139,6 +141,7 @@
       "title": "My QR",
       "description": "QR code for check-in on arrival",
       "loading": "Loading...",
+      "loadError": "Couldn't load your bookings. Please try again.",
       "bookingNotFound": "The requested booking wasn't found — it may have already passed or been cancelled. Choose a booking from the list below.",
       "wrongClubBooking": "This booking belongs to a different club you're linked to.",
       "switchClubAction": "Switch to that club",
@@ -243,7 +246,8 @@
       "statusActive": "Active",
       "statusExpired": "Expired",
       "statusEnded": "Ended",
-      "emptyTitle": "No support sessions yet"
+      "emptyTitle": "No support sessions yet",
+      "loadError": "Couldn't load support session history. This is not confirmation that no support sessions occurred."
     },
     "clubDetailPage": {
       "loadingTitle": "...",
@@ -565,6 +569,7 @@
         "closed": "Closed"
       },
       "emptyTitle": "No leads yet",
+      "loadError": "Couldn't load the leads list.",
       "statusUpdateError": "Couldn't update the request's status. Try again."
     },
     "overviewPage": {
@@ -779,7 +784,8 @@
       "statusCancelled": "Cancelled",
       "statusActive": "Active",
       "statusExpired": "Expired",
-      "emptyTitle": "No free trials yet"
+      "emptyTitle": "No free trials yet",
+      "loadError": "Couldn't load the trials list."
     }
   },
   "appShell": {
@@ -787,7 +793,11 @@
     "viewSubscription": "View subscription",
     "trialExpired": "Free trial expired — contact us to activate your subscription",
     "subscriptionExpired": "Subscription expired — contact us to activate your subscription",
-    "subscriptionGrace": "Your subscription is in grace period — new operations are temporarily paused"
+    "subscriptionGrace": "Your subscription is in grace period — new operations are temporarily paused",
+    "clubSwitcher": {
+      "label": "Club",
+      "roleLabel": "Role: {{role}}"
+    }
   },
   "routing": {
     "noClubAccess": "This account has no club staff access. If you're a customer, use the customer portal instead. If you believe this is a mistake, contact your club owner.",
@@ -1210,6 +1220,7 @@
       "overviewTab": {
         "title": "WhatsApp status",
         "loading": "Loading...",
+        "loadError": "Couldn't load WhatsApp status. The connection state and counts below may be wrong or stale.",
         "connectionLabel": "Connection:",
         "pending": "Pending",
         "failedFinal": "Failed permanently",
@@ -1260,6 +1271,7 @@
         "providerAcceptedAtLabel": "Accepted by WhatsApp",
         "noConsentDetail": "Consent is absent, revoked, or belongs to a different phone number.",
         "loading": "Loading...",
+        "loadError": "Couldn't load message activity. Please try again.",
         "emptyTitle": "No WhatsApp messages in this range yet.",
         "emptyFailed": "No permanently failed messages -- everything is sending normally.",
         "columns": {
@@ -1425,6 +1437,7 @@
       "adding": "Adding...",
       "add": "Add",
       "addError": "Couldn't add the player, please try again.",
+      "loadError": "Couldn't load the player list.",
       "emptyTitle": "No players",
       "emptyDescription": "Add your first player to start managing the academy",
       "saving": "Saving...",
@@ -1462,6 +1475,8 @@
       "saveError": "Couldn't save player.",
       "setPrimary": "Set primary",
       "confirmUnlinkGuardian": "Remove this guardian relationship?",
+      "confirmUnlinkGuardianButton": "Confirm remove",
+      "removingGuardian": "Removing...",
       "linkGuardianError": "Couldn't add this guardian."
     },
     "enrollments": {
@@ -1730,6 +1745,7 @@
     "members": {
       "searchPlaceholder": "Search by name, mobile, or membership number...",
       "allStatuses": "All statuses",
+      "loadError": "Couldn't load the membership list.",
       "emptyTitle": "No club memberships yet",
       "emptyDescription": "Sell a membership to see it listed here."
     },
@@ -2051,6 +2067,8 @@
       "empty": "No closures recorded for this field",
       "past": "Past",
       "delete": "Delete",
+      "confirmDelete": "Confirm delete",
+      "deleting": "Deleting...",
       "addLabel": "Add a new closure",
       "reasonPlaceholder": "Reason (optional)",
       "adding": "Adding...",
@@ -2076,6 +2094,8 @@
       "weeklyPricesHeading": "Weekly prices",
       "price": "EGP {{price}}",
       "delete": "Delete",
+      "confirmDelete": "Confirm delete",
+      "deleting": "Deleting...",
       "specialPricesHeading": "Special prices (specific dates)",
       "addWeeklyPriceLabel": "Add weekly price",
       "pricePerHourPlaceholder": "Price per hour (EGP)",
@@ -2374,6 +2394,10 @@
       "rejectDialogTitle": "Reject this receipt",
       "rejectReasonPlaceholder": "Reason for rejection",
       "confirmReject": "Confirm rejection",
+      "approveDialogTitle": "Approve this payment",
+      "approveDialogHint": "This records a real payment against the customer's invoice and can't be undone from here.",
+      "confirmApprove": "Confirm approval",
+      "approving": "Approving...",
       "approveError": "Couldn't approve this payment.",
       "rejectError": "Couldn't reject this payment."
     },
@@ -2554,6 +2578,8 @@
     "saveChanges": "Save changes",
     "searchPlaceholder": "Search by name or phone number",
     "outstandingOnlyFilter": "Outstanding balance only",
+    "loadingMore": "Loading...",
+    "loadMore": "Load more",
     "emptyTitle": "No customers",
     "emptyDescription": "Add your first customer to start managing the club's customer base",
     "outstanding": "Outstanding",
@@ -3171,6 +3197,7 @@
       "reason": "Reason"
     },
     "searchPlaceholder": "Search by action type",
+    "loadError": "Couldn't load the audit log. This is not confirmation that no sensitive actions occurred.",
     "emptyTitle": "No logs yet",
     "emptyDescription": "Sensitive actions will appear here as soon as they happen",
     "unknownUser": "Unknown user",
@@ -3212,6 +3239,9 @@
     "custodyEnabled": "Handles cash",
     "custodyDisabled": "No cash access",
     "deactivate": "Deactivate",
+    "confirmDeactivateMessage": "Deactivate this employee?",
+    "confirmDeactivate": "Confirm deactivate",
+    "deactivating": "Deactivating...",
     "emptyTitle": "No staff yet",
     "emptyDescription": "Add your first staff member to start managing club permissions",
     "roles": {
@@ -3775,6 +3805,9 @@
     "saveError": "Couldn't save this role. Make sure you're not trying to grant a permission you don't hold yourself.",
     "copyError": "Couldn't copy this role.",
     "deleteError": "Couldn't delete this role.",
+    "confirmDeleteMessage": "Delete this role?",
+    "confirmDelete": "Confirm delete",
+    "deleting": "Deleting...",
     "deleteBlockedInUse": "This role is assigned to {{count}} active employee(s) — reassign or suspend them first.",
     "save": "Save",
     "saving": "Saving...",
@@ -4145,6 +4178,7 @@
     "changeRole": "Change role",
     "resetPassword": "Reset password",
     "deactivate": "Deactivate",
+    "loadError": "Couldn't load the platform staff list.",
     "emptyTitle": "No platform staff yet",
     "emptyDescription": "Add your first platform employee and assign them a platform role",
     "fullNameLabel": "Full name",
@@ -4188,6 +4222,9 @@
     "nameRequired": "Both an Arabic and an English name are required.",
     "saveError": "Couldn't save this role. Make sure you're not trying to grant a permission you don't hold yourself.",
     "deleteError": "Couldn't delete this role.",
+    "confirmDeleteMessage": "Delete this role?",
+    "confirmDelete": "Confirm delete",
+    "deleting": "Deleting...",
     "deleteBlockedInUse": "This role is assigned to {{count}} active platform staff member(s) -- reassign them first.",
     "save": "Save",
     "saving": "Saving...",
@@ -4457,6 +4494,7 @@
       "description": "Manage the products your club sells",
       "searchPlaceholder": "Search products",
       "addProduct": "Add product",
+      "loadError": "Couldn't load the product list.",
       "creating": "Creating...",
       "createError": "Couldn't create the product.",
       "saving": "Saving...",
@@ -4500,7 +4538,9 @@
       "viewList": "List",
       "primaryImageLabel": "Primary image",
       "lowStock": "Low stock",
-      "stockCount": "{{count}} in stock"
+      "stockCount": "{{count}} in stock",
+      "loadingMore": "Loading...",
+      "loadMore": "Load more"
     },
     "categories": {
       "manageTitle": "Manage categories",
@@ -4660,6 +4700,7 @@
     "sales": {
       "title": "Sales & Returns",
       "description": "Sale history and returns",
+      "loadError": "Couldn't load the sales list.",
       "emptyTitle": "No sales yet",
       "emptyDescription": "Completed sales will appear here",
       "processReturn": "Process return",
@@ -4818,6 +4859,7 @@
       "notesLabel": "Notes",
       "continue": "Continue",
       "view": "View",
+      "loadError": "Couldn't load the stock count list.",
       "emptyTitle": "No stock counts yet",
       "addProductLabel": "Add product",
       "addLine": "Add",

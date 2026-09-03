@@ -3,8 +3,7 @@ import { useTranslation } from 'react-i18next'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '@/lib/supabase/client'
 import { useAuth } from '@/app/providers/AuthProvider'
-import { useDirection } from '@/app/providers/DirectionProvider'
-import { formatDate, type SupportedLocale } from '@/lib/i18n/config'
+import { FormattedDate } from '@/components/ui/formatted-date'
 import { PageHeader } from '@/components/ui/page-header'
 import { DataTable, type DataTableColumn } from '@/components/ui/data-table'
 import { StatusBadge } from '@/components/ui/status-badge'
@@ -263,8 +262,17 @@ async function fetchCategories(clubId: string): Promise<FilterOption[]> {
   return (data ?? []).map((c) => ({ id: c.category_id, label: c.name_ar }))
 }
 
+// PERF-05 (production audit remediation, 2026-09-03): list_shop_products
+// now defaults to 50 rows (p_limit/p_offset, see that RPC's own
+// migration comment). This call site populates the sales-history product
+// FILTER dropdown -- it must offer every product, not just the first 50,
+// so it passes an explicit, generous, still-bounded limit instead of
+// inheriting the new display-page-size default. Same reasoning as
+// ShopInventoryPage.tsx's PRODUCT_PICKER_LIMIT.
+const PRODUCT_PICKER_LIMIT = 1000
+
 async function fetchProducts(clubId: string): Promise<FilterOption[]> {
-  const { data, error } = await supabase.rpc('list_shop_products', { p_club_id: clubId, p_status: undefined })
+  const { data, error } = await supabase.rpc('list_shop_products', { p_club_id: clubId, p_status: undefined, p_limit: PRODUCT_PICKER_LIMIT })
   if (error) throw error
   return (data ?? []).map((p) => ({ id: p.product_id, label: p.name_ar }))
 }
@@ -291,7 +299,6 @@ const ALL_VALUE = '__all__'
 export function ShopSalesPage() {
   const { t } = useTranslation()
   const { currentClubId } = useAuth()
-  const { locale } = useDirection()
   const [returningSale, setReturningSale] = useState<SaleRow | null>(null)
   const [viewingInvoiceSaleId, setViewingInvoiceSaleId] = useState<string | null>(null)
   const [viewingDetailSaleId, setViewingDetailSaleId] = useState<string | null>(null)
@@ -300,7 +307,12 @@ export function ShopSalesPage() {
 
   const patchFilter = (patch: Partial<SalesFilters>) => setFilters((cur) => ({ ...cur, ...patch }))
 
-  const { data: sales = [], isLoading } = useQuery({
+  // Finding H-2 (frozen production audit): this list previously
+  // destructured only `data = [], isLoading` -- a failed fetch silently
+  // rendered as "no sales" via DataTable's own empty state,
+  // indistinguishable from a club that genuinely had none in this
+  // filtered range. isError/error/refetch are now surfaced.
+  const { data: sales = [], isLoading, isError: salesIsError, error: salesError, refetch: refetchSales } = useQuery({
     queryKey: ['shop-sales', currentClubId, filters],
     queryFn: () => fetchSales(currentClubId as string, filters),
     enabled: !!currentClubId,
@@ -370,7 +382,7 @@ export function ShopSalesPage() {
     { key: 'customer', header: t('shop.sales.columns.customer'), render: (s) => s.customerName ?? '—' },
     { key: 'cashier', header: t('shop.sales.columns.cashier'), render: (s) => s.soldByName ?? '—' },
     { key: 'items', header: t('shop.sales.columns.items'), render: (s) => s.itemCount },
-    { key: 'date', header: t('shop.sales.columns.date'), render: (s) => formatDate(s.createdAt, locale as SupportedLocale, 'Africa/Cairo', { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) },
+    { key: 'date', header: t('shop.sales.columns.date'), render: (s) => <FormattedDate value={s.createdAt} timeZone="Africa/Cairo" options={{ year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }} /> },
     { key: 'total', header: t('shop.sales.columns.total'), render: (s) => <MoneyDisplay amount={s.total} size="sm" /> },
     { key: 'discount', header: t('shop.sales.columns.discount'), render: (s) => (s.discountAmount > 0 ? <MoneyDisplay amount={s.discountAmount} size="sm" tone="danger" /> : '—') },
     { key: 'refund', header: t('shop.sales.columns.refund'), render: (s) => (s.refundAmount > 0 ? <MoneyDisplay amount={s.refundAmount} size="sm" tone="danger" /> : '—') },
@@ -529,7 +541,11 @@ export function ShopSalesPage() {
         ) : (
           <p className="mb-2 text-xs text-text-secondary print:block hidden">{t('shop.sales.printLimitNote', { count: 50 })}</p>
         )}
-        <DataTable columns={columns} rows={printedSales} rowKey={(s) => s.saleId} isLoading={isLoading} emptyTitle={t('shop.sales.emptyTitle')} emptyDescription={t('shop.sales.emptyDescription')} />
+        {salesIsError ? (
+          <ErrorState message={translateSupabaseError(salesError, t('shop.sales.loadError'))} onRetry={() => void refetchSales()} />
+        ) : (
+          <DataTable columns={columns} rows={printedSales} rowKey={(s) => s.saleId} isLoading={isLoading} emptyTitle={t('shop.sales.emptyTitle')} emptyDescription={t('shop.sales.emptyDescription')} />
+        )}
       </div>
 
       {returnLookupOpen && (
@@ -592,7 +608,6 @@ function SaleDetailDialog({ saleId, onClose, onPrintInvoice, onProcessReturn }: 
   onProcessReturn: (sale: SaleRow) => void
 }) {
   const { t } = useTranslation()
-  const { locale } = useDirection()
 
   const { data: sale, isLoading: saleLoading, isError, error, refetch } = useQuery({
     queryKey: ['shop-sale-invoice-data', saleId],
@@ -632,7 +647,7 @@ function SaleDetailDialog({ saleId, onClose, onPrintInvoice, onProcessReturn }: 
             <div className="grid grid-cols-2 gap-2">
               <div><p className="text-xs text-text-secondary">{t('shop.sales.detail.customer')}</p><p>{sale.customerName ?? '—'}</p></div>
               <div><p className="text-xs text-text-secondary">{t('shop.invoice.cashier')}</p><p>{sale.soldByName ?? '—'}</p></div>
-              <div><p className="text-xs text-text-secondary">{t('shop.sales.columns.date')}</p><p>{formatDate(sale.createdAt, locale as SupportedLocale, 'Africa/Cairo', { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}</p></div>
+              <div><p className="text-xs text-text-secondary">{t('shop.sales.columns.date')}</p><p><FormattedDate value={sale.createdAt} timeZone="Africa/Cairo" options={{ year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }} /></p></div>
               <div><p className="text-xs text-text-secondary">{t('shop.sales.columns.status')}</p><StatusBadge tone={STATUS_TONE[sale.saleStatus] ?? 'neutral'} label={t(`shop.sales.status.${sale.saleStatus}`, { defaultValue: sale.saleStatus })} /></div>
             </div>
 
@@ -672,7 +687,7 @@ function SaleDetailDialog({ saleId, onClose, onPrintInvoice, onProcessReturn }: 
                       <span>{t(`common.paymentMethodLabels.${p.method}`, { defaultValue: PAYMENT_METHOD_LABELS[p.method] ?? p.method })}</span>
                       <span className="flex items-center gap-2">
                         <MoneyDisplay amount={p.amount} size="sm" />
-                        <span className="text-text-secondary">{formatDate(p.receivedAt, locale as SupportedLocale, 'Africa/Cairo', { year: 'numeric', month: 'short', day: 'numeric' })}</span>
+                        <span className="text-text-secondary"><FormattedDate value={p.receivedAt} timeZone="Africa/Cairo" options={{ year: 'numeric', month: 'short', day: 'numeric' }} /></span>
                       </span>
                     </div>
                   ))}
@@ -687,7 +702,7 @@ function SaleDetailDialog({ saleId, onClose, onPrintInvoice, onProcessReturn }: 
                   {returnsHistory.map((r) => (
                     <div key={r.returnId} className="rounded-md border border-border p-2 text-xs">
                       <div className="flex items-center justify-between">
-                        <span>{formatDate(r.createdAt, locale as SupportedLocale, 'Africa/Cairo', { year: 'numeric', month: 'short', day: 'numeric' })} · {r.processedByName ?? '—'}</span>
+                        <span><FormattedDate value={r.createdAt} timeZone="Africa/Cairo" options={{ year: 'numeric', month: 'short', day: 'numeric' }} /> · {r.processedByName ?? '—'}</span>
                         {r.refundAmount !== null && <MoneyDisplay amount={r.refundAmount} size="sm" tone="danger" />}
                       </div>
                       <p className="mt-1 text-text-secondary">{r.reason}</p>
@@ -734,7 +749,6 @@ function SaleDetailDialog({ saleId, onClose, onPrintInvoice, onProcessReturn }: 
 function ReturnLookupDialog({ onClose, onFound }: { onClose: () => void; onFound: (sale: SaleRow) => void }) {
   const { t } = useTranslation()
   const { currentClubId } = useAuth()
-  const { locale } = useDirection()
   const [search, setSearch] = useState('')
   const [submitted, setSubmitted] = useState('')
 
@@ -780,7 +794,7 @@ function ReturnLookupDialog({ onClose, onFound }: { onClose: () => void; onFound
                   <span className="ms-2 text-text-secondary">{s.customerName ?? '—'}</span>
                 </span>
                 <span className="flex items-center gap-2">
-                  <span className="text-xs text-text-secondary">{formatDate(s.createdAt, locale as SupportedLocale, 'Africa/Cairo', { year: 'numeric', month: 'short', day: 'numeric' })}</span>
+                  <span className="text-xs text-text-secondary"><FormattedDate value={s.createdAt} timeZone="Africa/Cairo" options={{ year: 'numeric', month: 'short', day: 'numeric' }} /></span>
                   <MoneyDisplay amount={s.total} size="sm" />
                   <StatusBadge tone={STATUS_TONE[s.status] ?? 'neutral'} label={t(`shop.sales.status.${s.status}`, { defaultValue: s.status })} />
                 </span>
