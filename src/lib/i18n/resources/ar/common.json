@@ -2973,7 +2973,12 @@
       "description": "تقرير العملاء -- عملاء جدد وأعلى العملاء إنفاقًا",
       "newCustomers": "عملاء جدد",
       "topSpenders": "أعلى العملاء إنفاقًا",
-      "bookingCountSuffix": "{{count}} حجز",
+      "bookingCountSuffix_zero": "لا توجد حجوزات",
+      "bookingCountSuffix_one": "حجز واحد",
+      "bookingCountSuffix_two": "حجزان",
+      "bookingCountSuffix_few": "{{count}} حجوزات",
+      "bookingCountSuffix_many": "{{count}} حجزًا",
+      "bookingCountSuffix_other": "{{count}} حجز",
       "csvHeader": {
         "customer": "العميل",
         "totalSpend": "إجمالي الإنفاق",
