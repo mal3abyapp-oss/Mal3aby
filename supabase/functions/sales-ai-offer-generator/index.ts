@@ -61,26 +61,47 @@ function jsonResponse(req: Request, body: unknown, status = 200) {
 }
 
 const AI_API_TIMEOUT_MS = 30_000
-// Raised from 800 to 1400 (2026-09-04, commercial quality gate mission):
-// the new call-script prompt structure (literal opening + 2-3 discovery
-// questions + problem hypothesis + value proposition + 3 objection
-// responses + CTA, all as literal spoken text) is materially longer than
-// the old talking-points-scaffold format this limit was originally sized
-// for. Confirmed via live testing: at 800 tokens, Groq's response was
-// consistently truncated mid-PROBLEM_HYPOTHESIS, before ever reaching
-// OBJECTION HANDLING -- output_tokens: 800 (exactly the cap) on 2/2 test
-// calls, both correctly caught and rejected by the quality gate's
-// MISSING_OBJECTION_HANDLING check (the gate did its job; the cap was
-// the actual root cause). Emails stay well under this even at their
-// longer end (140-word target ~ 200-300 tokens), so a single shared
-// limit large enough for the call-script case does not risk emails
-// becoming any less concise.
-const AI_MAX_TOKENS = 1400
+// Raised from 800 -> 1400 -> 2000 (2026-09-04, commercial quality gate
+// hardening mission, second increase). History: the call-script prompt
+// structure (literal opening + 2-3 discovery questions + problem
+// hypothesis + value proposition + 3 objection responses + CTA, all as
+// literal spoken text) is materially longer than the old talking-
+// points-scaffold format this limit was originally sized for. At 800
+// tokens, generation was consistently truncated mid-PROBLEM_HYPOTHESIS.
+// Raised to 1400 -- but the FIRST production regeneration of CIC Arenas
+// under the hardened gate still hit the cap (finish_reason: 'length',
+// output_tokens: 1400 exactly), truncated mid-way through the SECOND
+// objection response at only 138 words of body -- proving 1400 was
+// still tight for a FULL 3-objection Arabic call script (Arabic
+// generally tokenizes at a higher token-per-word ratio than English,
+// and this specific generation ran more verbose than the 976-token
+// Mr Soccer Academy run that completed cleanly at the same 1400 cap).
+// This is a single, justified, evidence-based increase -- NOT an
+// open-ended retry loop (MAX_QUALITY_REGEN_ATTEMPTS below remains the
+// only retry mechanism, capped at 2). Groq's openai/gpt-oss-120b has a
+// 131K context window, so 2000 output tokens leaves no capacity
+// concern. Emails stay well under this even at their longer end
+// (140-word target ~ 200-300 tokens), so this shared limit does not
+// risk emails becoming any less concise.
+const AI_MAX_TOKENS = 2000
 // Bounded retry, no infinite retry (mission's explicit cost-guard
 // requirement) -- a single retry only on a transient timeout, never on
 // a quota/auth/upstream-error class (retrying those wastes the
 // caller's free-tier request budget on a failure that will not change).
 const MAX_RETRIES = 1
+// Bounded REGENERATION cap for the "generation was truncated" case
+// specifically (2026-09-04 owner directive, quality-gate hardening
+// mission: "Maximum automatic regeneration attempts: 2 additional
+// attempts after the initial generation. If all attempts fail:
+// QUALITY_REJECTED. Do not loop indefinitely."). This is a DIFFERENT
+// axis from MAX_RETRIES above: MAX_RETRIES bounds retrying the SAME
+// generation attempt on a transient provider-level timeout;
+// MAX_QUALITY_REGEN_ATTEMPTS bounds re-running the ENTIRE generate ->
+// parse -> quality-gate cycle when the result came back but failed
+// SPECIFICALLY due to GENERATION_TRUNCATED (a content-quality outcome,
+// not a provider error) -- never for any other quality-gate rejection
+// reason, which is a real, final, non-regenerable defect.
+const MAX_QUALITY_REGEN_ATTEMPTS = 2
 
 interface LeadEvidence {
   business_name: string
@@ -93,6 +114,17 @@ interface LeadEvidence {
   facility_count_estimate: number | null
   has_academy_presence: boolean | null
   signals: Array<{ signal_key: string; confidence: string; evidence: unknown; source_url: string | null }>
+  // Whether this lead has a public_email on file -- CONTACT/CHANNEL
+  // metadata only. This does NOT prove anything about how the business
+  // manages its communications internally (2026-09-04 owner directive,
+  // Defect 3: "public email evidence transformed into unsupported
+  // workflow claim" -- the real Elmasry defect was exactly this: a
+  // public Gmail address existing was written up as "you rely on Gmail
+  // to manage communications", a workflow claim the mere existence of
+  // an address does not support). Used both to build the prompt-level
+  // guard below AND passed through to the quality gate's
+  // contactMetadataOnlySignalKeys check as a defense-in-depth backstop.
+  hasPublicEmailContact: boolean
 }
 
 // Static pitch guidance per signal (Phase 10's worked examples) --
@@ -187,6 +219,20 @@ function buildGroundedPrompt(
     ? `\nCITY NAME GUARD: the business's city is ${lead.city} -- in Arabic this MUST be written ${AR_CITY_DISAMBIGUATION[lead.city.toLowerCase()]}.`
     : ''
 
+  // EVIDENCE-STRENGTH GUARD (2026-09-04 owner directive, Defect 3): a
+  // public contact channel existing (e.g. a Gmail address is the
+  // published business email) is CONTACT METADATA -- it proves nothing
+  // about the business's internal workflow. "They use Gmail" does NOT
+  // establish "they rely on Gmail to manage their communications" (a
+  // claim about process, effort, or organization the metadata alone
+  // cannot support). This mirrors the CAUTIOUS-LANGUAGE GUARD above but
+  // targets a different failure shape: that guard governs ABSENCE-of-
+  // evidence signals (low confidence); this one governs PRESENCE-of-
+  // contact-metadata being over-interpreted as a workflow fact.
+  const evidenceStrengthGuard = lead.hasPublicEmailContact
+    ? `\n\nEVIDENCE-STRENGTH GUARD -- MANDATORY: this business has a public email address on file. That ONLY proves a contact channel exists -- it does NOT prove HOW the business manages communications, registrations, or any internal process. NEVER write a claim like "you rely on Gmail to manage communications" / "تعتمدون على Gmail لإدارة التواصل" (an unsupported workflow claim). If you mention the email at all, phrase it ONLY as an observation of the published contact method (e.g. "we noticed your published contact email is a personal Gmail address" / "لاحظنا أن وسيلة البريد المعلنة هي Gmail شخصي"), never as a statement about their operations or workflow.`
+    : ''
+
   // Language policy (owner directive): for Egyptian businesses, prefer
   // natural professional Arabic (not robotic MSA) unless there is
   // strong evidence English is the appropriate business language.
@@ -195,8 +241,8 @@ function buildGroundedPrompt(
   // within the chosen language, not the language choice itself.
   const languageInstruction =
     language === 'ar'
-      ? `Write in natural, professional Egyptian-business Arabic -- NOT robotic/overly formal Modern Standard Arabic, but also not casual/slang. Sound like a real person writing a professional first-contact message to an Egyptian business owner.${cityGuard}${confidenceGuard}`
-      : `Write in natural, professional English suitable for a B2B sales context.${confidenceGuard}`
+      ? `Write in natural, professional Egyptian-business Arabic -- NOT robotic/overly formal Modern Standard Arabic, but also not casual/slang. Sound like a real person writing a professional first-contact message to an Egyptian business owner.${cityGuard}${confidenceGuard}${evidenceStrengthGuard}`
+      : `Write in natural, professional English suitable for a B2B sales context.${confidenceGuard}${evidenceStrengthGuard}`
 
   const teamSignatureExample = SALES_TEAM_SIGNATURE[language](replyAddress)
 
@@ -221,7 +267,9 @@ ${languageInstruction}
 SIGNATURE POLICY -- MANDATORY: never invent a personal name or job title for the sender. End with the exact team identity below, with NO modification, NO added name, NO added title:
 ${teamSignatureExample}
 
-Do not include any bracketed placeholder text like [Your Name], [Prospect Name], [Contact Information], {{...}}, <...>, TODO, or TBD anywhere in the output. Every word you write must be final, ready-to-send text -- never a template.`
+Do not include any bracketed placeholder text like [Your Name], [Prospect Name], [Contact Information], {{...}}, <...>, TODO, or TBD anywhere in the output. Every word you write must be final, ready-to-send text -- never a template.
+
+OUTPUT INTEGRITY -- MANDATORY: write the ENTIRE message in ${language === 'ar' ? 'Arabic' : 'English'} only, apart from the business name "${lead.business_name}", the product name "Mal3aby", and any email address/URL. Never insert a stray, isolated word in a different language/script than the rest of the sentence it appears in.`
 
   if (channel === 'email') {
     return `You are writing a FIRST-CONTACT sales email for Mal3aby, a sports facility booking and operations management platform, to a real prospect business. This is NOT a proposal or a feature brochure -- it is a short, personal-sounding first message meant to start a conversation.
@@ -378,7 +426,7 @@ Deno.serve(async (req) => {
 
   const { data: leadRow, error: leadError } = await admin
     .from('sales_leads')
-    .select('id, business_name, business_type, city, country, rating, review_count, branch_count_estimate, facility_count_estimate, has_academy_presence, status')
+    .select('id, business_name, business_type, city, country, rating, review_count, branch_count_estimate, facility_count_estimate, has_academy_presence, status, public_email, public_phone, website')
     .eq('id', leadId)
     .maybeSingle()
 
@@ -407,6 +455,7 @@ Deno.serve(async (req) => {
     facility_count_estimate: leadRow.facility_count_estimate,
     has_academy_presence: leadRow.has_academy_presence,
     signals: signalRows ?? [],
+    hasPublicEmailContact: !!leadRow.public_email,
   }
 
   const { data: decryptedSecret, error: secretError } = await admin.rpc('get_vault_secret_service', {
@@ -419,77 +468,137 @@ Deno.serve(async (req) => {
 
   const salesReplyAddress = Deno.env.get('SALES_OUTREACH_FROM_ADDRESS') ?? 'sales@mal3aby.app'
   const prompt = buildGroundedPrompt(evidence, language, messageType, resolvedChannel, salesReplyAddress)
-
-  let result
-  let attempt = 0
-  let lastErr: ProviderRequestError | null = null
-  while (attempt <= MAX_RETRIES) {
-    try {
-      result = await generateSalesOffer(prompt, providerKey, {
-        apiKey: decryptedSecret,
-        model,
-        maxTokens: AI_MAX_TOKENS,
-        timeoutMs: AI_API_TIMEOUT_MS,
-      })
-      lastErr = null
-      break
-    } catch (err) {
-      if (!(err instanceof ProviderRequestError)) {
-        return jsonResponse(req, { error: 'AI_PROVIDER_REQUEST_FAILED', detail: 'unexpected error calling AI provider' }, 502)
-      }
-      lastErr = err
-      // Only a timeout is worth one bounded retry -- every other class
-      // (auth/quota/upstream_error/empty_response) will not change on
-      // retry, so retrying would just waste the free-tier budget.
-      if (err.kind !== 'timeout' || attempt === MAX_RETRIES) break
-      attempt++
-    }
-  }
-
-  if (lastErr || !result) {
-    return mapProviderErrorToResponse(req, lastErr!)
-  }
-
-  // Every EMAIL message now follows the new prompt's mandatory
-  // "SUBJECT: ..." first-line convention (not just message_type='offer'
-  // -- the owner's email quality contract requires a subject on every
-  // first-contact email, regardless of message_type). Parse it out of
-  // the model's raw text and strip it from the body so it is never
-  // duplicated inside the email content itself. Call-script channels
-  // never have a subject (subjectPass is trivially true for them in the
-  // quality gate).
-  let subject: string | null = null
-  let generatedBody = result.text.trim()
-  if (resolvedChannel === 'email') {
-    const subjectMatch = generatedBody.match(/^SUBJECT:\s*(.+)$/im)
-    if (subjectMatch) {
-      subject = subjectMatch[1].trim().slice(0, 200)
-      generatedBody = generatedBody.replace(/^SUBJECT:\s*.+$/im, '').replace(/^\s+/, '')
-    }
-  }
-
-  // ------------------------------------------------------------
-  // COMMERCIAL QUALITY VALIDATION step (owner-mandated lifecycle:
-  // GENERATE -> GROUNDING VALIDATION -> COMMERCIAL QUALITY VALIDATION ->
-  // APPROVAL_READY -> HUMAN APPROVAL -> SEND). Grounding validation
-  // itself is enforced upstream by construction (buildGroundedPrompt
-  // only ever supplies verified sales_lead_signals evidence to the
-  // model, and the exact evidence given is persisted as `grounding` for
-  // audit) -- groundingPassed is true here because no unverifiable claim
-  // was ever offered to the model to begin with; a human reviewing the
-  // persisted grounding can always independently re-audit factual
-  // accuracy against the cited sources, same as before. This is a
-  // deterministic, non-LLM check -- see _shared/outreach-quality-gate.ts.
-  // ------------------------------------------------------------
   const lowConfidenceSignalKeys = evidence.signals.filter((s) => s.confidence === 'low').map((s) => s.signal_key)
-  const qualityResult = evaluateOutreachQuality({
-    channel: resolvedChannel,
-    language,
-    subject,
-    body: generatedBody,
-    lowConfidenceSignalKeys,
-    groundingPassed: true,
-  })
+  // Contact-metadata-only evidence class for the EVIDENCE_STRENGTH gate
+  // (Defect 3): a public_email existing is CONTACT metadata, never a
+  // workflow fact on its own -- see LeadEvidence.hasPublicEmailContact's
+  // own comment for the full rationale. A single fixed sentinel key
+  // (not tied to any real sales_lead_signals row, since this evidence
+  // class isn't one) is enough for the gate's contact-metadata check.
+  const contactMetadataOnlySignalKeys = evidence.hasPublicEmailContact ? ['public_email_contact'] : []
+
+  // ------------------------------------------------------------
+  // GENERATION + COMMERCIAL QUALITY VALIDATION, with BOUNDED
+  // regeneration specifically for GENERATION_TRUNCATED (2026-09-04
+  // owner directive: "Do not solve truncation by continuously
+  // increasing max_tokens... If the provider reports length/token-limit
+  // termination: reject and regenerate within bounded retry policy.
+  // Maximum automatic regeneration attempts: 2 additional attempts
+  // after the initial generation. If all attempts fail:
+  // QUALITY_REJECTED. Do not loop indefinitely."). This loop runs the
+  // FULL generate->parse->quality-gate cycle up to
+  // 1 + MAX_QUALITY_REGEN_ATTEMPTS times, but ONLY continues past a
+  // rejection when the rejection was SPECIFICALLY GENERATION_TRUNCATED
+  // -- every other rejection reason (missing subject, placeholder,
+  // overstated evidence, etc.) is a real, final QUALITY_REJECTED
+  // outcome persisted as-is, never silently retried (retrying those
+  // would risk masking a genuine, reproducible prompt defect behind an
+  // apparently-successful later attempt, which is exactly the kind of
+  // self-certification this mission's gate exists to prevent).
+  // ------------------------------------------------------------
+  let result: Awaited<ReturnType<typeof generateSalesOffer>> | undefined
+  let subject: string | null = null
+  let generatedBody = ''
+  let qualityResult: ReturnType<typeof evaluateOutreachQuality> | undefined
+  let lastErr: ProviderRequestError | null = null
+
+  for (let genAttempt = 0; genAttempt <= MAX_QUALITY_REGEN_ATTEMPTS; genAttempt++) {
+    let attempt = 0
+    lastErr = null
+    while (attempt <= MAX_RETRIES) {
+      try {
+        result = await generateSalesOffer(prompt, providerKey, {
+          apiKey: decryptedSecret,
+          model,
+          maxTokens: AI_MAX_TOKENS,
+          timeoutMs: AI_API_TIMEOUT_MS,
+        })
+        lastErr = null
+        break
+      } catch (err) {
+        if (!(err instanceof ProviderRequestError)) {
+          return jsonResponse(req, { error: 'AI_PROVIDER_REQUEST_FAILED', detail: 'unexpected error calling AI provider' }, 502)
+        }
+        lastErr = err
+        // Only a timeout is worth one bounded retry -- every other class
+        // (auth/quota/upstream_error/empty_response) will not change on
+        // retry, so retrying would just waste the free-tier budget.
+        if (err.kind !== 'timeout' || attempt === MAX_RETRIES) break
+        attempt++
+      }
+    }
+
+    if (lastErr || !result) {
+      // A hard provider failure ends the whole regeneration loop
+      // immediately -- an auth/quota/upstream failure will not resolve
+      // itself by regenerating, and burning further free-tier requests
+      // on it would violate the $0-cost, no-indefinite-retry mandate.
+      return mapProviderErrorToResponse(req, lastErr!)
+    }
+
+    // Every EMAIL message follows the prompt's mandatory "SUBJECT: ..."
+    // first-line convention (regardless of message_type). Parse it out
+    // of the model's raw text and strip it from the body so it is never
+    // duplicated inside the email content itself. Call-script channels
+    // never have a subject (subjectPass is trivially true for them in
+    // the quality gate).
+    subject = null
+    generatedBody = result.text.trim()
+    if (resolvedChannel === 'email') {
+      const subjectMatch = generatedBody.match(/^SUBJECT:\s*(.+)$/im)
+      if (subjectMatch) {
+        subject = subjectMatch[1].trim().slice(0, 200)
+        generatedBody = generatedBody.replace(/^SUBJECT:\s*.+$/im, '').replace(/^\s+/, '')
+      }
+    }
+
+    // ------------------------------------------------------------
+    // COMMERCIAL QUALITY VALIDATION step (owner-mandated lifecycle:
+    // GENERATE -> GROUNDING VALIDATION -> COMMERCIAL QUALITY VALIDATION
+    // -> APPROVAL_READY -> HUMAN APPROVAL -> SEND). Grounding validation
+    // itself is enforced upstream by construction (buildGroundedPrompt
+    // only ever supplies verified sales_lead_signals evidence to the
+    // model, and the exact evidence given is persisted as `grounding`
+    // for audit) -- groundingPassed is true here because no
+    // unverifiable claim was ever offered to the model to begin with; a
+    // human reviewing the persisted grounding can always independently
+    // re-audit factual accuracy against the cited sources, same as
+    // before. This is a deterministic, non-LLM check -- see
+    // _shared/outreach-quality-gate.ts.
+    // ------------------------------------------------------------
+    qualityResult = evaluateOutreachQuality({
+      channel: resolvedChannel,
+      language,
+      subject,
+      body: generatedBody,
+      lowConfidenceSignalKeys,
+      groundingPassed: true,
+      finishReason: result.finishReason,
+      contactMetadataOnlySignalKeys,
+      businessName: evidence.business_name,
+    })
+
+    const truncatedOnly = qualityResult.status === 'QUALITY_REJECTED' && qualityResult.rejection_reasons.every((r) => r === 'GENERATION_TRUNCATED')
+    if (qualityResult.status === 'APPROVAL_READY' || !truncatedOnly) {
+      // Either a clean pass, or a rejection for a reason regeneration
+      // cannot fix (a structural/content defect the SAME prompt would
+      // likely reproduce) -- stop here and persist this outcome as final.
+      break
+    }
+    // Reason was PURELY truncation -- worth one more attempt, up to the
+    // bounded cap. The loop condition (genAttempt <=
+    // MAX_QUALITY_REGEN_ATTEMPTS) enforces the hard stop; on the final
+    // iteration this rejection is simply persisted as QUALITY_REJECTED
+    // below, per the owner's explicit "if all attempts fail:
+    // QUALITY_REJECTED" instruction.
+  }
+
+  if (!result || !qualityResult) {
+    // Unreachable in practice (the loop always assigns both before
+    // exiting, or returns early on a hard provider failure) -- kept as
+    // an explicit, honest 500 rather than a silent fallthrough.
+    return jsonResponse(req, { error: 'AI_PROVIDER_REQUEST_FAILED', detail: 'generation loop ended without a result' }, 502)
+  }
 
   // Persist via the RPC (GENERATE step of Phase 11's lifecycle) using the
   // CALLER-scoped client so created_by correctly reflects the real user who
@@ -525,6 +634,7 @@ Deno.serve(async (req) => {
     ai_model: result.model,
     ai_usage: result.usage,
     ai_latency_ms: result.latencyMs,
+    ai_finish_reason: result.finishReason,
     quality_status: qualityResult.status === 'APPROVAL_READY' ? 'approval_ready' : 'quality_rejected',
     quality_gate_result: qualityResult,
   })

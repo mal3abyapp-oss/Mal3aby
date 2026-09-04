@@ -299,3 +299,193 @@ describe('wordCount', () => {
     expect(wordCount('  leading and trailing   spaces  ')).toBe(4)
   })
 })
+
+// ============================================================
+// FINAL QUALITY-GATE HARDENING (2026-09-04, owner directive): 3 real
+// defects the production regeneration exposed -- truncated generation,
+// a stray output artifact, and evidence-strength overstatement -- were
+// all incorrectly APPROVAL_READY under the prior gate. These tests lock
+// in the fix: "Add regression tests proving rejection of: (1) provider
+// completion stopped by token limit, (2) objection section cut mid-
+// sentence, (3) structurally incomplete call script, (4) obvious
+// isolated foreign-language artifact in an otherwise Arabic script,
+// (5) public email evidence transformed into unsupported workflow
+// claim. Also prove acceptance of: (6) legitimate English product/
+// business names inside Arabic, (7) email addresses, (8) URLs,
+// (9) properly completed Arabic call script, (10) properly completed
+// English email."
+// ============================================================
+describe('evaluateOutreachQuality — generation completeness (Defect 1)', () => {
+  it('1. rejects when the provider reports finishReason=length (token-limit termination), even if the text looks plausible', () => {
+    const result = evaluateOutreachQuality({ ...VALID_EMAIL_EN, finishReason: 'length' })
+    expect(result.status).toBe('QUALITY_REJECTED')
+    expect(result.rejection_reasons).toContain('GENERATION_TRUNCATED')
+    expect(result.gates.GENERATION_COMPLETENESS_PASS).toBe(false)
+  })
+
+  it('2. rejects a call script whose final objection response is cut off mid-sentence (the real Mr Soccer Academy defect shape)', () => {
+    const body = VALID_CALL_TASK_AR.body.replace(
+      /- "مش مهتم دلوقتي": مفهوم، ممكن أرجعلك بعد فترة لو الوقت يبقى أنسب؟/,
+      '- "مش مهتم دلوقتي": مفهوم، هل أقدر أحدد معاكم ميعاد قصير خلال الأسبوع عشان أوريكم كيف ممكن النظام يوفر وقت وجهد، ولو لقيتوا إن فيه ف',
+    )
+    const result = evaluateOutreachQuality({ ...VALID_CALL_TASK_AR, body, finishReason: 'length' })
+    expect(result.status).toBe('QUALITY_REJECTED')
+    expect(result.rejection_reasons).toContain('GENERATION_TRUNCATED')
+  })
+
+  it('3. rejects a structurally incomplete call script (ends on a dangling connector, no finishReason available)', () => {
+    const body = `افتتاحية:
+"معاك من فريق ملعبي، منصة لإدارة الأكاديميات والملاعب الرياضية. عندك دقيقتين أتكلم معاك؟"
+
+أسئلة استكشافية:
+1. إزاي بيتم تسجيل اللاعبين الجدد حاليًا؟
+2. إزاي بتحصلوا الاشتراكات الشهرية؟
+
+فرضية المشكلة: الاعتماد على فيسبوك فقط للتواصل قد يعني عمليات تسجيل يدوية.
+
+القيمة المقترحة: نظام تسجيل وحضور واشتراكات في مكان واحد.
+
+الرد على الاعتراضات:
+- "عندنا نظام بالفعل": تمام، ملعبي بيتكامل أو بيبسط الموضوع أكتر، تحب أوريك الفرق في عرض قصير؟
+- "ابعتلي معلومات": أكيد هبعتلك، بس عايز أفهم احتياجك الأول عشان
+- "مش مهتم دلوقتي": مفهوم و`
+    const result = evaluateOutreachQuality({ ...VALID_CALL_TASK_AR, body, finishReason: undefined })
+    expect(result.status).toBe('QUALITY_REJECTED')
+    expect(result.rejection_reasons).toContain('GENERATION_TRUNCATED')
+    expect(result.gates.GENERATION_COMPLETENESS_PASS).toBe(false)
+  })
+
+  it('9. accepts a properly completed Arabic call script with finishReason=stop', () => {
+    const result = evaluateOutreachQuality({ ...VALID_CALL_TASK_AR, finishReason: 'stop' })
+    expect(result.status).toBe('APPROVAL_READY')
+    expect(result.gates.GENERATION_COMPLETENESS_PASS).toBe(true)
+  })
+
+  it('10. accepts a properly completed English email with finishReason=stop', () => {
+    const result = evaluateOutreachQuality({ ...VALID_EMAIL_EN, finishReason: 'stop' })
+    expect(result.status).toBe('APPROVAL_READY')
+    expect(result.gates.GENERATION_COMPLETENESS_PASS).toBe(true)
+  })
+})
+
+describe('evaluateOutreachQuality — output integrity (Defect 2)', () => {
+  it('4. rejects an obvious isolated Latin-script artifact inserted into otherwise-Arabic output (the real CIC Arenas "Alley" defect shape)', () => {
+    const body = VALID_CALL_TASK_AR.body.replace(
+      'ممكن أرجعلك بعد فترة لو الوقت يبقى أنسب؟',
+      'ممكن أرجعلك بعد فترة لو الوقت يبقى أنسب؟ Alley',
+    )
+    const result = evaluateOutreachQuality({ ...VALID_CALL_TASK_AR, body })
+    expect(result.status).toBe('QUALITY_REJECTED')
+    expect(result.rejection_reasons).toContain('OUTPUT_INTEGRITY_FAILED')
+    expect(result.gates.OUTPUT_INTEGRITY_PASS).toBe(false)
+  })
+
+  it('6. does NOT reject a legitimate English product/business name inside Arabic (Mal3aby, and the lead\'s own business name)', () => {
+    const body = VALID_CALL_TASK_AR.body.replace('فريق ملعبي', 'فريق Mal3aby') + '\nنتكلم عن Mr Soccer Academy'
+    const result = evaluateOutreachQuality({ ...VALID_CALL_TASK_AR, body, businessName: 'Mr Soccer Academy' })
+    expect(result.gates.OUTPUT_INTEGRITY_PASS).toBe(true)
+    expect(result.rejection_reasons).not.toContain('OUTPUT_INTEGRITY_FAILED')
+  })
+
+  it('7. does NOT reject a legitimate email address inside Arabic output', () => {
+    const body = VALID_CALL_TASK_AR.body + '\nفريق ملعبي\nsales@mal3aby.app'
+    const result = evaluateOutreachQuality({ ...VALID_CALL_TASK_AR, body })
+    expect(result.gates.OUTPUT_INTEGRITY_PASS).toBe(true)
+  })
+
+  it('8. does NOT reject a legitimate URL inside Arabic output', () => {
+    const body = VALID_CALL_TASK_AR.body + '\nزوروا https://mal3aby.app لمزيد من التفاصيل'
+    const result = evaluateOutreachQuality({ ...VALID_CALL_TASK_AR, body })
+    expect(result.gates.OUTPUT_INTEGRITY_PASS).toBe(true)
+  })
+
+  it('does not reject an ALL-CAPS acronym (e.g. QR) inside Arabic output', () => {
+    const body = VALID_CALL_TASK_AR.body.replace('نظام تسجيل وحضور واشتراكات', 'نظام تسجيل وحضور بتقنية QR واشتراكات')
+    const result = evaluateOutreachQuality({ ...VALID_CALL_TASK_AR, body })
+    expect(result.gates.OUTPUT_INTEGRITY_PASS).toBe(true)
+  })
+
+  it('never runs the foreign-script-artifact check on English-language output (nothing to flag)', () => {
+    const result = evaluateOutreachQuality(VALID_EMAIL_EN)
+    expect(result.gates.OUTPUT_INTEGRITY_PASS).toBe(true)
+  })
+
+  it('does NOT reject a legitimate Latin-script brand name (Gmail) inside Arabic output when hedged as an observation (live production regeneration finding, 2026-09-04)', () => {
+    // Found live: Elmasry's regenerated draft correctly hedged the
+    // Gmail-evidence claim ("لاحظنا... بريدكم الإلكتروني كـ Gmail
+    // شخصي" -- an observation, not a workflow claim) but was then
+    // wrongly rejected by OUTPUT_INTEGRITY for the word "Gmail" itself
+    // -- a globally recognized email-service brand name, the same
+    // legitimate-proper-noun shape as "Mal3aby", not a random inserted
+    // artifact like the real "Alley" defect.
+    const body = `أهلاً فريق Elmasry Football Academy،
+لاحظنا نشاطكم المتواصل على إنستجرام لتدريب الأطفال في 6 أكتوبر وتوفر بريدكم الإلكتروني كـ Gmail شخصي.
+
+هل تواجهون صعوبة في تنظيم تسجيل اللاعبين وإدارة بياناتهم عبر القنوات الحالية؟
+
+مع خاصية إدارة تسجيل الأكاديمية من ملعبي، تقدروا تجمعوا بيانات اللاعبين وتسجيلاتهم في منصة موحدة وآمنة.
+
+هل يناسبكم مكالمة قصيرة هذا الأسبوع؟
+
+فريق ملعبي
+sales@mal3aby.app`
+    const result = evaluateOutreachQuality({
+      ...VALID_EMAIL_AR,
+      body,
+      businessName: 'Elmasry Football Academy',
+      contactMetadataOnlySignalKeys: ['public_email_contact'],
+    })
+    expect(result.gates.OUTPUT_INTEGRITY_PASS).toBe(true)
+    expect(result.rejection_reasons).not.toContain('OUTPUT_INTEGRITY_FAILED')
+  })
+})
+
+describe('evaluateOutreachQuality — evidence strength (Defect 3)', () => {
+  it('5. rejects a public-email-existence signal transformed into an unsupported operational workflow claim (the real Elmasry defect shape)', () => {
+    const body = `أهلاً فريق أكاديمية المصري لكرة القدم في الجيزة، لاحظت نشاطكم القوي على إنستجرام وفيسبوك مع الاعتماد على بريد جيميل شخصي لإدارة التواصل.
+
+هل تواجهون صعوبة في جمع وتنسيق طلبات التسجيل لللاعبين بصورة منظمة؟
+
+من خلال خاصية إدارة تسجيل الأكاديمية على منصة ملعبي، هتقدروا تستقبلوا طلبات التسجيل، تتبعها وتوثقها في نظام موحد.
+
+هل يناسبكم مكالمة سريعة لمدة 15 دقيقة خلال هذا الأسبوع؟
+
+فريق ملعبي
+sales@mal3aby.app`
+    const result = evaluateOutreachQuality({
+      ...VALID_EMAIL_AR,
+      subject: 'x',
+      body,
+      contactMetadataOnlySignalKeys: ['public_email_contact'],
+    })
+    expect(result.status).toBe('QUALITY_REJECTED')
+    expect(result.rejection_reasons).toContain('EVIDENCE_STRENGTH_OVERSTATED')
+    expect(result.gates.EVIDENCE_STRENGTH_PASS).toBe(false)
+  })
+
+  it('accepts the corrected, cautiously-hedged phrasing of the same observation ("the published contact method is Gmail" -- not a workflow claim)', () => {
+    const body = `أهلاً فريق أكاديمية المصري لكرة القدم في الجيزة، لاحظنا أن وسيلة البريد المعلنة هي Gmail شخصي بدلاً من بريد رسمي للأكاديمية.
+
+هل تواجهون صعوبة في جمع وتنسيق طلبات التسجيل لللاعبين بصورة منظمة؟
+
+من خلال خاصية إدارة تسجيل الأكاديمية على منصة ملعبي، هتقدروا تستقبلوا طلبات التسجيل، تتبعها وتوثقها في نظام موحد.
+
+هل يناسبكم مكالمة سريعة لمدة 15 دقيقة خلال هذا الأسبوع؟
+
+فريق ملعبي
+sales@mal3aby.app`
+    const result = evaluateOutreachQuality({
+      ...VALID_EMAIL_AR,
+      subject: 'x',
+      body,
+      contactMetadataOnlySignalKeys: ['public_email_contact'],
+    })
+    expect(result.gates.EVIDENCE_STRENGTH_PASS).toBe(true)
+    expect(result.rejection_reasons).not.toContain('EVIDENCE_STRENGTH_OVERSTATED')
+  })
+
+  it('never flags EVIDENCE_STRENGTH_OVERSTATED when no contact-metadata-only signal is present, even if similar wording appears', () => {
+    const result = evaluateOutreachQuality({ ...VALID_EMAIL_AR, contactMetadataOnlySignalKeys: [] })
+    expect(result.gates.EVIDENCE_STRENGTH_PASS).toBe(true)
+  })
+})
