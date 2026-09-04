@@ -56,7 +56,11 @@ interface LeadProfile {
   latest_score: { score: number; score_band: string; dimension_breakdown: Record<string, number>; explanation_en: string; explanation_ar: string } | null
   notes: Array<{ id: string; note: string; created_at: string }>
   activities: Array<{ id: string; activity_type: string; detail: Record<string, unknown>; created_at: string }>
-  outreach_messages: Array<{ id: string; channel: string; message_type: string; language: string; subject: string | null; body: string; status: string; created_at: string }>
+  outreach_messages: Array<{
+    id: string; channel: string; message_type: string; language: string; subject: string | null; body: string; status: string; created_at: string
+    quality_status?: string | null
+    quality_gate_result?: { gates?: Record<string, boolean>; rejection_reasons?: string[] } | null
+  }>
   followups: Array<{ id: string; reason: string; scheduled_at: string; status: string }>
   status_history: Array<{ from_status: string | null; to_status: string; reason: string | null; changed_at: string }>
   possible_duplicates: Array<{ id: string; lead_id_a: string; lead_id_b: string; confidence: string }>
@@ -547,7 +551,20 @@ export function SalesLeadDetailPage() {
                     <span>{m.channel} · {m.message_type}</span>
                     <StatusBadge tone={m.status === 'sent' ? 'success' : m.status === 'failed' || m.status === 'rejected' ? 'danger' : 'info'} label={m.status} />
                   </div>
-                  {m.subject && <p className="font-medium">{m.subject}</p>}
+                  {m.quality_status && (
+                    <div className="mt-1 flex flex-wrap items-center gap-2">
+                      <StatusBadge
+                        tone={m.quality_status === 'approval_ready' ? 'success' : m.quality_status === 'quality_rejected' ? 'danger' : 'neutral'}
+                        label={t(`platform.sales.leadProfile.qualityStatus.${m.quality_status}`, m.quality_status)}
+                      />
+                      {m.quality_status === 'quality_rejected' && m.quality_gate_result?.rejection_reasons && m.quality_gate_result.rejection_reasons.length > 0 && (
+                        <span className="text-xs text-status-danger">
+                          {m.quality_gate_result.rejection_reasons.join(', ')}
+                        </span>
+                      )}
+                    </div>
+                  )}
+                  {m.subject && <p className="mt-1 font-medium">{m.subject}</p>}
                   <p className="text-text-secondary">{m.body.slice(0, 200)}</p>
                 </li>
               ))}

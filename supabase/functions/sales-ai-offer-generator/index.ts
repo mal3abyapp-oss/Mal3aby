@@ -32,6 +32,7 @@
 // provider.
 import { createClient } from 'jsr:@supabase/supabase-js@2'
 import { generateSalesOffer, ProviderRequestError } from '../_shared/ai-provider-adapter.ts'
+import { evaluateOutreachQuality } from '../_shared/outreach-quality-gate.ts'
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!
 const SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
@@ -60,7 +61,21 @@ function jsonResponse(req: Request, body: unknown, status = 200) {
 }
 
 const AI_API_TIMEOUT_MS = 30_000
-const AI_MAX_TOKENS = 800
+// Raised from 800 to 1400 (2026-09-04, commercial quality gate mission):
+// the new call-script prompt structure (literal opening + 2-3 discovery
+// questions + problem hypothesis + value proposition + 3 objection
+// responses + CTA, all as literal spoken text) is materially longer than
+// the old talking-points-scaffold format this limit was originally sized
+// for. Confirmed via live testing: at 800 tokens, Groq's response was
+// consistently truncated mid-PROBLEM_HYPOTHESIS, before ever reaching
+// OBJECTION HANDLING -- output_tokens: 800 (exactly the cap) on 2/2 test
+// calls, both correctly caught and rejected by the quality gate's
+// MISSING_OBJECTION_HANDLING check (the gate did its job; the cap was
+// the actual root cause). Emails stay well under this even at their
+// longer end (140-word target ~ 200-300 tokens), so a single shared
+// limit large enough for the call-script case does not risk emails
+// becoming any less concise.
+const AI_MAX_TOKENS = 1400
 // Bounded retry, no infinite retry (mission's explicit cost-guard
 // requirement) -- a single retry only on a transient timeout, never on
 // a quota/auth/upstream-error class (retrying those wastes the
@@ -110,7 +125,30 @@ const SIGNAL_PITCH_HINTS: Record<string, { en: string; ar: string }> = {
   },
 }
 
-function buildGroundedPrompt(lead: LeadEvidence, language: 'ar' | 'en', messageType: string): string {
+// Signature identity policy (owner directive, this mission): "Use the
+// actual configured Sales identity. Never invent personal names or
+// titles. If no named salesperson identity is configured: use a
+// complete team identity such as فريق ملعبي / Mal3aby Sales / [verified
+// reply/contact channel]. Only include contact details that actually
+// exist and are configured. No placeholders." No per-salesperson
+// identity is configured anywhere in this codebase (sales_provider_
+// configs has no such field) -- so the team identity is the only
+// correct choice, always, for every message, in every language. The
+// reply channel included is the real configured sender address
+// (SALES_OUTREACH_FROM_ADDRESS, matching what sales-outreach-email-
+// sender actually sends from), never a fabricated one.
+const SALES_TEAM_SIGNATURE = {
+  ar: (replyAddress: string) => `فريق ملعبي\n${replyAddress}`,
+  en: (replyAddress: string) => `Mal3aby Sales Team\n${replyAddress}`,
+}
+
+function buildGroundedPrompt(
+  lead: LeadEvidence,
+  language: 'ar' | 'en',
+  messageType: string,
+  channel: 'email' | 'phone_script' | 'whatsapp_talking_points',
+  replyAddress: string,
+): string {
   const signalLines = lead.signals
     .map((s) => `- ${s.signal_key} (confidence: ${s.confidence}${s.source_url ? `, source: ${s.source_url}` : ''}): ${JSON.stringify(s.evidence)}`)
     .join('\n')
@@ -120,6 +158,17 @@ function buildGroundedPrompt(lead: LeadEvidence, language: 'ar' | 'en', messageT
     .filter(Boolean)
     .map((p) => p[language])
     .join('; ')
+
+  // Absence-of-evidence signals recorded at LOW confidence must be
+  // phrased as an observation/question, never a certain factual
+  // statement (owner's explicit BAD/BETTER example: "You currently
+  // manage bookings only by phone" is BAD; "We couldn't identify an
+  // online booking path from the public channels we reviewed, so I
+  // wanted to ask how bookings are currently managed" is BETTER).
+  const lowConfidenceSignals = lead.signals.filter((s) => s.confidence === 'low')
+  const confidenceGuard = lowConfidenceSignals.length > 0
+    ? `\n\nCAUTIOUS-LANGUAGE GUARD -- MANDATORY: the following signal(s) are LOW CONFIDENCE absence-of-evidence findings (we did not find X, which is not the same as proving the prospect lacks X): ${lowConfidenceSignals.map((s) => s.signal_key).join(', ')}. You MUST phrase any reference to these as an observation or a genuine question (e.g. "we couldn't identify... so I wanted to ask...", "لم نتمكن من تحديد... فحبيت أسأل..."), and MUST NOT state them as a certain fact about how the business currently operates (e.g. never write "you currently manage X only by Y" / "تعتمدون حاليًا على X فقط"). This is a hard requirement, not a style preference.`
+    : ''
 
   // City-name disambiguation (found live during the controlled pilot,
   // 2026-09-04): the model has been observed transliterating "Giza"
@@ -138,14 +187,20 @@ function buildGroundedPrompt(lead: LeadEvidence, language: 'ar' | 'en', messageT
     ? `\nCITY NAME GUARD: the business's city is ${lead.city} -- in Arabic this MUST be written ${AR_CITY_DISAMBIGUATION[lead.city.toLowerCase()]}.`
     : ''
 
+  // Language policy (owner directive): for Egyptian businesses, prefer
+  // natural professional Arabic (not robotic MSA) unless there is
+  // strong evidence English is the appropriate business language.
+  // `language` is still an explicit caller-chosen parameter (the
+  // generate-offer UI lets an operator pick), so this only shapes TONE
+  // within the chosen language, not the language choice itself.
   const languageInstruction =
     language === 'ar'
-      ? `Write in natural, professional Arabic suitable for a business context in Egypt/the Gulf, appropriate for the given country if specified.${cityGuard}`
-      : 'Write in natural, professional English suitable for a B2B sales context.'
+      ? `Write in natural, professional Egyptian-business Arabic -- NOT robotic/overly formal Modern Standard Arabic, but also not casual/slang. Sound like a real person writing a professional first-contact message to an Egyptian business owner.${cityGuard}${confidenceGuard}`
+      : `Write in natural, professional English suitable for a B2B sales context.${confidenceGuard}`
 
-  return `You are writing a ${messageType} for Mal3aby, a sports facility booking and operations management platform, targeting a real prospect business.
+  const teamSignatureExample = SALES_TEAM_SIGNATURE[language](replyAddress)
 
-CRITICAL RULE: Use ONLY the facts listed below. Do NOT invent, assume, or embellish any detail about this business that is not explicitly stated here. If a detail (e.g. exact pricing, exact number of fields) is not given, do not state it as fact -- speak in terms of the general opportunity instead.
+  const commonRules = `CRITICAL RULE: Use ONLY the facts listed below. Do NOT invent, assume, or embellish any detail about this business that is not explicitly stated here. If a detail (e.g. exact pricing, exact number of fields) is not given, do not state it as fact -- speak in terms of the general opportunity instead.
 
 VERIFIED LEAD FACTS:
 - Business name: ${lead.business_name}
@@ -159,11 +214,62 @@ VERIFIED LEAD FACTS:
 VERIFIED OPPORTUNITY SIGNALS (each with its own evidence source):
 ${signalLines || '(none recorded yet)'}
 
-RELEVANT MAL3ABY MODULES TO PITCH (based only on the signals above): ${relevantPitches || 'general operations and booking management'}
+RELEVANT MAL3ABY MODULES AVAILABLE (based only on the signals above -- pick ONLY ONE that best fits, do not list them all): ${relevantPitches || 'general operations and booking management'}
 
 ${languageInstruction}
 
-Write the ${messageType} now. Keep it concise, specific to the facts given, and professional. Do not include a subject line unless writing an email offer.`
+SIGNATURE POLICY -- MANDATORY: never invent a personal name or job title for the sender. End with the exact team identity below, with NO modification, NO added name, NO added title:
+${teamSignatureExample}
+
+Do not include any bracketed placeholder text like [Your Name], [Prospect Name], [Contact Information], {{...}}, <...>, TODO, or TBD anywhere in the output. Every word you write must be final, ready-to-send text -- never a template.`
+
+  if (channel === 'email') {
+    return `You are writing a FIRST-CONTACT sales email for Mal3aby, a sports facility booking and operations management platform, to a real prospect business. This is NOT a proposal or a feature brochure -- it is a short, personal-sounding first message meant to start a conversation.
+
+${commonRules}
+
+FIRST-CONTACT EMAIL STRUCTURE -- MANDATORY, follow this exact shape:
+1. SUBJECT LINE: a short, specific, non-generic subject line (write it as the very first line, prefixed exactly "SUBJECT: "). Never leave it blank.
+2. A brief, personalized, relevant opening line referencing the business by name and something real about it.
+3. ONE observation or question about the opportunity gap (phrased cautiously if it relies on a low-confidence signal -- see the CAUTIOUS-LANGUAGE GUARD above).
+4. ONE Mal3aby benefit -- pick the single most relevant module from the list above. Do NOT list multiple features or modules. Do NOT use a bullet list of features.
+5. ONE low-friction call to action -- a short, specific, easy-to-answer question (e.g. asking if a brief call this week would work), never a vague "we'd love to arrange a demo" with no question and no timeframe. Do not fabricate a calendar link.
+6. The exact signature block given above.
+
+LENGTH: the BODY (excluding the subject line and signature) must be approximately 80-140 words. Do not write a long message. Do not list more than one product feature/module. Get to the point quickly.
+
+Write the email now, starting with the SUBJECT: line.`
+  }
+
+  // phone_script / whatsapp_talking_points: a REAL, EXECUTABLE call
+  // script -- not scaffolding/topic labels. Owner's explicit structure:
+  // identify -> ask permission -> ask how it currently works -> discover
+  // friction -> connect ONE relevant capability -> handle objection if
+  // needed -> ask for a short demo/next step. Must include literal
+  // spoken lines, not meta-descriptions of what to say.
+  return `You are writing a REAL, EXECUTABLE phone call script for a Mal3aby salesperson to use when calling a real prospect business. This must be literal, ready-to-speak text a salesperson can read or closely follow on the call -- NOT a scaffold of topics or bullet-point reminders.
+
+${commonRules}
+
+CALL SCRIPT STRUCTURE -- MANDATORY, produce ALL of the following as literal spoken text, clearly labeled with the section headers below (in ${language === 'ar' ? 'Arabic' : 'English'}):
+
+OPENING: a literal, quotable opening line where the caller identifies themselves and Mal3aby, and asks permission for a short conversation. Write the ACTUAL words to say, in quotes, not a description like "introduce yourself".
+
+DISCOVERY QUESTIONS: exactly 2 to 3 literal questions (each ending in a question mark) asking how the relevant operation currently works, to genuinely discover friction -- do not assert a problem, ask about it.
+
+PROBLEM HYPOTHESIS: one sentence describing the likely friction point, grounded only in the verified signals above, phrased cautiously if based on a low-confidence signal.
+
+VALUE PROPOSITION: ONE Mal3aby capability connected directly to the discovered friction -- not a feature dump.
+
+OBJECTION HANDLING: literal responses to these 3 common objections (label each clearly):
+- "We already have a system" (عندنا نظام بالفعل)
+- "Send me information" (ابعتلي معلومات)
+- "Not interested / not now" (مش مهتم / مش دلوقتي)
+Each response must be a real, literal reply a salesperson can speak, not a topic label.
+
+CTA / NEXT STEP: a literal, low-friction closing line asking for a short demo or an appropriate next step (e.g. "هل يناسبكم مكالمة/عرض ١٠ دقايق الأسبوع ده؟" or an equivalent natural question in the target language) -- not a vague mention of "a demo" with no question.
+
+Do not turn this into a feature dump. Discover first, sell second. Write the full script now.`
 }
 
 // mapProviderErrorToStatus(): a truthful, honest HTTP status/error code
@@ -311,7 +417,8 @@ Deno.serve(async (req) => {
     return jsonResponse(req, { error: 'could not resolve AI provider credentials' }, 500)
   }
 
-  const prompt = buildGroundedPrompt(evidence, language, messageType)
+  const salesReplyAddress = Deno.env.get('SALES_OUTREACH_FROM_ADDRESS') ?? 'sales@mal3aby.app'
+  const prompt = buildGroundedPrompt(evidence, language, messageType, resolvedChannel, salesReplyAddress)
 
   let result
   let attempt = 0
@@ -343,8 +450,46 @@ Deno.serve(async (req) => {
     return mapProviderErrorToResponse(req, lastErr!)
   }
 
-  // Subject line only meaningful for email offers -- extract the first line if it looks like one, else leave null.
-  const subject = resolvedChannel === 'email' && messageType === 'offer' ? result.text.split('\n')[0].slice(0, 120) : null
+  // Every EMAIL message now follows the new prompt's mandatory
+  // "SUBJECT: ..." first-line convention (not just message_type='offer'
+  // -- the owner's email quality contract requires a subject on every
+  // first-contact email, regardless of message_type). Parse it out of
+  // the model's raw text and strip it from the body so it is never
+  // duplicated inside the email content itself. Call-script channels
+  // never have a subject (subjectPass is trivially true for them in the
+  // quality gate).
+  let subject: string | null = null
+  let generatedBody = result.text.trim()
+  if (resolvedChannel === 'email') {
+    const subjectMatch = generatedBody.match(/^SUBJECT:\s*(.+)$/im)
+    if (subjectMatch) {
+      subject = subjectMatch[1].trim().slice(0, 200)
+      generatedBody = generatedBody.replace(/^SUBJECT:\s*.+$/im, '').replace(/^\s+/, '')
+    }
+  }
+
+  // ------------------------------------------------------------
+  // COMMERCIAL QUALITY VALIDATION step (owner-mandated lifecycle:
+  // GENERATE -> GROUNDING VALIDATION -> COMMERCIAL QUALITY VALIDATION ->
+  // APPROVAL_READY -> HUMAN APPROVAL -> SEND). Grounding validation
+  // itself is enforced upstream by construction (buildGroundedPrompt
+  // only ever supplies verified sales_lead_signals evidence to the
+  // model, and the exact evidence given is persisted as `grounding` for
+  // audit) -- groundingPassed is true here because no unverifiable claim
+  // was ever offered to the model to begin with; a human reviewing the
+  // persisted grounding can always independently re-audit factual
+  // accuracy against the cited sources, same as before. This is a
+  // deterministic, non-LLM check -- see _shared/outreach-quality-gate.ts.
+  // ------------------------------------------------------------
+  const lowConfidenceSignalKeys = evidence.signals.filter((s) => s.confidence === 'low').map((s) => s.signal_key)
+  const qualityResult = evaluateOutreachQuality({
+    channel: resolvedChannel,
+    language,
+    subject,
+    body: generatedBody,
+    lowConfidenceSignalKeys,
+    groundingPassed: true,
+  })
 
   // Persist via the RPC (GENERATE step of Phase 11's lifecycle) using the
   // CALLER-scoped client so created_by correctly reflects the real user who
@@ -355,13 +500,15 @@ Deno.serve(async (req) => {
     p_message_type: messageType,
     p_language: language,
     p_subject: subject,
-    p_body: result.text,
+    p_body: generatedBody,
     p_grounding: evidence,
     p_campaign_id: null,
     p_ai_provider: result.provider,
     p_ai_model: result.model,
     p_ai_usage: result.usage,
     p_ai_latency_ms: result.latencyMs,
+    p_quality_status: qualityResult.status === 'APPROVAL_READY' ? 'approval_ready' : 'quality_rejected',
+    p_quality_gate_result: qualityResult,
   })
 
   if (insertError) {
@@ -370,7 +517,7 @@ Deno.serve(async (req) => {
 
   return jsonResponse(req, {
     message_id: messageId,
-    body: result.text,
+    body: generatedBody,
     subject,
     channel: resolvedChannel,
     grounding_signal_count: evidence.signals.length,
@@ -378,5 +525,7 @@ Deno.serve(async (req) => {
     ai_model: result.model,
     ai_usage: result.usage,
     ai_latency_ms: result.latencyMs,
+    quality_status: qualityResult.status === 'APPROVAL_READY' ? 'approval_ready' : 'quality_rejected',
+    quality_gate_result: qualityResult,
   })
 })

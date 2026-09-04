@@ -378,6 +378,11 @@
         "possibleDuplicates": "Possible Duplicates",
         "markDoNotContact": "Mark Do Not Contact",
         "statusChangeReason": "Reason",
+        "qualityStatus": {
+          "pending_quality_check": "Quality check pending",
+          "approval_ready": "Approval ready",
+          "quality_rejected": "Quality rejected"
+        },
         "channels": "Outreach Channels",
         "channelEmail": "Email",
         "channelWhatsapp": "WhatsApp",
