@@ -121,9 +121,26 @@ function buildGroundedPrompt(lead: LeadEvidence, language: 'ar' | 'en', messageT
     .map((p) => p[language])
     .join('; ')
 
+  // City-name disambiguation (found live during the controlled pilot,
+  // 2026-09-04): the model has been observed transliterating "Giza"
+  // (a real Cairo-metro city, Egypt) as "غزة" (Gaza, Palestine) in
+  // Arabic output -- a genuine factual corruption of a real, correct
+  // grounding fact, not a hallucination of a new fact. Confirmed
+  // non-deterministic (a same-lead regeneration produced the correct
+  // "الجيزة" the very next call), so this is a real, reachable-in-
+  // production risk worth an explicit prompt-level guard rather than
+  // hoping it doesn't recur. Extend this map if another Egyptian place
+  // name is ever found to collide the same way.
+  const AR_CITY_DISAMBIGUATION: Record<string, string> = {
+    giza: 'الجيزة (Giza, Egypt -- NEVER write غزة/Gaza, a different place in Palestine)',
+  }
+  const cityGuard = lead.city && AR_CITY_DISAMBIGUATION[lead.city.toLowerCase()]
+    ? `\nCITY NAME GUARD: the business's city is ${lead.city} -- in Arabic this MUST be written ${AR_CITY_DISAMBIGUATION[lead.city.toLowerCase()]}.`
+    : ''
+
   const languageInstruction =
     language === 'ar'
-      ? 'Write in natural, professional Arabic suitable for a business context in Egypt/the Gulf, appropriate for the given country if specified.'
+      ? `Write in natural, professional Arabic suitable for a business context in Egypt/the Gulf, appropriate for the given country if specified.${cityGuard}`
       : 'Write in natural, professional English suitable for a B2B sales context.'
 
   return `You are writing a ${messageType} for Mal3aby, a sports facility booking and operations management platform, targeting a real prospect business.
