@@ -281,11 +281,15 @@ A second real issue (an unverifiable "16313 hotline" claim for Pegasus Dreamland
 
 **DELIVERABILITY = NOT READY.** This is a real, unavoidable finding, not a code defect I can fix myself — it requires DNS records only the domain owner can add (SPF/DKIM for whichever provider is actually authorized to send, i.e. Resend if that's the intended path, or reconciling with the existing `amazonses.com` SPF if SES is actually the intended sender). No DNS change was made or attempted by me. **Sending any of these 5 messages today, even with owner approval, risks poor deliverability (spam-folder placement) or outright rejection by the recipient's mail server** given the missing SPF/DKIM alignment for the actual sending domain.
 
+> **CORRECTION (2026-09-04, later the same day, see `SALES_INTELLIGENCE_MULTICHANNEL_PILOT_APPROVAL.md`):** the "DKIM not found" / "provider mismatch" reading above was wrong. Using the Resend API directly (`list-domains`/`get-domain`), `mal3aby.app` was confirmed already fully `verified` for sending at the time of this report — the `send.mal3aby.app` records pointing at `amazonses.com` are Resend's own correct, expected configuration (Resend's infrastructure runs on Amazon SES internally), not a separate/conflicting provider. Email sending was never actually blocked. The one genuine gap (inbound MX for receiving) was closed in the follow-up mission with explicit owner DNS-change authorization. **DELIVERABILITY = READY** as of the multichannel report; treat this section as superseded.
+
 ---
 
 ## Response classification model (Phase 11)
 
 Current `sales_leads.status` and `sales_outreach_messages.status` enums do **not** yet cleanly represent all 9 required outcomes (`NO_REPLY`, `POSITIVE_REPLY`, `NEGATIVE_REPLY`, `NOT_INTERESTED`, `REQUESTED_INFORMATION`, `DEMO_REQUESTED`, `WRONG_CONTACT`, `BOUNCED`, `DO_NOT_CONTACT`) — several collapse into broader existing states (`replied`, `lost`) and `WRONG_CONTACT`/`BOUNCED`-at-the-lead-level have no dedicated representation. **Not implemented in this pass** — building this cleanly (new enum values, a classification RPC, UI) is real scope belonging to Phase 14 (actual response handling), not this approval package. Flagged here so it is not silently assumed to exist.
+
+> **UPDATE (2026-09-04, see `SALES_INTELLIGENCE_MULTICHANNEL_PILOT_APPROVAL.md`):** this gap is now closed — a dedicated `sales_outreach_events` table + `sales_record_outreach_event()` RPC implement the full 9-outcome taxonomy (as its own event model, not by overloading lead-lifecycle status), with automatic follow-up cancellation on any reply.
 
 ---
 
