@@ -1,6 +1,6 @@
 # Sales Intelligence Architecture
 
-**Status:** Live (2026-09-04). Fully functional except Phase 14 (tenant conversion), which is a deliberate, documented TRUE STOP — see [Open Decision](#open-decision-tenant-conversion-identityownership-model) below.
+**Status:** Live (2026-09-04). Fully functional, including Phase 14 (tenant conversion) — see [Tenant conversion: invite-based owner activation](#tenant-conversion-invite-based-owner-activation) below.
 
 Sales Intelligence is a Platform Owner bounded context for discovering, enriching, scoring, and pursuing prospective Mal3aby tenants (sports facilities, academies, clubs) from public sources, culminating in a governed conversion into a real tenant. See [ADR-054](docs/DECISIONS.md#adr-054--sales-intelligence-is-a-platform-owned-bounded-context-isolated-from-and-never-routed-through-clubtenant-authorization) for the full decision record.
 
@@ -10,7 +10,7 @@ Every `sales_*` table is platform-scoped — **no table has a `club_id` foreign 
 
 ## Domain model
 
-21 tables (see `supabase/migrations/20260904090000_sales_intelligence_schema.sql`): `sales_leads` (the canonical prospect entity) plus contacts/locations/social-links/dedup-fingerprints/possible-duplicates/enrichment-runs/signals/scores/notes/activities/status-history/campaigns/campaign-leads/outreach-messages/followups/demo-events/conversion-records/discovery-jobs/quota-usage/provider-configs.
+22 tables (see `supabase/migrations/20260904090000_sales_intelligence_schema.sql` and `20260904120000_sales_tenant_activation_invites_schema.sql`): `sales_leads` (the canonical prospect entity) plus contacts/locations/social-links/dedup-fingerprints/possible-duplicates/enrichment-runs/signals/scores/notes/activities/status-history/campaigns/campaign-leads/outreach-messages/followups/demo-events/conversion-records/discovery-jobs/quota-usage/provider-configs/tenant-activation-invites.
 
 ## Deduplication
 
@@ -22,7 +22,7 @@ Every `sales_*` table is platform-scoped — **no table has a `club_id` foreign 
 
 ## Pipeline
 
-`sales_change_lead_status()` is the sole path to change `sales_leads.status`, enforcing: `do_not_contact` leads can only move to `lost` (never re-activated for outreach); `won` leads are terminal; **`won` itself is only reachable via real tenant conversion** — the RPC raises a clean, specific error if attempted directly, backed by a DB-level CHECK constraint (`sales_leads_conversion_consistency`) as the actual enforcement layer.
+`sales_change_lead_status()` is the sole path to change `sales_leads.status`, enforcing: `do_not_contact` leads can only move to `lost` (never re-activated for outreach); `won` leads are terminal (any further change goes through the tenant-conversion RPCs below, not this generic status setter — `sales_change_lead_status()` itself still refuses to set `won` directly, forcing every WON transition through `sales_win_lead_and_invite_owner()`, which additionally moves the lead straight to `awaiting_owner_activation` in the same call).
 
 ## Outreach lifecycle
 
@@ -46,17 +46,19 @@ Both `google_places` and `ai_offer_generator` require an operator-configured Sup
 
 Discovery (`sales_discovery_jobs`) and enrichment (`sales_lead_enrichment_runs`) mirror `notification_queue`'s job-lifecycle shape and `whatsapp_connector_claim_next_batch()`'s `FOR UPDATE SKIP LOCKED` claim pattern — resumable, observable, bounded attempts, no infinite retry loops.
 
-## Open decision: tenant conversion identity/ownership model
+## Tenant conversion: invite-based owner activation
 
-Phase 14 ("Convert Lead → Tenant") is **not implemented**. `complete_new_club_onboarding()` — the codebase's only tenant-creation path — is coupled to `auth.uid()`: it creates the `club_owner` membership for whoever is calling it, and grants a one-per-account automatic trial keyed to that same caller's identity. It has no parameter for "create this club and make a different, not-currently-authenticated prospect its owner."
+Phase 14 ("Convert Lead → Tenant") resolves the identity/ownership TRUE STOP documented in [ADR-054](docs/DECISIONS.md#adr-054--sales-intelligence-is-a-platform-owned-bounded-context-isolated-from-and-never-routed-through-clubtenant-authorization): `complete_new_club_onboarding()` is `auth.uid()`-only, so it cannot be called by the Platform Owner's own session to create a tenant owned by a different, not-yet-authenticated prospect without making the platform owner the club's owner. The chosen resolution (final, user-mandated) is **invite-based owner activation** — mirroring the proven `portal_invites`/`claim_portal_invite(_service)` pattern this codebase already hardened through two real security fixes (column-level grants excluding hash columns; freshness-binding on any service-role identity claim).
 
-A Platform Owner clicking "Convert to Tenant" is a different session than the prospect who should actually own the resulting club. Calling the existing RPC as-is would make the **platform owner's own account** the tenant's `club_owner` — a real identity-ownership defect, not a UX gap.
+**Flow:** `sales_win_lead_and_invite_owner(lead_id, owner_email, ...)` (platform-owner only) moves the lead `won` → `awaiting_owner_activation` in one transaction (so `won` is never an observable standalone state a race could exploit) and mints a `sales_tenant_activation_invites` row — an opaque 256-bit token plus an independent 8-character human-typeable secret (delivered out of band by the platform owner, never in the URL), both sha256-hashed at rest, sharing one 5-attempt lockout budget. The prospect lands on `/sales-activate/:token` (`ActivateTenantOwnerPage.tsx`), verifies email + secret (`verify_sales_activation_email`/`verify_sales_activation_secret`, anon-callable, generic failure — never reveals which factor was wrong), then either:
+- **New prospect** — chooses a password; the `sales-activate-tenant-owner` Edge Function creates a pre-confirmed `auth.users` identity server-side (`auth.admin.createUser(..., {email_confirm: true})`, zero outbound email, matching this project's established convention) using the invite's own server-stored `owner_email` — never a client-supplied value. No session, no onboarding happens in this call.
+- **Existing account** — the Edge Function's `auth.admin.createUser` fails with "already registered"; the frontend routes to an ordinary sign-in form instead (never an automatic email-string link, per this codebase's own documented rule).
 
-Two resolutions exist, neither decided:
-1. **Two-step conversion via invite**: reuse the existing `portal_invites`/`claim_portal_invite_service` pattern — mark WON, send the prospect a real invite/magic-link, they complete their own onboarding. Conversion becomes asynchronous; "WON" no longer means "tenant exists this instant."
-2. **Extend the onboarding RPC** (or add a carefully-scoped platform-owner-only sibling) to accept an explicit `p_owner_user_id`/`p_owner_email` and create the membership for that identity — requires its own authorization gate and an explicit decision on whether a sales-converted tenant receives the same automatic free trial a self-service signup gets.
+Either way, the frontend then has (or creates) a **real session** for the prospect and calls `claim_sales_activation_invite(raw_token)` — the **only** function in this entire flow that calls `complete_new_club_onboarding()`, always under the prospect's own `auth.uid()`, reusing that RPC completely unmodified (same trial/module defaults any self-service signup gets). `_complete_sales_conversion()` guards this: it checks `sales_leads.status`/`converted_club_id` first and short-circuits to the existing club on any retry, since `complete_new_club_onboarding()` itself is not idempotent — this is what prevents a double-click or parallel-tab race from creating two clubs for one lead. The invite table's own `idx_..._one_pending_per_lead`/`idx_..._one_consumed_per_lead` partial unique indexes, plus `sales_conversion_records_one_per_lead`, provide two further independent layers against duplicate conversion.
 
-`sales_conversion_records` and `sales_leads.converted_club_id`/`converted_at` already exist and are ready to be populated the moment this decision is made — no schema change will be needed, only the one RPC. The UI (`SalesLeadDetailPage`) renders a disabled "Convert to Tenant" button with this exact explanation rather than a broken or silently-wrong action.
+`sales_leads.status` gained `awaiting_owner_activation` and `tenant_activated`; `sales_leads_conversion_consistency` now requires `converted_club_id`/`converted_at` if and only if `status = 'tenant_activated'` (not `won`) — "status=WON alone must NOT create a tenant" is enforced at the DB layer, not just by RPC discipline. The Platform Owner sees invite status (pending/expired/consumed) on `SalesLeadDetailPage` and can Resend (`resend_sales_activation_invite`, re-mints and revokes the prior pending invite). Full audit trail via `sales_lead_activities`: `won`, `activation_invite_created`, `activation_invite_resent`, `activation_invite_consumed`, `activation_failed`, `tenant_created`, `owner_linked`, `conversion_completed`.
+
+See `supabase/migrations/20260904120000_sales_tenant_activation_invites_schema.sql`, `20260904120100_sales_tenant_activation_invites_rpcs.sql`, `20260904120200_sales_lead_full_profile_activation_invite.sql`, and `supabase/functions/sales-activate-tenant-owner/index.ts` for the full implementation.
 
 ## Permissions
 
@@ -64,4 +66,4 @@ Two resolutions exist, neither decided:
 
 ## Testing
 
-`supabase/tests/sales_intelligence_structural_regression.sql` — 10 fixture-independent schema-shape checks, verified passing live. Component tests: `SalesLeadDetailPage.convert-blocked.test.tsx` (locks in the TRUE STOP is genuinely enforced in the UI, not just documented), `SalesDiscoverPage.configuration-blocked.test.tsx` (locks in CONFIGURATION_BLOCKED handling and that non-blocked work continues). See `docs/TEST_PLAN.md`'s "Sales Intelligence structural regression" section for CI-wiring status (same pre-existing blocker as the rest of this project's structural regression suite, not a new gap).
+`supabase/tests/sales_intelligence_structural_regression.sql` — 10 fixture-independent schema-shape checks, verified passing live. Component tests: `SalesLeadDetailPage.tenant-activation.test.tsx` (locks in the invite-send/resend/awaiting-activation/tenant-activated UI states and that no RPC in this flow can ever make the platform owner's own account the tenant owner), `SalesDiscoverPage.configuration-blocked.test.tsx` (locks in CONFIGURATION_BLOCKED handling and that non-blocked work continues). See `docs/TEST_PLAN.md`'s "Sales Intelligence structural regression" section for CI-wiring status (same pre-existing blocker as the rest of this project's structural regression suite, not a new gap).

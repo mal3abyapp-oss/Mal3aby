@@ -26,6 +26,7 @@ const VerifyInvoicePage = lazy(() => import('@/features/verify/VerifyInvoicePage
 const SecureBookingPage = lazy(() => import('@/features/verify/SecureBookingPage').then((m) => ({ default: m.SecureBookingPage })))
 const PublicClubBookingPage = lazy(() => import('@/features/public-booking/PublicClubBookingPage').then((m) => ({ default: m.PublicClubBookingPage })))
 const ActivateAccountPage = lazy(() => import('@/features/portal/ActivateAccountPage').then((m) => ({ default: m.ActivateAccountPage })))
+const ActivateTenantOwnerPage = lazy(() => import('@/features/platform/sales/ActivateTenantOwnerPage').then((m) => ({ default: m.ActivateTenantOwnerPage })))
 
 const TodayPage = lazy(() => import('@/features/dashboard/TodayPage').then((m) => ({ default: m.TodayPage })))
 const MorePage = lazy(() => import('@/features/dashboard/MorePage').then((m) => ({ default: m.MorePage })))
@@ -212,6 +213,16 @@ export const router = createBrowserRouter([
     // booking-QR or invoice-verify token at the routing layer.
     path: '/activate/:token',
     element: <Suspense fallback={<RouteLoadingFallback />}><ActivateAccountPage /></Suspense>,
+  },
+  {
+    // SALES INTELLIGENCE PHASE 14 -- INVITE-BASED OWNER ACTIVATION
+    // (ADR-054 final decision): the secure tenant-owner-activation
+    // entrypoint sent to a WON lead. No auth guard, standalone -- same
+    // "distinct path per token kind" convention as /activate/:token
+    // above, so a tenant-activation token is never interchangeable with
+    // a customer-portal-activation token at the routing layer.
+    path: '/sales-activate/:token',
+    element: <Suspense fallback={<RouteLoadingFallback />}><ActivateTenantOwnerPage /></Suspense>,
   },
   {
     element: <RequireAuth />,

@@ -34,7 +34,7 @@ begin
     'sales_lead_enrichment_runs', 'sales_lead_signals', 'sales_lead_scores', 'sales_lead_notes',
     'sales_lead_activities', 'sales_lead_status_history', 'sales_campaigns', 'sales_campaign_leads',
     'sales_outreach_messages', 'sales_followups', 'sales_demo_events', 'sales_conversion_records',
-    'sales_discovery_jobs', 'sales_quota_usage', 'sales_provider_configs'
+    'sales_discovery_jobs', 'sales_quota_usage', 'sales_provider_configs', 'sales_tenant_activation_invites'
   ]
   loop
     if not exists (
@@ -49,7 +49,7 @@ begin
   if array_length(v_missing, 1) > 0 then
     raise exception 'REGRESSION: sales_* tables missing RLS enabled+forced: %', v_missing;
   end if;
-  raise notice 'CHECK 1 PASS: all 22 sales_* tables have RLS enabled + forced';
+  raise notice 'CHECK 1 PASS: all 23 sales_* tables have RLS enabled + forced';
 end $$;
 
 -- ============================================================
@@ -256,7 +256,69 @@ begin
   raise notice 'CHECK 10 PASS: sales_queue_outreach_message structurally refuses non-email channels';
 end $$;
 
+-- ============================================================
+-- CHECK 11 (Phase 14): sales_tenant_activation_invites' token_hash and
+-- secret_hash columns are never directly selectable by `authenticated`
+-- -- the exact column-level-grant-from-day-one hardening this table was
+-- deliberately built with (never needing the 20260824080000-style
+-- retrofit portal_invites required).
+-- ============================================================
+do $$
+declare
+  v_leak_count int;
+begin
+  select count(*) into v_leak_count
+  from information_schema.role_column_grants
+  where table_schema = 'public' and table_name = 'sales_tenant_activation_invites'
+    and grantee = 'authenticated' and column_name in ('token_hash', 'secret_hash');
+
+  if v_leak_count > 0 then
+    raise exception 'REGRESSION: token_hash/secret_hash are selectable by authenticated on sales_tenant_activation_invites (% grant(s))', v_leak_count;
+  end if;
+  raise notice 'CHECK 11 PASS: token_hash/secret_hash never granted to authenticated on sales_tenant_activation_invites';
+end $$;
+
+-- ============================================================
+-- CHECK 12 (Phase 14): the partial-unique invariants that prevent
+-- duplicate/parallel conversion at the invite layer.
+-- ============================================================
 do $$
 begin
-  raise notice 'sales_intelligence_structural_regression.sql: ALL 10 CHECKS PASSED';
+  if not exists (
+    select 1 from pg_indexes where indexname = 'idx_sales_tenant_activation_invites_one_pending_per_lead'
+      and tablename = 'sales_tenant_activation_invites'
+  ) then
+    raise exception 'REGRESSION: idx_sales_tenant_activation_invites_one_pending_per_lead missing';
+  end if;
+  if not exists (
+    select 1 from pg_indexes where indexname = 'idx_sales_tenant_activation_invites_one_consumed_per_lead'
+      and tablename = 'sales_tenant_activation_invites'
+  ) then
+    raise exception 'REGRESSION: idx_sales_tenant_activation_invites_one_consumed_per_lead missing';
+  end if;
+  raise notice 'CHECK 12 PASS: one-pending / one-consumed per lead partial unique indexes both present';
+end $$;
+
+-- ============================================================
+-- CHECK 13 (Phase 14): sales_leads_conversion_consistency now ties
+-- converted_club_id/converted_at to status='tenant_activated'
+-- specifically (not 'won') -- the DB-level enforcement of "status=WON
+-- alone must NOT create a tenant".
+-- ============================================================
+do $$
+begin
+  if not exists (
+    select 1 from pg_constraint
+    where conrelid = 'public.sales_leads'::regclass and contype = 'c'
+      and conname = 'sales_leads_conversion_consistency'
+      and pg_get_constraintdef(oid) ilike '%tenant_activated%'
+  ) then
+    raise exception 'REGRESSION: sales_leads_conversion_consistency no longer references tenant_activated';
+  end if;
+  raise notice 'CHECK 13 PASS: sales_leads_conversion_consistency correctly gates on tenant_activated, not won';
+end $$;
+
+do $$
+begin
+  raise notice 'sales_intelligence_structural_regression.sql: ALL 13 CHECKS PASSED';
 end $$;

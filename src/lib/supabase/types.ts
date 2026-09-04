@@ -6154,6 +6154,78 @@ export type Database = {
         }
         Relationships: []
       }
+      sales_tenant_activation_invites: {
+        Row: {
+          activated_club_id: string | null
+          activated_user_id: string | null
+          business_name: string
+          business_name_ar: string | null
+          business_type: string | null
+          city: string | null
+          consumed_at: string | null
+          contact_phone: string | null
+          contact_phone_e164: string | null
+          country: string | null
+          created_at: string
+          created_by: string | null
+          email_verified_at: string | null
+          expires_at: string
+          id: string
+          lead_id: string
+          owner_email: string
+          purpose: string
+          secret_verified_at: string | null
+          status: string
+          verification_attempt_count: number
+        }
+        Insert: {
+          activated_club_id?: string | null
+          activated_user_id?: string | null
+          business_name: string
+          business_name_ar?: string | null
+          business_type?: string | null
+          city?: string | null
+          consumed_at?: string | null
+          contact_phone?: string | null
+          contact_phone_e164?: string | null
+          country?: string | null
+          created_at?: string
+          created_by?: string | null
+          email_verified_at?: string | null
+          expires_at: string
+          id?: string
+          lead_id: string
+          owner_email: string
+          purpose?: string
+          secret_verified_at?: string | null
+          status?: string
+          verification_attempt_count?: number
+        }
+        Update: {
+          activated_club_id?: string | null
+          activated_user_id?: string | null
+          business_name?: string
+          business_name_ar?: string | null
+          business_type?: string | null
+          city?: string | null
+          consumed_at?: string | null
+          contact_phone?: string | null
+          contact_phone_e164?: string | null
+          country?: string | null
+          created_at?: string
+          created_by?: string | null
+          email_verified_at?: string | null
+          expires_at?: string
+          id?: string
+          lead_id?: string
+          owner_email?: string
+          purpose?: string
+          secret_verified_at?: string | null
+          status?: string
+          verification_attempt_count?: number
+        }
+        Relationships: []
+      }
       seasons: {
         Row: {
           club_id: string
@@ -8076,6 +8148,42 @@ export type Database = {
           p_website?: string | null
         }
         Returns: { lead_id: string; outcome: string }[]
+      }
+      sales_win_lead_and_invite_owner: {
+        Args: {
+          p_business_name_ar?: string | null
+          p_contact_phone?: string | null
+          p_lead_id: string
+          p_owner_email: string
+          p_reason?: string | null
+        }
+        Returns: { raw_secret: string; raw_token: string }[]
+      }
+      resend_sales_activation_invite: {
+        Args: { p_lead_id: string }
+        Returns: { raw_secret: string; raw_token: string }[]
+      }
+      get_sales_activation_invite_context: {
+        Args: { p_raw_token: string }
+        Returns: {
+          business_name: string
+          business_name_ar: string | null
+          is_expired: boolean
+          owner_email_masked: string
+          status: string
+        }[]
+      }
+      verify_sales_activation_email: {
+        Args: { p_entered_email: string | null; p_raw_token: string }
+        Returns: boolean
+      }
+      verify_sales_activation_secret: {
+        Args: { p_entered_secret: string | null; p_raw_token: string }
+        Returns: boolean
+      }
+      claim_sales_activation_invite: {
+        Args: { p_raw_token: string }
+        Returns: string
       }
       get_sales_provider_status: {
         Args: Record<PropertyKey, never>
