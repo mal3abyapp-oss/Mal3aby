@@ -33,6 +33,20 @@ export interface GenerationResult {
   model: string
   usage: { input_tokens: number | null; output_tokens: number | null } | null
   latencyMs: number
+  // Provider-reported reason the generation stopped -- normalized to
+  // OpenAI's vocabulary since both current adapters map onto it (Groq is
+  // natively OpenAI-compatible; Anthropic's stop_reason values are
+  // mapped 1:1 below). 'length' means the provider truncated the
+  // response because it hit the requested token budget -- the ONLY
+  // signal the quality gate trusts to prove a response is INCOMPLETE
+  // (2026-09-04, owner directive: "Do not infer completeness merely
+  // because required topic keywords appeared... Use provider metadata
+  // where available: finish_reason / stop_reason"). 'stop' (or
+  // 'end_turn') means the model finished naturally. null means the
+  // provider did not report one (should not happen for either adapter
+  // today, but a caller must treat null as "unknown, cannot prove
+  // completeness" rather than silently assuming success).
+  finishReason: 'stop' | 'length' | 'content_filter' | 'other' | null
 }
 
 export class ProviderRequestError extends Error {
@@ -114,7 +128,21 @@ async function generateWithGroq(prompt: string, config: GenerationConfig): Promi
       ? { input_tokens: json.usage.prompt_tokens ?? null, output_tokens: json.usage.completion_tokens ?? null }
       : null,
     latencyMs: Date.now() - started,
+    // Groq's chat completions API is OpenAI-compatible: choices[0].
+    // finish_reason is 'stop' (natural completion), 'length' (hit
+    // max_tokens -- TRUNCATED, the one value the quality gate treats as
+    // proof of incompleteness), 'content_filter', or occasionally a
+    // provider-specific value normalized to 'other' here.
+    finishReason: normalizeFinishReason(json?.choices?.[0]?.finish_reason),
   }
+}
+
+function normalizeFinishReason(raw: unknown): GenerationResult['finishReason'] {
+  if (raw === 'stop' || raw === 'end_turn' || raw === 'stop_sequence') return 'stop'
+  if (raw === 'length' || raw === 'max_tokens') return 'length'
+  if (raw === 'content_filter') return 'content_filter'
+  if (typeof raw === 'string' && raw.length > 0) return 'other'
+  return null
 }
 
 // ============================================================
@@ -178,6 +206,10 @@ async function generateWithAnthropic(prompt: string, config: GenerationConfig): 
       ? { input_tokens: json.usage.input_tokens ?? null, output_tokens: json.usage.output_tokens ?? null }
       : null,
     latencyMs: Date.now() - started,
+    // Anthropic's stop_reason: 'end_turn'/'stop_sequence' = natural
+    // completion, 'max_tokens' = TRUNCATED, matching the same
+    // normalizeFinishReason() mapping the Groq adapter uses.
+    finishReason: normalizeFinishReason(json?.stop_reason),
   }
 }
 
