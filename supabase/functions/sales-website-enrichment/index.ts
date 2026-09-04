@@ -64,7 +64,65 @@ function sanitizeFetchError(err: unknown): string {
   return 'could not fetch the requested page'
 }
 
+// SSRF guard (P2 fix, 2026-09-04): sales_leads.website is operator-editable
+// (manual lead entry by any platform_admin/platform_owner session) with no
+// DB CHECK constraint on its shape. Without this guard, a malicious/
+// compromised lower-privilege platform_admin could set website to a
+// loopback/private/link-local/cloud-metadata address and use this
+// server-side fetch to probe internal Supabase/Edge Function network
+// surface. Google Places-sourced leads never hit this path with attacker
+// input (Google's own API populates `website`), but manual entry does, so
+// this must be enforced unconditionally for every URL fetched, not just
+// the initial lead.website value -- including same-domain links extracted
+// from the page itself (extractSameDomainLinks resolves relative hrefs,
+// which could theoretically redirect within an already-malicious base).
+function isSafePublicUrl(rawUrl: string): boolean {
+  let parsed: URL
+  try {
+    parsed = new URL(rawUrl)
+  } catch {
+    return false
+  }
+
+  if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') return false
+
+  const hostname = parsed.hostname.toLowerCase()
+
+  // Reject bare loopback/link-local/metadata hostnames outright.
+  if (
+    hostname === 'localhost' ||
+    hostname.endsWith('.localhost') ||
+    hostname === '0.0.0.0' ||
+    hostname === 'metadata.google.internal'
+  ) {
+    return false
+  }
+
+  // IPv4 literal check: loopback (127.0.0.0/8), private (10/8, 172.16/12,
+  // 192.168/16), link-local incl. cloud metadata (169.254.0.0/16), and
+  // unspecified (0.0.0.0) ranges.
+  const ipv4Match = hostname.match(/^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/)
+  if (ipv4Match) {
+    const [a, b] = [Number(ipv4Match[1]), Number(ipv4Match[2])]
+    if (a === 127) return false
+    if (a === 10) return false
+    if (a === 172 && b >= 16 && b <= 31) return false
+    if (a === 192 && b === 168) return false
+    if (a === 169 && b === 254) return false
+    if (a === 0) return false
+  }
+
+  // IPv6 literal check: loopback (::1) and unique-local (fc00::/7).
+  if (hostname === '::1' || hostname.startsWith('[::1]')) return false
+  if (hostname.startsWith('fc') || hostname.startsWith('fd') || hostname.startsWith('[fc') || hostname.startsWith('[fd')) {
+    return false
+  }
+
+  return true
+}
+
 async function fetchPage(url: string): Promise<string | null> {
+  if (!isSafePublicUrl(url)) return null
   try {
     const res = await fetch(url, {
       signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
