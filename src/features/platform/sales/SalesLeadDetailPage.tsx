@@ -63,6 +63,55 @@ interface LeadProfile {
   activation_invite: { status: string; owner_email: string; expires_at: string; created_at: string; consumed_at: string | null } | null
 }
 
+interface ChannelEligibility {
+  email_eligible: boolean
+  email_reason: string
+  whatsapp_eligible: boolean
+  whatsapp_reason: string
+  call_task_eligible: boolean
+  call_task_reason: string
+  recommended_channel: string
+  recommended_reason: string
+}
+
+interface CallTask {
+  id: string
+  phone_number: string
+  talking_points: string | null
+  status: string
+  outcome: string | null
+  created_at: string
+}
+
+interface OutreachEvent {
+  id: string
+  message_id: string
+  event_type: string
+  is_reply: boolean
+  reply_excerpt: string | null
+  created_at: string
+  message_channel: string
+  message_subject: string | null
+}
+
+async function fetchChannelEligibility(leadId: string): Promise<ChannelEligibility> {
+  const { data, error } = await supabase.rpc('get_lead_channel_eligibility', { p_lead_id: leadId })
+  if (error) throw error
+  return (Array.isArray(data) ? data[0] : data) as unknown as ChannelEligibility
+}
+
+async function fetchCallTasks(leadId: string): Promise<CallTask[]> {
+  const { data, error } = await supabase.rpc('get_lead_call_tasks', { p_lead_id: leadId })
+  if (error) throw error
+  return (data ?? []) as unknown as CallTask[]
+}
+
+async function fetchOutreachEvents(leadId: string): Promise<OutreachEvent[]> {
+  const { data, error } = await supabase.rpc('get_lead_outreach_events', { p_lead_id: leadId })
+  if (error) throw error
+  return (data ?? []) as unknown as OutreachEvent[]
+}
+
 function scoreBandTone(band: string | null): 'danger' | 'warning' | 'neutral' {
   if (band === 'hot') return 'danger'
   if (band === 'warm') return 'warning'
@@ -86,13 +135,64 @@ export function SalesLeadDetailPage() {
   const [convertContactPhone, setConvertContactPhone] = useState('')
   const [convertError, setConvertError] = useState<string | null>(null)
 
+  const [callOutcomeDrafts, setCallOutcomeDrafts] = useState<Record<string, string>>({})
+
   const profileQuery = useQuery({
     queryKey: ['sales-lead-profile', leadId],
     queryFn: () => fetchProfile(leadId!),
     enabled: !!leadId,
   })
 
-  const invalidate = () => queryClient.invalidateQueries({ queryKey: ['sales-lead-profile', leadId] })
+  const eligibilityQuery = useQuery({
+    queryKey: ['sales-lead-channel-eligibility', leadId],
+    queryFn: () => fetchChannelEligibility(leadId!),
+    enabled: !!leadId,
+  })
+
+  const callTasksQuery = useQuery({
+    queryKey: ['sales-lead-call-tasks', leadId],
+    queryFn: () => fetchCallTasks(leadId!),
+    enabled: !!leadId,
+  })
+
+  const outreachEventsQuery = useQuery({
+    queryKey: ['sales-lead-outreach-events', leadId],
+    queryFn: () => fetchOutreachEvents(leadId!),
+    enabled: !!leadId,
+  })
+
+  const invalidate = () => {
+    queryClient.invalidateQueries({ queryKey: ['sales-lead-profile', leadId] })
+    queryClient.invalidateQueries({ queryKey: ['sales-lead-channel-eligibility', leadId] })
+    queryClient.invalidateQueries({ queryKey: ['sales-lead-call-tasks', leadId] })
+    queryClient.invalidateQueries({ queryKey: ['sales-lead-outreach-events', leadId] })
+  }
+
+  const createCallTaskMutation = useMutation({
+    mutationFn: async () => {
+      const { error } = await supabase.rpc('sales_create_call_task', { p_lead_id: leadId! })
+      if (error) throw error
+    },
+    onSuccess: invalidate,
+  })
+
+  const completeCallTaskMutation = useMutation({
+    mutationFn: async (taskId: string) => {
+      const { error } = await supabase.rpc('sales_complete_call_task', {
+        p_task_id: taskId,
+        p_outcome: callOutcomeDrafts[taskId] ?? '',
+      })
+      if (error) throw error
+    },
+    onSuccess: (_data, taskId) => {
+      setCallOutcomeDrafts((prev) => {
+        const next = { ...prev }
+        delete next[taskId]
+        return next
+      })
+      invalidate()
+    },
+  })
 
   const scoreMutation = useMutation({
     mutationFn: async () => {
@@ -253,6 +353,103 @@ export function SalesLeadDetailPage() {
           </CardContent>
         </Card>
       </div>
+
+      <Card>
+        <CardHeader><CardTitle>{t('platform.sales.leadProfile.channels')}</CardTitle></CardHeader>
+        <CardContent className="space-y-3">
+          {eligibilityQuery.data ? (
+            <>
+              <ul className="grid grid-cols-1 gap-2 sm:grid-cols-3">
+                {(
+                  [
+                    { key: 'email', label: t('platform.sales.leadProfile.channelEmail'), eligible: eligibilityQuery.data.email_eligible, reason: eligibilityQuery.data.email_reason },
+                    { key: 'whatsapp', label: t('platform.sales.leadProfile.channelWhatsapp'), eligible: eligibilityQuery.data.whatsapp_eligible, reason: eligibilityQuery.data.whatsapp_reason },
+                    { key: 'call_task', label: t('platform.sales.leadProfile.channelCallTask'), eligible: eligibilityQuery.data.call_task_eligible, reason: eligibilityQuery.data.call_task_reason },
+                  ] as const
+                ).map((c) => (
+                  <li key={c.key} className="rounded-md border border-border-subtle p-2 text-sm">
+                    <div className="flex items-center justify-between">
+                      <span className="font-medium">{c.label}</span>
+                      <StatusBadge tone={c.eligible ? 'success' : 'neutral'} label={c.eligible ? t('platform.sales.leadProfile.channelEligible') : t('platform.sales.leadProfile.channelNotEligible')} />
+                    </div>
+                    <p className="mt-1 text-xs text-text-secondary">{c.reason}</p>
+                  </li>
+                ))}
+              </ul>
+              <p className="text-sm">
+                <span className="font-medium">{t('platform.sales.leadProfile.channelRecommended')}:</span>{' '}
+                {eligibilityQuery.data.recommended_channel} — <span className="text-text-secondary">{eligibilityQuery.data.recommended_reason}</span>
+              </p>
+              {eligibilityQuery.data.call_task_eligible && (
+                <Button size="sm" variant="outline" onClick={() => createCallTaskMutation.mutate()} disabled={createCallTaskMutation.isPending}>
+                  {createCallTaskMutation.isPending ? t('platform.sales.leadProfile.creatingCallTask') : t('platform.sales.leadProfile.createCallTaskButton')}
+                </Button>
+              )}
+            </>
+          ) : (
+            <p className="text-sm text-text-secondary">{t('common.loading')}</p>
+          )}
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader><CardTitle>{t('platform.sales.leadProfile.callTasks')}</CardTitle></CardHeader>
+        <CardContent>
+          {!callTasksQuery.data || callTasksQuery.data.length === 0 ? (
+            <p className="text-sm text-text-secondary">{t('platform.sales.leadProfile.noCallTasks')}</p>
+          ) : (
+            <ul className="space-y-2">
+              {callTasksQuery.data.map((task) => (
+                <li key={task.id} className="rounded-md border border-border-subtle p-2 text-sm">
+                  <div className="flex items-center justify-between">
+                    <span><bdi dir="ltr">{task.phone_number}</bdi></span>
+                    <StatusBadge tone={task.status === 'completed' ? 'success' : task.status === 'cancelled' ? 'neutral' : 'info'} label={task.status} />
+                  </div>
+                  {task.outcome && <p className="mt-1 text-text-secondary">{task.outcome}</p>}
+                  {task.status === 'pending' && (
+                    <div className="mt-2 flex gap-2">
+                      <input
+                        className="flex-1 rounded-md border border-border-subtle p-1.5 text-sm"
+                        placeholder={t('platform.sales.leadProfile.callTaskOutcomePlaceholder')}
+                        value={callOutcomeDrafts[task.id] ?? ''}
+                        onChange={(e) => setCallOutcomeDrafts((prev) => ({ ...prev, [task.id]: e.target.value }))}
+                      />
+                      <Button
+                        size="sm"
+                        onClick={() => completeCallTaskMutation.mutate(task.id)}
+                        disabled={!callOutcomeDrafts[task.id] || completeCallTaskMutation.isPending}
+                      >
+                        {t('platform.sales.leadProfile.completeCallTaskButton')}
+                      </Button>
+                    </div>
+                  )}
+                </li>
+              ))}
+            </ul>
+          )}
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader><CardTitle>{t('platform.sales.leadProfile.events')}</CardTitle></CardHeader>
+        <CardContent>
+          {!outreachEventsQuery.data || outreachEventsQuery.data.length === 0 ? (
+            <p className="text-sm text-text-secondary">{t('platform.sales.leadProfile.noEvents')}</p>
+          ) : (
+            <ul className="space-y-2">
+              {outreachEventsQuery.data.map((ev) => (
+                <li key={ev.id} className="rounded-md border border-border-subtle p-2 text-sm">
+                  <div className="flex items-center justify-between">
+                    <span>{ev.message_channel} · {t(`platform.sales.leadProfile.eventTypeLabels.${ev.event_type}`, ev.event_type)}</span>
+                    <FormattedDate value={ev.created_at} timeZone={SALES_DISPLAY_TIMEZONE} className="text-xs text-text-secondary" />
+                  </div>
+                  {ev.reply_excerpt && <p className="mt-1 whitespace-pre-wrap text-text-secondary">{ev.reply_excerpt}</p>}
+                </li>
+              ))}
+            </ul>
+          )}
+        </CardContent>
+      </Card>
 
       <Card>
         <CardHeader className="flex flex-row items-center justify-between">

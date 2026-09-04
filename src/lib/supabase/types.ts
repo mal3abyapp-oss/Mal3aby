@@ -8055,9 +8055,17 @@ export type Database = {
         }[]
       }
       sales_compute_lead_score: { Args: { p_lead_id: string }; Returns: number }
+      sales_complete_call_task: {
+        Args: { p_task_id: string; p_outcome: string; p_outcome_event_type?: string | null }
+        Returns: undefined
+      }
       sales_complete_followup: {
         Args: { p_followup_id: string; p_last_action: string }
         Returns: undefined
+      }
+      sales_create_call_task: {
+        Args: { p_lead_id: string; p_talking_points?: string | null; p_owner_id?: string | null }
+        Returns: string
       }
       sales_create_campaign: {
         Args: { p_criteria: Json; p_description?: string | null; p_name: string }
@@ -8133,6 +8141,16 @@ export type Database = {
           p_lead_id: string
           p_signal_key: string
           p_source_url?: string | null
+        }
+        Returns: string
+      }
+      sales_record_outreach_event: {
+        Args: {
+          p_message_id: string
+          p_event_type: string
+          p_raw_payload?: Json
+          p_reply_excerpt?: string | null
+          p_provider_event_id?: string | null
         }
         Returns: string
       }
@@ -8262,6 +8280,49 @@ export type Database = {
         }[]
       }
       get_lead_full_profile: { Args: { p_lead_id: string }; Returns: Json }
+      get_lead_channel_eligibility: {
+        Args: { p_lead_id: string }
+        Returns: {
+          lead_id: string
+          email_eligible: boolean
+          email_reason: string
+          whatsapp_eligible: boolean
+          whatsapp_reason: string
+          call_task_eligible: boolean
+          call_task_reason: string
+          recommended_channel: string
+          recommended_reason: string
+        }[]
+      }
+      get_lead_call_tasks: {
+        Args: { p_lead_id: string }
+        Returns: {
+          id: string
+          lead_id: string
+          phone_number: string
+          talking_points: string | null
+          status: string
+          owner_id: string | null
+          outcome: string | null
+          outcome_event_type: string | null
+          completed_at: string | null
+          created_by: string | null
+          created_at: string
+        }[]
+      }
+      get_lead_outreach_events: {
+        Args: { p_lead_id: string }
+        Returns: {
+          id: string
+          message_id: string
+          event_type: string
+          is_reply: boolean
+          reply_excerpt: string | null
+          created_at: string
+          message_channel: string
+          message_subject: string | null
+        }[]
+      }
       get_campaign_stats: {
         Args: { p_campaign_id: string }
         Returns: {

@@ -377,7 +377,37 @@
         "viewClubLink": "عرض النادي",
         "possibleDuplicates": "احتمالات تكرار",
         "markDoNotContact": "تحديد كعدم تواصل",
-        "statusChangeReason": "السبب"
+        "statusChangeReason": "السبب",
+        "channels": "قنوات التواصل",
+        "channelEmail": "البريد الإلكتروني",
+        "channelWhatsapp": "واتساب",
+        "channelCallTask": "مهمة اتصال",
+        "channelEligible": "مؤهل",
+        "channelNotEligible": "غير مؤهل",
+        "channelRecommended": "موصى به",
+        "createCallTaskButton": "إنشاء مهمة اتصال",
+        "creatingCallTask": "جارٍ الإنشاء...",
+        "callTasks": "مهام الاتصال",
+        "noCallTasks": "لا توجد مهام اتصال بعد",
+        "completeCallTaskButton": "تحديد كمكتملة",
+        "callTaskOutcomePlaceholder": "كيف كانت المكالمة؟",
+        "events": "أحداث التسليم والرد",
+        "noEvents": "لا توجد أحداث تسليم أو رد مسجلة بعد",
+        "reclassifyEvent": "إعادة تصنيف",
+        "eventTypeLabels": {
+          "delivered": "تم التسليم",
+          "delivery_delayed": "تأخر التسليم",
+          "bounced": "ارتد",
+          "complained": "شكوى بريد مزعج",
+          "failed": "فشل",
+          "positive_reply": "رد إيجابي",
+          "negative_reply": "رد سلبي",
+          "not_interested": "غير مهتم",
+          "requested_information": "طلب معلومات",
+          "demo_requested": "طلب عرض توضيحي",
+          "wrong_contact": "جهة اتصال خاطئة",
+          "do_not_contact": "طلب عدم التواصل"
+        }
       }
     },
     "alertsPage": {

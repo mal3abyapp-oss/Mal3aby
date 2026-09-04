@@ -377,7 +377,37 @@
         "viewClubLink": "View club",
         "possibleDuplicates": "Possible Duplicates",
         "markDoNotContact": "Mark Do Not Contact",
-        "statusChangeReason": "Reason"
+        "statusChangeReason": "Reason",
+        "channels": "Outreach Channels",
+        "channelEmail": "Email",
+        "channelWhatsapp": "WhatsApp",
+        "channelCallTask": "Call Task",
+        "channelEligible": "Eligible",
+        "channelNotEligible": "Not eligible",
+        "channelRecommended": "Recommended",
+        "createCallTaskButton": "Create Call Task",
+        "creatingCallTask": "Creating...",
+        "callTasks": "Call Tasks",
+        "noCallTasks": "No call tasks yet",
+        "completeCallTaskButton": "Mark Complete",
+        "callTaskOutcomePlaceholder": "How did the call go?",
+        "events": "Delivery & Reply Events",
+        "noEvents": "No delivery or reply events recorded yet",
+        "reclassifyEvent": "Reclassify",
+        "eventTypeLabels": {
+          "delivered": "Delivered",
+          "delivery_delayed": "Delivery delayed",
+          "bounced": "Bounced",
+          "complained": "Spam complaint",
+          "failed": "Failed",
+          "positive_reply": "Positive reply",
+          "negative_reply": "Negative reply",
+          "not_interested": "Not interested",
+          "requested_information": "Requested information",
+          "demo_requested": "Demo requested",
+          "wrong_contact": "Wrong contact",
+          "do_not_contact": "Requested do-not-contact"
+        }
       }
     },
     "alertsPage": {
