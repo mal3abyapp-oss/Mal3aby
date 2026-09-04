@@ -604,6 +604,30 @@
         "overLimitBadge": "Over limit",
         "overLimitHint": "Current usage is above the limit — existing records are preserved, and no new ones can be created until usage drops below the limit or the limit is raised."
       },
+      "commercialUsageCard": {
+        "title": "Staff & active players + founding offer",
+        "loading": "Loading...",
+        "noData": "No commercial plan assigned yet.",
+        "resourceLabels": {
+          "staff_limit": "Staff",
+          "active_player_limit": "Active players/customers"
+        },
+        "statusLabels": {
+          "unlimited": "Unlimited",
+          "normal": "Normal",
+          "approaching_limit": "Approaching limit",
+          "grace": "Over limit — grace period",
+          "over_limit": "Over limit — grace expired"
+        },
+        "graceHint": "Over the plan limit since {{since}}. A {{days}}-day grace period applies before this is flagged as over limit.",
+        "overLimitHint": "Over the plan limit and the grace period has expired. Existing staff/players are never removed — this is a visibility flag for the platform owner, not a lockout.",
+        "foundingOfferTitle": "Founding customer offer",
+        "founderBadge": "Founding customer — slot {{slot}}",
+        "promotionActiveBadge": "Promotion active",
+        "foundingPriceSummary": "Currently paying {{effective}} EGP (list price {{list}} EGP)",
+        "promotionEndsAt": "Promotional price ends {{date}}",
+        "notFounder": "Not a founding customer. {{slotsRemaining}} founding slot(s) remaining."
+      },
       "paymentsCard": {
         "title": "Online payments",
         "enabled": "Enabled",
@@ -2290,7 +2314,12 @@
         "branch_limit": "Branches",
         "field_limit": "Fields",
         "academy_limit": "Academy groups"
-      }
+      },
+      "controlledLimitLabels": {
+        "staff_limit": "Staff",
+        "active_player_limit": "Active players/customers"
+      },
+      "controlledOverLimit": "Above plan capacity"
     },
     "fieldsManagement": {
       "noPrice": "No price",
@@ -3698,6 +3727,49 @@
       "description": "Clear subscription plans, no hidden fees",
       "unavailable": "Plans aren't available right now.",
       "startFreeTrial": "Start your free trial",
+      "recommended": "Recommended",
+      "perMonth": "per month",
+      "perYear": "per year",
+      "annualSavingHint": "≈ EGP {{monthlyEquivalent}}/month billed annually",
+      "trialFunnelHint": "Every plan starts with a short demo, guided onboarding, then a 14-day free trial — no credit card required.",
+      "billingToggle": {
+        "monthly": "Monthly",
+        "annual": "Annual"
+      },
+      "capacity": {
+        "branches": "{{count}} branch",
+        "branches_other": "{{count}} branches",
+        "branchesUnlimited": "Unlimited branches",
+        "fields": "Up to {{count}} fields/facilities",
+        "fieldsUnlimited": "Unlimited fields/facilities",
+        "academies": "{{count}} academy",
+        "academies_other": "{{count}} academies",
+        "academiesUnlimited": "Unlimited academies",
+        "staff": "Up to {{count}} staff",
+        "staffUnlimited": "Unlimited staff",
+        "activePlayers": "Up to {{count}} active players/customers",
+        "activePlayersUnlimited": "Unlimited active players/customers",
+        "unlimitedBookingsAndReports": "Unlimited bookings & full reporting",
+        "whatsappFairUse": "WhatsApp included under Fair Usage Policy"
+      },
+      "supportLevel": {
+        "standard": "Standard support",
+        "priority": "Priority support",
+        "dedicated": "Dedicated support"
+      },
+      "foundingOffer": {
+        "title": "Founding Customer offer — limited to our first 5 customers",
+        "descriptionWithSlots": "{{count}} founding slot(s) remaining — 50% off for your first 3 months, then the regular plan price.",
+        "descriptionGeneric": "50% off for your first 3 months, then the regular plan price. Limited to our first 5 paying customers."
+      },
+      "enterprise": {
+        "title": "Enterprise",
+        "description": "7+ branches or a multi-region operation",
+        "customPricing": "Custom pricing",
+        "everythingInPro": "Everything in Pro",
+        "customOnboarding": "Full configuration service & staff training",
+        "contactUs": "Contact us"
+      },
       "intervals": {
         "month_1": "Monthly",
         "month_3": "Quarterly",

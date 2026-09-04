@@ -71,7 +71,7 @@ export function SalesCampaignsPage() {
 
   const createMutation = useMutation({
     mutationFn: async () => {
-      const { error: err } = await supabase.rpc('sales_create_campaign', { p_name: name, p_description: description || null, p_criteria: {} })
+      const { error: err } = await supabase.rpc('sales_create_campaign', { p_name: name, p_description: description || '', p_criteria: {} })
       if (err) throw err
     },
     onSuccess: () => {

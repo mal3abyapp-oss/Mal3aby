@@ -604,6 +604,30 @@
         "overLimitBadge": "فوق الحد",
         "overLimitHint": "الاستخدام الحالي أعلى من الحد — السجلات الحالية محفوظة، ولا يمكن إنشاء سجلات جديدة حتى ينخفض الاستخدام تحت الحد أو يُرفَع الحد."
       },
+      "commercialUsageCard": {
+        "title": "الموظفون واللاعبون النشطون + عرض العملاء المؤسسين",
+        "loading": "جارٍ التحميل...",
+        "noData": "لا توجد باقة تجارية مُسندة بعد.",
+        "resourceLabels": {
+          "staff_limit": "الموظفون",
+          "active_player_limit": "اللاعبون/العملاء النشطون"
+        },
+        "statusLabels": {
+          "unlimited": "بلا حد",
+          "normal": "طبيعي",
+          "approaching_limit": "يقترب من الحد",
+          "grace": "فوق الحد — فترة سماح",
+          "over_limit": "فوق الحد — انتهت فترة السماح"
+        },
+        "graceHint": "فوق حد الباقة منذ {{since}}. تُطبَّق فترة سماح مدتها {{days}} يومًا قبل اعتباره فوق الحد فعليًا.",
+        "overLimitHint": "فوق حد الباقة وانتهت فترة السماح. لا يتم حذف أي موظف أو لاعب أبدًا — هذه علامة توضيحية لمالك المنصة فقط، وليست حظرًا.",
+        "foundingOfferTitle": "عرض العملاء المؤسسين",
+        "founderBadge": "عميل مؤسس — الفتحة رقم {{slot}}",
+        "promotionActiveBadge": "العرض نشط حاليًا",
+        "foundingPriceSummary": "السعر الحالي {{effective}} جنيه (السعر الأساسي {{list}} جنيه)",
+        "promotionEndsAt": "ينتهي السعر التمهيدي في {{date}}",
+        "notFounder": "ليس عميلاً مؤسسًا. متبقٍ {{slotsRemaining}} من فتحات العملاء المؤسسين."
+      },
       "paymentsCard": {
         "title": "المدفوعات الإلكترونية",
         "enabled": "مفعّلة",
@@ -2303,7 +2327,12 @@
         "branch_limit": "الفروع",
         "field_limit": "الملاعب",
         "academy_limit": "مجموعات الأكاديمية"
-      }
+      },
+      "controlledLimitLabels": {
+        "staff_limit": "الموظفون",
+        "active_player_limit": "اللاعبون/العملاء النشطون"
+      },
+      "controlledOverLimit": "فوق سعة الباقة"
     },
     "fieldsManagement": {
       "noPrice": "لا يوجد سعر",
@@ -3718,7 +3747,50 @@
       "title": "الأسعار",
       "description": "خطط اشتراك واضحة، بدون رسوم خفية",
       "unavailable": "الخطط غير متاحة حاليًا.",
-      "startFreeTrial": "ابدأ تجربتك المجانية"
+      "startFreeTrial": "ابدأ تجربتك المجانية",
+      "recommended": "الأكثر طلبًا",
+      "perMonth": "شهريًا",
+      "perYear": "سنويًا",
+      "annualSavingHint": "≈ {{monthlyEquivalent}} ج.م/شهريًا عند الدفع السنوي",
+      "trialFunnelHint": "كل باقة تبدأ بعرض تجريبي قصير، ثم إعداد أولي موجّه، ثم تجربة مجانية لمدة 14 يومًا — بدون الحاجة لبطاقة بنكية.",
+      "billingToggle": {
+        "monthly": "شهري",
+        "annual": "سنوي"
+      },
+      "capacity": {
+        "branches": "فرع واحد",
+        "branches_other": "{{count}} فروع",
+        "branchesUnlimited": "عدد فروع غير محدود",
+        "fields": "حتى {{count}} ملاعب/منشآت",
+        "fieldsUnlimited": "ملاعب/منشآت غير محدودة",
+        "academies": "أكاديمية واحدة",
+        "academies_other": "{{count}} أكاديميات",
+        "academiesUnlimited": "عدد أكاديميات غير محدود",
+        "staff": "حتى {{count}} موظف",
+        "staffUnlimited": "عدد موظفين غير محدود",
+        "activePlayers": "حتى {{count}} لاعب/عميل نشط",
+        "activePlayersUnlimited": "عدد لاعبين/عملاء نشطين غير محدود",
+        "unlimitedBookingsAndReports": "حجوزات غير محدودة وتقارير كاملة",
+        "whatsappFairUse": "واتساب مشمول وفق سياسة الاستخدام العادل"
+      },
+      "supportLevel": {
+        "standard": "دعم قياسي",
+        "priority": "دعم ذو أولوية",
+        "dedicated": "دعم مخصص"
+      },
+      "foundingOffer": {
+        "title": "عرض العملاء المؤسسين — محدود لأول 5 عملاء فقط",
+        "descriptionWithSlots": "متبقٍ {{count}} من الفتحات — خصم 50% لأول 3 أشهر، ثم السعر الأساسي للباقة.",
+        "descriptionGeneric": "خصم 50% لأول 3 أشهر، ثم السعر الأساسي للباقة. محدود لأول 5 عملاء يدفعون فقط."
+      },
+      "enterprise": {
+        "title": "المؤسسات",
+        "description": "7 فروع أو أكثر، أو تشغيل متعدد المناطق",
+        "customPricing": "سعر مخصص",
+        "everythingInPro": "كل مزايا باقة الاحترافية",
+        "customOnboarding": "خدمة إعداد كاملة وتدريب للموظفين",
+        "contactUs": "تواصل معنا"
+      }
     },
     "home": {
       "eyebrow": "مع ملعبي",

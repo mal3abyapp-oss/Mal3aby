@@ -47,10 +47,10 @@ function scoreBandTone(band: string | null): 'danger' | 'warning' | 'neutral' {
 
 async function searchLeads(params: { search: string; status: string; minScore: string; city: string; page: number }) {
   const { data, error } = await supabase.rpc('search_sales_leads', {
-    p_search: params.search || null,
-    p_status: params.status === 'all' ? null : params.status,
-    p_min_score: params.minScore ? Number(params.minScore) : null,
-    p_city: params.city || null,
+    p_search: params.search || undefined,
+    p_status: params.status === 'all' ? undefined : params.status,
+    p_min_score: params.minScore ? Number(params.minScore) : undefined,
+    p_city: params.city || undefined,
     p_limit: PAGE_SIZE,
     p_offset: params.page * PAGE_SIZE,
   })
