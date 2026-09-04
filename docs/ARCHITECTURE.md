@@ -446,6 +446,10 @@ No BI tool. Reports are parameterized SQL views/RPCs (e.g. `get_revenue_report(c
 
 `vite-plugin-pwa` + Workbox. Caches **app shell and static assets only** — no offline database, no offline mutation queue. Service worker: `NetworkFirst` for API calls (financial data is never served stale silently), `CacheFirst` for static assets. If network drops during a financial operation, the operation is not considered successful until the database confirms it — no optimistic "success" UI for money (see [PROJECT_RULES.md](PROJECT_RULES.md) and the failure-scenario table below).
 
+## Sales Intelligence Strategy
+
+Platform Owner bounded context for prospect discovery, enrichment, scoring, CRM, and governed tenant conversion — entirely platform-scoped, never tenant-scoped, isolated via the platform (not club) authorization domain. See [SALES_INTELLIGENCE_ARCHITECTURE.md](../SALES_INTELLIGENCE_ARCHITECTURE.md) and [ADR-054](DECISIONS.md#adr-054--sales-intelligence-is-a-platform-owned-bounded-context-isolated-from-and-never-routed-through-clubtenant-authorization) for the full design.
+
 ## Deployment Strategy
 
 > **⚠️ Currently LOCAL ONLY.** Per an explicit, current directive, everything below describing GitHub push, Cloudflare Pages, and production Supabase is the *target* end-state, not an action to take now. `git init`, local commits, local branches, and local history are the only permitted git operations until a separate, explicit go-ahead is given. **`git push`, GitHub repo creation, GitHub Actions, Cloudflare deployment, and production Supabase are all blocked until then** — see [PROJECT_RULES.md](PROJECT_RULES.md) rule 5b.

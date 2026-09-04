@@ -26,6 +26,7 @@ const VerifyInvoicePage = lazy(() => import('@/features/verify/VerifyInvoicePage
 const SecureBookingPage = lazy(() => import('@/features/verify/SecureBookingPage').then((m) => ({ default: m.SecureBookingPage })))
 const PublicClubBookingPage = lazy(() => import('@/features/public-booking/PublicClubBookingPage').then((m) => ({ default: m.PublicClubBookingPage })))
 const ActivateAccountPage = lazy(() => import('@/features/portal/ActivateAccountPage').then((m) => ({ default: m.ActivateAccountPage })))
+const ActivateTenantOwnerPage = lazy(() => import('@/features/platform/sales/ActivateTenantOwnerPage').then((m) => ({ default: m.ActivateTenantOwnerPage })))
 
 const TodayPage = lazy(() => import('@/features/dashboard/TodayPage').then((m) => ({ default: m.TodayPage })))
 const MorePage = lazy(() => import('@/features/dashboard/MorePage').then((m) => ({ default: m.MorePage })))
@@ -108,6 +109,16 @@ const PlatformAuditPage = lazy(() => import('@/features/platform/PlatformAuditPa
 const PlatformSettingsPage = lazy(() => import('@/features/platform/PlatformSettingsPage').then((m) => ({ default: m.PlatformSettingsPage })))
 // PLATFORM STAFF + PLATFORM ROLES & PERMISSIONS (2026-08-26)
 const PlatformStaffPage = lazy(() => import('@/features/platform/PlatformStaffPage').then((m) => ({ default: m.PlatformStaffPage })))
+// SALES INTELLIGENCE (ADR-054, 2026-09-04) -- new Platform Owner
+// bounded context, entirely platform-scoped, never tenant-scoped.
+const SalesDashboardPage = lazy(() => import('@/features/platform/sales/SalesDashboardPage').then((m) => ({ default: m.SalesDashboardPage })))
+const SalesDiscoverPage = lazy(() => import('@/features/platform/sales/SalesDiscoverPage').then((m) => ({ default: m.SalesDiscoverPage })))
+const SalesLeadsPage = lazy(() => import('@/features/platform/sales/SalesLeadsPage').then((m) => ({ default: m.SalesLeadsPage })))
+const SalesLeadDetailPage = lazy(() => import('@/features/platform/sales/SalesLeadDetailPage').then((m) => ({ default: m.SalesLeadDetailPage })))
+const SalesPipelinePage = lazy(() => import('@/features/platform/sales/SalesPipelinePage').then((m) => ({ default: m.SalesPipelinePage })))
+const SalesCampaignsPage = lazy(() => import('@/features/platform/sales/SalesCampaignsPage').then((m) => ({ default: m.SalesCampaignsPage })))
+const SalesFollowupsPage = lazy(() => import('@/features/platform/sales/SalesFollowupsPage').then((m) => ({ default: m.SalesFollowupsPage })))
+const SalesSettingsPage = lazy(() => import('@/features/platform/sales/SalesSettingsPage').then((m) => ({ default: m.SalesSettingsPage })))
 const PlatformRolesPage = lazy(() => import('@/features/platform/PlatformRolesPage').then((m) => ({ default: m.PlatformRolesPage })))
 // PLATFORM OWNER AUTONOMOUS COMPLETION -- Phase E (2026-08-29)
 const PlatformSupportHistoryPage = lazy(() => import('@/features/platform/PlatformSupportHistoryPage').then((m) => ({ default: m.PlatformSupportHistoryPage })))
@@ -202,6 +213,16 @@ export const router = createBrowserRouter([
     // booking-QR or invoice-verify token at the routing layer.
     path: '/activate/:token',
     element: <Suspense fallback={<RouteLoadingFallback />}><ActivateAccountPage /></Suspense>,
+  },
+  {
+    // SALES INTELLIGENCE PHASE 14 -- INVITE-BASED OWNER ACTIVATION
+    // (ADR-054 final decision): the secure tenant-owner-activation
+    // entrypoint sent to a WON lead. No auth guard, standalone -- same
+    // "distinct path per token kind" convention as /activate/:token
+    // above, so a tenant-activation token is never interchangeable with
+    // a customer-portal-activation token at the routing layer.
+    path: '/sales-activate/:token',
+    element: <Suspense fallback={<RouteLoadingFallback />}><ActivateTenantOwnerPage /></Suspense>,
   },
   {
     element: <RequireAuth />,
@@ -451,6 +472,18 @@ export const router = createBrowserRouter([
           { path: 'support-history', element: <PlatformSupportHistoryPage /> },
           { path: 'staff', element: <PlatformStaffPage /> },
           { path: 'roles', element: <PlatformRolesPage /> },
+          // Sales Intelligence (ADR-054) -- deliberately /platform/sales/*, not
+          // /platform/leads (that pre-existing route is the unrelated
+          // contact_requests inbox, see ADR-054's note on the coincidental
+          // naming collision).
+          { path: 'sales', element: <SalesDashboardPage /> },
+          { path: 'sales/discover', element: <SalesDiscoverPage /> },
+          { path: 'sales/leads', element: <SalesLeadsPage /> },
+          { path: 'sales/leads/:leadId', element: <SalesLeadDetailPage /> },
+          { path: 'sales/pipeline', element: <SalesPipelinePage /> },
+          { path: 'sales/campaigns', element: <SalesCampaignsPage /> },
+          { path: 'sales/followups', element: <SalesFollowupsPage /> },
+          { path: 'sales/settings', element: <SalesSettingsPage /> },
           { path: 'settings', element: <PlatformSettingsPage /> },
         ],
       },
