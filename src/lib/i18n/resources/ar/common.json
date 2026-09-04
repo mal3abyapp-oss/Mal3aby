@@ -378,6 +378,11 @@
         "possibleDuplicates": "احتمالات تكرار",
         "markDoNotContact": "تحديد كعدم تواصل",
         "statusChangeReason": "السبب",
+        "qualityStatus": {
+          "pending_quality_check": "بانتظار فحص الجودة",
+          "approval_ready": "جاهز للاعتماد",
+          "quality_rejected": "مرفوض لعدم استيفاء الجودة"
+        },
         "channels": "قنوات التواصل",
         "channelEmail": "البريد الإلكتروني",
         "channelWhatsapp": "واتساب",

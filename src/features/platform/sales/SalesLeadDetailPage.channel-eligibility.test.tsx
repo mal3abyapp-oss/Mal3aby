@@ -219,3 +219,80 @@ describe('SalesLeadDetailPage — channel eligibility, call tasks, outreach even
     expect(screen.getByText(/Can you send more details\?/)).toBeInTheDocument()
   })
 })
+
+// Commercial Outreach Quality Gate mission (2026-09-04): regression lock
+// for the outreach-history quality-status badge, added per the owner's
+// "Production UI" requirement ("Expose the commercial quality result to
+// Platform Owner... show Grounding / Commercial Quality / Approval
+// Readiness"). Verifies an approval_ready draft shows a positive badge
+// with no rejection reasons, and a quality_rejected draft shows the
+// exact rejection reason codes -- never hidden, never silently allowed
+// through.
+describe('SalesLeadDetailPage — outreach message quality status badge', () => {
+  beforeEach(async () => {
+    mockRpc.mockReset()
+    await i18n.changeLanguage('en')
+  })
+
+  function profileWithMessages(messages: Array<Record<string, unknown>>) {
+    return {
+      lead: baseLead(),
+      signals: [],
+      latest_score: null,
+      notes: [],
+      activities: [],
+      outreach_messages: messages,
+      followups: [],
+      status_history: [],
+      possible_duplicates: [],
+      activation_invite: null,
+    }
+  }
+
+  it('shows an APPROVAL_READY badge with no rejection reasons for a compliant draft', async () => {
+    mockRpc.mockImplementation((fnName: string) => {
+      if (fnName === 'get_lead_full_profile') {
+        return Promise.resolve({
+          data: profileWithMessages([{
+            id: 'msg-1', channel: 'email', message_type: 'intro', language: 'en', subject: 'Hi',
+            body: 'Body text', status: 'generated', created_at: new Date().toISOString(),
+            quality_status: 'approval_ready', quality_gate_result: { rejection_reasons: [] },
+          }]),
+          error: null,
+        })
+      }
+      if (fnName === 'get_lead_channel_eligibility') return Promise.resolve({ data: [{ lead_id: 'lead-1', email_eligible: true, email_reason: 'ok', whatsapp_eligible: false, whatsapp_reason: 'structural', call_task_eligible: true, call_task_reason: 'ok', recommended_channel: 'EMAIL', recommended_reason: 'ok' }], error: null })
+      if (fnName === 'get_lead_call_tasks') return Promise.resolve({ data: [], error: null })
+      if (fnName === 'get_lead_outreach_events') return Promise.resolve({ data: [], error: null })
+      return Promise.resolve({ data: null, error: null })
+    })
+    renderPage()
+
+    expect(await screen.findByText(i18n.t('platform.sales.leadProfile.qualityStatus.approval_ready'))).toBeInTheDocument()
+    expect(screen.queryByText(i18n.t('platform.sales.leadProfile.qualityStatus.quality_rejected'))).not.toBeInTheDocument()
+  })
+
+  it('shows a QUALITY_REJECTED badge with the exact rejection reason codes for a non-compliant draft', async () => {
+    mockRpc.mockImplementation((fnName: string) => {
+      if (fnName === 'get_lead_full_profile') {
+        return Promise.resolve({
+          data: profileWithMessages([{
+            id: 'msg-2', channel: 'email', message_type: 'intro', language: 'en', subject: null,
+            body: 'Body text missing a subject and signature', status: 'generated', created_at: new Date().toISOString(),
+            quality_status: 'quality_rejected', quality_gate_result: { rejection_reasons: ['MISSING_SUBJECT', 'MISSING_SIGNATURE'] },
+          }]),
+          error: null,
+        })
+      }
+      if (fnName === 'get_lead_channel_eligibility') return Promise.resolve({ data: [{ lead_id: 'lead-1', email_eligible: true, email_reason: 'ok', whatsapp_eligible: false, whatsapp_reason: 'structural', call_task_eligible: true, call_task_reason: 'ok', recommended_channel: 'EMAIL', recommended_reason: 'ok' }], error: null })
+      if (fnName === 'get_lead_call_tasks') return Promise.resolve({ data: [], error: null })
+      if (fnName === 'get_lead_outreach_events') return Promise.resolve({ data: [], error: null })
+      return Promise.resolve({ data: null, error: null })
+    })
+    renderPage()
+
+    expect(await screen.findByText(i18n.t('platform.sales.leadProfile.qualityStatus.quality_rejected'))).toBeInTheDocument()
+    expect(screen.getByText(/MISSING_SUBJECT/)).toBeInTheDocument()
+    expect(screen.getByText(/MISSING_SIGNATURE/)).toBeInTheDocument()
+  })
+})
