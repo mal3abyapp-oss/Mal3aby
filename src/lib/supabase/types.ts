@@ -128,6 +128,103 @@ export type Database = {
           },
         ]
       }
+      attendance_history: {
+        Row: {
+          attendance_id: string
+          changed_at: string
+          changed_by: string | null
+          club_id: string
+          id: string
+          new_marked_at: string
+          new_marked_by: string | null
+          new_method: string
+          new_status: string
+          player_id: string
+          previous_marked_at: string
+          previous_marked_by: string | null
+          previous_method: string
+          previous_status: string
+          session_id: string
+        }
+        Insert: {
+          attendance_id: string
+          changed_at?: string
+          changed_by?: string | null
+          club_id: string
+          id?: string
+          new_marked_at: string
+          new_marked_by?: string | null
+          new_method: string
+          new_status: string
+          player_id: string
+          previous_marked_at: string
+          previous_marked_by?: string | null
+          previous_method: string
+          previous_status: string
+          session_id: string
+        }
+        Update: {
+          attendance_id?: string
+          changed_at?: string
+          changed_by?: string | null
+          club_id?: string
+          id?: string
+          new_marked_at?: string
+          new_marked_by?: string | null
+          new_method?: string
+          new_status?: string
+          player_id?: string
+          previous_marked_at?: string
+          previous_marked_by?: string | null
+          previous_method?: string
+          previous_status?: string
+          session_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "attendance_history_attendance_id_fkey"
+            columns: ["attendance_id"]
+            isOneToOne: false
+            referencedRelation: "attendance"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "attendance_history_club_id_fkey"
+            columns: ["club_id"]
+            isOneToOne: false
+            referencedRelation: "clubs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "attendance_history_club_id_fkey"
+            columns: ["club_id"]
+            isOneToOne: false
+            referencedRelation: "commercial_entitlements_usage"
+            referencedColumns: ["club_id"]
+          },
+          {
+            foreignKeyName: "attendance_history_player_id_fkey"
+            columns: ["player_id"]
+            isOneToOne: false
+            referencedRelation: "players"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "attendance_history_player_id_fkey"
+            columns: ["player_id"]
+            isOneToOne: false
+            referencedRelation: "players_safe"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "attendance_history_session_id_fkey"
+            columns: ["session_id"]
+            isOneToOne: false
+            referencedRelation: "training_sessions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       audit_logs: {
         Row: {
           acting_as_platform_admin: boolean
@@ -1340,6 +1437,7 @@ export type Database = {
           name: string
           name_ar: string
           name_en: string | null
+          onboarding_completed_at: string | null
           payment_receipt_whatsapp_number: string | null
           payment_receipt_whatsapp_number_e164: string | null
           primary_phone: string | null
@@ -1373,6 +1471,7 @@ export type Database = {
           name: string
           name_ar: string
           name_en?: string | null
+          onboarding_completed_at?: string | null
           payment_receipt_whatsapp_number?: string | null
           payment_receipt_whatsapp_number_e164?: string | null
           primary_phone?: string | null
@@ -1406,6 +1505,7 @@ export type Database = {
           name?: string
           name_ar?: string
           name_en?: string | null
+          onboarding_completed_at?: string | null
           payment_receipt_whatsapp_number?: string | null
           payment_receipt_whatsapp_number_e164?: string | null
           primary_phone?: string | null
@@ -1426,31 +1526,40 @@ export type Database = {
       commercial_entitlements: {
         Row: {
           academy_limit: number | null
+          active_player_limit: number | null
           branch_limit: number | null
           club_id: string
+          controlled_resource_grace_days: number
           field_limit: number | null
           notes: string | null
           payments_platform_disabled: boolean
+          staff_limit: number | null
           updated_at: string
           updated_by: string | null
         }
         Insert: {
           academy_limit?: number | null
+          active_player_limit?: number | null
           branch_limit?: number | null
           club_id: string
+          controlled_resource_grace_days?: number
           field_limit?: number | null
           notes?: string | null
           payments_platform_disabled?: boolean
+          staff_limit?: number | null
           updated_at?: string
           updated_by?: string | null
         }
         Update: {
           academy_limit?: number | null
+          active_player_limit?: number | null
           branch_limit?: number | null
           club_id?: string
+          controlled_resource_grace_days?: number
           field_limit?: number | null
           notes?: string | null
           payments_platform_disabled?: boolean
+          staff_limit?: number | null
           updated_at?: string
           updated_by?: string | null
         }
@@ -1466,6 +1575,39 @@ export type Database = {
             foreignKeyName: "commercial_entitlements_club_id_fkey"
             columns: ["club_id"]
             isOneToOne: true
+            referencedRelation: "commercial_entitlements_usage"
+            referencedColumns: ["club_id"]
+          },
+        ]
+      }
+      commercial_resource_grace_state: {
+        Row: {
+          club_id: string
+          first_over_limit_at: string
+          resource_type: string
+        }
+        Insert: {
+          club_id: string
+          first_over_limit_at?: string
+          resource_type: string
+        }
+        Update: {
+          club_id?: string
+          first_over_limit_at?: string
+          resource_type?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "commercial_resource_grace_state_club_id_fkey"
+            columns: ["club_id"]
+            isOneToOne: false
+            referencedRelation: "clubs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "commercial_resource_grace_state_club_id_fkey"
+            columns: ["club_id"]
+            isOneToOne: false
             referencedRelation: "commercial_entitlements_usage"
             referencedColumns: ["club_id"]
           },
@@ -2293,6 +2435,93 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "commercial_entitlements_usage"
             referencedColumns: ["club_id"]
+          },
+        ]
+      }
+      founding_customer_slots: {
+        Row: {
+          claimed_at: string
+          claimed_by: string | null
+          club_id: string | null
+          list_price: number
+          normal_price_after_promotion: number
+          platform_subscription_id: string | null
+          promotion_end: string
+          promotion_start: string
+          promotional_price: number
+          slot_number: number
+        }
+        Insert: {
+          claimed_at?: string
+          claimed_by?: string | null
+          club_id?: string | null
+          list_price: number
+          normal_price_after_promotion: number
+          platform_subscription_id?: string | null
+          promotion_end: string
+          promotion_start?: string
+          promotional_price: number
+          slot_number: number
+        }
+        Update: {
+          claimed_at?: string
+          claimed_by?: string | null
+          club_id?: string | null
+          list_price?: number
+          normal_price_after_promotion?: number
+          platform_subscription_id?: string | null
+          promotion_end?: string
+          promotion_start?: string
+          promotional_price?: number
+          slot_number?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "founding_customer_slots_club_id_fkey"
+            columns: ["club_id"]
+            isOneToOne: true
+            referencedRelation: "clubs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "founding_customer_slots_club_id_fkey"
+            columns: ["club_id"]
+            isOneToOne: true
+            referencedRelation: "commercial_entitlements_usage"
+            referencedColumns: ["club_id"]
+          },
+          {
+            foreignKeyName: "founding_customer_slots_platform_subscription_id_fkey"
+            columns: ["platform_subscription_id"]
+            isOneToOne: false
+            referencedRelation: "platform_subscriptions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      gateway_webhook_rate_limit_state: {
+        Row: {
+          provider_key: string
+          request_count: number
+          window_started_at: string
+        }
+        Insert: {
+          provider_key: string
+          request_count?: number
+          window_started_at?: string
+        }
+        Update: {
+          provider_key?: string
+          request_count?: number
+          window_started_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "gateway_webhook_rate_limit_state_provider_key_fkey"
+            columns: ["provider_key"]
+            isOneToOne: true
+            referencedRelation: "payment_gateway_providers"
+            referencedColumns: ["key"]
           },
         ]
       }
@@ -4448,10 +4677,12 @@ export type Database = {
           created_at: string
           currency: string
           default_academy_limit: number | null
+          default_active_player_limit: number | null
           default_branch_limit: number | null
           default_field_limit: number | null
           default_grace_period_days: number
           default_modules: string[] | null
+          default_staff_limit: number | null
           description_ar: string | null
           discount_label: string | null
           display_order: number
@@ -4470,10 +4701,12 @@ export type Database = {
           created_at?: string
           currency?: string
           default_academy_limit?: number | null
+          default_active_player_limit?: number | null
           default_branch_limit?: number | null
           default_field_limit?: number | null
           default_grace_period_days?: number
           default_modules?: string[] | null
+          default_staff_limit?: number | null
           description_ar?: string | null
           discount_label?: string | null
           display_order?: number
@@ -4492,10 +4725,12 @@ export type Database = {
           created_at?: string
           currency?: string
           default_academy_limit?: number | null
+          default_active_player_limit?: number | null
           default_branch_limit?: number | null
           default_field_limit?: number | null
           default_grace_period_days?: number
           default_modules?: string[] | null
+          default_staff_limit?: number | null
           description_ar?: string | null
           discount_label?: string | null
           display_order?: number
@@ -4729,6 +4964,13 @@ export type Database = {
             columns: ["plan_id"]
             isOneToOne: false
             referencedRelation: "platform_plans"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "platform_subscriptions_plan_id_fkey"
+            columns: ["plan_id"]
+            isOneToOne: false
+            referencedRelation: "public_plans"
             referencedColumns: ["id"]
           },
           {
@@ -5146,6 +5388,7 @@ export type Database = {
           credential_id: string | null
           device_metadata: Json | null
           id: string
+          identity_confirmed: boolean | null
           reference_id: string | null
           reference_type: string | null
           result: string
@@ -5158,6 +5401,7 @@ export type Database = {
           credential_id?: string | null
           device_metadata?: Json | null
           id?: string
+          identity_confirmed?: boolean | null
           reference_id?: string | null
           reference_type?: string | null
           result: string
@@ -5170,6 +5414,7 @@ export type Database = {
           credential_id?: string | null
           device_metadata?: Json | null
           id?: string
+          identity_confirmed?: boolean | null
           reference_id?: string | null
           reference_type?: string | null
           result?: string
@@ -5305,6 +5550,56 @@ export type Database = {
         }
         Relationships: []
       }
+      sales_call_tasks: {
+        Row: {
+          completed_at: string | null
+          created_at: string
+          created_by: string | null
+          id: string
+          lead_id: string
+          outcome: string | null
+          outcome_event_type: string | null
+          owner_id: string | null
+          phone_number: string
+          status: string
+          talking_points: string | null
+        }
+        Insert: {
+          completed_at?: string | null
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          lead_id: string
+          outcome?: string | null
+          outcome_event_type?: string | null
+          owner_id?: string | null
+          phone_number: string
+          status?: string
+          talking_points?: string | null
+        }
+        Update: {
+          completed_at?: string | null
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          lead_id?: string
+          outcome?: string | null
+          outcome_event_type?: string | null
+          owner_id?: string | null
+          phone_number?: string
+          status?: string
+          talking_points?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "sales_call_tasks_lead_id_fkey"
+            columns: ["lead_id"]
+            isOneToOne: false
+            referencedRelation: "sales_leads"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       sales_campaign_leads: {
         Row: {
           added_at: string
@@ -5321,7 +5616,22 @@ export type Database = {
           campaign_id?: string
           lead_id?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "sales_campaign_leads_campaign_id_fkey"
+            columns: ["campaign_id"]
+            isOneToOne: false
+            referencedRelation: "sales_campaigns"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "sales_campaign_leads_lead_id_fkey"
+            columns: ["lead_id"]
+            isOneToOne: false
+            referencedRelation: "sales_leads"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       sales_campaigns: {
         Row: {
@@ -5381,7 +5691,29 @@ export type Database = {
           id?: string
           lead_id?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "sales_conversion_records_club_id_fkey"
+            columns: ["club_id"]
+            isOneToOne: true
+            referencedRelation: "clubs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "sales_conversion_records_club_id_fkey"
+            columns: ["club_id"]
+            isOneToOne: true
+            referencedRelation: "commercial_entitlements_usage"
+            referencedColumns: ["club_id"]
+          },
+          {
+            foreignKeyName: "sales_conversion_records_lead_id_fkey"
+            columns: ["lead_id"]
+            isOneToOne: true
+            referencedRelation: "sales_leads"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       sales_demo_events: {
         Row: {
@@ -5414,7 +5746,15 @@ export type Database = {
           owner_id?: string | null
           scheduled_at?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "sales_demo_events_lead_id_fkey"
+            columns: ["lead_id"]
+            isOneToOne: false
+            referencedRelation: "sales_leads"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       sales_discovery_jobs: {
         Row: {
@@ -5477,6 +5817,41 @@ export type Database = {
           started_at?: string | null
           status?: string
         }
+        Relationships: [
+          {
+            foreignKeyName: "sales_discovery_jobs_source_id_fkey"
+            columns: ["source_id"]
+            isOneToOne: false
+            referencedRelation: "sales_lead_sources"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      sales_email_webhook_config: {
+        Row: {
+          enabled: boolean
+          id: boolean
+          secret_vault_id: string | null
+          updated_at: string
+          updated_by: string | null
+          webhook_id: string | null
+        }
+        Insert: {
+          enabled?: boolean
+          id?: boolean
+          secret_vault_id?: string | null
+          updated_at?: string
+          updated_by?: string | null
+          webhook_id?: string | null
+        }
+        Update: {
+          enabled?: boolean
+          id?: boolean
+          secret_vault_id?: string | null
+          updated_at?: string
+          updated_by?: string | null
+          webhook_id?: string | null
+        }
         Relationships: []
       }
       sales_followups: {
@@ -5516,7 +5891,15 @@ export type Database = {
           scheduled_at?: string
           status?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "sales_followups_lead_id_fkey"
+            columns: ["lead_id"]
+            isOneToOne: false
+            referencedRelation: "sales_leads"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       sales_lead_activities: {
         Row: {
@@ -5543,7 +5926,15 @@ export type Database = {
           id?: string
           lead_id?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "sales_lead_activities_lead_id_fkey"
+            columns: ["lead_id"]
+            isOneToOne: false
+            referencedRelation: "sales_leads"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       sales_lead_contacts: {
         Row: {
@@ -5579,7 +5970,15 @@ export type Database = {
           role_title?: string | null
           source_url?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "sales_lead_contacts_lead_id_fkey"
+            columns: ["lead_id"]
+            isOneToOne: false
+            referencedRelation: "sales_leads"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       sales_lead_dedup_fingerprints: {
         Row: {
@@ -5603,7 +6002,15 @@ export type Database = {
           id?: string
           lead_id?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "sales_lead_dedup_fingerprints_lead_id_fkey"
+            columns: ["lead_id"]
+            isOneToOne: false
+            referencedRelation: "sales_leads"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       sales_lead_enrichment_runs: {
         Row: {
@@ -5645,7 +6052,22 @@ export type Database = {
           started_at?: string | null
           status?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "sales_lead_enrichment_runs_lead_id_fkey"
+            columns: ["lead_id"]
+            isOneToOne: false
+            referencedRelation: "sales_leads"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "sales_lead_enrichment_runs_source_id_fkey"
+            columns: ["source_id"]
+            isOneToOne: false
+            referencedRelation: "sales_lead_sources"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       sales_lead_locations: {
         Row: {
@@ -5684,7 +6106,15 @@ export type Database = {
           longitude?: number | null
           source_url?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "sales_lead_locations_lead_id_fkey"
+            columns: ["lead_id"]
+            isOneToOne: false
+            referencedRelation: "sales_leads"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       sales_lead_notes: {
         Row: {
@@ -5708,7 +6138,15 @@ export type Database = {
           lead_id?: string
           note?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "sales_lead_notes_lead_id_fkey"
+            columns: ["lead_id"]
+            isOneToOne: false
+            referencedRelation: "sales_leads"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       sales_lead_scores: {
         Row: {
@@ -5741,7 +6179,15 @@ export type Database = {
           score?: number
           score_band?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "sales_lead_scores_lead_id_fkey"
+            columns: ["lead_id"]
+            isOneToOne: false
+            referencedRelation: "sales_leads"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       sales_lead_signals: {
         Row: {
@@ -5780,7 +6226,22 @@ export type Database = {
           signal_key?: string
           source_url?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "sales_lead_signals_enrichment_run_id_fkey"
+            columns: ["enrichment_run_id"]
+            isOneToOne: false
+            referencedRelation: "sales_lead_enrichment_runs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "sales_lead_signals_lead_id_fkey"
+            columns: ["lead_id"]
+            isOneToOne: false
+            referencedRelation: "sales_leads"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       sales_lead_social_links: {
         Row: {
@@ -5810,7 +6271,15 @@ export type Database = {
           source_url?: string | null
           url?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "sales_lead_social_links_lead_id_fkey"
+            columns: ["lead_id"]
+            isOneToOne: false
+            referencedRelation: "sales_leads"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       sales_lead_sources: {
         Row: {
@@ -5870,7 +6339,15 @@ export type Database = {
           reason?: string | null
           to_status?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "sales_lead_status_history_lead_id_fkey"
+            columns: ["lead_id"]
+            isOneToOne: false
+            referencedRelation: "sales_leads"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       sales_leads: {
         Row: {
@@ -5999,7 +6476,90 @@ export type Database = {
           website?: string | null
           whatsapp_public_number?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "sales_leads_converted_club_id_fkey"
+            columns: ["converted_club_id"]
+            isOneToOne: false
+            referencedRelation: "clubs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "sales_leads_converted_club_id_fkey"
+            columns: ["converted_club_id"]
+            isOneToOne: false
+            referencedRelation: "commercial_entitlements_usage"
+            referencedColumns: ["club_id"]
+          },
+          {
+            foreignKeyName: "sales_leads_merged_into_lead_id_fkey"
+            columns: ["merged_into_lead_id"]
+            isOneToOne: false
+            referencedRelation: "sales_leads"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "sales_leads_primary_source_id_fkey"
+            columns: ["primary_source_id"]
+            isOneToOne: false
+            referencedRelation: "sales_lead_sources"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      sales_outreach_events: {
+        Row: {
+          classified_by: string | null
+          created_at: string
+          event_type: string
+          id: string
+          is_reply: boolean
+          lead_id: string
+          message_id: string
+          provider_event_id: string | null
+          raw_payload: Json
+          reply_excerpt: string | null
+        }
+        Insert: {
+          classified_by?: string | null
+          created_at?: string
+          event_type: string
+          id?: string
+          is_reply?: boolean
+          lead_id: string
+          message_id: string
+          provider_event_id?: string | null
+          raw_payload?: Json
+          reply_excerpt?: string | null
+        }
+        Update: {
+          classified_by?: string | null
+          created_at?: string
+          event_type?: string
+          id?: string
+          is_reply?: boolean
+          lead_id?: string
+          message_id?: string
+          provider_event_id?: string | null
+          raw_payload?: Json
+          reply_excerpt?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "sales_outreach_events_lead_id_fkey"
+            columns: ["lead_id"]
+            isOneToOne: false
+            referencedRelation: "sales_leads"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "sales_outreach_events_message_id_fkey"
+            columns: ["message_id"]
+            isOneToOne: false
+            referencedRelation: "sales_outreach_messages"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       sales_outreach_messages: {
         Row: {
@@ -6021,6 +6581,8 @@ export type Database = {
           lead_id: string
           message_type: string
           provider_reference: string | null
+          quality_gate_result: Json | null
+          quality_status: string
           sent_at: string | null
           status: string
           subject: string | null
@@ -6044,6 +6606,8 @@ export type Database = {
           lead_id: string
           message_type: string
           provider_reference?: string | null
+          quality_gate_result?: Json | null
+          quality_status?: string
           sent_at?: string | null
           status?: string
           subject?: string | null
@@ -6067,11 +6631,28 @@ export type Database = {
           lead_id?: string
           message_type?: string
           provider_reference?: string | null
+          quality_gate_result?: Json | null
+          quality_status?: string
           sent_at?: string | null
           status?: string
           subject?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "sales_outreach_messages_campaign_id_fkey"
+            columns: ["campaign_id"]
+            isOneToOne: false
+            referencedRelation: "sales_campaigns"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "sales_outreach_messages_lead_id_fkey"
+            columns: ["lead_id"]
+            isOneToOne: false
+            referencedRelation: "sales_leads"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       sales_possible_duplicates: {
         Row: {
@@ -6107,7 +6688,22 @@ export type Database = {
           resolved_by?: string | null
           status?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "sales_possible_duplicates_lead_id_a_fkey"
+            columns: ["lead_id_a"]
+            isOneToOne: false
+            referencedRelation: "sales_leads"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "sales_possible_duplicates_lead_id_b_fkey"
+            columns: ["lead_id_b"]
+            isOneToOne: false
+            referencedRelation: "sales_leads"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       sales_provider_configs: {
         Row: {
@@ -6186,8 +6782,10 @@ export type Database = {
           lead_id: string
           owner_email: string
           purpose: string
+          secret_hash: string
           secret_verified_at: string | null
           status: string
+          token_hash: string
           verification_attempt_count: number
         }
         Insert: {
@@ -6209,8 +6807,10 @@ export type Database = {
           lead_id: string
           owner_email: string
           purpose?: string
+          secret_hash: string
           secret_verified_at?: string | null
           status?: string
+          token_hash: string
           verification_attempt_count?: number
         }
         Update: {
@@ -6232,11 +6832,35 @@ export type Database = {
           lead_id?: string
           owner_email?: string
           purpose?: string
+          secret_hash?: string
           secret_verified_at?: string | null
           status?: string
+          token_hash?: string
           verification_attempt_count?: number
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "sales_tenant_activation_invites_activated_club_id_fkey"
+            columns: ["activated_club_id"]
+            isOneToOne: false
+            referencedRelation: "clubs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "sales_tenant_activation_invites_activated_club_id_fkey"
+            columns: ["activated_club_id"]
+            isOneToOne: false
+            referencedRelation: "commercial_entitlements_usage"
+            referencedColumns: ["club_id"]
+          },
+          {
+            foreignKeyName: "sales_tenant_activation_invites_lead_id_fkey"
+            columns: ["lead_id"]
+            isOneToOne: false
+            referencedRelation: "sales_leads"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       seasons: {
         Row: {
@@ -7820,12 +8444,23 @@ export type Database = {
         Row: {
           academy_limit: number | null
           academy_used: number | null
+          active_player_limit: number | null
+          active_players_used: number | null
           branch_limit: number | null
           branches_used: number | null
           club_id: string | null
           club_name: string | null
           field_limit: number | null
           fields_used: number | null
+          staff_limit: number | null
+          staff_used: number | null
+        }
+        Relationships: []
+      }
+      founding_offer_public_status: {
+        Row: {
+          slots_remaining: number | null
+          slots_taken: number | null
         }
         Relationships: []
       }
@@ -7935,9 +8570,18 @@ export type Database = {
           billing_interval: string | null
           billing_interval_count: number | null
           currency: string | null
+          default_academy_limit: number | null
+          default_active_player_limit: number | null
+          default_branch_limit: number | null
+          default_field_limit: number | null
+          default_grace_period_days: number | null
+          default_staff_limit: number | null
           description_ar: string | null
           discount_label: string | null
+          display_order: number | null
           features_summary: string | null
+          id: string | null
+          name: string | null
           name_ar: string | null
           price: number | null
         }
@@ -7945,9 +8589,18 @@ export type Database = {
           billing_interval?: string | null
           billing_interval_count?: number | null
           currency?: string | null
+          default_academy_limit?: number | null
+          default_active_player_limit?: number | null
+          default_branch_limit?: number | null
+          default_field_limit?: number | null
+          default_grace_period_days?: number | null
+          default_staff_limit?: number | null
           description_ar?: string | null
           discount_label?: string | null
+          display_order?: number | null
           features_summary?: string | null
+          id?: string | null
+          name?: string | null
           name_ar?: string | null
           price?: number | null
         }
@@ -7955,9 +8608,18 @@ export type Database = {
           billing_interval?: string | null
           billing_interval_count?: number | null
           currency?: string | null
+          default_academy_limit?: number | null
+          default_active_player_limit?: number | null
+          default_branch_limit?: number | null
+          default_field_limit?: number | null
+          default_grace_period_days?: number | null
+          default_staff_limit?: number | null
           description_ar?: string | null
           discount_label?: string | null
+          display_order?: number | null
           features_summary?: string | null
+          id?: string | null
+          name?: string | null
           name_ar?: string | null
           price?: number | null
         }
@@ -8017,358 +8679,35 @@ export type Database = {
           },
         ]
       }
+      whatsapp_usage_by_club: {
+        Row: {
+          club_id: string | null
+          club_name: string | null
+          delivered_last_30d: number | null
+          failed_last_30d: number | null
+          last_message_at: string | null
+          messages_last_30d: number | null
+          messages_last_7d: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "notification_queue_club_id_fkey"
+            columns: ["club_id"]
+            isOneToOne: false
+            referencedRelation: "clubs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "notification_queue_club_id_fkey"
+            columns: ["club_id"]
+            isOneToOne: false
+            referencedRelation: "commercial_entitlements_usage"
+            referencedColumns: ["club_id"]
+          },
+        ]
+      }
     }
     Functions: {
-      sales_add_lead_note: { Args: { p_lead_id: string; p_note: string }; Returns: string }
-      sales_add_leads_to_campaign: {
-        Args: { p_campaign_id: string; p_lead_ids: string[] }
-        Returns: number
-      }
-      sales_approve_outreach_message: { Args: { p_message_id: string }; Returns: undefined }
-      sales_change_lead_status: {
-        Args: { p_lead_id: string; p_new_status: string; p_reason?: string | null }
-        Returns: undefined
-      }
-      sales_check_and_increment_quota: {
-        Args: { p_provider_key: string }
-        Returns: { allowed: boolean; current_count: number; daily_cap: number }[]
-      }
-      sales_claim_discovery_job: {
-        Args: Record<PropertyKey, never>
-        Returns: {
-          attempts: number
-          job_id: string
-          next_page_token: string | null
-          search_params: Json
-          source_key: string
-        }[]
-      }
-      sales_claim_queued_outreach_message: {
-        Args: Record<PropertyKey, never>
-        Returns: {
-          body: string
-          language: string
-          lead_id: string
-          message_id: string
-          recipient_email: string | null
-          subject: string | null
-        }[]
-      }
-      sales_compute_lead_score: { Args: { p_lead_id: string }; Returns: number }
-      sales_complete_call_task: {
-        Args: { p_task_id: string; p_outcome: string; p_outcome_event_type?: string | null }
-        Returns: undefined
-      }
-      sales_complete_followup: {
-        Args: { p_followup_id: string; p_last_action: string }
-        Returns: undefined
-      }
-      sales_create_call_task: {
-        Args: { p_lead_id: string; p_talking_points?: string | null; p_owner_id?: string | null }
-        Returns: string
-      }
-      sales_create_campaign: {
-        Args: { p_criteria: Json; p_description?: string | null; p_name: string }
-        Returns: string
-      }
-      sales_create_discovery_job: {
-        Args: { p_search_params: Json; p_source_key: string }
-        Returns: string
-      }
-      sales_find_duplicate_candidates: {
-        Args: {
-          p_city: string | null
-          p_domain: string | null
-          p_email: string | null
-          p_lat: number | null
-          p_lng: number | null
-          p_normalized_name: string | null
-          p_phone: string | null
-          p_place_id: string | null
-        }
-        Returns: { candidate_lead_id: string; confidence: string; matched_signals: string[] }[]
-      }
-      sales_finish_discovery_job: {
-        Args: {
-          p_discovered_count: number
-          p_duplicate_count: number
-          p_error_class?: string | null
-          p_failed_count: number
-          p_job_id: string
-          p_last_error?: string | null
-          p_new_count: number
-          p_next_page_token?: string | null
-          p_skipped_count: number
-          p_status: string
-        }
-        Returns: undefined
-      }
-      sales_generate_outreach_message: {
-        Args: {
-          p_ai_latency_ms?: number | null
-          p_ai_model?: string | null
-          p_ai_provider?: string | null
-          p_ai_usage?: Json | null
-          p_body: string
-          p_campaign_id?: string | null
-          p_channel: string
-          p_grounding: Json
-          p_language: string
-          p_lead_id: string
-          p_message_type: string
-          p_subject: string | null
-        }
-        Returns: string
-      }
-      sales_mark_outreach_sent: {
-        Args: {
-          p_error?: string | null
-          p_message_id: string
-          p_provider_reference?: string | null
-          p_success: boolean
-        }
-        Returns: undefined
-      }
-      sales_normalize_domain: { Args: { p_url: string }; Returns: string }
-      sales_normalize_name: { Args: { p_name: string }; Returns: string }
-      sales_normalize_phone: { Args: { p_phone: string }; Returns: string }
-      sales_queue_outreach_message: { Args: { p_message_id: string }; Returns: undefined }
-      sales_record_signal: {
-        Args: {
-          p_confidence: string
-          p_enrichment_run_id?: string | null
-          p_evidence: Json
-          p_lead_id: string
-          p_signal_key: string
-          p_source_url?: string | null
-        }
-        Returns: string
-      }
-      sales_record_outreach_event: {
-        Args: {
-          p_message_id: string
-          p_event_type: string
-          p_raw_payload?: Json
-          p_reply_excerpt?: string | null
-          p_provider_event_id?: string | null
-        }
-        Returns: string
-      }
-      sales_schedule_followup: {
-        Args: {
-          p_lead_id: string
-          p_owner_id?: string | null
-          p_reason: string
-          p_scheduled_at: string
-        }
-        Returns: string
-      }
-      sales_upsert_discovered_lead: {
-        Args: {
-          p_address?: string | null
-          p_area?: string | null
-          p_business_name: string
-          p_business_type?: string | null
-          p_city?: string | null
-          p_country?: string | null
-          p_email?: string | null
-          p_lat?: number | null
-          p_lng?: number | null
-          p_phone?: string | null
-          p_place_id?: string | null
-          p_rating?: number | null
-          p_review_count?: number | null
-          p_source_key: string
-          p_website?: string | null
-        }
-        Returns: { lead_id: string; outcome: string }[]
-      }
-      sales_win_lead_and_invite_owner: {
-        Args: {
-          p_business_name_ar?: string | null
-          p_contact_phone?: string | null
-          p_lead_id: string
-          p_owner_email: string
-          p_reason?: string | null
-        }
-        Returns: { raw_secret: string; raw_token: string }[]
-      }
-      resend_sales_activation_invite: {
-        Args: { p_lead_id: string }
-        Returns: { raw_secret: string; raw_token: string }[]
-      }
-      get_sales_activation_invite_context: {
-        Args: { p_raw_token: string }
-        Returns: {
-          business_name: string
-          business_name_ar: string | null
-          is_expired: boolean
-          owner_email_masked: string
-          status: string
-        }[]
-      }
-      verify_sales_activation_email: {
-        Args: { p_entered_email: string | null; p_raw_token: string }
-        Returns: boolean
-      }
-      verify_sales_activation_secret: {
-        Args: { p_entered_secret: string | null; p_raw_token: string }
-        Returns: boolean
-      }
-      claim_sales_activation_invite: {
-        Args: { p_raw_token: string }
-        Returns: string
-      }
-      get_sales_provider_status: {
-        Args: Record<PropertyKey, never>
-        Returns: {
-          config: Json
-          daily_cap: number
-          enabled: boolean
-          is_configured: boolean
-          provider_key: string
-        }[]
-      }
-      set_sales_provider_secret: {
-        Args: { p_enabled?: boolean; p_provider_key: string; p_secret_vault_id: string }
-        Returns: undefined
-      }
-      get_sales_funnel_stats: {
-        Args: Record<PropertyKey, never>
-        Returns: { lead_count: number; stage: string }[]
-      }
-      get_sales_dashboard_summary: {
-        Args: Record<PropertyKey, never>
-        Returns: {
-          avg_days_to_conversion: number | null
-          cold_leads: number
-          contact_ready: number
-          contacted: number
-          converted: number
-          demo_rate: number | null
-          demos_scheduled: number
-          hot_leads: number
-          reply_rate: number | null
-          total_leads: number
-          warm_leads: number
-          win_rate: number | null
-        }[]
-      }
-      get_sales_stats_by_dimension: {
-        Args: { p_dimension: string }
-        Returns: { dimension_value: string; lead_count: number; won_count: number }[]
-      }
-      get_sales_stats_by_source: {
-        Args: Record<PropertyKey, never>
-        Returns: {
-          lead_count: number
-          source_key: string
-          source_name_en: string
-          won_count: number
-        }[]
-      }
-      get_pending_followups: {
-        Args: { p_limit?: number }
-        Returns: {
-          business_name: string
-          followup_id: string
-          is_overdue: boolean
-          lead_id: string
-          owner_id: string | null
-          reason: string
-          scheduled_at: string
-        }[]
-      }
-      get_lead_full_profile: { Args: { p_lead_id: string }; Returns: Json }
-      get_lead_channel_eligibility: {
-        Args: { p_lead_id: string }
-        Returns: {
-          lead_id: string
-          email_eligible: boolean
-          email_reason: string
-          whatsapp_eligible: boolean
-          whatsapp_reason: string
-          call_task_eligible: boolean
-          call_task_reason: string
-          recommended_channel: string
-          recommended_reason: string
-        }[]
-      }
-      get_lead_call_tasks: {
-        Args: { p_lead_id: string }
-        Returns: {
-          id: string
-          lead_id: string
-          phone_number: string
-          talking_points: string | null
-          status: string
-          owner_id: string | null
-          outcome: string | null
-          outcome_event_type: string | null
-          completed_at: string | null
-          created_by: string | null
-          created_at: string
-        }[]
-      }
-      get_lead_outreach_events: {
-        Args: { p_lead_id: string }
-        Returns: {
-          id: string
-          message_id: string
-          event_type: string
-          is_reply: boolean
-          reply_excerpt: string | null
-          created_at: string
-          message_channel: string
-          message_subject: string | null
-        }[]
-      }
-      get_campaign_stats: {
-        Args: { p_campaign_id: string }
-        Returns: {
-          contacted: number
-          demos: number
-          lost: number
-          queued: number
-          replied: number
-          target_count: number
-          won: number
-        }[]
-      }
-      search_sales_leads: {
-        Args: {
-          p_business_type?: string | null
-          p_city?: string | null
-          p_country?: string | null
-          p_exclude_do_not_contact?: boolean
-          p_has_online_booking?: boolean | null
-          p_has_website?: boolean | null
-          p_limit?: number
-          p_min_score?: number | null
-          p_offset?: number
-          p_score_band?: string | null
-          p_search?: string | null
-          p_signal_key?: string | null
-          p_status?: string | null
-          p_uncontacted_only?: boolean
-        }
-        Returns: {
-          business_name: string
-          business_type: string | null
-          city: string | null
-          country: string | null
-          current_score: number | null
-          current_score_band: string | null
-          first_discovered_at: string
-          lead_id: string
-          public_phone: string | null
-          rating: number | null
-          review_count: number | null
-          status: string
-          total_count: number
-          website: string | null
-        }[]
-      }
       _academy_module_active: { Args: { p_club_id: string }; Returns: boolean }
       _activate_club_membership_if_due_internal: {
         Args: { p_membership_subscription_id: string }
@@ -8406,6 +8745,10 @@ export type Database = {
       _club_membership_module_active: {
         Args: { p_club_id: string }
         Returns: boolean
+      }
+      _complete_sales_conversion: {
+        Args: { p_invite_id: string; p_lead_id: string }
+        Returns: string
       }
       _compute_audit_log_row_hash: {
         Args: {
@@ -8480,6 +8823,25 @@ export type Database = {
           p_customer_id: string
           p_expires_at: string
           p_triggering_booking_id: string
+        }
+        Returns: {
+          raw_secret: string
+          raw_token: string
+        }[]
+      }
+      _mint_sales_activation_invite_internal: {
+        Args: {
+          p_business_name: string
+          p_business_name_ar: string
+          p_business_type: string
+          p_city: string
+          p_contact_phone: string
+          p_contact_phone_e164: string
+          p_country: string
+          p_created_by: string
+          p_expires_at: string
+          p_lead_id: string
+          p_owner_email: string
         }
         Returns: {
           raw_secret: string
@@ -8580,6 +8942,17 @@ export type Database = {
         }
         Returns: string
       }
+      check_gateway_webhook_rate_limit: {
+        Args: {
+          p_max_requests?: number
+          p_provider_key: string
+          p_window_seconds?: number
+        }
+        Returns: {
+          allowed: boolean
+          retry_after_seconds: number
+        }[]
+      }
       check_trial_eligibility: {
         Args: {
           p_email: string
@@ -8599,6 +8972,15 @@ export type Database = {
         }
         Returns: string
       }
+      claim_founding_customer_slot: {
+        Args: { p_club_id: string; p_platform_subscription_id: string }
+        Returns: {
+          eligible: boolean
+          promotion_end: string
+          promotional_price: number
+          slot_number: number
+        }[]
+      }
       claim_manual_payment: {
         Args: {
           p_claimed_amount: number
@@ -8613,6 +8995,10 @@ export type Database = {
       claim_portal_invite: { Args: { p_raw_token: string }; Returns: string }
       claim_portal_invite_service: {
         Args: { p_raw_token: string; p_user_id: string }
+        Returns: string
+      }
+      claim_sales_activation_invite: {
+        Args: { p_raw_token: string }
         Returns: string
       }
       close_cash_shift: {
@@ -8700,7 +9086,12 @@ export type Database = {
         }
         Returns: string
       }
+      count_active_customers_and_players: {
+        Args: { p_club_id: string }
+        Returns: number
+      }
       count_active_platform_owners: { Args: never; Returns: number }
+      count_active_staff: { Args: { p_club_id: string }; Returns: number }
       create_booking: {
         Args: {
           p_customer_id: string
@@ -9185,6 +9576,18 @@ export type Database = {
         }
         Returns: Json
       }
+      get_campaign_stats: {
+        Args: { p_campaign_id: string }
+        Returns: {
+          contacted: number
+          demos: number
+          lost: number
+          queued: number
+          replied: number
+          target_count: number
+          won: number
+        }[]
+      }
       get_club_membership_detail: {
         Args: { p_membership_subscription_id: string }
         Returns: Json
@@ -9234,6 +9637,19 @@ export type Database = {
           p_start_date: string
         }
         Returns: Json
+      }
+      get_commercial_usage: {
+        Args: { p_club_id: string }
+        Returns: {
+          grace_days: number
+          is_controlled: boolean
+          over_limit_since: string
+          percentage: number
+          resource_limit: number
+          resource_type: string
+          status: string
+          usage_count: number
+        }[]
       }
       get_customer_360_summary: {
         Args: { p_club_id: string; p_customer_id: string }
@@ -9404,6 +9820,21 @@ export type Database = {
         }
         Returns: Json
       }
+      get_founding_offer_status: {
+        Args: { p_club_id: string }
+        Returns: {
+          current_effective_price: number
+          is_founder: boolean
+          list_price: number
+          normal_price_after_promotion: number
+          promotion_active: boolean
+          promotion_end: string
+          promotion_start: string
+          promotional_price: number
+          slot_number: number
+          slots_remaining: number
+        }[]
+      }
       get_gateway_transaction_status: {
         Args: { p_transaction_id: string }
         Returns: {
@@ -9432,6 +9863,56 @@ export type Database = {
           payment_status: string
           refunded: number
           total: number
+        }[]
+      }
+      get_lead_call_tasks: {
+        Args: { p_lead_id: string }
+        Returns: {
+          completed_at: string | null
+          created_at: string
+          created_by: string | null
+          id: string
+          lead_id: string
+          outcome: string | null
+          outcome_event_type: string | null
+          owner_id: string | null
+          phone_number: string
+          status: string
+          talking_points: string | null
+        }[]
+        SetofOptions: {
+          from: "*"
+          to: "sales_call_tasks"
+          isOneToOne: false
+          isSetofReturn: true
+        }
+      }
+      get_lead_channel_eligibility: {
+        Args: { p_lead_id: string }
+        Returns: {
+          call_task_eligible: boolean
+          call_task_reason: string
+          email_eligible: boolean
+          email_reason: string
+          lead_id: string
+          recommended_channel: string
+          recommended_reason: string
+          whatsapp_eligible: boolean
+          whatsapp_reason: string
+        }[]
+      }
+      get_lead_full_profile: { Args: { p_lead_id: string }; Returns: Json }
+      get_lead_outreach_events: {
+        Args: { p_lead_id: string }
+        Returns: {
+          created_at: string
+          event_type: string
+          id: string
+          is_reply: boolean
+          message_channel: string
+          message_id: string
+          message_subject: string
+          reply_excerpt: string
         }[]
       }
       get_my_active_support_session: {
@@ -9557,6 +10038,16 @@ export type Database = {
         Args: { p_club_id: string }
         Returns: string
       }
+      get_outreach_message_quality: {
+        Args: { p_message_id: string }
+        Returns: {
+          channel: string
+          id: string
+          quality_gate_result: Json
+          quality_status: string
+          status: string
+        }[]
+      }
       get_payment_method_report: {
         Args: {
           p_branch_id?: string
@@ -9566,6 +10057,18 @@ export type Database = {
         }
         Returns: Json
       }
+      get_pending_followups: {
+        Args: { p_limit?: number }
+        Returns: {
+          business_name: string
+          followup_id: string
+          is_overdue: boolean
+          lead_id: string
+          owner_id: string
+          reason: string
+          scheduled_at: string
+        }[]
+      }
       get_phone_data_issues: {
         Args: { p_club_id: string }
         Returns: {
@@ -9573,6 +10076,19 @@ export type Database = {
           full_name: string
           issue: string
           mobile_display: string
+        }[]
+      }
+      get_platform_alert_subscriptions: {
+        Args: never
+        Returns: {
+          club_id: string
+          club_name: string
+          end_at: string
+          grace_period_days_snapshot: number
+          has_subscription: boolean
+          lifecycle_status: string
+          subscription_id: string
+          subscription_kind: string
         }[]
       }
       get_platform_audit_log: {
@@ -9600,19 +10116,6 @@ export type Database = {
           entity_type: string
           id: string
           reason: string
-        }[]
-      }
-      get_platform_alert_subscriptions: {
-        Args: never
-        Returns: {
-          club_id: string
-          club_name: string
-          end_at: string
-          grace_period_days_snapshot: number
-          has_subscription: boolean
-          lifecycle_status: string
-          subscription_id: string
-          subscription_kind: string
         }[]
       }
       get_platform_club_360: {
@@ -9738,6 +10241,20 @@ export type Database = {
         Args: { p_role_id: string }
         Returns: string[]
       }
+      get_platform_subscription_report: {
+        Args: never
+        Returns: {
+          club_id: string
+          club_name: string
+          end_at: string
+          grace_period_days_snapshot: number
+          lifecycle_status: string
+          plan_name_snapshot: string
+          price_snapshot: number
+          start_at: string
+          subscription_kind: string
+        }[]
+      }
       get_platform_support_session_history: {
         Args: { p_club_id?: string; p_limit?: number }
         Returns: {
@@ -9752,20 +10269,6 @@ export type Database = {
           reason: string
           started_at: string
           status: string
-        }[]
-      }
-      get_platform_subscription_report: {
-        Args: never
-        Returns: {
-          club_id: string
-          club_name: string
-          end_at: string
-          grace_period_days_snapshot: number
-          lifecycle_status: string
-          plan_name_snapshot: string
-          price_snapshot: number
-          start_at: string
-          subscription_kind: string
         }[]
       }
       get_platform_usage_report: {
@@ -9933,6 +10436,67 @@ export type Database = {
           p_start_date: string
         }
         Returns: Json
+      }
+      get_sales_activation_invite_context: {
+        Args: { p_raw_token: string }
+        Returns: {
+          business_name: string
+          business_name_ar: string
+          is_expired: boolean
+          owner_email_masked: string
+          status: string
+        }[]
+      }
+      get_sales_dashboard_summary: {
+        Args: never
+        Returns: {
+          avg_days_to_conversion: number
+          cold_leads: number
+          contact_ready: number
+          contacted: number
+          converted: number
+          demo_rate: number
+          demos_scheduled: number
+          hot_leads: number
+          reply_rate: number
+          total_leads: number
+          warm_leads: number
+          win_rate: number
+        }[]
+      }
+      get_sales_funnel_stats: {
+        Args: never
+        Returns: {
+          lead_count: number
+          stage: string
+        }[]
+      }
+      get_sales_provider_status: {
+        Args: never
+        Returns: {
+          config: Json
+          daily_cap: number
+          enabled: boolean
+          is_configured: boolean
+          provider_key: string
+        }[]
+      }
+      get_sales_stats_by_dimension: {
+        Args: { p_dimension: string }
+        Returns: {
+          dimension_value: string
+          lead_count: number
+          won_count: number
+        }[]
+      }
+      get_sales_stats_by_source: {
+        Args: never
+        Returns: {
+          lead_count: number
+          source_key: string
+          source_name_en: string
+          won_count: number
+        }[]
       }
       get_shop_gross_profit: {
         Args: {
@@ -10258,6 +10822,24 @@ export type Database = {
           qr_expires_at: string
           status: string
         }[]
+      }
+      get_whatsapp_usage_platform_wide: {
+        Args: never
+        Returns: {
+          club_id: string | null
+          club_name: string | null
+          delivered_last_30d: number | null
+          failed_last_30d: number | null
+          last_message_at: string | null
+          messages_last_30d: number | null
+          messages_last_7d: number | null
+        }[]
+        SetofOptions: {
+          from: "*"
+          to: "whatsapp_usage_by_club"
+          isOneToOne: false
+          isSetofReturn: true
+        }
       }
       has_branch_access: {
         Args: { p_branch_id: string; p_membership_id: string }
@@ -10844,6 +11426,14 @@ export type Database = {
         Args: { p_booking_id: string; p_reason?: string }
         Returns: undefined
       }
+      mark_club_onboarding_complete: {
+        Args: { p_club_id: string }
+        Returns: {
+          onboarding_completed_at: string
+          trial_end_at: string
+          trial_started: boolean
+        }[]
+      }
       mark_gateway_transaction_failed_service: {
         Args: {
           p_provider_raw_status?: string
@@ -10915,7 +11505,7 @@ export type Database = {
         }[]
       }
       qr_confirm_checkin: {
-        Args: { p_token: string }
+        Args: { p_identity_confirmed?: boolean; p_token: string }
         Returns: {
           booking_id: string
           diagnostic_code: string
@@ -11113,6 +11703,10 @@ export type Database = {
             }
             Returns: undefined
           }
+      refresh_commercial_grace_state: {
+        Args: { p_club_id: string }
+        Returns: undefined
+      }
       reject_payment_proof: {
         Args: { p_proof_id: string; p_reason: string }
         Returns: undefined
@@ -11184,6 +11778,13 @@ export type Database = {
           booking_id: string
           new_total_price: number
           price_changed: boolean
+        }[]
+      }
+      resend_sales_activation_invite: {
+        Args: { p_lead_id: string }
+        Returns: {
+          raw_secret: string
+          raw_token: string
         }[]
       }
       resolve_commercial_upgrade_request: {
@@ -11282,6 +11883,217 @@ export type Database = {
         Args: { p_approve: boolean; p_reason?: string; p_request_id: string }
         Returns: undefined
       }
+      sales_add_lead_note: {
+        Args: { p_lead_id: string; p_note: string }
+        Returns: string
+      }
+      sales_add_leads_to_campaign: {
+        Args: { p_campaign_id: string; p_lead_ids: string[] }
+        Returns: number
+      }
+      sales_approve_outreach_message: {
+        Args: { p_message_id: string }
+        Returns: undefined
+      }
+      sales_change_lead_status: {
+        Args: { p_lead_id: string; p_new_status: string; p_reason?: string }
+        Returns: undefined
+      }
+      sales_check_and_increment_quota: {
+        Args: { p_provider_key: string }
+        Returns: {
+          allowed: boolean
+          current_count: number
+          daily_cap: number
+        }[]
+      }
+      sales_claim_discovery_job: {
+        Args: never
+        Returns: {
+          attempts: number
+          job_id: string
+          next_page_token: string
+          search_params: Json
+          source_key: string
+        }[]
+      }
+      sales_claim_queued_outreach_message: {
+        Args: never
+        Returns: {
+          body: string
+          language: string
+          lead_id: string
+          message_id: string
+          recipient_email: string
+          subject: string
+        }[]
+      }
+      sales_complete_call_task: {
+        Args: {
+          p_outcome: string
+          p_outcome_event_type?: string
+          p_task_id: string
+        }
+        Returns: undefined
+      }
+      sales_complete_followup: {
+        Args: { p_followup_id: string; p_last_action: string }
+        Returns: undefined
+      }
+      sales_compute_lead_score: { Args: { p_lead_id: string }; Returns: number }
+      sales_create_call_task: {
+        Args: {
+          p_lead_id: string
+          p_owner_id?: string
+          p_talking_points?: string
+        }
+        Returns: string
+      }
+      sales_create_campaign: {
+        Args: { p_criteria: Json; p_description: string; p_name: string }
+        Returns: string
+      }
+      sales_create_discovery_job: {
+        Args: { p_search_params: Json; p_source_key: string }
+        Returns: string
+      }
+      sales_find_duplicate_candidates: {
+        Args: {
+          p_city: string
+          p_domain: string
+          p_email: string
+          p_lat: number
+          p_lng: number
+          p_normalized_name: string
+          p_phone: string
+          p_place_id: string
+        }
+        Returns: {
+          candidate_lead_id: string
+          confidence: string
+          matched_signals: string[]
+        }[]
+      }
+      sales_finish_discovery_job: {
+        Args: {
+          p_discovered_count: number
+          p_duplicate_count: number
+          p_error_class?: string
+          p_failed_count: number
+          p_job_id: string
+          p_last_error?: string
+          p_new_count: number
+          p_next_page_token?: string
+          p_skipped_count: number
+          p_status: string
+        }
+        Returns: undefined
+      }
+      sales_generate_outreach_message: {
+        Args: {
+          p_ai_latency_ms?: number
+          p_ai_model?: string
+          p_ai_provider?: string
+          p_ai_usage?: Json
+          p_body: string
+          p_campaign_id?: string
+          p_channel: string
+          p_grounding: Json
+          p_language: string
+          p_lead_id: string
+          p_message_type: string
+          p_quality_gate_result?: Json
+          p_quality_status?: string
+          p_subject: string
+        }
+        Returns: string
+      }
+      sales_mark_outreach_sent: {
+        Args: {
+          p_error?: string
+          p_message_id: string
+          p_provider_reference?: string
+          p_success: boolean
+        }
+        Returns: undefined
+      }
+      sales_normalize_domain: { Args: { p_url: string }; Returns: string }
+      sales_normalize_name: { Args: { p_name: string }; Returns: string }
+      sales_normalize_phone: { Args: { p_phone: string }; Returns: string }
+      sales_queue_outreach_message: {
+        Args: { p_message_id: string }
+        Returns: undefined
+      }
+      sales_record_outreach_event: {
+        Args: {
+          p_event_type: string
+          p_message_id: string
+          p_provider_event_id?: string
+          p_raw_payload?: Json
+          p_reply_excerpt?: string
+        }
+        Returns: string
+      }
+      sales_record_signal: {
+        Args: {
+          p_confidence: string
+          p_enrichment_run_id?: string
+          p_evidence: Json
+          p_lead_id: string
+          p_signal_key: string
+          p_source_url?: string
+        }
+        Returns: string
+      }
+      sales_reject_outreach_message: {
+        Args: { p_message_id: string; p_reason?: string }
+        Returns: undefined
+      }
+      sales_schedule_followup: {
+        Args: {
+          p_lead_id: string
+          p_owner_id?: string
+          p_reason: string
+          p_scheduled_at: string
+        }
+        Returns: string
+      }
+      sales_upsert_discovered_lead: {
+        Args: {
+          p_address?: string
+          p_area?: string
+          p_business_name: string
+          p_business_type?: string
+          p_city?: string
+          p_country?: string
+          p_email?: string
+          p_lat?: number
+          p_lng?: number
+          p_phone?: string
+          p_place_id?: string
+          p_rating?: number
+          p_review_count?: number
+          p_source_key: string
+          p_website?: string
+        }
+        Returns: {
+          lead_id: string
+          outcome: string
+        }[]
+      }
+      sales_win_lead_and_invite_owner: {
+        Args: {
+          p_business_name_ar?: string
+          p_contact_phone?: string
+          p_lead_id: string
+          p_owner_email: string
+          p_reason?: string
+        }
+        Returns: {
+          raw_secret: string
+          raw_token: string
+        }[]
+      }
       search_platform_clubs: {
         Args: {
           p_access?: string
@@ -11307,6 +12119,40 @@ export type Database = {
           owner_phones: string[]
           reason: string
           total_count: number
+        }[]
+      }
+      search_sales_leads: {
+        Args: {
+          p_business_type?: string
+          p_city?: string
+          p_country?: string
+          p_exclude_do_not_contact?: boolean
+          p_has_online_booking?: boolean
+          p_has_website?: boolean
+          p_limit?: number
+          p_min_score?: number
+          p_offset?: number
+          p_score_band?: string
+          p_search?: string
+          p_signal_key?: string
+          p_status?: string
+          p_uncontacted_only?: boolean
+        }
+        Returns: {
+          business_name: string
+          business_type: string
+          city: string
+          country: string
+          current_score: number
+          current_score_band: string
+          first_discovered_at: string
+          lead_id: string
+          public_phone: string
+          rating: number
+          review_count: number
+          status: string
+          total_count: number
+          website: string
         }[]
       }
       sell_club_membership: {
@@ -11417,6 +12263,22 @@ export type Database = {
       }
       set_primary_guardian: {
         Args: { p_customer_id: string; p_player_id: string }
+        Returns: undefined
+      }
+      set_sales_email_webhook_secret: {
+        Args: {
+          p_enabled?: boolean
+          p_secret_vault_id: string
+          p_webhook_id: string
+        }
+        Returns: undefined
+      }
+      set_sales_provider_secret: {
+        Args: {
+          p_enabled?: boolean
+          p_provider_key: string
+          p_secret_vault_id: string
+        }
         Returns: undefined
       }
       set_staff_branch_scope: {
@@ -11667,10 +12529,12 @@ export type Database = {
           created_at: string
           currency: string
           default_academy_limit: number | null
+          default_active_player_limit: number | null
           default_branch_limit: number | null
           default_field_limit: number | null
           default_grace_period_days: number
           default_modules: string[] | null
+          default_staff_limit: number | null
           description_ar: string | null
           discount_label: string | null
           display_order: number
@@ -11848,6 +12712,14 @@ export type Database = {
         Returns: boolean
       }
       verify_portal_invite_secret: {
+        Args: { p_entered_secret: string; p_raw_token: string }
+        Returns: boolean
+      }
+      verify_sales_activation_email: {
+        Args: { p_entered_email: string; p_raw_token: string }
+        Returns: boolean
+      }
+      verify_sales_activation_secret: {
         Args: { p_entered_secret: string; p_raw_token: string }
         Returns: boolean
       }
@@ -12043,12 +12915,12 @@ export type Tables<
   DefaultSchemaTableNameOrOptions extends
     | keyof (DefaultSchema["Tables"] & DefaultSchema["Views"])
     | { schema: keyof DatabaseWithoutInternals },
-  TableName extends DefaultSchemaTableNameOrOptions extends {
+  TableName extends (DefaultSchemaTableNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof (DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"] &
         DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Views"])
-    : never = never,
+    : never) = never,
 > = DefaultSchemaTableNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
@@ -12072,11 +12944,11 @@ export type TablesInsert<
   DefaultSchemaTableNameOrOptions extends
     | keyof DefaultSchema["Tables"]
     | { schema: keyof DatabaseWithoutInternals },
-  TableName extends DefaultSchemaTableNameOrOptions extends {
+  TableName extends (DefaultSchemaTableNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
-    : never = never,
+    : never) = never,
 > = DefaultSchemaTableNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
@@ -12097,11 +12969,11 @@ export type TablesUpdate<
   DefaultSchemaTableNameOrOptions extends
     | keyof DefaultSchema["Tables"]
     | { schema: keyof DatabaseWithoutInternals },
-  TableName extends DefaultSchemaTableNameOrOptions extends {
+  TableName extends (DefaultSchemaTableNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
-    : never = never,
+    : never) = never,
 > = DefaultSchemaTableNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
@@ -12122,11 +12994,11 @@ export type Enums<
   DefaultSchemaEnumNameOrOptions extends
     | keyof DefaultSchema["Enums"]
     | { schema: keyof DatabaseWithoutInternals },
-  EnumName extends DefaultSchemaEnumNameOrOptions extends {
+  EnumName extends (DefaultSchemaEnumNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof DatabaseWithoutInternals[DefaultSchemaEnumNameOrOptions["schema"]]["Enums"]
-    : never = never,
+    : never) = never,
 > = DefaultSchemaEnumNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
@@ -12139,11 +13011,11 @@ export type CompositeTypes<
   PublicCompositeTypeNameOrOptions extends
     | keyof DefaultSchema["CompositeTypes"]
     | { schema: keyof DatabaseWithoutInternals },
-  CompositeTypeName extends PublicCompositeTypeNameOrOptions extends {
+  CompositeTypeName extends (PublicCompositeTypeNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof DatabaseWithoutInternals[PublicCompositeTypeNameOrOptions["schema"]]["CompositeTypes"]
-    : never = never,
+    : never) = never,
 > = PublicCompositeTypeNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }

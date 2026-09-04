@@ -274,7 +274,7 @@ export function SalesLeadDetailPage() {
       const { error } = await supabase.rpc('sales_win_lead_and_invite_owner', {
         p_lead_id: leadId!,
         p_owner_email: ownerEmail.trim(),
-        p_contact_phone: convertContactPhone.trim() || null,
+        p_contact_phone: convertContactPhone.trim() || undefined,
       })
       if (error) throw error
     },
