@@ -102,6 +102,28 @@ export function SalesLeadDetailPage() {
     onSuccess: invalidate,
   })
 
+  // PHASE 3 acceptance-test fix (2026-09-04): sales-website-enrichment
+  // existed as a working Edge Function since Phase 5 but had NO frontend
+  // trigger anywhere in the app -- confirmed via a full source grep
+  // finding zero calls to it. This button is that missing production
+  // entrypoint. Requires lead.website to be set (mirrors the Edge
+  // Function's own "lead has no website to enrich" 400 guard).
+  const enrichMutation = useMutation({
+    mutationFn: async () => {
+      const { data: sessionData } = await supabase.auth.getSession()
+      const token = sessionData.session?.access_token
+      const res = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/sales-website-enrichment`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ lead_id: leadId }),
+      })
+      const json = await res.json()
+      if (!res.ok) throw Object.assign(new Error(json.error ?? 'website enrichment failed'), { status: res.status, detail: json })
+      return json
+    },
+    onSuccess: invalidate,
+  })
+
   const noteMutation = useMutation({
     mutationFn: async () => {
       const { error } = await supabase.rpc('sales_add_lead_note', { p_lead_id: leadId!, p_note: noteText })
@@ -235,8 +257,23 @@ export function SalesLeadDetailPage() {
       <Card>
         <CardHeader className="flex flex-row items-center justify-between">
           <CardTitle>{t('platform.sales.leadProfile.signals')}</CardTitle>
+          {lead.website && (
+            <Button size="sm" variant="outline" onClick={() => enrichMutation.mutate()} disabled={enrichMutation.isPending}>
+              {enrichMutation.isPending ? t('platform.sales.leadProfile.enriching') : t('platform.sales.leadProfile.runEnrichmentButton')}
+            </Button>
+          )}
         </CardHeader>
         <CardContent>
+          {enrichMutation.isError && (
+            <p role="alert" className="mb-2 text-sm text-status-danger">
+              {(enrichMutation.error as { detail?: { error?: string } })?.detail?.error === 'CONFIGURATION_BLOCKED'
+                ? t('platform.sales.discover.configurationBlocked')
+                : translateSupabaseError(enrichMutation.error, t('platform.sales.leadProfile.enrichmentError'))}
+            </p>
+          )}
+          {enrichMutation.isSuccess && (
+            <p className="mb-2 text-sm text-status-success">{t('platform.sales.leadProfile.enrichmentSuccess')}</p>
+          )}
           {signals.length === 0 ? (
             <p className="text-sm text-text-secondary">{t('platform.sales.leadProfile.noSignals')}</p>
           ) : (
