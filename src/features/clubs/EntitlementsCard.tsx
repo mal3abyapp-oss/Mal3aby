@@ -37,6 +37,16 @@ interface UsageRow {
   fields_used: number | null
   academy_limit: number | null
   academy_used: number | null
+  // COMMERCIAL PACKAGING (2026-09-04): staff/active-player are
+  // CONTROLLED resources (never a hard INSERT-time block, unlike
+  // branch/field/academy above) -- shown here for visibility only, no
+  // upgrade-request wiring for these two yet (request_commercial_upgrade
+  // only accepts branch_limit/field_limit/academy_limit today; a
+  // near-term follow-up, not invented here).
+  staff_limit: number | null
+  staff_used: number | null
+  active_player_limit: number | null
+  active_players_used: number | null
 }
 
 interface LimitDef {
@@ -50,6 +60,17 @@ const LIMIT_DEFS: Omit<LimitDef, 'label'>[] = [
   { key: 'branch_limit', limitField: 'branch_limit', usedField: 'branches_used' },
   { key: 'field_limit', limitField: 'field_limit', usedField: 'fields_used' },
   { key: 'academy_limit', limitField: 'academy_limit', usedField: 'academy_used' },
+]
+
+interface ControlledUsageDef {
+  key: 'staff_limit' | 'active_player_limit'
+  limitField: 'staff_limit' | 'active_player_limit'
+  usedField: 'staff_used' | 'active_players_used'
+}
+
+const CONTROLLED_USAGE_DEFS: ControlledUsageDef[] = [
+  { key: 'staff_limit', limitField: 'staff_limit', usedField: 'staff_used' },
+  { key: 'active_player_limit', limitField: 'active_player_limit', usedField: 'active_players_used' },
 ]
 
 async function fetchUsage(clubId: string): Promise<UsageRow | null> {
@@ -198,6 +219,33 @@ export function EntitlementsCard() {
                         <UpgradeRequestDialog limitType={def.key} label={def.label} />
                       )
                     )}
+                  </div>
+                </div>
+              )
+            })}
+            {/* COMMERCIAL PACKAGING (2026-09-04): staff/active-player are
+                CONTROLLED resources -- shown for visibility only, never a
+                hard block. No upgrade-request wiring yet for these two
+                (request_commercial_upgrade only accepts branch/field/
+                academy today) -- a near-term follow-up, not invented here. */}
+            {CONTROLLED_USAGE_DEFS.map((def) => {
+              const limit = data[def.limitField]
+              const used = data[def.usedField] ?? 0
+              const unlimited = limit === null
+              const atOrOverLimit = !unlimited && used >= limit
+              const nearLimit = !unlimited && !atOrOverLimit && used >= limit * 0.8
+              if (unlimited && used === 0) return null // nothing meaningful to show for a never-configured, unused controlled resource
+              return (
+                <div key={def.key} className="flex items-center justify-between gap-3 rounded-lg border border-border p-3">
+                  <div className="flex flex-col gap-1">
+                    <span className="text-sm font-medium">{t(`clubs.entitlements.controlledLimitLabels.${def.key}`)}</span>
+                    <span className="text-sm text-text-secondary tabular-nums">
+                      {used} {unlimited ? t('clubs.entitlements.unlimited') : `/ ${limit}`}
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    {atOrOverLimit && <StatusBadge tone="warning" label={t('clubs.entitlements.controlledOverLimit')} />}
+                    {nearLimit && <StatusBadge tone="warning" label={t('clubs.entitlements.nearLimit')} />}
                   </div>
                 </div>
               )

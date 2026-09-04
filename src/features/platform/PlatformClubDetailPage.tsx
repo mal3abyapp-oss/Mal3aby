@@ -1158,6 +1158,15 @@ export function PlatformClubDetailPage() {
         </CardContent>
       </Card>
 
+      {/* COMMERCIAL PACKAGING (2026-09-04): staff/active-player usage
+          (controlled/grace resources, distinct from the hard-enforced
+          branch/field/academy card above) + founding-customer offer
+          status. Read-only -- reuses get_commercial_usage()/
+          get_founding_offer_status(), never recomputes usage itself,
+          same "single source of truth" discipline as the limits card
+          above and EntitlementsCard.tsx's own tenant-facing view. */}
+      {clubId && <CommercialUsageAndFoundingOfferCard clubId={clubId} />}
+
       {/* PLATFORM OWNER CONTROL IMPLEMENTATION -- Phase 5 (P2): payment
           kill switch. AUTONOMOUS COMPLETION -- Phase A: the
           provider-allowlist UI this comment used to say was deferred to
@@ -1757,5 +1766,158 @@ function ProviderPolicyPanel({ clubId }: { clubId: string }) {
         </DialogContent>
       </Dialog>
     </div>
+  )
+}
+
+// COMMERCIAL PACKAGING (2026-09-04): staff/active-player usage
+// (controlled/grace resources) + founding-customer offer status.
+// Read-only Platform Owner view -- reuses get_commercial_usage() and
+// get_founding_offer_status() exactly, never recomputes usage
+// client-side (same discipline as the branch/field/academy limits
+// card above, which reads commercial_entitlements_usage). Both RPCs
+// are auth-gated server-side (club membership OR platform_owner) --
+// this component adds no client-side authorization of its own.
+interface CommercialUsageRow {
+  resource_type: 'branch_limit' | 'field_limit' | 'academy_limit' | 'staff_limit' | 'active_player_limit'
+  usage_count: number
+  resource_limit: number | null
+  percentage: number | null
+  status: 'unlimited' | 'normal' | 'approaching_limit' | 'blocked' | 'grace' | 'over_limit'
+  is_controlled: boolean
+  grace_days: number | null
+  over_limit_since: string | null
+}
+
+interface FoundingOfferStatus {
+  is_founder: boolean
+  slot_number: number | null
+  list_price: number | null
+  promotional_price: number | null
+  promotion_start: string | null
+  promotion_end: string | null
+  normal_price_after_promotion: number | null
+  current_effective_price: number | null
+  promotion_active: boolean
+  slots_remaining: number
+}
+
+const CONTROLLED_RESOURCE_STATUS_TONE: Record<string, 'success' | 'warning' | 'danger' | 'neutral'> = {
+  unlimited: 'neutral',
+  normal: 'success',
+  approaching_limit: 'warning',
+  grace: 'warning',
+  over_limit: 'danger',
+}
+
+async function fetchCommercialUsage(clubId: string): Promise<CommercialUsageRow[]> {
+  const { data, error } = await supabase.rpc('get_commercial_usage', { p_club_id: clubId })
+  if (error) throw error
+  return (data ?? []) as CommercialUsageRow[]
+}
+
+async function fetchFoundingOfferStatus(clubId: string): Promise<FoundingOfferStatus | null> {
+  const { data, error } = await supabase.rpc('get_founding_offer_status', { p_club_id: clubId })
+  if (error) throw error
+  return (data?.[0] ?? null) as FoundingOfferStatus | null
+}
+
+function CommercialUsageAndFoundingOfferCard({ clubId }: { clubId: string }) {
+  const { t } = useTranslation()
+  const { locale } = useDirection()
+
+  const { data: usage = [], isLoading: usageLoading } = useQuery({
+    queryKey: ['platform-commercial-usage', clubId],
+    queryFn: () => fetchCommercialUsage(clubId),
+  })
+  const { data: founding, isLoading: foundingLoading } = useQuery({
+    queryKey: ['platform-founding-offer-status', clubId],
+    queryFn: () => fetchFoundingOfferStatus(clubId),
+  })
+
+  // Only the two CONTROLLED resources belong on this card -- the hard
+  // branch/field/academy triggers already have their own dedicated
+  // card immediately above, with its own editing UI. Duplicating them
+  // here would be a second, divergent display of the same numbers.
+  const controlledRows = usage.filter((r) => r.is_controlled)
+
+  return (
+    <Card className="mb-4">
+      <CardHeader>
+        <CardTitle className="text-base">{t('platform.clubDetailPage.commercialUsageCard.title')}</CardTitle>
+      </CardHeader>
+      <CardContent className="flex flex-col gap-4">
+        {usageLoading ? (
+          <p className="text-sm text-text-secondary">{t('platform.clubDetailPage.commercialUsageCard.loading')}</p>
+        ) : controlledRows.length === 0 ? (
+          <p className="text-sm text-text-secondary">{t('platform.clubDetailPage.commercialUsageCard.noData')}</p>
+        ) : (
+          <div className="grid gap-3 md:grid-cols-2">
+            {controlledRows.map((row) => (
+              <div key={row.resource_type} className="rounded-lg border border-border p-3">
+                <div className="flex items-center justify-between gap-2">
+                  <p className="text-sm font-medium">
+                    {t(`platform.clubDetailPage.commercialUsageCard.resourceLabels.${row.resource_type}`)}
+                  </p>
+                  <StatusBadge
+                    tone={CONTROLLED_RESOURCE_STATUS_TONE[row.status] ?? 'neutral'}
+                    label={t(`platform.clubDetailPage.commercialUsageCard.statusLabels.${row.status}`)}
+                  />
+                </div>
+                <p className="text-sm text-text-secondary tabular-nums">
+                  {row.usage_count} {row.resource_limit === null ? t('platform.clubDetailPage.limitsCard.unlimited') : `/ ${row.resource_limit}`}
+                </p>
+                {row.status === 'grace' && row.over_limit_since && (
+                  <p className="mt-1 text-xs text-status-warning">
+                    {t('platform.clubDetailPage.commercialUsageCard.graceHint', {
+                      days: row.grace_days ?? 7,
+                      since: new Date(row.over_limit_since).toLocaleDateString(locale === 'en' ? 'en-US' : 'ar-EG'),
+                    })}
+                  </p>
+                )}
+                {row.status === 'over_limit' && (
+                  <p className="mt-1 text-xs text-status-danger">{t('platform.clubDetailPage.commercialUsageCard.overLimitHint')}</p>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
+
+        <div className="border-t border-border pt-4">
+          <p className="mb-2 text-sm font-medium">{t('platform.clubDetailPage.commercialUsageCard.foundingOfferTitle')}</p>
+          {foundingLoading ? (
+            <p className="text-sm text-text-secondary">{t('platform.clubDetailPage.commercialUsageCard.loading')}</p>
+          ) : !founding ? (
+            <p className="text-sm text-text-secondary">{t('platform.clubDetailPage.commercialUsageCard.noData')}</p>
+          ) : founding.is_founder ? (
+            <div className="flex flex-col gap-1 rounded-lg border border-status-success/40 bg-status-success/10 p-3">
+              <div className="flex items-center gap-2">
+                <StatusBadge tone="success" label={t('platform.clubDetailPage.commercialUsageCard.founderBadge', { slot: founding.slot_number })} />
+                {founding.promotion_active && <StatusBadge tone="warning" label={t('platform.clubDetailPage.commercialUsageCard.promotionActiveBadge')} />}
+              </div>
+              <p className="text-sm text-text-secondary">
+                {t('platform.clubDetailPage.commercialUsageCard.foundingPriceSummary', {
+                  effective: founding.current_effective_price ?? 0,
+                  list: founding.list_price ?? 0,
+                })}
+              </p>
+              {founding.promotion_active && founding.promotion_end && (
+                <p className="text-xs text-text-secondary">
+                  {t('platform.clubDetailPage.commercialUsageCard.promotionEndsAt', {
+                    date: new Date(founding.promotion_end).toLocaleDateString(locale === 'en' ? 'en-US' : 'ar-EG'),
+                  })}
+                </p>
+              )}
+            </div>
+          ) : (
+            <p className="text-sm text-text-secondary">
+              {t('platform.clubDetailPage.commercialUsageCard.notFounder', { slotsRemaining: founding.slots_remaining })}
+              {founding.current_effective_price !== null && (
+                <> — <MoneyDisplay amount={founding.current_effective_price} currency="EGP" size="sm" /></>
+              )}
+            </p>
+          )}
+        </div>
+      </CardContent>
+    </Card>
   )
 }
