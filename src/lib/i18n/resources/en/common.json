@@ -324,7 +324,13 @@
         "configured": "Connected",
         "notConfigured": "Configuration Required",
         "dailyCap": "Daily cap",
-        "configureButton": "Configure"
+        "configureButton": "Configure",
+        "activeProvider": "Active provider",
+        "freeTier": "free tier",
+        "optionalProvider": "optional, not required",
+        "available": "Available",
+        "availableNotActive": "Available — not active",
+        "billingNotEnabled": "Disabled — billing not enabled"
       },
       "leadProfile": {
         "loadError": "Could not load this lead's profile.",

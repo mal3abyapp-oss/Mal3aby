@@ -17,13 +17,21 @@
 // provider is not already authorized: do not purchase/enable it
 // automatically... surface it as configuration required").
 //
-// This function does NOT call any specific AI provider's SDK inline --
-// it uses a plain HTTPS fetch to a configurable endpoint (Anthropic
-// Messages API shape by default, since that's this assistant's own
-// provider and the most likely first configuration), matching this
-// codebase's own "no bundled provider SDKs in Edge Functions, plain
-// fetch + AbortSignal.timeout()" convention from every gateway function.
+// PROVIDER-AGNOSTIC (2026-09-04 owner decision): this function no
+// longer calls any AI vendor's API directly -- it goes through
+// _shared/ai-provider-adapter.ts's generateSalesOffer(), selecting the
+// active provider from sales_provider_configs.ai_offer_generator.
+// config->>'provider' (defaults to 'groq', Mal3aby's zero-cost default
+// -- see that file's own comments for the full provider-selection
+// rationale). Anthropic is fully supported by the adapter but disabled
+// by default; the owner explicitly declined to enable Anthropic paid
+// billing for Mal3aby, so this function must never require it. No
+// automatic fallback between providers exists or should ever be added
+// here -- a provider failure is a real, honest failure surfaced to the
+// caller, never silently retried against a different (possibly paid)
+// provider.
 import { createClient } from 'jsr:@supabase/supabase-js@2'
+import { generateSalesOffer, ProviderRequestError } from '../_shared/ai-provider-adapter.ts'
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!
 const SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
@@ -52,6 +60,12 @@ function jsonResponse(req: Request, body: unknown, status = 200) {
 }
 
 const AI_API_TIMEOUT_MS = 30_000
+const AI_MAX_TOKENS = 800
+// Bounded retry, no infinite retry (mission's explicit cost-guard
+// requirement) -- a single retry only on a transient timeout, never on
+// a quota/auth/upstream-error class (retrying those wastes the
+// caller's free-tier request budget on a failure that will not change).
+const MAX_RETRIES = 1
 
 interface LeadEvidence {
   business_name: string
@@ -135,6 +149,25 @@ ${languageInstruction}
 Write the ${messageType} now. Keep it concise, specific to the facts given, and professional. Do not include a subject line unless writing an email offer.`
 }
 
+// mapProviderErrorToStatus(): a truthful, honest HTTP status/error code
+// per failure class -- never a generic 502 for everything (mission's
+// "fail gracefully with a truthful status such as FREE_TIER_QUOTA_
+// EXHAUSTED... must NOT silently generate a bill" requirement).
+function mapProviderErrorToResponse(req: Request, err: ProviderRequestError) {
+  switch (err.kind) {
+    case 'quota_exhausted':
+      return jsonResponse(req, { error: 'FREE_TIER_QUOTA_EXHAUSTED', detail: `${err.provider} free-tier rate/request limit reached for today. No automatic paid fallback will be used.` }, 429)
+    case 'timeout':
+      return jsonResponse(req, { error: 'AI_PROVIDER_TIMEOUT', detail: `${err.provider} request timed out` }, 504)
+    case 'auth':
+      return jsonResponse(req, { error: 'AI_PROVIDER_AUTH_FAILED', detail: `${err.provider} rejected the configured credential -- an operator must reconfigure this provider in Sales Intelligence > Settings` }, 502)
+    case 'empty_response':
+      return jsonResponse(req, { error: 'AI_PROVIDER_EMPTY_RESPONSE', detail: `${err.provider} returned no content` }, 502)
+    default:
+      return jsonResponse(req, { error: 'AI_PROVIDER_REQUEST_FAILED', detail: `${err.provider} request failed` }, 502)
+  }
+}
+
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeadersFor(req) })
@@ -185,7 +218,10 @@ Deno.serve(async (req) => {
   // platform-owner/staff session, not the admin client) -- both the
   // 'platform.sales.generate_offer' permission and the daily quota are
   // independently re-verified server-side here, never trusted from a
-  // client-side "I'm allowed" assumption.
+  // client-side "I'm allowed" assumption. This is Mal3aby's OWN daily
+  // cap (sales_provider_configs.daily_cap), independent of and in
+  // addition to whatever the underlying AI provider's own free-tier
+  // limit is -- a second, always-on cost/abuse guard.
   const { data: quota, error: quotaError } = await callerClient.rpc('sales_check_and_increment_quota', {
     p_provider_key: 'ai_offer_generator',
   })
@@ -200,7 +236,7 @@ Deno.serve(async (req) => {
 
   const { data: providerConfig } = await admin
     .from('sales_provider_configs')
-    .select('enabled, secret_vault_id')
+    .select('enabled, secret_vault_id, config')
     .eq('provider_key', 'ai_offer_generator')
     .maybeSingle()
 
@@ -210,6 +246,12 @@ Deno.serve(async (req) => {
       detail: 'The AI offer generator provider has not been configured with credentials. An operator must configure this in Sales Intelligence > Settings before AI-generated offers can be produced.',
     }, 409)
   }
+
+  // provider/model are read from config, never hardcoded -- switching
+  // AI vendors (e.g. re-enabling Anthropic once billing is approved)
+  // is a config change via Sales Settings, not a code deploy.
+  const providerKey = (providerConfig.config as Record<string, unknown>)?.provider as string | undefined ?? 'groq'
+  const model = (providerConfig.config as Record<string, unknown>)?.model as string | undefined ?? 'openai/gpt-oss-120b'
 
   const { data: leadRow, error: leadError } = await admin
     .from('sales_leads')
@@ -254,39 +296,38 @@ Deno.serve(async (req) => {
 
   const prompt = buildGroundedPrompt(evidence, language, messageType)
 
-  let generatedText: string
-  try {
-    const aiRes = await fetch('https://api.anthropic.com/v1/messages', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-api-key': decryptedSecret,
-        'anthropic-version': '2023-06-01',
-      },
-      body: JSON.stringify({
-        model: 'claude-sonnet-5',
-        max_tokens: 800,
-        messages: [{ role: 'user', content: prompt }],
-      }),
-      signal: AbortSignal.timeout(AI_API_TIMEOUT_MS),
-    })
-
-    if (!aiRes.ok) {
-      return jsonResponse(req, { error: 'AI provider request failed' }, 502)
+  let result
+  let attempt = 0
+  let lastErr: ProviderRequestError | null = null
+  while (attempt <= MAX_RETRIES) {
+    try {
+      result = await generateSalesOffer(prompt, providerKey, {
+        apiKey: decryptedSecret,
+        model,
+        maxTokens: AI_MAX_TOKENS,
+        timeoutMs: AI_API_TIMEOUT_MS,
+      })
+      lastErr = null
+      break
+    } catch (err) {
+      if (!(err instanceof ProviderRequestError)) {
+        return jsonResponse(req, { error: 'AI_PROVIDER_REQUEST_FAILED', detail: 'unexpected error calling AI provider' }, 502)
+      }
+      lastErr = err
+      // Only a timeout is worth one bounded retry -- every other class
+      // (auth/quota/upstream_error/empty_response) will not change on
+      // retry, so retrying would just waste the free-tier budget.
+      if (err.kind !== 'timeout' || attempt === MAX_RETRIES) break
+      attempt++
     }
+  }
 
-    const aiJson = await aiRes.json()
-    generatedText = aiJson?.content?.[0]?.text ?? ''
-    if (!generatedText) {
-      return jsonResponse(req, { error: 'AI provider returned no content' }, 502)
-    }
-  } catch (err) {
-    const detail = err instanceof DOMException && err.name === 'AbortError' ? 'AI provider request timed out' : 'AI provider request failed unexpectedly'
-    return jsonResponse(req, { error: detail }, 502)
+  if (lastErr || !result) {
+    return mapProviderErrorToResponse(req, lastErr!)
   }
 
   // Subject line only meaningful for email offers -- extract the first line if it looks like one, else leave null.
-  const subject = resolvedChannel === 'email' && messageType === 'offer' ? generatedText.split('\n')[0].slice(0, 120) : null
+  const subject = resolvedChannel === 'email' && messageType === 'offer' ? result.text.split('\n')[0].slice(0, 120) : null
 
   // Persist via the RPC (GENERATE step of Phase 11's lifecycle) using the
   // CALLER-scoped client so created_by correctly reflects the real user who
@@ -297,14 +338,28 @@ Deno.serve(async (req) => {
     p_message_type: messageType,
     p_language: language,
     p_subject: subject,
-    p_body: generatedText,
+    p_body: result.text,
     p_grounding: evidence,
     p_campaign_id: null,
+    p_ai_provider: result.provider,
+    p_ai_model: result.model,
+    p_ai_usage: result.usage,
+    p_ai_latency_ms: result.latencyMs,
   })
 
   if (insertError) {
     return jsonResponse(req, { error: 'could not persist generated message' }, 500)
   }
 
-  return jsonResponse(req, { message_id: messageId, body: generatedText, subject, channel: resolvedChannel, grounding_signal_count: evidence.signals.length })
+  return jsonResponse(req, {
+    message_id: messageId,
+    body: result.text,
+    subject,
+    channel: resolvedChannel,
+    grounding_signal_count: evidence.signals.length,
+    ai_provider: result.provider,
+    ai_model: result.model,
+    ai_usage: result.usage,
+    ai_latency_ms: result.latencyMs,
+  })
 })

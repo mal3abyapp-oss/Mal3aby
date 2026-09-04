@@ -324,7 +324,13 @@
         "configured": "متصل",
         "notConfigured": "يتطلب التهيئة",
         "dailyCap": "الحد اليومي",
-        "configureButton": "تهيئة"
+        "configureButton": "تهيئة",
+        "activeProvider": "المزوّد النشط",
+        "freeTier": "خطة مجانية",
+        "optionalProvider": "اختياري، غير مطلوب",
+        "available": "متاح",
+        "availableNotActive": "متاح — غير مفعّل",
+        "billingNotEnabled": "معطّل — الفوترة غير مفعّلة"
       },
       "leadProfile": {
         "loadError": "تعذّر تحميل ملف هذا العميل المحتمل.",

@@ -6003,6 +6003,10 @@ export type Database = {
       }
       sales_outreach_messages: {
         Row: {
+          ai_latency_ms: number | null
+          ai_model: string | null
+          ai_provider: string | null
+          ai_usage: Json | null
           approved_at: string | null
           approved_by: string | null
           body: string
@@ -6022,6 +6026,10 @@ export type Database = {
           subject: string | null
         }
         Insert: {
+          ai_latency_ms?: number | null
+          ai_model?: string | null
+          ai_provider?: string | null
+          ai_usage?: Json | null
           approved_at?: string | null
           approved_by?: string | null
           body: string
@@ -6041,6 +6049,10 @@ export type Database = {
           subject?: string | null
         }
         Update: {
+          ai_latency_ms?: number | null
+          ai_model?: string | null
+          ai_provider?: string | null
+          ai_usage?: Json | null
           approved_at?: string | null
           approved_by?: string | null
           body?: string
@@ -8085,6 +8097,10 @@ export type Database = {
       }
       sales_generate_outreach_message: {
         Args: {
+          p_ai_latency_ms?: number | null
+          p_ai_model?: string | null
+          p_ai_provider?: string | null
+          p_ai_usage?: Json | null
           p_body: string
           p_campaign_id?: string | null
           p_channel: string
