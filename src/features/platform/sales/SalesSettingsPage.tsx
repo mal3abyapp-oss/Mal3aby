@@ -6,7 +6,7 @@
 // PAYMENT_GATEWAY_ARCHITECTURE.md) and then attaching its vault ID
 // here via set_sales_provider_secret() -- this UI never accepts or
 // displays a raw secret value itself.
-import { useState } from 'react'
+import { Fragment, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
 import { supabase } from '@/lib/supabase/client'
@@ -27,6 +27,7 @@ interface ProviderStatus {
   enabled: boolean
   is_configured: boolean
   daily_cap: number
+  config: { provider?: string; model?: string; free_tier?: boolean } | null
 }
 
 const PROVIDER_LABELS: Record<string, string> = {
@@ -38,7 +39,10 @@ const PROVIDER_LABELS: Record<string, string> = {
 async function fetchProviderStatus(): Promise<ProviderStatus[]> {
   const { data, error } = await supabase.rpc('get_sales_provider_status')
   if (error) throw error
-  return data ?? []
+  return (data ?? []).map((row) => ({
+    ...row,
+    config: (row.config ?? null) as ProviderStatus['config'],
+  }))
 }
 
 export function SalesSettingsPage() {
@@ -80,23 +84,47 @@ export function SalesSettingsPage() {
           ) : (
             <ul className="space-y-3">
               {(data ?? []).map((p) => (
-                <li key={p.provider_key} className="flex items-center justify-between border-b border-border-subtle pb-3 last:border-0">
-                  <div>
-                    <p className="font-medium">{PROVIDER_LABELS[p.provider_key] ?? p.provider_key}</p>
-                    <p className="text-sm text-text-secondary">{t('platform.sales.settings.dailyCap')}: {p.daily_cap}</p>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <StatusBadge
-                      tone={p.is_configured ? 'success' : 'warning'}
-                      label={p.is_configured ? t('platform.sales.settings.configured') : t('platform.sales.settings.notConfigured')}
-                    />
-                    {p.provider_key !== 'website_enrichment' && (
-                      <Button size="sm" variant="outline" onClick={() => setConfiguring(p.provider_key)}>
-                        {t('platform.sales.settings.configureButton')}
-                      </Button>
-                    )}
-                  </div>
-                </li>
+                <Fragment key={p.provider_key}>
+                  <li className="flex items-center justify-between border-b border-border-subtle pb-3 last:border-0">
+                    <div>
+                      <p className="font-medium">{PROVIDER_LABELS[p.provider_key] ?? p.provider_key}</p>
+                      {p.provider_key === 'ai_offer_generator' && p.config?.provider && (
+                        <p className="text-sm text-text-secondary">
+                          {t('platform.sales.settings.activeProvider')}: {p.config.provider === 'groq' ? 'Groq' : p.config.provider === 'anthropic' ? 'Anthropic' : p.config.provider}
+                          {p.config.model ? ` (${p.config.model})` : ''}
+                          {p.config.provider === 'groq' ? ` — ${t('platform.sales.settings.freeTier')}` : ''}
+                        </p>
+                      )}
+                      <p className="text-sm text-text-secondary">{t('platform.sales.settings.dailyCap')}: {p.daily_cap}</p>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <StatusBadge
+                        tone={p.is_configured ? 'success' : 'warning'}
+                        label={p.is_configured ? t('platform.sales.settings.configured') : t('platform.sales.settings.notConfigured')}
+                      />
+                      {p.provider_key !== 'website_enrichment' && (
+                        <Button size="sm" variant="outline" onClick={() => setConfiguring(p.provider_key)}>
+                          {t('platform.sales.settings.configureButton')}
+                        </Button>
+                      )}
+                    </div>
+                  </li>
+                  {/* AI Offer Generator: Anthropic is shown as a separate, informational
+                      row -- never as a system failure just because billing isn't enabled
+                      (owner decision, 2026-09-04: "Do not display Anthropic as a system
+                      failure merely because the owner chose not to purchase credits"). */}
+                  {p.provider_key === 'ai_offer_generator' && (
+                    <li className="flex items-center justify-between border-b border-border-subtle pb-3 last:border-0 pl-4">
+                      <div>
+                        <p className="text-sm font-medium text-text-secondary">Anthropic ({t('platform.sales.settings.optionalProvider')})</p>
+                      </div>
+                      <StatusBadge
+                        tone="neutral"
+                        label={p.config?.provider === 'anthropic' ? t('platform.sales.settings.available') : t('platform.sales.settings.billingNotEnabled')}
+                      />
+                    </li>
+                  )}
+                </Fragment>
               ))}
             </ul>
           )}
