@@ -68,10 +68,48 @@ export function computeAnnualDiscountsByFamily<T extends { name: string | null; 
     if (p.billing_interval !== 'year' || !p.name) continue
     const familyName = p.name.replace(/\s*\(Annual\)\s*$/, '')
     const monthly = plans.find((m) => m.billing_interval === 'month' && m.name === familyName)
-    if (!monthly || monthly.price == null || p.price == null) continue
-    const annualEquivalentOfMonthly = Number(monthly.price) * 12
-    const discountPct = (1 - Number(p.price) / annualEquivalentOfMonthly) * 100
-    result.set(familyName, Math.round(discountPct * 10) / 10)
+    if (!monthly) continue
+
+    const monthlyPrice = Number(monthly.price)
+    const annualPrice = Number(p.price)
+    // Guard against every input that would make the discount math
+    // produce NaN/Infinity/a misleading number: a null/non-numeric
+    // price on either row (Number(null) is 0, not NaN -- explicitly
+    // reject it), and a zero-or-negative monthly price specifically
+    // (division-by-zero -> Infinity, or a negative denominator
+    // flipping the sign of a "savings" percentage into nonsense). A
+    // zero-or-negative annual price is also rejected -- a free or
+    // negative-price "annual plan" is not a real discount to display.
+    if (
+      monthly.price == null || p.price == null ||
+      !Number.isFinite(monthlyPrice) || !Number.isFinite(annualPrice) ||
+      monthlyPrice <= 0 || annualPrice <= 0
+    ) {
+      continue
+    }
+
+    const annualEquivalentOfMonthly = monthlyPrice * 12
+    const discountPct = (1 - annualPrice / annualEquivalentOfMonthly) * 100
+    // A finite discountPct can still be misleading: if annualPrice
+    // exceeds 12x the monthly price (e.g. a real data-entry mistake in
+    // the plans table -- annual priced HIGHER than paying monthly all
+    // year), discountPct is finite but negative, which would render as
+    // nonsense like "Save -316.7%" in success-styled green text. There
+    // is no such thing as a negative "you saved" percentage worth
+    // showing a customer -- omit the family entirely rather than
+    // display a number that actively misleads them.
+    if (!Number.isFinite(discountPct) || discountPct <= 0) continue
+    const roundedDiscountPct = Math.round(discountPct * 10) / 10
+    // Independent-review finding: checking the raw discountPct > 0
+    // isn't sufficient on its own -- an extreme, hyper-precise near-
+    // 12x-miss (unreachable with any real product price, but not
+    // provably impossible) can have a positive raw value that still
+    // rounds down to a displayed "0" (e.g. raw 0.02% -> rounds to 0),
+    // which is the same misleading "Save 0%" display this guard exists
+    // to prevent. Reject on the ROUNDED value actually shown, not the
+    // raw one, closing that gap too.
+    if (roundedDiscountPct <= 0) continue
+    result.set(familyName, roundedDiscountPct)
   }
   return result
 }
