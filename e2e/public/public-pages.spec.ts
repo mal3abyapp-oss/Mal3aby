@@ -18,8 +18,38 @@ test.describe('Public marketing pages', () => {
     // defect (a link present in the DOM but not actually clickable/
     // visible is a separate concern from "does the link exist", but a
     // broken/removed nav link is caught here).
-    const loginLink = page.getByRole('link', { name: /تسجيل الدخول|login|sign in/i }).first()
-    await expect(loginLink).toBeVisible()
+    //
+    // 2026-09-05 fix: at narrow (mobile) viewports, PublicLayout.tsx
+    // correctly hides the desktop nav's Login link behind a hamburger
+    // button (`md:hidden`/`hidden md:flex` -- real, intentional
+    // responsive nav, not a bug) and only exposes Login inside the
+    // slide-in mobile menu (PublicMobileNav, a real accessible
+    // <Link to="/login"> once the menu is open). This test previously
+    // assumed desktop nav structure at every viewport and failed on
+    // chromium-mobile/webkit-desktop-as-narrow-viewport projects --
+    // that was a TEST bug (wrong assumption about layout), not a
+    // product accessibility defect. Fixed by opening the mobile menu
+    // first when the desktop nav's Login link isn't directly visible,
+    // then asserting the drawer's Login link is reachable via its real
+    // accessible role+name -- keeping the same real assertion (a
+    // visible, accessible Login link) rather than weakening it.
+    const desktopLoginLink = page.getByRole('link', { name: /تسجيل الدخول|login|sign in/i }).first()
+    if (await desktopLoginLink.isVisible()) {
+      await expect(desktopLoginLink).toBeVisible()
+    } else {
+      const openMenuButton = page.getByRole('button', { name: /فتح القائمة|open menu/i })
+      await expect(openMenuButton).toBeVisible()
+      await openMenuButton.click()
+      const mobileLoginLink = page.getByRole('link', { name: /تسجيل الدخول|login|sign in/i }).first()
+      await expect(mobileLoginLink).toBeVisible()
+      // Real accessible interaction, not just DOM presence: activate it
+      // via keyboard (Enter), matching how a keyboard-only user would
+      // actually reach /login from the open mobile menu.
+      await mobileLoginLink.focus()
+      await expect(mobileLoginLink).toBeFocused()
+      await page.keyboard.press('Enter')
+      await expect(page).toHaveURL(/\/login/)
+    }
   })
 
   test('pricing page loads', async ({ page }) => {

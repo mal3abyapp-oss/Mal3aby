@@ -8,6 +8,9 @@ import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { StatusBadge } from '@/components/ui/status-badge'
+import { EmptyState } from '@/components/ui/empty-state'
+import { ErrorState } from '@/components/ui/error-state'
+import { Skeleton } from '@/components/ui/skeleton'
 import {
   Dialog,
   DialogContent,
@@ -24,7 +27,7 @@ import {
 import { translateSupabaseError } from '@/lib/errors'
 import { useDirection } from '@/app/providers/DirectionProvider'
 import { usePortalClub } from '@/app/providers/PortalClubProvider'
-import { Wallet } from 'lucide-react'
+import { Wallet, Receipt } from 'lucide-react'
 
 // Master Payment Directive Sections 46-53, 86-87: "My Payments" -- a
 // customer sees every invoice with its real payment status (via the
@@ -262,7 +265,7 @@ export function PortalPaymentsPage() {
   // screen whose entire purpose is showing what a customer owes.
   // isError is now surfaced as a distinct inline message, matching the
   // sibling PortalAcademyPage/PortalMembershipsPage pattern.
-  const { data: allInvoices = [], isLoading, isError } = useQuery({
+  const { data: allInvoices = [], isLoading, isError, error, refetch } = useQuery({
     queryKey: ['portal', 'my-invoices'],
     queryFn: fetchMyInvoices,
     enabled: !!activeCustomerId,
@@ -298,8 +301,15 @@ export function PortalPaymentsPage() {
     <div className="flex flex-col gap-4">
       <PageHeader title={t('portal.paymentsPage.title')} description={t('portal.paymentsPage.description')} />
 
-      {(isLoading || clubLoading) && <p className="text-sm text-text-secondary">{t('portal.paymentsPage.loading')}</p>}
-      {isError && <p className="text-sm text-status-danger">{t('portal.paymentsPage.loadError')}</p>}
+      {(isLoading || clubLoading) && (
+        <div className="flex flex-col gap-2">
+          <Skeleton className="h-20 w-full rounded-lg" />
+          <Skeleton className="h-20 w-full rounded-lg" />
+        </div>
+      )}
+      {isError && (
+        <ErrorState message={translateSupabaseError(error, t('portal.paymentsPage.loadError'))} onRetry={() => void refetch()} />
+      )}
 
       {!isLoading && !isError && invoiceNotFound && (
         <p role="alert" className="rounded-lg border border-status-warning/30 bg-status-warning/5 p-3 text-sm text-status-warning">
@@ -325,9 +335,7 @@ export function PortalPaymentsPage() {
       )}
 
       {!isLoading && !isError && invoices.length === 0 && (
-        <p className="rounded-lg border border-dashed border-border p-6 text-center text-sm text-text-secondary">
-          {t('portal.paymentsPage.emptyTitle')}
-        </p>
+        <EmptyState icon={Receipt} title={t('portal.paymentsPage.emptyTitle')} description={t('portal.paymentsPage.emptyHint')} />
       )}
 
       <div className="flex flex-col gap-2">

@@ -98,7 +98,19 @@ export function PlatformTrialsPage() {
       {isError ? (
         <ErrorState message={translateSupabaseError(error, t('platform.trialsPage.loadError'))} onRetry={() => void refetch()} />
       ) : (
-        <DataTable columns={columns} rows={trials} rowKey={(row) => row.id} isLoading={isLoading} emptyTitle={t('platform.trialsPage.emptyTitle')} />
+        // Design remediation (premium-ui-ux-audit, mobile brief): opt-in
+        // to DataTable's existing 'cards-on-mobile' variant -- a narrow
+        // viewport gets a readable stacked card per trial instead of a
+        // forced horizontal scroll. Same columns/data/links, presentation
+        // only; the club-name column becomes the card's title line.
+        <DataTable
+          columns={columns.map((c) => (c.key === 'club' ? { ...c, cardPriority: 'primary' as const } : c))}
+          rows={trials}
+          rowKey={(row) => row.id}
+          isLoading={isLoading}
+          emptyTitle={t('platform.trialsPage.emptyTitle')}
+          variant="cards-on-mobile"
+        />
       )}
     </div>
   )

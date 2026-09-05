@@ -114,12 +114,18 @@ export function PlatformSupportHistoryPage() {
       {isError ? (
         <ErrorState message={translateSupabaseError(error, t('platform.supportHistoryPage.loadError'))} onRetry={() => void refetch()} />
       ) : (
+        // Design remediation (premium-ui-ux-audit, mobile brief): this
+        // table has 8 columns -- the worst horizontal-scroll case in the
+        // Platform Owner console on a narrow viewport. Opt-in to the
+        // existing 'cards-on-mobile' variant; same data/columns, the
+        // support-user column becomes the card title.
         <DataTable
-          columns={columns}
+          columns={columns.map((c) => (c.key === 'supportUser' ? { ...c, cardPriority: 'primary' as const } : c))}
           rows={rows}
           rowKey={(r) => r.id}
           isLoading={isLoading}
           emptyTitle={t('platform.supportHistoryPage.emptyTitle')}
+          variant="cards-on-mobile"
         />
       )}
     </div>

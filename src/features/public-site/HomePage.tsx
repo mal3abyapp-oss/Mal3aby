@@ -4,6 +4,8 @@ import { useTranslation } from 'react-i18next'
 import { supabase } from '@/lib/supabase/client'
 import { Button } from '@/components/ui/button'
 import { MoneyDisplay } from '@/components/ui/money-display'
+import { filterPublicCommercialPlans, computeAnnualDiscountsByFamily } from '@/lib/domain/billing'
+import { formatNumberIsolated } from '@/lib/i18n/config'
 import {
   CalendarDays,
   GraduationCap,
@@ -65,7 +67,12 @@ const faqItems = ['q1', 'q2', 'q3', 'q4'] as const
 async function fetchPublicPlans() {
   const { data, error } = await supabase.from('public_plans').select('*')
   if (error) throw error
-  return data ?? []
+  // P0 fix (2026-09-05): unfiltered, this returned the 2 surviving
+  // legacy plans (499/4,499 EGP) alongside the real Starter/Growth/Pro
+  // tiers on the public landing page -- see filterPublicCommercialPlans
+  // (src/lib/domain/billing.ts), the same shared guard now used by
+  // PricingPage.tsx and SubscriptionPage.tsx.
+  return filterPublicCommercialPlans(data ?? [])
 }
 
 // Real, live-looking numbers for the hero's product preview -- this is
@@ -136,6 +143,12 @@ export function HomePage() {
   const { t, i18n } = useTranslation()
   const { data: plans = [] } = useQuery({ queryKey: ['public-plans-home'], queryFn: fetchPublicPlans })
 
+  // P0 fix (2026-09-05): see computeAnnualDiscountsByFamily in
+  // src/lib/domain/billing.ts for the full rationale -- this used to be
+  // a hardcoded "Save 25%" i18n string, wrong against the real
+  // ~16.2-16.5% annual discounts.
+  const annualDiscountByFamily = computeAnnualDiscountsByFamily(plans)
+
   return (
     <>
       {/* ============ HERO ============ */}
@@ -193,7 +206,7 @@ export function HomePage() {
           <div className="grid grid-cols-2 gap-3.5 md:grid-cols-4">
             {suitableForSegments.map((s) => (
               <div key={s.key} className="rounded-xl border border-border bg-gradient-to-b from-white to-page-bg p-5 text-center">
-                <div className="mx-auto mb-3 flex size-9 items-center justify-center rounded-lg bg-accent/15 text-[#5B8A00]">
+                <div className="mx-auto mb-3 flex size-9 items-center justify-center rounded-lg bg-accent/15 text-accent-emphasis">
                   <s.icon className="size-[18px]" aria-hidden="true" />
                 </div>
                 <p className="text-sm font-bold text-text-primary">{t(`publicSite.home.suitableFor.${s.key}.title`)}</p>
@@ -208,8 +221,8 @@ export function HomePage() {
       <section id="features" className="bg-page-bg py-24">
         <div className="mx-auto max-w-6xl px-4">
           <div className="mx-auto mb-14 max-w-xl text-center">
-            <p className="mb-3.5 inline-flex items-center gap-2 text-sm font-semibold tracking-wide text-[#5B8A00]">
-              <span className="h-0.5 w-[18px] rounded-full bg-[#5B8A00]" />
+            <p className="mb-3.5 inline-flex items-center gap-2 text-sm font-semibold tracking-wide text-accent-emphasis">
+              <span className="h-0.5 w-[18px] rounded-full bg-accent-emphasis" />
               {t('publicSite.home.benefitsEyebrow')}
             </p>
             <h2 className="text-2xl font-bold text-text-primary text-balance md:text-[34px]">{t('publicSite.home.benefitsTitle')}</h2>
@@ -261,8 +274,8 @@ export function HomePage() {
         <section id="pricing-preview" className="bg-surface py-24">
           <div className="mx-auto max-w-6xl px-4">
             <div className="mx-auto mb-12 max-w-xl text-center">
-              <p className="mb-3.5 inline-flex items-center justify-center gap-2 text-sm font-semibold tracking-wide text-[#5B8A00]">
-                <span className="h-0.5 w-[18px] rounded-full bg-[#5B8A00]" />
+              <p className="mb-3.5 inline-flex items-center justify-center gap-2 text-sm font-semibold tracking-wide text-accent-emphasis">
+                <span className="h-0.5 w-[18px] rounded-full bg-accent-emphasis" />
                 {t('publicSite.home.pricingEyebrow')}
               </p>
               <h2 className="text-2xl font-bold text-text-primary md:text-[34px]">{t('publicSite.home.pricingTitle')}</h2>
@@ -270,7 +283,18 @@ export function HomePage() {
             </div>
             <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
               {plans.map((p) => {
-                const isFeatured = p.discount_label != null && Number(p.discount_label.match(/\d+/)?.[0] ?? 0) >= 20
+                // P0 fix (2026-09-05): this used to feature whichever
+                // plan had a discount_label >= 20% -- a threshold from
+                // an earlier pricing model. The approved packaging's
+                // real annual discounts are ~16.2-16.5% (see
+                // filterPublicCommercialPlans/NEW_COMMERCIAL_TIER_MIN_
+                // DISPLAY_ORDER in src/lib/domain/billing.ts), all
+                // under 20, so no plan was ever marked featured here --
+                // silently dropping the "Growth is recommended" signal
+                // PricingPage.tsx shows correctly. Mirrors PricingPage.
+                // tsx's own pattern: identify Growth by name, not by a
+                // fragile percentage threshold that drifts with pricing.
+                const isFeatured = p.name === 'Growth'
                 return (
                   <div
                     key={p.name_ar}
@@ -289,11 +313,19 @@ export function HomePage() {
                       {i18n.language.startsWith('ar') ? p.name_ar : t(`publicSite.pricing.intervals.${p.billing_interval}_${p.billing_interval_count}`)}
                     </p>
                     <MoneyDisplay amount={Number(p.price)} currency={p.currency ?? 'EGP'} size="lg" className={isFeatured ? 'text-white' : undefined} />
-                    {p.discount_label && (
-                      <p className={isFeatured ? 'text-[12.5px] font-semibold text-green-300' : 'text-[12.5px] font-semibold text-status-success'}>
-                        {i18n.language.startsWith('ar') ? p.discount_label : t(`publicSite.pricing.discounts.${p.billing_interval}_${p.billing_interval_count}`)}
-                      </p>
-                    )}
+                    {(() => {
+                      if (p.billing_interval !== 'year' || !p.name) return null
+                      const familyName = p.name.replace(/\s*\(Annual\)\s*$/, '')
+                      const discountPct = annualDiscountByFamily.get(familyName)
+                      if (discountPct == null) return null
+                      return (
+                        <p className={isFeatured ? 'text-[12.5px] font-semibold text-green-300' : 'text-[12.5px] font-semibold text-status-success'}>
+                          {t('publicSite.pricing.saveDiscount', {
+                            percent: formatNumberIsolated(discountPct, i18n.language.startsWith('ar') ? 'ar' : 'en'),
+                          })}
+                        </p>
+                      )
+                    })()}
                     <Button size="sm" className={isFeatured ? 'mt-1 bg-accent text-accent-foreground hover:bg-accent/90' : 'mt-1'} variant={isFeatured ? 'default' : 'outline'} asChild>
                       <Link to="/signup">{t('publicSite.home.startFreeTrial')}</Link>
                     </Button>
@@ -307,7 +339,7 @@ export function HomePage() {
 
       {/* ============ FINAL CTA ============ */}
       <section className="bg-dark-base px-4 pb-24">
-        <div className="mx-auto max-w-6xl overflow-hidden rounded-3xl bg-gradient-to-br from-[#C7FF5C] via-accent to-[#9FE032] px-6 py-14 text-center text-dark-base md:px-10 md:py-16">
+        <div className="mx-auto max-w-6xl overflow-hidden rounded-3xl bg-gradient-to-br from-accent-light via-accent to-accent-dark px-6 py-14 text-center text-dark-base md:px-10 md:py-16">
           <h2 className="text-2xl font-bold md:text-[30px]">{t('publicSite.home.finalCta.title')}</h2>
           <p className="mt-3 text-[15px] text-dark-base/75">{t('publicSite.home.finalCta.subtitle')}</p>
           <Button size="lg" className="mt-7 bg-dark-base text-white hover:bg-dark-base/90" asChild>

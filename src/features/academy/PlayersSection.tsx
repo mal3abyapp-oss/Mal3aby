@@ -220,6 +220,10 @@ export function PlayersSection() {
       // remains reachable via a separate quick-actions button (attendance
       // QR, fast subscribe/collect) but is no longer the primary
       // destination of the player's own name.
+      // cardPriority 'primary': on a mobile card this becomes the card's
+      // title line instead of a "الاسم: ..." label/value row -- same
+      // render, same Link, same destination.
+      cardPriority: 'primary',
       render: (p) => (
         <Link to={`/app/academy/players/${p.id}`} className="font-medium text-accent-foreground hover:underline">
           {p.fullName}
@@ -251,9 +255,20 @@ export function PlayersSection() {
       // Player 360 is the canonical detail/edit location" -- keeps the
       // existing fast subscribe/collect/attendance-QR dialog reachable
       // without it being the primary destination of the player's name.
+      // hideOnCard: the mobile card surfaces this exact same action via
+      // `renderCardActions` (once, next to the title) instead of a
+      // redundant unlabeled row in the card body.
+      hideOnCard: true,
       render: (p) => (
+        // RTL-A11Y-02 (2026-09-05): min-h-11/min-w-11 gives this the
+        // 44x44px touch target WCAG 2.5.5/mobile-HIG baselines expect --
+        // the previous p-1.5-only button measured ~28x28px, the smallest
+        // tap target in the app on a screen (reception desk phones/
+        // tablets) that's mostly touch. Icon visual size (size-4)
+        // unchanged; only the hit area grows, via flex-centering inside
+        // the larger box rather than more icon padding.
         <button
-          className="rounded-md p-1.5 text-text-secondary hover:bg-muted hover:text-text-primary"
+          className="flex min-h-11 min-w-11 items-center justify-center rounded-md text-text-secondary hover:bg-muted hover:text-text-primary"
           title={t('academy.players.quickActions', { defaultValue: 'Quick actions' })}
           onClick={() => setSelectedPlayer(p)}
         >
@@ -301,6 +316,20 @@ export function PlayersSection() {
           isLoading={isLoading}
           emptyTitle={t('academy.players.emptyTitle')}
           emptyDescription={t('academy.players.emptyDescription')}
+          variant="cards-on-mobile"
+          renderCardActions={(p) => (
+            // RTL-A11Y-02: same 44x44px hit-area fix as the table column's
+            // quick-actions button above -- this is the button a phone
+            // user actually taps (mobile card mode), so it's the more
+            // important of the two instances to get right.
+            <button
+              className="flex min-h-11 min-w-11 items-center justify-center rounded-md text-text-secondary hover:bg-muted hover:text-text-primary"
+              title={t('academy.players.quickActions', { defaultValue: 'Quick actions' })}
+              onClick={() => setSelectedPlayer(p)}
+            >
+              <Zap className="size-4" />
+            </button>
+          )}
         />
       )}
 

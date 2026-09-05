@@ -328,6 +328,9 @@ export function EnrollmentSection() {
     {
       key: 'player',
       header: t('academy.enrollments.player'),
+      // Mobile card title line (see DataTable's `cardPriority`) -- same
+      // click-to-open-subscription-detail button as the table cell.
+      cardPriority: 'primary',
       render: (e) => (
         <button className="text-accent-foreground hover:underline" onClick={() => setSelectedEnrollment(e)}>
           {e.playerName ?? '—'}
@@ -461,6 +464,7 @@ export function EnrollmentSection() {
         isLoading={isLoading}
         emptyTitle={t('academy.enrollments.emptyTitle')}
         emptyDescription={t('academy.enrollments.emptyDescription')}
+        variant="cards-on-mobile"
       />
 
       <Dialog open={!!selectedEnrollment} onOpenChange={(open) => !open && setSelectedEnrollment(null)}>

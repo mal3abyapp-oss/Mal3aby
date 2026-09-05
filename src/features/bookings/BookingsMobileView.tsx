@@ -13,6 +13,8 @@ import { useDirection } from '@/app/providers/DirectionProvider'
 import { formatNumberIsolated } from '@/lib/i18n/config'
 import { FormattedDate } from '@/components/ui/formatted-date'
 import { DatePickerButton } from '@/components/ui/date-picker-button'
+import { EmptyState } from '@/components/ui/empty-state'
+import { Skeleton } from '@/components/ui/skeleton'
 import type { QuickBookingSlot } from './QuickBookingSheet'
 
 // BOOKING CALENDAR UX PHASE (2026-08-23) -- full rewrite of the mobile
@@ -265,17 +267,18 @@ export function BookingsMobileView({
       {availabilityLoading ? (
         <div className="flex flex-col gap-2">
           {[0, 1, 2, 3].map((i) => (
-            <div key={i} className="h-14 animate-pulse rounded-lg bg-muted/40" />
+            <Skeleton key={i} className="h-14 w-full rounded-lg" />
           ))}
         </div>
       ) : isClosedAllDay ? (
         // Section 22: closed day gets a real empty state, not an empty
         // grid of "closed" rows repeated for every hour.
-        <div className="flex flex-col items-center gap-2 rounded-lg border border-dashed border-border py-10 text-center">
-          <CalendarX2 className="size-8 text-text-secondary/50" />
-          <p className="text-sm font-medium text-text-secondary">{t('bookings.mobile.fieldClosedToday')}</p>
-          <p className="text-xs text-text-secondary/70">{t('bookings.mobile.fieldClosedTodayHint')}</p>
-        </div>
+        <EmptyState
+          icon={CalendarX2}
+          title={t('bookings.mobile.fieldClosedToday')}
+          description={t('bookings.mobile.fieldClosedTodayHint')}
+          className="rounded-lg border border-dashed border-border py-10"
+        />
       ) : (
         <div className="flex flex-col divide-y divide-border rounded-lg border border-border">
           {timeline.map((item) => {

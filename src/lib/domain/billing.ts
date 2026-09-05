@@ -29,6 +29,91 @@ export interface PaymentRow {
   officialReceiptStatus: string | null
 }
 
+// COMMERCIAL PACKAGING (2026-09-04): public_plans contains 2 surviving
+// legacy plans (Monthly/Annual, display_order 1/4) kept is_public=true
+// ONLY because real existing subscriptions still reference them (see
+// MAL3ABY_V1_PRICING_MIGRATION.md) — they must NEVER be offered to new
+// customers on any public/authenticated commercial surface. Filtering
+// is a frontend display decision, not a database change.
+//
+// P0 fix (2026-09-05): this filter used to live only inside
+// PricingPage.tsx (as NEW_COMMERCIAL_TIER_MIN_DISPLAY_ORDER), so it was
+// never applied to SubscriptionPage.tsx or HomePage.tsx's own
+// public_plans queries — both leaked the legacy 499/4,499 EGP plans
+// live in production. Extracted here as the single shared source of
+// truth so a future 4th commercial surface can't reintroduce the same
+// leak by simply forgetting to copy a local constant.
+export const NEW_COMMERCIAL_TIER_MIN_DISPLAY_ORDER = 10
+
+export function filterPublicCommercialPlans<T extends { display_order: number | null }>(plans: readonly T[]): T[] {
+  return plans.filter((p) => (p.display_order ?? 0) >= NEW_COMMERCIAL_TIER_MIN_DISPLAY_ORDER)
+}
+
+// P0 fix (2026-09-05): HomePage.tsx's landing-page pricing preview used
+// to show a hardcoded English "Save 25%" label (i18n key
+// publicSite.pricing.discounts.year_1), left over from an earlier
+// pricing model and wrong against the real ~16.2-16.5% annual
+// discounts (the Arabic side separately read the DB's own
+// discount_label text directly, so only English was visibly wrong, but
+// both were one hardcoded/DB-text value away from ever drifting from
+// reality again). This computes the discount mathematically from the
+// real monthly/annual price pair for a plan family, with one
+// consistent rounding policy (1 decimal place), so both locales always
+// show the true number regardless of future price changes.
+export function computeAnnualDiscountsByFamily<T extends { name: string | null; billing_interval: string | null; price: number | string | null }>(
+  plans: readonly T[],
+): Map<string, number> {
+  const result = new Map<string, number>()
+  for (const p of plans) {
+    if (p.billing_interval !== 'year' || !p.name) continue
+    const familyName = p.name.replace(/\s*\(Annual\)\s*$/, '')
+    const monthly = plans.find((m) => m.billing_interval === 'month' && m.name === familyName)
+    if (!monthly) continue
+
+    const monthlyPrice = Number(monthly.price)
+    const annualPrice = Number(p.price)
+    // Guard against every input that would make the discount math
+    // produce NaN/Infinity/a misleading number: a null/non-numeric
+    // price on either row (Number(null) is 0, not NaN -- explicitly
+    // reject it), and a zero-or-negative monthly price specifically
+    // (division-by-zero -> Infinity, or a negative denominator
+    // flipping the sign of a "savings" percentage into nonsense). A
+    // zero-or-negative annual price is also rejected -- a free or
+    // negative-price "annual plan" is not a real discount to display.
+    if (
+      monthly.price == null || p.price == null ||
+      !Number.isFinite(monthlyPrice) || !Number.isFinite(annualPrice) ||
+      monthlyPrice <= 0 || annualPrice <= 0
+    ) {
+      continue
+    }
+
+    const annualEquivalentOfMonthly = monthlyPrice * 12
+    const discountPct = (1 - annualPrice / annualEquivalentOfMonthly) * 100
+    // A finite discountPct can still be misleading: if annualPrice
+    // exceeds 12x the monthly price (e.g. a real data-entry mistake in
+    // the plans table -- annual priced HIGHER than paying monthly all
+    // year), discountPct is finite but negative, which would render as
+    // nonsense like "Save -316.7%" in success-styled green text. There
+    // is no such thing as a negative "you saved" percentage worth
+    // showing a customer -- omit the family entirely rather than
+    // display a number that actively misleads them.
+    if (!Number.isFinite(discountPct) || discountPct <= 0) continue
+    const roundedDiscountPct = Math.round(discountPct * 10) / 10
+    // Independent-review finding: checking the raw discountPct > 0
+    // isn't sufficient on its own -- an extreme, hyper-precise near-
+    // 12x-miss (unreachable with any real product price, but not
+    // provably impossible) can have a positive raw value that still
+    // rounds down to a displayed "0" (e.g. raw 0.02% -> rounds to 0),
+    // which is the same misleading "Save 0%" display this guard exists
+    // to prevent. Reject on the ROUNDED value actually shown, not the
+    // raw one, closing that gap too.
+    if (roundedDiscountPct <= 0) continue
+    result.set(familyName, roundedDiscountPct)
+  }
+  return result
+}
+
 export const PAYMENT_METHOD_LABELS: Record<string, string> = {
   cash: 'نقدًا',
   card: 'بطاقة',

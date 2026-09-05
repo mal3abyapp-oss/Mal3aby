@@ -194,20 +194,43 @@ export function PlatformOverviewPage() {
           Phase B directive (B1): PlatformClubsPage now reads status/access/
           created query params (see its own header comment for the
           contract) -- each card below links to a genuinely filtered view
-          instead of the same undifferentiated list. */}
+          instead of the same undifferentiated list.
+
+          Design remediation (premium-ui-ux-audit, Platform Owner phase):
+          the 7 cards previously rendered as one flat, unlabeled grid --
+          a SaaS control plane's landing dashboard reads at a glance as
+          "what's my tenant base, what needs commercial attention, what's
+          growing", not an alphabet-soup of same-weight tiles. Split into
+          two labeled groups using the exact same cards/values/links/data
+          (no new fetch, no renamed field) -- Tenant Health (admin status +
+          subscription access, the two genuinely different "is this club
+          okay" signals per this file's own P2 comment above) and
+          Commercial Signals (trials/renewals/growth, the business-motion
+          numbers a platform owner reviews for growth). Pure grouping +
+          heading, zero behavior change. */}
+      <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-text-secondary">
+        {t('platform.overviewPage.groups.tenantHealth', { defaultValue: 'Tenant health' })}
+      </p>
       <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
         <StatCard label={t('platform.overviewPage.cards.totalClubs')} value={isLoading || isError ? '—' : String(data?.totalClubs ?? 0)} to="/platform/clubs" />
-        <StatCard label={t('platform.overviewPage.cards.activeClubs')} value={isLoading || isError ? '—' : String(data?.activeClubs ?? 0)} to="/platform/clubs?status=active" />
+        <StatCard label={t('platform.overviewPage.cards.activeClubs')} value={isLoading || isError ? '—' : String(data?.activeClubs ?? 0)} to="/platform/clubs?status=active" tone="success" />
         {/* Renamed from "أندية موقوفة" -- that label was ambiguous with
             "حالة الاشتراك: موقوف" on PlatformClubsPage, a different
             concept (subscription/billing access, not admin status).
             See blockedAccessClubs card below for that other signal. */}
-        <StatCard label={t('platform.overviewPage.cards.adminSuspendedClubs')} value={isLoading || isError ? '—' : String(data?.adminSuspendedClubs ?? 0)} to="/platform/clubs?status=suspended" />
+        <StatCard label={t('platform.overviewPage.cards.adminSuspendedClubs')} value={isLoading || isError ? '—' : String(data?.adminSuspendedClubs ?? 0)} to="/platform/clubs?status=suspended" tone={(data?.adminSuspendedClubs ?? 0) > 0 ? 'warning' : 'default'} />
         <StatCard
           label={t('platform.overviewPage.cards.blockedAccessClubs')}
           value={isLoading || isError ? '—' : String(data?.blockedAccessClubs ?? 0)}
           to="/platform/clubs?access=blocked"
+          tone={(data?.blockedAccessClubs ?? 0) > 0 ? 'danger' : 'default'}
         />
+      </div>
+
+      <p className="mb-2 mt-5 text-xs font-semibold uppercase tracking-wide text-text-secondary">
+        {t('platform.overviewPage.groups.commercialSignals', { defaultValue: 'Commercial signals' })}
+      </p>
+      <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
         <StatCard label={t('platform.overviewPage.cards.trialCount')} value={isLoading || isError ? '—' : String(data?.trialCount ?? 0)} to="/platform/trials" />
         {/* Label no longer says "(7 أيام)" -- the underlying threshold is
             now isSubscriptionExpiringSoon() (3d trial / 7d paid), not a
@@ -216,15 +239,22 @@ export function PlatformOverviewPage() {
           label={t('platform.overviewPage.cards.expiringSoonCount')}
           value={isLoading || isError ? '—' : String(data?.expiringSoonCount ?? 0)}
           to="/platform/alerts"
+          tone={(data?.expiringSoonCount ?? 0) > 0 ? 'warning' : 'default'}
         />
-        <StatCard label={t('platform.overviewPage.cards.newClubsThisMonth')} value={isLoading || isError ? '—' : String(data?.newClubsThisMonth ?? 0)} to="/platform/clubs?created=this_month" />
+        <StatCard label={t('platform.overviewPage.cards.newClubsThisMonth')} value={isLoading || isError ? '—' : String(data?.newClubsThisMonth ?? 0)} to="/platform/clubs?created=this_month" tone="success" />
       </div>
 
       {/* Gate 13 #56: pending action items were invisible platform-wide --
           an upgrade request only surfaced by opening that exact club's
           detail page, and new leads only by opening the Leads page. Both
           need a single glance from the landing dashboard, so they're
-          shown here as actionable links, not duplicated lists. */}
+          shown here as actionable links, not duplicated lists.
+
+          Design remediation: labeled "Needs attention" so this exception
+          panel reads as the control plane's operations queue, not an
+          unexplained second block of cards under the KPI groups above --
+          still only rendered when at least one real exception exists
+          (unchanged exception-first behavior). */}
       {!isLoading &&
         ((data?.pendingUpgradeRequests ?? 0) > 0 ||
           (data?.newLeads ?? 0) > 0 ||
@@ -232,7 +262,11 @@ export function PlatformOverviewPage() {
           (data?.whatsappDisconnectedCount ?? 0) > 0 ||
           (data?.whatsappFailuresCount ?? 0) > 0 ||
           (data?.flaggedDuplicateClubs ?? 0) > 0) && (
-        <div className="mt-4 grid grid-cols-1 gap-4 md:grid-cols-2">
+        <>
+        <p className="mb-2 mt-5 text-xs font-semibold uppercase tracking-wide text-text-secondary">
+          {t('platform.overviewPage.groups.needsAttention', { defaultValue: 'Needs attention' })}
+        </p>
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
           {/* Phase E directive: the single largest operational gap the
               audit found -- zero WhatsApp visibility platform-wide.
               Only surfaces when there's a real issue (per the exception-
@@ -333,9 +367,18 @@ export function PlatformOverviewPage() {
             </Link>
           )}
         </div>
+        </>
       )}
 
-      <Card className="mt-4">
+      {/* Design remediation: grouped under the same "Commercial signals"
+          framing as the trial/renewal/growth cards above -- a bare,
+          unlabeled Card previously sat disconnected below the exception
+          panel with no visual link to the KPI groups it actually belongs
+          with. Same data/query, presentation only. */}
+      <p className="mb-2 mt-5 text-xs font-semibold uppercase tracking-wide text-text-secondary">
+        {t('platform.overviewPage.groups.revenue', { defaultValue: 'Revenue' })}
+      </p>
+      <Card>
         <CardHeader>
           <CardTitle className="text-base">{t('platform.overviewPage.revenueThisMonth')}</CardTitle>
         </CardHeader>

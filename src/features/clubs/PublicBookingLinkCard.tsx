@@ -130,6 +130,15 @@ export function PublicBookingLinkCard() {
     const url = await QRCode.toDataURL(publicUrl, { width: 640, margin: 1 })
     const printWindow = window.open('', '_blank')
     if (!printWindow) return
+    // VISUAL AUDIT B2 (2026-09-05): #444/#888 below are intentionally
+    // literal, not a token-duplication bug — this markup is written via
+    // document.write() into a brand-new, separate HTML document opened
+    // in its own window, which has no access to the app's index.css
+    // custom properties (var(--color-text-secondary) would not resolve
+    // here). Kept as documented literals instead: #444 approximates
+    // --color-text-primary (#111827) at reduced weight for the tagline,
+    // #888 approximates --color-text-secondary (#667085) for the small
+    // brand footer line. If those tokens are ever retuned, revisit here too.
     printWindow.document.write(`<!doctype html><html><head><title>${club.name}</title><style>
       body { font-family: system-ui, sans-serif; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; margin: 0; text-align: center; }
       h1 { font-size: 28px; margin-bottom: 4px; }

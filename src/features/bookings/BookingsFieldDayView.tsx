@@ -7,6 +7,8 @@ import { cn } from '@/lib/utils'
 import { BOOKING_STATUS_LABELS, BOOKING_STATUS_TONE, FIELD_BLOCK_TYPE_LABELS, type BookingRow, type FieldBlockRow } from '@/lib/domain/booking'
 import { StatusBadge } from '@/components/ui/status-badge'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { EmptyState } from '@/components/ui/empty-state'
+import { Skeleton } from '@/components/ui/skeleton'
 import { useResolvedFieldPrice } from './useFieldPricing'
 import { fromInstant, formatInstant } from '@/lib/domain/time'
 import { useDirection } from '@/app/providers/DirectionProvider'
@@ -208,15 +210,16 @@ export function BookingsFieldDayView({
         {availabilityLoading ? (
           <div className="flex flex-col gap-2">
             {[0, 1, 2, 3, 4].map((i) => (
-              <div key={i} className="h-12 animate-pulse rounded-lg bg-muted/40" />
+              <Skeleton key={i} className="h-12 w-full rounded-lg" />
             ))}
           </div>
         ) : isClosedAllDay ? (
-          <div className="flex flex-col items-center gap-2 rounded-lg border border-dashed border-border py-16 text-center">
-            <CalendarX2 className="size-10 text-text-secondary/50" />
-            <p className="text-sm font-medium text-text-secondary">{t('bookings.mobile.fieldClosedToday')}</p>
-            <p className="text-xs text-text-secondary/70">{t('bookings.mobile.fieldClosedTodayHint')}</p>
-          </div>
+          <EmptyState
+            icon={CalendarX2}
+            title={t('bookings.mobile.fieldClosedToday')}
+            description={t('bookings.mobile.fieldClosedTodayHint')}
+            className="rounded-lg border border-dashed border-border py-16"
+          />
         ) : (
           <div className="grid grid-cols-2 gap-2 xl:grid-cols-3">
             {timeline.map((item) => {

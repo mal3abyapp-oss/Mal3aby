@@ -221,6 +221,9 @@ export function MembershipsSection() {
     {
       key: 'name',
       header: t('academy.memberships.name'),
+      // Mobile card title line (see DataTable's `cardPriority`) -- same
+      // click-to-open-detail button as the table cell.
+      cardPriority: 'primary',
       render: (m) => (
         <button className="font-medium text-accent-foreground hover:underline" onClick={() => setSelectedMembership(m)}>
           {m.name}
@@ -293,6 +296,7 @@ export function MembershipsSection() {
         isLoading={isLoading}
         emptyTitle={t('academy.memberships.emptyTitle')}
         emptyDescription={t('academy.memberships.emptyDescription')}
+        variant="cards-on-mobile"
       />
 
       {selectedMembership && (

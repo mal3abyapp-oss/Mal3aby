@@ -6,8 +6,13 @@ import QRCode from 'qrcode'
 import { supabase } from '@/lib/supabase/client'
 import { PageHeader } from '@/components/ui/page-header'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { EmptyState } from '@/components/ui/empty-state'
+import { ErrorState } from '@/components/ui/error-state'
+import { Skeleton } from '@/components/ui/skeleton'
+import { translateSupabaseError } from '@/lib/errors'
 import { useDirection } from '@/app/providers/DirectionProvider'
 import { usePortalClub } from '@/app/providers/PortalClubProvider'
+import { QrCode } from 'lucide-react'
 
 // Gate 3 — "My QR": shows a scannable QR for a selected upcoming
 // booking. Reuses the same ensure_booking_qr() RPC the staff-side
@@ -61,7 +66,7 @@ export function PortalQrPage() {
   // indistinguishable from a customer with genuinely none. isError is
   // now surfaced as a distinct inline message, matching the sibling
   // PortalAcademyPage/PortalMembershipsPage pattern.
-  const { data: allBookings = [], isLoading, isError } = useQuery({
+  const { data: allBookings = [], isLoading, isError, error, refetch } = useQuery({
     queryKey: ['portal', 'qr-bookings'],
     queryFn: fetchUpcomingBookings,
     enabled: !!activeCustomerId,
@@ -169,8 +174,10 @@ export function PortalQrPage() {
     <div className="flex flex-col gap-5">
       <PageHeader title={t('portal.qrPage.title')} description={t('portal.qrPage.description')} />
 
-      {(isLoading || clubLoading) && <p className="text-sm text-text-secondary">{t('portal.qrPage.loading')}</p>}
-      {isError && <p className="text-sm text-status-danger">{t('portal.qrPage.loadError')}</p>}
+      {(isLoading || clubLoading) && <Skeleton className="h-10 w-full rounded-md" />}
+      {isError && (
+        <ErrorState message={translateSupabaseError(error, t('portal.qrPage.loadError'))} onRetry={() => void refetch()} />
+      )}
 
       {!isLoading && !isError && preselectNotFound && (
         <p role="alert" className="rounded-lg border border-status-warning/30 bg-status-warning/5 p-3 text-sm text-status-warning">
@@ -196,9 +203,7 @@ export function PortalQrPage() {
       )}
 
       {!isLoading && !isError && bookings.length === 0 && (
-        <p className="rounded-lg border border-dashed border-border p-6 text-center text-sm text-text-secondary">
-          {t('portal.qrPage.emptyTitle')}
-        </p>
+        <EmptyState icon={QrCode} title={t('portal.qrPage.emptyTitle')} description={t('portal.qrPage.emptyHint')} />
       )}
 
       {!isError && bookings.length > 0 && (

@@ -114,11 +114,11 @@ Today · Bookings · **Scan** · Academy · More
 
 | Screen | Route | Contents |
 |---|---|---|
-| Home | `/` | Hero (headline + "ابدأ تجربتك المجانية" primary CTA + "تسجيل الدخول" secondary), Suitable For (clubs/academies/fields), Core Features, How It Works (4 steps), Why Mala3by, Pricing preview, 7-Day Trial CTA banner, FAQ, Contact CTA — see [USER_FLOWS.md](USER_FLOWS.md) for the homepage section order |
-| Pricing | `/pricing` | Plan cards sourced from `public_plans` (never hardcoded) — name, duration, price, discount label, features summary, "ابدأ 7 أيام مجانًا" CTA on every card. No "Buy"/"Checkout"/"Pay" language anywhere (see [ARCHITECTURE.md](ARCHITECTURE.md#public-website--layout-strategy)) |
+| Home | `/` | Hero (headline + "ابدأ تجربتك المجانية" primary CTA + "تسجيل الدخول" secondary), Suitable For (clubs/academies/fields), Core Features, How It Works (4 steps), Why Mala3by, Pricing preview, 14-Day Trial CTA banner, FAQ, Contact CTA — see [USER_FLOWS.md](USER_FLOWS.md) for the homepage section order |
+| Pricing | `/pricing` | Plan cards sourced from `public_plans`, filtered to the current commercial tiers only via `filterPublicCommercialPlans()` (legacy plans excluded) — name, duration, price, discount label, features summary, "ابدأ تجربتك المجانية" CTA on every card. No "Buy"/"Checkout"/"Pay" language anywhere (see [ARCHITECTURE.md](ARCHITECTURE.md#public-website--layout-strategy)) |
 | Contact | `/contact` | Phone, WhatsApp link (plain `wa.me` link, not the WhatsApp Business API), email, contact form (writes to `contact_requests`) |
 | Login | `/login` | Email, Password, Login button, "نسيت كلمة المرور؟" link, "ليس لديك حساب؟ ابدأ تجربتك المجانية" link to `/signup` |
-| Signup | `/signup` | Name, Mobile, Email, Password, Confirm Password, Accept Terms checkbox, "ابدأ تجربتك المجانية لمدة 7 أيام" CTA |
+| Signup | `/signup` | Name, Mobile, Email, Password, Confirm Password, Accept Terms checkbox, "ابدأ تجربتك المجانية لمدة 14 يومًا" CTA |
 | Forgot Password | `/forgot-password` | Email input, Supabase Auth reset-email trigger |
 | Reset Password | `/reset-password` | New password + confirm, via Supabase Auth's reset token flow |
 | Terms | `/terms` | Static content — placeholder legal text acceptable for V1, route must exist (see [DECISIONS.md](DECISIONS.md) brief Section 37) |
@@ -129,7 +129,7 @@ Today · Bookings · **Scan** · Academy · More
 | Screen | Route | Contents |
 |---|---|---|
 | New Club Setup (4-step wizard) | `/onboarding` | Step 1: Business Type (نادي/أكاديمية/ملاعب/مركز رياضي — classification label only). Step 2: Basic Details (club name, phone, city, address optional). Step 3: First Branch (branch name, city — can default from club details). Step 4: Trial Activation confirmation, then `complete_new_club_onboarding()` fires |
-| Onboarding Success | `/onboarding/success` (or a final wizard step) | "تم إنشاء ناديك بنجاح" + "تم تفعيل التجربة المجانية لمدة 7 أيام" + "ابدأ الإعداد" CTA into `/app` |
+| Onboarding Success | `/onboarding/success` (or a final wizard step) | "تم إنشاء ناديك بنجاح" + "تم تفعيل التجربة المجانية لمدة 14 يومًا" + "ابدأ الإعداد" CTA into `/app` |
 | First-Run Checklist | shown in `/app` dashboard, not a separate route | Dismissible checklist: ✓ club created, ✓ branch created, □ add a field, □ add a staff member, □ add a first customer, □ create a first booking — see [DECISIONS.md ADR-043](DECISIONS.md#adr-043--first-run-setup-is-a-checklist-not-a-multi-step-wizard) |
 
 ## Platform Owner Screen Inventory (`/platform`, Phase 3c)

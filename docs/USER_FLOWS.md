@@ -191,8 +191,8 @@ Anonymous visitor
                         no platform_subscriptions row created, club/branch/membership still committed
   → Onboarding outcome, one of two known business outcomes (neither is an error):
       trial_granted = true:
-        "تم إنشاء ناديك بنجاح" + "تم تفعيل التجربة المجانية لمدة 7 أيام"
-        → "ابدأ الإعداد" CTA → enters /app → Trial banner: "التجربة المجانية: متبقي 7 أيام"
+        "تم إنشاء ناديك بنجاح" + "تم تفعيل التجربة المجانية لمدة 14 يومًا"
+        → "ابدأ الإعداد" CTA → enters /app → Trial banner: "التجربة المجانية: متبقي 14 يومًا"
         → Club operates fully (get_club_platform_access() returns 'full') during the trial
       trial_granted = false:
         "تم إنشاء النادي" + "الاشتراك مطلوب" (Club Created — Subscription Required)

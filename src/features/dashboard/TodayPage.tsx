@@ -144,15 +144,65 @@ function QuickActionButtons({ isManager }: { isManager: boolean }) {
   )
 }
 
+// STAFF ACCESS CONTROL & CUSTOM ROLES fix (2026-09-05): this screen used
+// to gate every section on roleKey string equality against the 5
+// built-in system role names, so a custom role (roleKey is always null
+// for those -- see membership.ts) fell through every check and saw a
+// near-empty dashboard regardless of its actual permission set --
+// exactly the "fail CLOSED, hidden content, not a real permission
+// model" bug navigation.ts's own header comment already documents and
+// fixes for nav visibility. Fixed the same way: derive visibility from
+// ActiveMembership.permissionKeys (real, server-computed via
+// caller_permission_keys()) instead of roleKey, so a custom role with
+// manager-equivalent permissions sees the manager-equivalent dashboard
+// sections. Behavior-preserving for every built-in role -- each
+// predicate below was reconstructed from and verified against
+// docs/STAFF_PERMISSION_MATRIX.md's live-verified permission rows for
+// club_owner/club_manager/branch_manager/receptionist/coach, not
+// guessed:
+//   - isManager: club_owner ✅ everything; club_manager ✅ via
+//     staff.view/staff.create/staff.update/roles.view/roles.manage;
+//     branch_manager ✅ via branch.update/field.update (it does NOT
+//     hold staff.view -- confirmed live, so staff.* alone would have
+//     wrongly excluded it). Reception/accountant/academy-mgr/coach/
+//     scanner hold none of these keys.
+//   - isOwner: club.update is club_owner-exclusive among the 8 keys
+//     above (branch_manager/club_manager both lack it, live-verified).
+//   - isReception: booking.view is held by exactly
+//     owner/manager/branch_manager/reception and no one else
+//     (live-verified) -- reception-equivalent is "has it but isn't
+//     already a manager", so a manager-equivalent role isn't
+//     double-counted as reception too.
+// Reused the same NAV_DOMAIN_PERMISSIONS keys navigation.ts already
+// derives (staff/settings/bookings domains) rather than inventing a new
+// permission grouping for this screen.
+const MANAGER_PERMISSION_KEYS = [
+  'staff.view', 'staff.create', 'staff.update', 'roles.view', 'roles.manage',
+  'branch.update', 'field.update', 'club.update',
+] as const
+
+function hasAnyPermission(permissionKeys: readonly string[] | undefined, keys: readonly string[]): boolean {
+  if (!permissionKeys || permissionKeys.length === 0) return false
+  return keys.some((key) => permissionKeys.includes(key))
+}
+
 export function TodayPage() {
   const { t } = useTranslation()
   const { currentClubId, currentMembership } = useAuth()
   const { locale } = useDirection()
   const roleKey = currentMembership?.roleKey
+  const permissionKeys = currentMembership?.permissionKeys
 
-  const isManager = roleKey === 'club_owner' || roleKey === 'club_manager' || roleKey === 'branch_manager'
-  const isOwner = roleKey === 'club_owner'
-  const isReception = roleKey === 'receptionist'
+  const isManager = hasAnyPermission(permissionKeys, MANAGER_PERMISSION_KEYS)
+  const isOwner = hasAnyPermission(permissionKeys, ['club.update'])
+  const isReception = !isManager && hasAnyPermission(permissionKeys, ['booking.view'])
+  // Coach delegation stays roleKey-gated: CoachTodayView is a
+  // coach-specific UI (sessions/attendance only), a materially
+  // different component to route into, not a section-visibility toggle
+  // on this screen -- out of this fix's scope (a custom role with
+  // coach-equivalent permissions still gets the sections above it
+  // qualifies for, same as before this fix, since it never matched
+  // roleKey === 'coach' either).
   const isCoach = roleKey === 'coach'
 
   const { data, isLoading } = useQuery({

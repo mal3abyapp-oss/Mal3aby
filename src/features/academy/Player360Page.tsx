@@ -30,7 +30,9 @@ import {
 } from '@/components/ui/dialog'
 import { formatMoney, PAYMENT_STATUS_LABELS, PAYMENT_STATUS_TONE, type PaymentStatus } from '@/lib/domain/billing'
 import { SUBSCRIPTION_PLAN_LABELS } from '@/lib/domain/academy'
-import { ArrowLeft, Wallet, GraduationCap, UsersRound, CalendarCheck } from 'lucide-react'
+import { ArrowLeft, Wallet, GraduationCap, UsersRound, CalendarCheck, UserX } from 'lucide-react'
+import { EmptyState } from '@/components/ui/empty-state'
+import { Skeleton } from '@/components/ui/skeleton'
 
 // Academy Player/Guardian/Customer integrity closure: Player 360, the
 // canonical detail/edit location for a player, matching Customer 360's
@@ -192,17 +194,26 @@ export function Player360Page() {
 
   if (isError) {
     return (
-      <div className="flex flex-col items-start gap-2 p-4 text-sm">
-        <p className="text-status-danger">{t('academy.players.playerNotFoundOrDenied', { defaultValue: "This player couldn't be found, or you don't have access to view them." })}</p>
-        <button onClick={() => navigate('/app/academy')} className="text-accent-foreground hover:underline">
-          {t('academy.title', { defaultValue: 'Academy' })}
-        </button>
-      </div>
+      <EmptyState
+        icon={UserX}
+        title={t('academy.players.playerNotFoundOrDenied', { defaultValue: "This player couldn't be found, or you don't have access to view them." })}
+        action={
+          <Button variant="outline" size="sm" onClick={() => navigate('/app/academy')}>
+            {t('academy.title', { defaultValue: 'Academy' })}
+          </Button>
+        }
+      />
     )
   }
 
   if (isLoading || !summary) {
-    return <div className="p-4 text-sm text-text-secondary">{t('common.loading')}</div>
+    return (
+      <div className="flex flex-col gap-3 p-4">
+        <Skeleton className="h-8 w-1/3" />
+        <Skeleton className="h-24 w-full" />
+        <Skeleton className="h-24 w-full" />
+      </div>
+    )
   }
 
   const p = summary.player

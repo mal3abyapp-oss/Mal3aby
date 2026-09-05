@@ -3,8 +3,13 @@ import { useTranslation } from 'react-i18next'
 import { supabase } from '@/lib/supabase/client'
 import { PageHeader } from '@/components/ui/page-header'
 import { StatusBadge } from '@/components/ui/status-badge'
+import { EmptyState } from '@/components/ui/empty-state'
+import { ErrorState } from '@/components/ui/error-state'
+import { Skeleton } from '@/components/ui/skeleton'
+import { translateSupabaseError } from '@/lib/errors'
 import { usePortalClub } from '@/app/providers/PortalClubProvider'
 import { useDirection } from '@/app/providers/DirectionProvider'
+import { GraduationCap } from 'lucide-react'
 
 // Gate 3 — My Academies / My Children: shows every player linked to
 // this account as a guardian (via guardian_links), each with their
@@ -95,7 +100,7 @@ export function PortalAcademyPage() {
   const { t } = useTranslation()
   const { locale } = useDirection()
   const { isLoading: clubLoading } = usePortalClub()
-  const { data: players = [], isLoading, error } = useQuery({
+  const { data: players = [], isLoading, error, refetch } = useQuery({
     queryKey: ['portal', 'my-players'],
     queryFn: fetchMyPlayers,
     enabled: !clubLoading,
@@ -113,13 +118,18 @@ export function PortalAcademyPage() {
     <div className="flex flex-col gap-5">
       <PageHeader title={t('portal.academyPage.title')} description={t('portal.academyPage.description')} />
 
-      {isLoading && <p className="text-sm text-text-secondary">{t('portal.academyPage.loading')}</p>}
-      {error && <p className="text-sm text-status-danger">{t('portal.academyPage.loadError')}</p>}
+      {isLoading && (
+        <div className="flex flex-col gap-2">
+          <Skeleton className="h-16 w-full rounded-lg" />
+          <Skeleton className="h-16 w-full rounded-lg" />
+        </div>
+      )}
+      {!!error && (
+        <ErrorState message={translateSupabaseError(error, t('portal.academyPage.loadError'))} onRetry={() => void refetch()} />
+      )}
 
-      {!isLoading && players.length === 0 && (
-        <p className="rounded-lg border border-dashed border-border p-6 text-center text-sm text-text-secondary">
-          {t('portal.academyPage.emptyTitle')}
-        </p>
+      {!isLoading && !error && players.length === 0 && (
+        <EmptyState icon={GraduationCap} title={t('portal.academyPage.emptyTitle')} description={t('portal.academyPage.emptyHint')} />
       )}
 
       {players.map((p) => {

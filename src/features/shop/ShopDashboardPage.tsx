@@ -10,6 +10,7 @@ import { StatCard } from '@/components/ui/stat-card'
 import { MoneyDisplay } from '@/components/ui/money-display'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
+import { Skeleton } from '@/components/ui/skeleton'
 import { PAYMENT_METHOD_LABELS } from '@/lib/domain/billing'
 import {
   Wallet, ShoppingBag, TrendingUp, Package2, Undo2, AlertTriangle, XCircle, Receipt,
@@ -378,7 +379,7 @@ export function ShopDashboardPage() {
         <div>
           <h2 className="mb-2 text-lg font-semibold">{t('shop.dashboard.salesByCategory')}</h2>
           {categorySalesLoading ? (
-            <Card><CardContent className="p-4"><div className="h-24 animate-pulse rounded bg-muted" /></CardContent></Card>
+            <Card><CardContent className="p-4"><Skeleton className="h-24 w-full" /></CardContent></Card>
           ) : categorySales.length === 0 ? (
             <Card><CardContent className="p-4 text-sm text-text-secondary">{t('shop.dashboard.emptySales')}</CardContent></Card>
           ) : (
@@ -403,7 +404,7 @@ export function ShopDashboardPage() {
         <div>
           <h2 className="mb-2 text-lg font-semibold">{t('shop.dashboard.paymentMethodMix')}</h2>
           {paymentMixLoading ? (
-            <Card><CardContent className="p-4"><div className="h-24 animate-pulse rounded bg-muted" /></CardContent></Card>
+            <Card><CardContent className="p-4"><Skeleton className="h-24 w-full" /></CardContent></Card>
           ) : paymentMix.length === 0 ? (
             <Card><CardContent className="p-4 text-sm text-text-secondary">{t('shop.dashboard.emptySales')}</CardContent></Card>
           ) : (
