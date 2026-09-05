@@ -29,6 +29,26 @@ export interface PaymentRow {
   officialReceiptStatus: string | null
 }
 
+// COMMERCIAL PACKAGING (2026-09-04): public_plans contains 2 surviving
+// legacy plans (Monthly/Annual, display_order 1/4) kept is_public=true
+// ONLY because real existing subscriptions still reference them (see
+// MAL3ABY_V1_PRICING_MIGRATION.md) — they must NEVER be offered to new
+// customers on any public/authenticated commercial surface. Filtering
+// is a frontend display decision, not a database change.
+//
+// P0 fix (2026-09-05): this filter used to live only inside
+// PricingPage.tsx (as NEW_COMMERCIAL_TIER_MIN_DISPLAY_ORDER), so it was
+// never applied to SubscriptionPage.tsx or HomePage.tsx's own
+// public_plans queries — both leaked the legacy 499/4,499 EGP plans
+// live in production. Extracted here as the single shared source of
+// truth so a future 4th commercial surface can't reintroduce the same
+// leak by simply forgetting to copy a local constant.
+export const NEW_COMMERCIAL_TIER_MIN_DISPLAY_ORDER = 10
+
+export function filterPublicCommercialPlans<T extends { display_order: number | null }>(plans: readonly T[]): T[] {
+  return plans.filter((p) => (p.display_order ?? 0) >= NEW_COMMERCIAL_TIER_MIN_DISPLAY_ORDER)
+}
+
 export const PAYMENT_METHOD_LABELS: Record<string, string> = {
   cash: 'نقدًا',
   card: 'بطاقة',

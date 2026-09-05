@@ -7,12 +7,24 @@ import { PageHeader } from '@/components/ui/page-header'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { StatusBadge } from '@/components/ui/status-badge'
 import { Button } from '@/components/ui/button'
+import { MoneyDisplay } from '@/components/ui/money-display'
+import { filterPublicCommercialPlans } from '@/lib/domain/billing'
 
 // Club Owner's own-club subscription view. Scoped to the restricted
 // club_platform_subscription_summary view only — never platform_invoices/
 // platform_payments directly (ADR-035: "own club's commercial summary
 // only"). No self-service payment recording — "contact us to activate"
 // only, matching the no-online-payment-gateway product decision.
+//
+// P0 fix (2026-09-05): fetchPublicPlans() previously selected every
+// row from public_plans with no filter, so the 2 surviving legacy
+// plans (Monthly 499 EGP, Annual 4499 EGP) rendered mixed into
+// "Available Plans", and since the query ordered by raw price
+// ascending, the cheapest legacy plan (499) rendered FIRST -- ahead of
+// the real Starter/Growth/Pro tiers. Now uses the same shared
+// filterPublicCommercialPlans() helper as PricingPage.tsx/HomePage.tsx
+// (src/lib/domain/billing.ts) so this can't drift back out of sync.
+
 const ACCESS_TONE: Record<string, 'success' | 'warning' | 'danger'> = {
   full: 'success',
   grace: 'warning',
@@ -36,9 +48,28 @@ async function fetchSummary(clubId: string) {
 }
 
 async function fetchPublicPlans() {
-  const { data, error } = await supabase.from('public_plans').select('*').order('price')
+  const { data, error } = await supabase.from('public_plans').select('*').order('display_order')
   if (error) throw error
-  return data ?? []
+  // Exclude the 2 surviving legacy plans -- this page must never offer
+  // legacy plans as something a customer can switch TO; a legacy
+  // subscriber's own current plan is already shown separately above
+  // via club_platform_subscription_summary (plan_name_snapshot), not
+  // sourced from this list.
+  return filterPublicCommercialPlans(data ?? [])
+}
+
+// P0 fix (2026-09-05): this CTA used to hardcode wa.me/201000000000, a
+// placeholder platform number that drifted from the real one. The one
+// canonical published platform WhatsApp number lives in
+// platform_settings.platform_phone, read the same way PublicLayout's
+// footer reads it -- via get_platform_contact() -- never a second
+// hardcoded copy. Per-club numbers (whatsapp_number,
+// payment_receipt_whatsapp_number on ClubContactCard) are a separate,
+// legitimately-per-club concern and are not touched here.
+async function fetchPlatformContact() {
+  const { data, error } = await supabase.rpc('get_platform_contact')
+  if (error) throw error
+  return data?.[0] as { platform_phone: string | null; platform_email: string | null } | undefined
 }
 
 export function SubscriptionPage() {
@@ -51,6 +82,12 @@ export function SubscriptionPage() {
     enabled: !!currentClubId,
   })
   const { data: plans = [] } = useQuery({ queryKey: ['public-plans-subscription'], queryFn: fetchPublicPlans })
+  const { data: platformContact } = useQuery({
+    queryKey: ['platform-contact'],
+    queryFn: fetchPlatformContact,
+    staleTime: 5 * 60 * 1000,
+  })
+  const platformWaDigits = platformContact?.platform_phone?.replace(/\D/g, '')
 
   return (
     <div>
@@ -88,18 +125,20 @@ export function SubscriptionPage() {
             {plans.map((p) => (
               <div key={p.name_ar} className="rounded-md border border-border p-3">
                 <p className="font-medium">{p.name_ar}</p>
-                <p className="text-sm text-text-secondary">{p.price} {p.currency}</p>
+                <MoneyDisplay amount={Number(p.price)} currency={p.currency ?? 'EGP'} size="sm" />
               </div>
             ))}
           </div>
           <p className="text-sm text-text-secondary">
             {t('billing.subscriptionPage.contactToActivate')}
           </p>
-          <Button asChild className="w-fit">
-            <a href="https://wa.me/201000000000" target="_blank" rel="noreferrer">
-              {t('billing.subscriptionPage.contactCta')}
-            </a>
-          </Button>
+          {platformWaDigits && (
+            <Button asChild className="w-fit">
+              <a href={`https://wa.me/${platformWaDigits}`} target="_blank" rel="noreferrer">
+                {t('billing.subscriptionPage.contactCta')}
+              </a>
+            </Button>
+          )}
         </CardContent>
       </Card>
     </div>

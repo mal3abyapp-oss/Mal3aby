@@ -192,6 +192,10 @@ export function PlatformClubsPage() {
     {
       key: 'name',
       header: t('platform.clubsPage.columns.club'),
+      // Design remediation (mobile brief): this column already reads as
+      // a natural card title (pin toggle + club name link + duplicate
+      // badge) -- becomes the mobile card's title line.
+      cardPriority: 'primary',
       render: (c) => (
         <div className="flex items-center gap-2">
           <button
@@ -255,6 +259,9 @@ export function PlatformClubsPage() {
     {
       key: 'masterAdminActions',
       header: '',
+      // On mobile cards this same action renders once via
+      // renderCardActions below instead of as a body row.
+      hideOnCard: true,
       render: (c) => (
         <Button variant="outline" size="sm" onClick={() => setOpeningClub({ id: c.id, name_ar: c.name_ar })}>
           {t('masterAdmin.openAction')}
@@ -377,12 +384,23 @@ export function PlatformClubsPage() {
         )}
       </div>
 
+      {/* Design remediation (premium-ui-ux-audit, mobile brief): this is
+          the highest-traffic Platform Owner list (6 columns + a
+          per-row action) -- opts into the existing 'cards-on-mobile'
+          variant instead of forced horizontal scroll on narrow
+          viewports. Same rows/columns/links/actions, presentation only. */}
       <DataTable
         columns={columns}
         rows={clubs}
         rowKey={(c) => c.id}
         isLoading={isLoading}
         emptyTitle={t('platform.clubsPage.emptyTitle')}
+        variant="cards-on-mobile"
+        renderCardActions={(c) => (
+          <Button variant="outline" size="sm" onClick={() => setOpeningClub({ id: c.id, name_ar: c.name_ar })}>
+            {t('masterAdmin.openAction')}
+          </Button>
+        )}
       />
 
       {totalCount > 0 && (

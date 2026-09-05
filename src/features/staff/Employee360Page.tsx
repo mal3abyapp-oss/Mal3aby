@@ -29,7 +29,9 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import { Wallet, Wrench, Banknote, Activity, ArrowLeft, KeyRound } from 'lucide-react'
+import { Wallet, Wrench, Banknote, Activity, ArrowLeft, KeyRound, UserX } from 'lucide-react'
+import { EmptyState } from '@/components/ui/empty-state'
+import { Skeleton } from '@/components/ui/skeleton'
 
 // Staff 360 directive: Employee 360 is a PROJECTION over the existing
 // identity/finance sources -- club_memberships + cash_shifts +
@@ -243,17 +245,26 @@ export function Employee360Page() {
 
   if (isError) {
     return (
-      <div className="flex flex-col items-start gap-2 p-4 text-sm">
-        <p className="text-status-danger">{t('staff.detail.notFoundOrDenied', { defaultValue: "This employee couldn't be found, or you don't have access to view them." })}</p>
-        <button onClick={() => navigate('/app/staff')} className="text-accent-foreground hover:underline">
-          {t('staff.title')}
-        </button>
-      </div>
+      <EmptyState
+        icon={UserX}
+        title={t('staff.detail.notFoundOrDenied', { defaultValue: "This employee couldn't be found, or you don't have access to view them." })}
+        action={
+          <Button variant="outline" size="sm" onClick={() => navigate('/app/staff')}>
+            {t('staff.title')}
+          </Button>
+        }
+      />
     )
   }
 
   if (isLoading || !summary) {
-    return <div className="p-4 text-sm text-text-secondary">{t('common.loading', { defaultValue: 'Loading...' })}</div>
+    return (
+      <div className="flex flex-col gap-3 p-4">
+        <Skeleton className="h-8 w-1/3" />
+        <Skeleton className="h-24 w-full" />
+        <Skeleton className="h-24 w-full" />
+      </div>
+    )
   }
 
   const m = summary.membership

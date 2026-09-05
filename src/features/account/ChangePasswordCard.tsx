@@ -5,6 +5,7 @@ import { supabase } from '@/lib/supabase/client'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { FormLabel } from '@/components/ui/form-label'
 import { Eye, EyeOff } from 'lucide-react'
 
 // Platform Owner & Password Security directive: self-service password
@@ -49,7 +50,7 @@ function PasswordInput({
   const [visible, setVisible] = useState(false)
   return (
     <div className="flex flex-col gap-1.5">
-      <label htmlFor={id} className="text-sm font-medium text-text-secondary">{label}</label>
+      <FormLabel htmlFor={id} required>{label}</FormLabel>
       <div className="relative">
         <Input
           id={id}

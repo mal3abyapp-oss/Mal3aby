@@ -15,23 +15,24 @@ Mala3by must read as a **Modern Sports Operations SaaS** — not an old-style ER
 Design-direction starting values — treated as a direction to validate during Design QA (Phase 1), not immutable hex codes. A shade may be nudged for contrast/legibility while keeping the same brand identity.
 
 ```
---color-dark-base:       #0B1220   /* primary dark surface — sidebar, platform console dark areas */
---color-dark-secondary:  #111827   /* secondary dark surface */
---color-accent:          #B7F34A   /* electric lime / sports green — primary actions, CTAs */
---color-page-bg:         #F7F8FA   /* light content page background */
---color-surface:         #FFFFFF   /* cards, panels */
---color-text-primary:    #111827
---color-text-secondary:  #667085
+--color-dark-base:        #0B1220   /* primary dark surface — sidebar, platform console dark areas */
+--color-dark-secondary:   #111827   /* secondary dark surface */
+--color-accent:           #B7F34A   /* electric lime / sports green — primary actions, CTAs, selected state, brand signature. Small-touchpoint use only (buttons, badges, active-state indicators) — never a full-section/full-card background fill. */
+--color-accent-emphasis:  #4E7500   /* darker-lime TEXT variant of --color-accent — the raw accent fails contrast as text on light backgrounds (~1.6:1); use this instead for lime-toned eyebrow labels/underlines/links on light surfaces. Added 2026-09-05 (visual audit B1) to replace a hand-typed near-duplicate hex (#5B8A00) in HomePage.tsx; darkened from an initial #568200 to #4E7500 (independent review F1) after the first value failed AA (4.5:1) against --color-page-bg. Clears 5.43:1 against --color-surface and 5.11:1 against --color-page-bg. */
+--color-page-bg:          #F7F8FA   /* light content page background */
+--color-surface:          #FFFFFF   /* cards, panels */
+--color-text-primary:     #111827
+--color-text-secondary:   #667085
 ```
 
-**Semantic status tokens** — used for booking/subscription/payment/alert status, never a bespoke color per screen:
+**Semantic status tokens** — used for booking/subscription/payment/alert status, never a bespoke color per screen. Values below were darkened 2026-09-05 (accessibility audit RTL-A11Y-01) within each original hue family so `text-status-*` clears WCAG AA (4.5:1) when used directly as text color — the original, lighter values (success #12B76A, warning #F79009, danger #F04438, info #2E90FA, neutral #98A2B3) measured 2.35:1–3.76:1 as text and only passed as icon/badge-tint accents:
 
 ```
---status-success   (confirmed, paid, active, checked-in)
---status-warning    (pending, expiring soon, grace period)
---status-danger     (cancelled, overdue, expired, void)
---status-info        (informational, upcoming)
---status-neutral     (draft, inactive, no-show)
+--status-success:  #0B7A45   (confirmed, paid, active, checked-in)
+--status-warning:  #A35F06   (pending, expiring soon, grace period)
+--status-danger:   #DC2418   (cancelled, overdue, expired, void)
+--status-info:     #0468D7   (informational, upcoming)
+--status-neutral:  #64718A   (draft, inactive, no-show)
 ```
 
 **Status is never color-only.** Every status indicator pairs its color with an icon and a text label (see [DECISIONS.md](DECISIONS.md) Accessibility principles) — a colorblind user or a low-contrast screen in bright daylight must still be able to read a booking's state from the label alone.

@@ -9,6 +9,7 @@ import { MoneyDisplay } from '@/components/ui/money-display'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 import { CheckCircle2 } from 'lucide-react'
+import { NEW_COMMERCIAL_TIER_MIN_DISPLAY_ORDER } from '@/lib/domain/billing'
 
 // public_plans-sourced only, no hardcoded prices, no "Buy"/"Checkout"
 // language anywhere on this page — see docs/ARCHITECTURE.md
@@ -25,7 +26,12 @@ import { CheckCircle2 } from 'lucide-react'
 // Filtering on this is a frontend display decision, not a database
 // change — the legacy plans stay technically public for their own
 // existing-subscriber reasons, this page simply never surfaces them.
-const NEW_COMMERCIAL_TIER_MIN_DISPLAY_ORDER = 10
+//
+// P0 fix (2026-09-05): this threshold is now imported from
+// src/lib/domain/billing.ts, shared with SubscriptionPage.tsx (and any
+// future commercial surface), after that page was found live-leaking
+// the legacy 499/4,499 EGP plans by keeping its own local copy of this
+// same idea unfiltered. Single source of truth prevents recurrence.
 
 interface PublicPlanRow {
   id: string

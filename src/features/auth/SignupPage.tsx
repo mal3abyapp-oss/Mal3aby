@@ -5,6 +5,7 @@ import { supabase } from '@/lib/supabase/client'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { FormLabel } from '@/components/ui/form-label'
 
 // Supabase Auth's built-in signup flow — no custom password-reset/
 // verification system (ADR-041). On success, redirect to /onboarding
@@ -67,15 +68,15 @@ export function SignupPage() {
           ) : (
             <form onSubmit={handleSubmit} className="flex flex-col gap-4">
               <div className="flex flex-col gap-1.5">
-                <label htmlFor="full-name" className="text-sm font-medium text-text-secondary">
+                <FormLabel htmlFor="full-name" required>
                   {t('auth.fullNameLabel')}
-                </label>
+                </FormLabel>
                 <Input id="full-name" required value={fullName} onChange={(e) => setFullName(e.target.value)} />
               </div>
               <div className="flex flex-col gap-1.5">
-                <label htmlFor="signup-email" className="text-sm font-medium text-text-secondary">
+                <FormLabel htmlFor="signup-email" required>
                   {t('auth.emailLabel')}
-                </label>
+                </FormLabel>
                 <Input
                   id="signup-email"
                   type="email"
@@ -86,9 +87,9 @@ export function SignupPage() {
                 />
               </div>
               <div className="flex flex-col gap-1.5">
-                <label htmlFor="signup-password" className="text-sm font-medium text-text-secondary">
+                <FormLabel htmlFor="signup-password" required>
                   {t('auth.passwordLabel')}
-                </label>
+                </FormLabel>
                 <Input
                   id="signup-password"
                   type="password"

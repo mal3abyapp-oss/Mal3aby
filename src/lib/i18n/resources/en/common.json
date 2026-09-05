@@ -51,7 +51,9 @@
     "scan": "Scan",
     "logout": "Log out",
     "shop": "Shop",
-    "help": "How to Use"
+    "help": "How to Use",
+    "sidebarAria": "Main navigation",
+    "mobileNavAria": "Mobile navigation"
   },
   "portal": {
     "nav": {
@@ -72,6 +74,7 @@
       "loading": "Loading...",
       "loadError": "Couldn't load the data.",
       "emptyTitle": "No players are linked to your account yet.",
+      "emptyHint": "Once your child is enrolled in the academy, their details and subscription status will show up here.",
       "notEnrolled": "Not currently enrolled",
       "subscriptionUntil": "Until {{date}}"
     },
@@ -81,6 +84,7 @@
       "loading": "Loading...",
       "loadError": "Couldn't load your bookings. Please try again.",
       "emptyTitle": "No bookings yet.",
+      "emptyHint": "Once you book a field, it'll show up here along with its payment status.",
       "upcoming": "Upcoming",
       "past": "Past",
       "outstandingChip": "{{amount}} EGP outstanding",
@@ -96,6 +100,7 @@
       "wrongClubInvoice": "This invoice belongs to a different club you're linked to.",
       "switchClubAction": "Switch to that club",
       "emptyTitle": "No invoices yet.",
+      "emptyHint": "Any invoice you owe will show up here, along with its payment status and the available payment methods.",
       "total": "Total {{amount}}",
       "paid": "Paid {{amount}}",
       "outstanding": "Outstanding {{amount}}",
@@ -146,6 +151,7 @@
       "wrongClubBooking": "This booking belongs to a different club you're linked to.",
       "switchClubAction": "Switch to that club",
       "emptyTitle": "No upcoming bookings.",
+      "emptyHint": "Once a new booking of yours is confirmed, it'll show up here so you can view its entry code.",
       "choosePlaceholder": "Choose a booking to view its code",
       "generateError": "Couldn't generate the QR code for this booking.",
       "generating": "Generating the code...",
@@ -476,6 +482,10 @@
     "clubDetailPage": {
       "loadingTitle": "...",
       "loadError": "Some of this club's data failed to load. Numbers or status shown below may be stale or missing -- refresh before making a decision.",
+      "groups": {
+        "tenantOverview": "Tenant overview",
+        "commercialOperations": "Commercial & operations"
+      },
       "limitTypeLabels": {
         "branch_limit": "Branches",
         "field_limit": "Fields",
@@ -824,6 +834,12 @@
       "title": "Overview",
       "description": "Platform performance summary",
       "loadError": "Could not load the dashboard. The numbers below may be wrong or missing.",
+      "groups": {
+        "tenantHealth": "Tenant health",
+        "commercialSignals": "Commercial signals",
+        "needsAttention": "Needs attention",
+        "revenue": "Revenue"
+      },
       "cards": {
         "totalClubs": "Total clubs",
         "activeClubs": "Active clubs",

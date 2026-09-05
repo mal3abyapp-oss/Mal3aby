@@ -5,12 +5,16 @@ import { supabase } from '@/lib/supabase/client'
 import { StatusBadge } from '@/components/ui/status-badge'
 import { PageHeader } from '@/components/ui/page-header'
 import { MoneyDisplay } from '@/components/ui/money-display'
+import { EmptyState } from '@/components/ui/empty-state'
+import { ErrorState } from '@/components/ui/error-state'
+import { Skeleton } from '@/components/ui/skeleton'
 import { BOOKING_STATUS_LABELS, BOOKING_STATUS_TONE } from '@/lib/domain/booking'
 import { formatInstant } from '@/lib/domain/time'
 import { fetchInvoicePaymentSummaries, type InvoicePaymentSummary } from '@/lib/domain/billing'
+import { translateSupabaseError } from '@/lib/errors'
 import { useDirection } from '@/app/providers/DirectionProvider'
 import { usePortalClub } from '@/app/providers/PortalClubProvider'
-import { QrCode, Receipt } from 'lucide-react'
+import { CalendarDays, QrCode, Receipt } from 'lucide-react'
 
 // Gate 3 — first real screen of the Unified User Dashboard: My
 // Bookings. Read-only (see bookings_self_service_select RLS policy) --
@@ -94,7 +98,7 @@ export function PortalBookingsPage() {
   // indistinguishable from a customer with genuinely no bookings.
   // isError is now surfaced as a distinct inline message, matching the
   // sibling PortalAcademyPage/PortalMembershipsPage pattern.
-  const { data: allBookings = [], isLoading, isError } = useQuery({
+  const { data: allBookings = [], isLoading, isError, error, refetch } = useQuery({
     queryKey: ['portal', 'my-bookings'],
     queryFn: fetchMyBookings,
     enabled: !!activeCustomerId,
@@ -120,13 +124,18 @@ export function PortalBookingsPage() {
     <div className="flex flex-col gap-5">
       <PageHeader title={t('portal.bookingsPage.title')} description={t('portal.bookingsPage.description')} />
 
-      {(isLoading || clubLoading) && <p className="text-sm text-text-secondary">{t('portal.bookingsPage.loading')}</p>}
-      {isError && <p className="text-sm text-status-danger">{t('portal.bookingsPage.loadError')}</p>}
+      {(isLoading || clubLoading) && (
+        <div className="flex flex-col gap-2">
+          <Skeleton className="h-24 w-full rounded-lg" />
+          <Skeleton className="h-24 w-full rounded-lg" />
+        </div>
+      )}
+      {isError && (
+        <ErrorState message={translateSupabaseError(error, t('portal.bookingsPage.loadError'))} onRetry={() => void refetch()} />
+      )}
 
       {!isLoading && !clubLoading && !isError && bookings.length === 0 && (
-        <p className="rounded-lg border border-dashed border-border p-6 text-center text-sm text-text-secondary">
-          {t('portal.bookingsPage.emptyTitle')}
-        </p>
+        <EmptyState icon={CalendarDays} title={t('portal.bookingsPage.emptyTitle')} description={t('portal.bookingsPage.emptyHint')} />
       )}
 
       {upcoming.length > 0 && (

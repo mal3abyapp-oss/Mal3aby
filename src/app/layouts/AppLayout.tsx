@@ -243,12 +243,23 @@ export function AppLayout() {
           </div>
         )}
 
-        <nav className="flex flex-1 flex-col gap-4 px-2">
+        <nav aria-label={t('nav.sidebarAria')} className="flex flex-1 flex-col gap-1 px-2">
           {visibleNavSections.map((section, i) => (
             <div key={section.titleKey ?? `section-${i}`} className="flex flex-col gap-1">
               {section.titleKey && (
                 <p className="px-3 pb-1 text-xs font-semibold text-white/40">{t(section.titleKey)}</p>
               )}
+              {/* Nav grouping (design-remediation pass): the two
+                  sections here are deliberately different groups --
+                  daily operations vs. management/support, see the
+                  navSections comment above -- but both carry
+                  titleKey: null (no copy has been agreed for visible
+                  section headings), so a plain gap-4 stack read as one
+                  undifferentiated list with a slightly bigger gap in
+                  the middle, easy to miss at a glance. A thin divider
+                  before every section after the first gives the same
+                  grouping cue without inventing new label text. */}
+              {i > 0 && <div className="mx-3 my-2 border-t border-white/10" aria-hidden="true" />}
               {section.items.map((item) => (
                 <NavLink
                   key={item.to}
@@ -346,7 +357,7 @@ export function AppLayout() {
         </main>
 
         {/* Mobile bottom nav */}
-        <nav className="fixed inset-x-0 bottom-0 z-40 flex border-t border-border bg-surface md:hidden">
+        <nav aria-label={t('nav.mobileNavAria')} className="fixed inset-x-0 bottom-0 z-40 flex border-t border-border bg-surface md:hidden">
           {visibleMobileNavItems.map((item) => (
             <NavLink
               key={item.to}

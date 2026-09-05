@@ -9,10 +9,14 @@ import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Input } from '@/components/ui/input'
+import { EmptyState } from '@/components/ui/empty-state'
+import { ErrorState } from '@/components/ui/error-state'
+import { Skeleton } from '@/components/ui/skeleton'
 import { usePortalClub } from '@/app/providers/PortalClubProvider'
 import { CLUB_MEMBERSHIP_STATUS_TONE, daysRemaining, previewClubMembershipEndDate } from '@/lib/domain/clubMembership'
 import { MembershipCard } from '@/features/memberships/MembershipCard'
 import { useClubTimezone } from '@/features/bookings/useFieldPricing'
+import { IdCard } from 'lucide-react'
 
 // Customer Portal -- "My Memberships". Mirrors PortalAcademyPage.tsx's
 // structure (PageHeader, loading/error/empty states, useQuery +
@@ -88,7 +92,7 @@ export function PortalMembershipsPage() {
   const [browsePlansOpen, setBrowsePlansOpen] = useState(false)
   const [renewError, setRenewError] = useState<string | null>(null)
 
-  const { data: allMemberships = [], isLoading, error } = useQuery({
+  const { data: allMemberships = [], isLoading, error, refetch } = useQuery({
     queryKey: ['portal', 'my-club-memberships'],
     queryFn: fetchMyMemberships,
     enabled: !clubLoading,
@@ -173,15 +177,23 @@ export function PortalMembershipsPage() {
         actions={<Button size="sm" onClick={() => setBrowsePlansOpen(true)}>{t('clubMemberships.portal.buyMembership')}</Button>}
       />
 
-      {(isLoading || clubLoading) && <p className="text-sm text-text-secondary">{t('portal.academyPage.loading')}</p>}
-      {error && <p className="text-sm text-status-danger">{t('portal.academyPage.loadError')}</p>}
+      {(isLoading || clubLoading) && (
+        <div className="flex flex-col gap-2">
+          <Skeleton className="h-28 w-full rounded-lg" />
+          <Skeleton className="h-28 w-full rounded-lg" />
+        </div>
+      )}
+      {!!error && (
+        <ErrorState message={translateSupabaseError(error, t('portal.academyPage.loadError'))} onRetry={() => void refetch()} />
+      )}
       {renewError && <p role="alert" className="text-sm text-status-danger">{renewError}</p>}
 
-      {!isLoading && !clubLoading && memberships.length === 0 && (
-        <div className="flex flex-col items-center gap-3 rounded-lg border border-dashed border-border p-6 text-center text-sm text-text-secondary">
-          <p>{t('clubMemberships.portal.emptyTitle')}</p>
-          <Button size="sm" onClick={() => setBrowsePlansOpen(true)}>{t('clubMemberships.portal.buyMembership')}</Button>
-        </div>
+      {!isLoading && !clubLoading && !error && memberships.length === 0 && (
+        <EmptyState
+          icon={IdCard}
+          title={t('clubMemberships.portal.emptyTitle')}
+          action={<Button size="sm" onClick={() => setBrowsePlansOpen(true)}>{t('clubMemberships.portal.buyMembership')}</Button>}
+        />
       )}
 
       {current.length > 0 && (

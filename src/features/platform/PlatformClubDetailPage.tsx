@@ -695,7 +695,16 @@ export function PlatformClubDetailPage() {
           a facilities/booking/customer summary -- the specific data the
           audit found completely absent from this page despite fetching
           (but never rendering) most of the club row already. Summary
-          only, deliberately -- not a platform booking-operations system. */}
+          only, deliberately -- not a platform booking-operations system.
+
+          Design remediation (premium-ui-ux-audit, Platform Owner phase):
+          labeled "Tenant overview" so this record reads as a SaaS
+          control plane's per-tenant profile (identity + contact +
+          operational footprint) before the commercial/billing section
+          further down -- purely a heading, no data or layout change. */}
+      <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-text-secondary">
+        {t('platform.clubDetailPage.groups.tenantOverview', { defaultValue: 'Tenant overview' })}
+      </p>
       <div className="mb-4 grid gap-4 md:grid-cols-3">
         <Card>
           <CardHeader>
@@ -804,6 +813,16 @@ export function PlatformClubDetailPage() {
           </CardContent>
         </Card>
       </div>
+
+      {/* Design remediation (premium-ui-ux-audit, Platform Owner phase):
+          labeled "Commercial & operations" -- groups WhatsApp health,
+          government compliance, subscription status/actions, limits,
+          usage, and payment controls under one control-plane heading,
+          distinct from the read-only "Tenant overview" identity section
+          above. Heading only, no data/behavior change. */}
+      <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-text-secondary">
+        {t('platform.clubDetailPage.groups.commercialOperations', { defaultValue: 'Commercial & operations' })}
+      </p>
 
       {/* Phase E directive (C8/E4): operational health only -- connection
           state, masked phone (last 4 digits), failure/queue counts.

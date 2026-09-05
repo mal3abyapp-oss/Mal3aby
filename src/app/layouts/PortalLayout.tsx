@@ -47,9 +47,23 @@ export function PortalLayout() {
   return (
     <PortalClubProvider>
       <div className="flex min-h-screen flex-col bg-page-bg">
-        <header className="sticky top-0 z-30 flex flex-col gap-2 border-b border-border bg-surface px-4 py-3">
+        <header className="sticky top-0 z-30 flex flex-col gap-2.5 border-b border-border bg-surface px-4 py-3">
           <div className="flex items-center justify-between">
-            <span className="text-lg font-bold">ملعبي | Mal3aby</span>
+            {/* Design remediation (premium UI/UX audit): the portal
+                previously reused AppLayout's exact plain-text brand
+                lockup verbatim ("ملعبي | Mal3aby", no mark) -- the
+                clearest signal this shell was an admin panel repurposed
+                for customers rather than a distinct customer-facing
+                product. A small accent-colored brand mark (using the
+                same lime/dark-base tokens docs/DESIGN_SYSTEM.md already
+                reserves for brand-signature use) gives this its own
+                identity without inventing new colors or a logo asset. */}
+            <span className="flex items-center gap-2">
+              <span className="flex size-8 items-center justify-center rounded-lg bg-dark-base text-sm font-bold text-accent">
+                م
+              </span>
+              <span className="text-base font-bold text-text-primary">Mal3aby</span>
+            </span>
             <div className="flex items-center gap-3">
               <LanguageSwitcher />
               <button
@@ -64,25 +78,41 @@ export function PortalLayout() {
           <PortalClubSwitcher />
         </header>
 
-        <main className="mx-auto w-full max-w-2xl flex-1 px-4 py-4 pb-24">
+        <main className="mx-auto w-full max-w-2xl flex-1 px-4 py-5 pb-24">
           <Suspense fallback={<RouteLoadingFallback />}>
             <Outlet />
           </Suspense>
         </main>
 
-        <nav className="fixed inset-x-0 bottom-0 z-30 flex border-t border-border bg-surface">
+        <nav className="fixed inset-x-0 bottom-0 z-30 flex border-t border-border bg-surface px-1.5 pb-[env(safe-area-inset-bottom)]">
           {navItems.map((item) => (
             <NavLink
               key={item.to}
               to={item.to}
               className={({ isActive }) =>
-                `flex flex-1 flex-col items-center gap-0.5 py-2.5 text-xs ${
+                `flex flex-1 flex-col items-center gap-1 px-1 py-2.5 text-[11px] font-medium transition-colors ${
                   isActive ? 'text-accent-foreground' : 'text-text-secondary'
                 }`
               }
             >
-              <item.icon className="size-5" />
-              {t(item.labelKey)}
+              {({ isActive }) => (
+                <>
+                  {/* Bottom nav previously conveyed "active" with a text
+                      color shift only -- easy to miss at a glance and a
+                      weak touch/visual affordance compared to the
+                      pill-highlight pattern common in customer-facing
+                      mobile apps. Kept within the same icon+label
+                      structure/height so no layout/behavior changes. */}
+                  <span
+                    className={`flex items-center justify-center rounded-full px-3 py-1 transition-colors ${
+                      isActive ? 'bg-accent/15' : ''
+                    }`}
+                  >
+                    <item.icon className="size-5" />
+                  </span>
+                  {t(item.labelKey)}
+                </>
+              )}
             </NavLink>
           ))}
         </nav>

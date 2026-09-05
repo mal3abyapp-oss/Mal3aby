@@ -10,6 +10,26 @@ import { PlayersSection } from '@/features/academy/PlayersSection'
 import { CoachTodayView } from '@/features/academy/CoachTodayView'
 import { AcademyOverview } from '@/features/academy/AcademyOverview'
 
+// P0 fix (2026-09-05): this used to route purely on
+// `roleKey === 'coach'`, the same wrong pattern TodayPage.tsx had
+// (see that file's fix comment) and explicitly forbidden by
+// Employee360Page.tsx's own precedent ("never a role-name check").
+// A custom role built with coach-equivalent permissions (can mark
+// attendance / view sessions, but cannot manage enrollment/programs/
+// groups) was previously misrouted to the full manager tabs it has no
+// permission to act on. Mirrors navigation.ts's NAV_DOMAIN_PERMISSIONS
+// grouping: coach-view = holds session/attendance keys AND holds none
+// of the enrollment/program/group management keys.
+const COACH_DELIVERY_KEYS = ['session.view', 'attendance.view', 'attendance.mark']
+const ACADEMY_MANAGEMENT_KEYS = ['enrollment.view', 'enrollment.create', 'academy.group.manage', 'academy.program.manage']
+
+export function isCoachOnlyView(permissionKeys: readonly string[] | undefined): boolean {
+  if (!permissionKeys || permissionKeys.length === 0) return false
+  const hasDeliveryAccess = COACH_DELIVERY_KEYS.some((key) => permissionKeys.includes(key))
+  const hasManagementAccess = ACADEMY_MANAGEMENT_KEYS.some((key) => permissionKeys.includes(key))
+  return hasDeliveryAccess && !hasManagementAccess
+}
+
 export function AcademyPage() {
   const { t } = useTranslation()
   const { currentMembership } = useAuth()
@@ -26,7 +46,12 @@ export function AcademyPage() {
     searchParams.has('subscribePlayer') ? 'players' : 'overview',
   )
 
-  if (currentMembership?.roleKey === 'coach') {
+  // Built-in coach role keeps exactly its existing behavior (still
+  // roleKey-gated first, so system-role coaches are unaffected);
+  // additionally, any custom role whose real permission set is
+  // coach-equivalent now also gets the focused delivery view instead
+  // of the full manager tabs it can't act on.
+  if (currentMembership?.roleKey === 'coach' || isCoachOnlyView(currentMembership?.permissionKeys)) {
     return <CoachTodayView />
   }
 

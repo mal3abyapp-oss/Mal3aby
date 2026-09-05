@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next'
 import { supabase } from '@/lib/supabase/client'
 import { Button } from '@/components/ui/button'
 import { MoneyDisplay } from '@/components/ui/money-display'
+import { filterPublicCommercialPlans } from '@/lib/domain/billing'
 import {
   CalendarDays,
   GraduationCap,
@@ -65,7 +66,12 @@ const faqItems = ['q1', 'q2', 'q3', 'q4'] as const
 async function fetchPublicPlans() {
   const { data, error } = await supabase.from('public_plans').select('*')
   if (error) throw error
-  return data ?? []
+  // P0 fix (2026-09-05): unfiltered, this returned the 2 surviving
+  // legacy plans (499/4,499 EGP) alongside the real Starter/Growth/Pro
+  // tiers on the public landing page -- see filterPublicCommercialPlans
+  // (src/lib/domain/billing.ts), the same shared guard now used by
+  // PricingPage.tsx and SubscriptionPage.tsx.
+  return filterPublicCommercialPlans(data ?? [])
 }
 
 // Real, live-looking numbers for the hero's product preview -- this is
@@ -193,7 +199,7 @@ export function HomePage() {
           <div className="grid grid-cols-2 gap-3.5 md:grid-cols-4">
             {suitableForSegments.map((s) => (
               <div key={s.key} className="rounded-xl border border-border bg-gradient-to-b from-white to-page-bg p-5 text-center">
-                <div className="mx-auto mb-3 flex size-9 items-center justify-center rounded-lg bg-accent/15 text-[#5B8A00]">
+                <div className="mx-auto mb-3 flex size-9 items-center justify-center rounded-lg bg-accent/15 text-accent-emphasis">
                   <s.icon className="size-[18px]" aria-hidden="true" />
                 </div>
                 <p className="text-sm font-bold text-text-primary">{t(`publicSite.home.suitableFor.${s.key}.title`)}</p>
@@ -208,8 +214,8 @@ export function HomePage() {
       <section id="features" className="bg-page-bg py-24">
         <div className="mx-auto max-w-6xl px-4">
           <div className="mx-auto mb-14 max-w-xl text-center">
-            <p className="mb-3.5 inline-flex items-center gap-2 text-sm font-semibold tracking-wide text-[#5B8A00]">
-              <span className="h-0.5 w-[18px] rounded-full bg-[#5B8A00]" />
+            <p className="mb-3.5 inline-flex items-center gap-2 text-sm font-semibold tracking-wide text-accent-emphasis">
+              <span className="h-0.5 w-[18px] rounded-full bg-accent-emphasis" />
               {t('publicSite.home.benefitsEyebrow')}
             </p>
             <h2 className="text-2xl font-bold text-text-primary text-balance md:text-[34px]">{t('publicSite.home.benefitsTitle')}</h2>
@@ -261,8 +267,8 @@ export function HomePage() {
         <section id="pricing-preview" className="bg-surface py-24">
           <div className="mx-auto max-w-6xl px-4">
             <div className="mx-auto mb-12 max-w-xl text-center">
-              <p className="mb-3.5 inline-flex items-center justify-center gap-2 text-sm font-semibold tracking-wide text-[#5B8A00]">
-                <span className="h-0.5 w-[18px] rounded-full bg-[#5B8A00]" />
+              <p className="mb-3.5 inline-flex items-center justify-center gap-2 text-sm font-semibold tracking-wide text-accent-emphasis">
+                <span className="h-0.5 w-[18px] rounded-full bg-accent-emphasis" />
                 {t('publicSite.home.pricingEyebrow')}
               </p>
               <h2 className="text-2xl font-bold text-text-primary md:text-[34px]">{t('publicSite.home.pricingTitle')}</h2>
@@ -307,7 +313,7 @@ export function HomePage() {
 
       {/* ============ FINAL CTA ============ */}
       <section className="bg-dark-base px-4 pb-24">
-        <div className="mx-auto max-w-6xl overflow-hidden rounded-3xl bg-gradient-to-br from-[#C7FF5C] via-accent to-[#9FE032] px-6 py-14 text-center text-dark-base md:px-10 md:py-16">
+        <div className="mx-auto max-w-6xl overflow-hidden rounded-3xl bg-gradient-to-br from-accent-light via-accent to-accent-dark px-6 py-14 text-center text-dark-base md:px-10 md:py-16">
           <h2 className="text-2xl font-bold md:text-[30px]">{t('publicSite.home.finalCta.title')}</h2>
           <p className="mt-3 text-[15px] text-dark-base/75">{t('publicSite.home.finalCta.subtitle')}</p>
           <Button size="lg" className="mt-7 bg-dark-base text-white hover:bg-dark-base/90" asChild>

@@ -12,6 +12,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { translateSupabaseError } from '@/lib/errors'
 import { ChangePasswordCard } from '@/features/account/ChangePasswordCard'
 import { normalizePhone } from '@/lib/domain/phone'
+import { EmptyState } from '@/components/ui/empty-state'
+import { Skeleton } from '@/components/ui/skeleton'
+import { User } from 'lucide-react'
 
 // Gate 3 — "My Account": contact-preference self-service edit (the
 // columns protect_customer_identity_columns() explicitly allows a
@@ -156,12 +159,16 @@ export function PortalProfilePage() {
     <div className="flex flex-col gap-5">
       <PageHeader title={t('portal.profilePage.title')} description={t('portal.profilePage.description')} />
 
-      {isLoading && <p className="text-sm text-text-secondary">{t('portal.profilePage.loading')}</p>}
+      {isLoading && (
+        <div className="flex flex-col gap-3">
+          <Skeleton className="h-16 w-full rounded-lg" />
+          <Skeleton className="h-10 w-full rounded-md" />
+          <Skeleton className="h-10 w-full rounded-md" />
+        </div>
+      )}
 
       {!isLoading && !record && (
-        <p className="rounded-lg border border-dashed border-border p-6 text-center text-sm text-text-secondary">
-          {t('portal.profilePage.emptyTitle')}
-        </p>
+        <EmptyState icon={User} title={t('portal.profilePage.emptyTitle')} />
       )}
 
       {records.length > 1 && (
