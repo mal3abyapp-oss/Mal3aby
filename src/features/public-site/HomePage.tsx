@@ -1,11 +1,10 @@
+import { useState } from 'react'
 import { Link } from 'react-router-dom'
-import { useQuery } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
-import { supabase } from '@/lib/supabase/client'
 import { Button } from '@/components/ui/button'
-import { MoneyDisplay } from '@/components/ui/money-display'
-import { filterPublicCommercialPlans, computeAnnualDiscountsByFamily } from '@/lib/domain/billing'
-import { formatNumberIsolated } from '@/lib/i18n/config'
+import { cn } from '@/lib/utils'
+import { usePublicPricing } from './usePublicPricing'
+import { PricingCard } from './PricingCard'
 import {
   CalendarDays,
   GraduationCap,
@@ -40,9 +39,21 @@ import {
 // See docs/USER_FLOWS.md Flow 8, docs/SCREEN_MAP.md Home. Pricing
 // section reads only the public_plans view (never platform_plans
 // directly, unchanged from before) -- see
-// docs/ARCHITECTURE.md#public-website--layout-strategy. All 4 real
-// plans render (was previously capped by only having 3 in an older
-// snapshot); no hardcoded price ever appears here.
+// docs/ARCHITECTURE.md#public-website--layout-strategy. No hardcoded
+// price ever appears here.
+//
+// HOMEPAGE PRICING UX (2026-09-06): this preview used to render every
+// public_plans row as its own flat card -- 6 separate monthly+annual
+// cards for 3 packages, a real UX inconsistency against /pricing's
+// correct toggle-driven single-card-per-package model (confirmed via
+// live production review). Fetching, filtering, family-grouping, and
+// discount calculation are now shared with PricingPage.tsx via
+// usePublicPricing.ts (one commercial source of truth), and the card
+// markup itself is shared via PricingCard.tsx's "compact" variant. A
+// Monthly/Annual toggle, identical in logic to /pricing's, now drives
+// the SAME 3 package cards in place -- switching billing cycle updates
+// price/discount inside the existing cards rather than showing a
+// second set.
 
 const suitableForSegments = [
   { icon: Building2, key: 'club' },
@@ -63,17 +74,6 @@ const benefits = [
 const howItWorksSteps = ['step1', 'step2', 'step3', 'step4'] as const
 
 const faqItems = ['q1', 'q2', 'q3', 'q4'] as const
-
-async function fetchPublicPlans() {
-  const { data, error } = await supabase.from('public_plans').select('*')
-  if (error) throw error
-  // P0 fix (2026-09-05): unfiltered, this returned the 2 surviving
-  // legacy plans (499/4,499 EGP) alongside the real Starter/Growth/Pro
-  // tiers on the public landing page -- see filterPublicCommercialPlans
-  // (src/lib/domain/billing.ts), the same shared guard now used by
-  // PricingPage.tsx and SubscriptionPage.tsx.
-  return filterPublicCommercialPlans(data ?? [])
-}
 
 // Real, live-looking numbers for the hero's product preview -- this is
 // NOT a stock photo (docs/DESIGN_SYSTEM.md explicitly forbids stock
@@ -140,14 +140,9 @@ function HeroMockup() {
 }
 
 export function HomePage() {
-  const { t, i18n } = useTranslation()
-  const { data: plans = [] } = useQuery({ queryKey: ['public-plans-home'], queryFn: fetchPublicPlans })
-
-  // P0 fix (2026-09-05): see computeAnnualDiscountsByFamily in
-  // src/lib/domain/billing.ts for the full rationale -- this used to be
-  // a hardcoded "Save 25%" i18n string, wrong against the real
-  // ~16.2-16.5% annual discounts.
-  const annualDiscountByFamily = computeAnnualDiscountsByFamily(plans)
+  const { t } = useTranslation()
+  const { isLoading: isPricingLoading, families, annualDiscountByFamily } = usePublicPricing()
+  const [billingInterval, setBillingInterval] = useState<'month' | 'year'>('month')
 
   return (
     <>
@@ -270,10 +265,10 @@ export function HomePage() {
       </section>
 
       {/* ============ PRICING ============ */}
-      {plans.length > 0 && (
+      {!isPricingLoading && families.length > 0 && (
         <section id="pricing-preview" className="bg-surface py-24">
           <div className="mx-auto max-w-6xl px-4">
-            <div className="mx-auto mb-12 max-w-xl text-center">
+            <div className="mx-auto mb-8 max-w-xl text-center">
               <p className="mb-3.5 inline-flex items-center justify-center gap-2 text-sm font-semibold tracking-wide text-accent-emphasis">
                 <span className="h-0.5 w-[18px] rounded-full bg-accent-emphasis" />
                 {t('publicSite.home.pricingEyebrow')}
@@ -281,57 +276,46 @@ export function HomePage() {
               <h2 className="text-2xl font-bold text-text-primary md:text-[34px]">{t('publicSite.home.pricingTitle')}</h2>
               <p className="mt-3.5 text-base leading-relaxed text-text-secondary">{t('publicSite.home.pricingSubtitle')}</p>
             </div>
-            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-              {plans.map((p) => {
-                // P0 fix (2026-09-05): this used to feature whichever
-                // plan had a discount_label >= 20% -- a threshold from
-                // an earlier pricing model. The approved packaging's
-                // real annual discounts are ~16.2-16.5% (see
-                // filterPublicCommercialPlans/NEW_COMMERCIAL_TIER_MIN_
-                // DISPLAY_ORDER in src/lib/domain/billing.ts), all
-                // under 20, so no plan was ever marked featured here --
-                // silently dropping the "Growth is recommended" signal
-                // PricingPage.tsx shows correctly. Mirrors PricingPage.
-                // tsx's own pattern: identify Growth by name, not by a
-                // fragile percentage threshold that drifts with pricing.
-                const isFeatured = p.name === 'Growth'
-                return (
-                  <div
-                    key={p.name_ar}
-                    className={
-                      isFeatured
-                        ? 'relative flex -translate-y-1.5 flex-col gap-4 rounded-2xl border border-dark-base bg-dark-base p-6 text-white shadow-2xl shadow-dark-base/30'
-                        : 'flex flex-col gap-4 rounded-2xl border border-border bg-page-bg p-6'
-                    }
-                  >
-                    {isFeatured && (
-                      <span className="absolute -top-3 start-6 rounded-full bg-accent px-3 py-1 text-[11.5px] font-bold text-accent-foreground">
-                        {t('publicSite.home.mostPopular')}
-                      </span>
-                    )}
-                    <p className={isFeatured ? 'text-sm font-semibold text-white/70' : 'text-sm font-semibold text-text-secondary'}>
-                      {i18n.language.startsWith('ar') ? p.name_ar : t(`publicSite.pricing.intervals.${p.billing_interval}_${p.billing_interval_count}`)}
-                    </p>
-                    <MoneyDisplay amount={Number(p.price)} currency={p.currency ?? 'EGP'} size="lg" className={isFeatured ? 'text-white' : undefined} />
-                    {(() => {
-                      if (p.billing_interval !== 'year' || !p.name) return null
-                      const familyName = p.name.replace(/\s*\(Annual\)\s*$/, '')
-                      const discountPct = annualDiscountByFamily.get(familyName)
-                      if (discountPct == null) return null
-                      return (
-                        <p className={isFeatured ? 'text-[12.5px] font-semibold text-green-300' : 'text-[12.5px] font-semibold text-status-success'}>
-                          {t('publicSite.pricing.saveDiscount', {
-                            percent: formatNumberIsolated(discountPct, i18n.language.startsWith('ar') ? 'ar' : 'en'),
-                          })}
-                        </p>
-                      )
-                    })()}
-                    <Button size="sm" className={isFeatured ? 'mt-1 bg-accent text-accent-foreground hover:bg-accent/90' : 'mt-1'} variant={isFeatured ? 'default' : 'outline'} asChild>
-                      <Link to="/signup">{t('publicSite.home.startFreeTrial')}</Link>
-                    </Button>
-                  </div>
-                )
-              })}
+
+            {/* Monthly / Annual toggle -- identical in logic to
+                PricingPage.tsx's own toggle: switching this updates the
+                SAME 3 package cards below in place, it never renders a
+                second set of cards for the other billing cycle. */}
+            <div className="mb-8 flex justify-center">
+              <div className="inline-flex rounded-lg border border-border bg-page-bg p-1">
+                <button
+                  type="button"
+                  onClick={() => setBillingInterval('month')}
+                  className={cn(
+                    'rounded-md px-4 py-1.5 text-sm font-medium transition-colors',
+                    billingInterval === 'month' ? 'bg-primary text-primary-foreground' : 'text-text-secondary',
+                  )}
+                >
+                  {t('publicSite.pricing.billingToggle.monthly')}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setBillingInterval('year')}
+                  className={cn(
+                    'rounded-md px-4 py-1.5 text-sm font-medium transition-colors',
+                    billingInterval === 'year' ? 'bg-primary text-primary-foreground' : 'text-text-secondary',
+                  )}
+                >
+                  {t('publicSite.pricing.billingToggle.annual')}
+                </button>
+              </div>
+            </div>
+
+            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+              {families.map((family) => (
+                <PricingCard
+                  key={family.familyName}
+                  family={family}
+                  billingInterval={billingInterval}
+                  annualDiscountByFamily={annualDiscountByFamily}
+                  variant="compact"
+                />
+              ))}
             </div>
           </div>
         </section>
