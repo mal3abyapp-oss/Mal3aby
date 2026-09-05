@@ -49,6 +49,33 @@ export function filterPublicCommercialPlans<T extends { display_order: number | 
   return plans.filter((p) => (p.display_order ?? 0) >= NEW_COMMERCIAL_TIER_MIN_DISPLAY_ORDER)
 }
 
+// P0 fix (2026-09-05): HomePage.tsx's landing-page pricing preview used
+// to show a hardcoded English "Save 25%" label (i18n key
+// publicSite.pricing.discounts.year_1), left over from an earlier
+// pricing model and wrong against the real ~16.2-16.5% annual
+// discounts (the Arabic side separately read the DB's own
+// discount_label text directly, so only English was visibly wrong, but
+// both were one hardcoded/DB-text value away from ever drifting from
+// reality again). This computes the discount mathematically from the
+// real monthly/annual price pair for a plan family, with one
+// consistent rounding policy (1 decimal place), so both locales always
+// show the true number regardless of future price changes.
+export function computeAnnualDiscountsByFamily<T extends { name: string | null; billing_interval: string | null; price: number | string | null }>(
+  plans: readonly T[],
+): Map<string, number> {
+  const result = new Map<string, number>()
+  for (const p of plans) {
+    if (p.billing_interval !== 'year' || !p.name) continue
+    const familyName = p.name.replace(/\s*\(Annual\)\s*$/, '')
+    const monthly = plans.find((m) => m.billing_interval === 'month' && m.name === familyName)
+    if (!monthly || monthly.price == null || p.price == null) continue
+    const annualEquivalentOfMonthly = Number(monthly.price) * 12
+    const discountPct = (1 - Number(p.price) / annualEquivalentOfMonthly) * 100
+    result.set(familyName, Math.round(discountPct * 10) / 10)
+  }
+  return result
+}
+
 export const PAYMENT_METHOD_LABELS: Record<string, string> = {
   cash: 'نقدًا',
   card: 'بطاقة',

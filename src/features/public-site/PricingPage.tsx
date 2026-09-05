@@ -10,6 +10,7 @@ import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 import { CheckCircle2 } from 'lucide-react'
 import { NEW_COMMERCIAL_TIER_MIN_DISPLAY_ORDER } from '@/lib/domain/billing'
+import { formatNumberIsolated } from '@/lib/i18n/config'
 
 // public_plans-sourced only, no hardcoded prices, no "Buy"/"Checkout"
 // language anywhere on this page — see docs/ARCHITECTURE.md
@@ -188,7 +189,9 @@ export function PricingPage() {
                       </p>
                       {billingInterval === 'year' && monthlyEquivalent !== null && (
                         <p className="mt-1 text-xs text-status-success">
-                          {t('publicSite.pricing.annualSavingHint', { monthlyEquivalent: Math.round(monthlyEquivalent) })}
+                          {t('publicSite.pricing.annualSavingHint', {
+                            monthlyEquivalent: formatNumberIsolated(Math.round(monthlyEquivalent), isArabic ? 'ar' : 'en'),
+                          })}
                         </p>
                       )}
                     </div>

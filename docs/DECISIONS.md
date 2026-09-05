@@ -244,6 +244,8 @@ Platform Owner retains a separate, always-available path to grant a **manual** t
 
 ## ADR-037 — Trial length is a platform setting, not hardcoded
 
+> **UPDATE (2026-09-05, owner decision):** the platform's official trial length is now **14 days**. `platform_settings.default_trial_days` was changed live from `7` to `14` via `update_platform_settings()` (audited), plus a forward migration (`20260905150000_default_trial_days_14.sql`) updating the column's schema-level default for future rows. This ADR's original text below is preserved as decision history — the pattern it describes (one setting, read everywhere) is exactly what made this a one-value change instead of a copy-hunting exercise across the RPC, marketing copy, and in-app messaging.
+
 **Decision:** New table `platform_settings` (singleton — one row, or a simple key-value table) holds `default_trial_days` (default `7`). Every place that would otherwise hardcode "7 days" — the onboarding RPC, the marketing copy's "7 days free" claim, the trial reminder thresholds — reads this value at the point of use rather than embedding the literal `7`.
 
 **Reason:** The number 7 appears in at least three independent places in this brief (RPC logic, landing page copy, in-app messaging) — hardcoding it in each means a future change to trial length requires finding and updating every occurrence, with real risk of missing one and shipping inconsistent messaging (marketing says "7 days," the RPC grants 10). One setting, read everywhere, eliminates that class of bug entirely. This is the same "single source of truth" principle already applied to pricing (ADR-030's snapshot-from-plan pattern) and financial figures (rule 8's "dashboards and reports share one RPC/view definition").

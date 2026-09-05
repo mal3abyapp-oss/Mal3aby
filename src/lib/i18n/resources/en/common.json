@@ -3792,11 +3792,7 @@
         "month_6": "Semiannual",
         "year_1": "Annual"
       },
-      "discounts": {
-        "month_3": "Save 10%",
-        "month_6": "Save 17%",
-        "year_1": "Save 25%"
-      }
+      "saveDiscount": "Save {{percent}}%"
     },
     "home": {
       "eyebrow": "With Mal3aby",
@@ -3805,7 +3801,7 @@
       "startFreeTrial": "Start your free trial",
       "watchHowItWorks": "See how it works",
       "login": "Log in",
-      "trialBadge": "7 days free · No credit card required · Cancel anytime",
+      "trialBadge": "14 days free · No credit card required · Cancel anytime",
       "customerLink": "Already a customer of a club? Sign in to see your bookings, payments, and QR code",
       "mockup": {
         "tabLabel": "Today",
@@ -3863,7 +3859,7 @@
       "perMonth": "per month",
       "finalCta": {
         "title": "Drop the paperwork. Try Mal3aby.",
-        "subtitle": "7 days free, every feature unlocked, no credit card."
+        "subtitle": "14 days free, every feature unlocked, no credit card."
       },
       "faq": {
         "title": "Frequently asked questions",
@@ -3907,7 +3903,7 @@
       },
       "section2": {
         "title": "2. Account and Subscription",
-        "body": "Every new club starts with a 7-day free trial that requires no credit card, granted once per user. After the trial ends, continuing to use the platform requires a paid subscription activated by contacting the Mal3aby team. You are responsible for the accuracy of your club's data and for keeping your account's login credentials confidential."
+        "body": "Every new club starts with a 14-day free trial that requires no credit card, granted once per user. After the trial ends, continuing to use the platform requires a paid subscription activated by contacting the Mal3aby team. You are responsible for the accuracy of your club's data and for keeping your account's login credentials confidential."
       },
       "section3": {
         "title": "3. Data You Enter",
@@ -3940,7 +3936,7 @@
     "loginRequired": "You must log in first to set up your club.",
     "success": {
       "titleWithTrial": "Your club was created successfully!",
-      "trialActivated": "Your 7-day free trial has been activated.",
+      "trialActivated": "Your 14-day free trial has been activated.",
       "titleNoTrial": "Club created",
       "noTrialMessage": "This is your additional club, so it wasn't automatically activated with a free trial — additional clubs need approval from the Mal3aby platform team first. We'll be in touch once it's reviewed, and you can track the subscription status from the settings page.",
       "goToDashboard": "Go to dashboard"

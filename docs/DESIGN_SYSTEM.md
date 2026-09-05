@@ -222,7 +222,7 @@ Same brand tokens as the app — the public site is not a visually distinct prod
 
 **Hero direction:** dark premium background (using the dark base tokens above) + the lime accent for the primary CTA + a product interface mockup/screenshot as the visual anchor — not a generic stock photo. Headline explains the *outcome*, not the technology — direction example: "إدارة ناديك وأكاديميتك وملاعبك من مكان واحد."
 
-**Hero CTAs:** Primary "ابدأ تجربتك المجانية", secondary "تسجيل الدخول", with supporting microcopy "7 أيام مجانًا / بدون بطاقة بنكية" directly beneath — this is the single most important conversion moment on the site, matching [DECISIONS.md ADR-036](DECISIONS.md#adr-036--free-trial-requires-no-payment-method-zero-financial-exposure-by-construction).
+**Hero CTAs:** Primary "ابدأ تجربتك المجانية", secondary "تسجيل الدخول", with supporting microcopy "14 يومًا مجانًا / بدون بطاقة بنكية" directly beneath — this is the single most important conversion moment on the site, matching [DECISIONS.md ADR-036](DECISIONS.md#adr-036--free-trial-requires-no-payment-method-zero-financial-exposure-by-construction).
 
 **Homepage section order** (confirmed, matches [SCREEN_MAP.md](SCREEN_MAP.md) and [USER_FLOWS.md](USER_FLOWS.md) Flow 8): `Header → Hero → Suitable For → Core Benefits → Product Screens/Workflow → How It Works → Pricing → Free Trial CTA → FAQ → Contact → Footer`.
 

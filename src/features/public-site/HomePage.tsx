@@ -4,7 +4,8 @@ import { useTranslation } from 'react-i18next'
 import { supabase } from '@/lib/supabase/client'
 import { Button } from '@/components/ui/button'
 import { MoneyDisplay } from '@/components/ui/money-display'
-import { filterPublicCommercialPlans } from '@/lib/domain/billing'
+import { filterPublicCommercialPlans, computeAnnualDiscountsByFamily } from '@/lib/domain/billing'
+import { formatNumberIsolated } from '@/lib/i18n/config'
 import {
   CalendarDays,
   GraduationCap,
@@ -142,6 +143,12 @@ export function HomePage() {
   const { t, i18n } = useTranslation()
   const { data: plans = [] } = useQuery({ queryKey: ['public-plans-home'], queryFn: fetchPublicPlans })
 
+  // P0 fix (2026-09-05): see computeAnnualDiscountsByFamily in
+  // src/lib/domain/billing.ts for the full rationale -- this used to be
+  // a hardcoded "Save 25%" i18n string, wrong against the real
+  // ~16.2-16.5% annual discounts.
+  const annualDiscountByFamily = computeAnnualDiscountsByFamily(plans)
+
   return (
     <>
       {/* ============ HERO ============ */}
@@ -276,7 +283,18 @@ export function HomePage() {
             </div>
             <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
               {plans.map((p) => {
-                const isFeatured = p.discount_label != null && Number(p.discount_label.match(/\d+/)?.[0] ?? 0) >= 20
+                // P0 fix (2026-09-05): this used to feature whichever
+                // plan had a discount_label >= 20% -- a threshold from
+                // an earlier pricing model. The approved packaging's
+                // real annual discounts are ~16.2-16.5% (see
+                // filterPublicCommercialPlans/NEW_COMMERCIAL_TIER_MIN_
+                // DISPLAY_ORDER in src/lib/domain/billing.ts), all
+                // under 20, so no plan was ever marked featured here --
+                // silently dropping the "Growth is recommended" signal
+                // PricingPage.tsx shows correctly. Mirrors PricingPage.
+                // tsx's own pattern: identify Growth by name, not by a
+                // fragile percentage threshold that drifts with pricing.
+                const isFeatured = p.name === 'Growth'
                 return (
                   <div
                     key={p.name_ar}
@@ -295,11 +313,19 @@ export function HomePage() {
                       {i18n.language.startsWith('ar') ? p.name_ar : t(`publicSite.pricing.intervals.${p.billing_interval}_${p.billing_interval_count}`)}
                     </p>
                     <MoneyDisplay amount={Number(p.price)} currency={p.currency ?? 'EGP'} size="lg" className={isFeatured ? 'text-white' : undefined} />
-                    {p.discount_label && (
-                      <p className={isFeatured ? 'text-[12.5px] font-semibold text-green-300' : 'text-[12.5px] font-semibold text-status-success'}>
-                        {i18n.language.startsWith('ar') ? p.discount_label : t(`publicSite.pricing.discounts.${p.billing_interval}_${p.billing_interval_count}`)}
-                      </p>
-                    )}
+                    {(() => {
+                      if (p.billing_interval !== 'year' || !p.name) return null
+                      const familyName = p.name.replace(/\s*\(Annual\)\s*$/, '')
+                      const discountPct = annualDiscountByFamily.get(familyName)
+                      if (discountPct == null) return null
+                      return (
+                        <p className={isFeatured ? 'text-[12.5px] font-semibold text-green-300' : 'text-[12.5px] font-semibold text-status-success'}>
+                          {t('publicSite.pricing.saveDiscount', {
+                            percent: formatNumberIsolated(discountPct, i18n.language.startsWith('ar') ? 'ar' : 'en'),
+                          })}
+                        </p>
+                      )
+                    })()}
                     <Button size="sm" className={isFeatured ? 'mt-1 bg-accent text-accent-foreground hover:bg-accent/90' : 'mt-1'} variant={isFeatured ? 'default' : 'outline'} asChild>
                       <Link to="/signup">{t('publicSite.home.startFreeTrial')}</Link>
                     </Button>

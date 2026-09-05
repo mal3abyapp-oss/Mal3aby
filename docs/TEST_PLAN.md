@@ -47,11 +47,11 @@ Pure functions in `lib/domain/` only — no Supabase client, no DOM. Price calcu
 - **Unpublished plan hidden** — a `platform_plans` row with `is_public = false` never appears in `public_plans`, confirmed by inserting one and asserting it's absent from the view's result set
 - **Signup creates exactly one club** — calling `complete_new_club_onboarding()` once results in exactly one new `clubs` row, not zero, not two
 - **Signup creates exactly one owner membership** — exactly one `club_memberships` row with `role_id` resolving to `club_owner`, for the calling `auth.uid()`
-- **Signup creates exactly one 7-day trial subscription** — exactly one `platform_subscriptions` row with `subscription_kind = 'trial'` and `end_at - start_at` matching `platform_settings.default_trial_days`
-- **Trial duration comes from platform setting** — changing `platform_settings.default_trial_days` to a different value before onboarding changes the resulting trial's length; the RPC never has `7` hardcoded
+- **Signup creates exactly one 14-day trial subscription** — exactly one `platform_subscriptions` row with `subscription_kind = 'trial'` and `end_at - start_at` matching `platform_settings.default_trial_days` (14 as of 2026-09-05's owner decision, previously 7)
+- **Trial duration comes from platform setting** — changing `platform_settings.default_trial_days` to a different value before onboarding changes the resulting trial's length; the RPC never has the day count hardcoded
 - **Trial belongs to club, not user** — confirmed via the schema itself (`platform_subscriptions.club_id`, no `user_id` column) plus a behavioral test below
 - **Second user in same club does not create another trial** — adding a second `club_memberships` row to an existing club (e.g. an invited Receptionist) never inserts a new `platform_subscriptions` row; only `complete_new_club_onboarding()` (new-club creation) can create a trial, and only once per club (unique partial index)
-- **User A creates Club 1 → automatic 7-day trial created; User A creates Club 2 → club created, no automatic trial created** — the two-rule model (one trial per club, one automatic trial per user) confirmed via a full behavioral test, not just schema inspection: `trial_granted = true` on the first onboarding call, `trial_granted = false` on the second, both clubs exist with correct `club_memberships` rows regardless of trial outcome
+- **User A creates Club 1 → automatic 14-day trial created; User A creates Club 2 → club created, no automatic trial created** — the two-rule model (one trial per club, one automatic trial per user) confirmed via a full behavioral test, not just schema inspection: `trial_granted = true` on the first onboarding call, `trial_granted = false` on the second, both clubs exist with correct `club_memberships` rows regardless of trial outcome
 - **User B (a different user) creates Club 3 → automatic trial created if otherwise eligible** — confirms the per-user limit doesn't leak across users
 - **Club with a previous trial cannot receive another trial automatically** — even a long-expired or cancelled trial on a club blocks a second automatic trial for that same club (existing unique partial index on `platform_subscriptions`, re-confirmed here in combination with the new entitlement table)
 - **`automatic_trial_entitlements` concurrency safety** — two simultaneous `complete_new_club_onboarding()` calls from the same brand-new user (different clubs) result in exactly one `trial_granted = true` and one `trial_granted = false`, never two trials, regardless of call timing; verified via simulated concurrent transactions, not just sequential calls
@@ -117,7 +117,7 @@ Every item below must have a passing automated test (pgTAP or Vitest/integration
 - Plan price/interval snapshot immutability across plan edits
 - Renewal creates a correctly-linked new period row, never mutates the prior one
 - Public user can read published plans only; unpublished plan hidden
-- Signup creates exactly one club, one owner membership, one 7-day trial subscription
+- Signup creates exactly one club, one owner membership, one 14-day trial subscription
 - Trial duration comes from `platform_settings`, never hardcoded
 - Trial belongs to club, not user — second user in the same club does not create another trial
 - Expired trial blocks new bookings but does not delete data

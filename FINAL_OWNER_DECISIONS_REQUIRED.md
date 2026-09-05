@@ -4,20 +4,16 @@ Generated 2026-09-05, end of the premium UI/UX remediation mission on branch `de
 
 These are the items this mission could not safely decide on its own — either a genuine business/policy question, or a change large enough to need a deliberate design decision rather than an autonomous one. Everything else executable was completed; see [MAL3ABY_DESIGN_REMEDIATION_REPORT.md](MAL3ABY_DESIGN_REMEDIATION_REPORT.md) for the full account.
 
-## 1. Trial length: 7 days (live) vs. 14 days (documented) — REAL CONFLICT, NOT YET RESOLVED
+## 1. Trial length: 7 days (live) vs. 14 days (documented) — ✅ RESOLVED 2026-09-05
 
-**The single most important open decision.** Two authoritative sources disagree:
+**Owner decision received: the official trial length is 14 days**, applied platform-wide. What changed:
+- `platform_settings.default_trial_days` live-updated 7→14 via the same audited path as `update_platform_settings()` (confirmed in `audit_logs`: before `{7}`, after `{14}`), plus a forward migration (`supabase/migrations/20260905150000_default_trial_days_14.sql`) so the column's own schema-level default also reads 14 for any future direct insert.
+- All 8 trial-length i18n strings (4 keys × 2 locales) now consistently say 14/١٤ — verified live in both languages, both `/` and `/pricing`, on both dev-server pages.
+- Docs updated to reflect 14 as current (`README.md`, `docs/DESIGN_SYSTEM.md`, `docs/USER_FLOWS.md`, `docs/ARCHITECTURE.md`, `docs/TEST_PLAN.md`, `docs/SCREEN_MAP.md`, `docs/IMPLEMENTATION_PLAN.md`); `docs/DECISIONS.md`'s ADR-037 kept as historical record with an update note appended, not rewritten.
+- New regression test (`src/lib/i18n/trial-length-consistency.test.ts`) guards against a future change silently reintroducing "7" in one location while missing another.
+- Independently re-verified twice (fresh adversarial reviewers, live DB queries, both live functions' source read directly) — REGRESSION_PASSED both times.
 
-- **Live production config**: `platform_settings.default_trial_days = 7` (last changed 2026-08-19), and every EN/AR i18n string describing the trial consistently says **7 days** (hero badge, final CTA, terms & conditions §2, onboarding success message). This is what actually happens today for every real signup.
-- **Committed documentation**: [MAL3ABY_V1_COMMERCIAL_PACKAGING.md](MAL3ABY_V1_COMMERCIAL_PACKAGING.md) (merged the same day, same HEAD `1712371`) states the approved model is "Demo → Onboarding → **14-day** trial → Paid." The sales deck and presenter script also consistently say 14 days.
-
-During this mission, one implementing agent changed a single inconsistent copy string (`pricing.trialFunnelHint`) from "14-day" to "7-day" to match live behavior — an independent adversarial reviewer correctly flagged this as a regression against the just-merged commercial packaging doc, and it was reverted back to 14-day wording. **That revert makes the copy internally consistent with the doc again, but it does NOT resolve the underlying conflict** — the copy now says 14 days while the live database, the RPC, and 4 other i18n strings still say 7. The product is currently self-contradictory on this one fact, just with the contradiction moved rather than closed.
-
-**Also found**: there is no "Demo" step anywhere in the actual shipped code (`/signup` → onboarding wizard → immediate trial start via `mark_club_onboarding_complete()`, no sales-gate, no waiting). The "Demo →" prefix in the packaging doc's stated model does not match the real signup flow either.
-
-**Decision needed from you:**
-- (a) Is **14 days** the real, intended policy? If so: run `update_platform_settings(p_default_trial_days: 14)` (the existing audited RPC) to change the live value, then update the 4 remaining "7 days" i18n strings (both locales) to say 14/١٤. This is a live commercial-config change and needs your explicit go-ahead since it affects every future signup's actual entitlement.
-- (b) Is **7 days** actually correct, and the packaging doc/sales deck are the ones that are wrong? If so: update `MAL3ABY_V1_COMMERCIAL_PACKAGING.md`, the sales deck, and the presenter script instead, and revert the `trialFunnelHint` copy back toward 7-day framing.
+**Still no "Demo" step exists in the shipped code** (`/signup` → onboarding wizard → immediate trial start, no sales-gate) — the packaging doc's "Demo → Onboarding → 14-day trial" framing describes an aspirational funnel shape, not the literal implemented flow. This is unchanged from before and was reported, not silently resolved — the CTA copy itself was previously checked against the real flow and found accurate (self-service, no demo step), so no code changed here. If a real demo-gate step is wanted, that is a product feature to build, not a copy fix.
 - (c) Is there really meant to be a demo-gate step before onboarding? If so, that is unimplemented — a real feature gap, not a copy fix, and out of scope for this mission to build without your sign-off.
 
 **No code or config was changed for this decision beyond the copy revert described above.** Nothing was allowed to silently pick a side.

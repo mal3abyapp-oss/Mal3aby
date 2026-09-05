@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { filterPublicCommercialPlans, NEW_COMMERCIAL_TIER_MIN_DISPLAY_ORDER } from './billing'
+import { filterPublicCommercialPlans, NEW_COMMERCIAL_TIER_MIN_DISPLAY_ORDER, computeAnnualDiscountsByFamily } from './billing'
 
 // Regression coverage for the 2026-09-05 P0 fix: SubscriptionPage.tsx
 // and HomePage.tsx were live-leaking the 2 surviving legacy plans
@@ -62,5 +62,54 @@ describe('filterPublicCommercialPlans', () => {
 
   it('the shared threshold constant is 10, matching the documented legacy/current boundary', () => {
     expect(NEW_COMMERCIAL_TIER_MIN_DISPLAY_ORDER).toBe(10)
+  })
+})
+
+// Regression coverage for the 2026-09-05 P0 fix: HomePage.tsx's
+// landing-page pricing preview showed a hardcoded "Save 25%" English
+// discount label (stale, from an earlier pricing model) instead of the
+// real ~16.2-16.5% annual discount on the approved Starter/Growth/Pro
+// prices. This asserts the real percentages are computed correctly and
+// match what a customer should actually see, rounded to 1 decimal.
+describe('computeAnnualDiscountsByFamily', () => {
+  const NAMED_PLAN_ROWS = [
+    { name: 'Starter', billing_interval: 'month', price: 1790 },
+    { name: 'Starter (Annual)', billing_interval: 'year', price: 18000 },
+    { name: 'Growth', billing_interval: 'month', price: 2990 },
+    { name: 'Growth (Annual)', billing_interval: 'year', price: 30000 },
+    { name: 'Pro', billing_interval: 'month', price: 4990 },
+    { name: 'Pro (Annual)', billing_interval: 'year', price: 50000 },
+  ]
+
+  it('computes the correct Starter annual discount (~16.2%), not the stale "25%"', () => {
+    const result = computeAnnualDiscountsByFamily(NAMED_PLAN_ROWS)
+    expect(result.get('Starter')).toBeCloseTo(16.2, 1)
+  })
+
+  it('computes the correct Growth annual discount (~16.4%), not the stale "25%"', () => {
+    const result = computeAnnualDiscountsByFamily(NAMED_PLAN_ROWS)
+    expect(result.get('Growth')).toBeCloseTo(16.4, 1)
+  })
+
+  it('computes the correct Pro annual discount (~16.5%), not the stale "25%"', () => {
+    const result = computeAnnualDiscountsByFamily(NAMED_PLAN_ROWS)
+    expect(result.get('Pro')).toBeCloseTo(16.5, 1)
+  })
+
+  it('never returns 25 (the old hardcoded, now-wrong value) for any real tier', () => {
+    const result = computeAnnualDiscountsByFamily(NAMED_PLAN_ROWS)
+    for (const pct of result.values()) {
+      expect(pct).not.toBe(25)
+    }
+  })
+
+  it('skips a monthly-only plan family with no annual sibling (e.g. Enterprise has no DB row at all)', () => {
+    const result = computeAnnualDiscountsByFamily([{ name: 'Starter', billing_interval: 'month', price: 1790 }])
+    expect(result.size).toBe(0)
+  })
+
+  it('skips a row with a null name rather than throwing', () => {
+    const result = computeAnnualDiscountsByFamily([{ name: null, billing_interval: 'year', price: 18000 }])
+    expect(result.size).toBe(0)
   })
 })
