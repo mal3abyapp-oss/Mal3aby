@@ -149,6 +149,21 @@ export function PlatformClubDetailPage() {
   const [trialBlockedReason, setTrialBlockedReason] = useState<string | null>(null)
   const [trialOverrideReason, setTrialOverrideReason] = useState('')
   const [selectedPlanId, setSelectedPlanId] = useState<string>('')
+  // WORKSTREAM 4 (founding customer offer wiring): a Platform-Owner-only
+  // checkbox next to the paid-activation action. Deliberately NOT a
+  // public self-service race-to-claim promotion -- the Platform Owner
+  // decides per-club, at the moment of PAID conversion, whether this
+  // club should be offered the founding discount. claim_founding_customer_slot()
+  // itself is idempotent per club and structurally caps at 5 via
+  // PRIMARY KEY(slot_number), so this checkbox can never over-claim even
+  // if clicked more than once.
+  const [applyFoundingOffer, setApplyFoundingOffer] = useState(false)
+  const [foundingClaimResult, setFoundingClaimResult] = useState<
+    { outcome: 'claimed'; slotNumber: number; promotionalPrice: number; promotionEnd: string }
+    | { outcome: 'all_slots_taken' }
+    | { outcome: 'error'; message: string }
+    | null
+  >(null)
   const [actionError, setActionError] = useState<string | null>(null)
   const [editingLimits, setEditingLimits] = useState(false)
   const [branchLimitInput, setBranchLimitInput] = useState('')
@@ -342,16 +357,54 @@ export function PlatformClubDetailPage() {
   const activateMutation = useMutation({
     mutationFn: async () => {
       if (!selectedPlanId) throw new Error('no plan selected')
-      const { error } = await supabase.rpc('create_platform_subscription', {
+      // create_platform_subscription RETURNS uuid (the new subscription's
+      // id) -- previously discarded (only `error` was read). Now captured
+      // so the founding-offer claim below (which requires a real
+      // platform_subscription_id, not just a club_id) can run in the same
+      // action, at the exact moment of paid conversion.
+      const { data: newSubscriptionId, error } = await supabase.rpc('create_platform_subscription', {
         p_club_id: clubId!,
         p_subscription_kind: 'paid',
         p_plan_id: selectedPlanId,
       })
       if (error) throw error
+
+      // Founding-offer wiring (Platform-Owner-controlled, opt-in per
+      // activation -- never automatic, never a public claim path).
+      // claim_founding_customer_slot() itself never raises for
+      // "all slots taken" -- it returns eligible=false, which must be
+      // branched on explicitly rather than treated as an error.
+      if (applyFoundingOffer && newSubscriptionId) {
+        const { data: claimRows, error: claimError } = await supabase.rpc('claim_founding_customer_slot', {
+          p_club_id: clubId!,
+          p_platform_subscription_id: newSubscriptionId as string,
+        })
+        if (claimError) {
+          setFoundingClaimResult({ outcome: 'error', message: claimError.message })
+        } else {
+          const claim = claimRows?.[0] as
+            | { slot_number: number | null; eligible: boolean; promotional_price: number | null; promotion_end: string | null }
+            | undefined
+          if (claim?.eligible && claim.slot_number != null && claim.promotional_price != null && claim.promotion_end) {
+            setFoundingClaimResult({
+              outcome: 'claimed',
+              slotNumber: claim.slot_number,
+              promotionalPrice: claim.promotional_price,
+              promotionEnd: claim.promotion_end,
+            })
+          } else {
+            setFoundingClaimResult({ outcome: 'all_slots_taken' })
+          }
+        }
+      } else {
+        setFoundingClaimResult(null)
+      }
     },
     onSuccess: () => {
       invalidateAll()
       setSelectedPlanId('')
+      setApplyFoundingOffer(false)
+      void queryClient.invalidateQueries({ queryKey: ['platform-founding-offer-status', clubId] })
     },
     onError: () => setActionError(t('platform.clubDetailPage.errors.activate')),
   })
@@ -954,18 +1007,51 @@ export function PlatformClubDetailPage() {
                     </div>
                   )}
                 </div>
-                <div className="flex items-center gap-2">
-                  <Select value={selectedPlanId} onValueChange={setSelectedPlanId}>
-                    <SelectTrigger className="w-40"><SelectValue placeholder={t('platform.clubDetailPage.actionsCard.choosePlanPlaceholder')} /></SelectTrigger>
-                    <SelectContent>
-                      {plans.map((p) => (
-                        <SelectItem key={p.id} value={p.id}>{p.name_ar}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <Button size="sm" onClick={() => activateMutation.mutate()} disabled={activateMutation.isPending}>
-                    {t('platform.clubDetailPage.actionsCard.activate')}
-                  </Button>
+                <div className="flex flex-col gap-2">
+                  <div className="flex items-center gap-2">
+                    <Select value={selectedPlanId} onValueChange={setSelectedPlanId}>
+                      <SelectTrigger className="w-40"><SelectValue placeholder={t('platform.clubDetailPage.actionsCard.choosePlanPlaceholder')} /></SelectTrigger>
+                      <SelectContent>
+                        {plans.map((p) => (
+                          <SelectItem key={p.id} value={p.id}>{p.name_ar}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <Button size="sm" onClick={() => activateMutation.mutate()} disabled={activateMutation.isPending}>
+                      {t('platform.clubDetailPage.actionsCard.activate')}
+                    </Button>
+                  </div>
+                  {/* WORKSTREAM 4: Platform-Owner-controlled founding-offer
+                      grant, applied at the exact moment of PAID conversion
+                      (never at trial start -- the offer is for "first 5
+                      PAYING customers"). Not a public/self-service claim --
+                      this checkbox is the only call site for
+                      claim_founding_customer_slot() anywhere in the product. */}
+                  <label htmlFor="apply-founding-offer" className="flex items-center gap-2 text-xs text-text-secondary">
+                    <input
+                      id="apply-founding-offer"
+                      type="checkbox"
+                      checked={applyFoundingOffer}
+                      onChange={(e) => setApplyFoundingOffer(e.target.checked)}
+                      className="size-4"
+                    />
+                    {t('platform.clubDetailPage.actionsCard.applyFoundingOffer')}
+                  </label>
+                  {foundingClaimResult?.outcome === 'claimed' && (
+                    <p className="text-xs text-status-success">
+                      {t('platform.clubDetailPage.actionsCard.foundingOfferClaimed', {
+                        slot: foundingClaimResult.slotNumber,
+                        price: foundingClaimResult.promotionalPrice,
+                        date: new Date(foundingClaimResult.promotionEnd).toLocaleDateString(locale === 'en' ? 'en-US' : 'ar-EG'),
+                      })}
+                    </p>
+                  )}
+                  {foundingClaimResult?.outcome === 'all_slots_taken' && (
+                    <p className="text-xs text-status-warning">{t('platform.clubDetailPage.actionsCard.foundingOfferAllSlotsTaken')}</p>
+                  )}
+                  {foundingClaimResult?.outcome === 'error' && (
+                    <p className="text-xs text-status-danger">{t('platform.clubDetailPage.actionsCard.foundingOfferError', { message: foundingClaimResult.message })}</p>
+                  )}
                 </div>
               </>
             )}

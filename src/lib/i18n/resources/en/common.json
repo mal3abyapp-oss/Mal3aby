@@ -590,7 +590,11 @@
         "extendGrace": "Extend grace period (14 days)",
         "cancelSubscription": "Cancel subscription",
         "suspendClub": "Suspend club",
-        "reactivateClub": "Reactivate club"
+        "reactivateClub": "Reactivate club",
+        "applyFoundingOffer": "Apply founding customer offer (first 5 paying customers, 50% off for 3 months)",
+        "foundingOfferClaimed": "Founding offer applied — slot {{slot}}, {{price}} EGP/month until {{date}}.",
+        "foundingOfferAllSlotsTaken": "Could not apply the founding offer — all 5 slots are already taken.",
+        "foundingOfferError": "Could not apply the founding offer: {{message}}"
       },
       "limitsCard": {
         "title": "Commercial limits",

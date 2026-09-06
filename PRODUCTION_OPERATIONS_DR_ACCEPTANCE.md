@@ -294,3 +294,29 @@ solving the wrong end of the problem first).
 ## Notes
 
 (running log)
+
+**2026-09-06 addendum (separate mission — MAL3ABY FINAL PRE-SALES
+HARDENING, Workstream 3)**: a 4th `pg_cron` job,
+`sweep-commercial-grace-state` (daily `41 3 * * *`, distinct minute from
+the existing 03:17 job to avoid clustering), is written and ready to
+apply but **NOT YET LIVE** as of this note — migration
+`supabase/migrations/20260906170000_schedule_commercial_grace_state_sweep.sql`
+was authored, verified via read-only/rolled-back live queries against
+`gxkrtlvpjwxhcqdisyob`, and intentionally left unapplied per that
+mission's "do not apply migrations yourself" instruction. Once applied,
+update the **Scheduled jobs** count above from 3 to 4 and add:
+`sweep_commercial_grace_state()` daily 03:41 — calls
+`refresh_commercial_grace_state(club_id)` once per club with a
+staff/active-player limit set, per-club exception-isolated (same
+per-row-isolation shape as `expire_stale_booking_holds()`). Root-cause
+note for future reference: `refresh_commercial_grace_state()` had been
+live since 2026-09-04 but was **never actually invocable by pg_cron** —
+its `is_platform_owner()` gate always evaluates false with no JWT
+context (proven live), so every scheduled call would have raised `not
+authorized`. Fixed in the same migration using the exact
+`auth.uid() is null or is_platform_owner()` discriminator already
+proven correct for this exact bug class in
+`20260904130300_fix_sales_upsert_discovered_lead_service_role_auth.sql`
+/ `20260904140100_fix_sales_service_role_auth_current_user_bug_class.sql`
+— NOT `current_user = 'service_role'`, which those two migrations proved
+does not survive a `SECURITY DEFINER` boundary.

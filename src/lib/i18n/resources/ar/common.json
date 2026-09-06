@@ -590,7 +590,11 @@
         "extendGrace": "تمديد فترة السماح (14 يوم)",
         "cancelSubscription": "إلغاء الاشتراك",
         "suspendClub": "إيقاف النادي",
-        "reactivateClub": "إعادة تفعيل النادي"
+        "reactivateClub": "إعادة تفعيل النادي",
+        "applyFoundingOffer": "تطبيق عرض العملاء المؤسسين (أول 5 عملاء دافعين، خصم 50٪ لمدة 3 أشهر)",
+        "foundingOfferClaimed": "تم تطبيق عرض العملاء المؤسسين — الفتحة رقم {{slot}}، {{price}} جنيه شهريًا حتى {{date}}.",
+        "foundingOfferAllSlotsTaken": "تعذّر تطبيق عرض العملاء المؤسسين — جميع الفتحات الخمس محجوزة بالفعل.",
+        "foundingOfferError": "تعذّر تطبيق عرض العملاء المؤسسين: {{message}}"
       },
       "limitsCard": {
         "title": "الحدود التجارية",
