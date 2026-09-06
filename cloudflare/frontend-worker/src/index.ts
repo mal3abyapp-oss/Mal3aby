@@ -35,39 +35,88 @@ export interface Env {
 // NEVER be aggressively cached, since they're what a client uses to
 // discover which hashed assets to request next.
 //
-// CORRECTION found live post-deploy: `no-cache` alone was NOT enough
-// on this zone. Real Cloudflare documentation (developers.cloudflare.com
-// /cache/concepts/cache-control/, confirmed via search, not assumed):
-// "When setting `no-cache` with Origin Cache Control on, Cloudflare
-// caches and always revalidates." Free/Pro/Business plans (this
-// project is on Free, confirmed earlier this session) have Origin
-// Cache Control ON by default -- so `no-cache` still lets Cloudflare's
-// edge KEEP a cached copy and serve it while "revalidating", which in
-// practice was observed live, immediately after deploying this exact
-// fix: a bare `fetch('/', {cache:'no-store'})` (cache:'no-store' only
-// controls the BROWSER's own cache, not Cloudflare's edge) kept
-// returning `cf-cache-status: HIT` with the PREVIOUS deploy's HTML/JS
-// reference for a period after the new deploy went live. This project
-// has no cache-purge tool/API token available in this environment, so
-// the fix must not depend on ever needing a manual purge again.
-//
-// `no-store` is unambiguous in Cloudflare's own default-cache-behavior
-// docs: "Cloudflare does not cache the resource when: the Cache-Control
-// header is set to ... no-store ..." -- regardless of Origin Cache
-// Control. This is the correct, purge-independent directive for
-// content that must never be edge-stale even for a moment.
-//
 //   /assets/*  (Vite's hashed output directory): immutable, 1 year --
-//     unaffected by this correction, hashed filenames make revalidation
-//     pointless regardless of edge caching semantics.
+//     hashed filenames make revalidation pointless regardless of edge
+//     caching semantics.
+//   workbox-<hash>.js (independent-review finding, 2026-09-06): this
+//     Workbox-generated runtime file also carries a genuine content
+//     hash in its OWN filename (confirmed live in a real `dist/`
+//     build: workbox-98f7a950.js), the exact same immutability
+//     property as /assets/* -- a content change always produces a new
+//     hash/filename -- but it is written to the dist/ ROOT (Vite's
+//     PWA plugin output location, not the assets/ subdirectory), so it
+//     was previously falling into the `no-store` branch below purely
+//     because of its path, not its actual (im)mutability. sw.js itself
+//     (which references this file by its exact hashed name, the same
+//     way index.html references hashed /assets/* files) correctly
+//     stays no-store below -- only the hashed runtime file it points
+//     to is safe to cache long-term.
 //   everything else (index.html, sw.js, manifest.webmanifest, icons
 //     served from the public/ root, and the SPA-fallback index.html
 //     Workers Static Assets serves for any unmatched path): no-store.
+function isImmutableHashedAsset(pathname: string): boolean {
+  return pathname.startsWith('/assets/') || /^\/workbox-[0-9a-f]+\.js$/.test(pathname)
+}
+
 function cacheControlFor(pathname: string): string {
-  if (pathname.startsWith('/assets/')) {
+  if (isImmutableHashedAsset(pathname)) {
     return 'public, max-age=31536000, immutable'
   }
   return 'no-store'
+}
+
+// ROOT-CAUSE REMEDIATION (2026-09-06): the `no-store` fix above was
+// necessary but NOT sufficient -- it correctly controls what
+// Cache-Control value the CLIENT sees on the outbound response, but
+// this recurred live TWICE more after that fix shipped (2026-09-05,
+// 2026-09-06), each time confirmed via direct production header
+// inspection: `cf-cache-status: HIT` alongside `cache-control:
+// no-store` on the SAME response, with an identical `Date`/`ETag`
+// across repeated requests (including ones with different, unique
+// query strings) minutes apart. That combination is only possible if
+// Cloudflare's edge cached this exact response BEFORE this Worker's
+// `headers.set('Cache-Control', ...)` line ever ran, or if the
+// Workers Static Assets serving pipeline (env.ASSETS.fetch()) performs
+// its own automatic edge caching independently of the final
+// Cache-Control header the wrapping Worker returns to the client --
+// Cloudflare's own docs describe "automatic caching for static assets
+// across its network" as a first-class feature of Static Assets
+// itself, separate from standard Cache-Control-driven caching, but do
+// not document its exact precedence relative to a wrapping Worker's
+// header rewrite (confirmed via direct doc research this session --
+// this precise interaction is not covered).
+//
+// Given that gap, this applies EVERY defense-in-depth lever Cloudflare
+// documents for a Worker to influence caching of its own internal
+// fetch(), on top of (not instead of) the existing outbound-header
+// fix: `cf.cacheTtl: 0` and `cf.cacheEverything: false` on the REQUEST
+// object passed into env.ASSETS.fetch() for any non-hashed-asset path,
+// so the internal fetch itself is marked non-cacheable at the point
+// Cloudflare's edge makes its caching decision, not only on the
+// resulting client-facing response headers.
+//
+// This is still not a complete fix on its own -- see
+// docs/design-remediation/FRONTEND_CACHE_ROOT_CAUSE.md for the full
+// evidence trail and why a zone-level Cache Rule (bypass cache for all
+// non-/assets/* paths) is the actual authoritative mechanism proposed
+// alongside this code change, since Cache Rules operate at Cloudflare's
+// true edge cache-decision layer, upstream of both the Worker and the
+// Static Assets serving pipeline -- unlike this in-Worker mitigation,
+// whose effect on Workers Static Assets' specific internal caching
+// behavior is not fully documented and could not be exhaustively
+// proven from documentation alone.
+function shouldBypassAssetCache(pathname: string): boolean {
+  return !isImmutableHashedAsset(pathname)
+}
+
+function assetsFetchInit(pathname: string): RequestInit {
+  if (!shouldBypassAssetCache(pathname)) return {}
+  return {
+    cf: {
+      cacheTtl: 0,
+      cacheEverything: false,
+    },
+  } as RequestInit
 }
 
 function securityHeaders(supabaseUrl: string): Record<string, string> {
@@ -243,7 +292,7 @@ export default {
       return handleClientErrorBeacon(request)
     }
 
-    const response = await env.ASSETS.fetch(request)
+    const response = await env.ASSETS.fetch(request, assetsFetchInit(url.pathname))
     const headers = new Headers(response.headers)
     for (const [key, value] of Object.entries(securityHeaders(env.SUPABASE_URL))) {
       headers.set(key, value)

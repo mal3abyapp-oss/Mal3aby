@@ -1,2 +1,8 @@
 node_modules/
 .wrangler/
+
+# Auto-regenerable via `npx wrangler types` -- large (15k+ lines),
+# no secrets, but a pure build artifact that would bloat every diff
+# touching this Worker for no real value (identical output on every
+# regeneration from the current wrangler.jsonc).
+worker-configuration.d.ts
