@@ -157,13 +157,29 @@ safe as-is.
 
 Reports reconcile exactly to raw SQL on real data.
 
-- **OPEN P1**: two portal-security regression test suites
-  (`portal-cross-persona-authorization.integration.test.ts`,
+- **OPEN P1 — EXTERNAL BLOCKER, investigated and confirmed not
+  closable with tools available to this session**: two portal-security
+  regression test suites (`portal-cross-persona-authorization.integration.test.ts`,
   `claim-customer-corroboration.integration.test.ts`) exist and are
   well-targeted, but CI never wires their required secrets, so they
   silently SKIP instead of running. This is a real gap in the safety
   net, not a live vulnerability — the boundaries they test were
   separately confirmed via live adversarial testing this session.
+  Closing it requires either (a) a real `SUPABASE_SERVICE_ROLE_KEY` to
+  mint a QA session via the documented `generateLink`/`verifyOtp`
+  mechanism (`E2E_TEST_STRATEGY.md`), or (b) an existing dedicated QA
+  account's real password. Neither is obtainable through any tool
+  available to this session: the Supabase MCP server's
+  `get_publishable_keys` exposes only anon/publishable keys by design,
+  never `service_role`; creating an `auth.users` row directly via raw
+  SQL would bypass Supabase's own Auth system in an unsupported way and
+  was correctly avoided; and typing a real password into the login form
+  is explicitly prohibited by this project's own standing rule
+  (`docs/PROJECT_STATE.md`). This is recorded honestly as a genuine
+  external-credential blocker requiring the repository owner to either
+  add `CUSTOMER_360_TEST_EMAIL`/`PASSWORD` (or `SUPABASE_SERVICE_ROLE_KEY`)
+  as GitHub repository secrets themselves, or hand a session the
+  `service_role` key directly (never pasted into chat) to mint one.
 
 ### WhatsApp — PARTIALLY ACTIVE
 Architecturally complete and well-hardened: a real circuit breaker, rate
@@ -223,7 +239,7 @@ already noted above as a real gap.
 | 4 | `players.medical_notes` no column-level RLS on SELECT | P1 | **OPEN** | Needs RPC or security-barrier view; needs wider call-site mapping first |
 | 5 | `refresh_commercial_grace_state()` never called | P1 | **OPEN** | Grace status can never advance to over_limit; needs a scheduler |
 | 6 | `claim_founding_customer_slot()` has no frontend caller | P1 | **OPEN** | Founding offer unreachable through the product today |
-| 7 | Portal security regression suites silently SKIP in CI | P1 | **OPEN** | Needs `CUSTOMER_360_TEST_EMAIL`/`PASSWORD` wired as CI secrets |
+| 7 | Portal security regression suites silently SKIP in CI | P1 | **OPEN — EXTERNAL BLOCKER** | Investigated this session; requires either `SUPABASE_SERVICE_ROLE_KEY` or the QA account's real password, neither obtainable through any available tool. Needs the repository owner to add `CUSTOMER_360_TEST_EMAIL`/`PASSWORD` (or the service-role key) as GitHub repository secrets directly |
 | 8 | `request_commercial_upgrade()` wrong academy usage source | Informational | **FIXED THIS SESSION, NOT YET APPLIED** | `supabase/migrations/20260906120000...sql` written, awaiting owner go-ahead |
 | 9 | Platform Owner plan dropdown includes legacy plans | P2 | **AWAITING OWNER DECISION** | Product-intent question, not a clear bug |
 | 10 | Missing composite index, active-player 90-day query | P2 | **OPEN** | Perf risk at Pro-tier scale, not urgent today |
@@ -248,13 +264,17 @@ All re-confirmed green after the fixes in this session:
 
 ## Pending owner decisions
 
-Not yet resolved as of this document's writing:
-
-- Apply `supabase/migrations/20260906120000_fix_request_commercial_upgrade_academy_usage_source.sql`
-  to production (low-risk, informational-only fix, awaiting a separate
-  go-ahead).
-- Wire `CUSTOMER_360_TEST_EMAIL`/`CUSTOMER_360_TEST_PASSWORD` as CI
-  secrets so the two portal-security regression suites actually run.
+- ~~Apply `supabase/migrations/20260906120000_fix_request_commercial_upgrade_academy_usage_source.sql`
+  to production~~ — **DONE**, applied and verified live (migration
+  `20260906052835`), under explicit owner authorization.
+- ~~Wire `CUSTOMER_360_TEST_EMAIL`/`CUSTOMER_360_TEST_PASSWORD` as CI
+  secrets so the two portal-security regression suites actually run~~ —
+  **investigated, confirmed a genuine external-credential blocker**: no
+  tool available to this session can obtain a `SUPABASE_SERVICE_ROLE_KEY`
+  or the QA account's real password (see the Customer Portal /
+  Payments / Invoices / Reports section above for the full explanation).
+  Remains open — requires the repository owner to add the secret(s)
+  directly.
 - `players.medical_notes` column-level RLS gap needs a real fix
   (RPC-mediated read path or security-barrier view) — deferred, needs
   wider mapping first.
