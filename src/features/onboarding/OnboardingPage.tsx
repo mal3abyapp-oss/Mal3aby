@@ -83,6 +83,33 @@ export function OnboardingPage() {
       if (error) throw error
       const row = data?.[0]
       if (!row) throw new Error('no result')
+
+      // P0 fix (2026-09-06): complete_new_club_onboarding() no longer
+      // starts the trial itself (see 20260904210300_commercial_
+      // packaging_trial_gate_on_onboarding.sql) -- trial start was moved
+      // to mark_club_onboarding_complete(), a distinct RPC meant to be
+      // called once the owner finishes this wizard. That call was never
+      // added anywhere in the frontend, so every self-serve signup since
+      // that migration landed created a club with zero platform_
+      // subscriptions rows -- get_club_platform_access() returns
+      // 'blocked' for a club with no subscription row at all, so the
+      // brand-new owner would be locked out of their own club
+      // immediately after finishing this wizard, with no trial ever
+      // having started. This wizard IS "the owner finishing initial
+      // setup" (the 4th step below marks it complete) -- so this is the
+      // correct, and only, call site for a self-serve signup. Errors are
+      // deliberately swallowed (not rethrown): the club/branch/
+      // membership already exist at this point, so failing the whole
+      // signup over this second call would strand the owner with a real
+      // club they can't reach instead of a slightly-late trial start
+      // (idempotent, safe to retry from the Platform Owner side if this
+      // ever fails).
+      try {
+        await supabase.rpc('mark_club_onboarding_complete', { p_club_id: row.club_id })
+      } catch {
+        // best-effort — see comment above
+      }
+
       return { clubId: row.club_id as string, trialGranted: row.trial_granted as boolean }
     },
     onSuccess: async (r) => {

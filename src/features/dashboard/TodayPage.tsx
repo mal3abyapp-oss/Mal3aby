@@ -186,6 +186,33 @@ function hasAnyPermission(permissionKeys: readonly string[] | undefined, keys: r
   return keys.some((key) => permissionKeys.includes(key))
 }
 
+// Role/Permissions review fix (2026-09-06): mirrors AcademyPage.tsx's
+// isCoachOnlyView (2026-09-05 P0 fix) -- this screen had the exact same
+// bug class its own prior code comment claimed was "out of scope": a
+// custom role built with coach-equivalent permissions (session/
+// attendance keys, none of the manager/reception/owner keys above)
+// matched none of isManager/isReception/isOwner/isCoach and fell
+// through to a dashboard body that renders nothing but the header and
+// first-run checklist -- a blank Today screen instead of
+// CoachTodayView. Live-verified via Supabase: none of MANAGER_
+// PERMISSION_KEYS or 'booking.view'/'club.update' overlap with the
+// coach system role's real permission set (attendance.mark,
+// attendance.view, field.view, player.view, qr.scan, session.manage,
+// session.view), so any custom role composed from that same delivery
+// subset reproduces the blank screen. See AcademyPage.custom-role-
+// routing.test.ts for the sibling regression test this mirrors.
+const COACH_DELIVERY_KEYS = ['session.view', 'attendance.view', 'attendance.mark'] as const
+
+export function isCoachOnlyDashboard(
+  roleKey: string | null | undefined,
+  permissionKeys: readonly string[] | undefined,
+): boolean {
+  if (roleKey === 'coach') return true
+  if (hasAnyPermission(permissionKeys, MANAGER_PERMISSION_KEYS)) return false
+  if (hasAnyPermission(permissionKeys, ['booking.view', 'club.update'])) return false
+  return hasAnyPermission(permissionKeys, COACH_DELIVERY_KEYS)
+}
+
 export function TodayPage() {
   const { t } = useTranslation()
   const { currentClubId, currentMembership } = useAuth()
@@ -196,14 +223,7 @@ export function TodayPage() {
   const isManager = hasAnyPermission(permissionKeys, MANAGER_PERMISSION_KEYS)
   const isOwner = hasAnyPermission(permissionKeys, ['club.update'])
   const isReception = !isManager && hasAnyPermission(permissionKeys, ['booking.view'])
-  // Coach delegation stays roleKey-gated: CoachTodayView is a
-  // coach-specific UI (sessions/attendance only), a materially
-  // different component to route into, not a section-visibility toggle
-  // on this screen -- out of this fix's scope (a custom role with
-  // coach-equivalent permissions still gets the sections above it
-  // qualifies for, same as before this fix, since it never matched
-  // roleKey === 'coach' either).
-  const isCoach = roleKey === 'coach'
+  const isCoach = isCoachOnlyDashboard(roleKey, permissionKeys)
 
   const { data, isLoading } = useQuery({
     queryKey: ['today-dashboard', currentClubId],
