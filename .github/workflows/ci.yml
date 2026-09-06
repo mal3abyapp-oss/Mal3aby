@@ -6,18 +6,34 @@ name: CI
 # every commit should have passed locally anyway, so a defect can't reach
 # main/deploy silently because a developer forgot a step.
 #
-# Deliberately does NOT run the .test.ts integration suites
-# (customer360.integration.test.ts, staff360.integration.test.ts) as
-# hard-fail gates here: they require real QA staff credentials
-# (CUSTOMER_360_TEST_EMAIL/PASSWORD, STAFF_360_*_EMAIL/PASSWORD) against
-# the live Supabase project and skip cleanly without them (see each
-# file's own header). Wiring real secrets into a public/shared CI runner
-# is a separate, deliberate decision the repo owner should make explicitly
-# (rule: "do not commit QA credentials" / "use secure environment/secret
-# management") -- this workflow surfaces that gap honestly in its summary
-# rather than silently skipping it. If/when those secrets are added as
-# repository secrets, uncomment the "env:" block on the "Run tests" step
-# to make them read as PASSED instead of SKIPPED here too.
+# Most of the 15 `src/features/**/*.integration.test.ts` suites still
+# require real QA staff credentials this environment has no path to
+# create (CUSTOMER_360_TEST_EMAIL/PASSWORD, STAFF_360_*_EMAIL/PASSWORD,
+# QA_AUDIT_CLUB_ID, etc. -- different suites need different fixtures, see
+# docs/TEST_PLAN.md) and skip cleanly without them (see each file's own
+# header). Wiring real secrets into a public/shared CI runner is a
+# separate, deliberate decision the repo owner should make explicitly.
+#
+# PORTAL SECURITY CI HARDENING (2026-09-06): the "Unit tests" step below
+# now actually WIRES CUSTOMER_360_TEST_EMAIL/PASSWORD through to the test
+# process (previously commented out) -- so the moment those two secrets
+# are added as GitHub repository secrets, every gated suite that only
+# needs them (including the two portal cross-persona-authorization /
+# security suites below) starts executing for real on the very next run,
+# with zero further code changes. STAFF_360_*/QA_AUDIT_CLUB_ID are also
+# wired for the OTHER suites that declare a need for them (see each
+# suite's own header comment) -- but are NOT required by the two portal
+# suites this hardening pass is scoped to.
+#
+# The "Portal security suites must not silently SKIP -> GREEN" step
+# further down is a separate, narrowly-scoped hard-fail gate: it does NOT
+# fail CI today (there is no repository variable turning it on yet, and
+# none of this PR's changes create one), but makes it a ONE-STEP action
+# for the repo owner to make CI fail loudly, specifically for
+# portal-cross-persona-authorization.integration.test.ts and
+# claim-customer-corroboration.integration.test.ts, if those two ever
+# silently skip again after being expected to run. See that step for the
+# exact activation switch and rationale.
 on:
   push:
     branches: [main]
@@ -75,13 +91,66 @@ jobs:
           # authenticated integration suites still skip without their QA secrets.
           VITE_SUPABASE_URL: https://ci-placeholder.supabase.co
           VITE_SUPABASE_ANON_KEY: ci-placeholder-anon-key
-        # env:
-        #   CUSTOMER_360_TEST_EMAIL: ${{ secrets.CUSTOMER_360_TEST_EMAIL }}
-        #   CUSTOMER_360_TEST_PASSWORD: ${{ secrets.CUSTOMER_360_TEST_PASSWORD }}
-        #   STAFF_360_OWNER_EMAIL: ${{ secrets.STAFF_360_OWNER_EMAIL }}
-        #   STAFF_360_OWNER_PASSWORD: ${{ secrets.STAFF_360_OWNER_PASSWORD }}
-        #   STAFF_360_EMPLOYEE_EMAIL: ${{ secrets.STAFF_360_EMPLOYEE_EMAIL }}
-        #   STAFF_360_EMPLOYEE_PASSWORD: ${{ secrets.STAFF_360_EMPLOYEE_PASSWORD }}
+          # Wired through (previously commented out) so that whichever of
+          # these GitHub repository secrets the repo owner has actually
+          # added start reaching the test process immediately -- vitest
+          # exposes process.env directly on import.meta.env for
+          # non-VITE_-prefixed names (verified empirically this pass), so
+          # no further vitest.config.ts change is needed. Any secret left
+          # unset simply resolves to an empty string here, which is
+          # exactly what each suite's own `describeIfConfigured` gate
+          # already treats as "not configured -- skip cleanly".
+          CUSTOMER_360_TEST_EMAIL: ${{ secrets.CUSTOMER_360_TEST_EMAIL }}
+          CUSTOMER_360_TEST_PASSWORD: ${{ secrets.CUSTOMER_360_TEST_PASSWORD }}
+          STAFF_360_OWNER_EMAIL: ${{ secrets.STAFF_360_OWNER_EMAIL }}
+          STAFF_360_OWNER_PASSWORD: ${{ secrets.STAFF_360_OWNER_PASSWORD }}
+          STAFF_360_EMPLOYEE_EMAIL: ${{ secrets.STAFF_360_EMPLOYEE_EMAIL }}
+          STAFF_360_EMPLOYEE_PASSWORD: ${{ secrets.STAFF_360_EMPLOYEE_PASSWORD }}
+          QA_AUDIT_CLUB_ID: ${{ secrets.QA_AUDIT_CLUB_ID }}
+
+      - name: Portal security suites must not silently SKIP -> GREEN
+        # Hard-fail gate scoped to EXACTLY the two portal-security
+        # integration suites this hardening pass covers --
+        # portal-cross-persona-authorization.integration.test.ts and
+        # claim-customer-corroboration.integration.test.ts. Both suites'
+        # own header comments confirm they need only
+        # CUSTOMER_360_TEST_EMAIL/CUSTOMER_360_TEST_PASSWORD (neither
+        # references STAFF_360_* or any other var) -- so this check
+        # asserts only that pair, not the other 13 integration suites'
+        # unrelated fixtures (those legitimately have no QA credentials
+        # in this environment yet and must keep skipping without turning
+        # CI red -- see docs/TEST_PLAN.md).
+        #
+        # Defaults to NOT required (`false`) because the secrets
+        # genuinely don't exist yet (`gh secret list` shows only
+        # CLOUDFLARE_API_TOKEN) -- so this PR does not itself turn CI red
+        # for a secret nobody has added. The moment the repo owner adds
+        # CUSTOMER_360_TEST_EMAIL/PASSWORD as repository secrets AND sets
+        # the `PORTAL_SECURITY_TESTS_REQUIRED` repository/workflow
+        # variable to `true` (Settings -> Secrets and variables ->
+        # Actions -> Variables), this step starts failing loudly instead
+        # of passing silently if either secret is ever missing or empty
+        # again -- e.g. removed, renamed, or scoped to the wrong
+        # environment -- so a SKIP can never again quietly read as a
+        # security PASS for these two suites.
+        if: ${{ vars.PORTAL_SECURITY_TESTS_REQUIRED == 'true' }}
+        run: |
+          missing=0
+          if [ -z "$CUSTOMER_360_TEST_EMAIL" ]; then
+            echo "::error::PORTAL_SECURITY_TESTS_REQUIRED is true but CUSTOMER_360_TEST_EMAIL secret is missing/empty -- portal-cross-persona-authorization.integration.test.ts and claim-customer-corroboration.integration.test.ts would silently SKIP instead of proving the security fix. Add the CUSTOMER_360_TEST_EMAIL repository secret, or set PORTAL_SECURITY_TESTS_REQUIRED back to false if these suites are not meant to run yet."
+            missing=1
+          fi
+          if [ -z "$CUSTOMER_360_TEST_PASSWORD" ]; then
+            echo "::error::PORTAL_SECURITY_TESTS_REQUIRED is true but CUSTOMER_360_TEST_PASSWORD secret is missing/empty -- same risk as above."
+            missing=1
+          fi
+          if [ "$missing" -eq 1 ]; then
+            exit 1
+          fi
+          echo "Portal security QA credentials present -- portal-cross-persona-authorization and claim-customer-corroboration integration suites are expected to have executed for real above."
+        env:
+          CUSTOMER_360_TEST_EMAIL: ${{ secrets.CUSTOMER_360_TEST_EMAIL }}
+          CUSTOMER_360_TEST_PASSWORD: ${{ secrets.CUSTOMER_360_TEST_PASSWORD }}
 
       - name: Migration filename sanity check (new files only)
         run: |
