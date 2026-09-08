@@ -103,7 +103,13 @@ begin
   select
     m.club_id, m.club_name, m.club_code, m.club_status, m.membership_id,
     m.membership_status, m.user_id, m.full_name, m.phone, m.email, m.owner_since,
-    (select count(*) from matched) as total_count
+    -- count(*) over () (not a per-row correlated scalar subquery): computed
+    -- once per query plan over the full `matched` set and attached to every
+    -- output row in the same pass, instead of re-scanning `matched` once per
+    -- returned row (up to p_limit times). Flagged by an independent Phase 14
+    -- performance review as a real cost once audit/owner history grows well
+    -- past today's near-zero real data.
+    count(*) over () as total_count
   from matched m
   -- Stable/deterministic across pages at any page size: created_at is
   -- not guaranteed unique (e.g. two owner memberships created in the
@@ -178,7 +184,9 @@ begin
   select
     m.id, m.club_id, m.club_name, m.actor_id, m.actor_name, m.actor_email,
     m.action, m.entity_type, m.entity_id, m.before, m.after, m.reason, m.created_at,
-    (select count(*) from matched) as total_count
+    -- count(*) over () -- see get_platform_club_owners above for why this
+    -- replaced a per-row correlated scalar subquery.
+    count(*) over () as total_count
   from matched m
   -- Same stability fix as get_platform_club_owners above: id (primary
   -- key) as the tiebreaker after created_at, which audit rows from the

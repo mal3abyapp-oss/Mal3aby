@@ -904,7 +904,9 @@
       },
       "attentionProblems": {
         "whatsapp_disconnected": "WhatsApp is currently disconnected (was previously connected)",
-        "whatsapp_failures": "{{detail}} WhatsApp messages failed in the last 7 days",
+        "whatsapp_failures_zero": "No WhatsApp messages failed in the last 7 days",
+        "whatsapp_failures_one": "{{count}} WhatsApp message failed in the last 7 days",
+        "whatsapp_failures_other": "{{count}} WhatsApp messages failed in the last 7 days",
         "flagged_duplicate": "Possible duplicate club — review before treating as a duplicate or fraud",
         "no_subscription": "No subscription record exists for this club",
         "pending_upgrade_request": "Upgrade request awaiting review ({{detail}})",

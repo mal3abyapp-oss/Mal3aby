@@ -13,14 +13,30 @@
 -- cancel_platform_subscription, extend_grace_period, etc. all already
 -- require a real caller-supplied reason).
 --
--- FIX: add an optional p_reason parameter to both RPCs (optional, not
--- required, to preserve the exact same call signature compatibility for
--- any existing caller while the frontend is updated in the same release
--- to always pass one) and thread it through to write_audit_log(). Every
--- other line of business logic in both functions is byte-for-byte
--- unchanged from the live version -- privilege-ceiling checks,
--- last-assigner-lockout guard, support-session force-end, status
--- transition logic, all preserved verbatim.
+-- FIX: add a p_reason parameter to both RPCs and thread it through to
+-- write_audit_log(). Every other line of business logic in both
+-- functions is byte-for-byte unchanged from the live version --
+-- privilege-ceiling checks, last-assigner-lockout guard,
+-- support-session force-end, status transition logic, all preserved
+-- verbatim.
+--
+-- REVISED after independent Phase 15/16 review (2026-09-08): p_reason
+-- was originally left `default null` with no server-side validation --
+-- the frontend disabled its Save button until a reason was typed, but
+-- any direct RPC caller (a script, a different client, a future UI
+-- regression) could still bypass that and deactivate staff / reassign a
+-- role with reason=null, silently reopening the exact
+-- "unexplainable audit entry" gap this migration exists to close. Both
+-- an independent security reviewer (P2, auditability-only) and an
+-- independent UX reviewer (P1, citing this codebase's own established
+-- platform_suspend_club() precedent) flagged this; fixed by requiring a
+-- real non-empty reason server-side, matching platform_suspend_club()'s
+-- exact validation shape (20260817100225_platform_suspend_reactivate_club_with_reason.sql):
+-- `if p_reason is null or length(trim(p_reason)) = 0 then raise
+-- exception`. p_reason keeps its `default null` in the signature only
+-- so the exception message is the caller-facing error rather than a
+-- generic not-null-constraint failure -- omitting it or passing an
+-- empty/whitespace string is still rejected identically.
 --
 -- NOT DONE, DELIBERATELY: this migration does NOT retroactively rewrite
 -- or backfill the 4 existing NULL-reason audit_logs rows -- audit_logs
@@ -52,6 +68,10 @@ begin
 
   if (p_platform_role_id is not null) = (p_platform_custom_role_id is not null) then
     raise exception 'specify exactly one of a system role or a custom role';
+  end if;
+
+  if p_reason is null or length(trim(p_reason)) = 0 then
+    raise exception 'a reason is required to change a platform staff member''s role';
   end if;
 
   select * into v_membership from public.platform_staff_memberships where id = p_membership_id;
@@ -131,6 +151,10 @@ begin
     raise exception 'not authorized';
   end if;
 
+  if p_reason is null or length(trim(p_reason)) = 0 then
+    raise exception 'a reason is required to deactivate a platform staff member';
+  end if;
+
   select * into v_membership from public.platform_staff_memberships where id = p_membership_id;
   if v_membership.id is null then
     raise exception 'platform staff member not found';
@@ -166,7 +190,7 @@ revoke all on function public.deactivate_platform_staff(uuid, text) from anon;
 grant execute on function public.deactivate_platform_staff(uuid, text) to authenticated;
 
 comment on function public.set_platform_staff_role(uuid, uuid, uuid, text) is
-  'Adds p_reason (optional param, threaded to write_audit_log) -- fixes the confirmed live gap where every platform_staff.role_changed audit row had reason=NULL. See 20260908150000_platform_staff_actions_require_reason.sql for full root-cause. All other logic byte-for-byte unchanged from the pre-fix version.';
+  'Adds p_reason, required non-empty server-side (matches platform_suspend_club''s validation shape) and threaded to write_audit_log() -- fixes the confirmed live gap where every platform_staff.role_changed audit row had reason=NULL. See 20260908150000_platform_staff_actions_require_reason.sql for full root-cause. All other logic byte-for-byte unchanged from the pre-fix version.';
 
 comment on function public.deactivate_platform_staff(uuid, text) is
-  'Adds p_reason (optional param, threaded to write_audit_log) -- fixes the confirmed live gap where every platform_staff.disabled audit row had reason=NULL. See 20260908150000_platform_staff_actions_require_reason.sql for full root-cause. All other logic byte-for-byte unchanged from the pre-fix version.';
+  'Adds p_reason, required non-empty server-side (matches platform_suspend_club''s validation shape) and threaded to write_audit_log() -- fixes the confirmed live gap where every platform_staff.disabled audit row had reason=NULL. See 20260908150000_platform_staff_actions_require_reason.sql for full root-cause. All other logic byte-for-byte unchanged from the pre-fix version.';

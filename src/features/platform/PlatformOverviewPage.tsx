@@ -354,12 +354,22 @@ export function PlatformOverviewPage() {
                           <bdi>{item.clubName}</bdi>
                         </p>
                         <p className="text-sm text-text-secondary">
-                          {t(`platform.overviewPage.attentionProblems.${item.problemType}`, {
-                            defaultValue: item.problemType,
-                            detail: item.detail
-                              ? t(`platform.overviewPage.attentionResourceLabels.${item.detail}`, { defaultValue: item.detail })
-                              : '',
-                          })}
+                          {item.problemType === 'whatsapp_failures'
+                            ? t(`platform.overviewPage.attentionProblems.whatsapp_failures`, {
+                                defaultValue: item.problemType,
+                                // The RPC reports this condition's `detail` as a raw failed-message
+                                // count (see get_platform_attention_items(), condition 2), not a
+                                // resource-label key like every other condition below -- it needs
+                                // real i18next plural interpolation (count), not the
+                                // attentionResourceLabels lookup used for the rest.
+                                count: Number(item.detail ?? 0),
+                              })
+                            : t(`platform.overviewPage.attentionProblems.${item.problemType}`, {
+                                defaultValue: item.problemType,
+                                detail: item.detail
+                                  ? t(`platform.overviewPage.attentionResourceLabels.${item.detail}`, { defaultValue: item.detail })
+                                  : '',
+                              })}
                         </p>
                       </div>
                       <div className="flex shrink-0 items-center gap-2">

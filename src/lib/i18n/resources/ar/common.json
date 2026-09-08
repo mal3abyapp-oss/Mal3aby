@@ -904,7 +904,12 @@
       },
       "attentionProblems": {
         "whatsapp_disconnected": "واتساب غير متصل حاليًا (كان متصلًا سابقًا)",
-        "whatsapp_failures": "{{detail}} رسالة واتساب فشلت خلال آخر 7 أيام",
+        "whatsapp_failures_zero": "لا توجد رسائل واتساب فاشلة خلال آخر 7 أيام",
+        "whatsapp_failures_one": "رسالة واتساب واحدة فشلت خلال آخر 7 أيام",
+        "whatsapp_failures_two": "رسالتا واتساب فشلتا خلال آخر 7 أيام",
+        "whatsapp_failures_few": "{{count}} رسائل واتساب فشلت خلال آخر 7 أيام",
+        "whatsapp_failures_many": "{{count}} رسالة واتساب فشلت خلال آخر 7 أيام",
+        "whatsapp_failures_other": "{{count}} رسالة واتساب فشلت خلال آخر 7 أيام",
         "flagged_duplicate": "نادٍ محتمل التكرار — يحتاج مراجعة قبل اعتباره تكرارًا أو محاولة احتيال",
         "no_subscription": "لا يوجد سجل اشتراك من أي نوع لهذا النادي",
         "pending_upgrade_request": "طلب ترقية بانتظار المراجعة ({{detail}})",
