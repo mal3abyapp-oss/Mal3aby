@@ -186,6 +186,31 @@ async function fetchGrowthReport(locale: 'ar' | 'en') {
   return { rows, monthlyNewClubs }
 }
 
+// Platform Owner Control Plane V1, Phase 8: get_whatsapp_usage_platform_wide()
+// existed since the commercial packaging release with zero frontend call
+// site anywhere (confirmed by the deep dive, Section 22 -- "the clearest
+// 'built but not surfaced' finding"). Wired here as a sixth Reports tab,
+// matching this page's existing per-club DataTable pattern exactly (same
+// club-link-into-Tenant-360 convention every other tab already uses --
+// no generic unfiltered /platform/clubs link, per the deep dive's
+// explicitly flagged anti-pattern on the Overview WhatsApp cards). The
+// RPC itself was fixed in the same migration to exclude QA/test-fixture
+// clubs (it had never been updated for that when M-2 shipped, since
+// nothing read it yet).
+async function fetchWhatsappUsageReport() {
+  const { data, error } = await supabase.rpc('get_whatsapp_usage_platform_wide')
+  if (error) throw error
+  return (data ?? []).map((r) => ({
+    club_id: r.club_id ?? '',
+    club_name: r.club_name ?? '—',
+    messagesLast30d: Number(r.messages_last_30d ?? 0),
+    messagesLast7d: Number(r.messages_last_7d ?? 0),
+    deliveredLast30d: Number(r.delivered_last_30d ?? 0),
+    failedLast30d: Number(r.failed_last_30d ?? 0),
+    lastMessageAt: r.last_message_at as string | null,
+  }))
+}
+
 async function fetchUsageReport() {
   // Production audit remediation (M-2): now reads through
   // get_platform_usage_report(), a QA-fixture-excluded
@@ -216,6 +241,10 @@ export function PlatformReportsPage() {
   const growthRows = growthReport?.rows ?? []
   const monthlyNewClubs = growthReport?.monthlyNewClubs ?? []
   const { data: usageReport = [], isLoading: usageLoading } = useQuery({ queryKey: ['report-usage'], queryFn: fetchUsageReport })
+  const { data: whatsappUsageReport = [], isLoading: whatsappUsageLoading } = useQuery({
+    queryKey: ['report-whatsapp-usage'],
+    queryFn: fetchWhatsappUsageReport,
+  })
 
   const subColumns: DataTableColumn<SubRow>[] = [
     {
@@ -317,6 +346,31 @@ export function PlatformReportsPage() {
     { key: 'staff', header: t('platform.reportsPage.usageColumns.staff'), render: (r) => r.staffCount },
   ]
 
+  const whatsappUsageColumns: DataTableColumn<(typeof whatsappUsageReport)[number]>[] = [
+    {
+      key: 'club',
+      header: t('platform.reportsPage.whatsappUsageColumns.club'),
+      render: (r) => (
+        <Link to={`/platform/clubs/${r.club_id}`} className="text-accent-foreground hover:underline">
+          {r.club_name}
+        </Link>
+      ),
+    },
+    { key: 'messages30d', header: t('platform.reportsPage.whatsappUsageColumns.messages30d'), render: (r) => r.messagesLast30d },
+    { key: 'messages7d', header: t('platform.reportsPage.whatsappUsageColumns.messages7d'), render: (r) => r.messagesLast7d },
+    { key: 'delivered30d', header: t('platform.reportsPage.whatsappUsageColumns.delivered30d'), render: (r) => r.deliveredLast30d },
+    {
+      key: 'failed30d',
+      header: t('platform.reportsPage.whatsappUsageColumns.failed30d'),
+      render: (r) => (r.failedLast30d > 0 ? <StatusBadge tone="danger" label={String(r.failedLast30d)} /> : r.failedLast30d),
+    },
+    {
+      key: 'lastMessage',
+      header: t('platform.reportsPage.whatsappUsageColumns.lastMessage'),
+      render: (r) => (r.lastMessageAt ? new Date(r.lastMessageAt).toLocaleDateString(locale === 'en' ? 'en-US' : 'ar-EG') : '—'),
+    },
+  ]
+
   return (
     <div>
       <PageHeader title={t('platform.reportsPage.title')} description={t('platform.reportsPage.description')} />
@@ -327,6 +381,7 @@ export function PlatformReportsPage() {
           <TabsTrigger value="renewal">{t('platform.reportsPage.tabs.renewal')}</TabsTrigger>
           <TabsTrigger value="growth">{t('platform.reportsPage.tabs.growth')}</TabsTrigger>
           <TabsTrigger value="usage">{t('platform.reportsPage.tabs.usage')}</TabsTrigger>
+          <TabsTrigger value="whatsapp">{t('platform.reportsPage.tabs.whatsapp')}</TabsTrigger>
         </TabsList>
         <TabsContent value="subscription">
           <DataTable columns={subColumns} rows={subReport} rowKey={(r) => `${r.club_id}-${r.start_at}`} isLoading={subLoading} emptyTitle={t('platform.reportsPage.emptyTitle')} />
@@ -371,6 +426,15 @@ export function PlatformReportsPage() {
         </TabsContent>
         <TabsContent value="usage">
           <DataTable columns={usageColumns} rows={usageReport} rowKey={(r) => r.club_id} isLoading={usageLoading} emptyTitle={t('platform.reportsPage.emptyTitle')} />
+        </TabsContent>
+        <TabsContent value="whatsapp">
+          <DataTable
+            columns={whatsappUsageColumns}
+            rows={whatsappUsageReport}
+            rowKey={(r) => r.club_id}
+            isLoading={whatsappUsageLoading}
+            emptyTitle={t('platform.reportsPage.emptyTitle')}
+          />
         </TabsContent>
       </Tabs>
     </div>
