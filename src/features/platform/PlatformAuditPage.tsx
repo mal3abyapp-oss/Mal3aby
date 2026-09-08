@@ -29,6 +29,18 @@ import { useDirection } from '@/app/providers/DirectionProvider'
 // expandable diff of before/after for rows that have them. Also adds
 // server-side filters (actor/action/entity/date range) instead of only
 // ever paging through the whole unfiltered table.
+//
+// Control Plane V1, Phase 9: this page used to keep accumulating every
+// fetched page into one ever-growing client-side array via a `pages`
+// counter and Promise.all/flatMap re-fetch-everything-so-far pattern --
+// a real, confirmed scale risk at `audit_logs` = 2,197 rows today and
+// growing on every mutating action platform-wide, per the deep dive
+// (Section 16/26). Now real page-replace pagination, matching
+// PlatformClubsPage.tsx's established convention (real server-side
+// total_count from the RPC, Prev/Next replacing the current page
+// instead of appending to it). Every existing filter (actor/action/
+// entity/date range) is preserved exactly -- only the pagination
+// mechanism underneath changed.
 
 const PAGE_SIZE = 200
 
@@ -69,10 +81,10 @@ interface Filters {
 // every club" was unanswerable -- so actor is now filterable the same
 // way club already was: click a name in the table to filter by them
 // (actor_id is already present on every row, no new lookup UI needed).
-async function fetchAudit(offset: number, filters: Filters): Promise<{ rows: AuditRow[]; hasMore: boolean }> {
+async function fetchAudit(page: number, filters: Filters): Promise<{ rows: AuditRow[]; totalCount: number }> {
   const { data, error } = await supabase.rpc('get_platform_audit_log', {
     p_limit: PAGE_SIZE,
-    p_offset: offset,
+    p_offset: page * PAGE_SIZE,
     p_actor_id: filters.actorId || undefined,
     p_action: filters.action || undefined,
     p_entity_type: filters.entityType || undefined,
@@ -80,8 +92,8 @@ async function fetchAudit(offset: number, filters: Filters): Promise<{ rows: Aud
     p_to: filters.to ? new Date(filters.to + 'T23:59:59').toISOString() : undefined,
   })
   if (error) throw error
-  const rows = (data ?? []) as AuditRow[]
-  return { rows, hasMore: rows.length === PAGE_SIZE }
+  const rows = (data ?? []) as (AuditRow & { total_count?: number })[]
+  return { rows, totalCount: Number(rows[0]?.total_count ?? 0) }
 }
 
 // Renders a compact "what changed" diff for the fields present in
@@ -129,7 +141,7 @@ function ChangeDiff({ before, after }: { before: Record<string, unknown> | null;
 export function PlatformAuditPage() {
   const { t } = useTranslation()
   const { locale } = useDirection()
-  const [pages, setPages] = useState(1)
+  const [page, setPage] = useState(0)
   const [actionFilter, setActionFilter] = useState('')
   const [entityFilter, setEntityFilter] = useState('')
   const [fromDate, setFromDate] = useState('')
@@ -142,17 +154,16 @@ export function PlatformAuditPage() {
   )
 
   const { data, isLoading, isFetching } = useQuery({
-    queryKey: ['platform-audit', pages, filters],
-    queryFn: async () => {
-      const results = await Promise.all(Array.from({ length: pages }, (_, i) => fetchAudit(i * PAGE_SIZE, filters)))
-      const lastPage = results.at(-1)
-      return { rows: results.flatMap((r) => r.rows), hasMore: lastPage?.hasMore ?? false }
-    },
+    queryKey: ['platform-audit', page, filters],
+    queryFn: () => fetchAudit(page, filters),
+    placeholderData: (prev) => prev,
   })
   const rows = data?.rows ?? []
+  const totalCount = data?.totalCount ?? 0
+  const totalPages = Math.max(1, Math.ceil(totalCount / PAGE_SIZE))
 
   function resetToFirstPage() {
-    setPages(1)
+    setPage(0)
   }
 
   const columns: DataTableColumn<AuditRow>[] = [
@@ -166,6 +177,7 @@ export function PlatformAuditPage() {
             type="button"
             className="flex flex-col text-start hover:underline"
             title={t('platform.auditPage.filterByThisActor')}
+            aria-label={t('platform.auditPage.filterByThisActor')}
             onClick={() => {
               setActorFilter({ id: r.actor_id!, label: r.actor_name ?? r.actor_email ?? r.actor_id! })
               resetToFirstPage()
@@ -219,46 +231,77 @@ export function PlatformAuditPage() {
       )}
 
       <div className="mb-4 grid grid-cols-2 gap-3 md:grid-cols-4">
-        <Input
-          placeholder={t('platform.auditPage.filterAction')}
-          value={actionFilter}
-          onChange={(e) => {
-            setActionFilter(e.target.value)
-            resetToFirstPage()
-          }}
-        />
-        <Input
-          placeholder={t('platform.auditPage.filterEntity')}
-          value={entityFilter}
-          onChange={(e) => {
-            setEntityFilter(e.target.value)
-            resetToFirstPage()
-          }}
-        />
-        <Input
-          type="date"
-          value={fromDate}
-          onChange={(e) => {
-            setFromDate(e.target.value)
-            resetToFirstPage()
-          }}
-        />
-        <Input
-          type="date"
-          value={toDate}
-          onChange={(e) => {
-            setToDate(e.target.value)
-            resetToFirstPage()
-          }}
-        />
+        <div className="flex flex-col gap-1">
+          <label htmlFor="platform-audit-filter-action" className="sr-only">
+            {t('platform.auditPage.filterAction')}
+          </label>
+          <Input
+            id="platform-audit-filter-action"
+            placeholder={t('platform.auditPage.filterAction')}
+            value={actionFilter}
+            onChange={(e) => {
+              setActionFilter(e.target.value)
+              resetToFirstPage()
+            }}
+          />
+        </div>
+        <div className="flex flex-col gap-1">
+          <label htmlFor="platform-audit-filter-entity" className="sr-only">
+            {t('platform.auditPage.filterEntity')}
+          </label>
+          <Input
+            id="platform-audit-filter-entity"
+            placeholder={t('platform.auditPage.filterEntity')}
+            value={entityFilter}
+            onChange={(e) => {
+              setEntityFilter(e.target.value)
+              resetToFirstPage()
+            }}
+          />
+        </div>
+        <div className="flex flex-col gap-1">
+          <label htmlFor="platform-audit-filter-from" className="sr-only">
+            {t('platform.auditPage.filterFromDate', { defaultValue: 'From date' })}
+          </label>
+          <Input
+            id="platform-audit-filter-from"
+            type="date"
+            value={fromDate}
+            onChange={(e) => {
+              setFromDate(e.target.value)
+              resetToFirstPage()
+            }}
+          />
+        </div>
+        <div className="flex flex-col gap-1">
+          <label htmlFor="platform-audit-filter-to" className="sr-only">
+            {t('platform.auditPage.filterToDate', { defaultValue: 'To date' })}
+          </label>
+          <Input
+            id="platform-audit-filter-to"
+            type="date"
+            value={toDate}
+            onChange={(e) => {
+              setToDate(e.target.value)
+              resetToFirstPage()
+            }}
+          />
+        </div>
       </div>
 
       <DataTable columns={columns} rows={rows} rowKey={(r) => r.id} isLoading={isLoading} emptyTitle={t('platform.auditPage.emptyTitle')} />
-      {data?.hasMore && (
-        <div className="mt-4 flex justify-center">
-          <Button variant="outline" onClick={() => setPages((p) => p + 1)} disabled={isFetching}>
-            {isFetching ? t('platform.auditPage.loadingMore') : t('platform.auditPage.loadMore')}
-          </Button>
+      {totalCount > 0 && (
+        <div className="mt-4 flex items-center justify-between text-sm text-text-secondary">
+          <span>{t('platform.auditPage.resultCount', { count: totalCount })}</span>
+          <div className="flex items-center gap-2">
+            <Button variant="outline" size="sm" disabled={page === 0 || isFetching} onClick={() => setPage((p) => p - 1)}>
+              {t('platform.clubsPage.prevPage')}
+            </Button>
+            <span>{t('platform.clubsPage.pageOf', { page: page + 1, total: totalPages })}</span>
+            <Button variant="outline" size="sm" disabled={page + 1 >= totalPages || isFetching} onClick={() => setPage((p) => p + 1)}>
+              {t('platform.clubsPage.nextPage')}
+            </Button>
+          </div>
         </div>
       )}
     </div>

@@ -162,7 +162,7 @@ function PlatformNavList({ onNavigate }: { onNavigate?: () => void }) {
         return (
         <div key={section.titleKey ?? `section-${i}`} className="flex flex-col gap-1">
           {section.titleKey && (
-            <p className="px-3 pb-1 text-xs font-semibold text-white/40">{t(section.titleKey)}</p>
+            <h2 className="px-3 pb-1 text-xs font-semibold text-white/40">{t(section.titleKey)}</h2>
           )}
           {visibleItems.map((item) => (
             <NavLink
