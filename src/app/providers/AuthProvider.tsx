@@ -42,6 +42,22 @@ interface AuthContextValue {
   loading: boolean
   memberships: ActiveMembership[]
   isPlatformOwner: boolean
+  // PLATFORM STAFF AUTH FIX (Control Plane V1, Phase 1): isPlatformOwner
+  // above is UNCHANGED -- still purely club_memberships.roles.key=
+  // 'platform_owner'-based, byte-for-byte identical to before this
+  // change, so every existing is_platform_owner()-gated dependency keeps
+  // working exactly as it did. This is a genuinely NEW, additive signal:
+  // does the caller hold an ACTIVE platform_staff_memberships row (the
+  // second, previously-unreachable authorization domain the deep dive
+  // found)? A real platform_owner always has this true too (the
+  // has_platform_permission() bridge in the DB already treats
+  // is_platform_owner()=true as holding every platform permission), so
+  // "can reach /platform/*" = isPlatformOwner || isPlatformStaff --
+  // never a replacement for isPlatformOwner, only a widening of who ELSE
+  // may enter, with their own real, server-computed, least-privilege
+  // permission set (never a client-invented one).
+  isPlatformStaff: boolean
+  platformPermissionKeys: string[]
   currentClubId: string | null
   setCurrentClubId: (clubId: string) => void
   currentMembership: ActiveMembership | null
@@ -63,6 +79,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true)
   const [memberships, setMemberships] = useState<ActiveMembership[]>([])
   const [isPlatformOwner, setIsPlatformOwner] = useState(false)
+  const [isPlatformStaff, setIsPlatformStaff] = useState(false)
+  const [platformPermissionKeys, setPlatformPermissionKeys] = useState<string[]>([])
   const [currentClubId, setCurrentClubIdState] = useState<string | null>(null)
   const [supportSession, setSupportSession] = useState<SupportSession | null>(() => {
     // Same-tab fast-path hint only -- see the class-level comment above.
@@ -132,6 +150,40 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setSupportSession(null)
     setSupportPermissionKeys([])
     localStorage.removeItem(SUPPORT_SESSION_HINT_KEY)
+  }
+
+  // PLATFORM STAFF AUTH FIX (Control Plane V1, Phase 1): resolves the
+  // caller's platform-domain access, independent of the club_memberships-
+  // based isPlatformOwner above. caller_platform_permission_keys() is the
+  // already-shipped, server-computed source of truth (2026-08-26) --
+  // it returns every permission key for a real platform_owner (via the
+  // has_platform_permission() bridge) OR for an active
+  // platform_staff_memberships row's role (system or custom); an
+  // inactive/disabled staff row, a forged/stale client state, or a plain
+  // club user/customer all correctly resolve to an empty set, since the
+  // RPC re-derives everything from auth.uid() server-side on every call
+  // -- nothing here is ever a client-side authorization decision, only a
+  // UI-visibility hint fed by a real RPC result.
+  async function loadPlatformAccess() {
+    const { data, error } = await supabase.rpc('caller_platform_permission_keys')
+    if (error || !data) {
+      setIsPlatformStaff(false)
+      setPlatformPermissionKeys([])
+      return
+    }
+    const keys = (data as unknown as (string | { key: string })[]).map((k) =>
+      typeof k === 'string' ? k : k.key,
+    )
+    setPlatformPermissionKeys(keys)
+    // A real platform_owner already gets every key via the DB-side bridge
+    // -- isPlatformStaff here specifically means "holds platform access
+    // via the staff/role tier" so RequirePlatformOwner can grant entry
+    // to someone who is NOT a club_memberships platform_owner row but IS
+    // a legitimate, active platform_staff_memberships holder. A
+    // non-empty key set with isPlatformOwner already false is exactly
+    // that case; when isPlatformOwner is true this flag is irrelevant
+    // (isPlatformOwner alone already grants full entry, unchanged).
+    setIsPlatformStaff(keys.length > 0)
   }
 
   async function loadMemberships() {
@@ -264,6 +316,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setSession(data.session)
       if (data.session) {
         await loadMemberships()
+        await loadPlatformAccess()
         await refreshSupportSession()
       }
       setLoading(false)
@@ -274,10 +327,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setSession(newSession)
       if (newSession) {
         await loadMemberships()
+        await loadPlatformAccess()
         await refreshSupportSession()
       } else {
         setMemberships([])
         setIsPlatformOwner(false)
+        setIsPlatformStaff(false)
+        setPlatformPermissionKeys([])
         setCurrentClubIdState(null)
         localStorage.removeItem(CURRENT_CLUB_STORAGE_KEY)
         setSupportSession(null)
@@ -339,6 +395,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         loading,
         memberships,
         isPlatformOwner,
+        isPlatformStaff,
+        platformPermissionKeys,
         currentClubId: effectiveCurrentClubId,
         setCurrentClubId,
         currentMembership: effectiveCurrentMembership,

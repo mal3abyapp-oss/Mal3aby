@@ -53,6 +53,17 @@ interface NavItem {
   to: string
   labelKey: string
   icon: LucideIcon
+  // PLATFORM STAFF AUTH FIX (Control Plane V1, Phase 1): least-privilege
+  // nav visibility for the newly-reachable platform-staff tier. `null`
+  // means "always visible to anyone who can reach this console" (a real
+  // platform_owner, or any staff role at all) -- used only for items
+  // with no meaningful staff-permission boundary (Overview itself).
+  // Otherwise, the item is hidden from a staff caller unless they hold
+  // at least one of the listed platform_permissions.key values -- a
+  // real platform_owner always passes (isPlatformOwner short-circuits
+  // the check entirely, see requiresPermission below), so this can only
+  // ever narrow a STAFF caller's nav, never the owner's.
+  requiredPermissions: string[] | null
 }
 
 interface NavSection {
@@ -63,34 +74,34 @@ interface NavSection {
 const navSections: NavSection[] = [
   {
     titleKey: null,
-    items: [{ to: '/platform', labelKey: 'platform.nav.overview', icon: LayoutDashboard }],
+    items: [{ to: '/platform', labelKey: 'platform.nav.overview', icon: LayoutDashboard, requiredPermissions: null }],
   },
   {
     titleKey: 'platform.nav.sectionClubs',
     items: [
-      { to: '/platform/clubs', labelKey: 'platform.nav.allClubs', icon: Building2 },
-      { to: '/platform/owners', labelKey: 'platform.nav.clubOwners', icon: Users },
+      { to: '/platform/clubs', labelKey: 'platform.nav.allClubs', icon: Building2, requiredPermissions: ['platform.club.view'] },
+      { to: '/platform/owners', labelKey: 'platform.nav.clubOwners', icon: Users, requiredPermissions: ['platform.club.view'] },
     ],
   },
   {
     titleKey: 'platform.nav.sectionCommerce',
     items: [
-      { to: '/platform/plans', labelKey: 'platform.nav.plans', icon: Sparkles },
-      { to: '/platform/leads', labelKey: 'platform.nav.leads', icon: Inbox },
+      { to: '/platform/plans', labelKey: 'platform.nav.plans', icon: Sparkles, requiredPermissions: ['platform.finance.view', 'platform.finance.manage'] },
+      { to: '/platform/leads', labelKey: 'platform.nav.leads', icon: Inbox, requiredPermissions: ['platform.club.view'] },
     ],
   },
   {
     titleKey: 'platform.nav.sectionMonitoring',
     items: [
-      { to: '/platform/reports', labelKey: 'platform.nav.reports', icon: BarChart3 },
-      { to: '/platform/alerts', labelKey: 'platform.nav.alerts', icon: Bell },
-      { to: '/platform/trials', labelKey: 'platform.nav.trials', icon: Award },
-      { to: '/platform/audit', labelKey: 'platform.nav.auditLog', icon: ShieldCheck },
+      { to: '/platform/reports', labelKey: 'platform.nav.reports', icon: BarChart3, requiredPermissions: ['platform.finance.view'] },
+      { to: '/platform/alerts', labelKey: 'platform.nav.alerts', icon: Bell, requiredPermissions: ['platform.club.view'] },
+      { to: '/platform/trials', labelKey: 'platform.nav.trials', icon: Award, requiredPermissions: ['platform.subscription.view'] },
+      { to: '/platform/audit', labelKey: 'platform.nav.auditLog', icon: ShieldCheck, requiredPermissions: ['platform.audit.view'] },
       // PLATFORM OWNER AUTONOMOUS COMPLETION -- Phase E (2026-08-29):
       // directive Section 22, a practical read-only support session
       // history screen. Grouped with Audit Log -- both are
       // read-only historical logs of privileged platform actions.
-      { to: '/platform/support-history', labelKey: 'platform.nav.supportHistory', icon: History },
+      { to: '/platform/support-history', labelKey: 'platform.nav.supportHistory', icon: History, requiredPermissions: ['platform.audit.view', 'platform.support.start_view', 'platform.support.start_manage'] },
     ],
   },
   // PLATFORM STAFF + PLATFORM ROLES & PERMISSIONS (2026-08-26) -- a
@@ -100,41 +111,60 @@ const navSections: NavSection[] = [
   {
     titleKey: 'platform.nav.sectionStaffAccess',
     items: [
-      { to: '/platform/staff', labelKey: 'platform.nav.platformStaff', icon: UserCog },
-      { to: '/platform/roles', labelKey: 'platform.nav.platformRoles', icon: KeyRound },
+      { to: '/platform/staff', labelKey: 'platform.nav.platformStaff', icon: UserCog, requiredPermissions: ['platform.staff.view'] },
+      { to: '/platform/roles', labelKey: 'platform.nav.platformRoles', icon: KeyRound, requiredPermissions: ['platform.role.view'] },
     ],
   },
   // Sales Intelligence (ADR-054, 2026-09-04) -- its own nav section,
   // matching the same "genuinely separate bounded context gets its own
-  // section" convention already used for Staff & Access above.
+  // section" convention already used for Staff & Access above. No
+  // dedicated platform_permissions keys exist yet for Sales Intelligence
+  // specifically (it predates/sits outside the platform_staff_memberships
+  // permission catalog) -- scoped to platform.club.view as the closest
+  // real, already-seeded permission a "can see tenant-facing commercial
+  // activity" staff member would hold, rather than inventing a new
+  // permission key unilaterally (a genuine product decision, flagged in
+  // FINAL_OWNER_DECISIONS_REQUIRED.md).
   {
     titleKey: 'platform.nav.sectionSalesIntelligence',
     items: [
-      { to: '/platform/sales', labelKey: 'platform.nav.salesDashboard', icon: Radar },
-      { to: '/platform/sales/discover', labelKey: 'platform.nav.salesDiscover', icon: Sparkles },
-      { to: '/platform/sales/leads', labelKey: 'platform.nav.salesLeads', icon: ListChecks },
-      { to: '/platform/sales/pipeline', labelKey: 'platform.nav.salesPipeline', icon: Kanban },
-      { to: '/platform/sales/campaigns', labelKey: 'platform.nav.salesCampaigns', icon: Megaphone },
-      { to: '/platform/sales/followups', labelKey: 'platform.nav.salesFollowups', icon: CalendarClock },
-      { to: '/platform/sales/settings', labelKey: 'platform.nav.salesSettings', icon: SlidersHorizontal },
+      { to: '/platform/sales', labelKey: 'platform.nav.salesDashboard', icon: Radar, requiredPermissions: ['platform.club.view'] },
+      { to: '/platform/sales/discover', labelKey: 'platform.nav.salesDiscover', icon: Sparkles, requiredPermissions: ['platform.club.view'] },
+      { to: '/platform/sales/leads', labelKey: 'platform.nav.salesLeads', icon: ListChecks, requiredPermissions: ['platform.club.view'] },
+      { to: '/platform/sales/pipeline', labelKey: 'platform.nav.salesPipeline', icon: Kanban, requiredPermissions: ['platform.club.view'] },
+      { to: '/platform/sales/campaigns', labelKey: 'platform.nav.salesCampaigns', icon: Megaphone, requiredPermissions: ['platform.club.view'] },
+      { to: '/platform/sales/followups', labelKey: 'platform.nav.salesFollowups', icon: CalendarClock, requiredPermissions: ['platform.club.view'] },
+      { to: '/platform/sales/settings', labelKey: 'platform.nav.salesSettings', icon: SlidersHorizontal, requiredPermissions: ['platform.settings.manage'] },
     ],
   },
   {
     titleKey: null,
-    items: [{ to: '/platform/settings', labelKey: 'platform.nav.settings', icon: Settings }],
+    items: [{ to: '/platform/settings', labelKey: 'platform.nav.settings', icon: Settings, requiredPermissions: ['platform.settings.view', 'platform.settings.manage'] }],
   },
 ]
 
 function PlatformNavList({ onNavigate }: { onNavigate?: () => void }) {
   const { t } = useTranslation()
+  const { isPlatformOwner, platformPermissionKeys } = useAuth()
+  const permissionSet = new Set(platformPermissionKeys)
+  // A real platform_owner always sees the full nav, exactly as before
+  // this change -- least-privilege filtering only ever applies to a
+  // staff caller (isPlatformOwner === false, isPlatformStaff === true,
+  // per RequirePlatformOwner already having required one or the other
+  // to reach this shell at all).
+  const canSee = (item: NavItem) =>
+    isPlatformOwner || !item.requiredPermissions || item.requiredPermissions.some((key) => permissionSet.has(key))
   return (
     <nav className="flex flex-1 flex-col gap-4 px-2">
-      {navSections.map((section, i) => (
+      {navSections.map((section, i) => {
+        const visibleItems = section.items.filter(canSee)
+        if (visibleItems.length === 0) return null
+        return (
         <div key={section.titleKey ?? `section-${i}`} className="flex flex-col gap-1">
           {section.titleKey && (
             <p className="px-3 pb-1 text-xs font-semibold text-white/40">{t(section.titleKey)}</p>
           )}
-          {section.items.map((item) => (
+          {visibleItems.map((item) => (
             <NavLink
               key={item.to}
               to={item.to}
@@ -152,7 +182,8 @@ function PlatformNavList({ onNavigate }: { onNavigate?: () => void }) {
             </NavLink>
           ))}
         </div>
-      ))}
+        )
+      })}
     </nav>
   )
 }
