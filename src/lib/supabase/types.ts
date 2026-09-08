@@ -10091,6 +10091,17 @@ export type Database = {
           subscription_kind: string
         }[]
       }
+      get_platform_attention_items: {
+        Args: never
+        Returns: {
+          club_id: string
+          club_name: string
+          context_at: string | null
+          detail: string | null
+          problem_type: string
+          severity: string
+        }[]
+      }
       get_platform_audit_log: {
         Args: {
           p_action?: string
@@ -10121,16 +10132,26 @@ export type Database = {
       get_platform_club_360: {
         Args: { p_club_id: string }
         Returns: {
+          academy_count: number
           bookings_pending: number
           bookings_this_month: number
           bookings_today: number
           branch_count: number
           customer_count: number
           field_count: number
+          last_activity_at: string | null
+          last_activity_type: string | null
           owner_email: string
           owner_name: string
           owner_phone: string
           owner_user_id: string
+        }[]
+      }
+      get_platform_club_last_activity: {
+        Args: { p_club_id: string }
+        Returns: {
+          last_activity_at: string | null
+          last_activity_type: string | null
         }[]
       }
       get_platform_club_gateway_overview: {
@@ -10183,6 +10204,20 @@ export type Database = {
           access: string
           club_id: string
           reason: string
+        }[]
+      }
+      get_platform_commercial_snapshot: {
+        Args: never
+        Returns: {
+          active_trials: number
+          arr: number
+          expired_action_required: number
+          mrr: number
+          outstanding_amount: number
+          paying_tenants: number
+          trial_to_paid_conversion_rate: number | null
+          trial_to_paid_conversion_rate_unavailable: boolean
+          trials_ending_soon: number
         }[]
       }
       get_platform_contact: {
@@ -10269,6 +10304,14 @@ export type Database = {
           reason: string
           started_at: string
           status: string
+        }[]
+      }
+      get_platform_tenant_health: {
+        Args: never
+        Returns: {
+          club_id: string
+          health: string
+          reasons: string[]
         }[]
       }
       get_platform_usage_report: {
@@ -12114,6 +12157,8 @@ export type Database = {
           club_status: string
           created_at: string
           flagged_duplicate: boolean
+          last_activity_at: string | null
+          last_activity_type: string | null
           owner_emails: string[]
           owner_names: string[]
           owner_phones: string[]

@@ -49,6 +49,23 @@ export const ACCESS_LABEL: Record<string, string> = {
   blocked: 'موقوف',
 }
 
+// Accessibility/i18n remediation (Control Plane V1, Phase 13): this map
+// used to live as a standalone hardcoded-Arabic-only object directly in
+// PlatformOwnersPage.tsx, bypassing the i18n system entirely -- unlike
+// every other enum-label map in that file (CLUB_STATUS_LABELS/
+// ACCESS_LABEL above), which are already routed through t() with this
+// kind of map used only as the `defaultValue` fallback. The real i18n
+// keys (platform.ownersPage.membershipStatusLabels.*) already existed
+// in both common.json locales before this fix -- only the frontend
+// fallback map's location was inconsistent. Moved here to match the
+// established convention (one shared labels module, not a per-file
+// duplicate), value unchanged.
+export const MEMBERSHIP_STATUS_LABELS: Record<string, string> = {
+  active: 'نشطة',
+  suspended: 'موقوفة',
+  removed: 'ملغاة',
+}
+
 // Master IA/UX audit (Platform Owner phase): confirmed 3 DIFFERENT
 // "expiring soon" thresholds existed for the same underlying concept
 // across 3 screens -- Overview used a flat 7 days regardless of
