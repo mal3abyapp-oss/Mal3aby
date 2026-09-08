@@ -223,12 +223,38 @@ export function PlatformClubDetailPage() {
   // Government / Ministry Collection Compliance directive, section 46:
   // Club 360 shows affiliation status, effective policy, receipt
   // counts, and collected total -- no receipt images (section 45).
-  const { data: govCompliance } = useQuery({
+  // PLATFORM OWNER CONTROL PLANE V1 -- Phase 4 (2026-09-08): the deep
+  // dive's confirmed gap -- this query only ever destructured `data`,
+  // so a real RPC failure and a legitimate "not affiliated" club (a
+  // real row with enabled=false, or genuinely zero rows) rendered
+  // identically: the card silently didn't appear either way. isLoading/
+  // isError now branch explicitly below, matching the isLoading/isError
+  // pattern already used elsewhere on this page (ModulesPanel,
+  // ProviderPolicyPanel, CommercialUsageAndFoundingOfferCard).
+  const { data: govCompliance, isLoading: govComplianceLoading, isError: govComplianceError } = useQuery({
     queryKey: ['platform-club-gov-compliance', clubId],
     queryFn: async () => {
       const { data, error } = await supabase.rpc('get_platform_government_compliance_summary')
       if (error) throw error
       return (data ?? []).find((row) => row.club_id === clubId) ?? null
+    },
+    enabled: !!clubId,
+  })
+  // Phase 5: defensible "last meaningfully active" signal -- MAX of
+  // bookings.created_at / payments.received_at / attendance.marked_at
+  // for this club, computed server-side (get_platform_club_last_activity,
+  // also inlined into get_platform_club_360 below so this page's own
+  // batched RPC already carries it -- this standalone query exists only
+  // so the indicator can show its own isLoading/isError state
+  // independent of the larger club360 read, matching the loadError
+  // banner's existing "don't let one slow/failing read block everything
+  // else" philosophy).
+  const { data: lastActivity, isLoading: lastActivityLoading, isError: lastActivityError } = useQuery({
+    queryKey: ['platform-club-last-activity', clubId],
+    queryFn: async () => {
+      const { data, error } = await supabase.rpc('get_platform_club_last_activity', { p_club_id: clubId! })
+      if (error) throw error
+      return data?.[0] ?? null
     },
     enabled: !!clubId,
   })
@@ -851,6 +877,15 @@ export function PlatformClubDetailPage() {
           <CardContent className="grid grid-cols-2 gap-2 text-sm tabular-nums">
             <div><span className="text-text-secondary">{t('platform.clubDetailPage.summaryCard.branches')}</span> <span className="font-medium">{club360?.branch_count ?? '—'}</span></div>
             <div><span className="text-text-secondary">{t('platform.clubDetailPage.summaryCard.fields')}</span> <span className="font-medium">{club360?.field_count ?? '—'}</span></div>
+            {/* PLATFORM OWNER CONTROL PLANE V1 -- Phase 4: academies
+                previously showed entitlement/active state only (Modules
+                tab), with no count anywhere -- the one asymmetry vs.
+                branches/fields/customers, confirmed by the deep dive
+                (Section 6/7). get_platform_club_360()'s new
+                academy_count column (same definition as
+                commercial_entitlements_usage.academy_used) closes it
+                here, in the same grid, same styling as its siblings. */}
+            <div><span className="text-text-secondary">{t('platform.clubDetailPage.summaryCard.academies')}</span> <span className="font-medium">{club360?.academy_count ?? '—'}</span></div>
             <div><span className="text-text-secondary">{t('platform.clubDetailPage.summaryCard.customers')}</span> <span className="font-medium">{club360?.customer_count ?? '—'}</span></div>
             <div><span className="text-text-secondary">{t('platform.clubDetailPage.summaryCard.bookingsToday')}</span> <span className="font-medium">{club360?.bookings_today ?? '—'}</span></div>
             <div><span className="text-text-secondary">{t('platform.clubDetailPage.summaryCard.bookingsMonth')}</span> <span className="font-medium">{club360?.bookings_this_month ?? '—'}</span></div>
@@ -863,6 +898,36 @@ export function PlatformClubDetailPage() {
                 </span>
               </div>
             )}
+            {/* PLATFORM OWNER CONTROL PLANE V1 -- Phase 5: "no
+                last-activity/last-login tracking exists anywhere in the
+                product" (deep dive Section 12/23, HIGH VALUE) --
+                surfaced prominently in the same Tenant overview grid
+                the mission asked for ("near Identity/Summary"), not
+                buried in a separate tab. MAX of
+                bookings.created_at/payments.received_at/
+                attendance.marked_at, computed server-side
+                (get_platform_club_last_activity). isLoading/isError
+                explicit, same discipline as the Government Compliance
+                fix just below -- a stale/blank "—" here could otherwise
+                read as "never active" when it may just mean "still
+                loading" or "failed to load". */}
+            <div className="col-span-2 border-t border-border pt-2">
+              <span className="text-text-secondary">{t('platform.clubDetailPage.lastActivityCard.title')}</span>{' '}
+              {lastActivityLoading ? (
+                <span className="text-text-secondary">{t('platform.clubDetailPage.lastActivityCard.loading')}</span>
+              ) : lastActivityError ? (
+                <span className="text-status-danger">{t('platform.clubDetailPage.lastActivityCard.error')}</span>
+              ) : lastActivity?.last_activity_at && lastActivity.last_activity_type ? (
+                <span className="font-medium">
+                  {t('platform.clubDetailPage.lastActivityCard.summary', {
+                    type: t(`platform.clubDetailPage.lastActivityCard.typeLabels.${lastActivity.last_activity_type}`, { defaultValue: lastActivity.last_activity_type }),
+                    date: `⁧${new Date(lastActivity.last_activity_at).toLocaleString(locale === 'en' ? 'en-US' : 'ar-EG')}⁩`,
+                  })}
+                </span>
+              ) : (
+                <span className="text-text-secondary">{t('platform.clubDetailPage.lastActivityCard.none')}</span>
+              )}
+            </div>
           </CardContent>
         </Card>
       </div>
@@ -911,10 +976,40 @@ export function PlatformClubDetailPage() {
 
       {/* Government / Ministry Collection Compliance directive, section
           46: affiliation status, effective policy, receipt counts,
-          collected total. No receipt images shown (section 45). Only
-          rendered when the club is actually affiliated -- an ordinary
-          commercial club's Club 360 stays unchanged. */}
-      {govCompliance?.enabled && (
+          collected total. No receipt images shown (section 45).
+
+          PLATFORM OWNER CONTROL PLANE V1 -- Phase 4 fix (2026-09-08):
+          the deep dive's confirmed gap -- this card previously rendered
+          only on `govCompliance?.enabled`, so "not affiliated" (a real
+          row, enabled=false) and "failed to load" (query error, data
+          undefined) were visually IDENTICAL: the card simply didn't
+          appear either way, with no way for a platform owner to tell
+          "this club genuinely has no government affiliation" from "I
+          don't actually know because the read failed". Three explicit
+          branches now: loading / error / affiliated -- an unaffiliated
+          club (enabled=false, no error) still renders nothing here,
+          unchanged from before, since that is the correct default state
+          for the overwhelming majority of ordinary commercial clubs and
+          a permanent card here would be noise for them. */}
+      {govComplianceLoading ? (
+        <Card className="mb-4">
+          <CardHeader>
+            <CardTitle className="text-base">{t('platform.clubDetailPage.govComplianceCard.title')}</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="text-sm text-text-secondary">{t('platform.clubDetailPage.govComplianceCard.loading')}</p>
+          </CardContent>
+        </Card>
+      ) : govComplianceError ? (
+        <Card className="mb-4">
+          <CardHeader>
+            <CardTitle className="text-base">{t('platform.clubDetailPage.govComplianceCard.title')}</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <ErrorState message={t('platform.clubDetailPage.govComplianceCard.error')} />
+          </CardContent>
+        </Card>
+      ) : govCompliance?.enabled ? (
         <Card className="mb-4">
           <CardHeader>
             <CardTitle className="text-base">{t('platform.clubDetailPage.govComplianceCard.title')}</CardTitle>
@@ -942,7 +1037,7 @@ export function PlatformClubDetailPage() {
             </div>
           </CardContent>
         </Card>
-      )}
+      ) : null}
 
       <div className="mb-4 grid gap-4 md:grid-cols-3">
         <Card>
@@ -1196,6 +1291,32 @@ export function PlatformClubDetailPage() {
                 // new ones) -- this was purely a "clear warning" gap
                 // per the directive's own §14 wording.
                 const isOverLimit = limit !== null && used > limit
+                // PLATFORM OWNER CONTROL PLANE V1 -- Phase 4
+                // (2026-09-08): the deep dive found this card only ever
+                // distinguished "over limit" vs. not -- no NORMAL/NEAR
+                // LIMIT differentiation, unlike the separate
+                // CommercialUsageAndFoundingOfferCard's controlled-
+                // resource card just below, which already has
+                // unlimited/normal/approaching_limit/grace/over_limit
+                // via get_commercial_usage(). This card covers the
+                // HARD-enforced resources (branch/field/academy) --
+                // no GRACE state applies to them (the DB trigger blocks
+                // new inserts outright, it doesn't grace-period them),
+                // so the added vocabulary here is intentionally
+                // narrower: unlimited / normal / approaching_limit (>=
+                // 80%, same threshold get_commercial_usage() already
+                // uses for its own hard-limit branch) / over_limit
+                // (used > limit -- can still happen after a limit is
+                // lowered below already-existing usage, per the
+                // existing isOverLimit computation/comment above).
+                const limitStatus: 'unlimited' | 'normal' | 'approaching_limit' | 'over_limit' =
+                  limit === null ? 'unlimited' : isOverLimit ? 'over_limit' : used >= limit * 0.8 ? 'approaching_limit' : 'normal'
+                const limitStatusTone: Record<typeof limitStatus, 'success' | 'warning' | 'danger' | 'neutral'> = {
+                  unlimited: 'neutral',
+                  normal: 'success',
+                  approaching_limit: 'warning',
+                  over_limit: 'danger',
+                }
                 return (
                   <div
                     key={key}
@@ -1206,9 +1327,11 @@ export function PlatformClubDetailPage() {
                   >
                     <div className="flex items-center justify-between gap-2">
                       <p className="text-sm font-medium">{limitTypeLabel[key]}</p>
-                      {isOverLimit && (
+                      {isOverLimit ? (
                         <StatusBadge tone="danger" label={t('platform.clubDetailPage.limitsCard.overLimitBadge')} />
-                      )}
+                      ) : limitStatus !== 'unlimited' ? (
+                        <StatusBadge tone={limitStatusTone[limitStatus]} label={t(`platform.clubDetailPage.limitsCard.statusLabels.${limitStatus}`)} />
+                      ) : null}
                     </div>
                     <p className="text-sm text-text-secondary tabular-nums">{used} {limit === null ? t('platform.clubDetailPage.limitsCard.unlimited') : `/ ${limit}`}</p>
                     {isOverLimit && (
