@@ -56,7 +56,23 @@ async function fetchOverview(): Promise<OverviewData> {
     // ad hoc filtered query here.
     supabase.rpc('get_platform_subscription_report'),
     supabase.rpc('get_platform_revenue_report'),
-    supabase.from('commercial_upgrade_requests').select('id', { count: 'exact', head: true }).eq('status', 'pending'),
+    // FIXTURE ISOLATION FIX (Control Plane V1, Phase 3): this query was
+    // the one remaining unfiltered read on this page -- commercial_
+    // upgrade_requests.club_id genuinely can point at a test-fixture
+    // club (confirmed via schema: it has a real club_id FK), unlike
+    // every sibling metric above which already excludes fixtures. Now
+    // joined through clubs and filtered the same way. Dormant in
+    // practice at time of writing (0 rows live) but would have silently
+    // counted a QA club's upgrade request as a real commercial signal
+    // the moment one existed.
+    supabase.from('commercial_upgrade_requests').select('id, clubs!inner(is_test_fixture)', { count: 'exact', head: true }).eq('status', 'pending').eq('clubs.is_test_fixture', false),
+    // contact_requests has NO club_id / club association at all (it is
+    // an anonymous, pre-signup, insert-only public inbox -- see its own
+    // table comment: "not a CRM") -- there is structurally no fixture to
+    // exclude here, so no filter is added. A prior review flagged this
+    // as unfiltered alongside commercial_upgrade_requests, but the two
+    // are not actually the same class of gap -- confirmed via schema
+    // read, not assumed.
     supabase.from('contact_requests').select('id', { count: 'exact', head: true }).eq('status', 'new'),
     // Phase E directive: the single largest operational gap the audit
     // found -- zero WhatsApp visibility anywhere in the platform console.

@@ -21,10 +21,20 @@ interface TrialRow {
 }
 
 async function fetchTrials(): Promise<TrialRow[]> {
+  // FIXTURE ISOLATION FIX (Control Plane V1, Phase 3): this query
+  // previously read platform_subscriptions directly with NO
+  // is_test_fixture filter at all -- unlike PlatformOverviewPage's own
+  // trial count (via the fixture-excluded get_platform_subscription_
+  // report() RPC), so the two screens could disagree on "how many
+  // trials exist" for exactly this reason. Now joined through clubs
+  // (inner join, so a subscription whose club is a fixture is excluded
+  // entirely) and filtered the same way every other commercial-metric
+  // screen already is.
   const { data, error } = await supabase
     .from('platform_subscriptions')
-    .select('id, club_id, start_at, end_at, trial_origin, lifecycle_status, clubs(name_ar)')
+    .select('id, club_id, start_at, end_at, trial_origin, lifecycle_status, clubs!inner(name_ar, is_test_fixture)')
     .eq('subscription_kind', 'trial')
+    .eq('clubs.is_test_fixture', false)
     .order('start_at', { ascending: false })
 
   if (error) throw error
