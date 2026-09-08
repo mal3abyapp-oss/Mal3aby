@@ -4549,7 +4549,11 @@
     "deactivateError": "Couldn't deactivate this employee.",
     "resetPasswordError": "Couldn't generate a password setup link.",
     "setupLinkTitle": "Account setup link",
-    "setupLinkHint": "Send this link to the employee so they can set their own password. It is shown only once -- copy it now."
+    "setupLinkHint": "Send this link to the employee so they can set their own password. It is shown only once -- copy it now.",
+    "reasonLabel": "Reason",
+    "reasonPlaceholder": "Why are you making this change?",
+    "deactivateTitle": "Deactivate {{name}}",
+    "deactivateWarning": "This immediately revokes their access to the Platform Owner console and ends any active support session they hold. This can be undone later by reactivating them."
   },
   "platformRoles": {
     "title": "Platform Roles & Permissions",
