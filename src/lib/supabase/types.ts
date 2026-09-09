@@ -11631,6 +11631,50 @@ export type Database = {
           id: string
         }[]
       }
+      // PLATFORM OWNER OPERATIONAL GAP CLOSURE -- architecture
+      // correction (2026-09-09): hand-added shapes for the Platform
+      // WhatsApp domain, 20260909200000_platform_whatsapp_domain.sql --
+      // parameterless (no p_club_id) since there is exactly one
+      // platform account.
+      platform_disconnect_whatsapp_own: {
+        Args: { p_reason: string }
+        Returns: undefined
+      }
+      platform_flag_whatsapp_own_test_connection: {
+        Args: { p_reason?: string }
+        Returns: undefined
+      }
+      platform_get_whatsapp_own_recent_events: {
+        Args: { p_limit?: number }
+        Returns: {
+          actor_id: string
+          actor_name: string
+          created_at: string
+          detail: Json
+          event: string
+          id: string
+        }[]
+      }
+      platform_get_whatsapp_own_qr: {
+        Args: Record<PropertyKey, never>
+        Returns: {
+          qr_expires_at: string
+          qr_payload: string
+        }[]
+      }
+      platform_get_whatsapp_status: {
+        Args: Record<PropertyKey, never>
+        Returns: {
+          circuit_breaker_open_until: string | null
+          connected_at: string | null
+          connected_phone_number: string | null
+          last_error: string | null
+          last_seen_at: string | null
+          last_successful_send_at: string | null
+          qr_expires_at: string | null
+          status: string
+        }[]
+      }
       platform_reactivate_club: {
         Args: { p_club_id: string }
         Returns: undefined
@@ -11639,8 +11683,16 @@ export type Database = {
         Args: { p_club_id: string; p_reason?: string }
         Returns: undefined
       }
+      platform_retry_whatsapp_own_connection: {
+        Args: { p_reason?: string }
+        Returns: undefined
+      }
       platform_start_whatsapp_pairing: {
         Args: { p_club_id: string; p_reason?: string }
+        Returns: undefined
+      }
+      platform_start_whatsapp_own_pairing: {
+        Args: { p_reason?: string }
         Returns: undefined
       }
       platform_suspend_club: {
@@ -12184,6 +12236,14 @@ export type Database = {
       sales_queue_outreach_message: {
         Args: { p_message_id: string }
         Returns: undefined
+      }
+      // Deliberately disabled server-side (unconditional raise) pending
+      // an owner decision -- see FINAL_OWNER_DECISIONS_REQUIRED.md #20
+      // and this RPC's own migration comment
+      // (20260909200000_platform_whatsapp_domain.sql).
+      sales_queue_platform_whatsapp_message: {
+        Args: { p_message_id: string }
+        Returns: string
       }
       sales_record_outreach_event: {
         Args: {

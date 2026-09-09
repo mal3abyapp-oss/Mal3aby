@@ -237,7 +237,7 @@ create policy platform_whatsapp_safety_settings_select on public.platform_whatsa
 --    is exactly one platform account, never ambiguous which one).
 -- ============================================================
 
-create or replace function public.platform_get_whatsapp_qr()
+create or replace function public.platform_get_whatsapp_own_qr()
 returns table(qr_payload text, qr_expires_at timestamptz)
 language plpgsql
 security definer
@@ -255,8 +255,8 @@ begin
 end;
 $$;
 
-revoke execute on function public.platform_get_whatsapp_qr() from public, anon;
-grant execute on function public.platform_get_whatsapp_qr() to authenticated;
+revoke execute on function public.platform_get_whatsapp_own_qr() from public, anon;
+grant execute on function public.platform_get_whatsapp_own_qr() to authenticated;
 
 create or replace function public.platform_get_whatsapp_status()
 returns table(
