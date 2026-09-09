@@ -465,6 +465,7 @@
         "demoNoDemos": "No demos scheduled yet",
         "demoOpenBadge": "Scheduled",
         "demoCompletedBadge": "Completed",
+        "outreachLatestBadge": "Latest",
         "outreachApproveButton": "Approve",
         "outreachApproving": "Approving...",
         "outreachApproveError": "Could not approve this message.",

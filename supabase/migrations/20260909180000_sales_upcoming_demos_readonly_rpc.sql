@@ -16,6 +16,17 @@
 -- first. This is a short list for a dashboard card, not a calendar
 -- view -- no new aggregate stats are added here per the mission's own
 -- "keep this simple" instruction for item 6.
+--
+-- REVISED (Phase 15 independent security review, P3): originally
+-- embedded the authorization check in the WHERE clause -- mirroring
+-- get_pending_followups()'s own pre-existing convention exactly (a
+-- deliberate choice, not an oversight) -- but the review correctly
+-- noted this is inconsistent with every OTHER new RPC in this mission,
+-- which raises an exception for an unauthorized caller rather than
+-- silently returning zero rows. Functionally identical (no data leak
+-- either way), but an explicit raise is the more defensive, more
+-- debuggable convention going forward -- changed to a plpgsql body with
+-- an explicit guard to match this mission's own new RPCs.
 create or replace function public.get_sales_upcoming_demos(p_limit int default 10)
 returns table(
   demo_id uuid,
@@ -24,18 +35,24 @@ returns table(
   scheduled_at timestamptz,
   notes text
 )
-language sql
+language plpgsql
 stable security definer
 set search_path to 'public', 'pg_temp'
 as $$
-  select d.id, d.lead_id, l.business_name, d.scheduled_at, d.notes
-  from public.sales_demo_events d
-  join public.sales_leads l on l.id = d.lead_id
-  where d.completed_at is null
-    and d.scheduled_at is not null
-    and (public.is_platform_owner() or public.has_platform_permission('platform.sales.view'))
-  order by d.scheduled_at
-  limit p_limit
+begin
+  if not (public.is_platform_owner() or public.has_platform_permission('platform.sales.view')) then
+    raise exception 'not authorized';
+  end if;
+
+  return query
+    select d.id, d.lead_id, l.business_name, d.scheduled_at, d.notes
+    from public.sales_demo_events d
+    join public.sales_leads l on l.id = d.lead_id
+    where d.completed_at is null
+      and d.scheduled_at is not null
+    order by d.scheduled_at
+    limit p_limit;
+end;
 $$;
 
 revoke all on function public.get_sales_upcoming_demos(int) from public, anon;

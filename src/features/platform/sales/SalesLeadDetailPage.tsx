@@ -43,9 +43,15 @@ const CHANGEABLE_STATUSES = [
   'replied', 'demo_scheduled', 'demo_completed', 'negotiation', 'lost', 'do_not_contact',
 ]
 
-// Statuses where a reason is a hard UI requirement (not just recorded)
-// per the mission's "record reason lost" instruction -- the RPC itself
-// only has p_reason default null generically, this is a UI-level rule.
+// Statuses where a reason is required per the mission's "record reason
+// lost" instruction. Originally UI-only (the RPC's p_reason was
+// default null with no server-side check for these); a Phase 16
+// independent UX review correctly flagged this as a real gap (a direct
+// RPC call could bypass it), fixed server-side in
+// 20260910100000_sales_change_lead_status_require_reason_for_lost.sql
+// -- this constant now mirrors that RPC's own guard, kept here so the
+// UI can disable Save before the round-trip rather than only surfacing
+// the server's rejection after the fact.
 const REASON_REQUIRED_STATUSES = new Set(['lost', 'do_not_contact'])
 // Statuses where a real confirm step is required before saving --
 // terminal-ish transitions that are hard to walk back from.
@@ -799,10 +805,18 @@ export function SalesLeadDetailPage() {
             <p className="text-sm text-text-secondary">—</p>
           ) : (
             <ul className="space-y-2">
-              {outreach_messages.map((m) => (
-                <li key={m.id} className="rounded-md border border-border-subtle p-2 text-sm">
-                  <div className="flex items-center justify-between">
-                    <span>{m.channel} · {m.message_type}</span>
+              {outreach_messages.map((m, index) => (
+                <li
+                  key={m.id}
+                  className={`rounded-md border p-2 text-sm ${index === 0 ? 'border-primary/40 bg-primary/5' : 'border-border-subtle'}`}
+                >
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="flex items-center gap-2">
+                      {index === 0 && (
+                        <StatusBadge tone="info" label={t('platform.sales.leadProfile.outreachLatestBadge')} />
+                      )}
+                      {m.channel} · {m.message_type}
+                    </span>
                     <StatusBadge
                       tone={m.status === 'sent' || m.status === 'approved' || m.status === 'queued' ? 'success' : m.status === 'failed' || m.status === 'rejected' ? 'danger' : 'info'}
                       label={t(`platform.sales.leadProfile.outreachStatus.${m.status}`, m.status)}
