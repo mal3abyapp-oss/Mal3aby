@@ -136,7 +136,12 @@ describe('SalesLeadDetailPage — Phase 14 invite-based owner activation', () =>
     })
     renderPage()
 
-    expect(await screen.findByText(i18n.t('platform.sales.leadProfile.statusAwaitingActivation'))).toBeInTheDocument()
+    // Pre-existing (not introduced by this test): this exact Arabic
+    // string is shared by statusAwaitingActivation and the page's own
+    // header status badge (platform.sales.pipeline.stage.
+    // awaiting_owner_activation) -- both legitimately render for this
+    // status, so this asserts presence, not uniqueness.
+    expect((await screen.findAllByText(i18n.t('platform.sales.leadProfile.statusAwaitingActivation'))).length).toBeGreaterThan(0)
     const resendButton = screen.getByRole('button', { name: i18n.t('platform.sales.leadProfile.resendInviteButton') })
     fireEvent.click(resendButton)
     await waitFor(() => {
@@ -157,7 +162,10 @@ describe('SalesLeadDetailPage — Phase 14 invite-based owner activation', () =>
     })
     renderPage()
 
-    expect(await screen.findByText(i18n.t('platform.sales.leadProfile.statusTenantActivated'))).toBeInTheDocument()
+    // Same pre-existing shared-string situation as the awaiting-activation
+    // test above (statusTenantActivated and pipeline.stage.tenant_activated
+    // translate identically) -- asserts presence, not uniqueness.
+    expect((await screen.findAllByText(i18n.t('platform.sales.leadProfile.statusTenantActivated'))).length).toBeGreaterThan(0)
     const link = screen.getByRole('link', { name: i18n.t('platform.sales.leadProfile.viewClubLink') })
     expect(link).toHaveAttribute('href', '/platform/clubs/club-123')
   })

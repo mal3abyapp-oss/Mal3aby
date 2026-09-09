@@ -506,7 +506,12 @@ export function SalesLeadDetailPage() {
     return <p className="text-sm text-text-secondary">{t('common.loading')}</p>
   }
 
-  const { lead, signals, latest_score, notes, activities, outreach_messages, followups, status_history, demo_events, possible_duplicates, activation_invite } = profileQuery.data
+  const { lead, signals, latest_score, notes, activities, outreach_messages, followups, status_history, possible_duplicates, activation_invite } = profileQuery.data
+  // Defensive: get_lead_full_profile() always coalesces this to '[]',
+  // but a stale/incomplete test fixture or an older cached RPC
+  // response should degrade to "no demos" rather than crash the whole
+  // page -- normalized once here instead of at every usage site below.
+  const demo_events = profileQuery.data.demo_events ?? []
 
   const isTerminalStatus = ['do_not_contact', 'won', 'awaiting_owner_activation', 'tenant_activated'].includes(lead.status)
   const openDemo = demo_events.find((d) => d.scheduled_at && !d.completed_at)
