@@ -10238,6 +10238,17 @@ export type Database = {
           user_id: string
         }[]
       }
+      get_platform_club_sales_origin: {
+        Args: { p_club_id: string }
+        Returns: {
+          business_name: string
+          converted_at: string
+          converted_by: string
+          converted_by_name: string
+          lead_id: string
+          source_place_id: string
+        }[]
+      }
       get_platform_club_staff_summary: {
         Args: { p_club_id: string }
         Returns: {
@@ -10591,6 +10602,16 @@ export type Database = {
           source_key: string
           source_name_en: string
           won_count: number
+        }[]
+      }
+      get_sales_upcoming_demos: {
+        Args: { p_limit?: number }
+        Returns: {
+          business_name: string
+          demo_id: string
+          lead_id: string
+          notes: string
+          scheduled_at: string
         }[]
       }
       get_shop_gross_profit: {
@@ -11577,8 +11598,49 @@ export type Database = {
         Returns: boolean
       }
       pin_platform_club: { Args: { p_club_id: string }; Returns: undefined }
+      // PLATFORM OWNER OPERATIONAL GAP CLOSURE -- Workstream 1
+      // (2026-09-09): hand-added shapes for
+      // 20260909150000_platform_owner_whatsapp_connection_control.sql --
+      // real type generation not available this session, matching this
+      // repo's established interim pattern (to be replaced by real
+      // generation before production deploy, same as every prior
+      // mission's hand-typed additions here).
+      platform_disconnect_whatsapp: {
+        Args: { p_club_id: string; p_reason: string }
+        Returns: undefined
+      }
+      platform_flag_whatsapp_container_restart: {
+        Args: { p_club_id: string; p_reason?: string }
+        Returns: undefined
+      }
+      platform_get_whatsapp_qr: {
+        Args: { p_club_id: string }
+        Returns: {
+          qr_expires_at: string
+          qr_payload: string
+        }[]
+      }
+      platform_get_whatsapp_recent_events: {
+        Args: { p_club_id: string; p_limit?: number }
+        Returns: {
+          actor_id: string
+          actor_name: string
+          created_at: string
+          detail: Json
+          event: string
+          id: string
+        }[]
+      }
       platform_reactivate_club: {
         Args: { p_club_id: string }
+        Returns: undefined
+      }
+      platform_retry_whatsapp_connection: {
+        Args: { p_club_id: string; p_reason?: string }
+        Returns: undefined
+      }
+      platform_start_whatsapp_pairing: {
+        Args: { p_club_id: string; p_reason?: string }
         Returns: undefined
       }
       platform_suspend_club: {
@@ -12031,6 +12093,10 @@ export type Database = {
         }
         Returns: undefined
       }
+      sales_complete_demo: {
+        Args: { p_lead_id: string; p_notes?: string; p_outcome: string }
+        Returns: string
+      }
       sales_complete_followup: {
         Args: { p_followup_id: string; p_last_action: string }
         Returns: undefined
@@ -12144,6 +12210,10 @@ export type Database = {
         Args: { p_message_id: string; p_reason?: string }
         Returns: undefined
       }
+      sales_schedule_demo: {
+        Args: { p_lead_id: string; p_notes?: string; p_scheduled_at: string }
+        Returns: string
+      }
       sales_schedule_followup: {
         Args: {
           p_lead_id: string
@@ -12248,6 +12318,7 @@ export type Database = {
           rating: number
           review_count: number
           status: string
+          status_reason: string
           total_count: number
           website: string
         }[]

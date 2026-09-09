@@ -52,6 +52,14 @@ interface PendingFollowup {
   is_overdue: boolean
 }
 
+interface UpcomingDemo {
+  demo_id: string
+  lead_id: string
+  business_name: string
+  scheduled_at: string
+  notes: string | null
+}
+
 async function fetchSummary(): Promise<DashboardSummary> {
   const { data, error } = await supabase.rpc('get_sales_dashboard_summary')
   if (error) throw error
@@ -80,6 +88,16 @@ async function fetchFollowups(): Promise<PendingFollowup[]> {
   return data ?? []
 }
 
+// PLATFORM OWNER OPERATIONAL GAP CLOSURE -- Workstream 2 (2026-09-09):
+// "Which demos are scheduled?" is one of the mission's explicit daily-
+// queue questions. get_sales_dashboard_summary()'s demos_scheduled is
+// only a COUNT -- this narrow read-only RPC returns the actionable list.
+async function fetchUpcomingDemos(): Promise<UpcomingDemo[]> {
+  const { data, error } = await supabase.rpc('get_sales_upcoming_demos', { p_limit: 10 })
+  if (error) throw error
+  return data ?? []
+}
+
 export function SalesDashboardPage() {
   const { t } = useTranslation()
 
@@ -87,6 +105,7 @@ export function SalesDashboardPage() {
   const funnelQuery = useQuery({ queryKey: ['sales-funnel-stats'], queryFn: fetchFunnel })
   const sourceQuery = useQuery({ queryKey: ['sales-stats-by-source'], queryFn: fetchBySource })
   const followupsQuery = useQuery({ queryKey: ['sales-pending-followups'], queryFn: fetchFollowups })
+  const upcomingDemosQuery = useQuery({ queryKey: ['sales-upcoming-demos'], queryFn: fetchUpcomingDemos })
 
   const summary = summaryQuery.data
 
@@ -180,6 +199,33 @@ export function SalesDashboardPage() {
                     <FormattedDate value={f.scheduled_at} timeZone={SALES_DISPLAY_TIMEZONE} className="text-sm" />
                     {f.is_overdue && <StatusBadge tone="danger" label={t('platform.sales.dashboard.overdue')} className="mt-1" />}
                   </div>
+                </li>
+              ))}
+            </ul>
+          )}
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader><CardTitle>{t('platform.sales.dashboard.upcomingDemosTitle')}</CardTitle></CardHeader>
+        <CardContent>
+          {upcomingDemosQuery.isError ? (
+            <ErrorState message={translateSupabaseError(upcomingDemosQuery.error, t('platform.sales.dashboard.loadError'))} onRetry={() => upcomingDemosQuery.refetch()} />
+          ) : upcomingDemosQuery.isLoading ? (
+            <p className="text-sm text-text-secondary">{t('common.loading')}</p>
+          ) : (upcomingDemosQuery.data ?? []).length === 0 ? (
+            <p className="text-sm text-text-secondary">{t('platform.sales.dashboard.noUpcomingDemos')}</p>
+          ) : (
+            <ul className="space-y-2">
+              {(upcomingDemosQuery.data ?? []).map((d) => (
+                <li key={d.demo_id} className="flex items-center justify-between border-b border-border-subtle pb-2 last:border-0">
+                  <div>
+                    <Link to={`/platform/sales/leads/${d.lead_id}`} className="font-medium text-accent-foreground hover:underline">
+                      {d.business_name}
+                    </Link>
+                    {d.notes && <p className="text-sm text-text-secondary">{d.notes}</p>}
+                  </div>
+                  <FormattedDate value={d.scheduled_at} timeZone={SALES_DISPLAY_TIMEZONE} className="text-sm" />
                 </li>
               ))}
             </ul>

@@ -28,7 +28,32 @@ import { Input } from '@/components/ui/input'
 import { StatusBadge } from '@/components/ui/status-badge'
 import { FormattedDate } from '@/components/ui/formatted-date'
 import { FormLabel } from '@/components/ui/form-label'
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { SALES_DISPLAY_TIMEZONE } from './salesTimeZone'
+
+// PLATFORM OWNER OPERATIONAL GAP CLOSURE -- Workstream 2 (2026-09-09):
+// pipeline statuses this page's status-change control can offer.
+// 'won', 'awaiting_owner_activation', 'tenant_activated' are excluded
+// (only reachable via sales_win_lead_and_invite_owner -- attempting
+// them via sales_change_lead_status correctly raises server-side).
+// The current status itself is also filtered out client-side below.
+const CHANGEABLE_STATUSES = [
+  'discovered', 'enriching', 'enriched', 'qualified', 'contact_ready', 'contacted',
+  'replied', 'demo_scheduled', 'demo_completed', 'negotiation', 'lost', 'do_not_contact',
+]
+
+// Statuses where a reason is a hard UI requirement (not just recorded)
+// per the mission's "record reason lost" instruction -- the RPC itself
+// only has p_reason default null generically, this is a UI-level rule.
+const REASON_REQUIRED_STATUSES = new Set(['lost', 'do_not_contact'])
+// Statuses where a real confirm step is required before saving --
+// terminal-ish transitions that are hard to walk back from.
+const CONFIRM_REQUIRED_STATUSES = new Set(['lost', 'do_not_contact'])
+
+const DEMO_OUTCOMES = ['positive', 'neutral', 'negative', 'no_show']
+const OUTREACH_MESSAGE_TYPES = ['intro', 'offer', 'followup', 'demo_pitch', 'proposal_summary']
+const OUTREACH_CHANNELS = ['email', 'phone_script', 'whatsapp_talking_points']
 
 interface LeadProfile {
   lead: {
@@ -63,6 +88,7 @@ interface LeadProfile {
   }>
   followups: Array<{ id: string; reason: string; scheduled_at: string; status: string }>
   status_history: Array<{ from_status: string | null; to_status: string; reason: string | null; changed_at: string }>
+  demo_events: Array<{ id: string; scheduled_at: string | null; completed_at: string | null; outcome: string | null; notes: string | null; created_at: string }>
   possible_duplicates: Array<{ id: string; lead_id_a: string; lead_id_b: string; confidence: string }>
   activation_invite: { status: string; owner_email: string; expires_at: string; created_at: string; consumed_at: string | null } | null
 }
@@ -140,6 +166,33 @@ export function SalesLeadDetailPage() {
   const [convertError, setConvertError] = useState<string | null>(null)
 
   const [callOutcomeDrafts, setCallOutcomeDrafts] = useState<Record<string, string>>({})
+
+  // Item 1: general pipeline status-change control.
+  const [statusDialogOpen, setStatusDialogOpen] = useState(false)
+  const [newStatus, setNewStatus] = useState('')
+  const [statusReason, setStatusReason] = useState('')
+  const [statusChangeError, setStatusChangeError] = useState<string | null>(null)
+
+  // Item 2: demo scheduling / completion.
+  const [scheduleDemoOpen, setScheduleDemoOpen] = useState(false)
+  const [demoScheduledAt, setDemoScheduledAt] = useState('')
+  const [demoScheduleNotes, setDemoScheduleNotes] = useState('')
+  const [demoScheduleError, setDemoScheduleError] = useState<string | null>(null)
+  const [completeDemoOpen, setCompleteDemoOpen] = useState(false)
+  const [demoOutcome, setDemoOutcome] = useState('')
+  const [demoCompleteNotes, setDemoCompleteNotes] = useState('')
+  const [demoCompleteError, setDemoCompleteError] = useState<string | null>(null)
+
+  // Item 4: AI draft approve/reject/queue/regenerate.
+  const [rejectDialogFor, setRejectDialogFor] = useState<string | null>(null)
+  const [rejectReason, setRejectReason] = useState('')
+  const [rejectError, setRejectError] = useState<string | null>(null)
+  const [approveError, setApproveError] = useState<string | null>(null)
+  const [queueError, setQueueError] = useState<string | null>(null)
+  const [regenerateError, setRegenerateError] = useState<string | null>(null)
+  const [regenMessageType, setRegenMessageType] = useState('offer')
+  const [regenChannel, setRegenChannel] = useState('email')
+  const [regenLanguage, setRegenLanguage] = useState<'ar' | 'en'>('ar')
 
   const profileQuery = useQuery({
     queryKey: ['sales-lead-profile', leadId],
@@ -255,16 +308,157 @@ export function SalesLeadDetailPage() {
     },
   })
 
-  const doNotContactMutation = useMutation({
+  // Item 1: general pipeline status-change control -- replaces the old
+  // single hardcoded "Mark do_not_contact" button. sales_change_lead_
+  // status() itself enforces the real guards server-side (do_not_contact
+  // near-terminal, won/awaiting_owner_activation/tenant_activated fully
+  // terminal and only reachable via the dedicated conversion RPC) -- this
+  // is a thin, general UI over that same single RPC.
+  const changeStatusMutation = useMutation({
     mutationFn: async () => {
       const { error } = await supabase.rpc('sales_change_lead_status', {
         p_lead_id: leadId!,
-        p_new_status: 'do_not_contact',
-        p_reason: 'marked by platform staff',
+        p_new_status: newStatus,
+        p_reason: statusReason.trim() || undefined,
       })
       if (error) throw error
     },
-    onSuccess: invalidate,
+    onSuccess: () => {
+      setStatusDialogOpen(false)
+      setNewStatus('')
+      setStatusReason('')
+      setStatusChangeError(null)
+      invalidate()
+    },
+    onError: (error: { message?: string }) => {
+      setStatusChangeError(error?.message || t('platform.sales.leadProfile.changeStatusError'))
+    },
+  })
+
+  // Item 2: demo scheduling / completion -- first writers to
+  // sales_demo_events (schema-only stub before this session).
+  const scheduleDemoMutation = useMutation({
+    mutationFn: async () => {
+      const { error } = await supabase.rpc('sales_schedule_demo', {
+        p_lead_id: leadId!,
+        p_scheduled_at: new Date(demoScheduledAt).toISOString(),
+        p_notes: demoScheduleNotes.trim() || undefined,
+      })
+      if (error) throw error
+    },
+    onSuccess: () => {
+      setScheduleDemoOpen(false)
+      setDemoScheduledAt('')
+      setDemoScheduleNotes('')
+      setDemoScheduleError(null)
+      invalidate()
+    },
+    onError: (error: { message?: string }) => {
+      setDemoScheduleError(error?.message || t('platform.sales.leadProfile.demoScheduleError'))
+    },
+  })
+
+  const completeDemoMutation = useMutation({
+    mutationFn: async () => {
+      const { error } = await supabase.rpc('sales_complete_demo', {
+        p_lead_id: leadId!,
+        p_outcome: demoOutcome,
+        p_notes: demoCompleteNotes.trim() || undefined,
+      })
+      if (error) throw error
+    },
+    onSuccess: () => {
+      setCompleteDemoOpen(false)
+      setDemoOutcome('')
+      setDemoCompleteNotes('')
+      setDemoCompleteError(null)
+      invalidate()
+    },
+    onError: (error: { message?: string }) => {
+      setDemoCompleteError(error?.message || t('platform.sales.leadProfile.demoCompleteError'))
+    },
+  })
+
+  // Item 4: AI draft approve/reject/queue -- these RPCs already exist
+  // and are already permission-gated server-side but had ZERO frontend
+  // callers before this pass.
+  const approveMessageMutation = useMutation({
+    mutationFn: async (messageId: string) => {
+      const { error } = await supabase.rpc('sales_approve_outreach_message', { p_message_id: messageId })
+      if (error) throw error
+    },
+    onSuccess: () => {
+      setApproveError(null)
+      invalidate()
+    },
+    onError: (error: { message?: string }) => {
+      setApproveError(error?.message || t('platform.sales.leadProfile.outreachApproveError'))
+    },
+  })
+
+  const rejectMessageMutation = useMutation({
+    mutationFn: async () => {
+      const { error } = await supabase.rpc('sales_reject_outreach_message', {
+        p_message_id: rejectDialogFor!,
+        p_reason: rejectReason.trim() || undefined,
+      })
+      if (error) throw error
+    },
+    onSuccess: () => {
+      setRejectDialogFor(null)
+      setRejectReason('')
+      setRejectError(null)
+      invalidate()
+    },
+    onError: (error: { message?: string }) => {
+      setRejectError(error?.message || t('platform.sales.leadProfile.outreachRejectError'))
+    },
+  })
+
+  // sales_queue_outreach_message() refuses non-email channel server-side
+  // -- the button that calls this is only shown for channel='email'
+  // approved messages (belt-and-suspenders: the RPC's own guard is the
+  // real enforcement, this is just not offering a button that would
+  // always fail).
+  const queueMessageMutation = useMutation({
+    mutationFn: async (messageId: string) => {
+      const { error } = await supabase.rpc('sales_queue_outreach_message', { p_message_id: messageId })
+      if (error) throw error
+    },
+    onSuccess: () => {
+      setQueueError(null)
+      invalidate()
+    },
+    onError: (error: { message?: string }) => {
+      setQueueError(error?.message || t('platform.sales.leadProfile.outreachQueueError'))
+    },
+  })
+
+  // No "edit a draft" RPC exists in this architecture (deliberately not
+  // invented this pass -- see the code comment near the outreach section
+  // below). "Regenerate" calls the same generation Edge Function used
+  // everywhere else in this module; the fresh draft goes through the
+  // same quality gate and approval flow as any other generation.
+  const regenerateMutation = useMutation({
+    mutationFn: async () => {
+      const { data: sessionData } = await supabase.auth.getSession()
+      const token = sessionData.session?.access_token
+      const res = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/sales-ai-offer-generator`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ lead_id: leadId, message_type: regenMessageType, language: regenLanguage, channel: regenChannel }),
+      })
+      const json = await res.json()
+      if (!res.ok) throw Object.assign(new Error(json.error ?? 'regeneration failed'), { status: res.status, detail: json })
+      return json
+    },
+    onSuccess: () => {
+      setRegenerateError(null)
+      invalidate()
+    },
+    onError: (error: { message?: string }) => {
+      setRegenerateError(error?.message || t('platform.sales.leadProfile.outreachRegenerateError'))
+    },
   })
 
   // PHASE 14: sends the secure activation invite -- never creates a
@@ -306,7 +500,10 @@ export function SalesLeadDetailPage() {
     return <p className="text-sm text-text-secondary">{t('common.loading')}</p>
   }
 
-  const { lead, signals, latest_score, notes, activities, outreach_messages, followups, possible_duplicates, activation_invite } = profileQuery.data
+  const { lead, signals, latest_score, notes, activities, outreach_messages, followups, status_history, demo_events, possible_duplicates, activation_invite } = profileQuery.data
+
+  const isTerminalStatus = ['do_not_contact', 'won', 'awaiting_owner_activation', 'tenant_activated'].includes(lead.status)
+  const openDemo = demo_events.find((d) => d.scheduled_at && !d.completed_at)
 
   return (
     <div className="space-y-6">
@@ -314,9 +511,17 @@ export function SalesLeadDetailPage() {
         title={lead.business_name}
         description={[lead.business_type, lead.city, lead.country].filter(Boolean).join(' · ')}
         actions={
-          !['do_not_contact', 'won', 'awaiting_owner_activation', 'tenant_activated'].includes(lead.status) ? (
-            <Button variant="outline" onClick={() => doNotContactMutation.mutate()} disabled={doNotContactMutation.isPending}>
-              {t('platform.sales.leadProfile.markDoNotContact')}
+          !isTerminalStatus ? (
+            <Button
+              variant="outline"
+              onClick={() => {
+                setNewStatus('')
+                setStatusReason('')
+                setStatusChangeError(null)
+                setStatusDialogOpen(true)
+              }}
+            >
+              {t('platform.sales.leadProfile.changeStatusButton')}
             </Button>
           ) : undefined
         }
@@ -539,8 +744,57 @@ export function SalesLeadDetailPage() {
       </Card>
 
       <Card>
-        <CardHeader><CardTitle>{t('platform.sales.leadProfile.outreach')}</CardTitle></CardHeader>
-        <CardContent>
+        <CardHeader className="flex flex-row items-center justify-between">
+          <CardTitle>{t('platform.sales.leadProfile.outreach')}</CardTitle>
+          {!isTerminalStatus && (
+            <div className="flex items-center gap-2">
+              <Select value={regenMessageType} onValueChange={setRegenMessageType}>
+                <SelectTrigger className="h-8 w-40 text-xs"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  {OUTREACH_MESSAGE_TYPES.map((mt) => (
+                    <SelectItem key={mt} value={mt}>{t(`platform.sales.leadProfile.outreachMessageType.${mt}`)}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <Select value={regenChannel} onValueChange={setRegenChannel}>
+                <SelectTrigger className="h-8 w-40 text-xs"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  {OUTREACH_CHANNELS.map((c) => (
+                    <SelectItem key={c} value={c}>{t(`platform.sales.leadProfile.outreachChannelOptions.${c}`)}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <Select value={regenLanguage} onValueChange={(v) => setRegenLanguage(v as 'ar' | 'en')}>
+                <SelectTrigger className="h-8 w-28 text-xs"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="ar">{t('platform.sales.leadProfile.outreachLanguageOptions.ar')}</SelectItem>
+                  <SelectItem value="en">{t('platform.sales.leadProfile.outreachLanguageOptions.en')}</SelectItem>
+                </SelectContent>
+              </Select>
+              <Button size="sm" variant="outline" onClick={() => regenerateMutation.mutate()} disabled={regenerateMutation.isPending}>
+                {regenerateMutation.isPending ? t('platform.sales.leadProfile.outreachRegenerating') : t('platform.sales.leadProfile.outreachRegenerateButton')}
+              </Button>
+            </div>
+          )}
+        </CardHeader>
+        <CardContent className="space-y-2">
+          {/* AI GENERATES/ASSISTS, OWNER REVIEWS, OWNER AUTHORIZES SEND.
+              There is no in-place edit of AI-generated draft text in this
+              pass -- no versioned-edit RPC exists in this architecture,
+              and inventing one is a real product decision out of scope
+              here (mission's own instruction). "Regenerate" (above) is
+              the only way to get a revised draft; it produces a NEW
+              message through the same generation -> quality-gate ->
+              approval flow as any other draft, it does not mutate an
+              existing one. */}
+          {(approveError || rejectError || queueError || regenerateError) && (
+            <p role="alert" className="text-sm text-status-danger">
+              {approveError || rejectError || queueError || regenerateError}
+            </p>
+          )}
+          {regenerateMutation.isSuccess && (
+            <p className="text-sm text-status-success">{t('platform.sales.leadProfile.outreachRegenerateButton')} ✓</p>
+          )}
           {outreach_messages.length === 0 ? (
             <p className="text-sm text-text-secondary">—</p>
           ) : (
@@ -549,7 +803,10 @@ export function SalesLeadDetailPage() {
                 <li key={m.id} className="rounded-md border border-border-subtle p-2 text-sm">
                   <div className="flex items-center justify-between">
                     <span>{m.channel} · {m.message_type}</span>
-                    <StatusBadge tone={m.status === 'sent' ? 'success' : m.status === 'failed' || m.status === 'rejected' ? 'danger' : 'info'} label={m.status} />
+                    <StatusBadge
+                      tone={m.status === 'sent' || m.status === 'approved' || m.status === 'queued' ? 'success' : m.status === 'failed' || m.status === 'rejected' ? 'danger' : 'info'}
+                      label={t(`platform.sales.leadProfile.outreachStatus.${m.status}`, m.status)}
+                    />
                   </div>
                   {m.quality_status && (
                     <div className="mt-1 flex flex-wrap items-center gap-2">
@@ -566,10 +823,39 @@ export function SalesLeadDetailPage() {
                   )}
                   {m.subject && <p className="mt-1 font-medium">{m.subject}</p>}
                   <p className="text-text-secondary">{m.body.slice(0, 200)}</p>
+
+                  {m.status === 'generated' && (
+                    <div className="mt-2 flex flex-wrap gap-2">
+                      <Button
+                        size="sm"
+                        onClick={() => approveMessageMutation.mutate(m.id)}
+                        disabled={m.quality_status !== 'approval_ready' || approveMessageMutation.isPending}
+                        title={m.quality_status !== 'approval_ready' ? t('platform.sales.leadProfile.qualityStatus.quality_rejected') : undefined}
+                      >
+                        {approveMessageMutation.isPending ? t('platform.sales.leadProfile.outreachApproving') : t('platform.sales.leadProfile.outreachApproveButton')}
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => { setRejectDialogFor(m.id); setRejectReason(''); setRejectError(null) }}
+                        disabled={rejectMessageMutation.isPending}
+                      >
+                        {t('platform.sales.leadProfile.outreachRejectButton')}
+                      </Button>
+                    </div>
+                  )}
+                  {m.status === 'approved' && m.channel === 'email' && (
+                    <div className="mt-2">
+                      <Button size="sm" onClick={() => queueMessageMutation.mutate(m.id)} disabled={queueMessageMutation.isPending}>
+                        {queueMessageMutation.isPending ? t('platform.sales.leadProfile.outreachQueuing') : t('platform.sales.leadProfile.outreachQueueButton')}
+                      </Button>
+                    </div>
+                  )}
                 </li>
               ))}
             </ul>
           )}
+          <p className="text-xs text-text-secondary">{t('platform.sales.leadProfile.outreachNoEditNotice')}</p>
         </CardContent>
       </Card>
 
@@ -597,6 +883,89 @@ export function SalesLeadDetailPage() {
               </li>
             ))}
           </ul>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader className="flex flex-row items-center justify-between">
+          <CardTitle>{t('platform.sales.leadProfile.demos')}</CardTitle>
+          {!isTerminalStatus && (
+            <div className="flex gap-2">
+              {openDemo ? (
+                <Button
+                  size="sm"
+                  onClick={() => { setDemoOutcome(''); setDemoCompleteNotes(''); setDemoCompleteError(null); setCompleteDemoOpen(true) }}
+                >
+                  {t('platform.sales.leadProfile.demoCompleteButton')}
+                </Button>
+              ) : (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => { setDemoScheduledAt(''); setDemoScheduleNotes(''); setDemoScheduleError(null); setScheduleDemoOpen(true) }}
+                >
+                  {t('platform.sales.leadProfile.demoScheduleButton')}
+                </Button>
+              )}
+            </div>
+          )}
+        </CardHeader>
+        <CardContent>
+          {demo_events.length === 0 ? (
+            <p className="text-sm text-text-secondary">{t('platform.sales.leadProfile.demoNoDemos')}</p>
+          ) : (
+            <ul className="space-y-2">
+              {demo_events.map((d) => (
+                <li key={d.id} className="rounded-md border border-border-subtle p-2 text-sm">
+                  <div className="flex items-center justify-between">
+                    <span>
+                      {t('platform.sales.leadProfile.demoScheduledAt')}: {d.scheduled_at ? <FormattedDate value={d.scheduled_at} timeZone={SALES_DISPLAY_TIMEZONE} /> : '—'}
+                    </span>
+                    {d.completed_at ? (
+                      <StatusBadge
+                        tone={d.outcome === 'positive' ? 'success' : d.outcome === 'negative' || d.outcome === 'no_show' ? 'danger' : 'neutral'}
+                        label={d.outcome ? t(`platform.sales.leadProfile.demoOutcome.${d.outcome}`, d.outcome) : t('platform.sales.leadProfile.demoCompletedBadge')}
+                      />
+                    ) : (
+                      <StatusBadge tone="info" label={t('platform.sales.leadProfile.demoOpenBadge')} />
+                    )}
+                  </div>
+                  {d.completed_at && (
+                    <p className="mt-1 text-xs text-text-secondary">
+                      {t('platform.sales.leadProfile.demoCompletedAt')}: <FormattedDate value={d.completed_at} timeZone={SALES_DISPLAY_TIMEZONE} />
+                    </p>
+                  )}
+                  {d.notes && <p className="mt-1 text-text-secondary">{d.notes}</p>}
+                </li>
+              ))}
+            </ul>
+          )}
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader><CardTitle>{t('platform.sales.leadProfile.statusHistory')}</CardTitle></CardHeader>
+        <CardContent>
+          {status_history.length === 0 ? (
+            <p className="text-sm text-text-secondary">{t('platform.sales.leadProfile.noStatusHistory')}</p>
+          ) : (
+            <ul className="space-y-2">
+              {status_history.map((h, idx) => (
+                <li key={idx} className="border-b border-border-subtle pb-2 text-sm last:border-0">
+                  <div className="flex items-center justify-between">
+                    <span>
+                      {t('platform.sales.leadProfile.statusHistoryTransition', {
+                        from: h.from_status ? t(`platform.sales.pipeline.stage.${h.from_status}`, h.from_status) : t('platform.sales.leadProfile.statusHistoryNoPreviousStatus'),
+                        to: t(`platform.sales.pipeline.stage.${h.to_status}`, h.to_status),
+                      })}
+                    </span>
+                    <FormattedDate value={h.changed_at} timeZone={SALES_DISPLAY_TIMEZONE} className="text-xs text-text-secondary" />
+                  </div>
+                  {h.reason && <p className="mt-1 text-text-secondary">{h.reason}</p>}
+                </li>
+              ))}
+            </ul>
+          )}
         </CardContent>
       </Card>
 
@@ -669,6 +1038,164 @@ export function SalesLeadDetailPage() {
           )}
         </CardContent>
       </Card>
+
+      {statusDialogOpen && (
+        <Dialog open onOpenChange={(open) => { if (!open) setStatusDialogOpen(false) }}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>{t('platform.sales.leadProfile.changeStatusTitle')}</DialogTitle>
+            </DialogHeader>
+            <div className="flex flex-col gap-4">
+              <div className="flex flex-col gap-1">
+                <FormLabel htmlFor="change-status-new-status">{t('platform.sales.leadProfile.changeStatusNewStatusLabel')}</FormLabel>
+                <Select value={newStatus} onValueChange={setNewStatus}>
+                  <SelectTrigger id="change-status-new-status"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    {CHANGEABLE_STATUSES.filter((s) => s !== lead.status).map((s) => (
+                      <SelectItem key={s} value={s}>{t(`platform.sales.pipeline.stage.${s}`)}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="flex flex-col gap-1">
+                <FormLabel htmlFor="change-status-reason">
+                  {t('platform.sales.leadProfile.changeStatusReasonLabel')}
+                  {newStatus && REASON_REQUIRED_STATUSES.has(newStatus) ? ' *' : ''}
+                </FormLabel>
+                <Input
+                  id="change-status-reason"
+                  value={statusReason}
+                  onChange={(e) => setStatusReason(e.target.value)}
+                  placeholder={t('platform.sales.leadProfile.changeStatusReasonLabel')}
+                />
+                <p className="text-xs text-text-secondary">
+                  {newStatus && REASON_REQUIRED_STATUSES.has(newStatus)
+                    ? t('platform.sales.leadProfile.changeStatusReasonRequiredHint')
+                    : t('platform.sales.leadProfile.changeStatusReasonOptionalHint')}
+                </p>
+              </div>
+              {newStatus && CONFIRM_REQUIRED_STATUSES.has(newStatus) && (
+                <p className="text-sm text-status-danger">{t('platform.sales.leadProfile.changeStatusConfirmWarning')}</p>
+              )}
+              {statusChangeError && <p role="alert" className="text-sm text-status-danger">{statusChangeError}</p>}
+              <div className="flex justify-end gap-2">
+                <Button variant="outline" onClick={() => setStatusDialogOpen(false)}>{t('common.cancel')}</Button>
+                <Button
+                  variant={newStatus && CONFIRM_REQUIRED_STATUSES.has(newStatus) ? 'destructive' : 'default'}
+                  disabled={
+                    !newStatus ||
+                    (REASON_REQUIRED_STATUSES.has(newStatus) && !statusReason.trim()) ||
+                    changeStatusMutation.isPending
+                  }
+                  onClick={() => changeStatusMutation.mutate()}
+                >
+                  {changeStatusMutation.isPending ? t('platform.sales.leadProfile.changeStatusSaving') : t('platform.sales.leadProfile.changeStatusSave')}
+                </Button>
+              </div>
+            </div>
+          </DialogContent>
+        </Dialog>
+      )}
+
+      {scheduleDemoOpen && (
+        <Dialog open onOpenChange={(open) => { if (!open) setScheduleDemoOpen(false) }}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>{t('platform.sales.leadProfile.demoScheduleTitle')}</DialogTitle>
+            </DialogHeader>
+            <div className="flex flex-col gap-4">
+              <div className="flex flex-col gap-1">
+                <FormLabel htmlFor="demo-schedule-at">{t('platform.sales.leadProfile.demoScheduleDateLabel')}</FormLabel>
+                <input
+                  id="demo-schedule-at"
+                  type="datetime-local"
+                  className="w-full rounded-md border border-border-subtle p-2 text-sm"
+                  value={demoScheduledAt}
+                  onChange={(e) => setDemoScheduledAt(e.target.value)}
+                />
+              </div>
+              <div className="flex flex-col gap-1">
+                <FormLabel htmlFor="demo-schedule-notes">{t('platform.sales.leadProfile.demoScheduleNotesLabel')}</FormLabel>
+                <textarea
+                  id="demo-schedule-notes"
+                  className="min-h-16 w-full rounded-md border border-border-subtle p-2 text-sm"
+                  value={demoScheduleNotes}
+                  onChange={(e) => setDemoScheduleNotes(e.target.value)}
+                />
+              </div>
+              {demoScheduleError && <p role="alert" className="text-sm text-status-danger">{demoScheduleError}</p>}
+              <div className="flex justify-end gap-2">
+                <Button variant="outline" onClick={() => setScheduleDemoOpen(false)}>{t('common.cancel')}</Button>
+                <Button disabled={!demoScheduledAt || scheduleDemoMutation.isPending} onClick={() => scheduleDemoMutation.mutate()}>
+                  {scheduleDemoMutation.isPending ? t('platform.sales.leadProfile.demoScheduleSaving') : t('platform.sales.leadProfile.demoScheduleSave')}
+                </Button>
+              </div>
+            </div>
+          </DialogContent>
+        </Dialog>
+      )}
+
+      {completeDemoOpen && (
+        <Dialog open onOpenChange={(open) => { if (!open) setCompleteDemoOpen(false) }}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>{t('platform.sales.leadProfile.demoCompleteTitle')}</DialogTitle>
+            </DialogHeader>
+            <div className="flex flex-col gap-4">
+              <div className="flex flex-col gap-1">
+                <FormLabel htmlFor="demo-complete-outcome">{t('platform.sales.leadProfile.demoCompleteOutcomeLabel')}</FormLabel>
+                <Select value={demoOutcome} onValueChange={setDemoOutcome}>
+                  <SelectTrigger id="demo-complete-outcome"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    {DEMO_OUTCOMES.map((o) => (
+                      <SelectItem key={o} value={o}>{t(`platform.sales.leadProfile.demoOutcome.${o}`)}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="flex flex-col gap-1">
+                <FormLabel htmlFor="demo-complete-notes">{t('platform.sales.leadProfile.demoCompleteNotesLabel')}</FormLabel>
+                <textarea
+                  id="demo-complete-notes"
+                  className="min-h-16 w-full rounded-md border border-border-subtle p-2 text-sm"
+                  value={demoCompleteNotes}
+                  onChange={(e) => setDemoCompleteNotes(e.target.value)}
+                />
+              </div>
+              {demoCompleteError && <p role="alert" className="text-sm text-status-danger">{demoCompleteError}</p>}
+              <div className="flex justify-end gap-2">
+                <Button variant="outline" onClick={() => setCompleteDemoOpen(false)}>{t('common.cancel')}</Button>
+                <Button disabled={!demoOutcome || completeDemoMutation.isPending} onClick={() => completeDemoMutation.mutate()}>
+                  {completeDemoMutation.isPending ? t('platform.sales.leadProfile.demoCompleteSaving') : t('platform.sales.leadProfile.demoCompleteSave')}
+                </Button>
+              </div>
+            </div>
+          </DialogContent>
+        </Dialog>
+      )}
+
+      {rejectDialogFor && (
+        <Dialog open onOpenChange={(open) => { if (!open) setRejectDialogFor(null) }}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>{t('platform.sales.leadProfile.outreachRejectTitle')}</DialogTitle>
+            </DialogHeader>
+            <div className="flex flex-col gap-4">
+              <div className="flex flex-col gap-1">
+                <FormLabel htmlFor="reject-reason">{t('platform.sales.leadProfile.outreachRejectReasonLabel')}</FormLabel>
+                <Input id="reject-reason" value={rejectReason} onChange={(e) => setRejectReason(e.target.value)} />
+              </div>
+              {rejectError && <p role="alert" className="text-sm text-status-danger">{rejectError}</p>}
+              <div className="flex justify-end gap-2">
+                <Button variant="outline" onClick={() => setRejectDialogFor(null)}>{t('common.cancel')}</Button>
+                <Button variant="destructive" disabled={rejectMessageMutation.isPending} onClick={() => rejectMessageMutation.mutate()}>
+                  {rejectMessageMutation.isPending ? t('platform.sales.leadProfile.outreachRejecting') : t('platform.sales.leadProfile.outreachRejectButton')}
+                </Button>
+              </div>
+            </div>
+          </DialogContent>
+        </Dialog>
+      )}
     </div>
   )
 }

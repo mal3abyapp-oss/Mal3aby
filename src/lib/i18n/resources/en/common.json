@@ -224,7 +224,9 @@
         "noData": "No data yet",
         "followupsTitle": "Upcoming Follow-ups",
         "noFollowups": "No pending follow-ups",
-        "overdue": "Overdue"
+        "overdue": "Overdue",
+        "upcomingDemosTitle": "Demos Scheduled",
+        "noUpcomingDemos": "No demos scheduled"
       },
       "discover": {
         "title": "Discover Leads",
@@ -291,6 +293,8 @@
           "demo_completed": "Demo Completed",
           "negotiation": "Negotiation",
           "won": "Won",
+          "awaiting_owner_activation": "Awaiting Owner Activation",
+          "tenant_activated": "Tenant Activated",
           "lost": "Lost",
           "do_not_contact": "Do Not Contact"
         }
@@ -389,6 +393,87 @@
           "approval_ready": "Approval ready",
           "quality_rejected": "Quality rejected"
         },
+        "changeStatusButton": "Change Status",
+        "changeStatusTitle": "Change lead status",
+        "changeStatusNewStatusLabel": "New status",
+        "changeStatusReasonLabel": "Reason",
+        "changeStatusReasonRequiredHint": "A reason is required for this status.",
+        "changeStatusReasonOptionalHint": "Optional, but recorded in the lead's history.",
+        "changeStatusConfirmWarning": "This is a hard-to-reverse pipeline transition. Confirm before continuing.",
+        "changeStatusSave": "Save status",
+        "changeStatusSaving": "Saving...",
+        "changeStatusError": "Could not change this lead's status.",
+        "statusHistory": "Status History",
+        "noStatusHistory": "No status changes recorded yet",
+        "statusHistoryTransition": "{{from}} → {{to}}",
+        "statusHistoryNoPreviousStatus": "(none)",
+        "demoScheduleButton": "Schedule Demo",
+        "demoScheduleTitle": "Schedule a demo",
+        "demoScheduleDateLabel": "Date & time",
+        "demoScheduleNotesLabel": "Notes (optional)",
+        "demoScheduleSave": "Schedule",
+        "demoScheduleSaving": "Scheduling...",
+        "demoScheduleError": "Could not schedule this demo.",
+        "demoCompleteButton": "Complete Demo",
+        "demoCompleteTitle": "Complete demo",
+        "demoCompleteOutcomeLabel": "Outcome",
+        "demoCompleteNotesLabel": "Notes (optional)",
+        "demoCompleteSave": "Save outcome",
+        "demoCompleteSaving": "Saving...",
+        "demoCompleteError": "Could not record this demo's outcome.",
+        "demoOutcome": {
+          "positive": "Positive",
+          "neutral": "Neutral",
+          "negative": "Negative",
+          "no_show": "No-show"
+        },
+        "demoScheduledAt": "Scheduled",
+        "demoCompletedAt": "Completed",
+        "demoNoDemos": "No demos scheduled yet",
+        "demoOpenBadge": "Scheduled",
+        "demoCompletedBadge": "Completed",
+        "outreachApproveButton": "Approve",
+        "outreachApproving": "Approving...",
+        "outreachApproveError": "Could not approve this message.",
+        "outreachRejectButton": "Reject",
+        "outreachRejecting": "Rejecting...",
+        "outreachRejectError": "Could not reject this message.",
+        "outreachRejectTitle": "Reject this draft",
+        "outreachRejectReasonLabel": "Reason (optional)",
+        "outreachQueueButton": "Queue for sending",
+        "outreachQueuing": "Queuing...",
+        "outreachQueueError": "Could not queue this message for sending.",
+        "outreachRegenerateButton": "Regenerate",
+        "outreachRegenerating": "Regenerating...",
+        "outreachRegenerateError": "Could not regenerate a draft.",
+        "outreachMessageTypeLabel": "Message type",
+        "outreachChannelLabel": "Channel",
+        "outreachLanguageLabel": "Language",
+        "outreachMessageType": {
+          "intro": "Introduction",
+          "offer": "Offer",
+          "followup": "Follow-up",
+          "demo_pitch": "Demo pitch",
+          "proposal_summary": "Proposal summary"
+        },
+        "outreachChannelOptions": {
+          "email": "Email",
+          "phone_script": "Phone script",
+          "whatsapp_talking_points": "WhatsApp talking points"
+        },
+        "outreachLanguageOptions": {
+          "en": "English",
+          "ar": "Arabic"
+        },
+        "outreachStatus": {
+          "generated": "Draft",
+          "approved": "Approved",
+          "rejected": "Rejected",
+          "queued": "Queued",
+          "sent": "Sent",
+          "failed": "Failed"
+        },
+        "outreachNoEditNotice": "Editing AI-generated text in place is not supported yet. Regenerate a new draft instead -- it goes through the same quality gate and approval flow.",
         "channels": "Outreach Channels",
         "channelEmail": "Email",
         "channelWhatsapp": "WhatsApp",
@@ -583,17 +668,58 @@
         "notAffiliated": "This club is not affiliated with a government/ministry collection authority."
       },
       "whatsappCard": {
-        "title": "WhatsApp health",
+        "title": "WhatsApp connection",
         "status": "Status",
         "number": "Connected number",
+        "lastSeen": "Last seen",
         "failures7d": "Failures (7d)",
         "pending": "Pending",
+        "loading": "Loading...",
+        "loadError": "Couldn't load WhatsApp connection state. Numbers or status shown below may be stale or missing -- refresh before making a decision.",
         "statusLabels": {
           "connected": "Connected",
           "not_connected": "Not connected",
           "logged_out": "Logged out",
           "qr_pending": "Awaiting QR scan",
           "connecting": "Connecting"
+        },
+        "connect": "Connect",
+        "retry": "Retry",
+        "disconnect": "Disconnect",
+        "connectHint": "Start a pairing session for this club's WhatsApp number on their behalf. The club will need to scan the resulting QR code from their own phone.",
+        "disconnectDialog": {
+          "title": "Disconnect this club's WhatsApp",
+          "warning": "This immediately disconnects the club's WhatsApp number. Booking, payment, and invoice confirmations will stop sending until it's reconnected. This action is recorded in the audit log.",
+          "confirm": "Confirm disconnect"
+        },
+        "errors": {
+          "connect": "Couldn't start the WhatsApp connection.",
+          "retry": "Couldn't retry the WhatsApp connection.",
+          "disconnect": "Couldn't disconnect WhatsApp."
+        },
+        "recentEvents": {
+          "show": "View recent events",
+          "hide": "Hide recent events",
+          "loading": "Loading...",
+          "empty": "No connection events recorded yet.",
+          "systemActor": "System",
+          "initiatedByPrefix": "initiated by {{who}}",
+          "eventLabels": {
+            "pairing_requested": "Pairing requested",
+            "retry_requested": "Retry requested",
+            "disconnect_requested": "Disconnect requested",
+            "container_restart_flagged": "Container restart flagged",
+            "status_connected": "Connected",
+            "status_qr_required": "QR code generated",
+            "status_connecting": "Connecting",
+            "status_disconnected": "Disconnected",
+            "status_reconnecting": "Reconnecting",
+            "status_degraded": "Connection degraded",
+            "status_logged_out": "Logged out",
+            "status_restricted": "Account restricted",
+            "status_failed": "Connection failed",
+            "status_error": "Error"
+          }
         }
       },
       "actionsCard": {

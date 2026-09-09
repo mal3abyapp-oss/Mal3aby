@@ -224,7 +224,9 @@
         "noData": "لا توجد بيانات بعد",
         "followupsTitle": "المتابعات القادمة",
         "noFollowups": "لا توجد متابعات معلّقة",
-        "overdue": "متأخر"
+        "overdue": "متأخر",
+        "upcomingDemosTitle": "العروض التوضيحية المجدولة",
+        "noUpcomingDemos": "لا توجد عروض توضيحية مجدولة"
       },
       "discover": {
         "title": "اكتشاف العملاء المحتملين",
@@ -291,6 +293,8 @@
           "demo_completed": "عرض توضيحي مكتمل",
           "negotiation": "تفاوض",
           "won": "تم الفوز",
+          "awaiting_owner_activation": "في انتظار تفعيل المالك",
+          "tenant_activated": "تم تفعيل النادي",
           "lost": "خسارة",
           "do_not_contact": "عدم التواصل"
         }
@@ -389,6 +393,87 @@
           "approval_ready": "جاهز للاعتماد",
           "quality_rejected": "مرفوض لعدم استيفاء الجودة"
         },
+        "changeStatusButton": "تغيير الحالة",
+        "changeStatusTitle": "تغيير حالة العميل المحتمل",
+        "changeStatusNewStatusLabel": "الحالة الجديدة",
+        "changeStatusReasonLabel": "السبب",
+        "changeStatusReasonRequiredHint": "السبب مطلوب لهذه الحالة.",
+        "changeStatusReasonOptionalHint": "اختياري، لكن يُسجَّل في سجل تاريخ هذا العميل المحتمل.",
+        "changeStatusConfirmWarning": "هذا تحوّل في مسار المبيعات يصعب التراجع عنه. تأكد قبل المتابعة.",
+        "changeStatusSave": "حفظ الحالة",
+        "changeStatusSaving": "جارٍ الحفظ...",
+        "changeStatusError": "تعذّر تغيير حالة هذا العميل المحتمل.",
+        "statusHistory": "سجل تاريخ الحالة",
+        "noStatusHistory": "لا توجد تغييرات في الحالة مسجّلة بعد",
+        "statusHistoryTransition": "{{from}} ← {{to}}",
+        "statusHistoryNoPreviousStatus": "(لا يوجد)",
+        "demoScheduleButton": "جدولة عرض توضيحي",
+        "demoScheduleTitle": "جدولة عرض توضيحي",
+        "demoScheduleDateLabel": "التاريخ والوقت",
+        "demoScheduleNotesLabel": "ملاحظات (اختياري)",
+        "demoScheduleSave": "جدولة",
+        "demoScheduleSaving": "جارٍ الجدولة...",
+        "demoScheduleError": "تعذّر جدولة هذا العرض التوضيحي.",
+        "demoCompleteButton": "إكمال العرض التوضيحي",
+        "demoCompleteTitle": "إكمال العرض التوضيحي",
+        "demoCompleteOutcomeLabel": "النتيجة",
+        "demoCompleteNotesLabel": "ملاحظات (اختياري)",
+        "demoCompleteSave": "حفظ النتيجة",
+        "demoCompleteSaving": "جارٍ الحفظ...",
+        "demoCompleteError": "تعذّر تسجيل نتيجة هذا العرض التوضيحي.",
+        "demoOutcome": {
+          "positive": "إيجابية",
+          "neutral": "محايدة",
+          "negative": "سلبية",
+          "no_show": "لم يحضر"
+        },
+        "demoScheduledAt": "موعد الجدولة",
+        "demoCompletedAt": "تاريخ الإكمال",
+        "demoNoDemos": "لا توجد عروض توضيحية مجدولة بعد",
+        "demoOpenBadge": "مجدول",
+        "demoCompletedBadge": "مكتمل",
+        "outreachApproveButton": "اعتماد",
+        "outreachApproving": "جارٍ الاعتماد...",
+        "outreachApproveError": "تعذّر اعتماد هذه الرسالة.",
+        "outreachRejectButton": "رفض",
+        "outreachRejecting": "جارٍ الرفض...",
+        "outreachRejectError": "تعذّر رفض هذه الرسالة.",
+        "outreachRejectTitle": "رفض هذه المسودة",
+        "outreachRejectReasonLabel": "السبب (اختياري)",
+        "outreachQueueButton": "إضافة لقائمة الإرسال",
+        "outreachQueuing": "جارٍ الإضافة...",
+        "outreachQueueError": "تعذّر إضافة هذه الرسالة لقائمة الإرسال.",
+        "outreachRegenerateButton": "إعادة توليد",
+        "outreachRegenerating": "جارٍ إعادة التوليد...",
+        "outreachRegenerateError": "تعذّر توليد مسودة جديدة.",
+        "outreachMessageTypeLabel": "نوع الرسالة",
+        "outreachChannelLabel": "القناة",
+        "outreachLanguageLabel": "اللغة",
+        "outreachMessageType": {
+          "intro": "مقدمة تعريفية",
+          "offer": "عرض",
+          "followup": "متابعة",
+          "demo_pitch": "عرض توضيحي",
+          "proposal_summary": "ملخص المقترح"
+        },
+        "outreachChannelOptions": {
+          "email": "بريد إلكتروني",
+          "phone_script": "نص مكالمة هاتفية",
+          "whatsapp_talking_points": "نقاط حديث واتساب"
+        },
+        "outreachLanguageOptions": {
+          "en": "الإنجليزية",
+          "ar": "العربية"
+        },
+        "outreachStatus": {
+          "generated": "مسودة",
+          "approved": "معتمدة",
+          "rejected": "مرفوضة",
+          "queued": "في قائمة الإرسال",
+          "sent": "أُرسلت",
+          "failed": "فشلت"
+        },
+        "outreachNoEditNotice": "تعديل نص الذكاء الاصطناعي مباشرةً غير مدعوم بعد. أعد توليد مسودة جديدة بدلًا من ذلك — تمر بنفس بوابة الجودة ومسار الاعتماد.",
         "channels": "قنوات التواصل",
         "channelEmail": "البريد الإلكتروني",
         "channelWhatsapp": "واتساب",
@@ -583,17 +668,58 @@
         "notAffiliated": "هذا النادي غير منتسب لجهة تحصيل حكومية/وزارية."
       },
       "whatsappCard": {
-        "title": "صحة واتساب",
+        "title": "اتصال واتساب",
         "status": "الحالة",
         "number": "الرقم المتصل",
+        "lastSeen": "آخر ظهور",
         "failures7d": "فشل آخر 7 أيام",
         "pending": "قيد الانتظار",
+        "loading": "جارٍ التحميل...",
+        "loadError": "تعذّر تحميل حالة اتصال واتساب. الأرقام أو الحالة الموضحة أدناه قد تكون قديمة أو غير مكتملة -- يُرجى التحديث قبل اتخاذ أي قرار.",
         "statusLabels": {
           "connected": "متصل",
           "not_connected": "غير متصل",
           "logged_out": "تم تسجيل الخروج",
           "qr_pending": "بانتظار مسح رمز QR",
           "connecting": "جارٍ الاتصال"
+        },
+        "connect": "ربط",
+        "retry": "إعادة المحاولة",
+        "disconnect": "قطع الاتصال",
+        "connectHint": "بدء جلسة ربط لرقم واتساب الخاص بهذا النادي نيابةً عنه. سيحتاج النادي إلى مسح رمز QR الناتج من هاتفه الخاص.",
+        "disconnectDialog": {
+          "title": "قطع اتصال واتساب لهذا النادي",
+          "warning": "سيتم قطع اتصال رقم واتساب الخاص بالنادي فورًا. ستتوقف رسائل تأكيد الحجز والدفع والفواتير حتى إعادة الاتصال. هذا الإجراء يُسجَّل في سجل التدقيق.",
+          "confirm": "تأكيد قطع الاتصال"
+        },
+        "errors": {
+          "connect": "تعذّر بدء اتصال واتساب.",
+          "retry": "تعذّر إعادة محاولة اتصال واتساب.",
+          "disconnect": "تعذّر قطع اتصال واتساب."
+        },
+        "recentEvents": {
+          "show": "عرض الأحداث الأخيرة",
+          "hide": "إخفاء الأحداث الأخيرة",
+          "loading": "جارٍ التحميل...",
+          "empty": "لا توجد أحداث اتصال مسجلة بعد.",
+          "systemActor": "النظام",
+          "initiatedByPrefix": "بدأها {{who}}",
+          "eventLabels": {
+            "pairing_requested": "تم طلب الربط",
+            "retry_requested": "تم طلب إعادة المحاولة",
+            "disconnect_requested": "تم طلب قطع الاتصال",
+            "container_restart_flagged": "تم تعليم الحاوية لإعادة التشغيل",
+            "status_connected": "تم الاتصال",
+            "status_qr_required": "تم إنشاء رمز QR",
+            "status_connecting": "جارٍ الاتصال",
+            "status_disconnected": "تم قطع الاتصال",
+            "status_reconnecting": "جارٍ إعادة الاتصال",
+            "status_degraded": "الاتصال غير مستقر",
+            "status_logged_out": "تم تسجيل الخروج",
+            "status_restricted": "الحساب مقيّد",
+            "status_failed": "فشل الاتصال",
+            "status_error": "حدث خطأ"
+          }
         }
       },
       "actionsCard": {

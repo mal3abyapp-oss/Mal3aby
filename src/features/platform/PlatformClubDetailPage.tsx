@@ -1,13 +1,14 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
+import QRCode from 'qrcode'
 import { supabase } from '@/lib/supabase/client'
 import { cn } from '@/lib/utils'
 import { PageHeader } from '@/components/ui/page-header'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
-import { StatusBadge } from '@/components/ui/status-badge'
+import { StatusBadge, type StatusTone } from '@/components/ui/status-badge'
 import { MoneyDisplay } from '@/components/ui/money-display'
 import { DataTable, type DataTableColumn } from '@/components/ui/data-table'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
@@ -29,6 +30,7 @@ import { LIFECYCLE_STATUS_LABELS, SUBSCRIPTION_KIND_LABELS, ACCESS_TONE, ACCESS_
 import { actionLabel, entityLabel } from '@/lib/domain/audit'
 import { useDirection } from '@/app/providers/DirectionProvider'
 import { ErrorState } from '@/components/ui/error-state'
+import { translateSupabaseError } from '@/lib/errors'
 
 // Per-club detail: Overview / Current Subscription / History / Payment
 // History / Access Status / Audit, plus the Actions panel wired to every
@@ -195,26 +197,14 @@ export function PlatformClubDetailPage() {
     },
     enabled: !!clubId,
   })
-  // Phase E directive (C8/E4): fills the WhatsApp health placeholder
-  // card added in Phase C. Reuses the same RPC Overview uses, and keeps
-  // a single source of truth for WhatsApp health logic instead of a
-  // second per-club RPC.
-  // Production audit remediation (M-2): get_platform_whatsapp_health()'s
-  // aggregate (no-argument) call now excludes QA/test-fixture clubs --
-  // passing p_club_id here opts this single-club lookup out of that
-  // filter, matching get_platform_club_360() above (a fixture club's
-  // own Detail page must still show its real data, including WhatsApp
-  // health, the same way a platform owner or support session can still
-  // open that page at all).
-  const { data: whatsappHealthRow } = useQuery({
-    queryKey: ['platform-whatsapp-health', clubId],
-    queryFn: async () => {
-      const { data, error } = await supabase.rpc('get_platform_whatsapp_health', { p_club_id: clubId! })
-      if (error) throw error
-      return data?.[0] ?? null
-    },
-    enabled: !!clubId,
-  })
+  // Phase E directive (C8/E4): WhatsApp health used to be fetched here
+  // and rendered read-only. PLATFORM OWNER OPERATIONAL GAP CLOSURE --
+  // Workstream 1 (2026-09-09): moved into PlatformWhatsAppCard below,
+  // which now owns this query itself alongside the new connect/
+  // disconnect/retry/QR polling it added -- keeping one component
+  // responsible for the whole card's data + actions, matching
+  // ModulesPanel/ProviderPolicyPanel's existing precedent of owning
+  // their own queries rather than threading fetched data down as props.
   // Cross-phase directive (U2): staff visibility beyond club_owner
   // (managers, coaches, scanners, etc.) had no platform-level summary --
   // a platform owner had to open each club's own Staff page to see it.
@@ -942,37 +932,25 @@ export function PlatformClubDetailPage() {
         {t('platform.clubDetailPage.groups.commercialOperations', { defaultValue: 'Commercial & operations' })}
       </p>
 
-      {/* Phase E directive (C8/E4): operational health only -- connection
+      {/* Phase E directive (C8/E4): operational health -- connection
           state, masked phone (last 4 digits), failure/queue counts.
           Never message content, per the directive's explicit privacy
           requirement (respect tenant privacy -- no customer conversation
-          content). */}
-      <Card className="mb-4">
-        <CardHeader>
-          <CardTitle className="text-base">{t('platform.clubDetailPage.whatsappCard.title')}</CardTitle>
-        </CardHeader>
-        <CardContent className="grid grid-cols-2 gap-3 text-sm md:grid-cols-4">
-          <div>
-            <p className="text-text-secondary">{t('platform.clubDetailPage.whatsappCard.status')}</p>
-            <StatusBadge
-              tone={whatsappHealthRow?.connection_status === 'connected' ? 'success' : whatsappHealthRow?.connection_status === 'not_connected' ? 'neutral' : 'danger'}
-              label={t(`platform.clubDetailPage.whatsappCard.statusLabels.${whatsappHealthRow?.connection_status ?? 'not_connected'}`, { defaultValue: whatsappHealthRow?.connection_status ?? '—' })}
-            />
-          </div>
-          <div>
-            <p className="text-text-secondary">{t('platform.clubDetailPage.whatsappCard.number')}</p>
-            <bdi>{whatsappHealthRow?.connected_phone_masked ?? '—'}</bdi>
-          </div>
-          <div>
-            <p className="text-text-secondary">{t('platform.clubDetailPage.whatsappCard.failures7d')}</p>
-            <p className="font-medium tabular-nums">{whatsappHealthRow?.failed_count_7d ?? 0}</p>
-          </div>
-          <div>
-            <p className="text-text-secondary">{t('platform.clubDetailPage.whatsappCard.pending')}</p>
-            <p className="font-medium tabular-nums">{whatsappHealthRow?.pending_count ?? 0}</p>
-          </div>
-        </CardContent>
-      </Card>
+          content).
+
+          PLATFORM OWNER OPERATIONAL GAP CLOSURE -- Workstream 1
+          (2026-09-09): this card used to be read-only -- a platform
+          owner/staff member could SEE a club's WhatsApp state but had no
+          way to connect/disconnect/reconnect/view-QR for a club they do
+          not personally own (every existing club-facing RPC is gated on
+          club membership). PlatformWhatsAppCard below extends this exact
+          card with those actions, wired to the new platform_* RPCs
+          (20260909150000_platform_owner_whatsapp_connection_control.sql)
+          -- same health data, same card position, just no longer
+          read-only. Extracted to its own component (matching
+          ModulesPanel/ProviderPolicyPanel's precedent below) since it
+          now owns its own polling/QR/dialog state. */}
+      {clubId && <PlatformWhatsAppCard clubId={clubId} />}
 
       {/* Government / Ministry Collection Compliance directive, section
           46: affiliation status, effective policy, receipt counts,
@@ -2148,4 +2126,450 @@ function CommercialUsageAndFoundingOfferCard({ clubId }: { clubId: string }) {
       </CardContent>
     </Card>
   )
+}
+
+// ============================================================
+// PlatformWhatsAppCard -- PLATFORM OWNER OPERATIONAL GAP CLOSURE,
+// Workstream 1 (2026-09-09). Extends the formerly read-only WhatsApp
+// health card with connect/retry/disconnect/QR actions, wired to the
+// new platform_* RPCs (20260909150000_platform_owner_whatsapp_connection_
+// control.sql). Mirrors WhatsAppConnectionCard.tsx's own UX pattern
+// exactly (5s status poll, 3s QR poll while qr_required, client-side
+// QRCode.toDataURL(), 20s honest QR-wait timeout) -- the only real
+// difference is which RPCs are called (platform_* instead of the
+// club-facing ones) and the authorization tier those RPCs check
+// server-side (is_platform_owner() OR platform.whatsapp.manage,
+// instead of club membership). This card never itself decides who is
+// allowed to act -- every mutation below simply calls the RPC and
+// surfaces whatever error Postgres returns (including "not authorized"
+// for a platform staff member who lacks platform.whatsapp.manage).
+//
+// get_platform_whatsapp_health() (already used by this page before this
+// workstream) remains the source for connected_phone_masked/
+// failed_count_7d/pending_count -- none of the new platform_* RPCs
+// duplicate that data. connection_status from that RPC coalesces to
+// 'not_connected' when no whatsapp_accounts row exists yet, which this
+// component treats identically to 'disconnected' for action-eligibility
+// purposes (a club with no row at all is exactly as "not connected" as
+// one with a disconnected row -- platform_start_whatsapp_pairing's own
+// ON CONFLICT DO UPDATE upsert already handles both cases identically).
+
+type PlatformWhatsAppStatus =
+  | 'not_connected'
+  | 'disconnected'
+  | 'qr_required'
+  | 'connecting'
+  | 'connected'
+  | 'reconnecting'
+  | 'degraded'
+  | 'logged_out'
+  | 'restricted'
+  | 'failed'
+  | 'error'
+
+interface PlatformWhatsAppHealthRow {
+  club_id: string
+  club_name: string
+  connection_status: string
+  connected_phone_masked: string | null
+  last_seen_at: string | null
+  circuit_breaker_open: boolean
+  failed_count_7d: number
+  pending_count: number
+}
+
+interface PlatformWhatsAppEventRow {
+  id: string
+  event: string
+  actor_id: string | null
+  actor_name: string | null
+  // Defensive per the mission's own instruction: this column is
+  // migration-documented as always {initiated_by, reason}-shaped, but
+  // rendered here via a narrow whitelist of known keys rather than a
+  // raw JSON dump, so an unexpected/malformed future value can never
+  // leak something unintended onto the screen.
+  detail: Record<string, unknown> | null
+  created_at: string
+}
+
+const PLATFORM_WHATSAPP_STATUS_TONE: Record<PlatformWhatsAppStatus, StatusTone> = {
+  not_connected: 'neutral',
+  disconnected: 'neutral',
+  qr_required: 'warning',
+  connecting: 'warning',
+  connected: 'success',
+  reconnecting: 'warning',
+  degraded: 'warning',
+  logged_out: 'danger',
+  restricted: 'danger',
+  failed: 'danger',
+  error: 'danger',
+}
+
+// Matches WhatsAppConnectionCard.tsx's own QR_WAIT_TIMEOUT_MS exactly --
+// same connector, same real-world QR TTL/poll cadence, so the same
+// honest-timeout window applies regardless of which actor (club owner
+// or platform owner) initiated the pairing.
+const PLATFORM_QR_WAIT_TIMEOUT_MS = 20000
+
+async function fetchPlatformWhatsAppHealth(clubId: string): Promise<PlatformWhatsAppHealthRow | null> {
+  const { data, error } = await supabase.rpc('get_platform_whatsapp_health', { p_club_id: clubId })
+  if (error) throw error
+  return data?.[0] ?? null
+}
+
+async function fetchPlatformWhatsAppQr(clubId: string): Promise<{ qrPayload: string | null; qrExpiresAt: string | null }> {
+  const { data, error } = await supabase.rpc('platform_get_whatsapp_qr', { p_club_id: clubId })
+  if (error) throw error
+  const row = data?.[0]
+  return { qrPayload: row?.qr_payload ?? null, qrExpiresAt: row?.qr_expires_at ?? null }
+}
+
+async function fetchPlatformWhatsAppRecentEvents(clubId: string): Promise<PlatformWhatsAppEventRow[]> {
+  const { data, error } = await supabase.rpc('platform_get_whatsapp_recent_events', { p_club_id: clubId, p_limit: 10 })
+  if (error) throw error
+  return (data ?? []) as PlatformWhatsAppEventRow[]
+}
+
+function PlatformWhatsAppCard({ clubId }: { clubId: string }) {
+  const { t } = useTranslation()
+  const { locale } = useDirection()
+  const queryClient = useQueryClient()
+
+  const [qrDataUrl, setQrDataUrl] = useState<string | null>(null)
+  const [actionError, setActionError] = useState<string | null>(null)
+  const [qrWaitStartedAt, setQrWaitStartedAt] = useState<number | null>(null)
+  const [qrTimedOut, setQrTimedOut] = useState(false)
+  const [showEvents, setShowEvents] = useState(false)
+  // Reason-required confirm dialog, matching PlatformStaffPage.tsx's
+  // ChangeRoleDialog pattern exactly: Save/Confirm stays disabled until
+  // a real non-empty reason is typed. platform_disconnect_whatsapp()
+  // itself also rejects an empty reason server-side -- this is
+  // defense-in-depth in the UI, not the only enforcement.
+  const [disconnectDialogOpen, setDisconnectDialogOpen] = useState(false)
+  const [disconnectReason, setDisconnectReason] = useState('')
+
+  const { data: health, isLoading: healthLoading, isError: healthError } = useQuery({
+    queryKey: ['platform-whatsapp-health', clubId],
+    queryFn: () => fetchPlatformWhatsAppHealth(clubId),
+    enabled: !!clubId,
+    // Same live-state polling cadence as WhatsAppConnectionCard.tsx's
+    // own status query -- a platform owner watching this card while a
+    // connect/retry is in flight needs to see it move without a manual
+    // refresh, and status can also change from real WhatsApp-side
+    // events (reconnect, logout from phone) no one in this tab triggered.
+    refetchInterval: 5000,
+  })
+
+  const rawStatus = (health?.connection_status ?? 'not_connected') as PlatformWhatsAppStatus
+  const isQrPending = rawStatus === 'qr_required'
+  const isWaitingForConnector = rawStatus === 'connecting' || rawStatus === 'qr_required'
+
+  const { data: qr } = useQuery({
+    queryKey: ['platform-whatsapp-qr', clubId],
+    queryFn: () => fetchPlatformWhatsAppQr(clubId),
+    enabled: !!clubId && isQrPending && !qrTimedOut,
+    // Matches WhatsAppConnectionCard.tsx's own QR poll cadence exactly
+    // -- QR polling is only ever active while actively waiting for a
+    // scan, never continuously (isQrPending above gates it off outside
+    // that window).
+    refetchInterval: 3000,
+  })
+
+  const { data: recentEvents = [], isLoading: eventsLoading, refetch: refetchEvents } = useQuery({
+    queryKey: ['platform-whatsapp-recent-events', clubId],
+    queryFn: () => fetchPlatformWhatsAppRecentEvents(clubId),
+    enabled: !!clubId && showEvents,
+  })
+
+  useEffect(() => {
+    if (!isWaitingForConnector) {
+      setQrWaitStartedAt(null)
+      setQrTimedOut(false)
+      return
+    }
+    if (qrDataUrl) {
+      setQrTimedOut(false)
+      return
+    }
+    if (qrWaitStartedAt === null) {
+      setQrWaitStartedAt(Date.now())
+      return
+    }
+    const elapsed = Date.now() - qrWaitStartedAt
+    if (elapsed >= PLATFORM_QR_WAIT_TIMEOUT_MS) {
+      setQrTimedOut(true)
+    } else {
+      const timer = setTimeout(() => setQrTimedOut(true), PLATFORM_QR_WAIT_TIMEOUT_MS - elapsed)
+      return () => clearTimeout(timer)
+    }
+  }, [isWaitingForConnector, qrDataUrl, qrWaitStartedAt])
+
+  useEffect(() => {
+    if (!qr?.qrPayload) {
+      setQrDataUrl(null)
+      return
+    }
+    let cancelled = false
+    QRCode.toDataURL(qr.qrPayload, { width: 240, margin: 1 }).then((url) => {
+      if (!cancelled) setQrDataUrl(url)
+    })
+    return () => {
+      cancelled = true
+    }
+  }, [qr?.qrPayload])
+
+  const invalidateHealth = () => {
+    void queryClient.invalidateQueries({ queryKey: ['platform-whatsapp-health', clubId] })
+  }
+
+  const connectMutation = useMutation({
+    mutationFn: async () => {
+      const { error } = await supabase.rpc('platform_start_whatsapp_pairing', { p_club_id: clubId })
+      if (error) throw error
+    },
+    onSuccess: () => {
+      setActionError(null)
+      setQrTimedOut(false)
+      setQrWaitStartedAt(Date.now())
+      invalidateHealth()
+    },
+    onError: (err) => setActionError(translateSupabaseError(err, t('platform.clubDetailPage.whatsappCard.errors.connect'))),
+  })
+
+  const retryMutation = useMutation({
+    mutationFn: async () => {
+      const { error } = await supabase.rpc('platform_retry_whatsapp_connection', { p_club_id: clubId })
+      if (error) throw error
+    },
+    onSuccess: () => {
+      setActionError(null)
+      setQrTimedOut(false)
+      setQrWaitStartedAt(Date.now())
+      invalidateHealth()
+      void queryClient.invalidateQueries({ queryKey: ['platform-whatsapp-qr', clubId] })
+    },
+    onError: (err) => setActionError(translateSupabaseError(err, t('platform.clubDetailPage.whatsappCard.errors.retry'))),
+  })
+
+  const disconnectMutation = useMutation({
+    mutationFn: async (reason: string) => {
+      const { error } = await supabase.rpc('platform_disconnect_whatsapp', { p_club_id: clubId, p_reason: reason })
+      if (error) throw error
+    },
+    onSuccess: () => {
+      setActionError(null)
+      setDisconnectDialogOpen(false)
+      setDisconnectReason('')
+      invalidateHealth()
+      if (showEvents) void refetchEvents()
+    },
+    onError: (err) => setActionError(translateSupabaseError(err, t('platform.clubDetailPage.whatsappCard.errors.disconnect'))),
+  })
+
+  const statusLabel = t(`whatsapp.statusLabels.${rawStatus === 'not_connected' ? 'disconnected' : rawStatus}`, {
+    defaultValue: rawStatus,
+  })
+
+  // Renders only the known, migration-documented shape
+  // ({initiated_by, reason}) -- never the raw jsonb blob -- per the
+  // mission's explicit instruction to read `detail` defensively even
+  // though the backend never puts anything else in it today.
+  function renderEventDetail(detail: Record<string, unknown> | null): string | null {
+    if (!detail) return null
+    const parts: string[] = []
+    if (typeof detail.reason === 'string' && detail.reason.trim()) parts.push(detail.reason)
+    if (typeof detail.initiated_by === 'string' && detail.initiated_by.trim()) {
+      parts.push(t('platform.clubDetailPage.whatsappCard.recentEvents.initiatedByPrefix', { who: detail.initiated_by }))
+    }
+    return parts.length ? parts.join(' — ') : null
+  }
+
+  return (
+    <Card className="mb-4">
+      <CardHeader className="flex flex-row items-center justify-between">
+        <CardTitle className="text-base">{t('platform.clubDetailPage.whatsappCard.title')}</CardTitle>
+        {!healthLoading && <StatusBadge tone={PLATFORM_WHATSAPP_STATUS_TONE[rawStatus] ?? 'neutral'} label={statusLabel} />}
+      </CardHeader>
+      <CardContent className="flex flex-col gap-4">
+        {healthLoading && <p className="text-sm text-text-secondary">{t('platform.clubDetailPage.whatsappCard.loading')}</p>}
+        {healthError && <ErrorState message={t('platform.clubDetailPage.whatsappCard.loadError')} />}
+        {actionError && (
+          <p role="alert" className="text-sm text-status-danger">
+            {actionError}
+          </p>
+        )}
+
+        {!healthLoading && !healthError && (
+          <>
+            <div className="grid grid-cols-2 gap-3 text-sm md:grid-cols-4">
+              <div>
+                <p className="text-text-secondary">{t('platform.clubDetailPage.whatsappCard.number')}</p>
+                <bdi>{health?.connected_phone_masked ?? '—'}</bdi>
+              </div>
+              <div>
+                <p className="text-text-secondary">{t('platform.clubDetailPage.whatsappCard.lastSeen')}</p>
+                <p className="font-medium">{formatPlatformWhatsAppDateTime(health?.last_seen_at ?? null, locale)}</p>
+              </div>
+              <div>
+                <p className="text-text-secondary">{t('platform.clubDetailPage.whatsappCard.failures7d')}</p>
+                <p className="font-medium tabular-nums">{health?.failed_count_7d ?? 0}</p>
+              </div>
+              <div>
+                <p className="text-text-secondary">{t('platform.clubDetailPage.whatsappCard.pending')}</p>
+                <p className="font-medium tabular-nums">{health?.pending_count ?? 0}</p>
+              </div>
+            </div>
+
+            {/* Connected state -- disconnect available, reason required. */}
+            {(rawStatus === 'connected' || rawStatus === 'reconnecting' || rawStatus === 'degraded') && (
+              <div className="flex flex-col gap-2">
+                {rawStatus === 'reconnecting' && (
+                  <p className="text-sm text-text-secondary">{t('whatsapp.connectionCard.reconnecting')}</p>
+                )}
+                {rawStatus === 'degraded' && (
+                  <p className="text-sm text-text-secondary">{t('whatsapp.connectionCard.degraded')}</p>
+                )}
+                <Button
+                  variant="destructive"
+                  size="sm"
+                  className="self-start"
+                  onClick={() => {
+                    setDisconnectReason('')
+                    setDisconnectDialogOpen(true)
+                  }}
+                  disabled={disconnectMutation.isPending}
+                >
+                  {t('platform.clubDetailPage.whatsappCard.disconnect')}
+                </Button>
+              </div>
+            )}
+
+            {/* Connecting / QR wait -- same QR render + 20s honest
+                timeout as WhatsAppConnectionCard.tsx. */}
+            {(rawStatus === 'qr_required' || rawStatus === 'connecting') && (
+              <div className="flex flex-col items-center gap-3 text-center">
+                {qrDataUrl ? (
+                  <>
+                    <img src={qrDataUrl} alt={t('whatsapp.connectionCard.qrAlt')} className="size-60 rounded-md border border-border" />
+                    <p className="text-sm text-text-secondary">{t('whatsapp.connectionCard.qrInstructions')}</p>
+                    <p className="text-xs text-text-secondary">{t('whatsapp.connectionCard.qrExpiryHint')}</p>
+                  </>
+                ) : qrTimedOut ? (
+                  <>
+                    <p className="text-sm text-status-danger">{t('whatsapp.connectionCard.timeoutMessage')}</p>
+                    <Button size="sm" onClick={() => retryMutation.mutate()} disabled={retryMutation.isPending}>
+                      {t('platform.clubDetailPage.whatsappCard.retry')}
+                    </Button>
+                  </>
+                ) : (
+                  <p className="text-sm text-text-secondary">{t('whatsapp.connectionCard.generatingQr')}</p>
+                )}
+              </div>
+            )}
+
+            {/* Not connected / logged out / failed -- connect available. */}
+            {(rawStatus === 'not_connected' ||
+              rawStatus === 'disconnected' ||
+              rawStatus === 'logged_out' ||
+              rawStatus === 'failed' ||
+              rawStatus === 'error' ||
+              rawStatus === 'restricted') && (
+              <div className="flex flex-col gap-2">
+                <p className="text-sm text-text-secondary">
+                  {rawStatus === 'restricted' ? t('whatsapp.connectionCard.restrictedHint') : t('platform.clubDetailPage.whatsappCard.connectHint')}
+                </p>
+                <div className="flex gap-2">
+                  <Button size="sm" className="self-start" onClick={() => connectMutation.mutate()} disabled={connectMutation.isPending}>
+                    {t('platform.clubDetailPage.whatsappCard.connect')}
+                  </Button>
+                  {(rawStatus === 'failed' || rawStatus === 'error') && (
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="self-start"
+                      onClick={() => retryMutation.mutate()}
+                      disabled={retryMutation.isPending}
+                    >
+                      {t('platform.clubDetailPage.whatsappCard.retry')}
+                    </Button>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* Recent events -- short list, not a new page, matching the
+                mission's explicit "keep this simple" instruction. */}
+            <div className="border-t border-border pt-3">
+              <Button variant="outline" size="sm" onClick={() => setShowEvents((v) => !v)}>
+                {showEvents ? t('platform.clubDetailPage.whatsappCard.recentEvents.hide') : t('platform.clubDetailPage.whatsappCard.recentEvents.show')}
+              </Button>
+              {showEvents && (
+                <div className="mt-3 flex flex-col gap-2">
+                  {eventsLoading ? (
+                    <p className="text-sm text-text-secondary">{t('platform.clubDetailPage.whatsappCard.recentEvents.loading')}</p>
+                  ) : recentEvents.length === 0 ? (
+                    <p className="text-sm text-text-secondary">{t('platform.clubDetailPage.whatsappCard.recentEvents.empty')}</p>
+                  ) : (
+                    <ul className="flex flex-col gap-1.5 text-sm">
+                      {recentEvents.map((ev) => (
+                        <li key={ev.id} className="rounded-md border border-border p-2">
+                          <div className="flex items-center justify-between gap-2">
+                            <span className="font-medium">{t(`platform.clubDetailPage.whatsappCard.recentEvents.eventLabels.${ev.event}`, { defaultValue: ev.event })}</span>
+                            <span className="text-xs text-text-secondary">{formatPlatformWhatsAppDateTime(ev.created_at, locale)}</span>
+                          </div>
+                          <p className="text-xs text-text-secondary">
+                            {ev.actor_name ?? t('platform.clubDetailPage.whatsappCard.recentEvents.systemActor')}
+                            {renderEventDetail(ev.detail) ? ` — ${renderEventDetail(ev.detail)}` : ''}
+                          </p>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
+              )}
+            </div>
+          </>
+        )}
+      </CardContent>
+
+      <Dialog open={disconnectDialogOpen} onOpenChange={(open) => !open && setDisconnectDialogOpen(false)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>{t('platform.clubDetailPage.whatsappCard.disconnectDialog.title')}</DialogTitle>
+          </DialogHeader>
+          <div className="flex flex-col gap-3">
+            <p className="text-sm text-status-danger">{t('platform.clubDetailPage.whatsappCard.disconnectDialog.warning')}</p>
+            <Input
+              value={disconnectReason}
+              onChange={(e) => setDisconnectReason(e.target.value)}
+              placeholder={t('platform.clubDetailPage.reasonDialog.reasonPlaceholder')}
+            />
+            <Button
+              variant="destructive"
+              disabled={!disconnectReason.trim() || disconnectMutation.isPending}
+              onClick={() => disconnectMutation.mutate(disconnectReason)}
+            >
+              {t('platform.clubDetailPage.whatsappCard.disconnectDialog.confirm')}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+    </Card>
+  )
+}
+
+// Matches WhatsAppConnectionCard.tsx's own formatDateTime() FSI/PDI-
+// isolated helper exactly (production audit finding H-1) -- a local
+// copy rather than an import since that component is explicitly
+// read-only/off-limits for this workstream (mission instruction: "don't
+// edit the club-facing component"), and exporting a helper out of it
+// just for this one caller would be a bigger change than duplicating
+// eight lines.
+const PLATFORM_DATETIME_FSI = '⁦'
+const PLATFORM_DATETIME_PDI = '⁩'
+function formatPlatformWhatsAppDateTime(iso: string | null, locale: 'ar' | 'en'): string {
+  if (!iso) return '—'
+  const formatted = new Date(iso).toLocaleString(locale === 'en' ? 'en-US' : 'ar-EG', { dateStyle: 'medium', timeStyle: 'short' })
+  return `${PLATFORM_DATETIME_FSI}${formatted}${PLATFORM_DATETIME_PDI}`
 }
