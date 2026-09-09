@@ -12,6 +12,31 @@ export type Database = {
   __InternalSupabase: {
     PostgrestVersion: "14.5"
   }
+  graphql_public: {
+    Tables: {
+      [_ in never]: never
+    }
+    Views: {
+      [_ in never]: never
+    }
+    Functions: {
+      graphql: {
+        Args: {
+          extensions?: Json
+          operationName?: string
+          query?: string
+          variables?: Json
+        }
+        Returns: Json
+      }
+    }
+    Enums: {
+      [_ in never]: never
+    }
+    CompositeTypes: {
+      [_ in never]: never
+    }
+  }
   public: {
     Tables: {
       age_groups: {
@@ -8016,6 +8041,7 @@ export type Database = {
           club_id: string
           coach_id: string | null
           created_at: string
+          during: unknown
           end_time: string
           field_id: string | null
           group_id: string
@@ -8028,6 +8054,7 @@ export type Database = {
           club_id: string
           coach_id?: string | null
           created_at?: string
+          during: unknown
           end_time: string
           field_id?: string | null
           group_id: string
@@ -8040,6 +8067,7 @@ export type Database = {
           club_id?: string
           coach_id?: string | null
           created_at?: string
+          during?: unknown
           end_time?: string
           field_id?: string | null
           group_id?: string
@@ -8802,6 +8830,24 @@ export type Database = {
           start_at: string
         }[]
       }
+      _field_has_conflicting_booking: {
+        Args: {
+          p_end_at: string
+          p_exclude_booking_id?: string
+          p_field_id: string
+          p_start_at: string
+        }
+        Returns: boolean
+      }
+      _field_has_conflicting_training_session: {
+        Args: {
+          p_end_at: string
+          p_exclude_session_id?: string
+          p_field_id: string
+          p_start_at: string
+        }
+        Returns: boolean
+      }
       _fields_module_active: { Args: { p_club_id: string }; Returns: boolean }
       _mint_booking_qr_token_internal: {
         Args: {
@@ -9397,7 +9443,7 @@ export type Database = {
         Returns: string
       }
       deactivate_platform_staff: {
-        Args: { p_membership_id: string }
+        Args: { p_membership_id: string; p_reason?: string }
         Returns: undefined
       }
       deactivate_staff_member: {
@@ -10096,8 +10142,8 @@ export type Database = {
         Returns: {
           club_id: string
           club_name: string
-          context_at: string | null
-          detail: string | null
+          context_at: string
+          detail: string
           problem_type: string
           severity: string
         }[]
@@ -10127,6 +10173,7 @@ export type Database = {
           entity_type: string
           id: string
           reason: string
+          total_count: number
         }[]
       }
       get_platform_club_360: {
@@ -10139,19 +10186,12 @@ export type Database = {
           branch_count: number
           customer_count: number
           field_count: number
-          last_activity_at: string | null
-          last_activity_type: string | null
+          last_activity_at: string
+          last_activity_type: string
           owner_email: string
           owner_name: string
           owner_phone: string
           owner_user_id: string
-        }[]
-      }
-      get_platform_club_last_activity: {
-        Args: { p_club_id: string }
-        Returns: {
-          last_activity_at: string | null
-          last_activity_type: string | null
         }[]
       }
       get_platform_club_gateway_overview: {
@@ -10174,6 +10214,13 @@ export type Database = {
           supported_countries: string[]
         }[]
       }
+      get_platform_club_last_activity: {
+        Args: { p_club_id: string }
+        Returns: {
+          last_activity_at: string
+          last_activity_type: string
+        }[]
+      }
       get_platform_club_owners: {
         Args: { p_limit?: number; p_offset?: number; p_search?: string }
         Returns: {
@@ -10187,6 +10234,7 @@ export type Database = {
           membership_status: string
           owner_since: string
           phone: string
+          total_count: number
           user_id: string
         }[]
       }
@@ -10215,7 +10263,7 @@ export type Database = {
           mrr: number
           outstanding_amount: number
           paying_tenants: number
-          trial_to_paid_conversion_rate: number | null
+          trial_to_paid_conversion_rate: number
           trial_to_paid_conversion_rate_unavailable: boolean
           trials_ending_soon: number
         }[]
@@ -10339,6 +10387,10 @@ export type Database = {
       get_player_360_summary: {
         Args: { p_club_id: string; p_player_id: string }
         Returns: Json
+      }
+      get_player_medical_notes: {
+        Args: { p_player_id: string }
+        Returns: string
       }
       get_portal_invite_context: {
         Args: { p_raw_token: string }
@@ -12157,8 +12209,8 @@ export type Database = {
           club_status: string
           created_at: string
           flagged_duplicate: boolean
-          last_activity_at: string | null
-          last_activity_type: string | null
+          last_activity_at: string
+          last_activity_type: string
           owner_emails: string[]
           owner_names: string[]
           owner_phones: string[]
@@ -12303,6 +12355,7 @@ export type Database = {
           p_membership_id: string
           p_platform_custom_role_id?: string
           p_platform_role_id?: string
+          p_reason?: string
         }
         Returns: undefined
       }
@@ -12384,6 +12437,7 @@ export type Database = {
         Args: { p_club_id: string }
         Returns: undefined
       }
+      sweep_commercial_grace_state: { Args: never; Returns: number }
       transfer_shop_stock: {
         Args: {
           p_dest_location_id: string
@@ -13070,6 +13124,9 @@ export type CompositeTypes<
     : never
 
 export const Constants = {
+  graphql_public: {
+    Enums: {},
+  },
   public: {
     Enums: {},
   },
