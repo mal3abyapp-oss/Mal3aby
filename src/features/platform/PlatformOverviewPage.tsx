@@ -2,11 +2,14 @@ import { useQuery } from '@tanstack/react-query'
 import { Link } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { supabase } from '@/lib/supabase/client'
+import { useDirection } from '@/app/providers/DirectionProvider'
 import { PageHeader } from '@/components/ui/page-header'
 import { StatCard } from '@/components/ui/stat-card'
 import { MoneyDisplay } from '@/components/ui/money-display'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { StatusBadge, type StatusTone } from '@/components/ui/status-badge'
 import { ErrorState } from '@/components/ui/error-state'
+import { EmptyState } from '@/components/ui/empty-state'
 import { translateSupabaseError } from '@/lib/errors'
 import { isSubscriptionExpiringSoon } from './labels'
 
@@ -20,16 +23,11 @@ interface OverviewData {
   activeClubs: number
   adminSuspendedClubs: number
   blockedAccessClubs: number
-  noSubscriptionClubs: number
   trialCount: number
   expiringSoonCount: number
   revenueThisMonth: number
   newClubsThisMonth: number
-  pendingUpgradeRequests: number
   newLeads: number
-  whatsappDisconnectedCount: number
-  whatsappFailuresCount: number
-  flaggedDuplicateClubs: number
 }
 
 async function fetchOverview(): Promise<OverviewData> {
@@ -37,9 +35,7 @@ async function fetchOverview(): Promise<OverviewData> {
     { data: clubs, error: clubsError },
     { data: subs, error: subsError },
     { data: payments, error: paymentsError },
-    { count: pendingUpgradeRequests, error: upgradeError },
     { count: newLeads, error: leadsError },
-    { data: whatsappHealth, error: whatsappError },
   ] = await Promise.all([
     // Controlled Commercial Launch Gate, Phase 6 follow-up: exclude QA/
     // test/demo tenant fixtures from platform-level aggregate counts by
@@ -56,22 +52,20 @@ async function fetchOverview(): Promise<OverviewData> {
     // ad hoc filtered query here.
     supabase.rpc('get_platform_subscription_report'),
     supabase.rpc('get_platform_revenue_report'),
-    supabase.from('commercial_upgrade_requests').select('id', { count: 'exact', head: true }).eq('status', 'pending'),
+    // contact_requests has NO club_id / club association at all (it is
+    // an anonymous, pre-signup, insert-only public inbox -- see its own
+    // table comment: "not a CRM") -- there is structurally no fixture to
+    // exclude here, so no filter is added. Not part of the per-tenant
+    // Attention Center below (Phase 7) for the same reason -- it cannot
+    // be expressed as a (club, problem) row -- and stays its own
+    // platform-wide card here.
     supabase.from('contact_requests').select('id', { count: 'exact', head: true }).eq('status', 'new'),
-    // Phase E directive: the single largest operational gap the audit
-    // found -- zero WhatsApp visibility anywhere in the platform console.
-    // One batched RPC (not per-club), consistent with Phase A/C.
-    // Production audit remediation (M-2): get_platform_whatsapp_health()
-    // itself now excludes QA/test fixtures server-side too.
-    supabase.rpc('get_platform_whatsapp_health'),
   ])
 
   if (clubsError) throw clubsError
   if (subsError) throw subsError
   if (paymentsError) throw paymentsError
-  if (upgradeError) throw upgradeError
   if (leadsError) throw leadsError
-  if (whatsappError) throw whatsappError
 
   const now = new Date()
   const monthStart = new Date(now.getFullYear(), now.getMonth(), 1)
@@ -93,15 +87,6 @@ async function fetchOverview(): Promise<OverviewData> {
   // the landing dashboard.
   const adminSuspendedClubs = clubs?.filter((c) => c.status === 'suspended').length ?? 0
   const newClubsThisMonth = clubs?.filter((c) => new Date(c.created_at) >= monthStart).length ?? 0
-  // FINAL PRODUCT COMPLETENESS ROUND (2026-08-25) -- Platform Owner
-  // persona: complete_new_club_onboarding() has computed flagged_
-  // duplicate at signup time since before this audit; only status
-  // filter (active/suspended/closed) was ever counted here, so a real
-  // "needs review" signal was invisible from the landing dashboard.
-  // Still counts ACTIVE flagged clubs only -- a club a Platform Owner
-  // already suspended for this reason shouldn't keep showing as a live
-  // exception.
-  const flaggedDuplicateClubs = clubs?.filter((c) => c.flagged_duplicate && c.status === 'active').length ?? 0
 
   // Production audit remediation (M-2): get_platform_subscription_report()
   // returns full lifecycle history (Reports' Subscription tab needs
@@ -136,37 +121,120 @@ async function fetchOverview(): Promise<OverviewData> {
       : { data: [] as { club_id: string; access: string; reason: string }[], error: null }
   if (accessError) throw accessError
   const blockedAccessClubs = (accessRows ?? []).filter((r) => r.access === 'blocked').length
-  const noSubscriptionClubs = (accessRows ?? []).filter((r) => r.reason === 'no_subscription').length
-
-  // Only count clubs that ever actually connected (had a whatsapp_accounts
-  // row) and are now not connected -- a club that simply never set up
-  // WhatsApp yet isn't a "disconnected" exception, it's just unconfigured.
-  const whatsappDisconnectedCount = (whatsappHealth ?? []).filter(
-    (w) => w.connection_status !== 'not_connected' && w.connection_status !== 'connected',
-  ).length
-  const whatsappFailuresCount = (whatsappHealth ?? []).reduce((sum, w) => sum + (w.failed_count_7d ?? 0), 0)
 
   return {
     totalClubs,
     activeClubs,
     adminSuspendedClubs,
     blockedAccessClubs,
-    noSubscriptionClubs,
     trialCount,
     expiringSoonCount,
     revenueThisMonth,
     newClubsThisMonth,
-    pendingUpgradeRequests: pendingUpgradeRequests ?? 0,
     newLeads: newLeads ?? 0,
-    whatsappDisconnectedCount,
-    whatsappFailuresCount,
-    flaggedDuplicateClubs,
+  }
+}
+
+// Platform Owner Control Plane V1, Phase 7 -- Attention Center. One row
+// per (club, problem) pair from get_platform_attention_items() (see its
+// own migration comment for the full architecture rationale: a single
+// server-side RPC, deterministic rules, no scoring engine, QA/test-
+// fixture clubs excluded throughout). Every item links DIRECTLY to that
+// specific club's Tenant 360 page -- never the generic unfiltered
+// /platform/clubs list the deep dive flagged as a real anti-pattern on
+// the previous aggregate-card version of this panel.
+interface AttentionItem {
+  clubId: string
+  clubName: string
+  problemType: string
+  severity: 'danger' | 'warning'
+  detail: string | null
+  contextAt: string | null
+}
+
+async function fetchAttentionItems(): Promise<AttentionItem[]> {
+  const { data, error } = await supabase.rpc('get_platform_attention_items')
+  if (error) throw error
+  return (data ?? []).map((r) => ({
+    clubId: r.club_id ?? '',
+    clubName: r.club_name ?? '—',
+    problemType: r.problem_type ?? '',
+    severity: r.severity === 'danger' ? 'danger' : 'warning',
+    detail: r.detail,
+    contextAt: r.context_at,
+  }))
+}
+
+// Fixed severity ordering (danger before warning) -- deliberately not a
+// weighted/scored ranking, per the mission's explicit "not a
+// complicated scoring engine yet" instruction. Ties within a severity
+// keep the RPC's own context_at desc ordering.
+const SEVERITY_ORDER: Record<AttentionItem['severity'], number> = { danger: 0, warning: 1 }
+
+// Platform Owner Control Plane V1, Phase 6 -- Commercial Snapshot. One
+// SECURITY DEFINER RPC (get_platform_commercial_snapshot(), see its own
+// migration comment for the exact per-metric derivation and every
+// reliability decision) returning a single row. Any metric the RPC could
+// not reliably compute comes back as a real SQL NULL, never a fabricated
+// 0 -- rendered here as an explicit "not yet available" state, never as
+// "0", per the mission's explicit "do not fake it" constraint. Kept as
+// its own query/section, deliberately not merged into fetchOverview()
+// above or the Attention Center query -- this is snapshot-shaped data
+// (a handful of point-in-time numbers), not a list, and the mission
+// directive requires collected revenue (fetchOverview's revenueThisMonth,
+// unchanged above) to stay conceptually and mechanically separate from
+// MRR/ARR/outstanding here, not quietly blended into one query result.
+interface CommercialSnapshot {
+  payingTenants: number
+  activeTrials: number
+  trialsEndingSoon: number
+  expiredActionRequired: number
+  mrr: number
+  arr: number
+  outstandingAmount: number
+  trialToPaidConversionRate: number | null
+  trialToPaidConversionRateUnavailable: boolean
+}
+
+async function fetchCommercialSnapshot(): Promise<CommercialSnapshot | null> {
+  const { data, error } = await supabase.rpc('get_platform_commercial_snapshot')
+  if (error) throw error
+  const row = data?.[0]
+  if (!row) return null
+  return {
+    payingTenants: row.paying_tenants ?? 0,
+    activeTrials: row.active_trials ?? 0,
+    trialsEndingSoon: row.trials_ending_soon ?? 0,
+    expiredActionRequired: row.expired_action_required ?? 0,
+    mrr: Number(row.mrr ?? 0),
+    arr: Number(row.arr ?? 0),
+    outstandingAmount: Number(row.outstanding_amount ?? 0),
+    trialToPaidConversionRate: row.trial_to_paid_conversion_rate === null ? null : Number(row.trial_to_paid_conversion_rate),
+    trialToPaidConversionRateUnavailable: row.trial_to_paid_conversion_rate_unavailable ?? true,
   }
 }
 
 export function PlatformOverviewPage() {
   const { t } = useTranslation()
+  const { locale } = useDirection()
   const { data, isLoading, isError, error, refetch } = useQuery({ queryKey: ['platform-overview'], queryFn: fetchOverview })
+  const {
+    data: attentionItems = [],
+    isLoading: attentionLoading,
+    isError: attentionIsError,
+    error: attentionError,
+    refetch: refetchAttention,
+  } = useQuery({ queryKey: ['platform-attention-items'], queryFn: fetchAttentionItems })
+  const sortedAttentionItems = [...attentionItems].sort((a, b) => SEVERITY_ORDER[a.severity] - SEVERITY_ORDER[b.severity])
+  const {
+    data: snapshot,
+    isLoading: snapshotLoading,
+    isError: snapshotIsError,
+    error: snapshotError,
+    refetch: refetchSnapshot,
+  } = useQuery({ queryKey: ['platform-commercial-snapshot'], queryFn: fetchCommercialSnapshot })
+  const snapshotUnavailable = (v: number | null | undefined) => snapshotLoading || snapshotIsError || v === null || v === undefined
+  const fmtSnapshotValue = (v: number | null | undefined) => (snapshotUnavailable(v) ? '—' : String(v))
 
   return (
     <div>
@@ -244,130 +312,178 @@ export function PlatformOverviewPage() {
         <StatCard label={t('platform.overviewPage.cards.newClubsThisMonth')} value={isLoading || isError ? '—' : String(data?.newClubsThisMonth ?? 0)} to="/platform/clubs?created=this_month" tone="success" />
       </div>
 
-      {/* Gate 13 #56: pending action items were invisible platform-wide --
-          an upgrade request only surfaced by opening that exact club's
-          detail page, and new leads only by opening the Leads page. Both
-          need a single glance from the landing dashboard, so they're
-          shown here as actionable links, not duplicated lists.
-
-          Design remediation: labeled "Needs attention" so this exception
-          panel reads as the control plane's operations queue, not an
-          unexplained second block of cards under the KPI groups above --
-          still only rendered when at least one real exception exists
-          (unchanged exception-first behavior). */}
-      {!isLoading &&
-        ((data?.pendingUpgradeRequests ?? 0) > 0 ||
-          (data?.newLeads ?? 0) > 0 ||
-          (data?.noSubscriptionClubs ?? 0) > 0 ||
-          (data?.whatsappDisconnectedCount ?? 0) > 0 ||
-          (data?.whatsappFailuresCount ?? 0) > 0 ||
-          (data?.flaggedDuplicateClubs ?? 0) > 0) && (
+      {/* Platform Owner Control Plane V1, Phase 7: upgraded from 6
+          per-METRIC-TYPE aggregate cards (each linking to the same
+          generic unfiltered /platform/clubs list -- a confirmed deep-
+          dive finding, PLATFORM_OWNER_DEEP_DIVE_REPORT.md Section 13)
+          into a genuine per-TENANT Attention Center: one row per
+          (club, problem) pair from get_platform_attention_items(),
+          each linking DIRECTLY to that club's Tenant 360 page. Still
+          exception-first -- hidden entirely when the list is empty,
+          same as before. New leads (contact_requests) has no club_id
+          at all (confirmed via schema read -- an anonymous pre-signup
+          inbox, not tenant-scoped) so it cannot be expressed as a
+          (club, problem) row and stays its own small platform-wide
+          card alongside this list rather than inside it. */}
+      {attentionLoading || attentionIsError || sortedAttentionItems.length > 0 || (data?.newLeads ?? 0) > 0 ? (
         <>
-        <p className="mb-2 mt-5 text-xs font-semibold uppercase tracking-wide text-text-secondary">
-          {t('platform.overviewPage.groups.needsAttention', { defaultValue: 'Needs attention' })}
-        </p>
-        <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-          {/* Phase E directive: the single largest operational gap the
-              audit found -- zero WhatsApp visibility platform-wide.
-              Only surfaces when there's a real issue (per the exception-
-              first principle already established for the other cards
-              here), not as a permanent dashboard fixture. */}
-          {(data?.whatsappDisconnectedCount ?? 0) > 0 && (
-            <Link to="/platform/clubs" className="block">
-              <Card className="border-danger/40 bg-danger/5 transition-colors hover:bg-danger/10">
-                <CardContent className="flex items-center justify-between p-4">
-                  <div>
-                    <p className="font-medium text-text-primary">{t('platform.overviewPage.whatsappDisconnected.title')}</p>
-                    <p className="text-sm text-text-secondary">{t('platform.overviewPage.whatsappDisconnected.description')}</p>
-                  </div>
-                  <span className="text-2xl font-semibold text-danger">{data?.whatsappDisconnectedCount}</span>
-                </CardContent>
-              </Card>
-            </Link>
+          <p className="mb-2 mt-5 text-xs font-semibold uppercase tracking-wide text-text-secondary">
+            {t('platform.overviewPage.groups.needsAttention', { defaultValue: 'Needs attention' })}
+          </p>
+          {attentionIsError && (
+            <ErrorState
+              message={translateSupabaseError(attentionError, t('platform.overviewPage.attentionLoadError', { defaultValue: 'Could not load the attention list.' }))}
+              onRetry={() => void refetchAttention()}
+              className="mb-4"
+            />
           )}
-          {(data?.whatsappFailuresCount ?? 0) > 0 && (
-            <Link to="/platform/clubs" className="block">
-              <Card className="border-warning/40 bg-warning/5 transition-colors hover:bg-warning/10">
-                <CardContent className="flex items-center justify-between p-4">
-                  <div>
-                    <p className="font-medium text-text-primary">{t('platform.overviewPage.whatsappFailures.title')}</p>
-                    <p className="text-sm text-text-secondary">{t('platform.overviewPage.whatsappFailures.description')}</p>
-                  </div>
-                  <span className="text-2xl font-semibold text-warning">{data?.whatsappFailuresCount}</span>
-                </CardContent>
-              </Card>
-            </Link>
+          {!attentionIsError && (
+            <div className="space-y-2">
+              {sortedAttentionItems.map((item) => (
+                <Link key={`${item.clubId}-${item.problemType}`} to={`/platform/clubs/${item.clubId}`} className="block">
+                  <Card
+                    className={
+                      item.severity === 'danger'
+                        ? 'border-danger/40 bg-danger/5 transition-colors hover:bg-danger/10'
+                        : 'border-warning/40 bg-warning/5 transition-colors hover:bg-warning/10'
+                    }
+                  >
+                    <CardContent className="flex items-center justify-between gap-3 p-4">
+                      <div className="min-w-0">
+                        <p className="truncate font-medium text-text-primary">
+                          <bdi>{item.clubName}</bdi>
+                        </p>
+                        <p className="text-sm text-text-secondary">
+                          {item.problemType === 'whatsapp_failures'
+                            ? t(`platform.overviewPage.attentionProblems.whatsapp_failures`, {
+                                defaultValue: item.problemType,
+                                // The RPC reports this condition's `detail` as a raw failed-message
+                                // count (see get_platform_attention_items(), condition 2), not a
+                                // resource-label key like every other condition below -- it needs
+                                // real i18next plural interpolation (count), not the
+                                // attentionResourceLabels lookup used for the rest.
+                                count: Number(item.detail ?? 0),
+                              })
+                            : t(`platform.overviewPage.attentionProblems.${item.problemType}`, {
+                                defaultValue: item.problemType,
+                                detail: item.detail
+                                  ? t(`platform.overviewPage.attentionResourceLabels.${item.detail}`, { defaultValue: item.detail })
+                                  : '',
+                              })}
+                        </p>
+                      </div>
+                      <div className="flex shrink-0 items-center gap-2">
+                        {item.contextAt && (
+                          <span className="text-xs text-text-secondary">
+                            <bdi>{new Date(item.contextAt).toLocaleDateString(locale === 'en' ? 'en-US' : 'ar-EG')}</bdi>
+                          </span>
+                        )}
+                        <StatusBadge
+                          tone={item.severity as StatusTone}
+                          label={t(`platform.overviewPage.attentionSeverity.${item.severity}`, { defaultValue: item.severity })}
+                        />
+                      </div>
+                    </CardContent>
+                  </Card>
+                </Link>
+              ))}
+              {(data?.newLeads ?? 0) > 0 && (
+                <Link to="/platform/leads" className="block">
+                  <Card className="border-info/40 bg-info/5 transition-colors hover:bg-info/10">
+                    <CardContent className="flex items-center justify-between p-4">
+                      <div>
+                        <p className="font-medium text-text-primary">{t('platform.overviewPage.newLeads.title')}</p>
+                        <p className="text-sm text-text-secondary">{t('platform.overviewPage.newLeads.description')}</p>
+                      </div>
+                      <span className="text-2xl font-semibold text-info">{data?.newLeads}</span>
+                    </CardContent>
+                  </Card>
+                </Link>
+              )}
+              {attentionLoading && sortedAttentionItems.length === 0 && (
+                <EmptyState title={t('platform.overviewPage.attentionLoading', { defaultValue: 'Loading attention items…' })} />
+              )}
+            </div>
           )}
-          {/* FINAL PRODUCT COMPLETENESS ROUND (2026-08-25) -- Platform
-              Owner persona: complete_new_club_onboarding() computes
-              flagged_duplicate at every signup (a real, existing
-              signal) but no screen ever surfaced it -- a new club goes
-              fully active immediately (the platform's own self-serve
-              trial model, unchanged here), so this exception card plus
-              the existing suspend action on Club Detail is the real
-              accept/reject mechanism this persona needs, without a new
-              approval-workflow architecture or a new club-status value. */}
-          {(data?.flaggedDuplicateClubs ?? 0) > 0 && (
-            <Link to="/platform/clubs?flagged=1" className="block">
-              <Card className="border-warning/40 bg-warning/5 transition-colors hover:bg-warning/10">
-                <CardContent className="flex items-center justify-between p-4">
-                  <div>
-                    <p className="font-medium text-text-primary">{t('platform.overviewPage.flaggedDuplicateClubs.title')}</p>
-                    <p className="text-sm text-text-secondary">{t('platform.overviewPage.flaggedDuplicateClubs.description')}</p>
-                  </div>
-                  <span className="text-2xl font-semibold text-warning">{data?.flaggedDuplicateClubs}</span>
-                </CardContent>
-              </Card>
-            </Link>
-          )}
-          {/* Phase A/B directive: the audit found a real club with zero
-              platform_subscriptions rows -- get_club_platform_access()
-              correctly failed closed to 'blocked', but that state was
-              indistinguishable from any other blocked club (grace expired,
-              cancelled, etc). get_platform_clubs_access() now returns a
-              machine-readable `reason`, so this real data-integrity gap is
-              a distinct, actionable exception instead of an invisible one. */}
-          {(data?.noSubscriptionClubs ?? 0) > 0 && (
-            <Link to="/platform/clubs?reason=no_subscription" className="block">
-              <Card className="border-danger/40 bg-danger/5 transition-colors hover:bg-danger/10">
-                <CardContent className="flex items-center justify-between p-4">
-                  <div>
-                    <p className="font-medium text-text-primary">{t('platform.overviewPage.noSubscriptionClubs.title')}</p>
-                    <p className="text-sm text-text-secondary">{t('platform.overviewPage.noSubscriptionClubs.description')}</p>
-                  </div>
-                  <span className="text-2xl font-semibold text-danger">{data?.noSubscriptionClubs}</span>
-                </CardContent>
-              </Card>
-            </Link>
-          )}
-          {(data?.pendingUpgradeRequests ?? 0) > 0 && (
-            <Link to="/platform/clubs" className="block">
-              <Card className="border-warning/40 bg-warning/5 transition-colors hover:bg-warning/10">
-                <CardContent className="flex items-center justify-between p-4">
-                  <div>
-                    <p className="font-medium text-text-primary">{t('platform.overviewPage.pendingUpgradeRequests.title')}</p>
-                    <p className="text-sm text-text-secondary">{t('platform.overviewPage.pendingUpgradeRequests.description')}</p>
-                  </div>
-                  <span className="text-2xl font-semibold text-warning">{data?.pendingUpgradeRequests}</span>
-                </CardContent>
-              </Card>
-            </Link>
-          )}
-          {(data?.newLeads ?? 0) > 0 && (
-            <Link to="/platform/leads" className="block">
-              <Card className="border-info/40 bg-info/5 transition-colors hover:bg-info/10">
-                <CardContent className="flex items-center justify-between p-4">
-                  <div>
-                    <p className="font-medium text-text-primary">{t('platform.overviewPage.newLeads.title')}</p>
-                    <p className="text-sm text-text-secondary">{t('platform.overviewPage.newLeads.description')}</p>
-                  </div>
-                  <span className="text-2xl font-semibold text-info">{data?.newLeads}</span>
-                </CardContent>
-              </Card>
-            </Link>
-          )}
-        </div>
         </>
+      ) : null}
+
+      {/* Platform Owner Control Plane V1, Phase 6 -- Commercial Snapshot.
+          Plain numbers, no charts, matching the existing StatCard pattern
+          used throughout this console (per the mission directive's
+          explicit "no charts/graphs" instruction). Every value that came
+          back null from get_platform_commercial_snapshot() renders as
+          "—" via fmtSnapshotValue/snapshotUnavailable, with a one-line
+          note explaining why -- never a fabricated 0. Currently only
+          trial-to-paid conversion is null in practice (see the RPC's own
+          migration comment for the exact schema-derived reason); every
+          other metric here is reliably computable and always populated. */}
+      <p className="mb-2 mt-5 text-xs font-semibold uppercase tracking-wide text-text-secondary">
+        {t('platform.overviewPage.groups.commercialSnapshot', { defaultValue: 'Commercial snapshot' })}
+      </p>
+      {snapshotIsError && (
+        <ErrorState
+          message={translateSupabaseError(snapshotError, t('platform.overviewPage.snapshotLoadError', { defaultValue: 'Could not load the commercial snapshot.' }))}
+          onRetry={() => void refetchSnapshot()}
+          className="mb-4"
+        />
+      )}
+      <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
+        <StatCard
+          label={t('platform.overviewPage.cards.payingTenants', { defaultValue: 'Paying tenants' })}
+          value={fmtSnapshotValue(snapshot?.payingTenants)}
+          to="/platform/clubs"
+          tone="success"
+        />
+        <StatCard
+          label={t('platform.overviewPage.cards.activeTrials', { defaultValue: 'Active trials' })}
+          value={fmtSnapshotValue(snapshot?.activeTrials)}
+          to="/platform/trials"
+        />
+        <StatCard
+          label={t('platform.overviewPage.cards.trialsEndingSoon', { defaultValue: 'Trials ending soon' })}
+          value={fmtSnapshotValue(snapshot?.trialsEndingSoon)}
+          to="/platform/alerts"
+          tone={(snapshot?.trialsEndingSoon ?? 0) > 0 ? 'warning' : 'default'}
+        />
+        <StatCard
+          label={t('platform.overviewPage.cards.expiredActionRequired', { defaultValue: 'Expired / action required' })}
+          value={fmtSnapshotValue(snapshot?.expiredActionRequired)}
+          to="/platform/clubs?access=blocked"
+          tone={(snapshot?.expiredActionRequired ?? 0) > 0 ? 'danger' : 'default'}
+        />
+      </div>
+      <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-3">
+        <Card>
+          <CardHeader><CardTitle className="text-base">{t('platform.overviewPage.cards.mrr', { defaultValue: 'MRR' })}</CardTitle></CardHeader>
+          <CardContent>
+            {snapshotUnavailable(snapshot?.mrr) ? '—' : <MoneyDisplay amount={snapshot?.mrr ?? 0} size="lg" />}
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader><CardTitle className="text-base">{t('platform.overviewPage.cards.arr', { defaultValue: 'ARR' })}</CardTitle></CardHeader>
+          <CardContent>
+            {snapshotUnavailable(snapshot?.arr) ? '—' : <MoneyDisplay amount={snapshot?.arr ?? 0} size="lg" />}
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader><CardTitle className="text-base">{t('platform.overviewPage.cards.outstandingAmount', { defaultValue: 'Outstanding amount' })}</CardTitle></CardHeader>
+          <CardContent>
+            {snapshotUnavailable(snapshot?.outstandingAmount) ? '—' : <MoneyDisplay amount={snapshot?.outstandingAmount ?? 0} size="lg" />}
+          </CardContent>
+        </Card>
+      </div>
+      {/* Trial -> paid conversion is a genuine, documented data-model
+          limitation (see the RPC migration comment), not a loading state
+          -- shown as its own explicit note rather than folded into a
+          StatCard's "—", so a Platform Owner can tell "not computed yet"
+          apart from "still loading" or "query failed". */}
+      {!snapshotLoading && !snapshotIsError && snapshot?.trialToPaidConversionRateUnavailable && (
+        <p className="mt-3 text-xs text-text-secondary">
+          {t('platform.overviewPage.trialConversionUnavailable', {
+            defaultValue: 'Trial → paid conversion rate: not yet available (no reliable link exists between a trial and its resulting paid subscription in the current data model).',
+          })}
+        </p>
       )}
 
       {/* Design remediation: grouped under the same "Commercial signals"

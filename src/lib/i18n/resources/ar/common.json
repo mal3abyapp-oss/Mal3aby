@@ -455,9 +455,12 @@
       "reason": "السبب",
       "filterAction": "تصفية حسب الإجراء",
       "filterEntity": "تصفية حسب الكيان",
+      "filterFromDate": "من تاريخ",
+      "filterToDate": "إلى تاريخ",
       "emptyTitle": "لا يوجد سجل تدقيق بعد",
       "loadingMore": "جارٍ التحميل...",
-      "loadMore": "تحميل المزيد"
+      "loadMore": "تحميل المزيد",
+      "resultCount": "{{count}} سجل تدقيق"
     },
     "supportHistoryPage": {
       "title": "سجل جلسات الدعم",
@@ -551,17 +554,33 @@
         "branches": "الفروع",
         "fields": "الملاعب",
         "customers": "العملاء",
+        "academies": "مجموعات الأكاديمية",
         "bookingsToday": "حجوزات اليوم",
         "bookingsMonth": "حجوزات الشهر",
         "bookingsPending": "حجوزات معلقة",
         "staff": "الموظفون"
+      },
+      "lastActivityCard": {
+        "title": "آخر نشاط",
+        "loading": "جارٍ التحقق من آخر نشاط...",
+        "error": "تعذّر تحميل آخر نشاط.",
+        "none": "لا يوجد نشاط مسجَّل بعد",
+        "typeLabels": {
+          "booking": "حجز",
+          "payment": "دفعة",
+          "attendance": "حضور الأكاديمية"
+        },
+        "summary": "{{type}} — {{date}}"
       },
       "govComplianceCard": {
         "title": "الامتثال الحكومي",
         "authorityType": "نوع الجهة",
         "receiptRequired": "إيصال رسمي مطلوب",
         "receiptCounts": "إيصالات فعالة / معكوسة",
-        "totalCollected": "إجمالي التحصيل"
+        "totalCollected": "إجمالي التحصيل",
+        "loading": "جارٍ التحقق من حالة الامتثال...",
+        "error": "تعذّر تحميل حالة الامتثال الحكومي. قد يكون هذا النادي فعلًا \"غير منتسب\" أو أن التحميل فشل -- حدّث الصفحة للتحقق.",
+        "notAffiliated": "هذا النادي غير منتسب لجهة تحصيل حكومية/وزارية."
       },
       "whatsappCard": {
         "title": "صحة واتساب",
@@ -616,7 +635,13 @@
         "reasonLabel": "السبب (اختياري)",
         "overLimitWarning": "{{label}}: {{used}} مستخدَم حاليًا، أعلى من الحد الجديد {{limit}}. السجلات الحالية محفوظة — لا يمكن إنشاء سجلات جديدة حتى ينخفض الاستخدام تحت الحد.",
         "overLimitBadge": "فوق الحد",
-        "overLimitHint": "الاستخدام الحالي أعلى من الحد — السجلات الحالية محفوظة، ولا يمكن إنشاء سجلات جديدة حتى ينخفض الاستخدام تحت الحد أو يُرفَع الحد."
+        "overLimitHint": "الاستخدام الحالي أعلى من الحد — السجلات الحالية محفوظة، ولا يمكن إنشاء سجلات جديدة حتى ينخفض الاستخدام تحت الحد أو يُرفَع الحد.",
+        "statusLabels": {
+          "unlimited": "بلا حد",
+          "normal": "طبيعي",
+          "approaching_limit": "قريب من الحد",
+          "over_limit": "فوق الحد"
+        }
       },
       "commercialUsageCard": {
         "title": "الموظفون واللاعبون النشطون + عرض العملاء المؤسسين",
@@ -774,10 +799,18 @@
         "club": "النادي",
         "code": "الكود",
         "createdAt": "تاريخ الانضمام",
+        "lastActivity": "آخر نشاط",
         "adminStatus": "الحالة الإدارية",
         "subscriptionStatus": "حالة الاشتراك",
-        "owner": "المالك"
+        "owner": "المالك",
+        "tenantHealth": "الحالة الصحية"
       },
+      "tenantHealthLabels": {
+        "HEALTHY": "سليم",
+        "WATCH": "يحتاج متابعة",
+        "AT_RISK": "معرّض للخطر"
+      },
+      "lastActivityNone": "لا يوجد نشاط بعد",
       "searchPlaceholder": "بحث بالاسم أو الكود",
       "loadError": "تعذّر تحميل الأندية.",
       "flaggedDuplicate": "تكرار محتمل",
@@ -842,7 +875,8 @@
         "tenantHealth": "صحة الأندية",
         "commercialSignals": "مؤشرات تجارية",
         "needsAttention": "يحتاج انتباهًا",
-        "revenue": "الإيرادات"
+        "revenue": "الإيرادات",
+        "commercialSnapshot": "لمحة تجارية"
       },
       "cards": {
         "totalClubs": "إجمالي الأندية",
@@ -851,27 +885,50 @@
         "blockedAccessClubs": "أندية بوصول موقوف (اشتراك)",
         "trialCount": "تجارب مجانية نشطة",
         "expiringSoonCount": "اشتراكات تنتهي قريبًا",
-        "newClubsThisMonth": "أندية جديدة هذا الشهر"
+        "newClubsThisMonth": "أندية جديدة هذا الشهر",
+        "payingTenants": "أندية مدفوعة",
+        "activeTrials": "تجارب نشطة",
+        "trialsEndingSoon": "تجارب تنتهي قريبًا",
+        "expiredActionRequired": "منتهية / تحتاج إجراء",
+        "mrr": "الإيراد الشهري المتكرر (MRR)",
+        "arr": "الإيراد السنوي المتكرر (ARR)",
+        "outstandingAmount": "مبالغ مستحقة"
       },
-      "noSubscriptionClubs": {
-        "title": "أندية بدون اشتراك على الإطلاق",
-        "description": "لا يوجد سجل اشتراك من أي نوع لهذا النادي — يحتاج مراجعة يدوية"
+      "snapshotLoadError": "تعذّر تحميل اللمحة التجارية.",
+      "trialConversionUnavailable": "معدّل التحويل من تجربة إلى اشتراك مدفوع: غير متاح حاليًا (لا يوجد ربط موثوق بين التجربة والاشتراك المدفوع الناتج عنها في نموذج البيانات الحالي).",
+      "attentionLoadError": "تعذّر تحميل قائمة الأندية التي تحتاج انتباهًا.",
+      "attentionLoading": "جارٍ تحميل قائمة الانتباه…",
+      "attentionSeverity": {
+        "danger": "عاجل",
+        "warning": "تنبيه"
       },
-      "whatsappDisconnected": {
-        "title": "أندية واتساب غير متصلة",
-        "description": "كان متصلًا سابقًا والآن غير متصل — يحتاج مراجعة"
+      "attentionProblems": {
+        "whatsapp_disconnected": "واتساب غير متصل حاليًا (كان متصلًا سابقًا)",
+        "whatsapp_failures_zero": "لا توجد رسائل واتساب فاشلة خلال آخر 7 أيام",
+        "whatsapp_failures_one": "رسالة واتساب واحدة فشلت خلال آخر 7 أيام",
+        "whatsapp_failures_two": "رسالتا واتساب فشلتا خلال آخر 7 أيام",
+        "whatsapp_failures_few": "{{count}} رسائل واتساب فشلت خلال آخر 7 أيام",
+        "whatsapp_failures_many": "{{count}} رسالة واتساب فشلت خلال آخر 7 أيام",
+        "whatsapp_failures_other": "{{count}} رسالة واتساب فشلت خلال آخر 7 أيام",
+        "flagged_duplicate": "نادٍ محتمل التكرار — يحتاج مراجعة قبل اعتباره تكرارًا أو محاولة احتيال",
+        "no_subscription": "لا يوجد سجل اشتراك من أي نوع لهذا النادي",
+        "pending_upgrade_request": "طلب ترقية بانتظار المراجعة ({{detail}})",
+        "expiring_soon": "الاشتراك ({{detail}}) ينتهي قريبًا",
+        "expired": "الاشتراك ({{detail}}) منتهٍ ولم يُلغَ بعد",
+        "over_plan_limit": "تجاوز حد الباقة: {{detail}}",
+        "near_plan_limit": "اقترب من حد الباقة: {{detail}}"
       },
-      "whatsappFailures": {
-        "title": "رسائل واتساب فاشلة (7 أيام)",
-        "description": "إجمالي محاولات الإرسال الفاشلة عبر كل الأندية"
-      },
-      "flaggedDuplicateClubs": {
-        "title": "أندية محتملة التكرار",
-        "description": "اسم نادٍ جديد كان مشابهًا جدًا لاسم نادٍ موجود عند التسجيل — راجعه قبل أن يُعتبر تكرارًا أو محاولة احتيال"
-      },
-      "pendingUpgradeRequests": {
-        "title": "طلبات ترقية بانتظار المراجعة",
-        "description": "افتح صفحة النادي المعني من قائمة الأندية لمراجعتها"
+      "attentionResourceLabels": {
+        "branches": "الفروع",
+        "fields": "الملاعب",
+        "academy": "الأكاديمية",
+        "staff": "الموظفون",
+        "active_players": "اللاعبون النشطون",
+        "branch_limit": "حد الفروع",
+        "field_limit": "حد الملاعب",
+        "academy_limit": "حد الأكاديمية",
+        "trial": "تجربة مجانية",
+        "paid": "مدفوع"
       },
       "newLeads": {
         "title": "طلبات تواصل جديدة",
@@ -929,7 +986,8 @@
       "resetNoEmail": "لا يوجد بريد إلكتروني مسجّل لهذا المستخدم.",
       "resetError": "تعذّر إرسال رسالة إعادة تعيين كلمة المرور.",
       "emptyTitle": "لا توجد نتائج مطابقة",
-      "emptyTitleNoOwners": "لا يوجد أصحاب أندية بعد"
+      "emptyTitleNoOwners": "لا يوجد أصحاب أندية بعد",
+      "resultCount": "{{count}} عضوية"
     },
     "plansPage": {
       "title": "الخطط",
@@ -972,7 +1030,8 @@
         "revenue": "الإيرادات",
         "renewal": "التجديدات",
         "growth": "النمو",
-        "usage": "الاستخدام"
+        "usage": "الاستخدام",
+        "whatsapp": "واتساب"
       },
       "subscriptionColumns": {
         "club": "النادي",
@@ -1004,6 +1063,14 @@
         "club": "النادي",
         "branches": "الفروع",
         "staff": "الموظفون"
+      },
+      "whatsappUsageColumns": {
+        "club": "النادي",
+        "messages30d": "الرسائل (٣٠ يومًا)",
+        "messages7d": "الرسائل (٧ أيام)",
+        "delivered30d": "تم التسليم (٣٠ يومًا)",
+        "failed30d": "فشل (٣٠ يومًا)",
+        "lastMessage": "آخر رسالة"
       },
       "lifecycleStatusLabels": {
         "trial": "تجربة مجانية",
@@ -4572,7 +4639,11 @@
     "deactivateError": "تعذر تعطيل هذا الموظف.",
     "resetPasswordError": "تعذر إنشاء رابط إعداد كلمة المرور.",
     "setupLinkTitle": "رابط إعداد الحساب",
-    "setupLinkHint": "أرسل هذا الرابط للموظف ليحدد كلمة المرور الخاصة به. يظهر مرة واحدة فقط -- انسخه الآن."
+    "setupLinkHint": "أرسل هذا الرابط للموظف ليحدد كلمة المرور الخاصة به. يظهر مرة واحدة فقط -- انسخه الآن.",
+    "reasonLabel": "السبب",
+    "reasonPlaceholder": "لماذا تقوم بهذا التغيير؟",
+    "deactivateTitle": "تعطيل {{name}}",
+    "deactivateWarning": "سيؤدي هذا فورًا إلى إلغاء وصوله إلى لوحة تحكم مالك المنصة وإنهاء أي جلسة دعم نشطة لديه. يمكن التراجع عن هذا لاحقًا بإعادة تفعيله."
   },
   "platformRoles": {
     "title": "أدوار وصلاحيات المنصة",

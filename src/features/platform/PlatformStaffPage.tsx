@@ -102,6 +102,14 @@ export function PlatformStaffPage() {
 
   const [addOpen, setAddOpen] = useState(false)
   const [roleAssignFor, setRoleAssignFor] = useState<PlatformStaffRow | null>(null)
+  // AUDITABILITY FIX (Control Plane V1, Phase 2): deactivate previously
+  // fired immediately on click with no confirmation and no reason --
+  // the only Platform Owner action of comparable consequence (revokes
+  // console access + force-ends any active support session) lacking
+  // both safeguards. Now routes through a proper confirm+reason dialog,
+  // matching PlatformClubDetailPage.tsx's suspend-club pattern exactly.
+  const [deactivateFor, setDeactivateFor] = useState<PlatformStaffRow | null>(null)
+  const [deactivateReason, setDeactivateReason] = useState('')
   const [setupLink, setSetupLink] = useState<string | null>(null)
   const [actionError, setActionError] = useState<string | null>(null)
 
@@ -120,11 +128,15 @@ export function PlatformStaffPage() {
   }
 
   const deactivateMutation = useMutation({
-    mutationFn: async (membershipId: string) => {
-      const { error } = await supabase.rpc('deactivate_platform_staff', { p_membership_id: membershipId })
+    mutationFn: async ({ membershipId, reason }: { membershipId: string; reason: string }) => {
+      const { error } = await supabase.rpc('deactivate_platform_staff', { p_membership_id: membershipId, p_reason: reason.trim() })
       if (error) throw error
     },
-    onSuccess: invalidate,
+    onSuccess: () => {
+      invalidate()
+      setDeactivateFor(null)
+      setDeactivateReason('')
+    },
     onError: (err) => setActionError(translateSupabaseError(err, t('platformStaff.deactivateError'))),
   })
 
@@ -192,8 +204,7 @@ export function PlatformStaffPage() {
             <Button
               variant="ghost"
               size="sm"
-              disabled={deactivateMutation.isPending}
-              onClick={() => { setActionError(null); deactivateMutation.mutate(r.membershipId) }}
+              onClick={() => { setActionError(null); setDeactivateReason(''); setDeactivateFor(r) }}
             >
               {t('platformStaff.deactivate')}
             </Button>
@@ -245,6 +256,41 @@ export function PlatformStaffPage() {
           onClose={() => setRoleAssignFor(null)}
           onSaved={() => { setRoleAssignFor(null); invalidate() }}
         />
+      )}
+
+      {deactivateFor && (
+        <Dialog open onOpenChange={(open) => { if (!open) setDeactivateFor(null) }}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>{t('platformStaff.deactivateTitle', { name: deactivateFor.fullName ?? deactivateFor.email })}</DialogTitle>
+            </DialogHeader>
+            <div className="flex flex-col gap-4">
+              <p className="text-sm text-status-danger">{t('platformStaff.deactivateWarning')}</p>
+              <div className="flex flex-col gap-1">
+                <label htmlFor="deactivate-reason" className="text-xs font-medium text-text-secondary">
+                  {t('platformStaff.reasonLabel')}
+                </label>
+                <Input
+                  id="deactivate-reason"
+                  value={deactivateReason}
+                  onChange={(e) => setDeactivateReason(e.target.value)}
+                  placeholder={t('platformStaff.reasonPlaceholder')}
+                />
+              </div>
+              {actionError && <p role="alert" className="text-sm text-status-danger">{actionError}</p>}
+              <div className="flex justify-end gap-2">
+                <Button variant="outline" onClick={() => setDeactivateFor(null)}>{t('common.cancel')}</Button>
+                <Button
+                  variant="destructive"
+                  disabled={!deactivateReason.trim() || deactivateMutation.isPending}
+                  onClick={() => deactivateMutation.mutate({ membershipId: deactivateFor.membershipId, reason: deactivateReason })}
+                >
+                  {deactivateMutation.isPending ? t('platformStaff.saving') : t('platformStaff.deactivate')}
+                </Button>
+              </div>
+            </div>
+          </DialogContent>
+        </Dialog>
       )}
 
       {setupLink && (
@@ -347,6 +393,13 @@ function ChangeRoleDialog({
   const { t, i18n } = useTranslation()
   const locale = i18n.language
   const [roleId, setRoleId] = useState(row.platformRoleId ?? '')
+  // AUDITABILITY FIX (Control Plane V1, Phase 2): reason is now
+  // required, matching every other consequential Platform Owner action
+  // in this console (e.g. change_platform_plan, extend_grace_period) --
+  // Save stays disabled until a real reason is typed, the same pattern
+  // PlatformClubDetailPage.tsx already establishes for its own
+  // reason-gated dialogs.
+  const [reason, setReason] = useState('')
   const [error, setError] = useState<string | null>(null)
 
   const { data: roleOptions = [] } = useQuery({
@@ -361,6 +414,7 @@ function ChangeRoleDialog({
         p_membership_id: row.membershipId,
         p_platform_role_id: chosen?.isSystem ? roleId : undefined,
         p_platform_custom_role_id: chosen && !chosen.isSystem ? roleId : undefined,
+        p_reason: reason.trim(),
       })
       if (err) throw err
     },
@@ -385,10 +439,21 @@ function ChangeRoleDialog({
               ))}
             </SelectContent>
           </Select>
+          <div className="flex flex-col gap-1">
+            <label htmlFor="change-role-reason" className="text-xs font-medium text-text-secondary">
+              {t('platformStaff.reasonLabel')}
+            </label>
+            <Input
+              id="change-role-reason"
+              value={reason}
+              onChange={(e) => setReason(e.target.value)}
+              placeholder={t('platformStaff.reasonPlaceholder')}
+            />
+          </div>
           {error && <p role="alert" className="text-sm text-status-danger">{error}</p>}
           <div className="flex justify-end gap-2">
             <Button variant="outline" onClick={onClose}>{t('common.cancel')}</Button>
-            <Button disabled={!roleId || saveMutation.isPending} onClick={() => { setError(null); saveMutation.mutate() }}>
+            <Button disabled={!roleId || !reason.trim() || saveMutation.isPending} onClick={() => { setError(null); saveMutation.mutate() }}>
               {saveMutation.isPending ? t('platformStaff.saving') : t('common.save')}
             </Button>
           </div>

@@ -437,8 +437,22 @@ export { RequireAcademyModule, RequireFieldsModule, RequireClubMembershipModule 
 // least one active membership. Real enforcement is still server-side
 // (public.is_platform_owner() SECURITY DEFINER + RLS policies); this only
 // prevents rendering the console shell for non-owners.
+// PLATFORM STAFF AUTH FIX (Control Plane V1, Phase 1): the deep dive found
+// that legitimate platform_staff_memberships holders (5 of the 6 seeded
+// platform staff roles) could never reach /platform/* at all, since this
+// guard only ever checked isPlatformOwner. isPlatformOwner's own
+// club_memberships-based computation is completely untouched here --
+// this only WIDENS entry to also allow isPlatformStaff (a real, active
+// platform_staff_memberships row, server-resolved via
+// caller_platform_permission_keys() in AuthProvider -- never a
+// client-invented flag). least-privilege is enforced downstream: reaching
+// the console shell is not the same as seeing every page/action inside it
+// -- individual nav items and mutating actions still gate on the caller's
+// real platformPermissionKeys (see PlatformLayout.tsx / individual pages),
+// exactly mirroring how a low-privilege club role can reach /app but see
+// a reduced nav.
 export function RequirePlatformOwner() {
-  const { session, loading, isPlatformOwner } = useAuth()
+  const { session, loading, isPlatformOwner, isPlatformStaff } = useAuth()
   const location = useLocation()
 
   if (loading) return null
@@ -447,7 +461,7 @@ export function RequirePlatformOwner() {
     return <Navigate to="/login" state={{ from: location }} replace />
   }
 
-  if (!isPlatformOwner) {
+  if (!isPlatformOwner && !isPlatformStaff) {
     return <Navigate to="/app" replace />
   }
 

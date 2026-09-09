@@ -27,6 +27,39 @@ import { ErrorState } from '@/components/ui/error-state'
 import { translateSupabaseError } from '@/lib/errors'
 import { Star, StarOff } from 'lucide-react'
 
+// PLATFORM OWNER CONTROL PLANE V1 -- Phase 10 (Tenant Health V1). Batched
+// platform-wide via get_platform_tenant_health() (one RPC call, not one
+// per row -- same N+1-avoidance pattern as get_platform_clubs_access()
+// below and the last-activity columns above), joined client-side onto
+// this page's rows by club_id. Only added to this list per the mission
+// directive's own guidance ("add it to PlatformClubsPage.tsx only and
+// leave a clear TODO-style comment for Tenant 360 integration" -- another
+// agent owns PlatformClubDetailPage.tsx concurrently, so this badge is
+// deliberately NOT added there in this pass). See the RPC's own migration
+// comment (20260908180000_platform_owner_v1_phase10_tenant_health.sql)
+// for the exact formula and every input-inclusion/exclusion decision.
+const TENANT_HEALTH_TONE: Record<string, 'success' | 'warning' | 'danger'> = {
+  HEALTHY: 'success',
+  WATCH: 'warning',
+  AT_RISK: 'danger',
+}
+
+interface TenantHealthRow {
+  clubId: string
+  health: string
+  reasons: string[]
+}
+
+async function fetchTenantHealth(): Promise<Map<string, TenantHealthRow>> {
+  const { data, error } = await supabase.rpc('get_platform_tenant_health')
+  if (error) throw error
+  const map = new Map<string, TenantHealthRow>()
+  for (const r of data ?? []) {
+    map.set(r.club_id, { clubId: r.club_id, health: r.health, reasons: r.reasons ?? [] })
+  }
+  return map
+}
+
 // PLATFORM CLUB SELECTOR FOR LARGE SCALE (2026-08-26) -- the platform
 // may hold hundreds/thousands of clubs. The previous implementation
 // (Master IA/UX audit, Platform Owner phase, Audit 5) already fixed the
@@ -59,6 +92,15 @@ interface ClubRow {
   ownerNames: string[]
   ownerEmails: string[]
   ownerPhones: string[]
+  // PLATFORM OWNER CONTROL PLANE V1 -- Phase 5 (2026-09-08):
+  // last-activity, batched into the same search_platform_clubs() row
+  // (one query plan, N rows -- NOT a per-row RPC call in a loop, which
+  // is the N+1 shape the deep dive explicitly flagged elsewhere in this
+  // console). See the RPC's own migration comment
+  // (20260908160000_platform_club_360_academy_count_and_last_activity.sql)
+  // for why this was judged safe to add here rather than skipped.
+  lastActivityAt: string | null
+  lastActivityType: string | null
 }
 
 async function searchClubs(params: {
@@ -99,6 +141,8 @@ async function searchClubs(params: {
     ownerNames: r.owner_names ?? [],
     ownerEmails: r.owner_emails ?? [],
     ownerPhones: r.owner_phones ?? [],
+    lastActivityAt: r.last_activity_at ?? null,
+    lastActivityType: r.last_activity_type ?? null,
   }))
   return { rows, totalCount: Number((data as unknown as { total_count?: number }[])?.[0]?.total_count ?? 0) }
 }
@@ -162,6 +206,16 @@ export function PlatformClubsPage() {
   const clubs = data?.rows ?? []
   const totalCount = data?.totalCount ?? 0
   const totalPages = Math.max(1, Math.ceil(totalCount / PAGE_SIZE))
+
+  // Phase 10: one platform-wide call, independent of search/filter/page
+  // state -- get_platform_tenant_health() already returns every real
+  // club in one row set, so this does not need to be re-queried per page
+  // of the clubs list (same query result is joined against whichever
+  // page of rows is currently displayed).
+  const { data: tenantHealth, isError: tenantHealthIsError } = useQuery({
+    queryKey: ['platform-tenant-health'],
+    queryFn: fetchTenantHealth,
+  })
 
   const { data: recentClubs = [] } = useQuery({
     queryKey: ['platform-clubs-recent'],
@@ -237,6 +291,22 @@ export function PlatformClubsPage() {
       render: (c) => <bdi>{new Date(c.created_at).toLocaleDateString()}</bdi>,
     },
     {
+      // PLATFORM OWNER CONTROL PLANE V1 -- Phase 5 (2026-09-08): batched
+      // via search_platform_clubs' own columns, no extra round trip per
+      // row -- safe to add to the real server-paginated list per the
+      // mission's own N+1 guidance. Date-only (not full timestamp) to
+      // keep the column compact next to 5 existing columns + a
+      // per-row action.
+      key: 'lastActivity',
+      header: t('platform.clubsPage.columns.lastActivity'),
+      render: (c) =>
+        c.lastActivityAt ? (
+          <bdi>{new Date(c.lastActivityAt).toLocaleDateString()}</bdi>
+        ) : (
+          <span className="text-text-secondary">{t('platform.clubsPage.lastActivityNone')}</span>
+        ),
+    },
+    {
       key: 'status',
       header: t('platform.clubsPage.columns.adminStatus'),
       render: (c) => (
@@ -255,6 +325,35 @@ export function PlatformClubsPage() {
           label={t(`platform.ownersPage.accessLabels.${c.access}`, { defaultValue: ACCESS_LABEL[c.access] ?? c.access })}
         />
       ),
+    },
+    {
+      // Phase 10 (Tenant Health V1): tenantHealth is a single
+      // platform-wide batched fetch (see fetchTenantHealth above), joined
+      // here per-row by club_id -- no per-row RPC call. Absent from the
+      // map (still loading, or the health RPC itself errored) renders as
+      // a neutral "—", never a fabricated HEALTHY. The `reasons` array is
+      // surfaced as the badge's title tooltip so a Platform Owner can see
+      // WHY without leaving the list -- Tenant 360 (PlatformClubDetailPage.tsx)
+      // does not yet show this badge; that page is owned by a concurrent
+      // agent in this same mission and was intentionally left untouched
+      // here rather than risk a collision -- integrating this same
+      // get_platform_tenant_health() row there is a clean follow-up.
+      key: 'tenantHealth',
+      header: t('platform.clubsPage.columns.tenantHealth', { defaultValue: 'Health' }),
+      render: (c) => {
+        const h = tenantHealth?.get(c.id)
+        if (tenantHealthIsError || !h) {
+          return <span className="text-text-secondary">—</span>
+        }
+        return (
+          <span title={h.reasons.length > 0 ? h.reasons.join(', ') : undefined}>
+            <StatusBadge
+              tone={TENANT_HEALTH_TONE[h.health] ?? 'neutral'}
+              label={t(`platform.clubsPage.tenantHealthLabels.${h.health}`, { defaultValue: h.health })}
+            />
+          </span>
+        )
+      },
     },
     {
       key: 'masterAdminActions',
@@ -293,7 +392,7 @@ export function PlatformClubsPage() {
         <div className="mb-4 flex flex-col gap-3">
           {pinnedClubsList.length > 0 && (
             <div>
-              <p className="mb-1.5 text-xs font-semibold text-text-secondary">{t('platform.clubsPage.pinnedClubs')}</p>
+              <h2 className="mb-1.5 text-xs font-semibold text-text-secondary">{t('platform.clubsPage.pinnedClubs')}</h2>
               <div className="flex flex-wrap gap-2">
                 {pinnedClubsList.map((c) => (
                   <Link
@@ -309,7 +408,7 @@ export function PlatformClubsPage() {
           )}
           {recentClubs.length > 0 && (
             <div>
-              <p className="mb-1.5 text-xs font-semibold text-text-secondary">{t('platform.clubsPage.recentClubs')}</p>
+              <h2 className="mb-1.5 text-xs font-semibold text-text-secondary">{t('platform.clubsPage.recentClubs')}</h2>
               <div className="flex flex-wrap gap-2">
                 {recentClubs.map((c) => (
                   <Link
@@ -327,7 +426,11 @@ export function PlatformClubsPage() {
       )}
 
       <div className="mb-4 flex flex-wrap gap-3">
+        <label htmlFor="platform-clubs-search" className="sr-only">
+          {t('platform.clubsPage.searchPlaceholder')}
+        </label>
         <Input
+          id="platform-clubs-search"
           placeholder={t('platform.clubsPage.searchPlaceholder')}
           value={searchInput}
           onChange={(e) => setSearchInput(e.target.value)}

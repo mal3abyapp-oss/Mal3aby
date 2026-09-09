@@ -455,9 +455,12 @@
       "reason": "Reason",
       "filterAction": "Filter by action",
       "filterEntity": "Filter by entity",
+      "filterFromDate": "From date",
+      "filterToDate": "To date",
       "emptyTitle": "No audit log yet",
       "loadingMore": "Loading...",
-      "loadMore": "Load more"
+      "loadMore": "Load more",
+      "resultCount": "{{count}} audit entries"
     },
     "supportHistoryPage": {
       "title": "Support Session History",
@@ -551,17 +554,33 @@
         "branches": "Branches",
         "fields": "Fields",
         "customers": "Customers",
+        "academies": "Academy groups",
         "bookingsToday": "Bookings today",
         "bookingsMonth": "Bookings this month",
         "bookingsPending": "Pending bookings",
         "staff": "Staff"
+      },
+      "lastActivityCard": {
+        "title": "Last activity",
+        "loading": "Checking last activity...",
+        "error": "Couldn't load last activity.",
+        "none": "No recorded activity yet",
+        "typeLabels": {
+          "booking": "Booking",
+          "payment": "Payment",
+          "attendance": "Academy attendance"
+        },
+        "summary": "{{type}} — {{date}}"
       },
       "govComplianceCard": {
         "title": "Government Compliance",
         "authorityType": "Authority type",
         "receiptRequired": "Official receipt required",
         "receiptCounts": "Active / reversed receipts",
-        "totalCollected": "Total collected"
+        "totalCollected": "Total collected",
+        "loading": "Checking compliance status...",
+        "error": "Couldn't load government compliance status. This may be a real \"not affiliated\" club or a failed load -- refresh to check.",
+        "notAffiliated": "This club is not affiliated with a government/ministry collection authority."
       },
       "whatsappCard": {
         "title": "WhatsApp health",
@@ -616,7 +635,13 @@
         "reasonLabel": "Reason (optional)",
         "overLimitWarning": "{{label}}: {{used}} currently in use, above the new limit of {{limit}}. Existing records are preserved — no new ones can be created until usage drops below the limit.",
         "overLimitBadge": "Over limit",
-        "overLimitHint": "Current usage is above the limit — existing records are preserved, and no new ones can be created until usage drops below the limit or the limit is raised."
+        "overLimitHint": "Current usage is above the limit — existing records are preserved, and no new ones can be created until usage drops below the limit or the limit is raised.",
+        "statusLabels": {
+          "unlimited": "Unlimited",
+          "normal": "Normal",
+          "approaching_limit": "Near limit",
+          "over_limit": "Over limit"
+        }
       },
       "commercialUsageCard": {
         "title": "Staff & active players + founding offer",
@@ -774,10 +799,18 @@
         "club": "Club",
         "code": "Code",
         "createdAt": "Joined",
+        "lastActivity": "Last activity",
         "adminStatus": "Administrative status",
         "subscriptionStatus": "Subscription status",
-        "owner": "Owner"
+        "owner": "Owner",
+        "tenantHealth": "Health"
       },
+      "tenantHealthLabels": {
+        "HEALTHY": "Healthy",
+        "WATCH": "Watch",
+        "AT_RISK": "At risk"
+      },
+      "lastActivityNone": "No activity yet",
       "searchPlaceholder": "Search by name or code",
       "loadError": "Could not load clubs.",
       "flaggedDuplicate": "Possible duplicate",
@@ -842,7 +875,8 @@
         "tenantHealth": "Tenant health",
         "commercialSignals": "Commercial signals",
         "needsAttention": "Needs attention",
-        "revenue": "Revenue"
+        "revenue": "Revenue",
+        "commercialSnapshot": "Commercial snapshot"
       },
       "cards": {
         "totalClubs": "Total clubs",
@@ -851,27 +885,47 @@
         "blockedAccessClubs": "Clubs with blocked access (subscription)",
         "trialCount": "Active free trials",
         "expiringSoonCount": "Subscriptions expiring soon",
-        "newClubsThisMonth": "New clubs this month"
+        "newClubsThisMonth": "New clubs this month",
+        "payingTenants": "Paying tenants",
+        "activeTrials": "Active trials",
+        "trialsEndingSoon": "Trials ending soon",
+        "expiredActionRequired": "Expired / action required",
+        "mrr": "MRR",
+        "arr": "ARR",
+        "outstandingAmount": "Outstanding amount"
       },
-      "noSubscriptionClubs": {
-        "title": "Clubs with no subscription at all",
-        "description": "No subscription record exists for this club — needs manual review"
+      "snapshotLoadError": "Could not load the commercial snapshot.",
+      "trialConversionUnavailable": "Trial → paid conversion rate: not yet available (no reliable link exists between a trial and its resulting paid subscription in the current data model).",
+      "attentionLoadError": "Could not load the attention list.",
+      "attentionLoading": "Loading attention items…",
+      "attentionSeverity": {
+        "danger": "Urgent",
+        "warning": "Attention"
       },
-      "whatsappDisconnected": {
-        "title": "Clubs with WhatsApp disconnected",
-        "description": "Previously connected, now disconnected — needs review"
+      "attentionProblems": {
+        "whatsapp_disconnected": "WhatsApp is currently disconnected (was previously connected)",
+        "whatsapp_failures_zero": "No WhatsApp messages failed in the last 7 days",
+        "whatsapp_failures_one": "{{count}} WhatsApp message failed in the last 7 days",
+        "whatsapp_failures_other": "{{count}} WhatsApp messages failed in the last 7 days",
+        "flagged_duplicate": "Possible duplicate club — review before treating as a duplicate or fraud",
+        "no_subscription": "No subscription record exists for this club",
+        "pending_upgrade_request": "Upgrade request awaiting review ({{detail}})",
+        "expiring_soon": "Subscription ({{detail}}) ending soon",
+        "expired": "Subscription ({{detail}}) has expired and is not yet cancelled",
+        "over_plan_limit": "Over the plan limit: {{detail}}",
+        "near_plan_limit": "Approaching the plan limit: {{detail}}"
       },
-      "whatsappFailures": {
-        "title": "Failed WhatsApp messages (7d)",
-        "description": "Total failed send attempts across all clubs"
-      },
-      "flaggedDuplicateClubs": {
-        "title": "Possible duplicate club signups",
-        "description": "A new club's name closely matched an existing one at signup — review before it's mistaken for spam or a genuine duplicate"
-      },
-      "pendingUpgradeRequests": {
-        "title": "Upgrade requests awaiting review",
-        "description": "Open the relevant club's page from the club list to review them"
+      "attentionResourceLabels": {
+        "branches": "branches",
+        "fields": "fields",
+        "academy": "academy",
+        "staff": "staff",
+        "active_players": "active players",
+        "branch_limit": "branch limit",
+        "field_limit": "field limit",
+        "academy_limit": "academy limit",
+        "trial": "free trial",
+        "paid": "paid"
       },
       "newLeads": {
         "title": "New contact requests",
@@ -929,7 +983,8 @@
       "resetNoEmail": "This user has no email on file.",
       "resetError": "Couldn't send the password reset email.",
       "emptyTitle": "No matching results",
-      "emptyTitleNoOwners": "No club owners yet"
+      "emptyTitleNoOwners": "No club owners yet",
+      "resultCount": "{{count}} memberships"
     },
     "plansPage": {
       "title": "Plans",
@@ -972,7 +1027,8 @@
         "revenue": "Revenue",
         "renewal": "Renewals",
         "growth": "Growth",
-        "usage": "Usage"
+        "usage": "Usage",
+        "whatsapp": "WhatsApp"
       },
       "subscriptionColumns": {
         "club": "Club",
@@ -1004,6 +1060,14 @@
         "club": "Club",
         "branches": "Branches",
         "staff": "Staff"
+      },
+      "whatsappUsageColumns": {
+        "club": "Club",
+        "messages30d": "Messages (30d)",
+        "messages7d": "Messages (7d)",
+        "delivered30d": "Delivered (30d)",
+        "failed30d": "Failed (30d)",
+        "lastMessage": "Last message"
       },
       "lifecycleStatusLabels": {
         "trial": "Free trial",
@@ -4549,7 +4613,11 @@
     "deactivateError": "Couldn't deactivate this employee.",
     "resetPasswordError": "Couldn't generate a password setup link.",
     "setupLinkTitle": "Account setup link",
-    "setupLinkHint": "Send this link to the employee so they can set their own password. It is shown only once -- copy it now."
+    "setupLinkHint": "Send this link to the employee so they can set their own password. It is shown only once -- copy it now.",
+    "reasonLabel": "Reason",
+    "reasonPlaceholder": "Why are you making this change?",
+    "deactivateTitle": "Deactivate {{name}}",
+    "deactivateWarning": "This immediately revokes their access to the Platform Owner console and ends any active support session they hold. This can be undone later by reactivating them."
   },
   "platformRoles": {
     "title": "Platform Roles & Permissions",

@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useMutation, useQuery } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
@@ -10,7 +10,7 @@ import { DataTable, type DataTableColumn } from '@/components/ui/data-table'
 import { StatusBadge } from '@/components/ui/status-badge'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
-import { CLUB_STATUS_LABELS } from '@/features/platform/labels'
+import { CLUB_STATUS_LABELS, MEMBERSHIP_STATUS_LABELS } from '@/features/platform/labels'
 import { ErrorState } from '@/components/ui/error-state'
 import { translateSupabaseError } from '@/lib/errors'
 
@@ -40,6 +40,13 @@ interface OwnerRow {
 // real club count. Search is now server-side (p_search), so pagination
 // and search interact correctly instead of only filtering whatever
 // happened to already be fetched.
+//
+// Control Plane V1, Phase 9: this page used to keep accumulating every
+// fetched page into one ever-growing client-side array via a `pages`
+// counter and Promise.all/flatMap re-fetch-everything-so-far pattern --
+// real page-replace pagination now, matching PlatformClubsPage.tsx's
+// established convention (real server-side total_count from the RPC,
+// Prev/Next replacing the current page instead of appending to it).
 const PAGE_SIZE = 100
 
 // Cross-phase directive (U1): Platform Owner accounts had zero
@@ -60,44 +67,50 @@ async function fetchPlatformOwnerAccounts(): Promise<PlatformOwnerAccount[]> {
   return (data ?? []) as PlatformOwnerAccount[]
 }
 
-async function fetchOwners(search: string, offset: number): Promise<{ rows: OwnerRow[]; hasMore: boolean }> {
+async function fetchOwners(search: string, page: number): Promise<{ rows: OwnerRow[]; totalCount: number }> {
   const { data, error } = await supabase.rpc('get_platform_club_owners', {
     p_search: search.trim() || undefined,
     p_limit: PAGE_SIZE,
-    p_offset: offset,
+    p_offset: page * PAGE_SIZE,
   })
   if (error) throw error
-  const rows = (data ?? []) as OwnerRow[]
-  return { rows, hasMore: rows.length === PAGE_SIZE }
+  const rows = (data ?? []) as (OwnerRow & { total_count?: number })[]
+  return { rows, totalCount: Number(rows[0]?.total_count ?? 0) }
 }
-
-const MEMBERSHIP_STATUS_LABELS: Record<string, string> = { active: 'نشطة', suspended: 'موقوفة', removed: 'ملغاة' }
 
 export function PlatformOwnersPage() {
   const { t } = useTranslation()
   const { locale } = useDirection()
-  const [search, setSearch] = useState('')
-  const [pages, setPages] = useState(1)
+  const [searchInput, setSearchInput] = useState('')
+  const [debouncedSearch, setDebouncedSearch] = useState('')
+  const [page, setPage] = useState(0)
   const [resetSentFor, setResetSentFor] = useState<string | null>(null)
   const [resetError, setResetError] = useState<string | null>(null)
+
+  // Same debounce convention as PlatformClubsPage.tsx -- avoid firing a
+  // server round trip on every keystroke.
+  useEffect(() => {
+    const timer = setTimeout(() => setDebouncedSearch(searchInput), 300)
+    return () => clearTimeout(timer)
+  }, [searchInput])
+  useEffect(() => { setPage(0) }, [debouncedSearch])
+
   const { data, isLoading, isFetching, isError, error, refetch } = useQuery({
-    queryKey: ['platform-owners', search, pages],
-    queryFn: async () => {
-      const results = await Promise.all(Array.from({ length: pages }, (_, i) => fetchOwners(search, i * PAGE_SIZE)))
-      const lastPage = results.at(-1)
-      return { rows: results.flatMap((r) => r.rows), hasMore: lastPage?.hasMore ?? false }
-    },
+    queryKey: ['platform-owners', debouncedSearch, page],
+    queryFn: () => fetchOwners(debouncedSearch, page),
+    placeholderData: (prev) => prev,
   })
-  const owners = data?.rows ?? []
+  // `data?.rows ?? []` would create a fresh array reference every render
+  // whenever `data` is undefined (e.g. mid-fetch with no placeholderData
+  // yet) -- memoized so sortedFiltered's own useMemo below doesn't
+  // recompute on every render for no reason.
+  const owners = useMemo(() => data?.rows ?? [], [data])
+  const totalCount = data?.totalCount ?? 0
+  const totalPages = Math.max(1, Math.ceil(totalCount / PAGE_SIZE))
   const { data: platformOwnerAccounts = [] } = useQuery({
     queryKey: ['platform-owner-accounts'],
     queryFn: fetchPlatformOwnerAccounts,
   })
-
-  function updateSearch(value: string) {
-    setSearch(value)
-    setPages(1)
-  }
 
   // Platform Owner & Password Security directive item 17/18: the
   // preferred admin action is "send a reset email", never viewing or
@@ -268,7 +281,7 @@ export function PlatformOwnersPage() {
           club's billing/entitlements). */}
       {platformOwnerAccounts.length > 0 && (
         <div className="mb-6 rounded-lg border border-border p-4">
-          <p className="mb-2 text-sm font-medium text-text-primary">{t('platform.ownersPage.platformOwnersHeading')}</p>
+          <h2 className="mb-2 text-sm font-medium text-text-primary">{t('platform.ownersPage.platformOwnersHeading')}</h2>
           <div className="flex flex-col gap-2">
             {platformOwnerAccounts.map((acc) => (
               <div key={acc.user_id} className="flex flex-wrap items-center justify-between gap-2 text-sm">
@@ -287,32 +300,35 @@ export function PlatformOwnersPage() {
         </div>
       )}
 
-      {/* Phase I directive (I1): these 3 cards are computed from the
-          currently LOADED page(s), not the true platform-wide total, now
-          that this screen is genuinely paginated. Rather than silently
-          understate once there's more than one page (the exact "no
-          silent caps" failure mode the audit warns against), each card
-          shows a "+ more" qualifier whenever more data exists beyond
-          what's loaded. */}
+      {/* Control Plane V1, Phase 9: these 3 cards are computed from the
+          currently LOADED page only, now that this screen is genuinely
+          page-replace paginated (real server-side total_count) instead
+          of an ever-growing accumulation -- a "+ more" qualifier is
+          shown whenever the true platform-wide total exceeds what's on
+          this page, so the cards never silently understate. */}
       <div className="mb-4 grid grid-cols-2 gap-4 md:grid-cols-3">
         <StatCard
           label={t('platform.ownersPage.cards.uniqueOwners')}
-          value={data?.hasMore ? t('platform.ownersPage.cards.atLeastValue', { count: uniqueOwners }) : String(uniqueOwners)}
+          value={totalCount > owners.length ? t('platform.ownersPage.cards.atLeastValue', { count: uniqueOwners }) : String(uniqueOwners)}
         />
         <StatCard
           label={t('platform.ownersPage.cards.totalMemberships')}
-          value={data?.hasMore ? t('platform.ownersPage.cards.atLeastValue', { count: owners.length }) : String(owners.length)}
+          value={String(totalCount)}
         />
         <StatCard
           label={t('platform.ownersPage.cards.multiClubOwners')}
-          value={data?.hasMore ? t('platform.ownersPage.cards.atLeastValue', { count: multiClubOwners }) : String(multiClubOwners)}
+          value={totalCount > owners.length ? t('platform.ownersPage.cards.atLeastValue', { count: multiClubOwners }) : String(multiClubOwners)}
         />
       </div>
       <div className="mb-4 max-w-sm">
+        <label htmlFor="platform-owners-search" className="sr-only">
+          {t('platform.ownersPage.searchPlaceholder')}
+        </label>
         <Input
+          id="platform-owners-search"
           placeholder={t('platform.ownersPage.searchPlaceholder')}
-          value={search}
-          onChange={(e) => updateSearch(e.target.value)}
+          value={searchInput}
+          onChange={(e) => setSearchInput(e.target.value)}
         />
       </div>
       {resetError && <p role="alert" className="mb-3 text-sm text-status-danger">{resetError}</p>}
@@ -321,13 +337,20 @@ export function PlatformOwnersPage() {
         rows={sortedFiltered}
         rowKey={(o) => o.membership_id}
         isLoading={isLoading}
-        emptyTitle={search ? t('platform.ownersPage.emptyTitle') : t('platform.ownersPage.emptyTitleNoOwners')}
+        emptyTitle={debouncedSearch ? t('platform.ownersPage.emptyTitle') : t('platform.ownersPage.emptyTitleNoOwners')}
       />
-      {data?.hasMore && (
-        <div className="mt-4 flex justify-center">
-          <Button variant="outline" onClick={() => setPages((p) => p + 1)} disabled={isFetching}>
-            {isFetching ? t('platform.clubsPage.loadingMore') : t('platform.clubsPage.loadMore')}
-          </Button>
+      {totalCount > 0 && (
+        <div className="mt-4 flex items-center justify-between text-sm text-text-secondary">
+          <span>{t('platform.ownersPage.resultCount', { count: totalCount })}</span>
+          <div className="flex items-center gap-2">
+            <Button variant="outline" size="sm" disabled={page === 0 || isFetching} onClick={() => setPage((p) => p - 1)}>
+              {t('platform.clubsPage.prevPage')}
+            </Button>
+            <span>{t('platform.clubsPage.pageOf', { page: page + 1, total: totalPages })}</span>
+            <Button variant="outline" size="sm" disabled={page + 1 >= totalPages || isFetching} onClick={() => setPage((p) => p + 1)}>
+              {t('platform.clubsPage.nextPage')}
+            </Button>
+          </div>
         </div>
       )}
     </div>
