@@ -493,7 +493,8 @@
         "outreachChannelOptions": {
           "email": "Email",
           "phone_script": "Phone script",
-          "whatsapp_talking_points": "WhatsApp talking points"
+          "whatsapp_talking_points": "WhatsApp talking points",
+          "whatsapp_message": "WhatsApp message"
         },
         "outreachLanguageOptions": {
           "en": "English",
@@ -507,7 +508,20 @@
           "sent": "Sent",
           "failed": "Failed"
         },
-        "outreachNoEditNotice": "Editing AI-generated text in place is not supported yet. Regenerate a new draft instead -- it goes through the same quality gate and approval flow.",
+        "outreachNoEditNotice": "Editing AI-generated text in place is only supported for WhatsApp message drafts (see Edit below). For every other channel, regenerate a new draft instead -- it goes through the same quality gate and approval flow.",
+        "outreachEditedBadge": "Edited by owner",
+        "outreachEditButton": "Edit",
+        "outreachEditTitle": "Edit this WhatsApp draft",
+        "outreachEditBodyLabel": "Message text",
+        "outreachEditSave": "Save edit",
+        "outreachEditSaving": "Saving...",
+        "outreachEditError": "Could not save this edit.",
+        "outreachSendButton": "Send via Platform WhatsApp",
+        "outreachSending": "Sending...",
+        "outreachSendError": "Could not send this message.",
+        "outreachSendFrom": "Will send from: {{number}}",
+        "outreachWhatsappNotConnected": "Platform WhatsApp is not connected ({{status}}).",
+        "outreachGoToWhatsappSettings": "Go to Platform WhatsApp settings",
         "channels": "Outreach Channels",
         "channelEmail": "Email",
         "channelWhatsapp": "WhatsApp",

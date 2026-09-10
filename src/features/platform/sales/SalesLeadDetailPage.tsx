@@ -30,6 +30,7 @@ import { FormattedDate } from '@/components/ui/formatted-date'
 import { FormLabel } from '@/components/ui/form-label'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { MessageCircle } from 'lucide-react'
 import { SALES_DISPLAY_TIMEZONE } from './salesTimeZone'
 
 // PLATFORM OWNER OPERATIONAL GAP CLOSURE -- Workstream 2 (2026-09-09):
@@ -59,7 +60,12 @@ const CONFIRM_REQUIRED_STATUSES = new Set(['lost', 'do_not_contact'])
 
 const DEMO_OUTCOMES = ['positive', 'neutral', 'negative', 'no_show']
 const OUTREACH_MESSAGE_TYPES = ['intro', 'offer', 'followup', 'demo_pitch', 'proposal_summary']
-const OUTREACH_CHANNELS = ['email', 'phone_script', 'whatsapp_talking_points']
+// OWNER DECISION #20 FRONTEND (2026-09-10): 'whatsapp_message' is a NEW,
+// genuinely distinct channel -- a single, literal, send-ready WhatsApp
+// message -- structurally separate from 'whatsapp_talking_points' (a
+// human call/chat script that stays permanently un-sendable; see
+// 20260910110000_sales_whatsapp_message_channel_and_edit_tracking.sql).
+const OUTREACH_CHANNELS = ['email', 'phone_script', 'whatsapp_talking_points', 'whatsapp_message']
 
 interface LeadProfile {
   lead: {
@@ -91,6 +97,8 @@ interface LeadProfile {
     id: string; channel: string; message_type: string; language: string; subject: string | null; body: string; status: string; created_at: string
     quality_status?: string | null
     quality_gate_result?: { gates?: Record<string, boolean>; rejection_reasons?: string[] } | null
+    edited_body?: string | null
+    edited_at?: string | null
   }>
   followups: Array<{ id: string; reason: string; scheduled_at: string; status: string }>
   status_history: Array<{ from_status: string | null; to_status: string; reason: string | null; changed_at: string }>
@@ -148,6 +156,23 @@ async function fetchOutreachEvents(leadId: string): Promise<OutreachEvent[]> {
   return (data ?? []) as unknown as OutreachEvent[]
 }
 
+// OWNER DECISION #20 FRONTEND: Send step needs to know which Platform
+// WhatsApp account will send and whether it's connected, before
+// offering a Send button. get_platform_whatsapp_sender_identity() is a
+// narrow read scoped exactly to that -- see
+// 20260910120000_sales_platform_whatsapp_send_enabled.sql.
+interface PlatformWhatsAppSenderIdentity {
+  status: string
+  connected_phone_number: string | null
+}
+
+async function fetchPlatformWhatsAppSenderIdentity(): Promise<PlatformWhatsAppSenderIdentity | null> {
+  const { data, error } = await supabase.rpc('get_platform_whatsapp_sender_identity')
+  if (error) throw error
+  const row = Array.isArray(data) ? data[0] : data
+  return (row ?? null) as PlatformWhatsAppSenderIdentity | null
+}
+
 function scoreBandTone(band: string | null): 'danger' | 'warning' | 'neutral' {
   if (band === 'hot') return 'danger'
   if (band === 'warm') return 'warning'
@@ -200,6 +225,14 @@ export function SalesLeadDetailPage() {
   const [regenChannel, setRegenChannel] = useState('email')
   const [regenLanguage, setRegenLanguage] = useState<'ar' | 'en'>('ar')
 
+  // OWNER DECISION #20 FRONTEND: Edit (whatsapp_message drafts, status
+  // generated/approved) and explicit Send (whatsapp_message drafts,
+  // status approved, via Platform WhatsApp only).
+  const [editDialogFor, setEditDialogFor] = useState<string | null>(null)
+  const [editBody, setEditBody] = useState('')
+  const [editError, setEditError] = useState<string | null>(null)
+  const [sendErrors, setSendErrors] = useState<Record<string, string>>({})
+
   const profileQuery = useQuery({
     queryKey: ['sales-lead-profile', leadId],
     queryFn: () => fetchProfile(leadId!),
@@ -221,6 +254,16 @@ export function SalesLeadDetailPage() {
   const outreachEventsQuery = useQuery({
     queryKey: ['sales-lead-outreach-events', leadId],
     queryFn: () => fetchOutreachEvents(leadId!),
+    enabled: !!leadId,
+  })
+
+  // Only needed once a whatsapp_message draft exists on this lead --
+  // still cheap/harmless to fetch unconditionally (narrow, read-only,
+  // no p_lead_id parameter -- it's the platform account's own status,
+  // not lead-scoped), matching how eligibilityQuery etc. run eagerly too.
+  const whatsappSenderQuery = useQuery({
+    queryKey: ['platform-whatsapp-sender-identity'],
+    queryFn: fetchPlatformWhatsAppSenderIdentity,
     enabled: !!leadId,
   })
 
@@ -440,11 +483,59 @@ export function SalesLeadDetailPage() {
     },
   })
 
-  // No "edit a draft" RPC exists in this architecture (deliberately not
-  // invented this pass -- see the code comment near the outreach section
-  // below). "Regenerate" calls the same generation Edge Function used
-  // everywhere else in this module; the fresh draft goes through the
+  // OWNER DECISION #20 FRONTEND (2026-09-10): sales_edit_outreach_draft()
+  // now exists (20260910130000_sales_edit_outreach_draft.sql) -- but only
+  // for channel='whatsapp_message' drafts in this UI (the owner's exact
+  // required workflow: Generate -> Review -> Edit (optional) -> Approve
+  // -> Send). Every other channel keeps "Regenerate" as its only revision
+  // path, unchanged. "Regenerate" calls the same generation Edge Function
+  // used everywhere else in this module; the fresh draft goes through the
   // same quality gate and approval flow as any other generation.
+  const editMessageMutation = useMutation({
+    mutationFn: async () => {
+      const { error } = await supabase.rpc('sales_edit_outreach_draft', {
+        p_message_id: editDialogFor!,
+        p_edited_body: editBody,
+      })
+      if (error) throw error
+    },
+    onSuccess: () => {
+      setEditDialogFor(null)
+      setEditBody('')
+      setEditError(null)
+      invalidate()
+    },
+    onError: (error: { message?: string }) => {
+      setEditError(translateSupabaseError(error, t('platform.sales.leadProfile.outreachEditError')))
+    },
+  })
+
+  // OWNER DECISION #20 FRONTEND: explicit Send action, separate from
+  // Approve -- "Approval does NOT silently send unless the owner
+  // explicitly presses Send" is the owner's own literal requirement.
+  // Only ever called for channel='whatsapp_message' + status='approved'
+  // rows; the RPC itself re-checks both server-side regardless.
+  const sendWhatsAppMutation = useMutation({
+    mutationFn: async (messageId: string) => {
+      const { error } = await supabase.rpc('sales_queue_platform_whatsapp_message', { p_message_id: messageId })
+      if (error) throw error
+    },
+    onSuccess: (_data, messageId) => {
+      setSendErrors((prev) => {
+        const next = { ...prev }
+        delete next[messageId]
+        return next
+      })
+      invalidate()
+    },
+    onError: (error: { message?: string }, messageId) => {
+      setSendErrors((prev) => ({
+        ...prev,
+        [messageId]: translateSupabaseError(error, t('platform.sales.leadProfile.outreachSendError')),
+      }))
+    },
+  })
+
   const regenerateMutation = useMutation({
     mutationFn: async () => {
       const { data: sessionData } = await supabase.auth.getSession()
@@ -790,17 +881,18 @@ export function SalesLeadDetailPage() {
         </CardHeader>
         <CardContent className="space-y-2">
           {/* AI GENERATES/ASSISTS, OWNER REVIEWS, OWNER AUTHORIZES SEND.
-              There is no in-place edit of AI-generated draft text in this
-              pass -- no versioned-edit RPC exists in this architecture,
-              and inventing one is a real product decision out of scope
-              here (mission's own instruction). "Regenerate" (above) is
-              the only way to get a revised draft; it produces a NEW
-              message through the same generation -> quality-gate ->
-              approval flow as any other draft, it does not mutate an
-              existing one. */}
-          {(approveError || rejectError || queueError || regenerateError) && (
+              OWNER DECISION #20 (2026-09-10): channel='whatsapp_message'
+              drafts now support in-place Edit (sales_edit_outreach_draft)
+              and an explicit Send through Platform WhatsApp
+              (sales_queue_platform_whatsapp_message) -- see the two
+              action blocks below. Every other channel is unchanged:
+              "Regenerate" (above) remains the only way to get a revised
+              draft for them; it produces a NEW message through the same
+              generation -> quality-gate -> approval flow as any other
+              draft, it does not mutate an existing one. */}
+          {(approveError || rejectError || queueError || regenerateError || editError) && (
             <p role="alert" className="text-sm text-status-danger">
-              {approveError || rejectError || queueError || regenerateError}
+              {approveError || rejectError || queueError || regenerateError || editError}
             </p>
           )}
           {regenerateMutation.isSuccess && (
@@ -810,68 +902,132 @@ export function SalesLeadDetailPage() {
             <p className="text-sm text-text-secondary">—</p>
           ) : (
             <ul className="space-y-2">
-              {outreach_messages.map((m, index) => (
-                <li
-                  key={m.id}
-                  className={`rounded-md border p-2 text-sm ${index === 0 ? 'border-primary/40 bg-primary/5' : 'border-border-subtle'}`}
-                >
-                  <div className="flex items-center justify-between gap-2">
-                    <span className="flex items-center gap-2">
-                      {index === 0 && (
-                        <StatusBadge tone="info" label={t('platform.sales.leadProfile.outreachLatestBadge')} />
-                      )}
-                      {m.channel} · {m.message_type}
-                    </span>
-                    <StatusBadge
-                      tone={m.status === 'sent' || m.status === 'approved' || m.status === 'queued' ? 'success' : m.status === 'failed' || m.status === 'rejected' ? 'danger' : 'info'}
-                      label={t(`platform.sales.leadProfile.outreachStatus.${m.status}`, m.status)}
-                    />
-                  </div>
-                  {m.quality_status && (
-                    <div className="mt-1 flex flex-wrap items-center gap-2">
-                      <StatusBadge
-                        tone={m.quality_status === 'approval_ready' ? 'success' : m.quality_status === 'quality_rejected' ? 'danger' : 'neutral'}
-                        label={t(`platform.sales.leadProfile.qualityStatus.${m.quality_status}`, m.quality_status)}
-                      />
-                      {m.quality_status === 'quality_rejected' && m.quality_gate_result?.rejection_reasons && m.quality_gate_result.rejection_reasons.length > 0 && (
-                        <span className="text-xs text-status-danger">
-                          {m.quality_gate_result.rejection_reasons.join(', ')}
+              {outreach_messages.map((m, index) => {
+                const isWhatsAppMessage = m.channel === 'whatsapp_message'
+                const effectiveBody = m.edited_body ?? m.body
+                const senderIdentity = whatsappSenderQuery.data
+                const isPlatformWhatsAppConnected = senderIdentity?.status === 'connected'
+                return (
+                  <li
+                    key={m.id}
+                    className={`rounded-md border p-2 text-sm ${index === 0 ? 'border-primary/40 bg-primary/5' : 'border-border-subtle'}`}
+                  >
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="flex items-center gap-2">
+                        {index === 0 && (
+                          <StatusBadge tone="info" label={t('platform.sales.leadProfile.outreachLatestBadge')} />
+                        )}
+                        {isWhatsAppMessage && <MessageCircle className="size-4 text-status-success" aria-hidden="true" />}
+                        <span>
+                          {isWhatsAppMessage ? t('platform.sales.leadProfile.outreachChannelOptions.whatsapp_message') : m.channel} · {m.message_type}
                         </span>
-                      )}
+                      </span>
+                      <StatusBadge
+                        tone={m.status === 'sent' || m.status === 'approved' || m.status === 'queued' ? 'success' : m.status === 'failed' || m.status === 'rejected' ? 'danger' : 'info'}
+                        label={t(`platform.sales.leadProfile.outreachStatus.${m.status}`, m.status)}
+                      />
                     </div>
-                  )}
-                  {m.subject && <p className="mt-1 font-medium">{m.subject}</p>}
-                  <p className="text-text-secondary">{m.body.slice(0, 200)}</p>
+                    {m.quality_status && (
+                      <div className="mt-1 flex flex-wrap items-center gap-2">
+                        <StatusBadge
+                          tone={m.quality_status === 'approval_ready' ? 'success' : m.quality_status === 'quality_rejected' ? 'danger' : 'neutral'}
+                          label={t(`platform.sales.leadProfile.qualityStatus.${m.quality_status}`, m.quality_status)}
+                        />
+                        {m.quality_status === 'quality_rejected' && m.quality_gate_result?.rejection_reasons && m.quality_gate_result.rejection_reasons.length > 0 && (
+                          <span className="text-xs text-status-danger">
+                            {m.quality_gate_result.rejection_reasons.join(', ')}
+                          </span>
+                        )}
+                      </div>
+                    )}
+                    {m.subject && <p className="mt-1 font-medium">{m.subject}</p>}
+                    <p className="text-text-secondary">{effectiveBody.slice(0, 200)}</p>
+                    {m.edited_body != null && (
+                      <p className="mt-1 text-xs text-text-secondary">{t('platform.sales.leadProfile.outreachEditedBadge')}</p>
+                    )}
 
-                  {m.status === 'generated' && (
-                    <div className="mt-2 flex flex-wrap gap-2">
-                      <Button
-                        size="sm"
-                        onClick={() => approveMessageMutation.mutate(m.id)}
-                        disabled={m.quality_status !== 'approval_ready' || approveMessageMutation.isPending}
-                        title={m.quality_status !== 'approval_ready' ? t('platform.sales.leadProfile.qualityStatus.quality_rejected') : undefined}
-                      >
-                        {approveMessageMutation.isPending ? t('platform.sales.leadProfile.outreachApproving') : t('platform.sales.leadProfile.outreachApproveButton')}
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={() => { setRejectDialogFor(m.id); setRejectReason(''); setRejectError(null) }}
-                        disabled={rejectMessageMutation.isPending}
-                      >
-                        {t('platform.sales.leadProfile.outreachRejectButton')}
-                      </Button>
-                    </div>
-                  )}
-                  {m.status === 'approved' && m.channel === 'email' && (
-                    <div className="mt-2">
-                      <Button size="sm" onClick={() => queueMessageMutation.mutate(m.id)} disabled={queueMessageMutation.isPending}>
-                        {queueMessageMutation.isPending ? t('platform.sales.leadProfile.outreachQueuing') : t('platform.sales.leadProfile.outreachQueueButton')}
-                      </Button>
-                    </div>
-                  )}
-                </li>
-              ))}
+                    {m.status === 'generated' && (
+                      <div className="mt-2 flex flex-wrap gap-2">
+                        <Button
+                          size="sm"
+                          onClick={() => approveMessageMutation.mutate(m.id)}
+                          disabled={m.quality_status !== 'approval_ready' || approveMessageMutation.isPending}
+                          title={m.quality_status !== 'approval_ready' ? t('platform.sales.leadProfile.qualityStatus.quality_rejected') : undefined}
+                        >
+                          {approveMessageMutation.isPending ? t('platform.sales.leadProfile.outreachApproving') : t('platform.sales.leadProfile.outreachApproveButton')}
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => { setRejectDialogFor(m.id); setRejectReason(''); setRejectError(null) }}
+                          disabled={rejectMessageMutation.isPending}
+                        >
+                          {t('platform.sales.leadProfile.outreachRejectButton')}
+                        </Button>
+                        {isWhatsAppMessage && (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => { setEditDialogFor(m.id); setEditBody(effectiveBody); setEditError(null) }}
+                          >
+                            {t('platform.sales.leadProfile.outreachEditButton')}
+                          </Button>
+                        )}
+                      </div>
+                    )}
+                    {m.status === 'approved' && m.channel === 'email' && (
+                      <div className="mt-2">
+                        <Button size="sm" onClick={() => queueMessageMutation.mutate(m.id)} disabled={queueMessageMutation.isPending}>
+                          {queueMessageMutation.isPending ? t('platform.sales.leadProfile.outreachQueuing') : t('platform.sales.leadProfile.outreachQueueButton')}
+                        </Button>
+                      </div>
+                    )}
+                    {m.status === 'approved' && isWhatsAppMessage && (
+                      <div className="mt-2 space-y-2 rounded-md border border-border-subtle bg-surface p-2">
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => { setEditDialogFor(m.id); setEditBody(effectiveBody); setEditError(null) }}
+                        >
+                          {t('platform.sales.leadProfile.outreachEditButton')}
+                        </Button>
+                        {whatsappSenderQuery.isLoading ? (
+                          <p className="text-xs text-text-secondary">{t('common.loading')}</p>
+                        ) : isPlatformWhatsAppConnected ? (
+                          <>
+                            <p className="text-xs text-text-secondary">
+                              {t('platform.sales.leadProfile.outreachSendFrom', { number: senderIdentity?.connected_phone_number ?? '—' })}
+                            </p>
+                            <Button
+                              size="sm"
+                              onClick={() => sendWhatsAppMutation.mutate(m.id)}
+                              disabled={sendWhatsAppMutation.isPending}
+                            >
+                              {sendWhatsAppMutation.isPending && sendWhatsAppMutation.variables === m.id
+                                ? t('platform.sales.leadProfile.outreachSending')
+                                : t('platform.sales.leadProfile.outreachSendButton')}
+                            </Button>
+                          </>
+                        ) : (
+                          <div className="space-y-1">
+                            <p className="text-xs text-status-danger">
+                              {t('platform.sales.leadProfile.outreachWhatsappNotConnected', {
+                                status: t(`whatsapp.statusLabels.${senderIdentity?.status ?? 'disconnected'}`, senderIdentity?.status ?? '—'),
+                              })}
+                            </p>
+                            <Link to="/platform/whatsapp" className="text-xs text-accent-foreground hover:underline">
+                              {t('platform.sales.leadProfile.outreachGoToWhatsappSettings')}
+                            </Link>
+                          </div>
+                        )}
+                        {sendErrors[m.id] && (
+                          <p role="alert" className="text-xs text-status-danger">{sendErrors[m.id]}</p>
+                        )}
+                      </div>
+                    )}
+                  </li>
+                )
+              })}
             </ul>
           )}
           <p className="text-xs text-text-secondary">{t('platform.sales.leadProfile.outreachNoEditNotice')}</p>
@@ -1209,6 +1365,37 @@ export function SalesLeadDetailPage() {
                 <Button variant="outline" onClick={() => setRejectDialogFor(null)}>{t('common.cancel')}</Button>
                 <Button variant="destructive" disabled={rejectMessageMutation.isPending} onClick={() => rejectMessageMutation.mutate()}>
                   {rejectMessageMutation.isPending ? t('platform.sales.leadProfile.outreachRejecting') : t('platform.sales.leadProfile.outreachRejectButton')}
+                </Button>
+              </div>
+            </div>
+          </DialogContent>
+        </Dialog>
+      )}
+
+      {editDialogFor && (
+        <Dialog open onOpenChange={(open) => { if (!open) setEditDialogFor(null) }}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>{t('platform.sales.leadProfile.outreachEditTitle')}</DialogTitle>
+            </DialogHeader>
+            <div className="flex flex-col gap-4">
+              <div className="flex flex-col gap-1">
+                <FormLabel htmlFor="edit-outreach-body">{t('platform.sales.leadProfile.outreachEditBodyLabel')}</FormLabel>
+                <textarea
+                  id="edit-outreach-body"
+                  className="min-h-40 w-full rounded-md border border-border-subtle p-2 text-sm"
+                  value={editBody}
+                  onChange={(e) => setEditBody(e.target.value)}
+                />
+              </div>
+              {editError && <p role="alert" className="text-sm text-status-danger">{editError}</p>}
+              <div className="flex justify-end gap-2">
+                <Button variant="outline" onClick={() => setEditDialogFor(null)}>{t('common.cancel')}</Button>
+                <Button
+                  disabled={!editBody.trim() || editMessageMutation.isPending}
+                  onClick={() => editMessageMutation.mutate()}
+                >
+                  {editMessageMutation.isPending ? t('platform.sales.leadProfile.outreachEditSaving') : t('platform.sales.leadProfile.outreachEditSave')}
                 </Button>
               </div>
             </div>

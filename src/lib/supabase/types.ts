@@ -10395,6 +10395,14 @@ export type Database = {
           pending_count: number
         }[]
       }
+      // NEW (owner decision #20 frontend, 2026-09-10) -- see
+      // 20260910120000_sales_platform_whatsapp_send_enabled.sql. Narrow
+      // read of the Platform WhatsApp account's status + connected
+      // number, for the Sales send UI to gate the Send button.
+      get_platform_whatsapp_sender_identity: {
+        Args: never
+        Returns: { connected_phone_number: string; status: string }[]
+      }
       get_player_360_summary: {
         Args: { p_club_id: string; p_player_id: string }
         Returns: Json
@@ -12170,6 +12178,14 @@ export type Database = {
         Args: { p_search_params: Json; p_source_key: string }
         Returns: string
       }
+      // NEW (owner decision #20 frontend, 2026-09-10) -- see
+      // 20260910130000_sales_edit_outreach_draft.sql. Writes only
+      // edited_body/edited_at/edited_by (never body itself); allowed
+      // while status is generated or approved.
+      sales_edit_outreach_draft: {
+        Args: { p_edited_body: string; p_message_id: string }
+        Returns: undefined
+      }
       sales_find_duplicate_candidates: {
         Args: {
           p_city: string
@@ -12237,10 +12253,10 @@ export type Database = {
         Args: { p_message_id: string }
         Returns: undefined
       }
-      // Deliberately disabled server-side (unconditional raise) pending
-      // an owner decision -- see FINAL_OWNER_DECISIONS_REQUIRED.md #20
-      // and this RPC's own migration comment
-      // (20260909200000_platform_whatsapp_domain.sql).
+      // ENABLED (owner decision #20, 2026-09-10) -- see
+      // 20260910120000_sales_platform_whatsapp_send_enabled.sql. Queues
+      // an approved, channel=whatsapp_message draft for sending through
+      // Platform WhatsApp only; one queue row per message ever.
       sales_queue_platform_whatsapp_message: {
         Args: { p_message_id: string }
         Returns: string

@@ -493,7 +493,8 @@
         "outreachChannelOptions": {
           "email": "بريد إلكتروني",
           "phone_script": "نص مكالمة هاتفية",
-          "whatsapp_talking_points": "نقاط حديث واتساب"
+          "whatsapp_talking_points": "نقاط حديث واتساب",
+          "whatsapp_message": "رسالة واتساب"
         },
         "outreachLanguageOptions": {
           "en": "الإنجليزية",
@@ -507,7 +508,20 @@
           "sent": "أُرسلت",
           "failed": "فشلت"
         },
-        "outreachNoEditNotice": "تعديل نص الذكاء الاصطناعي مباشرةً غير مدعوم بعد. أعد توليد مسودة جديدة بدلًا من ذلك — تمر بنفس بوابة الجودة ومسار الاعتماد.",
+        "outreachNoEditNotice": "تعديل نص الذكاء الاصطناعي مباشرةً مدعوم فقط لمسودات رسائل واتساب (زر التعديل أدناه). أما بقية القنوات فأعد توليد مسودة جديدة بدلًا من ذلك — تمر بنفس بوابة الجودة ومسار الاعتماد.",
+        "outreachEditedBadge": "تم تعديلها من قِبل المالك",
+        "outreachEditButton": "تعديل",
+        "outreachEditTitle": "تعديل مسودة رسالة الواتساب هذه",
+        "outreachEditBodyLabel": "نص الرسالة",
+        "outreachEditSave": "حفظ التعديل",
+        "outreachEditSaving": "جارٍ الحفظ...",
+        "outreachEditError": "تعذّر حفظ هذا التعديل.",
+        "outreachSendButton": "إرسال عبر واتساب المنصة",
+        "outreachSending": "جارٍ الإرسال...",
+        "outreachSendError": "تعذّر إرسال هذه الرسالة.",
+        "outreachSendFrom": "سيتم الإرسال من: {{number}}",
+        "outreachWhatsappNotConnected": "واتساب المنصة غير متصل ({{status}}).",
+        "outreachGoToWhatsappSettings": "الانتقال إلى إعدادات واتساب المنصة",
         "channels": "قنوات التواصل",
         "channelEmail": "البريد الإلكتروني",
         "channelWhatsapp": "واتساب",
