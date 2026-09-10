@@ -255,7 +255,7 @@ describeIfOwnerConfigured('platform_get_whatsapp_own_qr() vs platform_get_whatsa
 const canRunStaff = !!(SUPABASE_URL && SUPABASE_ANON_KEY && STAFF_EMAIL && STAFF_PASSWORD)
 const describeIfStaffConfigured = canRunStaff ? describe : describe.skip
 
-describeIfStaffConfigured('Platform WhatsApp (own) RPCs -- a staff member without platform.whatsapp.manage is rejected from every variant (live integration)', () => {
+describeIfStaffConfigured('Platform WhatsApp (own) RPCs -- a staff member without platform.whatsapp_platform.manage is rejected from every variant (live integration)', () => {
   let client: SupabaseClient
 
   beforeAll(async () => {

@@ -96,7 +96,7 @@ const navSections: NavSection[] = [
     items: [
       { to: '/platform/reports', labelKey: 'platform.nav.reports', icon: BarChart3, requiredPermissions: ['platform.finance.view'] },
       { to: '/platform/alerts', labelKey: 'platform.nav.alerts', icon: Bell, requiredPermissions: ['platform.club.view'] },
-      { to: '/platform/whatsapp', labelKey: 'platform.nav.platformWhatsapp', icon: MessageCircle, requiredPermissions: ['platform.whatsapp.manage'] },
+      { to: '/platform/whatsapp', labelKey: 'platform.nav.platformWhatsapp', icon: MessageCircle, requiredPermissions: ['platform.whatsapp_platform.manage'] },
       { to: '/platform/trials', labelKey: 'platform.nav.trials', icon: Award, requiredPermissions: ['platform.subscription.view'] },
       { to: '/platform/audit', labelKey: 'platform.nav.auditLog', icon: ShieldCheck, requiredPermissions: ['platform.audit.view'] },
       // PLATFORM OWNER AUTONOMOUS COMPLETION -- Phase E (2026-08-29):

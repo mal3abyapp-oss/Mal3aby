@@ -17,7 +17,7 @@
 -- tables, same "record intent, the connector's own 3s poll picks it up"
 -- model, same status enum). The only thing that changes is the
 -- authorization check: is_platform_owner() OR
--- has_platform_permission('platform.whatsapp.manage') instead of
+-- has_platform_permission('platform.whatsapp_tenant.manage') instead of
 -- club membership. Every action also writes to the platform-wide
 -- audit_logs table (via write_audit_log), matching every other
 -- platform_* RPC's convention -- the existing club-facing RPCs only
@@ -25,11 +25,29 @@
 -- owner acting on their own account isn't a platform-level event; a
 -- platform staff member acting on someone else's tenant is.
 --
--- New permission key: platform.whatsapp.manage (connect/disconnect/
+-- New permission key: platform.whatsapp_tenant.manage (connect/disconnect/
 -- reconnect a club's WhatsApp session on their behalf). Read access
 -- reuses the existing platform.club.view permission (already required
 -- by get_platform_whatsapp_health) -- no new read-only permission key
 -- needed, consistent with how Tenant 360's other operational cards work.
+--
+-- PERMISSION SEPARATION (owner decision #21, resolved after initial
+-- implementation): originally a single platform.whatsapp.manage key
+-- governed BOTH this file's tenant-club WhatsApp actions AND the
+-- separate Platform WhatsApp domain (20260909200000_platform_whatsapp_
+-- domain.sql). The owner explicitly rejected that -- a staff member
+-- trusted to support a club's WhatsApp connection must NOT
+-- automatically gain permission to control Mal3aby's own Platform
+-- WhatsApp account or send Mal3aby sales outreach, and vice versa.
+-- Renamed to platform.whatsapp_tenant.manage here (this file's exact
+-- scope: inspect/QR/reconnect/disconnect any club's own session,
+-- operational support only); a fully separate
+-- platform.whatsapp_platform.manage key governs the Platform WhatsApp
+-- domain (see 20260909200000_platform_whatsapp_domain.sql's own header
+-- for that key's exact scope). Neither key is a superset of the other;
+-- platform_owner (via is_platform_owner()) remains the only identity
+-- that always holds both, by design (the existing owner-is-unrestricted
+-- bridge, unchanged).
 --
 -- Reason REQUIRED (not optional-with-default-null) for
 -- platform_disconnect_whatsapp -- this is exactly the class of
@@ -43,7 +61,7 @@
 -- start_whatsapp_pairing's own club-facing precedent.
 
 insert into public.platform_permissions (key, group_key) values
-  ('platform.whatsapp.manage', 'clubs')
+  ('platform.whatsapp_tenant.manage', 'clubs')
 on conflict (key) do nothing;
 
 -- Grant to platform_owner (every permission, already covered by the
@@ -53,7 +71,7 @@ on conflict (key) do nothing;
 -- staff-administration, concern, matching that role's existing scope.
 insert into public.platform_role_permissions (platform_role_id, platform_permission_id)
 select r.id, p.id from public.platform_roles r join public.platform_permissions p
-  on p.key = 'platform.whatsapp.manage'
+  on p.key = 'platform.whatsapp_tenant.manage'
 where r.key = 'platform_operations'
 on conflict do nothing;
 
@@ -102,7 +120,7 @@ as $$
 declare
   v_before jsonb;
 begin
-  if not (public.is_platform_owner() or public.has_platform_permission('platform.whatsapp.manage')) then
+  if not (public.is_platform_owner() or public.has_platform_permission('platform.whatsapp_tenant.manage')) then
     raise exception 'not authorized';
   end if;
 
@@ -155,7 +173,7 @@ as $$
 declare
   v_before jsonb;
 begin
-  if not (public.is_platform_owner() or public.has_platform_permission('platform.whatsapp.manage')) then
+  if not (public.is_platform_owner() or public.has_platform_permission('platform.whatsapp_tenant.manage')) then
     raise exception 'not authorized';
   end if;
 
@@ -203,7 +221,7 @@ as $$
 declare
   v_before jsonb;
 begin
-  if not (public.is_platform_owner() or public.has_platform_permission('platform.whatsapp.manage')) then
+  if not (public.is_platform_owner() or public.has_platform_permission('platform.whatsapp_tenant.manage')) then
     raise exception 'not authorized';
   end if;
 
@@ -268,7 +286,7 @@ security definer
 set search_path = public, pg_temp
 as $$
 begin
-  if not (public.is_platform_owner() or public.has_platform_permission('platform.whatsapp.manage')) then
+  if not (public.is_platform_owner() or public.has_platform_permission('platform.whatsapp_tenant.manage')) then
     raise exception 'not authorized';
   end if;
 
@@ -332,7 +350,7 @@ revoke execute on function public.platform_get_whatsapp_recent_events(uuid, int)
 grant execute on function public.platform_get_whatsapp_recent_events(uuid, int) to authenticated;
 
 comment on function public.platform_start_whatsapp_pairing(uuid, text) is
-  'Platform Owner/staff-initiated WhatsApp connect for any club (not just clubs they own). Mirrors start_whatsapp_pairing() mechanics exactly; authorization is is_platform_owner() OR platform.whatsapp.manage instead of club membership. Also writes to platform-wide audit_logs.';
+  'Platform Owner/staff-initiated WhatsApp connect for any club (not just clubs they own). Mirrors start_whatsapp_pairing() mechanics exactly; authorization is is_platform_owner() OR platform.whatsapp_tenant.manage instead of club membership. Also writes to platform-wide audit_logs.';
 comment on function public.platform_disconnect_whatsapp(uuid, text) is
   'Platform Owner/staff-initiated WhatsApp disconnect for any club. Destructive -- requires a real non-empty reason, matching platform_suspend_club''s validation shape. Mirrors disconnect_whatsapp() mechanics exactly.';
 comment on function public.platform_retry_whatsapp_connection(uuid, text) is

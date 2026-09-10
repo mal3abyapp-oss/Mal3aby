@@ -94,12 +94,12 @@ comment on table public.platform_whatsapp_account is
 alter table public.platform_whatsapp_account enable row level security;
 alter table public.platform_whatsapp_account force row level security;
 
--- Read: platform owner, or staff holding the new platform.whatsapp.manage
+-- Read: platform owner, or staff holding the new platform.whatsapp_platform.manage
 -- permission (same tier as tenant WhatsApp management -- one platform
 -- permission key governs both domains, since the same operational role
 -- plausibly manages both).
 create policy platform_whatsapp_account_select on public.platform_whatsapp_account
-  for select using (public.is_platform_owner() or public.has_platform_permission('platform.whatsapp.manage'));
+  for select using (public.is_platform_owner() or public.has_platform_permission('platform.whatsapp_platform.manage'));
 
 -- No direct INSERT/UPDATE/DELETE policy -- exactly like whatsapp_accounts,
 -- deliberately RPC-only (rls_enabled_no_policy is the documented,
@@ -126,7 +126,7 @@ alter table public.platform_whatsapp_connection_events enable row level security
 alter table public.platform_whatsapp_connection_events force row level security;
 
 create policy platform_whatsapp_connection_events_select on public.platform_whatsapp_connection_events
-  for select using (public.is_platform_owner() or public.has_platform_permission('platform.whatsapp.manage'));
+  for select using (public.is_platform_owner() or public.has_platform_permission('platform.whatsapp_platform.manage'));
 
 -- ============================================================
 -- 3. platform_whatsapp_queue: a dedicated, DELIBERATELY SIMPLER queue
@@ -218,14 +218,32 @@ alter table public.platform_whatsapp_safety_settings enable row level security;
 alter table public.platform_whatsapp_safety_settings force row level security;
 
 create policy platform_whatsapp_safety_settings_select on public.platform_whatsapp_safety_settings
-  for select using (public.is_platform_owner() or public.has_platform_permission('platform.whatsapp.manage'));
+  for select using (public.is_platform_owner() or public.has_platform_permission('platform.whatsapp_platform.manage'));
 
 -- ============================================================
--- 5. Permission: reuse platform.whatsapp.manage (already added in
---    20260909150000_platform_owner_whatsapp_connection_control.sql for
---    Tenant WhatsApp connection management) -- one permission key
---    governs both domains for the same operational role, rather than
---    inventing a second near-duplicate key.
+-- 5. Permission: a genuinely SEPARATE key from the tenant-club domain's
+--    platform.whatsapp_tenant.manage (20260909150000_platform_owner_
+--    whatsapp_connection_control.sql). Originally these two domains
+--    shared one key (platform.whatsapp.manage); the owner explicitly
+--    rejected that (decision #21) -- a staff member trusted to support
+--    a club's WhatsApp connection must NOT automatically gain
+--    permission to control Mal3aby's own Platform WhatsApp account or
+--    send Mal3aby sales outreach, and vice versa. Neither key is a
+--    superset of the other; only is_platform_owner() always holds both
+--    (the existing owner-is-unrestricted bridge, unchanged).
+insert into public.platform_permissions (key, group_key) values
+  ('platform.whatsapp_platform.manage', 'clubs')
+on conflict (key) do nothing;
+
+-- Grant to platform_owner (every permission, already covered by the
+-- cross-join-all-permissions seed in 20260826121055). Deliberately NOT
+-- granted to platform_operations by default (unlike
+-- platform.whatsapp_tenant.manage) -- operating Mal3aby's own sales/
+-- commercial WhatsApp channel is a narrower, more sensitive capability
+-- than supporting a club's connection, and the owner's decision #21
+-- specifically calls out that these must not be implicitly linked. A
+-- role needing both must be granted both explicitly, e.g. via a custom
+-- platform role -- not by holding either seeded role.
 -- ============================================================
 
 -- ============================================================
@@ -244,7 +262,7 @@ security definer
 set search_path = public, pg_temp
 as $$
 begin
-  if not (public.is_platform_owner() or public.has_platform_permission('platform.whatsapp.manage')) then
+  if not (public.is_platform_owner() or public.has_platform_permission('platform.whatsapp_platform.manage')) then
     raise exception 'not authorized';
   end if;
 
@@ -274,7 +292,7 @@ security definer
 set search_path = public, pg_temp
 as $$
 begin
-  if not (public.is_platform_owner() or public.has_platform_permission('platform.whatsapp.manage')) then
+  if not (public.is_platform_owner() or public.has_platform_permission('platform.whatsapp_platform.manage')) then
     raise exception 'not authorized';
   end if;
 
@@ -297,7 +315,7 @@ as $$
 declare
   v_before jsonb;
 begin
-  if not (public.is_platform_owner() or public.has_platform_permission('platform.whatsapp.manage')) then
+  if not (public.is_platform_owner() or public.has_platform_permission('platform.whatsapp_platform.manage')) then
     raise exception 'not authorized';
   end if;
 
@@ -329,7 +347,7 @@ as $$
 declare
   v_before jsonb;
 begin
-  if not (public.is_platform_owner() or public.has_platform_permission('platform.whatsapp.manage')) then
+  if not (public.is_platform_owner() or public.has_platform_permission('platform.whatsapp_platform.manage')) then
     raise exception 'not authorized';
   end if;
 
@@ -363,7 +381,7 @@ as $$
 declare
   v_before jsonb;
 begin
-  if not (public.is_platform_owner() or public.has_platform_permission('platform.whatsapp.manage')) then
+  if not (public.is_platform_owner() or public.has_platform_permission('platform.whatsapp_platform.manage')) then
     raise exception 'not authorized';
   end if;
 
@@ -397,7 +415,7 @@ security definer
 set search_path = public, pg_temp
 as $$
 begin
-  if not (public.is_platform_owner() or public.has_platform_permission('platform.whatsapp.manage')) then
+  if not (public.is_platform_owner() or public.has_platform_permission('platform.whatsapp_platform.manage')) then
     raise exception 'not authorized';
   end if;
 
@@ -430,7 +448,7 @@ security definer
 set search_path = public, pg_temp
 as $$
 begin
-  if not (public.is_platform_owner() or public.has_platform_permission('platform.whatsapp.manage')) then
+  if not (public.is_platform_owner() or public.has_platform_permission('platform.whatsapp_platform.manage')) then
     raise exception 'not authorized';
   end if;
 

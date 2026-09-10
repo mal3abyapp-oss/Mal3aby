@@ -9,7 +9,7 @@ import { createClient, type SupabaseClient } from '@supabase/supabase-js'
 // platform_retry_whatsapp_connection -- new RPCs letting a Platform
 // Owner/staff member connect/disconnect/retry ANY club's WhatsApp
 // connection (not just clubs they personally own), gated on
-// is_platform_owner() OR has_platform_permission('platform.whatsapp.manage')
+// is_platform_owner() OR has_platform_permission('platform.whatsapp_tenant.manage')
 // instead of club membership.
 //
 // This suite proves the correction's own stated requirement is real,
@@ -22,11 +22,11 @@ import { createClient, type SupabaseClient } from '@supabase/supabase-js'
 // not-found check.
 //
 // Identity used for "authorized staff member, but missing
-// platform.whatsapp.manage specifically": PLATFORM_STAFF_TEST_ADMIN_*
+// platform.whatsapp_tenant.manage specifically": PLATFORM_STAFF_TEST_ADMIN_*
 // (reused from platform-staff-auth.integration.test.ts). Confirmed by
 // reading supabase/migrations/20260826121055_platform_staff_roles_schema.sql:
 // only the platform_owner and platform_operations roles are granted
-// platform.whatsapp.manage (20260909150000 grants it to
+// platform.whatsapp_tenant.manage (20260909150000 grants it to
 // platform_operations alongside its existing platform.club.manage) --
 // platform_support (the role that test's own header comment documents
 // this fixture account as holding) is NOT one of them, so this
@@ -41,7 +41,7 @@ import { createClient, type SupabaseClient } from '@supabase/supabase-js'
 //   VITE_SUPABASE_URL, VITE_SUPABASE_ANON_KEY
 //   PLATFORM_STAFF_TEST_ADMIN_EMAIL / PLATFORM_STAFF_TEST_ADMIN_PASSWORD
 //     (active platform_staff_memberships holder, platform_support-class
-//     role -- does NOT hold platform.whatsapp.manage)
+//     role -- does NOT hold platform.whatsapp_tenant.manage)
 //   PLATFORM_OWNER_TEST_EMAIL / PLATFORM_OWNER_TEST_PASSWORD
 //     (real platform_owner -- used only to reach past authorization and
 //     prove the reason-required validation itself; no real club is
@@ -82,7 +82,7 @@ async function signIn(client: SupabaseClient, email: string, password: string) {
 
 // ---------------------------------------------------------------------
 // 1. Server-authorized, not frontend-only: a platform staff member
-//    without platform.whatsapp.manage cannot call any of the three
+//    without platform.whatsapp_tenant.manage cannot call any of the three
 //    mutating Tenant WhatsApp RPCs for ANY club, including one they
 //    plainly do not own and one that does not even exist.
 // ---------------------------------------------------------------------
@@ -101,7 +101,7 @@ describeIfStaffConfigured('platform_start_whatsapp_pairing / platform_disconnect
     await client.auth.signOut()
   })
 
-  it('a staff member without platform.whatsapp.manage cannot call platform_start_whatsapp_pairing for ANY club_id', async () => {
+  it('a staff member without platform.whatsapp_tenant.manage cannot call platform_start_whatsapp_pairing for ANY club_id', async () => {
     const { data, error } = await client.rpc('platform_start_whatsapp_pairing', {
       p_club_id: RANDOM_CLUB_ID,
       p_reason: null,
@@ -111,7 +111,7 @@ describeIfStaffConfigured('platform_start_whatsapp_pairing / platform_disconnect
     expect(data).toBeNull()
   })
 
-  it('a staff member without platform.whatsapp.manage cannot call platform_retry_whatsapp_connection for ANY club_id', async () => {
+  it('a staff member without platform.whatsapp_tenant.manage cannot call platform_retry_whatsapp_connection for ANY club_id', async () => {
     const { data, error } = await client.rpc('platform_retry_whatsapp_connection', {
       p_club_id: RANDOM_CLUB_ID,
       p_reason: null,
@@ -121,7 +121,7 @@ describeIfStaffConfigured('platform_start_whatsapp_pairing / platform_disconnect
     expect(data).toBeNull()
   })
 
-  it('a staff member without platform.whatsapp.manage cannot call platform_disconnect_whatsapp for ANY club_id -- rejected before the reason check even runs', async () => {
+  it('a staff member without platform.whatsapp_tenant.manage cannot call platform_disconnect_whatsapp for ANY club_id -- rejected before the reason check even runs', async () => {
     // Deliberately omits p_reason too (which would otherwise also be
     // rejected) -- the assertion is that "not authorized" is the actual
     // error, proving the authorization check runs BEFORE the reason
@@ -136,7 +136,7 @@ describeIfStaffConfigured('platform_start_whatsapp_pairing / platform_disconnect
     expect(data).toBeNull()
   })
 
-  it('the same staff member CAN call the read-only platform_get_whatsapp_qr (platform.club.view tier), confirming the rejection above is specific to platform.whatsapp.manage, not a blanket auth failure', async () => {
+  it('the same staff member CAN call the read-only platform_get_whatsapp_qr (platform.club.view tier), confirming the rejection above is specific to platform.whatsapp_tenant.manage, not a blanket auth failure', async () => {
     const { error } = await client.rpc('platform_get_whatsapp_qr', { p_club_id: RANDOM_CLUB_ID })
     // No qr row exists for this random club, so this returns an empty
     // set, not an authorization error -- confirming this account is

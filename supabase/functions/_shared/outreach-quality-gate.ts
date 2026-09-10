@@ -65,7 +65,7 @@ export interface QualityGateResult {
 }
 
 export interface QualityGateInput {
-  channel: 'email' | 'phone_script' | 'whatsapp_talking_points'
+  channel: 'email' | 'phone_script' | 'whatsapp_talking_points' | 'whatsapp_message'
   language: 'ar' | 'en'
   subject: string | null
   body: string
@@ -514,6 +514,112 @@ function evaluateEmail(input: QualityGateInput): QualityGateResult {
 }
 
 // ============================================================
+// WhatsApp message (owner decision #20, 2026-09-10) gate -- a single,
+// short, send-ready WhatsApp text. Modeled closely on evaluateEmail
+// (same shared checks: placeholders, signature, CTA, grounding,
+// confidence language, generation completeness, output integrity,
+// evidence strength) but with NO subject-line requirement (WhatsApp
+// messages don't have one) and a much shorter length range matching
+// the generation prompt's own 40-70 word target -- a message that
+// reads like an email pasted into a chat window is exactly the
+// "sounds automated" failure mode the owner's decision explicitly
+// asked to avoid, so length is enforced here, not left to the model's
+// judgment alone.
+// ============================================================
+const WHATSAPP_MESSAGE_MIN_WORDS = 25
+const WHATSAPP_MESSAGE_MAX_WORDS = 90
+
+function evaluateWhatsappMessage(input: QualityGateInput): QualityGateResult {
+  const placeholders = findPlaceholders(input.body)
+  const words = wordCount(input.body)
+  const cta = evaluateCta(input.body)
+  const signaturePresent = hasSignature(input.body)
+  const overstated = overstatesLowConfidence(input.body, input.lowConfidenceSignalKeys)
+  const featureBullets = countFeatureBullets(input.body)
+  const completeness = evaluateGenerationCompleteness(input.body, input.finishReason)
+  const integrity = evaluateOutputIntegrity(input.body, input.language, [input.businessName ?? ''])
+  const evidenceStrength = evaluateEvidenceStrength(input.body, input.contactMetadataOnlySignalKeys ?? [])
+
+  const reasons: QualityRejectionReason[] = []
+
+  // No subject for a WhatsApp message -- trivially pass, matching how
+  // the call-task gate below treats SUBJECT_PASS for a channel that
+  // structurally has no subject line.
+  const subjectPass = true
+
+  const placeholderPass = placeholders.length === 0
+  if (!placeholderPass) reasons.push('UNRESOLVED_PLACEHOLDER')
+
+  const signaturePass = signaturePresent
+  if (!signaturePass) reasons.push('MISSING_SIGNATURE')
+
+  const ctaPass = cta.strong
+  if (!cta.present) reasons.push('MISSING_CTA')
+  else if (!cta.strong) reasons.push('WEAK_CTA')
+
+  const lengthPass = words >= WHATSAPP_MESSAGE_MIN_WORDS && words <= WHATSAPP_MESSAGE_MAX_WORDS
+  if (words > WHATSAPP_MESSAGE_MAX_WORDS) reasons.push('MESSAGE_TOO_LONG')
+  if (words < WHATSAPP_MESSAGE_MIN_WORDS) reasons.push('MESSAGE_TOO_SHORT')
+
+  // A WhatsApp message that dumps multiple feature bullets is exactly
+  // the "sounds automated/spammy" failure the owner's decision warned
+  // against -- same MAX_EMAIL_FEATURE_BULLETS threshold reused (0
+  // bullets expected in a genuine short WhatsApp message; a small
+  // allowance rather than a hard zero, matching the email gate's own
+  // tolerance).
+  const channelStructurePass = featureBullets <= MAX_EMAIL_FEATURE_BULLETS
+  if (!channelStructurePass) reasons.push('MULTIPLE_PRODUCT_PITCHES_DUMPED')
+
+  const confidenceLanguagePass = !overstated
+  if (overstated) reasons.push('CONFIDENCE_OVERSTATED')
+
+  const groundingPass = input.groundingPassed
+  if (!groundingPass) reasons.push('UNSUPPORTED_CLAIM')
+
+  const generationCompletenessPass = completeness.pass
+  if (!generationCompletenessPass) reasons.push('GENERATION_TRUNCATED')
+
+  const outputIntegrityPass = integrity.pass
+  if (!outputIntegrityPass) reasons.push('OUTPUT_INTEGRITY_FAILED')
+
+  const evidenceStrengthPass = evidenceStrength.pass
+  if (!evidenceStrengthPass) reasons.push('EVIDENCE_STRENGTH_OVERSTATED')
+
+  const gates: Record<QualityGateName, boolean> = {
+    GROUNDING_PASS: groundingPass,
+    EVIDENCE_STRENGTH_PASS: evidenceStrengthPass,
+    PLACEHOLDER_PASS: placeholderPass,
+    SUBJECT_PASS: subjectPass,
+    SIGNATURE_PASS: signaturePass,
+    CTA_PASS: ctaPass,
+    LENGTH_PASS: lengthPass,
+    CHANNEL_STRUCTURE_PASS: channelStructurePass,
+    CONFIDENCE_LANGUAGE_PASS: confidenceLanguagePass,
+    GENERATION_COMPLETENESS_PASS: generationCompletenessPass,
+    OUTPUT_INTEGRITY_PASS: outputIntegrityPass,
+  }
+
+  const allPass = Object.values(gates).every(Boolean)
+
+  return {
+    gates,
+    status: allPass ? 'APPROVAL_READY' : 'QUALITY_REJECTED',
+    rejection_reasons: reasons,
+    detail: {
+      word_count: words,
+      placeholders_found: placeholders,
+      feature_bullet_count: featureBullets,
+      cta_present: cta.present,
+      cta_strong: cta.strong,
+      truncated_by_provider: completeness.truncatedByProvider,
+      structurally_incomplete: completeness.structurallyIncomplete,
+      output_artifact_found: integrity.artifactFound,
+      evidence_overstated: evidenceStrength.overstated,
+    },
+  }
+}
+
+// ============================================================
 // Call-task (phone_script / whatsapp_talking_points) gate
 // ============================================================
 // Literal opening: a real, quotable spoken line -- not a topic label
@@ -689,5 +795,6 @@ function evaluateCallTask(input: QualityGateInput): QualityGateResult {
 // ============================================================
 export function evaluateOutreachQuality(input: QualityGateInput): QualityGateResult {
   if (input.channel === 'email') return evaluateEmail(input)
+  if (input.channel === 'whatsapp_message') return evaluateWhatsappMessage(input)
   return evaluateCallTask(input)
 }

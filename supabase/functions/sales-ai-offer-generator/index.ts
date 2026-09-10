@@ -178,7 +178,7 @@ function buildGroundedPrompt(
   lead: LeadEvidence,
   language: 'ar' | 'en',
   messageType: string,
-  channel: 'email' | 'phone_script' | 'whatsapp_talking_points',
+  channel: 'email' | 'phone_script' | 'whatsapp_talking_points' | 'whatsapp_message',
   replyAddress: string,
 ): string {
   const signalLines = lead.signals
@@ -289,6 +289,33 @@ LENGTH: the BODY (excluding the subject line and signature) must be approximatel
 Write the email now, starting with the SUBJECT: line.`
   }
 
+  if (channel === 'whatsapp_message') {
+    // Owner decision #20 (2026-09-10): a genuinely NEW, distinct
+    // artifact purpose from whatsapp_talking_points -- ONE literal,
+    // ready-to-send WhatsApp message (not a call script, not a
+    // multi-section document). Structural requirements the owner
+    // stated explicitly: natural, concise, conversational,
+    // personalized, commercially persuasive without sounding
+    // automated/spammy, editable before approval (this prompt does not
+    // need to address editability -- that's a product/UI property, not
+    // a generation instruction), never a template with placeholders.
+    return `You are writing a SINGLE, real, ready-to-send WhatsApp first-contact message for Mal3aby, a sports facility booking and operations management platform, to a real prospect business. This is a genuine WhatsApp message a Platform Owner will review, optionally edit, and then send AS-IS through Mal3aby's own WhatsApp number -- not a call script, not a topic outline, not an email. Write exactly what should be sent, nothing else.
+
+${commonRules}
+
+WHATSAPP MESSAGE STYLE -- MANDATORY:
+- Natural and conversational, the way one business owner would genuinely message another on WhatsApp -- short sentences, no corporate/marketing tone, no robotic phrasing.
+- Concise: this is a WhatsApp message, not an email. Get to the point in the first line.
+- Personalized: reference the business by name and something real and specific about it (from the verified facts/signals above) in the opening line -- never a generic greeting that could apply to any business.
+- Commercially persuasive without sounding automated or spammy: connect ONE relevant Mal3aby capability to a real observed opportunity gap, phrased as genuine interest in helping, not a sales pitch dumped on a stranger. No exclamation-mark-heavy hype, no "amazing offer," no urgency/scarcity pressure tactics.
+- End with ONE short, low-friction question inviting a reply (e.g. asking if a brief call this week would work) -- never a vague "let us know if interested" with nothing to respond to.
+- The signature block above, but WhatsApp-appropriate: keep it brief, it does not need to be on its own visually separated block the way an email signature is -- a short closing line naming the team identity is enough.
+
+LENGTH: the ENTIRE message (opening through signature) must be approximately 40-70 words -- genuinely short, the length of a real WhatsApp message a person would actually send and a recipient would actually read, not an email pasted into a chat window. Do not write multiple paragraphs. Do not use bullet points or numbered lists -- WhatsApp messages are prose, not documents.
+
+Write the WhatsApp message now -- output ONLY the message text itself, with no "SUBJECT:" line and no section headers.`
+  }
+
   // phone_script / whatsapp_talking_points: a REAL, EXECUTABLE call
   // script -- not scaffolding/topic labels. Owner's explicit structure:
   // identify -> ask permission -> ask how it currently works -> discover
@@ -370,7 +397,7 @@ Deno.serve(async (req) => {
   if (language !== 'ar' && language !== 'en') {
     return jsonResponse(req, { error: 'language must be ar or en' }, 400)
   }
-  const resolvedChannel = channel && ['email', 'phone_script', 'whatsapp_talking_points'].includes(channel) ? channel : 'email'
+  const resolvedChannel = channel && ['email', 'phone_script', 'whatsapp_talking_points', 'whatsapp_message'].includes(channel) ? channel : 'email'
 
   const callerClient = createClient(SUPABASE_URL, ANON_KEY, {
     global: { headers: { Authorization: authHeader } },

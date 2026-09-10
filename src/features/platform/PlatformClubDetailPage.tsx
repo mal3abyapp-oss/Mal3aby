@@ -2138,11 +2138,14 @@ function CommercialUsageAndFoundingOfferCard({ clubId }: { clubId: string }) {
 // QRCode.toDataURL(), 20s honest QR-wait timeout) -- the only real
 // difference is which RPCs are called (platform_* instead of the
 // club-facing ones) and the authorization tier those RPCs check
-// server-side (is_platform_owner() OR platform.whatsapp.manage,
+// server-side (is_platform_owner() OR platform.whatsapp_tenant.manage,
 // instead of club membership). This card never itself decides who is
 // allowed to act -- every mutation below simply calls the RPC and
 // surfaces whatever error Postgres returns (including "not authorized"
-// for a platform staff member who lacks platform.whatsapp.manage).
+// for a platform staff member who lacks platform.whatsapp_tenant.manage --
+// a distinct permission from platform.whatsapp_platform.manage, which
+// governs Mal3aby's own Platform WhatsApp domain and does NOT imply
+// this one, per owner decision #21).
 //
 // get_platform_whatsapp_health() (already used by this page before this
 // workstream) remains the source for connected_phone_masked/
