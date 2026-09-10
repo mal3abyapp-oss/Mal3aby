@@ -160,3 +160,77 @@ A real, already-authenticated platform-owner browser session was available in th
 - **Clubs list page**: loads correctly with real QA-fixture club rows once the "Show QA/test clubs" toggle is enabled (off by default, confirming the fixture-hiding default this mission relied on elsewhere still holds). **Last Activity column** renders an honest "لا يوجد نشاط بعد" ("No activity yet") empty state. **Health column** renders as an em dash (`—`) rather than blank/broken — confirmed by reading `PlatformClubsPage.tsx`'s render function (`tenantHealthIsError || !h` → renders `—`), matching what was visually observed; this is the correct, documented graceful-degradation behavior for an RPC (`get_platform_tenant_health()`) not yet applied to this database, not a bug.
 - **375px mobile viewport, Overview page**: genuinely responsive — stat-grid correctly collapses to 2 columns, RTL alignment holds, no horizontal overflow, Attention Center's error state remains legible. Confirms the UX reviewer's CODE VERIFIED claim about the responsive grid classes.
 - **Not live-verified this session** (would require either applying the 6 pending migrations to this database, which is a protected action requiring separate authorization, or waiting for that to happen): the actual rendered content of the Attention Center's item cards, Commercial Snapshot's real numbers, Tenant Health badges with real HEALTHY/WATCH/AT_RISK values, the WhatsApp Reports tab's real data, and Tenant 360's Last Activity/academy-count values beyond their empty states. All of these are CODE VERIFIED (read directly, matches the independent security/UX/performance reviews' own code-level findings) but not LIVE VERIFIED against real post-migration data, since no migration has been applied.
+
+---
+
+# Platform Owner Operational Gap Closure — WhatsApp Control + Sales Intelligence Control
+
+Generated 2026-09-09, branch `feature/platform-owner-whatsapp-sales-control`. One genuine, deliberately-unresolved product-policy question found while building the Platform WhatsApp domain.
+
+## 20. Sales outreach cannot be sent through Platform WhatsApp yet — `whatsapp_talking_points` is a human call script, not send-ready text
+
+This mission's architecture correction requires Sales Intelligence outreach to flow through a new, dedicated Platform WhatsApp connection (built — see `supabase/migrations/20260909200000_platform_whatsapp_domain.sql`) rather than any club's WhatsApp session. While wiring the "queue an approved AI draft for platform-WhatsApp sending" RPC (`sales_queue_platform_whatsapp_message`), a real, pre-existing conflict was found and is recorded here rather than silently resolved either way, per this mission's own "document clearly before changing behavior" instruction.
+
+**The conflict**: `sales_outreach_messages.channel` has exactly 3 valid values (`email`, `phone_script`, `whatsapp_talking_points`, `20260904090000_sales_intelligence_schema.sql:404`). The existing `sales_queue_outreach_message()` RPC (from an earlier Sales Intelligence mission) hardcodes a rejection of every channel except `email`, with an explicit comment citing that mission's own Phase 11 hard rule: *"DO NOT IMPLEMENT AUTOMATED COLD WHATSAPP OUTREACH... do not touch the existing WhatsApp subsystem"* (`20260904090400_sales_intelligence_scoring_outreach_conversion.sql:273-283`). Separately, reading `sales-ai-offer-generator/index.ts`'s actual generation prompt (`:292-317`) confirms `whatsapp_talking_points` generates a structured, multi-section **human call/chat script** (a literal opening line, 2-3 discovery questions, objection-handling responses, a closing CTA — meant for a salesperson to read/adapt live) — not a single, literal, send-ready WhatsApp message body. Queuing that raw multi-section text as one automated WhatsApp send would be a real UX defect on top of reversing a documented prior policy this mission was not explicitly asked to reverse.
+
+**What was built regardless**: the full Platform WhatsApp connection domain (its own session/QR/connect/disconnect/status/audit-trail, fully isolated from every club's `whatsapp_accounts` row) is complete and independently usable — a Platform Owner can connect the platform's own WhatsApp number and use it for manual, human-composed messages today. Only the specific "click Approve on an AI-generated draft → it auto-queues to Platform WhatsApp" pipeline is paused — `sales_queue_platform_whatsapp_message()` exists, is correctly scoped/isolated/permissioned, but unconditionally raises an exception with a clear explanation until this decision is made.
+
+**Decision needed**: either —
+- (a) add a genuinely new outreach generation purpose (a distinct prompt producing one literal, ≤~140-word, send-ready WhatsApp message — structurally different from the call-script-shaped `whatsapp_talking_points`, likely a new channel value or a variant of the existing `email` generation prompt adapted for WhatsApp's shorter format), then wire `sales_queue_platform_whatsapp_message()` to consume that instead; or
+- (b) confirm `whatsapp_talking_points` text should in fact be sent as-is (i.e., the "talking points" framing was never meant to preclude an automated send, just to describe its conversational tone) and this migration's guard should simply be removed.
+
+Neither option was chosen unilaterally — this is exactly the kind of reversal-of-a-documented-policy decision that needs the owner's explicit sign-off, not an autonomous choice.
+
+## 21. Independent Phase 15/16 review findings — two fixed, one recorded as a tradeoff to be aware of
+
+Independent security review (no P0/P1, safe to proceed) and independent UX review (no P0, branch meaningfully closes both operational gaps) both completed against the committed branch. Findings:
+
+- **✅ FIXED — reason not required server-side for "lost"/"do_not_contact" lead status changes** (UX review P2): `sales_change_lead_status()` already threaded `p_reason` through everywhere but never required a non-empty value for these two transitions specifically, despite the mission's own "record reason lost" instruction and the new pipeline UI already requiring one client-side. Fixed in `20260910100000_sales_change_lead_status_require_reason_for_lost.sql`, matching `platform_suspend_club()`'s exact validation shape — every other transition's reason stays optional, unchanged.
+- **✅ FIXED — no "latest draft" visual marker on the AI outreach message list** (UX review P2): added a "Latest" badge on the newest (`index === 0`, confirmed via `get_lead_full_profile()`'s own `order by created_at desc`) outreach message, plus a highlighted border, so a Platform Owner reviewing multiple regenerated drafts can immediately tell which one is current.
+- **✅ FIXED — `get_sales_upcoming_demos` silently returned zero rows for an unauthorized caller instead of raising** (security review P3, functionally safe, no data leak — but inconsistent with this mission's own new RPCs): changed to an explicit `raise exception 'not authorized'` guard. Note: the original shape deliberately mirrored the pre-existing `get_pending_followups()`'s own established convention — this change makes new RPCs consistent with each other, not "wrong before."
+- **Recorded, not auto-fixed — `platform.whatsapp.manage` governs BOTH the tenant-club WhatsApp domain and Mal3aby's own Platform WhatsApp domain** (security review P2): a staff member trusted to reconnect a club's WhatsApp connection on the club's behalf automatically also gets permission to disconnect Mal3aby's own sales/commercial WhatsApp channel. The migration's own comment documents this as a deliberate choice (one permission key for one plausible combined operational role), and the reviewer agreed it's a legitimate design choice, not an oversight — but flagged it as worth the owner's explicit awareness. **If tighter separation is wanted**: split into two keys (e.g. `platform.whatsapp.manage_tenant` / `platform.whatsapp.manage_platform`) and update the ~13 RPCs' authorization checks accordingly — a small, low-risk follow-up, not done here since it wasn't judged necessary without an explicit request.
+
+---
+
+# Owner Decisions #20 and #21 — RESOLVED (2026-09-10)
+
+## Decision #20: RESOLVED — human-approved, editable AI WhatsApp sales workflow
+
+**Owner's resolution**: AI may generate a WhatsApp-ready sales message. AI must not autonomously send it. The final send action always requires explicit Platform Owner approval, via: Lead → Generate WhatsApp Draft → Owner Review → Owner Edit (optional) → Approve → explicit Send → Platform WhatsApp → delivery result/history/audit.
+
+**Implemented, not `whatsapp_talking_points`**: a genuinely new, distinct draft artifact (`sales_outreach_messages.channel = 'whatsapp_message'`) was added, with its own AI generation prompt (natural, concise, 40-70 words, personalized, ready-to-send — distinct from the call-script-shaped `whatsapp_talking_points`, which remains permanently un-sendable) and its own quality-gate evaluator.
+
+**Every one of the owner's 10 numbered "STRICT SAFETY / CONTROL" requirements independently security-reviewed and confirmed PASS** (fresh reviewer, zero P0/P1):
+1. AI generation never authorizes sending (`sales_generate_outreach_message()` only ever produces `status='generated'`).
+2. Approval never silently sends (`sales_approve_outreach_message()` only sets `status='approved'`; the frontend's Approve action never calls the send RPC).
+3. Only `platform.whatsapp_platform.manage` may send (a distinct, narrower permission than the generic `platform.sales.send_outreach`).
+4/5. Platform WhatsApp only, structurally cannot reach a tenant session (no `p_club_id` parameter anywhere, `platform_whatsapp_queue` has no `club_id` column).
+6. Every send attempt audit-logged (`write_audit_log`).
+7. The AI's original text is never overwritten — an edit writes to a separate `edited_body` column; the effective send text is `coalesce(edited_body, body)`.
+8. No duplicate delivery — a database-level unique constraint (`platform_whatsapp_queue_outreach_message_id_unique`) plus an explicit pre-insert guard, confirmed race-safe under Postgres's own transaction semantics.
+9. Server-side enforcement throughout — every UI gate (Edit visibility, Send visibility) has a matching, independently-checked server-side guard.
+10. No bulk/unsolicited automation — one row inserted per explicit Send click, no new scheduled/cron path.
+
+**Self-caught and fixed mid-implementation**: the send RPC originally had no explicit check that Platform WhatsApp was actually connected before queueing — a Send click while disconnected would have returned a false success and left the message stuck forever. Added an explicit `platform_whatsapp_account.status = 'connected'` guard before the insert, with a distinct, frontend-recognizable error.
+
+**Independent UX review found and this session fixed**: the disconnect-race error (Platform WhatsApp disconnects between page load and the Send click) initially fell through to a generic error with no actionable guidance — fixed by mapping the RPC's specific exception through `src/lib/errors.ts` and adding the same "connect at /platform/whatsapp" link to the inline error path, plus auto-refetching the connection status so the primary (already-correct) disconnected-state UI takes over. Also added a "show the AI's original text" collapsible in the Edit dialog, since the backend already preserved both versions but the UI previously only surfaced the effective (possibly-edited) one.
+
+## Decision #21: RESOLVED — Platform WhatsApp and Tenant WhatsApp use separate permissions
+
+**Owner's resolution**: do not use one shared permission for both WhatsApp security domains. A staff member trusted to support tenant WhatsApp sessions must not automatically gain permission to control Mal3aby's own Platform WhatsApp account or send Mal3aby sales outreach, and vice versa.
+
+**Implemented**: the previously-shared `platform.whatsapp.manage` was split into two genuinely independent keys:
+- `platform.whatsapp_tenant.manage` — inspect/QR/reconnect/disconnect any club's own WhatsApp session (operational support only).
+- `platform.whatsapp_platform.manage` — connect/QR/disconnect/retry/send Mal3aby's own Platform WhatsApp, including Sales Intelligence send authority.
+
+Neither key is a superset of the other. `platform_operations` (the seeded role) continues to hold the tenant-scoped key by default but does **not** automatically receive the platform-scoped one — a role needing both must be granted both explicitly. Only `is_platform_owner()` always holds both, by design (the existing owner-is-unrestricted bridge, unchanged). Every one of the ~17 affected RPCs' authorization checks, the `/platform/whatsapp` nav gate, and every related code comment were updated to the new keys.
+
+**Independently security-reviewed** (fresh reviewer): confirmed bidirectionally — grepped both permission strings across every relevant migration file; each appears only in the other domain's historical comments, never as an executable authorization check. Confirmed `platform_operations`' actual granted-permissions insert statement, not just the comment describing it.
+
+**Regression tests added**: 37 new tests (`sales-platform-whatsapp-send.structural.test.ts`, `sales-platform-whatsapp-send.integration.test.ts`) proving both directions of isolation — every Platform-domain RPC authorizes on `platform.whatsapp_platform.manage` and never `_tenant`, and vice versa — both structurally (unconditional, parses the real migration SQL) and via gated live-integration tests for when a single-permission staff fixture exists.
+
+**Self-caught during test-writing**: the earlier `platform-whatsapp-domain-isolation.integration.test.ts` (written before decision #20 was resolved) had one live-integration assertion that would have genuinely failed against a real deployed database, since it still expected the send RPC's original "deliberately disabled" error text after a later migration superseded that function body. Fixed by removing the stale live assertion (with a comment pointing to the new, correct test files) and re-scoping the adjacent structural assertion to state it proves an archival fact about one migration file's own unchanged text, not a claim about current behavior.
+
+## Final verification for both decisions
+
+`npx tsc -b --force` clean. `npm run lint` clean (0 errors, 20 pre-existing warnings, none new). `npx vitest run`: 349 passed, 254 skipped, 0 failed. `npm run build` clean. All 10 migrations in this branch re-verified together as one cumulative chain via a rolled-back transaction against the live production schema after every change — zero errors, nothing applied to production. Independent security review: zero P0/P1 across both decisions. Independent UX review: zero P0, one P1 (fixed) and one P2 (fixed) on the decision #20/#21 changes specifically.

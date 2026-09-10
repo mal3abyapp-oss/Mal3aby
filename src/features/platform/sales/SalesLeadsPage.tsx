@@ -32,6 +32,7 @@ interface LeadRow {
   review_count: number | null
   first_discovered_at: string
   total_count: number
+  status_reason: string | null
 }
 
 const STATUS_VALUES = [
@@ -122,6 +123,18 @@ export function SalesLeadsPage() {
     },
     { key: 'rating', header: t('platform.sales.leads.columns.rating'), render: (l: LeadRow) => (l.rating != null ? `${l.rating} (${l.review_count ?? 0})` : '—') },
   ]
+
+  // Item 3/6: "which leads were lost and why" -- show the reason column
+  // only when filtering to a status where it's meaningful, matching the
+  // mission's own "keep this simple" instruction (no new aggregate
+  // stats RPC, just this existing list's reason column surfaced).
+  if (statusFilter === 'lost' || statusFilter === 'do_not_contact') {
+    columns.push({
+      key: 'statusReason',
+      header: t('platform.sales.leadProfile.statusChangeReason'),
+      render: (l: LeadRow) => l.status_reason ?? '—',
+    })
+  }
 
   return (
     <div className="space-y-6">

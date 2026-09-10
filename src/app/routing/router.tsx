@@ -105,6 +105,7 @@ const PlatformTrialsPage = lazy(() => import('@/features/platform/PlatformTrials
 const PlatformLeadsPage = lazy(() => import('@/features/platform/PlatformLeadsPage').then((m) => ({ default: m.PlatformLeadsPage })))
 const PlatformReportsPage = lazy(() => import('@/features/platform/PlatformReportsPage').then((m) => ({ default: m.PlatformReportsPage })))
 const PlatformAlertsPage = lazy(() => import('@/features/platform/PlatformAlertsPage').then((m) => ({ default: m.PlatformAlertsPage })))
+const PlatformWhatsAppPage = lazy(() => import('@/features/platform/PlatformWhatsAppPage').then((m) => ({ default: m.PlatformWhatsAppPage })))
 const PlatformAuditPage = lazy(() => import('@/features/platform/PlatformAuditPage').then((m) => ({ default: m.PlatformAuditPage })))
 const PlatformSettingsPage = lazy(() => import('@/features/platform/PlatformSettingsPage').then((m) => ({ default: m.PlatformSettingsPage })))
 // PLATFORM STAFF + PLATFORM ROLES & PERMISSIONS (2026-08-26)
@@ -468,6 +469,7 @@ export const router = createBrowserRouter([
           { path: 'leads', element: <PlatformLeadsPage /> },
           { path: 'reports', element: <PlatformReportsPage /> },
           { path: 'alerts', element: <PlatformAlertsPage /> },
+          { path: 'whatsapp', element: <PlatformWhatsAppPage /> },
           { path: 'audit', element: <PlatformAuditPage /> },
           { path: 'support-history', element: <PlatformSupportHistoryPage /> },
           { path: 'staff', element: <PlatformStaffPage /> },

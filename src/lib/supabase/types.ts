@@ -5058,6 +5058,192 @@ export type Database = {
           },
         ]
       }
+      platform_whatsapp_account: {
+        Row: {
+          circuit_breaker_open_until: string | null
+          circuit_breaker_reason: string | null
+          connected_at: string | null
+          connected_phone_number: string | null
+          last_error: string | null
+          last_generation: number
+          last_seen_at: string | null
+          last_state_seq: number
+          last_successful_send_at: string | null
+          qr_expires_at: string | null
+          qr_payload: string | null
+          session_credentials_encrypted: string | null
+          session_key: string
+          singleton_guard: number
+          status: string
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          circuit_breaker_open_until?: string | null
+          circuit_breaker_reason?: string | null
+          connected_at?: string | null
+          connected_phone_number?: string | null
+          last_error?: string | null
+          last_generation?: number
+          last_seen_at?: string | null
+          last_state_seq?: number
+          last_successful_send_at?: string | null
+          qr_expires_at?: string | null
+          qr_payload?: string | null
+          session_credentials_encrypted?: string | null
+          session_key?: string
+          singleton_guard?: number
+          status?: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          circuit_breaker_open_until?: string | null
+          circuit_breaker_reason?: string | null
+          connected_at?: string | null
+          connected_phone_number?: string | null
+          last_error?: string | null
+          last_generation?: number
+          last_seen_at?: string | null
+          last_state_seq?: number
+          last_successful_send_at?: string | null
+          qr_expires_at?: string | null
+          qr_payload?: string | null
+          session_credentials_encrypted?: string | null
+          session_key?: string
+          singleton_guard?: number
+          status?: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: []
+      }
+      platform_whatsapp_connection_events: {
+        Row: {
+          actor_id: string | null
+          created_at: string
+          detail: Json
+          event: string
+          id: string
+        }
+        Insert: {
+          actor_id?: string | null
+          created_at?: string
+          detail?: Json
+          event: string
+          id?: string
+        }
+        Update: {
+          actor_id?: string | null
+          created_at?: string
+          detail?: Json
+          event?: string
+          id?: string
+        }
+        Relationships: []
+      }
+      platform_whatsapp_queue: {
+        Row: {
+          attempts: number
+          created_at: string
+          expires_at: string | null
+          id: string
+          last_attempt_at: string | null
+          last_error: string | null
+          lead_id: string | null
+          message_body: string
+          next_attempt_at: string | null
+          outreach_message_id: string | null
+          provider_reference: string | null
+          recipient_phone: string
+          requested_by: string | null
+          scheduled_at: string
+          status: string
+        }
+        Insert: {
+          attempts?: number
+          created_at?: string
+          expires_at?: string | null
+          id?: string
+          last_attempt_at?: string | null
+          last_error?: string | null
+          lead_id?: string | null
+          message_body: string
+          next_attempt_at?: string | null
+          outreach_message_id?: string | null
+          provider_reference?: string | null
+          recipient_phone: string
+          requested_by?: string | null
+          scheduled_at?: string
+          status?: string
+        }
+        Update: {
+          attempts?: number
+          created_at?: string
+          expires_at?: string | null
+          id?: string
+          last_attempt_at?: string | null
+          last_error?: string | null
+          lead_id?: string | null
+          message_body?: string
+          next_attempt_at?: string | null
+          outreach_message_id?: string | null
+          provider_reference?: string | null
+          recipient_phone?: string
+          requested_by?: string | null
+          scheduled_at?: string
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "platform_whatsapp_queue_lead_id_fkey"
+            columns: ["lead_id"]
+            isOneToOne: false
+            referencedRelation: "sales_leads"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "platform_whatsapp_queue_outreach_message_id_fkey"
+            columns: ["outreach_message_id"]
+            isOneToOne: true
+            referencedRelation: "sales_outreach_messages"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      platform_whatsapp_safety_settings: {
+        Row: {
+          circuit_breaker_cooldown_minutes: number
+          circuit_breaker_failure_rate_threshold: number
+          circuit_breaker_min_sample_size: number
+          circuit_breaker_window_minutes: number
+          max_sends_per_hour: number
+          max_sends_per_minute: number
+          min_minutes_between_recipient_sends: number
+          singleton_guard: number
+        }
+        Insert: {
+          circuit_breaker_cooldown_minutes?: number
+          circuit_breaker_failure_rate_threshold?: number
+          circuit_breaker_min_sample_size?: number
+          circuit_breaker_window_minutes?: number
+          max_sends_per_hour?: number
+          max_sends_per_minute?: number
+          min_minutes_between_recipient_sends?: number
+          singleton_guard?: number
+        }
+        Update: {
+          circuit_breaker_cooldown_minutes?: number
+          circuit_breaker_failure_rate_threshold?: number
+          circuit_breaker_min_sample_size?: number
+          circuit_breaker_window_minutes?: number
+          max_sends_per_hour?: number
+          max_sends_per_minute?: number
+          min_minutes_between_recipient_sends?: number
+          singleton_guard?: number
+        }
+        Relationships: []
+      }
       players: {
         Row: {
           club_id: string
@@ -6599,6 +6785,9 @@ export type Database = {
           channel: string
           created_at: string
           created_by: string | null
+          edited_at: string | null
+          edited_body: string | null
+          edited_by: string | null
           grounding: Json
           id: string
           language: string
@@ -6624,6 +6813,9 @@ export type Database = {
           channel: string
           created_at?: string
           created_by?: string | null
+          edited_at?: string | null
+          edited_body?: string | null
+          edited_by?: string | null
           grounding?: Json
           id?: string
           language: string
@@ -6649,6 +6841,9 @@ export type Database = {
           channel?: string
           created_at?: string
           created_by?: string | null
+          edited_at?: string | null
+          edited_body?: string | null
+          edited_by?: string | null
           grounding?: Json
           id?: string
           language?: string
@@ -10238,6 +10433,17 @@ export type Database = {
           user_id: string
         }[]
       }
+      get_platform_club_sales_origin: {
+        Args: { p_club_id: string }
+        Returns: {
+          business_name: string
+          converted_at: string
+          converted_by: string
+          converted_by_name: string
+          lead_id: string
+          source_place_id: string
+        }[]
+      }
       get_platform_club_staff_summary: {
         Args: { p_club_id: string }
         Returns: {
@@ -10382,6 +10588,13 @@ export type Database = {
           failed_count_7d: number
           last_seen_at: string
           pending_count: number
+        }[]
+      }
+      get_platform_whatsapp_sender_identity: {
+        Args: never
+        Returns: {
+          connected_phone_number: string
+          status: string
         }[]
       }
       get_player_360_summary: {
@@ -10591,6 +10804,16 @@ export type Database = {
           source_key: string
           source_name_en: string
           won_count: number
+        }[]
+      }
+      get_sales_upcoming_demos: {
+        Args: { p_limit?: number }
+        Returns: {
+          business_name: string
+          demo_id: string
+          lead_id: string
+          notes: string
+          scheduled_at: string
         }[]
       }
       get_shop_gross_profit: {
@@ -11577,8 +11800,89 @@ export type Database = {
         Returns: boolean
       }
       pin_platform_club: { Args: { p_club_id: string }; Returns: undefined }
+      platform_disconnect_whatsapp: {
+        Args: { p_club_id: string; p_reason?: string }
+        Returns: undefined
+      }
+      platform_disconnect_whatsapp_own: {
+        Args: { p_reason?: string }
+        Returns: undefined
+      }
+      platform_flag_whatsapp_container_restart: {
+        Args: { p_club_id: string; p_reason?: string }
+        Returns: undefined
+      }
+      platform_flag_whatsapp_own_test_connection: {
+        Args: { p_reason?: string }
+        Returns: undefined
+      }
+      platform_get_whatsapp_own_qr: {
+        Args: never
+        Returns: {
+          qr_expires_at: string
+          qr_payload: string
+        }[]
+      }
+      platform_get_whatsapp_own_recent_events: {
+        Args: { p_limit?: number }
+        Returns: {
+          actor_id: string
+          actor_name: string
+          created_at: string
+          detail: Json
+          event: string
+          id: string
+        }[]
+      }
+      platform_get_whatsapp_qr: {
+        Args: { p_club_id: string }
+        Returns: {
+          qr_expires_at: string
+          qr_payload: string
+        }[]
+      }
+      platform_get_whatsapp_recent_events: {
+        Args: { p_club_id: string; p_limit?: number }
+        Returns: {
+          actor_id: string
+          actor_name: string
+          created_at: string
+          detail: Json
+          event: string
+          id: string
+        }[]
+      }
+      platform_get_whatsapp_status: {
+        Args: never
+        Returns: {
+          circuit_breaker_open_until: string
+          connected_at: string
+          connected_phone_number: string
+          last_error: string
+          last_seen_at: string
+          last_successful_send_at: string
+          qr_expires_at: string
+          status: string
+        }[]
+      }
       platform_reactivate_club: {
         Args: { p_club_id: string }
+        Returns: undefined
+      }
+      platform_retry_whatsapp_connection: {
+        Args: { p_club_id: string; p_reason?: string }
+        Returns: undefined
+      }
+      platform_retry_whatsapp_own_connection: {
+        Args: { p_reason?: string }
+        Returns: undefined
+      }
+      platform_start_whatsapp_own_pairing: {
+        Args: { p_reason?: string }
+        Returns: undefined
+      }
+      platform_start_whatsapp_pairing: {
+        Args: { p_club_id: string; p_reason?: string }
         Returns: undefined
       }
       platform_suspend_club: {
@@ -12031,6 +12335,10 @@ export type Database = {
         }
         Returns: undefined
       }
+      sales_complete_demo: {
+        Args: { p_lead_id: string; p_notes?: string; p_outcome: string }
+        Returns: string
+      }
       sales_complete_followup: {
         Args: { p_followup_id: string; p_last_action: string }
         Returns: undefined
@@ -12051,6 +12359,10 @@ export type Database = {
       sales_create_discovery_job: {
         Args: { p_search_params: Json; p_source_key: string }
         Returns: string
+      }
+      sales_edit_outreach_draft: {
+        Args: { p_edited_body: string; p_message_id: string }
+        Returns: undefined
       }
       sales_find_duplicate_candidates: {
         Args: {
@@ -12119,6 +12431,10 @@ export type Database = {
         Args: { p_message_id: string }
         Returns: undefined
       }
+      sales_queue_platform_whatsapp_message: {
+        Args: { p_message_id: string }
+        Returns: string
+      }
       sales_record_outreach_event: {
         Args: {
           p_event_type: string
@@ -12143,6 +12459,10 @@ export type Database = {
       sales_reject_outreach_message: {
         Args: { p_message_id: string; p_reason?: string }
         Returns: undefined
+      }
+      sales_schedule_demo: {
+        Args: { p_lead_id: string; p_notes?: string; p_scheduled_at: string }
+        Returns: string
       }
       sales_schedule_followup: {
         Args: {
@@ -12248,6 +12568,7 @@ export type Database = {
           rating: number
           review_count: number
           status: string
+          status_reason: string
           total_count: number
           website: string
         }[]
@@ -12849,6 +13170,15 @@ export type Database = {
           variables: Json
         }[]
       }
+      whatsapp_connector_claim_next_platform_batch: {
+        Args: { p_limit?: number }
+        Returns: {
+          attempts: number
+          id: string
+          message_body: string
+          recipient_phone: string
+        }[]
+      }
       whatsapp_connector_expire_stale: { Args: never; Returns: number }
       whatsapp_connector_get_invoice_document_data: {
         Args: { p_invoice_id: string }
@@ -12881,6 +13211,13 @@ export type Database = {
           total: number
         }[]
       }
+      whatsapp_connector_get_platform_session_key: {
+        Args: never
+        Returns: {
+          session_key: string
+          status: string
+        }[]
+      }
       whatsapp_connector_list_accounts: {
         Args: never
         Returns: {
@@ -12888,6 +13225,7 @@ export type Database = {
           status: string
         }[]
       }
+      whatsapp_connector_load_platform_session: { Args: never; Returns: string }
       whatsapp_connector_load_session: {
         Args: { p_club_id: string }
         Returns: string
@@ -12898,6 +13236,27 @@ export type Database = {
       }
       whatsapp_connector_report_delivery_receipt: {
         Args: { p_provider_reference: string; p_status_level: number }
+        Returns: undefined
+      }
+      whatsapp_connector_report_platform_send_result: {
+        Args: {
+          p_error?: string
+          p_id: string
+          p_provider_reference?: string
+          p_success: boolean
+        }
+        Returns: undefined
+      }
+      whatsapp_connector_report_platform_status: {
+        Args: {
+          p_connected_phone_number?: string
+          p_error?: string
+          p_generation?: number
+          p_qr_payload?: string
+          p_qr_ttl_seconds?: number
+          p_state_seq?: number
+          p_status: string
+        }
         Returns: undefined
       }
       whatsapp_connector_report_send_result: {
@@ -12920,6 +13279,10 @@ export type Database = {
           p_state_seq?: number
           p_status: string
         }
+        Returns: undefined
+      }
+      whatsapp_connector_store_platform_session: {
+        Args: { p_session_credentials_encrypted: string }
         Returns: undefined
       }
       whatsapp_connector_store_session: {
