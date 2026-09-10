@@ -60,6 +60,16 @@
 --     (unchanged, already rate-limited via platform_whatsapp_safety_settings,
 --     20260909200000_platform_whatsapp_domain.sql) -- this migration
 --     adds no new bulk/scheduled send path.
+--
+-- "Disconnected Platform WhatsApp blocks sending safely" (explicit
+-- owner requirement): this function checks platform_whatsapp_account.
+-- status='connected' BEFORE inserting into the queue and raises a
+-- distinct, frontend-recognizable exception
+-- (platform_whatsapp_not_connected: ...) if not -- without this check,
+-- a Send click while disconnected would still create a queue row that
+-- then sits in 'pending' forever (the connector's own claim function
+-- already correctly requires status='connected', so nothing would ever
+-- actually be delivered) -- a false-success result, not a safe block.
 
 -- Idempotency, requirement 8: a given outreach message can only ever
 -- occupy ONE row in the platform send queue, for its entire lifetime --
@@ -120,6 +130,25 @@ begin
   -- of a raw unique-violation error.
   if exists (select 1 from public.platform_whatsapp_queue where outreach_message_id = p_message_id) then
     raise exception 'this message has already been queued or sent -- Send cannot be pressed twice for the same draft';
+  end if;
+
+  -- Explicit connection-status guard (owner's own requirement:
+  -- "disconnected Platform WhatsApp blocks sending safely" -- and
+  -- "Enforce server-side authorization and state transitions, not
+  -- UI-only guards"). Without this check, a Send click while
+  -- disconnected would still insert a queue row that then sits
+  -- indefinitely in 'pending' (the connector's own claim function
+  -- already correctly requires status='connected' before claiming
+  -- anything, so nothing would ever actually be sent -- but the caller
+  -- would get a false-success "queued" result with no indication
+  -- anything is wrong, which is not "blocks sending safely," it is
+  -- "silently accepts and never delivers"). A distinct exception
+  -- message lets the frontend recognize this specific case and point
+  -- the owner at /platform/whatsapp, exactly as the owner's stated UX
+  -- expectation describes ("show a clear actionable message, provide
+  -- navigation to /platform/whatsapp").
+  if not exists (select 1 from public.platform_whatsapp_account where status = 'connected') then
+    raise exception 'platform_whatsapp_not_connected: Platform WhatsApp is not connected -- connect it at /platform/whatsapp before sending';
   end if;
 
   select * into v_lead from public.sales_leads where id = v_message.lead_id;
