@@ -512,6 +512,7 @@
         "outreachEditedBadge": "Edited by owner",
         "outreachEditButton": "Edit",
         "outreachEditTitle": "Edit this WhatsApp draft",
+        "outreachEditShowOriginal": "Show the AI's original text",
         "outreachEditBodyLabel": "Message text",
         "outreachEditSave": "Save edit",
         "outreachEditSaving": "Saving...",

@@ -30,6 +30,18 @@ interface SupabaseLikeError {
 
 const MESSAGE_RULES: Array<[RegExp, string, string]> = [
   // [pattern, arabic, english]
+  // Owner decision #20's own explicit connection-status guard
+  // (sales_queue_platform_whatsapp_message,
+  // 20260910120000_sales_platform_whatsapp_send_enabled.sql) --
+  // without this rule, the race-condition case (Platform WhatsApp
+  // disconnects between page load and the Send click) fell through to
+  // the generic "could not send this message" fallback with no
+  // indication of what actually went wrong or how to fix it, caught by
+  // an independent UX review. Matched BEFORE the generic /not
+  // authorized/ rule below, since the RPC's own exception text does
+  // not contain that phrase, but ordering it first keeps every
+  // WhatsApp-specific rule grouped for readability.
+  [/platform_whatsapp_not_connected/i, 'واتساب المنصة غير متصل حاليًا — يجب الاتصال أولًا من صفحة واتساب المنصة قبل الإرسال.', 'Platform WhatsApp is not connected -- connect it from the Platform WhatsApp page before sending.'],
   [/not authorized/i, 'ليس لديك صلاحية لتنفيذ هذا الإجراء.', "You don't have permission to do this."],
   [/authentication required/i, 'يجب تسجيل الدخول أولاً.', 'You need to sign in first.'],
   [/group is at full capacity/i, 'المجموعة وصلت إلى الحد الأقصى من اللاعبين.', 'This group has reached its maximum number of players.'],

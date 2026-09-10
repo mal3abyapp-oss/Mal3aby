@@ -231,7 +231,7 @@ export function SalesLeadDetailPage() {
   const [editDialogFor, setEditDialogFor] = useState<string | null>(null)
   const [editBody, setEditBody] = useState('')
   const [editError, setEditError] = useState<string | null>(null)
-  const [sendErrors, setSendErrors] = useState<Record<string, string>>({})
+  const [sendErrors, setSendErrors] = useState<Record<string, { message: string; isNotConnected: boolean }>>({})
 
   const profileQuery = useQuery({
     queryKey: ['sales-lead-profile', leadId],
@@ -529,10 +529,32 @@ export function SalesLeadDetailPage() {
       invalidate()
     },
     onError: (error: { message?: string }, messageId) => {
+      // Independent UX review finding, fixed: the connection-status
+      // race (Platform WhatsApp disconnects between page load and the
+      // Send click -- the RPC's own server-side guard,
+      // 20260910120000_sales_platform_whatsapp_send_enabled.sql)
+      // previously fell through to the generic outreachSendError
+      // fallback with no link back to /platform/whatsapp, even though
+      // the page-load-time "not connected" state (whatsappSenderQuery)
+      // already showed one. Detect the RPC's own machine-parseable
+      // error prefix and render the same actionable Link for this case
+      // too, matching translateSupabaseError's own now-added mapped
+      // text (src/lib/errors.ts) for the plain-message part.
+      const isNotConnected = !!error.message?.toLowerCase().includes('platform_whatsapp_not_connected')
       setSendErrors((prev) => ({
         ...prev,
-        [messageId]: translateSupabaseError(error, t('platform.sales.leadProfile.outreachSendError')),
+        [messageId]: {
+          message: translateSupabaseError(error, t('platform.sales.leadProfile.outreachSendError')),
+          isNotConnected,
+        },
       }))
+      if (isNotConnected) {
+        // The page's own cached connection status is now known-stale --
+        // refetch so the primary "not connected" card (with its own
+        // Link) takes over on the next render instead of relying only
+        // on this inline fallback.
+        void whatsappSenderQuery.refetch()
+      }
     },
   })
 
@@ -1020,9 +1042,20 @@ export function SalesLeadDetailPage() {
                             </Link>
                           </div>
                         )}
-                        {sendErrors[m.id] && (
-                          <p role="alert" className="text-xs text-status-danger">{sendErrors[m.id]}</p>
-                        )}
+                        {(() => {
+                          const sendError = sendErrors[m.id]
+                          if (!sendError) return null
+                          return (
+                            <div className="space-y-1">
+                              <p role="alert" className="text-xs text-status-danger">{sendError.message}</p>
+                              {sendError.isNotConnected && (
+                                <Link to="/platform/whatsapp" className="text-xs text-accent-foreground hover:underline">
+                                  {t('platform.sales.leadProfile.outreachGoToWhatsappSettings')}
+                                </Link>
+                              )}
+                            </div>
+                          )
+                        })()}
                       </div>
                     )}
                   </li>
@@ -1372,13 +1405,31 @@ export function SalesLeadDetailPage() {
         </Dialog>
       )}
 
-      {editDialogFor && (
+      {editDialogFor && (() => {
+        // Independent UX review finding (P2), fixed: the dialog
+        // previously showed only the effective (possibly-already-
+        // edited) text, with no way to see what the AI originally
+        // wrote once an edit exists -- the backend already preserves
+        // both (edited_body is additive, body is never overwritten,
+        // 20260910110000_sales_whatsapp_message_channel_and_edit_
+        // tracking.sql), this just surfaces that to the owner too.
+        const editingMessage = outreach_messages.find((om) => om.id === editDialogFor)
+        const hasPriorEdit = !!editingMessage?.edited_body
+        return (
         <Dialog open onOpenChange={(open) => { if (!open) setEditDialogFor(null) }}>
           <DialogContent>
             <DialogHeader>
               <DialogTitle>{t('platform.sales.leadProfile.outreachEditTitle')}</DialogTitle>
             </DialogHeader>
             <div className="flex flex-col gap-4">
+              {hasPriorEdit && editingMessage && (
+                <details className="rounded-md border border-border-subtle p-2 text-sm">
+                  <summary className="cursor-pointer text-text-secondary">
+                    {t('platform.sales.leadProfile.outreachEditShowOriginal')}
+                  </summary>
+                  <p className="mt-2 whitespace-pre-wrap text-text-secondary">{editingMessage.body}</p>
+                </details>
+              )}
               <div className="flex flex-col gap-1">
                 <FormLabel htmlFor="edit-outreach-body">{t('platform.sales.leadProfile.outreachEditBodyLabel')}</FormLabel>
                 <textarea
@@ -1401,7 +1452,8 @@ export function SalesLeadDetailPage() {
             </div>
           </DialogContent>
         </Dialog>
-      )}
+        )
+      })()}
     </div>
   )
 }
