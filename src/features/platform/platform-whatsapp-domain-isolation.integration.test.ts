@@ -143,28 +143,32 @@ describe('Platform WhatsApp domain isolation -- STRUCTURAL proof (parses the rea
     expect(updateTargets).toContain('platform_whatsapp_queue')
   })
 
-  it('sales_queue_platform_whatsapp_message() is unconditionally disabled -- raises the exact documented pending-decision exception regardless of caller/message state', () => {
+  // SUPERSEDED (owner decision #20, resolved 2026-09-10): this
+  // migration's OWN copy of sales_queue_platform_whatsapp_message() was
+  // the original "deliberately disabled" version -- that text is still
+  // genuinely present in THIS file (20260909200000), unchanged, since
+  // the enabling happened via a LATER `create or replace` in a
+  // different file (20260910120000_sales_platform_whatsapp_send_
+  // enabled.sql), which Postgres applies on top at migration-apply
+  // time. This test's assertion below is therefore still TRUE about
+  // this file's own source text, but would be misleading if read as a
+  // claim about the function's current live behavior -- it is not
+  // disabled anymore. Narrowed to state exactly that scope. The real,
+  // current behavior is covered by
+  // sales-platform-whatsapp-send.structural.test.ts /
+  // sales-platform-whatsapp-send.integration.test.ts (written for
+  // decision #20's resolution) -- this test now only proves the
+  // ARCHIVAL fact that this migration file's own text represents the
+  // pre-resolution state, not a claim about production behavior today.
+  it("this migration file's OWN original text (20260909200000) still contains the pre-resolution \"disabled\" guard -- an archival fact about this file, NOT a claim about current live behavior (superseded by a later create or replace in 20260910120000; see sales-platform-whatsapp-send.*.test.ts for the current, real behavior)", () => {
     const body = extractFunctionBody(
       migrationSql,
       'create or replace function public.sales_queue_platform_whatsapp_message(p_message_id uuid)',
     )
     const expectedMessage =
       "automated WhatsApp send from an AI-generated draft is not yet enabled -- whatsapp_talking_points drafts are human call/chat scripts, not send-ready message text (see this function's migration-level comment for the full product-policy question this raises, recorded in FINAL_OWNER_DECISIONS_REQUIRED.md). The platform WhatsApp CONNECTION is fully available for manual, human-composed messages."
-    // Normalize whitespace/quote-doubling the same way the raw SQL
-    // literal encodes ('' inside a single-quoted string == a literal
-    // apostrophe once Postgres parses it) before comparing.
     const normalizedBody = body.replace(/''/g, "'")
     expect(normalizedBody).toContain(expectedMessage)
-
-    // Confirms the raise is unconditional (not inside an if-branch that
-    // could be bypassed) -- it appears BEFORE the queue INSERT, and
-    // there is no code path in the body that reaches the insert without
-    // passing through this raise first.
-    const raiseIdx = normalizedBody.indexOf(expectedMessage)
-    const insertIdx = normalizedBody.indexOf('insert into public.platform_whatsapp_queue')
-    expect(raiseIdx).toBeGreaterThan(-1)
-    expect(insertIdx).toBeGreaterThan(-1)
-    expect(raiseIdx).toBeLessThan(insertIdx)
   })
 })
 
@@ -349,38 +353,23 @@ describeIfTenantConfigured('Platform WhatsApp (own) RPCs -- a normal club_manage
 })
 
 // ---------------------------------------------------------------------
-// 4. sales_queue_platform_whatsapp_message -- live confirmation that
-//    the disabled guard fires even for an owner with full sales
-//    permissions (structural proof above confirms WHY; this confirms
-//    the guard is reachable/live in the deployed function, not just in
-//    the migration source file).
+// 4. sales_queue_platform_whatsapp_message -- REMOVED (owner decision
+//    #20, resolved 2026-09-10). This block previously live-asserted
+//    that a nonexistent message id surfaces the "not yet enabled"
+//    pending-decision text -- that was true when this test was
+//    written, but is now FALSE: the function was superseded by a later
+//    `create or replace` (20260910120000_sales_platform_whatsapp_send_
+//    enabled.sql) that removed the disabled-guard entirely, so a
+//    nonexistent message id now correctly raises "outreach message not
+//    found" instead. Leaving the old assertion in place would make
+//    this suite fail against a real deployed database (a genuine,
+//    self-caught test bug -- not a product regression), so it is
+//    removed here rather than left to fail later. The CURRENT, real
+//    behavior of this function is covered by
+//    sales-platform-whatsapp-send.structural.test.ts and
+//    sales-platform-whatsapp-send.integration.test.ts, written
+//    specifically for decision #20's resolution -- see those files for
+//    the up-to-date live-integration and structural coverage of this
+//    RPC (authorization, status guards, connection-status guard,
+//    idempotency, audit logging).
 // ---------------------------------------------------------------------
-describeIfOwnerConfigured('sales_queue_platform_whatsapp_message() -- deliberately disabled pending owner decision (live integration)', () => {
-  let client: SupabaseClient
-
-  beforeAll(async () => {
-    client = makeClient('sb-platform-owner-whatsapp-queue-disabled-auth-token')
-    await signIn(client, OWNER_EMAIL!, OWNER_PASSWORD!)
-  })
-
-  afterAll(async () => {
-    await client.auth.signOut()
-  })
-
-  it('raises the exact pending-decision exception for a nonexistent message id too -- the guard fires before the message lookup, so no message/lead fixture is required to observe it', async () => {
-    const { error } = await client.rpc('sales_queue_platform_whatsapp_message', {
-      p_message_id: '11111111-2222-3333-4444-555555555555',
-    })
-    expect(error).toBeTruthy()
-    // The guard raises unconditionally BEFORE the "outreach message not
-    // found" lookup in the real function body (confirmed structurally
-    // above) -- so even a nonexistent message id surfaces the
-    // pending-decision text, not a "not found" error. If this
-    // assertion ever starts seeing "outreach message not found"
-    // instead, the guard has been removed/reordered without the
-    // required owner decision, which is exactly the regression this
-    // test exists to catch.
-    expect(error!.message.toLowerCase()).toContain('not yet enabled')
-    expect(error!.message.toLowerCase()).toContain('final_owner_decisions_required.md')
-  })
-})
