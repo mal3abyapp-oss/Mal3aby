@@ -263,21 +263,59 @@ const DANGLING_CONNECTOR_PATTERN = /\b(and|or|but|so|because)\s*$|(^|\s)(و|أو
 // sentence-completeness, so the completeness check runs against the
 // last PROSE content, not the non-sentence identity block that
 // correctly follows it.
+//
+// FIX (2026-09-10, found during PR #28 production release verification):
+// a line is stripped ENTIRELY only when the signature/email match
+// consumes the WHOLE line (an email-shaped signature, always on its own
+// line). When a signature match is only a TRAILING portion of a longer
+// line -- exactly the natural, non-separated closing style the
+// whatsapp_message prompt deliberately asks for ("it does not need to
+// be on its own visually separated block the way an email signature
+// is") -- only that trailing signature portion is cut, and the real
+// prose sentence preceding it on the same line is kept. Previously this
+// function popped the ENTIRE line whenever it merely CONTAINED a
+// signature pattern anywhere, which discarded genuine prose (e.g. "...
+// نتكلم فيها؟ فريق ملعبي") and left completeness checking an empty
+// string -- unconditionally failing GENERATION_COMPLETENESS_PASS for
+// every well-formed whatsapp_message draft with this natural,
+// spec-compliant closing shape. Reproduced deterministically and fixed
+// here; email's own always-own-line signature convention is unaffected
+// (a whole-line match still strips the whole line, same as before).
 function stripTrailingSignatureBlock(text: string): string {
   const lines = text.trim().split('\n')
   while (lines.length > 0) {
-    const lastLine = lines[lines.length - 1].trim()
-    if (lastLine.length === 0) {
+    const lastLine = lines[lines.length - 1]
+    const trimmedLine = lastLine.trim()
+    if (trimmedLine.length === 0) {
       lines.pop()
       continue
     }
-    const isSignatureLine = SIGNATURE_PATTERNS.some((p) => p.test(lastLine)) || EMAIL_PATTERN.test(lastLine)
-    // Reset EMAIL_PATTERN's lastIndex (it's a /g regex reused across
-    // calls) so a stateful match here never leaks into a later,
-    // unrelated .test()/.match() call elsewhere in this module.
+    if (EMAIL_PATTERN.test(trimmedLine)) {
+      EMAIL_PATTERN.lastIndex = 0
+      lines.pop()
+      continue
+    }
     EMAIL_PATTERN.lastIndex = 0
-    if (!isSignatureLine) break
-    lines.pop()
+
+    const signatureMatch = SIGNATURE_PATTERNS
+      .map((p) => trimmedLine.match(p))
+      .find((m): m is RegExpMatchArray => m !== null)
+
+    if (!signatureMatch || signatureMatch.index === undefined) break
+
+    const beforeMatch = trimmedLine.slice(0, signatureMatch.index).trim()
+    if (beforeMatch.length === 0) {
+      // The signature match consumes the entire line (nothing but
+      // whitespace/punctuation precedes it) -- the classic email shape,
+      // strip the whole line and keep checking upward.
+      lines.pop()
+      continue
+    }
+    // Real prose precedes the signature on this same line (the natural
+    // WhatsApp closing style) -- keep the prose, cut only the trailing
+    // signature portion, and stop (this is now the last content line).
+    lines[lines.length - 1] = beforeMatch
+    break
   }
   return lines.join('\n')
 }
