@@ -366,6 +366,61 @@ describe('evaluateOutreachQuality — generation completeness (Defect 1)', () =>
     expect(result.status).toBe('APPROVAL_READY')
     expect(result.gates.GENERATION_COMPLETENESS_PASS).toBe(true)
   })
+
+  // 11-12. REGRESSION (found 2026-09-10 during PR #28 production release
+  // verification, live QA against a real deployed instance): a
+  // well-formed whatsapp_message draft was unconditionally rejected with
+  // GENERATION_COMPLETENESS_PASS=false / GENERATION_TRUNCATED, even
+  // though the provider's own finishReason was 'stop' and the text was
+  // genuinely complete. Root cause: stripTrailingSignatureBlock() popped
+  // the ENTIRE last line whenever it merely CONTAINED a signature
+  // pattern anywhere in it, rather than only the matched signature
+  // portion -- correct for email's own-line signature convention, but
+  // wrong for whatsapp_message's deliberately natural, non-separated
+  // closing style (the prompt explicitly asks for "فريق ملعبي" to follow
+  // the closing sentence on the SAME line, per owner decision #20 -- see
+  // sales-ai-offer-generator/index.ts's whatsapp_message prompt branch).
+  // The entire prose sentence before the inline signature was discarded,
+  // leaving stripTrailingSignatureBlock() returning an empty string,
+  // which endsIncomplete() then correctly (but wrongly, for this input)
+  // reports as incomplete. Fixed to strip only the matched trailing
+  // signature substring from a line, keeping any real prose that
+  // precedes it on that same line.
+  it('11. accepts a genuine, complete whatsapp_message draft whose signature follows the closing question on the SAME line (no newline before it) -- the real production defect shape', () => {
+    const body = 'أهلاً فريق Black Ball Sporting Club، شفت إنكم عندكم ملعب كرة قدم وممكن يكون فيه صعوبة في إدارة الحجوزات اليومية. منصة ملعبي بتوفر نظام بسيط لإدارة العمليات وحجز المواعيد. ممكن نتكلم 15 دقيقة الأسبوع ده نوضح أكتر؟ فريق ملعبي\nsales@mal3aby.app'
+    const result = evaluateOutreachQuality({
+      channel: 'whatsapp_message',
+      language: 'ar',
+      subject: null,
+      body,
+      lowConfidenceSignalKeys: [],
+      groundingPassed: true,
+      finishReason: 'stop',
+    })
+    expect(result.gates.GENERATION_COMPLETENESS_PASS).toBe(true)
+    expect(result.rejection_reasons).not.toContain('GENERATION_TRUNCATED')
+  })
+
+  it('12. still rejects a genuinely truncated whatsapp_message draft that ends on a dangling connector after signature-stripping', () => {
+    const body = 'أهلاً، شفت إنكم عندكم ملعب كرة قدم وممكن يكون فيه صعوبة في إدارة الحجوزات اليومية ونتيجة لذلك و'
+    const result = evaluateOutreachQuality({
+      channel: 'whatsapp_message',
+      language: 'ar',
+      subject: null,
+      body,
+      lowConfidenceSignalKeys: [],
+      groundingPassed: true,
+      finishReason: 'stop',
+    })
+    expect(result.status).toBe('QUALITY_REJECTED')
+    expect(result.rejection_reasons).toContain('GENERATION_TRUNCATED')
+    expect(result.gates.GENERATION_COMPLETENESS_PASS).toBe(false)
+  })
+
+  it('13. still fully strips an email-shaped own-line signature block (regression guard: the fix must not weaken the existing email convention)', () => {
+    const result = evaluateOutreachQuality({ ...VALID_EMAIL_EN, finishReason: 'stop' })
+    expect(result.gates.GENERATION_COMPLETENESS_PASS).toBe(true)
+  })
 })
 
 describe('evaluateOutreachQuality — output integrity (Defect 2)', () => {
