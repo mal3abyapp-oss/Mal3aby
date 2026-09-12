@@ -279,7 +279,11 @@ export function WhatsAppConnectionCard() {
           <p role="alert" className="text-sm text-status-danger">
             {t('whatsapp.connectionCard.restrictionSignalDetected', {
               date: formatDateTime(status.restrictionSignalDetectedAt, locale),
-              detail: status.restrictionSignalDetail ?? '',
+              // detail is Latin-script evidence text (e.g. "403 forbidden
+              // disconnect x3 within 10 minutes") embedded inside Arabic
+              // RTL sentence text -- isolate it the same way formatDateTime
+              // already isolates `date`, or it bidi-mangles in RTL locale.
+              detail: `${DATETIME_FSI}${status.restrictionSignalDetail ?? ''}${DATETIME_PDI}`,
             })}
           </p>
         )}

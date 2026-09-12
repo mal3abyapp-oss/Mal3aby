@@ -342,7 +342,10 @@ export function PlatformWhatsAppPage() {
                 <p role="alert" className="text-sm text-status-danger">
                   {t('platform.whatsappPage.restrictionSignalDetected', {
                     date: formatDateTime(status.restrictionSignalDetectedAt, locale),
-                    detail: status.restrictionSignalDetail ?? '',
+                    // Latin-script evidence text embedded inside Arabic RTL
+                    // sentence text -- isolate it like `date` already is, or
+                    // it bidi-mangles in the Arabic locale.
+                    detail: `${DATETIME_FSI}${status.restrictionSignalDetail ?? ''}${DATETIME_PDI}`,
                   })}
                 </p>
               )}

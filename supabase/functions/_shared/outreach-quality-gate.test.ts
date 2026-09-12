@@ -643,6 +643,20 @@ describe('evaluateOutreachQuality — tone / spam-signal detection (ban-protecti
     expect(result.rejection_reasons).not.toContain('SHOUTING_DETECTED')
   })
 
+  it('rejects a classic 2-word ALL-CAPS shout ("FREE NOW") -- an earlier draft required 3+ words and missed this shape entirely', () => {
+    const body = 'Hi team, FREE NOW for your club this week. Would a quick call work?\n\nMal3aby Sales Team\nsales@mal3aby.app'
+    const result = evaluateOutreachQuality({ ...VALID_EMAIL_EN, body })
+    expect(result.gates.TONE_PASS).toBe(false)
+    expect(result.rejection_reasons).toContain('SHOUTING_DETECTED')
+  })
+
+  it('does not flag a 2-letter ALL-CAPS acronym pair (e.g. "US CEO") as shouting', () => {
+    const body = VALID_EMAIL_EN.body.replace('team', 'US CEO team')
+    const result = evaluateOutreachQuality({ ...VALID_EMAIL_EN, body })
+    expect(result.gates.TONE_PASS).toBe(true)
+    expect(result.rejection_reasons).not.toContain('SHOUTING_DETECTED')
+  })
+
   it('rejects a message with more than 2 emoji', () => {
     const body = VALID_EMAIL_AR.body.replace('فريق ملعبي', '🎉🔥💯 فريق ملعبي')
     const result = evaluateOutreachQuality({ ...VALID_EMAIL_AR, body })

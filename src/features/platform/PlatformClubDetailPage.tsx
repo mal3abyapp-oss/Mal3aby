@@ -2433,7 +2433,10 @@ function PlatformWhatsAppCard({ clubId }: { clubId: string }) {
               <p role="alert" className="text-sm text-status-danger">
                 {t('platform.clubDetailPage.whatsappCard.restrictionSignalDetected', {
                   date: formatPlatformWhatsAppDateTime(health.restriction_signal_detected_at, locale),
-                  detail: health.restriction_signal_detail ?? '',
+                  // Latin-script evidence text embedded inside Arabic RTL
+                  // sentence text -- isolate it like `date` already is, or
+                  // it bidi-mangles in the Arabic locale.
+                  detail: `${PLATFORM_DATETIME_FSI}${health.restriction_signal_detail ?? ''}${PLATFORM_DATETIME_PDI}`,
                 })}
               </p>
             )}

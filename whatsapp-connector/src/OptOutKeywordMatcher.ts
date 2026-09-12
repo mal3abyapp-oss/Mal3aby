@@ -34,7 +34,12 @@
 
 const OPT_OUT_PATTERNS: RegExp[] = [
   /^\s*(stop|unsubscribe|cancel)\s*$/i,
-  /^\s*(إيقاف|وقف|إلغاء(?:\s*الاشتراك)?|لا\s*ترسل(?:وا)?)\s*$/,
+  // إيقاف/ايقاف covers both the correctly-hamzated spelling and the
+  // common un-hamzated one (hamzas are frequently dropped when typing
+  // Arabic on a phone keyboard) -- both mean the same word. توقف is
+  // arguably the single most natural everyday way to say "stop" in
+  // Arabic and was missing from the original list.
+  /^\s*(إيقاف|ايقاف|توقف|وقف|إلغاء(?:\s*الاشتراك)?|لا\s*ترسل(?:وا)?)\s*$/,
 ]
 
 export function isOptOutKeyword(messageText: string): boolean {

@@ -509,15 +509,19 @@ function evaluateOutputIntegrity(body: string, language: 'ar' | 'en', extraAllow
 //   1. Multiple exclamation marks in a row ("!!!", "!!") or more than
 //      one single exclamation mark total in a genuinely short message
 //      -- ordinary business correspondence rarely uses more than one.
-//   2. A run of 3+ consecutive fully-uppercase Latin words (a "shouted"
-//      phrase) -- a single acronym (QR, CTA) is untouched; this only
-//      catches multi-word ALL-CAPS runs, the actual "shouting" shape.
+//   2. A run of 2+ consecutive fully-uppercase Latin WORDS (3+ letters
+//      each, a "shouted" phrase like "FREE NOW" or "ACT FAST") -- a
+//      lone acronym (QR, CTA) is untouched (2-letter minimum keeps
+//      2-letter acronym pairs like "US CEO" from false-flagging), and
+//      this deliberately catches the classic 2-word shout, not just
+//      3+-word runs (an earlier draft required 3+ words and verified
+//      missed "BIG SALE"/"FREE NOW"-style 2-word shouting entirely).
 //   3. More than 2 emoji characters in the whole message -- a single
 //      friendly emoji is not flagged; a message peppered with several
 //      is a real, well-documented spam-perception signal.
 const EXCESSIVE_EXCLAMATION_PATTERN = /!{2,}/
 const SINGLE_EXCLAMATION_COUNT_PATTERN = /!/g
-const SHOUTING_RUN_PATTERN = /\b[A-Z]{2,}(?:\s+[A-Z]{2,}){2,}\b/
+const SHOUTING_RUN_PATTERN = /\b[A-Z]{3,}(?:\s+[A-Z]{3,}){1,}\b/
 // Conservative emoji range -- common pictographs/emoticons/symbols
 // actually used in casual chat, not every possible Unicode symbol
 // (avoids false-flagging currency signs, arrows used in ordinary text,
@@ -891,6 +895,15 @@ function evaluateCallTask(input: QualityGateInput): QualityGateResult {
   // check below; kept true here for the same shared-shape reason.
   const signaturePass = true
 
+  // No TONE_PASS concept for a spoken call script either (ban-protection
+  // hardening, 2026-09-12): the tone gate's three signals -- exclamation-
+  // mark punctuation, ALL-CAPS shouting, emoji -- only exist as concepts
+  // in TYPED text; a call script is read aloud, not sent as a literal
+  // string of characters, so none of them apply. Kept trivially true here
+  // for the same shared-gates-shape reason as subjectPass/signaturePass
+  // above, not evaluated against input.body.
+  const tonePass = true
+
   const ctaPass = cta.present
   if (!cta.present) reasons.push('MISSING_CTA')
 
@@ -938,6 +951,7 @@ function evaluateCallTask(input: QualityGateInput): QualityGateResult {
     CONFIDENCE_LANGUAGE_PASS: confidenceLanguagePass,
     GENERATION_COMPLETENESS_PASS: generationCompletenessPass,
     OUTPUT_INTEGRITY_PASS: outputIntegrityPass,
+    TONE_PASS: tonePass,
   }
 
   const allPass = Object.values(gates).every(Boolean)

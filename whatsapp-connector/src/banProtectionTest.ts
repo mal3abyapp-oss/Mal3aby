@@ -66,6 +66,8 @@ function main() {
     ['unsubscribe', true],
     ['cancel', true],
     ['إيقاف', true],
+    ['ايقاف', true], // common un-hamzated spelling -- hamzas are frequently dropped on phone keyboards
+    ['توقف', true], // arguably the single most natural everyday Arabic word for "stop"
     ['وقف', true],
     ['إلغاء الاشتراك', true],
     ['  stop  ', true], // whitespace-tolerant
