@@ -42,9 +42,13 @@ interface SafetySettings {
   quietHoursBypassCritical: boolean
   maxSendsPerMinute: number
   maxSendsPerHour: number
+  maxSendsPerDay: number
   minMinutesBetweenRecipientSends: number
+  maxSendsPerDayPerRecipient: number
   circuitBreakerEnabled: boolean
   defaultLanguage: 'ar' | 'en'
+  warmUpEnabled: boolean
+  warmUpDays: number
 }
 
 interface Diagnostics {
@@ -84,7 +88,7 @@ async function fetchSafetySettings(clubId: string): Promise<SafetySettings> {
   const { data, error } = await supabase
     .from('messaging_safety_settings')
     .select(
-      'quiet_hours_enabled, quiet_hours_start, quiet_hours_end, quiet_hours_bypass_critical, max_sends_per_minute_per_account, max_sends_per_hour_per_account, min_minutes_between_recipient_sends, circuit_breaker_enabled, default_language',
+      'quiet_hours_enabled, quiet_hours_start, quiet_hours_end, quiet_hours_bypass_critical, max_sends_per_minute_per_account, max_sends_per_hour_per_account, max_sends_per_day_per_account, min_minutes_between_recipient_sends, max_sends_per_day_per_recipient, circuit_breaker_enabled, default_language, warm_up_enabled, warm_up_days',
     )
     .eq('club_id', clubId)
     .maybeSingle()
@@ -97,9 +101,13 @@ async function fetchSafetySettings(clubId: string): Promise<SafetySettings> {
     quietHoursBypassCritical: data?.quiet_hours_bypass_critical ?? true,
     maxSendsPerMinute: data?.max_sends_per_minute_per_account ?? 6,
     maxSendsPerHour: data?.max_sends_per_hour_per_account ?? 120,
+    maxSendsPerDay: data?.max_sends_per_day_per_account ?? 500,
     minMinutesBetweenRecipientSends: data?.min_minutes_between_recipient_sends ?? 5,
+    maxSendsPerDayPerRecipient: data?.max_sends_per_day_per_recipient ?? 3,
     circuitBreakerEnabled: data?.circuit_breaker_enabled ?? true,
     defaultLanguage: (data?.default_language as 'ar' | 'en') ?? 'ar',
+    warmUpEnabled: data?.warm_up_enabled ?? true,
+    warmUpDays: data?.warm_up_days ?? 7,
   }
 }
 
@@ -224,9 +232,13 @@ export function MessagingSafetyCard() {
           quiet_hours_bypass_critical: effective.quietHoursBypassCritical,
           max_sends_per_minute_per_account: effective.maxSendsPerMinute,
           max_sends_per_hour_per_account: effective.maxSendsPerHour,
+          max_sends_per_day_per_account: effective.maxSendsPerDay,
           min_minutes_between_recipient_sends: effective.minMinutesBetweenRecipientSends,
+          max_sends_per_day_per_recipient: effective.maxSendsPerDayPerRecipient,
           circuit_breaker_enabled: effective.circuitBreakerEnabled,
           default_language: effective.defaultLanguage,
+          warm_up_enabled: effective.warmUpEnabled,
+          warm_up_days: effective.warmUpDays,
         },
         { onConflict: 'club_id' },
       )
@@ -323,7 +335,7 @@ export function MessagingSafetyCard() {
                   <p className="text-xs text-text-secondary">
                     {t('whatsapp.messagingSafetyCard.rateLimitHint')}
                   </p>
-                  <div className="grid grid-cols-2 gap-3">
+                  <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
                     <div className="flex flex-col gap-1">
                       <label className="text-xs text-text-secondary">{t('whatsapp.messagingSafetyCard.maxPerMinuteLabel')}</label>
                       <Input
@@ -342,15 +354,35 @@ export function MessagingSafetyCard() {
                         onChange={(e) => setDraft((d) => ({ ...d, maxSendsPerHour: Number(e.target.value) }))}
                       />
                     </div>
+                    <div className="flex flex-col gap-1">
+                      <label className="text-xs text-text-secondary">{t('whatsapp.messagingSafetyCard.maxPerDayLabel')}</label>
+                      <Input
+                        type="number"
+                        min={1}
+                        value={effective.maxSendsPerDay}
+                        onChange={(e) => setDraft((d) => ({ ...d, maxSendsPerDay: Number(e.target.value) }))}
+                      />
+                    </div>
                   </div>
-                  <div className="flex flex-col gap-1">
-                    <label className="text-xs text-text-secondary">{t('whatsapp.messagingSafetyCard.minMinutesBetweenSendsLabel')}</label>
-                    <Input
-                      type="number"
-                      min={0}
-                      value={effective.minMinutesBetweenRecipientSends}
-                      onChange={(e) => setDraft((d) => ({ ...d, minMinutesBetweenRecipientSends: Number(e.target.value) }))}
-                    />
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="flex flex-col gap-1">
+                      <label className="text-xs text-text-secondary">{t('whatsapp.messagingSafetyCard.minMinutesBetweenSendsLabel')}</label>
+                      <Input
+                        type="number"
+                        min={0}
+                        value={effective.minMinutesBetweenRecipientSends}
+                        onChange={(e) => setDraft((d) => ({ ...d, minMinutesBetweenRecipientSends: Number(e.target.value) }))}
+                      />
+                    </div>
+                    <div className="flex flex-col gap-1">
+                      <label className="text-xs text-text-secondary">{t('whatsapp.messagingSafetyCard.maxPerDayPerRecipientLabel')}</label>
+                      <Input
+                        type="number"
+                        min={1}
+                        value={effective.maxSendsPerDayPerRecipient}
+                        onChange={(e) => setDraft((d) => ({ ...d, maxSendsPerDayPerRecipient: Number(e.target.value) }))}
+                      />
+                    </div>
                   </div>
                   <label className="flex items-center gap-2 text-sm">
                     <input
@@ -361,6 +393,31 @@ export function MessagingSafetyCard() {
                     />
                     {t('whatsapp.messagingSafetyCard.circuitBreakerLabel')}
                   </label>
+                </div>
+
+                <div className="flex flex-col gap-2 border-t border-border pt-4">
+                  <h3 className="text-sm font-medium">{t('whatsapp.messagingSafetyCard.warmUpHeading')}</h3>
+                  <p className="text-xs text-text-secondary">{t('whatsapp.messagingSafetyCard.warmUpHint')}</p>
+                  <label className="flex items-center gap-2 text-sm">
+                    <input
+                      type="checkbox"
+                      checked={effective.warmUpEnabled}
+                      onChange={(e) => setDraft((d) => ({ ...d, warmUpEnabled: e.target.checked }))}
+                      className="size-4"
+                    />
+                    {t('whatsapp.messagingSafetyCard.warmUpEnabledLabel')}
+                  </label>
+                  {effective.warmUpEnabled && (
+                    <div className="flex flex-col gap-1">
+                      <label className="text-xs text-text-secondary">{t('whatsapp.messagingSafetyCard.warmUpDaysLabel')}</label>
+                      <Input
+                        type="number"
+                        min={0}
+                        value={effective.warmUpDays}
+                        onChange={(e) => setDraft((d) => ({ ...d, warmUpDays: Number(e.target.value) }))}
+                      />
+                    </div>
+                  )}
                 </div>
 
                 <div className="flex flex-col gap-1">

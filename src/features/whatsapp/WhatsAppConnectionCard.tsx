@@ -51,6 +51,8 @@ interface StatusData {
   lastSeenAt: string | null
   lastError: string | null
   qrExpiresAt: string | null
+  restrictionSignalDetectedAt: string | null
+  restrictionSignalDetail: string | null
 }
 
 const STATUS_TONE: Record<WhatsAppStatus, StatusTone> = {
@@ -77,6 +79,8 @@ async function fetchStatus(clubId: string): Promise<StatusData> {
     lastSeenAt: row?.last_seen_at ?? null,
     lastError: row?.last_error ?? null,
     qrExpiresAt: row?.qr_expires_at ?? null,
+    restrictionSignalDetectedAt: row?.restriction_signal_detected_at ?? null,
+    restrictionSignalDetail: row?.restriction_signal_detail ?? null,
   }
 }
 
@@ -264,6 +268,24 @@ export function WhatsAppConnectionCard() {
         {actionError && <p className="text-sm text-status-danger">{actionError}</p>}
         {!isLoading && status?.lastError && (currentStatus === 'error' || currentStatus === 'failed' || currentStatus === 'restricted' || currentStatus === 'degraded') && (
           <p className="text-sm text-status-danger">{status.lastError}</p>
+        )}
+
+        {/* Ban-protection hardening (2026-09-12) -- see
+            PlatformWhatsAppPage.tsx's own copy of this banner for the
+            full rationale (distinct from the existing static
+            restrictedHint above: this is the specific, evidence-backed
+            detection event, not a generic status-shaped hint). */}
+        {!isLoading && status?.restrictionSignalDetectedAt && (
+          <p role="alert" className="text-sm text-status-danger">
+            {t('whatsapp.connectionCard.restrictionSignalDetected', {
+              date: formatDateTime(status.restrictionSignalDetectedAt, locale),
+              // detail is Latin-script evidence text (e.g. "403 forbidden
+              // disconnect x3 within 10 minutes") embedded inside Arabic
+              // RTL sentence text -- isolate it the same way formatDateTime
+              // already isolates `date`, or it bidi-mangles in RTL locale.
+              detail: `${DATETIME_FSI}${status.restrictionSignalDetail ?? ''}${DATETIME_PDI}`,
+            })}
+          </p>
         )}
 
         {!isLoading && currentStatus === 'connected' && (

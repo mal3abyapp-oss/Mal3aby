@@ -284,6 +284,8 @@ FIRST-CONTACT EMAIL STRUCTURE -- MANDATORY, follow this exact shape:
 5. ONE low-friction call to action -- a short, specific, easy-to-answer question (e.g. asking if a brief call this week would work), never a vague "we'd love to arrange a demo" with no question and no timeframe. Do not fabricate a calendar link.
 6. The exact signature block given above.
 
+TONE -- MANDATORY: no exclamation-mark-heavy hype, no "amazing offer," no urgency/scarcity pressure tactics, no ALL-CAPS words or phrases, no emoji at all -- this is a professional first-contact business email, not a chat message.
+
 LENGTH: the BODY (excluding the subject line and signature) must be approximately 80-140 words. Do not write a long message. Do not list more than one product feature/module. Get to the point quickly.
 
 Write the email now, starting with the SUBJECT: line.`
@@ -307,7 +309,7 @@ WHATSAPP MESSAGE STYLE -- MANDATORY:
 - Natural and conversational, the way one business owner would genuinely message another on WhatsApp -- short sentences, no corporate/marketing tone, no robotic phrasing.
 - Concise: this is a WhatsApp message, not an email. Get to the point in the first line.
 - Personalized: reference the business by name and something real and specific about it (from the verified facts/signals above) in the opening line -- never a generic greeting that could apply to any business.
-- Commercially persuasive without sounding automated or spammy: connect ONE relevant Mal3aby capability to a real observed opportunity gap, phrased as genuine interest in helping, not a sales pitch dumped on a stranger. No exclamation-mark-heavy hype, no "amazing offer," no urgency/scarcity pressure tactics.
+- Commercially persuasive without sounding automated or spammy: connect ONE relevant Mal3aby capability to a real observed opportunity gap, phrased as genuine interest in helping, not a sales pitch dumped on a stranger. No exclamation-mark-heavy hype, no "amazing offer," no urgency/scarcity pressure tactics, no ALL-CAPS words or phrases, and at most one emoji in the entire message (a plain, natural closing tone reads more genuinely human than any emoji at all -- never stack multiple emoji).
 - End with ONE short, low-friction question inviting a reply (e.g. asking if a brief call this week would work) -- never a vague "let us know if interested" with nothing to respond to.
 - The signature block above, but WhatsApp-appropriate: keep it brief, it does not need to be on its own visually separated block the way an email signature is -- a short closing line naming the team identity is enough.
 

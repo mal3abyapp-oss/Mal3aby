@@ -37,6 +37,7 @@ export type QualityGateName =
   | 'CONFIDENCE_LANGUAGE_PASS'
   | 'GENERATION_COMPLETENESS_PASS'
   | 'OUTPUT_INTEGRITY_PASS'
+  | 'TONE_PASS'
 
 export type QualityRejectionReason =
   | 'MISSING_SUBJECT'
@@ -56,6 +57,9 @@ export type QualityRejectionReason =
   | 'GENERATION_TRUNCATED'
   | 'OUTPUT_INTEGRITY_FAILED'
   | 'EVIDENCE_STRENGTH_OVERSTATED'
+  | 'EXCESSIVE_PUNCTUATION'
+  | 'SHOUTING_DETECTED'
+  | 'EXCESSIVE_EMOJI'
 
 export interface QualityGateResult {
   gates: Record<QualityGateName, boolean>
@@ -486,6 +490,59 @@ function evaluateOutputIntegrity(body: string, language: 'ar' | 'en', extraAllow
 }
 
 // ============================================================
+// TONE (ban-protection hardening, 2026-09-12): every generation prompt
+// already INSTRUCTS the model against spam-shaped copy ("No
+// exclamation-mark-heavy hype, no 'amazing offer,' no urgency/scarcity
+// pressure tactics" -- sales-ai-offer-generator/index.ts's own
+// whatsapp_message prompt branch), but nothing in this gate previously
+// ENFORCED it deterministically -- every other quality dimension in
+// this file follows the owner's own explicit "do not rely solely on
+// the LLM to self-evaluate" directive; tone/spam-signal detection had
+// been the one dimension left entirely to the prompt's own instruction
+// with no fallback check. A message that merely SOUNDS automated/
+// spammy is itself a real WhatsApp-ban risk factor (recipients marking
+// it as spam, WhatsApp's own automated-behavior heuristics), distinct
+// from every structural check already above.
+//
+// Three narrow, conservative signals, none of which flags legitimate
+// business writing:
+//   1. Multiple exclamation marks in a row ("!!!", "!!") or more than
+//      one single exclamation mark total in a genuinely short message
+//      -- ordinary business correspondence rarely uses more than one.
+//   2. A run of 2+ consecutive fully-uppercase Latin WORDS (3+ letters
+//      each, a "shouted" phrase like "FREE NOW" or "ACT FAST") -- a
+//      lone acronym (QR, CTA) is untouched (2-letter minimum keeps
+//      2-letter acronym pairs like "US CEO" from false-flagging), and
+//      this deliberately catches the classic 2-word shout, not just
+//      3+-word runs (an earlier draft required 3+ words and verified
+//      missed "BIG SALE"/"FREE NOW"-style 2-word shouting entirely).
+//   3. More than 2 emoji characters in the whole message -- a single
+//      friendly emoji is not flagged; a message peppered with several
+//      is a real, well-documented spam-perception signal.
+const EXCESSIVE_EXCLAMATION_PATTERN = /!{2,}/
+const SINGLE_EXCLAMATION_COUNT_PATTERN = /!/g
+const SHOUTING_RUN_PATTERN = /\b[A-Z]{3,}(?:\s+[A-Z]{3,}){1,}\b/
+// Conservative emoji range -- common pictographs/emoticons/symbols
+// actually used in casual chat, not every possible Unicode symbol
+// (avoids false-flagging currency signs, arrows used in ordinary text,
+// etc.).
+const EMOJI_PATTERN = /[\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}]/gu
+
+function evaluateTone(body: string): { pass: boolean; excessiveExclamation: boolean; shoutingDetected: boolean; excessiveEmoji: boolean } {
+  const exclamationCount = (body.match(SINGLE_EXCLAMATION_COUNT_PATTERN) ?? []).length
+  const excessiveExclamation = EXCESSIVE_EXCLAMATION_PATTERN.test(body) || exclamationCount > 1
+  const shoutingDetected = SHOUTING_RUN_PATTERN.test(body)
+  const emojiCount = (body.match(EMOJI_PATTERN) ?? []).length
+  const excessiveEmoji = emojiCount > 2
+  return {
+    pass: !excessiveExclamation && !shoutingDetected && !excessiveEmoji,
+    excessiveExclamation,
+    shoutingDetected,
+    excessiveEmoji,
+  }
+}
+
+// ============================================================
 // EVIDENCE STRENGTH (Defect 3, 2026-09-04 owner directive): "Observed
 // contact/channel metadata must not be transformed into operational
 // workflow claims without supporting evidence." Example: a public Gmail
@@ -545,6 +602,7 @@ function evaluateEmail(input: QualityGateInput): QualityGateResult {
   const completeness = evaluateGenerationCompleteness(input.body, input.finishReason)
   const integrity = evaluateOutputIntegrity(input.body, input.language, [input.subject ?? '', input.businessName ?? ''])
   const evidenceStrength = evaluateEvidenceStrength(input.body, input.contactMetadataOnlySignalKeys ?? [])
+  const tone = evaluateTone(`${input.subject ?? ''}\n${input.body}`)
 
   const reasons: QualityRejectionReason[] = []
 
@@ -583,6 +641,11 @@ function evaluateEmail(input: QualityGateInput): QualityGateResult {
   const evidenceStrengthPass = evidenceStrength.pass
   if (!evidenceStrengthPass) reasons.push('EVIDENCE_STRENGTH_OVERSTATED')
 
+  const tonePass = tone.pass
+  if (tone.excessiveExclamation) reasons.push('EXCESSIVE_PUNCTUATION')
+  if (tone.shoutingDetected) reasons.push('SHOUTING_DETECTED')
+  if (tone.excessiveEmoji) reasons.push('EXCESSIVE_EMOJI')
+
   const gates: Record<QualityGateName, boolean> = {
     GROUNDING_PASS: groundingPass,
     EVIDENCE_STRENGTH_PASS: evidenceStrengthPass,
@@ -595,6 +658,7 @@ function evaluateEmail(input: QualityGateInput): QualityGateResult {
     CONFIDENCE_LANGUAGE_PASS: confidenceLanguagePass,
     GENERATION_COMPLETENESS_PASS: generationCompletenessPass,
     OUTPUT_INTEGRITY_PASS: outputIntegrityPass,
+    TONE_PASS: tonePass,
   }
 
   const allPass = Object.values(gates).every(Boolean)
@@ -643,6 +707,7 @@ function evaluateWhatsappMessage(input: QualityGateInput): QualityGateResult {
   const completeness = evaluateGenerationCompleteness(input.body, input.finishReason)
   const integrity = evaluateOutputIntegrity(input.body, input.language, [input.businessName ?? ''])
   const evidenceStrength = evaluateEvidenceStrength(input.body, input.contactMetadataOnlySignalKeys ?? [])
+  const tone = evaluateTone(input.body)
 
   const reasons: QualityRejectionReason[] = []
 
@@ -689,6 +754,11 @@ function evaluateWhatsappMessage(input: QualityGateInput): QualityGateResult {
   const evidenceStrengthPass = evidenceStrength.pass
   if (!evidenceStrengthPass) reasons.push('EVIDENCE_STRENGTH_OVERSTATED')
 
+  const tonePass = tone.pass
+  if (tone.excessiveExclamation) reasons.push('EXCESSIVE_PUNCTUATION')
+  if (tone.shoutingDetected) reasons.push('SHOUTING_DETECTED')
+  if (tone.excessiveEmoji) reasons.push('EXCESSIVE_EMOJI')
+
   const gates: Record<QualityGateName, boolean> = {
     GROUNDING_PASS: groundingPass,
     EVIDENCE_STRENGTH_PASS: evidenceStrengthPass,
@@ -701,6 +771,7 @@ function evaluateWhatsappMessage(input: QualityGateInput): QualityGateResult {
     CONFIDENCE_LANGUAGE_PASS: confidenceLanguagePass,
     GENERATION_COMPLETENESS_PASS: generationCompletenessPass,
     OUTPUT_INTEGRITY_PASS: outputIntegrityPass,
+    TONE_PASS: tonePass,
   }
 
   const allPass = Object.values(gates).every(Boolean)
@@ -824,6 +895,15 @@ function evaluateCallTask(input: QualityGateInput): QualityGateResult {
   // check below; kept true here for the same shared-shape reason.
   const signaturePass = true
 
+  // No TONE_PASS concept for a spoken call script either (ban-protection
+  // hardening, 2026-09-12): the tone gate's three signals -- exclamation-
+  // mark punctuation, ALL-CAPS shouting, emoji -- only exist as concepts
+  // in TYPED text; a call script is read aloud, not sent as a literal
+  // string of characters, so none of them apply. Kept trivially true here
+  // for the same shared-gates-shape reason as subjectPass/signaturePass
+  // above, not evaluated against input.body.
+  const tonePass = true
+
   const ctaPass = cta.present
   if (!cta.present) reasons.push('MISSING_CTA')
 
@@ -871,6 +951,7 @@ function evaluateCallTask(input: QualityGateInput): QualityGateResult {
     CONFIDENCE_LANGUAGE_PASS: confidenceLanguagePass,
     GENERATION_COMPLETENESS_PASS: generationCompletenessPass,
     OUTPUT_INTEGRITY_PASS: outputIntegrityPass,
+    TONE_PASS: tonePass,
   }
 
   const allPass = Object.values(gates).every(Boolean)

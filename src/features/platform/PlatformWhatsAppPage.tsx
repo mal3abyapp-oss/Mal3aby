@@ -20,6 +20,7 @@ import {
 } from '@/components/ui/dialog'
 import { translateSupabaseError } from '@/lib/errors'
 import { MessageCircle } from 'lucide-react'
+import { PlatformWhatsAppSafetyCard } from './PlatformWhatsAppSafetyCard'
 
 // PLATFORM OWNER OPERATIONAL GAP CLOSURE -- Architecture correction:
 // Mal3aby's own WhatsApp connection ("PLATFORM WHATSAPP"), strictly
@@ -55,6 +56,8 @@ interface PlatformWhatsAppStatusData {
   qrExpiresAt: string | null
   circuitBreakerOpenUntil: string | null
   lastSuccessfulSendAt: string | null
+  restrictionSignalDetectedAt: string | null
+  restrictionSignalDetail: string | null
 }
 
 const STATUS_TONE: Record<PlatformWhatsAppStatus, StatusTone> = {
@@ -97,6 +100,8 @@ async function fetchStatus(): Promise<PlatformWhatsAppStatusData> {
     qrExpiresAt: row?.qr_expires_at ?? null,
     circuitBreakerOpenUntil: row?.circuit_breaker_open_until ?? null,
     lastSuccessfulSendAt: row?.last_successful_send_at ?? null,
+    restrictionSignalDetectedAt: row?.restriction_signal_detected_at ?? null,
+    restrictionSignalDetail: row?.restriction_signal_detail ?? null,
   }
 }
 
@@ -322,6 +327,29 @@ export function PlatformWhatsAppPage() {
                 </p>
               )}
 
+              {/* Ban-protection hardening (2026-09-12): a genuine
+                  WhatsApp-side restriction signal was observed (a
+                  repeated 403/forbidden disconnect pattern, or a
+                  known-shape system-JID risk notice) -- see
+                  RestrictionSignalDetector.ts's own doc comment for the
+                  evidence bar. This is distinct from the circuit-breaker
+                  banner above (which reacts to OUR OWN send-failure
+                  rate) -- shown whenever restrictionSignalDetectedAt is
+                  set, regardless of current status, since the account
+                  may have since been manually reconnected while the
+                  evidence is still worth surfacing to the owner. */}
+              {status?.restrictionSignalDetectedAt && (
+                <p role="alert" className="text-sm text-status-danger">
+                  {t('platform.whatsappPage.restrictionSignalDetected', {
+                    date: formatDateTime(status.restrictionSignalDetectedAt, locale),
+                    // Latin-script evidence text embedded inside Arabic RTL
+                    // sentence text -- isolate it like `date` already is, or
+                    // it bidi-mangles in the Arabic locale.
+                    detail: `${DATETIME_FSI}${status.restrictionSignalDetail ?? ''}${DATETIME_PDI}`,
+                  })}
+                </p>
+              )}
+
               {isQrPending && (
                 <div className="flex flex-col items-center gap-3 rounded-md border border-border-subtle p-4">
                   {qrDataUrl ? (
@@ -403,6 +431,8 @@ export function PlatformWhatsAppPage() {
           </CardContent>
         )}
       </Card>
+
+      <PlatformWhatsAppSafetyCard />
 
       <Dialog open={showDisconnectDialog} onOpenChange={(open) => { if (!open) setShowDisconnectDialog(false) }}>
         <DialogContent>
