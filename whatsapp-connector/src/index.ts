@@ -4,6 +4,10 @@ import { SupabaseSync } from './SupabaseSync.js'
 import { TenantConnectionManager } from './TenantConnectionManager.js'
 import { startHealthServer } from './HealthServer.js'
 import { recordUncaughtException, recordUnhandledRejection } from './ProcessDiagnostics.js'
+import { PlatformSupabaseSync } from './PlatformSupabaseSync.js'
+import { PlatformConnectionManager } from './PlatformConnectionManager.js'
+import { PlatformConnectionRequestPoller } from './PlatformConnectionRequestPoller.js'
+import { PlatformQueueConsumer } from './PlatformQueueConsumer.js'
 
 /**
  * index.ts -- process entrypoint. No inbound HTTP server: this service
@@ -180,6 +184,21 @@ async function main() {
   const sync = new SupabaseSync()
   const connections = new TenantConnectionManager(sync)
 
+  // Platform WhatsApp domain (owner decision, 2026-09-12): a completely
+  // separate sync/connection-manager pair, matching the two-domain
+  // separation (Platform WhatsApp vs. Tenant/Club WhatsApp, owner
+  // decision #21) already enforced at the database/permission layer.
+  // This connector process serves BOTH domains -- whichever container
+  // instance happens to be running polls the tenant list (existing,
+  // unchanged) AND the one singleton platform account (new) -- exactly
+  // mirroring how this process already safely handles multiple tenant
+  // clubs from a single running instance today. Constructing this is
+  // always safe even if the Platform WhatsApp account has never been
+  // paired: getSessionKey()/restorePersistedSession() both degrade to a
+  // no-op when there is nothing to do yet (see their own doc comments).
+  const platformSync = new PlatformSupabaseSync()
+  const platformConnection = new PlatformConnectionManager(platformSync)
+
   // Cloudflare Containers requires the image to listen on an HTTP port
   // (see MAL3ABY_CLOUDFLARE_PRODUCTION_ARCHITECTURE.md) so the platform
   // and the owning Durable Object can check liveness/readiness and
@@ -189,10 +208,14 @@ async function main() {
 
   console.log('[connector] restoring persisted sessions...')
   await connections.restoreAllPersistedSessions()
+  await platformConnection.restorePersistedSession()
   console.log('[connector] session restore pass complete.')
 
   const connectionPoller = new ConnectionRequestPoller(sync, connections, 3000)
   connectionPoller.start()
+
+  const platformConnectionPoller = new PlatformConnectionRequestPoller(platformSync, platformConnection, 3000)
+  platformConnectionPoller.start()
 
   const queueConsumer = new QueueConsumer(
     sync,
@@ -202,7 +225,15 @@ async function main() {
   )
   queueConsumer.start()
 
-  console.log('[connector] running: watching for pairing requests and polling the WhatsApp notification queue.')
+  const platformQueueConsumer = new PlatformQueueConsumer(
+    platformSync,
+    platformConnection,
+    Number(process.env.PLATFORM_QUEUE_POLL_INTERVAL_MS ?? 5000),
+    Number(process.env.PLATFORM_QUEUE_BATCH_SIZE ?? 10),
+  )
+  platformQueueConsumer.start()
+
+  console.log('[connector] running: watching for pairing requests and polling the WhatsApp notification queue (tenant + platform).')
 
   // P1 reliability fix (2026-08-17): the previous version of this
   // handler stopped the pollers and exited immediately -- it never
@@ -222,9 +253,10 @@ async function main() {
     console.log(`[connector] shutting down (triggered by ${signal})...`)
     connectionPoller.stop()
     queueConsumer.stop()
+    platformConnectionPoller.stop()
+    platformQueueConsumer.stop()
     healthServer.close()
-    void connections
-      .disconnectAllGracefully()
+    void Promise.all([connections.disconnectAllGracefully(), platformConnection.disconnectGracefully()])
       .catch((err) => console.error('[connector] error during graceful shutdown (exiting anyway):', (err as Error).message))
       .finally(() => process.exit(0))
   }
