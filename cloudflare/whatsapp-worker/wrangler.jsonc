@@ -498,7 +498,34 @@
       // own templates.ts at send time, so this rebuild is required
       // before any real WhatsApp message can show the code. GitHub
       // Actions run 32652063473.
-      "image": "registry.cloudflare.com/35ac10727701095866b16c276b4a33d1/mala3by-whatsapp-connector:c414bea",
+      //
+      // v32, commit 3a107a1 -- PLATFORM WHATSAPP DOMAIN CONNECTOR
+      // (2026-09-12): the Platform WhatsApp feature (PR #28,
+      // 20260909200000_platform_whatsapp_domain.sql) shipped a complete
+      // DB schema and connector-facing RPCs
+      // (whatsapp_connector_*_platform_*) plus a frontend page
+      // (/platform/whatsapp), but no connector process ever called
+      // those RPCs -- confirmed live in production: status stuck at
+      // 'connecting' indefinitely, QR never populated, and a
+      // repo-wide grep found zero callers of any platform-domain
+      // connector RPC before this build. Adds 4 new files
+      // (PlatformSupabaseSync/PlatformConnectionManager/
+      // PlatformConnectionRequestPoller/PlatformQueueConsumer.ts),
+      // each a direct, deliberately SEPARATE counterpart to an
+      // existing tenant-domain class (matching owner decision #21's
+      // two-domain separation at the connector's own code-structure
+      // level) -- reuses BaileysProvider UNCHANGED, keyed by the
+      // platform account's own sentinel session_key (a real UUID from
+      // platform_whatsapp_account, resolved live, never hardcoded),
+      // which hashes to its own auth-dir path structurally distinct
+      // from any real club's. index.ts now starts both the tenant and
+      // platform sync/connection/poller/consumer pairs unconditionally
+      // -- safe even before the Platform account has ever been paired.
+      // Zero existing tenant-domain code modified; 8 pre-existing test
+      // suites all still pass, plus 10 new regression tests in
+      // platformDomainIsolationTest.ts. GitHub Actions run 34669860154,
+      // digest sha256:3690a27e938ad36636d060068454487f788b8388fec67c5bcccada48dad72ff5.
+      "image": "registry.cloudflare.com/35ac10727701095866b16c276b4a33d1/mala3by-whatsapp-connector:3a107a1",
       // One container instance per WhatsApp account (one Durable
       // Object = one container, directive rule 21's chosen model --
       // NOT a shared container serving multiple clubs, which would
