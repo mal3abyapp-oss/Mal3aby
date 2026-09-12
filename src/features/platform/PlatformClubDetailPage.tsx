@@ -2504,11 +2504,17 @@ function PlatformWhatsAppCard({ clubId }: { clubId: string }) {
             {/* Recent events -- short list, not a new page, matching the
                 mission's explicit "keep this simple" instruction. */}
             <div className="border-t border-border pt-3">
-              <Button variant="outline" size="sm" onClick={() => setShowEvents((v) => !v)}>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setShowEvents((v) => !v)}
+                aria-expanded={showEvents}
+                aria-controls="platform-club-whatsapp-recent-events"
+              >
                 {showEvents ? t('platform.clubDetailPage.whatsappCard.recentEvents.hide') : t('platform.clubDetailPage.whatsappCard.recentEvents.show')}
               </Button>
               {showEvents && (
-                <div className="mt-3 flex flex-col gap-2">
+                <div id="platform-club-whatsapp-recent-events" className="mt-3 flex flex-col gap-2">
                   {eventsLoading ? (
                     <p className="text-sm text-text-secondary">{t('platform.clubDetailPage.whatsappCard.recentEvents.loading')}</p>
                   ) : recentEvents.length === 0 ? (

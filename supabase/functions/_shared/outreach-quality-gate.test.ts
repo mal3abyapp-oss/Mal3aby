@@ -421,6 +421,48 @@ describe('evaluateOutreachQuality — generation completeness (Defect 1)', () =>
     const result = evaluateOutreachQuality({ ...VALID_EMAIL_EN, finishReason: 'stop' })
     expect(result.gates.GENERATION_COMPLETENESS_PASS).toBe(true)
   })
+
+  // 14-15. REGRESSION (found 2026-09-12 by an independent security review
+  // of the case-11/12 fix, re-fixed in the same pass): the first fix
+  // only checked that real prose PRECEDED a signature-pattern match, not
+  // that nothing substantive FOLLOWED it on the same line. A signature
+  // pattern is only a real closing identity when it is the LAST thing on
+  // the line -- if it merely appears as a coincidental substring inside
+  // an ordinary sentence (its own subject, not a sign-off), the fix
+  // would still treat it as a signature and silently discard the real
+  // prose that follows the match. Fixed by requiring the text AFTER a
+  // candidate match to be empty/trivial (only trailing
+  // punctuation/whitespace) before stripping it -- a match with
+  // substantive text on both sides is not a signature, and the whole
+  // line is kept as ordinary prose instead.
+  it('14. does not lose real prose when a signature pattern matches mid-sentence as a coincidental substring, not an actual sign-off', () => {
+    const body = 'نحن نمثل فريق ملعبي الرياضي في المدينة.'
+    const result = evaluateOutreachQuality({
+      channel: 'whatsapp_message',
+      language: 'ar',
+      subject: null,
+      body,
+      lowConfidenceSignalKeys: [],
+      groundingPassed: true,
+      finishReason: 'stop',
+    })
+    // The full sentence, including the real prose that follows "فريق
+    // ملعبي" mid-sentence, must survive completeness checking -- it
+    // ends in "." so it is genuinely complete, not truncated.
+    expect(result.gates.GENERATION_COMPLETENESS_PASS).toBe(true)
+    expect(result.rejection_reasons).not.toContain('GENERATION_TRUNCATED')
+  })
+
+  it('15. still fully strips a multi-word own-line signature even when a SHORTER pattern could match only part of it (regression guard for the match-selection fix itself)', () => {
+    // "Mal3aby Sales Team" -- /Regards,/i-style short patterns must not
+    // win over the fuller /Mal3aby\s*(Sales\s*Team|Sales|Team)/i match
+    // just because they also happen to match a substring; picking the
+    // wrong candidate would leave a real word ("Team", or "Best" from
+    // "Best regards,") mistaken for legitimate preceding prose.
+    const result = evaluateOutreachQuality({ ...VALID_EMAIL_EN, finishReason: 'stop' })
+    expect(result.gates.GENERATION_COMPLETENESS_PASS).toBe(true)
+    expect(result.rejection_reasons).not.toContain('GENERATION_TRUNCATED')
+  })
 })
 
 describe('evaluateOutreachQuality — output integrity (Defect 2)', () => {

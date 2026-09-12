@@ -335,7 +335,7 @@ export function PlatformWhatsAppPage() {
                 </div>
               )}
 
-              {actionError && <p className="text-sm text-status-danger">{actionError}</p>}
+              {actionError && <p role="alert" className="text-sm text-status-danger">{actionError}</p>}
 
               <div className="flex flex-wrap gap-2">
                 {canConnect && (
@@ -373,13 +373,15 @@ export function PlatformWhatsAppPage() {
             type="button"
             className="flex w-full items-center justify-between text-start text-sm font-medium"
             onClick={() => setShowEvents((v) => !v)}
+            aria-expanded={showEvents}
+            aria-controls="platform-whatsapp-recent-events"
           >
             {t('platform.whatsappPage.recentEvents')}
             <span className="text-text-secondary">{showEvents ? '−' : '+'}</span>
           </button>
         </CardHeader>
         {showEvents && (
-          <CardContent>
+          <CardContent id="platform-whatsapp-recent-events">
             {eventsLoading && <p className="text-sm text-text-secondary">{t('platform.whatsappPage.eventsLoading')}</p>}
             {!eventsLoading && (recentEvents?.length ?? 0) === 0 && (
               <p className="text-sm text-text-secondary">{t('platform.whatsappPage.noEvents')}</p>

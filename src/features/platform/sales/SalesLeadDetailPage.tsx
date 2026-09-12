@@ -261,10 +261,23 @@ export function SalesLeadDetailPage() {
   // still cheap/harmless to fetch unconditionally (narrow, read-only,
   // no p_lead_id parameter -- it's the platform account's own status,
   // not lead-scoped), matching how eligibilityQuery etc. run eagerly too.
+  //
+  // FIX (2026-09-12, UX review finding): this query previously relied
+  // solely on the 30s global staleTime + refetchOnWindowFocus, so an
+  // owner who opens a lead, sees "connected", and stays on this exact
+  // tab (no window blur/refocus) while Platform WhatsApp is disconnected
+  // elsewhere would keep seeing the stale "connected" banner and an
+  // enabled Send button indefinitely -- only discovering the disconnect
+  // when Send itself fails. A 15s poll while this page is mounted closes
+  // that window without adding meaningful load (matches the spirit of
+  // PlatformWhatsAppPage.tsx's own 5s status poll, relaxed here since
+  // this is a lighter, less latency-critical confirmation check, not
+  // the dedicated connection-management page).
   const whatsappSenderQuery = useQuery({
     queryKey: ['platform-whatsapp-sender-identity'],
     queryFn: fetchPlatformWhatsAppSenderIdentity,
     enabled: !!leadId,
+    refetchInterval: 15_000,
   })
 
   const invalidate = () => {
@@ -619,11 +632,24 @@ export function SalesLeadDetailPage() {
     return <p className="text-sm text-text-secondary">{t('common.loading')}</p>
   }
 
-  const { lead, signals, latest_score, notes, activities, outreach_messages, followups, status_history, possible_duplicates, activation_invite } = profileQuery.data
-  // Defensive: get_lead_full_profile() always coalesces this to '[]',
-  // but a stale/incomplete test fixture or an older cached RPC
-  // response should degrade to "no demos" rather than crash the whole
-  // page -- normalized once here instead of at every usage site below.
+  const { lead, latest_score, activation_invite } = profileQuery.data
+  // Defensive: get_lead_full_profile() always coalesces every one of
+  // these eight array fields to '[]', but a stale/incomplete test
+  // fixture or an older cached RPC response should degrade to "no
+  // items" rather than crash the whole page -- normalized once here
+  // for ALL eight fields consistently, instead of the single field
+  // (demo_events) this guard originally covered. That earlier
+  // asymmetry meant a future regression in the RPC's own coalesce
+  // logic would crash the page via any of the other seven fields the
+  // exact same way demo_events was once found to (found in an
+  // independent UX review, 2026-09-12).
+  const signals = profileQuery.data.signals ?? []
+  const notes = profileQuery.data.notes ?? []
+  const activities = profileQuery.data.activities ?? []
+  const outreach_messages = profileQuery.data.outreach_messages ?? []
+  const followups = profileQuery.data.followups ?? []
+  const status_history = profileQuery.data.status_history ?? []
+  const possible_duplicates = profileQuery.data.possible_duplicates ?? []
   const demo_events = profileQuery.data.demo_events ?? []
 
   const isTerminalStatus = ['do_not_contact', 'won', 'awaiting_owner_activation', 'tenant_activated'].includes(lead.status)
@@ -1020,10 +1046,22 @@ export function SalesLeadDetailPage() {
                             <p className="text-xs text-text-secondary">
                               {t('platform.sales.leadProfile.outreachSendFrom', { number: senderIdentity?.connected_phone_number ?? '—' })}
                             </p>
+                            {/* UX review finding, fixed (2026-09-12): one shared
+                                mutation backs every whatsapp_message row's Send
+                                button. Disabling on isPending alone froze every
+                                OTHER approved draft's Send button too while any
+                                single one was in flight, with no explanation --
+                                confusing when a lead has more than one approved
+                                whatsapp_message draft. Scope the disabled state to
+                                THIS row (isPending AND this is the row in flight)
+                                so sibling rows stay interactive; the server's own
+                                idempotency guard (unique constraint on
+                                platform_whatsapp_queue.outreach_message_id) is the
+                                real safety net regardless of button state. */}
                             <Button
                               size="sm"
                               onClick={() => sendWhatsAppMutation.mutate(m.id)}
-                              disabled={sendWhatsAppMutation.isPending}
+                              disabled={sendWhatsAppMutation.isPending && sendWhatsAppMutation.variables === m.id}
                             >
                               {sendWhatsAppMutation.isPending && sendWhatsAppMutation.variables === m.id
                                 ? t('platform.sales.leadProfile.outreachSending')

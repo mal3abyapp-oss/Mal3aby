@@ -184,9 +184,17 @@ function evaluateCta(body: string): { present: boolean; strong: boolean } {
 // named signature with [Your Name] still intact fails PLACEHOLDER_PASS
 // independently, so this check only needs to confirm SOME closing
 // identity line exists at all).
+// NOTE: "Mal3aby Sales Team" must match as ONE phrase, not just its
+// "Mal3aby Sales" prefix -- stripTrailingSignatureBlock()'s
+// after-the-match check (below) requires nothing substantive to follow
+// a signature match on the same line, so a pattern that only captures
+// part of a multi-word signature phrase would wrongly see the
+// remaining word(s) as "substantive trailing text" and refuse to strip
+// a genuine signature. The longer alternative (`Sales\s*Team`) is tried
+// before the shorter ones so the full phrase wins.
 const SIGNATURE_PATTERNS: RegExp[] = [
   /فريق\s*(ملعبي|Mal3aby)/i,
-  /Mal3aby\s*(Sales|Team)/i,
+  /Mal3aby\s*(Sales\s*Team|Sales|Team)/i,
   /مع\s*(خالص\s*)?(التحية|تحياتنا)/,
   /Best regards/i,
   /Regards,/i,
@@ -281,6 +289,22 @@ const DANGLING_CONNECTOR_PATTERN = /\b(and|or|but|so|because)\s*$|(^|\s)(و|أو
 // spec-compliant closing shape. Reproduced deterministically and fixed
 // here; email's own always-own-line signature convention is unaffected
 // (a whole-line match still strips the whole line, same as before).
+//
+// FIX 2 (2026-09-12, found by an independent security review of the
+// first fix): a signature is, by definition, the CLOSING identity of
+// the message -- nothing substantive can legitimately follow it on the
+// same line. The first fix only checked that real prose PRECEDED the
+// match, not that nothing meaningful FOLLOWED it, so a signature
+// pattern that merely appears as a coincidental substring in the middle
+// of an ordinary sentence (e.g. "نحن نمثل فريق ملعبي الرياضي في
+// المدينة" -- "فريق ملعبي" here is part of the sentence's own subject,
+// not a sign-off) was still treated as a real signature match, silently
+// discarding the real prose that follows it ("الرياضي في المدينة").
+// Fixed by also requiring the text AFTER the match to be empty/trivial
+// (only trailing punctuation/whitespace) before treating it as a real
+// trailing signature -- a match with substantive text on both sides is
+// not a signature at all, and the whole line is kept as ordinary prose.
+const TRIVIAL_TRAILING_PATTERN = /^[\s.!?؟…"'”’)»,،:]*$/
 function stripTrailingSignatureBlock(text: string): string {
   const lines = text.trim().split('\n')
   while (lines.length > 0) {
@@ -297,11 +321,52 @@ function stripTrailingSignatureBlock(text: string): string {
     }
     EMAIL_PATTERN.lastIndex = 0
 
-    const signatureMatch = SIGNATURE_PATTERNS
+    // Try every pattern, not just the first that matches. Two things
+    // can go wrong picking a single match naively:
+    //  1. One pattern only captures PART of a multi-word signature
+    //     phrase (e.g. a pattern matching "Mal3aby Sales" out of
+    //     "Mal3aby Sales Team"): picking that match could see "Team"
+    //     left over and wrongly conclude something substantive follows,
+    //     when a fuller alternative would have matched the whole phrase
+    //     with nothing left over.
+    //  2. A short pattern can match a SUBSTRING deep inside a longer
+    //     signature line (e.g. "Regards," matching inside "Best
+    //     regards,"), leaving a real prefix ("Best") that then gets
+    //     mistaken for legitimate preceding prose, when the earlier,
+    //     fuller match ("Best regards") is the one that actually
+    //     describes the whole line.
+    // Fix: among all candidates whose trailing remainder is trivial,
+    // prefer the one starting EARLIEST in the line (closest to
+    // consuming the whole line as signature) -- this picks "Best
+    // regards" over "regards," and "Mal3aby Sales Team" over any
+    // partial alternative, without needing every pattern to be written
+    // maximally-greedy by hand.
+    const candidateMatches = SIGNATURE_PATTERNS
       .map((p) => trimmedLine.match(p))
-      .find((m): m is RegExpMatchArray => m !== null)
+      .filter((m): m is RegExpMatchArray => m !== null && m.index !== undefined)
 
-    if (!signatureMatch || signatureMatch.index === undefined) break
+    if (candidateMatches.length === 0) break
+
+    const withTrailing = candidateMatches
+      .map((m) => ({ m, after: trimmedLine.slice(m.index! + m[0].length) }))
+      .sort((a, b) => {
+        const aTrivial = TRIVIAL_TRAILING_PATTERN.test(a.after)
+        const bTrivial = TRIVIAL_TRAILING_PATTERN.test(b.after)
+        if (aTrivial !== bTrivial) return aTrivial ? -1 : 1
+        return a.m.index! - b.m.index!
+      })
+    const { m: signatureMatch, after: afterMatch } = withTrailing[0]
+
+    if (!TRIVIAL_TRAILING_PATTERN.test(afterMatch)) {
+      // Real, substantive text follows every candidate "signature" match
+      // on this same line -- this was never a genuine closing identity,
+      // just a coincidental substring match inside an ordinary sentence
+      // (e.g. the subject "فريق ملعبي" mentioned mid-sentence, not a
+      // sign-off at the very end). Treat the whole line as ordinary
+      // prose and stop stripping -- nothing here is a signature to
+      // remove.
+      break
+    }
 
     const beforeMatch = trimmedLine.slice(0, signatureMatch.index).trim()
     if (beforeMatch.length === 0) {
@@ -312,8 +377,9 @@ function stripTrailingSignatureBlock(text: string): string {
       continue
     }
     // Real prose precedes the signature on this same line (the natural
-    // WhatsApp closing style) -- keep the prose, cut only the trailing
-    // signature portion, and stop (this is now the last content line).
+    // WhatsApp closing style), and nothing substantive follows it --
+    // keep the prose, cut only the trailing signature portion, and stop
+    // (this is now the last content line).
     lines[lines.length - 1] = beforeMatch
     break
   }
