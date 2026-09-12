@@ -3194,6 +3194,8 @@ export type Database = {
           circuit_breaker_window_minutes: number
           club_id: string
           default_language: string
+          max_sends_per_day_per_account: number
+          max_sends_per_day_per_recipient: number
           max_sends_per_hour_per_account: number
           max_sends_per_minute_per_account: number
           min_minutes_between_recipient_sends: number
@@ -3203,6 +3205,9 @@ export type Database = {
           quiet_hours_start: string
           updated_at: string
           updated_by: string | null
+          warm_up_days: number
+          warm_up_enabled: boolean
+          warm_up_rate_multiplier: number
         }
         Insert: {
           circuit_breaker_cooldown_minutes?: number
@@ -3212,6 +3217,8 @@ export type Database = {
           circuit_breaker_window_minutes?: number
           club_id: string
           default_language?: string
+          max_sends_per_day_per_account?: number
+          max_sends_per_day_per_recipient?: number
           max_sends_per_hour_per_account?: number
           max_sends_per_minute_per_account?: number
           min_minutes_between_recipient_sends?: number
@@ -3221,6 +3228,9 @@ export type Database = {
           quiet_hours_start?: string
           updated_at?: string
           updated_by?: string | null
+          warm_up_days?: number
+          warm_up_enabled?: boolean
+          warm_up_rate_multiplier?: number
         }
         Update: {
           circuit_breaker_cooldown_minutes?: number
@@ -3230,6 +3240,8 @@ export type Database = {
           circuit_breaker_window_minutes?: number
           club_id?: string
           default_language?: string
+          max_sends_per_day_per_account?: number
+          max_sends_per_day_per_recipient?: number
           max_sends_per_hour_per_account?: number
           max_sends_per_minute_per_account?: number
           min_minutes_between_recipient_sends?: number
@@ -3239,6 +3251,9 @@ export type Database = {
           quiet_hours_start?: string
           updated_at?: string
           updated_by?: string | null
+          warm_up_days?: number
+          warm_up_enabled?: boolean
+          warm_up_rate_multiplier?: number
         }
         Relationships: [
           {
@@ -5071,6 +5086,8 @@ export type Database = {
           last_successful_send_at: string | null
           qr_expires_at: string | null
           qr_payload: string | null
+          restriction_signal_detail: string | null
+          restriction_signal_detected_at: string | null
           session_credentials_encrypted: string | null
           session_key: string
           singleton_guard: number
@@ -5090,6 +5107,8 @@ export type Database = {
           last_successful_send_at?: string | null
           qr_expires_at?: string | null
           qr_payload?: string | null
+          restriction_signal_detail?: string | null
+          restriction_signal_detected_at?: string | null
           session_credentials_encrypted?: string | null
           session_key?: string
           singleton_guard?: number
@@ -5109,6 +5128,8 @@ export type Database = {
           last_successful_send_at?: string | null
           qr_expires_at?: string | null
           qr_payload?: string | null
+          restriction_signal_detail?: string | null
+          restriction_signal_detected_at?: string | null
           session_credentials_encrypted?: string | null
           session_key?: string
           singleton_guard?: number
@@ -5217,30 +5238,45 @@ export type Database = {
           circuit_breaker_failure_rate_threshold: number
           circuit_breaker_min_sample_size: number
           circuit_breaker_window_minutes: number
+          max_sends_per_day: number
+          max_sends_per_day_per_recipient: number
           max_sends_per_hour: number
           max_sends_per_minute: number
           min_minutes_between_recipient_sends: number
           singleton_guard: number
+          warm_up_days: number
+          warm_up_enabled: boolean
+          warm_up_rate_multiplier: number
         }
         Insert: {
           circuit_breaker_cooldown_minutes?: number
           circuit_breaker_failure_rate_threshold?: number
           circuit_breaker_min_sample_size?: number
           circuit_breaker_window_minutes?: number
+          max_sends_per_day?: number
+          max_sends_per_day_per_recipient?: number
           max_sends_per_hour?: number
           max_sends_per_minute?: number
           min_minutes_between_recipient_sends?: number
           singleton_guard?: number
+          warm_up_days?: number
+          warm_up_enabled?: boolean
+          warm_up_rate_multiplier?: number
         }
         Update: {
           circuit_breaker_cooldown_minutes?: number
           circuit_breaker_failure_rate_threshold?: number
           circuit_breaker_min_sample_size?: number
           circuit_breaker_window_minutes?: number
+          max_sends_per_day?: number
+          max_sends_per_day_per_recipient?: number
           max_sends_per_hour?: number
           max_sends_per_minute?: number
           min_minutes_between_recipient_sends?: number
           singleton_guard?: number
+          warm_up_days?: number
+          warm_up_enabled?: boolean
+          warm_up_rate_multiplier?: number
         }
         Relationships: []
       }
@@ -8316,6 +8352,8 @@ export type Database = {
           last_successful_send_at: string | null
           qr_expires_at: string | null
           qr_payload: string | null
+          restriction_signal_detail: string | null
+          restriction_signal_detected_at: string | null
           session_credentials_encrypted: string | null
           status: string
           updated_at: string
@@ -8334,6 +8372,8 @@ export type Database = {
           last_successful_send_at?: string | null
           qr_expires_at?: string | null
           qr_payload?: string | null
+          restriction_signal_detail?: string | null
+          restriction_signal_detected_at?: string | null
           session_credentials_encrypted?: string | null
           status?: string
           updated_at?: string
@@ -8352,6 +8392,8 @@ export type Database = {
           last_successful_send_at?: string | null
           qr_expires_at?: string | null
           qr_payload?: string | null
+          restriction_signal_detail?: string | null
+          restriction_signal_detected_at?: string | null
           session_credentials_encrypted?: string | null
           status?: string
           updated_at?: string
@@ -10588,7 +10630,33 @@ export type Database = {
           failed_count_7d: number
           last_seen_at: string
           pending_count: number
+          restriction_signal_detail: string
+          restriction_signal_detected_at: string
         }[]
+      }
+      get_platform_whatsapp_safety_settings: {
+        Args: never
+        Returns: {
+          circuit_breaker_cooldown_minutes: number
+          circuit_breaker_failure_rate_threshold: number
+          circuit_breaker_min_sample_size: number
+          circuit_breaker_window_minutes: number
+          max_sends_per_day: number
+          max_sends_per_day_per_recipient: number
+          max_sends_per_hour: number
+          max_sends_per_minute: number
+          min_minutes_between_recipient_sends: number
+          singleton_guard: number
+          warm_up_days: number
+          warm_up_enabled: boolean
+          warm_up_rate_multiplier: number
+        }
+        SetofOptions: {
+          from: "*"
+          to: "platform_whatsapp_safety_settings"
+          isOneToOne: true
+          isSetofReturn: false
+        }
       }
       get_platform_whatsapp_sender_identity: {
         Args: never
@@ -11138,6 +11206,8 @@ export type Database = {
           last_seen_at: string
           last_successful_send_at: string
           qr_expires_at: string
+          restriction_signal_detail: string
+          restriction_signal_detected_at: string
           status: string
         }[]
       }
@@ -11862,6 +11932,8 @@ export type Database = {
           last_seen_at: string
           last_successful_send_at: string
           qr_expires_at: string
+          restriction_signal_detail: string
+          restriction_signal_detected_at: string
           status: string
         }[]
       }
@@ -12978,6 +13050,39 @@ export type Database = {
         Args: { p_default_trial_days: number }
         Returns: undefined
       }
+      update_platform_whatsapp_safety_settings: {
+        Args: {
+          p_circuit_breaker_enabled?: boolean
+          p_max_sends_per_day?: number
+          p_max_sends_per_day_per_recipient?: number
+          p_max_sends_per_hour?: number
+          p_max_sends_per_minute?: number
+          p_min_minutes_between_recipient_sends?: number
+          p_warm_up_days?: number
+          p_warm_up_enabled?: boolean
+        }
+        Returns: {
+          circuit_breaker_cooldown_minutes: number
+          circuit_breaker_failure_rate_threshold: number
+          circuit_breaker_min_sample_size: number
+          circuit_breaker_window_minutes: number
+          max_sends_per_day: number
+          max_sends_per_day_per_recipient: number
+          max_sends_per_hour: number
+          max_sends_per_minute: number
+          min_minutes_between_recipient_sends: number
+          singleton_guard: number
+          warm_up_days: number
+          warm_up_enabled: boolean
+          warm_up_rate_multiplier: number
+        }
+        SetofOptions: {
+          from: "*"
+          to: "platform_whatsapp_safety_settings"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
       update_player: {
         Args: {
           p_date_of_birth?: string
@@ -13234,8 +13339,16 @@ export type Database = {
         Args: { p_provider_reference: string; p_queue_id: string }
         Returns: undefined
       }
+      whatsapp_connector_record_opt_out_keyword: {
+        Args: { p_club_id: string; p_from_phone_digits_only: string }
+        Returns: undefined
+      }
       whatsapp_connector_report_delivery_receipt: {
         Args: { p_provider_reference: string; p_status_level: number }
+        Returns: undefined
+      }
+      whatsapp_connector_report_platform_restriction_signal: {
+        Args: { p_detail: string }
         Returns: undefined
       }
       whatsapp_connector_report_platform_send_result: {
@@ -13257,6 +13370,10 @@ export type Database = {
           p_state_seq?: number
           p_status: string
         }
+        Returns: undefined
+      }
+      whatsapp_connector_report_restriction_signal: {
+        Args: { p_club_id: string; p_detail: string }
         Returns: undefined
       }
       whatsapp_connector_report_send_result: {
@@ -13334,6 +13451,15 @@ export type Database = {
       whatsapp_observability_retention_cleanup: {
         Args: never
         Returns: undefined
+      }
+      whatsapp_warm_up_multiplier: {
+        Args: {
+          p_connected_at: string
+          p_warm_up_days: number
+          p_warm_up_enabled: boolean
+          p_warm_up_floor: number
+        }
+        Returns: number
       }
       write_audit_log: {
         Args: {

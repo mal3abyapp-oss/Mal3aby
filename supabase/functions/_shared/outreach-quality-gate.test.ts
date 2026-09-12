@@ -586,3 +586,88 @@ sales@mal3aby.app`
     expect(result.gates.EVIDENCE_STRENGTH_PASS).toBe(true)
   })
 })
+
+// ============================================================
+// TONE (ban-protection hardening, 2026-09-12): a message that merely
+// SOUNDS automated/spammy is itself a real WhatsApp-ban risk factor,
+// distinct from every structural check above. Every generation prompt
+// already instructs the model against this shape, but nothing
+// previously enforced it deterministically -- this is the one quality
+// dimension that had been left entirely to the prompt's own
+// instruction, unlike every other dimension in this file (which
+// follows the owner's own "do not rely solely on the LLM to
+// self-evaluate" directive).
+// ============================================================
+describe('evaluateOutreachQuality — tone / spam-signal detection (ban-protection hardening)', () => {
+  it('accepts VALID_EMAIL_AR and VALID_EMAIL_EN unchanged -- the new tone gate does not false-positive-reject genuine, already-passing fixtures', () => {
+    const ar = evaluateOutreachQuality(VALID_EMAIL_AR)
+    expect(ar.gates.TONE_PASS).toBe(true)
+    expect(ar.status).toBe('APPROVAL_READY')
+
+    const en = evaluateOutreachQuality(VALID_EMAIL_EN)
+    expect(en.gates.TONE_PASS).toBe(true)
+    expect(en.status).toBe('APPROVAL_READY')
+  })
+
+  it('rejects a message with multiple exclamation marks in a row ("!!!")', () => {
+    const body = VALID_EMAIL_AR.body.replace('؟', '!!!')
+    const result = evaluateOutreachQuality({ ...VALID_EMAIL_AR, body })
+    expect(result.gates.TONE_PASS).toBe(false)
+    expect(result.rejection_reasons).toContain('EXCESSIVE_PUNCTUATION')
+  })
+
+  it('rejects a message with more than one single exclamation mark scattered through it', () => {
+    const body = VALID_EMAIL_AR.body.replace('،', '!').replace('؟', '!')
+    const result = evaluateOutreachQuality({ ...VALID_EMAIL_AR, body })
+    expect(result.gates.TONE_PASS).toBe(false)
+    expect(result.rejection_reasons).toContain('EXCESSIVE_PUNCTUATION')
+  })
+
+  it('accepts a single exclamation mark -- ordinary, not spam-shaped', () => {
+    const body = VALID_EMAIL_EN.body.replace('.', '!')
+    const result = evaluateOutreachQuality({ ...VALID_EMAIL_EN, body })
+    expect(result.gates.TONE_PASS).toBe(true)
+  })
+
+  it('rejects a shouted, multi-word ALL-CAPS run', () => {
+    const body = 'Hi team, THIS IS A LIMITED TIME OFFER for your club. Would a quick call this week work?\n\nMal3aby Sales Team\nsales@mal3aby.app'
+    const result = evaluateOutreachQuality({ ...VALID_EMAIL_EN, body })
+    expect(result.gates.TONE_PASS).toBe(false)
+    expect(result.rejection_reasons).toContain('SHOUTING_DETECTED')
+  })
+
+  it('does not flag a single ALL-CAPS acronym (e.g. QR, CRM) as shouting', () => {
+    const body = VALID_EMAIL_EN.body.replace('registration', 'QR-based registration')
+    const result = evaluateOutreachQuality({ ...VALID_EMAIL_EN, body })
+    expect(result.gates.TONE_PASS).toBe(true)
+    expect(result.rejection_reasons).not.toContain('SHOUTING_DETECTED')
+  })
+
+  it('rejects a message with more than 2 emoji', () => {
+    const body = VALID_EMAIL_AR.body.replace('فريق ملعبي', '🎉🔥💯 فريق ملعبي')
+    const result = evaluateOutreachQuality({ ...VALID_EMAIL_AR, body })
+    expect(result.gates.TONE_PASS).toBe(false)
+    expect(result.rejection_reasons).toContain('EXCESSIVE_EMOJI')
+  })
+
+  it('accepts a single friendly emoji -- not flagged as excessive', () => {
+    const body = VALID_EMAIL_AR.body.replace('فريق ملعبي', '👋 فريق ملعبي')
+    const result = evaluateOutreachQuality({ ...VALID_EMAIL_AR, body })
+    expect(result.gates.TONE_PASS).toBe(true)
+  })
+
+  it('applies the same tone check to the whatsapp_message channel', () => {
+    const spammyBody = 'أهلاً!! عرض حصري لفترة محدودة فقط 🔥🔥🔥 اتصل بنا الآن! فريق ملعبي\nsales@mal3aby.app'
+    const result = evaluateOutreachQuality({
+      channel: 'whatsapp_message',
+      language: 'ar',
+      subject: null,
+      body: spammyBody,
+      lowConfidenceSignalKeys: [],
+      groundingPassed: true,
+      finishReason: 'stop',
+    })
+    expect(result.gates.TONE_PASS).toBe(false)
+    expect(result.status).toBe('QUALITY_REJECTED')
+  })
+})

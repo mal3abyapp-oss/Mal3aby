@@ -51,6 +51,34 @@ export class SupabaseSync {
   }
 
   /**
+   * Ban-protection hardening (2026-09-12): reports a genuine,
+   * conservative-threshold-confirmed WhatsApp-side restriction signal.
+   * See whatsapp_connector_report_restriction_signal()'s own SQL doc
+   * comment and RestrictionSignalDetector.ts's own doc comment for the
+   * full evidence bar -- this is never called speculatively.
+   */
+  async reportRestrictionSignal(clubId: string, detail: string): Promise<void> {
+    const { error } = await this.client.rpc('whatsapp_connector_report_restriction_signal', {
+      p_club_id: clubId,
+      p_detail: detail,
+    })
+    if (error) throw new Error(`whatsapp_connector_report_restriction_signal failed: ${error.message}`)
+  }
+
+  /**
+   * Ban-protection hardening (2026-09-12): records a customer-typed
+   * stop/إيقاف keyword as a real WhatsApp consent opt-out. See
+   * whatsapp_connector_record_opt_out_keyword()'s own SQL doc comment.
+   */
+  async recordOptOutKeyword(clubId: string, fromPhoneDigitsOnly: string): Promise<void> {
+    const { error } = await this.client.rpc('whatsapp_connector_record_opt_out_keyword', {
+      p_club_id: clubId,
+      p_from_phone_digits_only: fromPhoneDigitsOnly,
+    })
+    if (error) throw new Error(`whatsapp_connector_record_opt_out_keyword failed: ${error.message}`)
+  }
+
+  /**
    * WHATSAPP DELIVERY TRUTH fix (2026-08-22): records a REAL received
    * delivery/read receipt -- the honest counterpart to
    * reportSendResult(), which only ever proved provider acceptance.

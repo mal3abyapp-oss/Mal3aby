@@ -2179,6 +2179,8 @@ interface PlatformWhatsAppHealthRow {
   circuit_breaker_open: boolean
   failed_count_7d: number
   pending_count: number
+  restriction_signal_detected_at: string | null
+  restriction_signal_detail: string | null
 }
 
 interface PlatformWhatsAppEventRow {
@@ -2423,6 +2425,18 @@ function PlatformWhatsAppCard({ clubId }: { clubId: string }) {
                 <p className="font-medium tabular-nums">{health?.pending_count ?? 0}</p>
               </div>
             </div>
+
+            {/* Ban-protection hardening (2026-09-12) -- see
+                PlatformWhatsAppPage.tsx's own copy of this banner for
+                the full rationale. */}
+            {health?.restriction_signal_detected_at && (
+              <p role="alert" className="text-sm text-status-danger">
+                {t('platform.clubDetailPage.whatsappCard.restrictionSignalDetected', {
+                  date: formatPlatformWhatsAppDateTime(health.restriction_signal_detected_at, locale),
+                  detail: health.restriction_signal_detail ?? '',
+                })}
+              </p>
+            )}
 
             {/* Connected state -- disconnect available, reason required. */}
             {(rawStatus === 'connected' || rawStatus === 'reconnecting' || rawStatus === 'degraded') && (
