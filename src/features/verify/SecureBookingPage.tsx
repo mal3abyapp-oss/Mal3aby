@@ -49,6 +49,17 @@ export function SecureBookingPage() {
   const [qrDataUrl, setQrDataUrl] = useState<string | null>(null)
   const [qrRevealed, setQrRevealed] = useState(false)
   const [copyState, setCopyState] = useState<'idle' | 'copied' | 'error'>('idle')
+  // OWNER FEEDBACK (2026-09-14): "من الأفضل وضع إشعار للاحتفاظ برقم
+  // الحجز بعلامة مميزة أو أي طريقة تلفت النظر" -- the booking ref is
+  // the one input request_public_booking_link() (the exact-match
+  // recovery path) actually needs, so drawing deliberate attention to
+  // it here, at the moment the customer is most likely to still have
+  // this tab open, reduces how often anyone needs the phone-only
+  // fallback at all. A separate copy state from the link's own
+  // copyState -- the two are independent actions with independent
+  // feedback, copying one should never silently reset the other's
+  // "copied" confirmation mid-read.
+  const [refCopyState, setRefCopyState] = useState<'idle' | 'copied' | 'error'>('idle')
   const [qrError, setQrError] = useState(false)
   const [now, setNow] = useState(Date.now())
   const { data, isLoading, isError, isFetching, refetch } = useQuery({
@@ -120,7 +131,25 @@ export function SecureBookingPage() {
           <div><div className="mb-3 inline-flex items-center gap-2 text-sm text-white/80">{pending ? <Clock className="size-4" /> : <Ticket className="size-4" />}{t(`secureBooking.bookingStatusLabels.${data.booking_status}`, { defaultValue: data.booking_status })}</div>
             <h1>{t('publicBooking.manage.title')}</h1><p>{data.field_name}</p>
           </div>
-          <div className="text-start sm:text-end"><span className="block text-xs text-white/60">{t('secureBooking.bookingRef')}</span><bdi className="mt-2 block text-xl font-semibold tracking-wider">{data.booking_ref}</bdi></div>
+          <div className="text-start sm:text-end">
+            <span className="block text-xs text-white/60">{t('secureBooking.bookingRef')}</span>
+            <div className="mt-2 flex items-center gap-2 sm:justify-end">
+              <bdi className="text-xl font-semibold tracking-wider">{data.booking_ref}</bdi>
+              {data.booking_ref && <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                className="text-white/80 hover:bg-white/10 hover:text-white"
+                aria-label={t('publicBooking.manage.copyRef')}
+                onClick={async () => {
+                  try { await navigator.clipboard.writeText(data.booking_ref!); setRefCopyState('copied') } catch { setRefCopyState('error') }
+                  window.setTimeout(() => setRefCopyState('idle'), 2000)
+                }}
+              >
+                {refCopyState === 'copied' ? <CheckCircle2 className="size-4" /> : <Copy className="size-4" />}
+              </Button>}
+            </div>
+          </div>
         </section>
         <div className="booking-layout booking-manage-layout">
           <div className="flex min-w-0 flex-col gap-6">
@@ -148,6 +177,34 @@ export function SecureBookingPage() {
           <aside className="booking-summary">
             <h2 className="mb-5 text-lg font-semibold">{t('secureBooking.paymentSummary')}</h2>
             <dl className="flex flex-col gap-4 text-sm"><div className="flex justify-between gap-3"><dt>{t('secureBooking.total')}</dt><dd><FormattedCurrency value={Number(data.total ?? 0)} currencyCode={currency} /></dd></div><div className="flex justify-between gap-3"><dt>{t('secureBooking.paid')}</dt><dd><FormattedCurrency value={Number(data.paid ?? 0)} currencyCode={currency} /></dd></div><div className="flex justify-between gap-3 border-t border-border pt-4 text-lg font-semibold"><dt>{t('secureBooking.outstanding')}</dt><dd><FormattedCurrency value={Number(data.outstanding ?? 0)} currencyCode={currency} /></dd></div></dl>
+            {/* OWNER FEEDBACK (2026-09-14): "من الأفضل وضع إشعار
+                للاحتفاظ برقم الحجز بعلامة مميزة أو أي طريقة تلفت
+                النظر" -- a deliberately distinct, bordered callout
+                (not a full-color fill, not a pulse/flash -- see
+                .booking-ref-callout's own comment) right above the
+                existing "save your link" card, since the ref is the
+                one input the exact-match recovery path actually needs. */}
+            <div className="booking-ref-callout mt-6">
+              <h3 className="text-sm font-semibold">{t('publicBooking.manage.refCalloutTitle')}</h3>
+              <p className="mt-1.5 text-xs leading-6 text-text-secondary">{t('publicBooking.manage.refCalloutHint')}</p>
+              <div className="mt-3 flex items-center justify-between gap-2 rounded-lg border border-border bg-surface px-3 py-2">
+                <bdi className="text-base font-semibold tracking-wider">{data.booking_ref}</bdi>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  aria-label={t('publicBooking.manage.copyRef')}
+                  onClick={async () => {
+                    try { await navigator.clipboard.writeText(data.booking_ref ?? ''); setRefCopyState('copied') } catch { setRefCopyState('error') }
+                    window.setTimeout(() => setRefCopyState('idle'), 2000)
+                  }}
+                >
+                  {refCopyState === 'copied' ? <CheckCircle2 className="size-4" /> : <Copy className="size-4" />}
+                </Button>
+              </div>
+              {refCopyState === 'copied' && <p role="status" className="mt-1.5 text-xs text-status-success">{t('publicBooking.manage.refCopied')}</p>}
+              {refCopyState === 'error' && <p role="alert" className="mt-1.5 text-xs text-text-secondary">{t('publicBooking.manage.refCopyErrorHint')}</p>}
+            </div>
             <div className="booking-return-card"><h3 className="font-semibold">{t('publicBooking.manage.saveTitle')}</h3><p className="mt-2 text-xs leading-6 text-text-secondary">{t('publicBooking.manage.saveHint')}</p>
               <Button variant="outline" className="mt-3 min-h-11 w-full gap-2" onClick={async () => { try { await navigator.clipboard.writeText(savedUrl); setCopyState('copied') } catch { setCopyState('error') } }}>{copyState === 'copied' ? <CheckCircle2 className="size-4" /> : <Copy className="size-4" />}{t(copyState === 'copied' ? 'publicBooking.manage.copied' : 'publicBooking.manage.copy')}</Button>
               {copyState === 'error' && <p role="alert" className="mt-2 break-all text-xs">{savedUrl}</p>}
