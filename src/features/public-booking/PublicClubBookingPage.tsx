@@ -12,7 +12,23 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { PhoneInput } from '@/components/ui/phone-input'
 import { LanguageSwitcher } from '@/components/ui/language-switcher'
-import { CheckCircle2, MapPin, ChevronLeft, ChevronRight, Phone, MessageCircle, Copy, Check, CalendarPlus } from 'lucide-react'
+import {
+  CheckCircle2,
+  MapPin,
+  ChevronLeft,
+  ChevronRight,
+  Phone,
+  MessageCircle,
+  Copy,
+  Check,
+  CalendarPlus,
+  Home,
+  Sun,
+  Users,
+  CalendarDays,
+  Clock,
+  Pencil,
+} from 'lucide-react'
 import { PaymentMethodsPanel } from './PaymentMethodsPanel'
 import { HoldCountdown } from './HoldCountdown'
 import { normalizePhone } from '@/lib/domain/phone'
@@ -193,6 +209,65 @@ function buildIcsDataUri(opts: {
     'END:VCALENDAR',
   ].filter((l): l is string => l !== null)
   return `data:text/calendar;charset=utf-8,${encodeURIComponent(lines.join('\r\n'))}`
+}
+
+// DESIGN PASS (2026-09-13, customer "فقيرة جدا" feedback): the wizard
+// previously gave a customer no sense of where they were in a 4-step
+// flow (field/date/time/details) -- this is the ONLY new visual
+// primitive this pass introduces beyond existing tokens/components.
+// Deliberately excludes the 'confirmed' step (that's a distinct
+// end-state, not a step to track progress toward) and uses ONLY the
+// existing --color-accent token for the filled/current segment per
+// the design system's "small touchpoint only, never a full-section
+// fill" rule -- each segment is a thin 4px bar, not a card.
+const PROGRESS_STEPS: Array<Exclude<Step, 'confirmed'>> = ['field', 'date', 'time', 'details']
+
+function StepProgress({ current }: { current: Step }) {
+  const { t } = useTranslation()
+  if (current === 'confirmed') return null
+  const currentIndex = PROGRESS_STEPS.indexOf(current)
+  return (
+    <div className="mb-4 flex flex-col gap-1.5" role="group" aria-label={t(`publicBooking.steps.${current}`)}>
+      <div className="flex items-center gap-1.5">
+        {PROGRESS_STEPS.map((s, i) => (
+          <div
+            key={s}
+            className={`h-1 flex-1 rounded-full transition-colors ${i <= currentIndex ? 'bg-accent' : 'bg-border'}`}
+            aria-hidden="true"
+          />
+        ))}
+      </div>
+      <div className="flex items-center justify-between text-[11px] font-medium text-text-secondary">
+        <span>{t(`publicBooking.steps.${current}`)}</span>
+        <span className="tabular-nums">
+          <bdi>{currentIndex + 1}/{PROGRESS_STEPS.length}</bdi>
+        </span>
+      </div>
+    </div>
+  )
+}
+
+// Real semantic icons (Lucide, per design system -- no emoji) for the
+// indoor/outdoor + capacity metadata that was already fetched
+// (PublicField.indoor / .capacity) but never surfaced on the field-
+// selection cards. Small neutral chips, not full-card color fills.
+function FieldMetaChips({ field }: { field: PublicField }) {
+  const { t } = useTranslation()
+  const IndoorIcon = field.indoor ? Home : Sun
+  return (
+    <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
+      <span className="inline-flex items-center gap-1 rounded-md border border-border bg-page-bg px-1.5 py-0.5 text-[11px] font-medium text-text-secondary">
+        <IndoorIcon className="size-3" aria-hidden="true" />
+        {t(field.indoor ? 'publicBooking.indoor' : 'publicBooking.outdoor')}
+      </span>
+      {field.capacity != null && (
+        <span className="inline-flex items-center gap-1 rounded-md border border-border bg-page-bg px-1.5 py-0.5 text-[11px] font-medium text-text-secondary">
+          <Users className="size-3" aria-hidden="true" />
+          <bdi>{t('publicBooking.capacityLabel', { count: field.capacity })}</bdi>
+        </span>
+      )}
+    </div>
+  )
 }
 
 export function PublicClubBookingPage() {
@@ -477,12 +552,37 @@ export function PublicClubBookingPage() {
   return (
     <div dir={direction} className="min-h-screen bg-page-bg pb-24">
       <header className="border-b border-border bg-surface px-4 py-4">
+        {/* DESIGN PASS (2026-09-13): logo treatment elevated slightly
+            (shadow + border ring instead of a bare flat image) --
+            still strictly a "logo + name" overlay per DESIGN_SYSTEM.md
+            "Club Branding (V1 Scope)": no new club-configurable field
+            is introduced, this only changes how the two existing ones
+            (logoUrl, clubName) are framed. Branch subline is real,
+            already-fetched data (club.branches), not invented -- only
+            shown once a field/branch is actually known, same condition
+            as before. */}
         <div className="mx-auto flex max-w-lg items-center justify-between gap-3">
           <div className="flex items-center gap-3">
-            {club.logoUrl && <img src={club.logoUrl} alt={club.clubName} className="size-10 rounded-full object-cover" />}
+            {club.logoUrl ? (
+              <img
+                src={club.logoUrl}
+                alt={club.clubName}
+                className="size-11 rounded-full border border-border object-cover shadow-sm"
+              />
+            ) : (
+              <div className="flex size-11 items-center justify-center rounded-full border border-border bg-page-bg text-sm font-semibold text-text-secondary">
+                {club.clubName.trim().charAt(0)}
+              </div>
+            )}
             <div>
-              <p className="font-semibold">{club.clubName}</p>
-              {selectedBranch && <p className="text-xs text-text-secondary">{selectedBranch.name}</p>}
+              <p className="font-semibold leading-tight">{club.clubName}</p>
+              {selectedBranch ? (
+                <p className="flex items-center gap-1 text-xs text-text-secondary">
+                  <MapPin className="size-3" aria-hidden="true" /> {selectedBranch.name}
+                </p>
+              ) : (
+                club.address && <p className="text-xs text-text-secondary">{club.address}</p>
+              )}
             </div>
           </div>
           {/* HIGH-ROI UX PASS 01, supplementary item 6: the highest-
@@ -496,6 +596,8 @@ export function PublicClubBookingPage() {
       </header>
 
       <main className="mx-auto max-w-lg px-4 py-5">
+        <StepProgress current={step} />
+
         {step !== 'field' && step !== 'confirmed' && (
           <button
             type="button"
@@ -510,6 +612,44 @@ export function PublicClubBookingPage() {
           </button>
         )}
 
+        {/* DESIGN PASS (2026-09-13): persistent compact summary once
+            field+date+time are all known -- carried into the details
+            step so the customer never loses context of what they're
+            about to pay for. Deliberately NOT duplicated with the
+            details-step card below: that card was restructured to drop
+            its own field/date/time rows and keep only the price line,
+            since this strip now owns that information. Each segment is
+            a real, focused edit affordance (not just decorative
+            recap) -- tapping a field jumps back to that exact step,
+            same behavior the existing back button already allows, just
+            more direct. */}
+        {step === 'details' && selectedField && selectedDate && selectedTime && (
+          <div className="mb-4 flex flex-col gap-2 rounded-lg border border-border bg-surface p-3 shadow-sm">
+            <button
+              type="button"
+              className="flex items-center justify-between gap-2 text-start text-sm"
+              onClick={() => setStep('field')}
+              aria-label={t('publicBooking.summaryStrip.editField')}
+            >
+              <span className="flex min-w-0 items-center gap-1.5 font-medium">
+                <MapPin className="size-3.5 shrink-0 text-text-secondary" aria-hidden="true" />
+                <span className="truncate">{selectedField.name}</span>
+              </span>
+              <Pencil className="size-3.5 shrink-0 text-text-secondary" aria-hidden="true" />
+            </button>
+            <div className="flex items-center gap-4 border-t border-border pt-2 text-xs text-text-secondary">
+              <button type="button" className="flex items-center gap-1" onClick={() => setStep('date')} aria-label={t('publicBooking.summaryStrip.editDate')}>
+                <CalendarDays className="size-3.5" aria-hidden="true" />
+                <FormattedDate value={selectedDate} timeZone={club.timezone} options={{ day: 'numeric', month: 'short' }} />
+              </button>
+              <button type="button" className="flex items-center gap-1" onClick={() => setStep('time')} aria-label={t('publicBooking.summaryStrip.editTime')}>
+                <Clock className="size-3.5" aria-hidden="true" />
+                <span className="tabular-nums"><bdi>{selectedTime}</bdi></span>
+              </button>
+            </div>
+          </div>
+        )}
+
         {step === 'field' && (
           <div className="flex flex-col gap-3">
             <h1 className="text-lg font-semibold">{t('publicBooking.chooseField')}</h1>
@@ -520,13 +660,13 @@ export function PublicClubBookingPage() {
                 <button
                   key={f.id}
                   type="button"
-                  className="flex items-center justify-between rounded-lg border border-border bg-surface p-4 text-start shadow-sm transition hover:border-accent"
+                  className="flex items-center justify-between gap-3 rounded-lg border border-border bg-surface p-4 text-start shadow-sm transition hover:border-accent hover:shadow"
                   onClick={() => {
                     setSelectedFieldId(f.id)
                     setStep('date')
                   }}
                 >
-                  <div>
+                  <div className="min-w-0">
                     <p className="font-medium">{f.name}</p>
                     <p className="text-sm text-text-secondary">{t(`publicBooking.sportLabels.${f.sport}`, { defaultValue: f.sport })}</p>
                     {branch && (
@@ -534,8 +674,15 @@ export function PublicClubBookingPage() {
                         <MapPin className="size-3" /> {branch.name}
                       </p>
                     )}
+                    {/* DESIGN PASS (2026-09-13): PublicField.indoor/
+                        .capacity were already fetched by
+                        fetchPublicClub() but never rendered -- real
+                        server data, real Lucide icons, surfaced here so
+                        a customer can actually tell fields apart before
+                        picking one. */}
+                    <FieldMetaChips field={f} />
                   </div>
-                  <ChevronRight className={direction === 'rtl' ? 'size-4 rotate-180' : 'size-4'} />
+                  <ChevronRight className={direction === 'rtl' ? 'size-4 shrink-0 rotate-180 text-text-secondary' : 'size-4 shrink-0 text-text-secondary'} />
                 </button>
               )
             })}
@@ -589,8 +736,16 @@ export function PublicClubBookingPage() {
                     {opt.isToday ? t('publicBooking.today') : <FormattedDate value={opt.date} timeZone={club.timezone} options={{ weekday: 'short' }} />}
                   </p>
                   <p className="text-text-secondary"><FormattedDate value={opt.date} timeZone={club.timezone} options={{ day: 'numeric', month: 'short' }} /></p>
+                  {/* DESIGN PASS (2026-09-13): fixed a latent styling
+                      bug alongside the visual differentiation this
+                      badge needed anyway -- `bg-info`/`text-info`
+                      referenced Tailwind classes that don't exist in
+                      this project's token set (only `status-info` is
+                      defined, see tailwind.config.ts); the badge was
+                      silently rendering unstyled. Now uses the real
+                      semantic token. */}
                   {opt.isToday && (
-                    <span className="rounded-full bg-info/10 px-2 py-0.5 text-[11px] font-medium text-info">
+                    <span className="rounded-full bg-status-info/10 px-2 py-0.5 text-[11px] font-medium text-status-info">
                       {t('publicBooking.todayContactBadge')}
                     </span>
                   )}
@@ -643,21 +798,30 @@ export function PublicClubBookingPage() {
               </div>
             )}
 
-            {isTodaySelected && (
-              <div className="rounded-lg border border-info/30 bg-info/5 p-3 text-sm text-info">
-                {t('publicBooking.todayContactExplainer')}
-              </div>
-            )}
-
-            {/* HIGH-ROI UX PASS 01, supplementary item 18: the same-day
-                contact card moved above the (possibly long) slot list --
-                a customer in a hurry to reach the club right now no
-                longer has to scroll past every remaining slot first.
-                Not duplicated: this is the ONLY render of this card,
-                just repositioned. */}
+            {/* DESIGN PASS (2026-09-13): the explainer text and contact
+                card previously rendered as two separate, disconnected
+                boxes (a bare tinted paragraph, then an unrelated-
+                looking plain white card) -- reads as two bolted-on
+                afterthoughts rather than one deliberate "this is a
+                different path" experience. Merged into a single
+                info-toned container with an icon header, so the
+                explainer reads as this card's own subtitle instead of
+                a floating disclaimer above it. Still only status-info
+                tokens (also fixes the same bg-info/text-info
+                non-existent-class bug as the date-step badge above),
+                still the exact same content/behavior -- explainer copy,
+                race-condition warning, call + WhatsApp actions, all
+                unchanged. Not duplicated: still the ONLY render of
+                this content, just visually unified. */}
             {isTodaySelected && clubWaNumber && (
-              <div className="flex flex-col gap-2 rounded-lg border border-border bg-surface p-4">
-                <p className="text-sm font-medium">{t('publicBooking.todayContactTitle')}</p>
+              <div className="flex flex-col gap-3 rounded-lg border border-status-info/30 bg-status-info/5 p-4">
+                <div className="flex items-start gap-2">
+                  <Phone className="mt-0.5 size-4 shrink-0 text-status-info" aria-hidden="true" />
+                  <div>
+                    <p className="text-sm font-medium text-status-info">{t('publicBooking.todayContactTitle')}</p>
+                    <p className="mt-0.5 text-xs text-status-info/90">{t('publicBooking.todayContactExplainer')}</p>
+                  </div>
+                </div>
                 <p className="text-xs text-text-secondary">{t('publicBooking.todayRaceWarning')}</p>
                 <div className="flex flex-wrap gap-2">
                   <Button asChild size="sm" variant="outline">
@@ -681,6 +845,15 @@ export function PublicClubBookingPage() {
                     </a>
                   </Button>
                 </div>
+              </div>
+            )}
+            {/* Explainer still shown standalone in the (rare) case a
+                club has no WhatsApp/phone number configured at all --
+                preserves the previous fallback behavior exactly (this
+                text was never conditioned on clubWaNumber before). */}
+            {isTodaySelected && !clubWaNumber && (
+              <div className="rounded-lg border border-status-info/30 bg-status-info/5 p-3 text-sm text-status-info">
+                {t('publicBooking.todayContactExplainer')}
               </div>
             )}
 
@@ -732,28 +905,23 @@ export function PublicClubBookingPage() {
           <div className="flex flex-col gap-4">
             <h1 className="text-lg font-semibold">{t('publicBooking.yourDetails')}</h1>
 
-            <div className="rounded-lg border border-border bg-surface p-4 text-sm">
-              <div className="flex justify-between py-1">
-                <span className="text-text-secondary">{t('publicBooking.field')}</span>
-                <span className="font-medium">{selectedField?.name}</span>
+            {/* DESIGN PASS (2026-09-13): field/date/time were previously
+                repeated here in full -- the exact same three facts
+                already shown one screen-height above by the new
+                persistent summary strip (rendered right under
+                StepProgress once step === 'details'). Kept ONLY the
+                price row here, which the strip deliberately does not
+                carry (price is fetched by a separate query gated on
+                !isTodaySelected && step === 'details', so it belongs
+                with the form it's paid through, not the always-visible
+                strip). This consolidates two summaries into one
+                without losing any information. */}
+            {price != null && (
+              <div className="flex items-center justify-between rounded-lg border border-border bg-surface p-4 text-sm font-semibold">
+                <span>{t('publicBooking.total')}</span>
+                <span className="tabular-nums"><FormattedCurrency value={price} currencyCode={club.currency} /></span>
               </div>
-              {selectedDate && (
-                <div className="flex justify-between py-1">
-                  <span className="text-text-secondary">{t('publicBooking.date')}</span>
-                  <span className="font-medium"><FormattedDate value={selectedDate} timeZone={club.timezone} options={{ day: 'numeric', month: 'long' }} /></span>
-                </div>
-              )}
-              <div className="flex justify-between py-1">
-                <span className="text-text-secondary">{t('publicBooking.time')}</span>
-                <span className="font-medium tabular-nums"><bdi>{selectedTime}</bdi></span>
-              </div>
-              {price != null && (
-                <div className="mt-1 flex justify-between border-t border-border pt-2 font-semibold">
-                  <span>{t('publicBooking.total')}</span>
-                  <span className="tabular-nums"><FormattedCurrency value={price} currencyCode={club.currency} /></span>
-                </div>
-              )}
-            </div>
+            )}
 
             <div className="flex flex-col gap-1.5">
               <label className="text-sm font-medium text-text-secondary">{t('publicBooking.nameLabel')}</label>
@@ -814,8 +982,21 @@ export function PublicClubBookingPage() {
           </div>
         )}
 
+        {/* DESIGN PASS (2026-09-13): the confirmation screen was one
+            long undifferentiated vertical stack of cards with no visual
+            hierarchy -- everything (success header, entry-code CTA,
+            calendar button, payment panel, contact card, fine print)
+            competed at the same visual weight in reading order only.
+            Regrouped into labeled sections with subtle dividers
+            (border-t + small uppercase-ish section labels, matching the
+            existing Body/Small/Caption type scale -- no new typography
+            tokens introduced) so a customer can scan by *purpose*
+            (what did I book -> what can I do now -> how do I pay -> how
+            do I reach the club) instead of by arbitrary card order.
+            Every existing element, condition, and behavior below is
+            unchanged -- only grouping/visual treatment changed. */}
         {step === 'confirmed' && (
-          <div className="flex flex-col gap-5">
+          <div className="flex flex-col gap-6">
             <div className="flex flex-col items-center gap-2 text-center">
               <CheckCircle2 className="size-14 text-status-success" />
               <h1 className="text-lg font-semibold">{t('publicBooking.confirmedTitle')}</h1>
@@ -834,140 +1015,159 @@ export function PublicClubBookingPage() {
               <HoldCountdown holdExpiresAt={confirmedHoldExpiresAt} />
             )}
 
-            {/* FINAL ACCEPTANCE CLOSURE (2026-08-29): the primary,
-                reliable path to the booking/entry-code page -- does not
-                depend on WhatsApp or email delivery succeeding, unlike
-                the notification-only channels below. Rendered directly
-                from the token this page's own browser just received in
-                the booking-creation response, linking to the existing,
-                already-secured /qr/:token page. Prominent placement
-                (right after the reference number, before the calendar/
-                payment panels) since this is now the one guaranteed way
-                every customer can reach their credential. */}
-            {confirmedQrToken && (
-              <Button asChild size="lg" className="w-full">
-                <a href={`/qr/${confirmedQrToken}`}>
-                  {t('publicBooking.viewBookingAndEntryCode')}
-                </a>
-              </Button>
-            )}
-
-            {/* HIGH-ROI UX PASS 01, item 19: a plain .ics download for
-                the just-created booking -- low cost, reduces no-shows.
-                No payment secrets/tokens in the description, per the
-                directive. dateKey/selectedTime are still the values
-                that were just submitted (this step only renders right
-                after a successful mutation, before either could change). */}
-            {selectedField && dateKey && selectedTime && (
-              <Button asChild size="sm" variant="outline" className="w-fit self-center">
-                <a
-                  href={buildIcsDataUri({
-                    clubName: club.clubName,
-                    fieldName: selectedField.name,
-                    address: club.address,
-                    // D1 fix (same as bookMutation above): the previous
-                    // `new Date(`${dateKey}T${selectedTime}:00`)` parsed
-                    // in the browser's local timezone, so a customer
-                    // outside the venue's timezone got a calendar event
-                    // at the wrong wall-clock time. toInstant() resolves
-                    // the true instant in the club's venue timezone first.
-                    startAt: new Date(toInstant(dateKey, selectedTime, club.timezone)),
-                    endAt: new Date(new Date(toInstant(dateKey, selectedTime, club.timezone)).getTime() + selectedDuration * 60000),
-                    bookingRef: confirmedRef,
-                  })}
-                  download={`${confirmedRef ?? 'booking'}.ics`}
-                >
-                  <CalendarPlus className="me-1 size-4" /> {t('publicBooking.addToCalendar')}
-                </a>
-              </Button>
-            )}
-
-            {confirmedBookingId && (
-              <PaymentMethodsPanel
-                bookingId={confirmedBookingId}
-                clubId={club.clubId}
-                bookingRef={confirmedRef}
-                clubName={club.clubName}
-                total={confirmedTotal}
-                currency={club.currency}
-                locale={locale as SupportedLocale}
-              />
-            )}
-
-            {(club.primaryPhone || clubWaNumber || club.address) && (
-              <div className="flex flex-col gap-2 rounded-lg border border-border bg-surface p-4">
-                <p className="text-sm font-medium">{t('publicBooking.contactClubTitle')}</p>
-                {club.primaryPhone && (
-                  <div className="flex items-center justify-between text-sm">
-                    <span dir="ltr" className="tabular-nums">{club.primaryPhone}</span>
-                    <div className="flex gap-1">
-                      <Button asChild size="sm" variant="ghost">
-                        <a href={`tel:${club.primaryPhone}`} aria-label={t('publicBooking.callClub')}><Phone className="size-4" /></a>
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        onClick={() => copyToClipboard(club.primaryPhone!, 'club-phone')}
-                        aria-label={t('publicBooking.copyPhoneNumber')}
-                      >
-                        {copiedField === 'club-phone' ? <Check className="size-4" /> : <Copy className="size-4" />}
-                      </Button>
-                    </div>
-                  </div>
-                )}
-                {clubWaNumber && (
-                  <Button asChild size="sm" variant="outline" className="w-fit">
-                    <a href={`https://wa.me/${toWaDigits(clubWaNumber)}`} target="_blank" rel="noreferrer">
-                      <MessageCircle className="me-1 size-4" /> {t('publicBooking.whatsappClub')}
-                    </a>
-                  </Button>
-                )}
-                {club.address && (
-                  <p className="text-xs text-text-secondary">{club.address}</p>
-                )}
-                {club.mapsUrl && (
-                  <a href={club.mapsUrl} target="_blank" rel="noreferrer" className="text-xs text-accent-foreground underline">
-                    {t('publicBooking.directions')}
+            {/* Section: "Your actions" -- the entry-code CTA and the
+                calendar download are both things the customer DOES
+                right now, grouped together instead of floating as two
+                unrelated standalone buttons. */}
+            <div className="flex flex-col gap-3 border-t border-border pt-5">
+              <p className="text-xs font-medium uppercase tracking-wide text-text-secondary">{t('publicBooking.confirmed.yourActions')}</p>
+              {/* FINAL ACCEPTANCE CLOSURE (2026-08-29): the primary,
+                  reliable path to the booking/entry-code page -- does not
+                  depend on WhatsApp or email delivery succeeding, unlike
+                  the notification-only channels below. Rendered directly
+                  from the token this page's own browser just received in
+                  the booking-creation response, linking to the existing,
+                  already-secured /qr/:token page. Prominent placement
+                  (right after the reference number, before the calendar/
+                  payment panels) since this is now the one guaranteed way
+                  every customer can reach their credential. */}
+              {confirmedQrToken && (
+                <Button asChild size="lg" className="w-full">
+                  <a href={`/qr/${confirmedQrToken}`}>
+                    {t('publicBooking.viewBookingAndEntryCode')}
                   </a>
-                )}
+                </Button>
+              )}
+
+              {/* HIGH-ROI UX PASS 01, item 19: a plain .ics download for
+                  the just-created booking -- low cost, reduces no-shows.
+                  No payment secrets/tokens in the description, per the
+                  directive. dateKey/selectedTime are still the values
+                  that were just submitted (this step only renders right
+                  after a successful mutation, before either could change). */}
+              {selectedField && dateKey && selectedTime && (
+                <Button asChild size="sm" variant="outline" className="w-fit self-center">
+                  <a
+                    href={buildIcsDataUri({
+                      clubName: club.clubName,
+                      fieldName: selectedField.name,
+                      address: club.address,
+                      // D1 fix (same as bookMutation above): the previous
+                      // `new Date(`${dateKey}T${selectedTime}:00`)` parsed
+                      // in the browser's local timezone, so a customer
+                      // outside the venue's timezone got a calendar event
+                      // at the wrong wall-clock time. toInstant() resolves
+                      // the true instant in the club's venue timezone first.
+                      startAt: new Date(toInstant(dateKey, selectedTime, club.timezone)),
+                      endAt: new Date(new Date(toInstant(dateKey, selectedTime, club.timezone)).getTime() + selectedDuration * 60000),
+                      bookingRef: confirmedRef,
+                    })}
+                    download={`${confirmedRef ?? 'booking'}.ics`}
+                  >
+                    <CalendarPlus className="me-1 size-4" /> {t('publicBooking.addToCalendar')}
+                  </a>
+                </Button>
+              )}
+            </div>
+
+            {/* Section: "Payment" -- unchanged internally, just given
+                its own labeled section instead of sitting unlabeled
+                between the calendar button and the contact card. */}
+            {confirmedBookingId && (
+              <div className="flex flex-col gap-3 border-t border-border pt-5">
+                <p className="text-xs font-medium uppercase tracking-wide text-text-secondary">{t('publicBooking.confirmed.payment')}</p>
+                <PaymentMethodsPanel
+                  bookingId={confirmedBookingId}
+                  clubId={club.clubId}
+                  bookingRef={confirmedRef}
+                  clubName={club.clubName}
+                  total={confirmedTotal}
+                  currency={club.currency}
+                  locale={locale as SupportedLocale}
+                />
               </div>
             )}
 
-            {/* FINAL ACCEPTANCE CLOSURE (2026-08-29): reworded from an
-                unconditional "check WhatsApp for your link and code"
-                promise -- WhatsApp delivery silently no-ops when the
-                club's account is disconnected (queue_whatsapp_notification()),
-                so that copy could leave a customer with no working
-                instructions at all. Now describes WhatsApp/email as an
-                additional copy of what the button above already
-                guarantees, not the only path to it. */}
-            <p className="text-center text-xs text-text-secondary">{t('publicBooking.whatsappHintSupplementary')}</p>
-
-            {/* Confirmed gap fix: the confirmation screen previously never
-                mentioned that a self-service account/portal exists at all
-                (see claim_customer_self_service() /
-                customers.user_id -- My Bookings, My Subscriptions, etc).
-                This is a short, informational note only -- no new CTA/flow
-                is invented here; it just tells the customer, at the one
-                moment they'd care most, that providing an email (above,
-                still optional) is what would let them access that portal
-                later. Only shown when an email was actually provided this
-                time, since that's the precondition for future access.
-                FINAL PRODUCT COMPLETENESS ROUND (2026-08-25) -- Customer
-                persona: this note was informational text only, with no
-                actual link -- a customer who wanted to act on it had
-                nowhere to click. /login is the safe target (its own
-                post-auth logic already correctly routes a linked customer
-                to /portal, unchanged here; an unlinked one lands on the
-                portal's claim screen, also already correct). */}
-            {customerEmail.trim() && (
-              <p className="text-center text-xs text-text-secondary">
-                {t('publicBooking.accountAwarenessNote')}{' '}
-                <Link to="/login" className="text-accent-foreground hover:underline">
-                  {t('publicBooking.accountAwarenessLink')}
-                </Link>
-              </p>
+            {/* Section: "Contact & location" -- unchanged content. */}
+            {(club.primaryPhone || clubWaNumber || club.address) && (
+              <div className="flex flex-col gap-2 border-t border-border pt-5">
+                <p className="text-xs font-medium uppercase tracking-wide text-text-secondary">{t('publicBooking.confirmed.clubContact')}</p>
+                <div className="flex flex-col gap-2 rounded-lg border border-border bg-surface p-4">
+                  {club.primaryPhone && (
+                    <div className="flex items-center justify-between text-sm">
+                      <span dir="ltr" className="tabular-nums">{club.primaryPhone}</span>
+                      <div className="flex gap-1">
+                        <Button asChild size="sm" variant="ghost">
+                          <a href={`tel:${club.primaryPhone}`} aria-label={t('publicBooking.callClub')}><Phone className="size-4" /></a>
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          onClick={() => copyToClipboard(club.primaryPhone!, 'club-phone')}
+                          aria-label={t('publicBooking.copyPhoneNumber')}
+                        >
+                          {copiedField === 'club-phone' ? <Check className="size-4" /> : <Copy className="size-4" />}
+                        </Button>
+                      </div>
+                    </div>
+                  )}
+                  {clubWaNumber && (
+                    <Button asChild size="sm" variant="outline" className="w-fit">
+                      <a href={`https://wa.me/${toWaDigits(clubWaNumber)}`} target="_blank" rel="noreferrer">
+                        <MessageCircle className="me-1 size-4" /> {t('publicBooking.whatsappClub')}
+                      </a>
+                    </Button>
+                  )}
+                  {club.address && (
+                    <p className="text-xs text-text-secondary">{club.address}</p>
+                  )}
+                  {club.mapsUrl && (
+                    <a href={club.mapsUrl} target="_blank" rel="noreferrer" className="text-xs text-accent-foreground underline">
+                      {t('publicBooking.directions')}
+                    </a>
+                  )}
+                </div>
+              </div>
             )}
+
+            {/* Fine print -- unchanged content, grouped visually last. */}
+            <div className="flex flex-col gap-2 border-t border-border pt-4">
+              {/* FINAL ACCEPTANCE CLOSURE (2026-08-29): reworded from an
+                  unconditional "check WhatsApp for your link and code"
+                  promise -- WhatsApp delivery silently no-ops when the
+                  club's account is disconnected (queue_whatsapp_notification()),
+                  so that copy could leave a customer with no working
+                  instructions at all. Now describes WhatsApp/email as an
+                  additional copy of what the button above already
+                  guarantees, not the only path to it. */}
+              <p className="text-center text-xs text-text-secondary">{t('publicBooking.whatsappHintSupplementary')}</p>
+
+              {/* Confirmed gap fix: the confirmation screen previously never
+                  mentioned that a self-service account/portal exists at all
+                  (see claim_customer_self_service() /
+                  customers.user_id -- My Bookings, My Subscriptions, etc).
+                  This is a short, informational note only -- no new CTA/flow
+                  is invented here; it just tells the customer, at the one
+                  moment they'd care most, that providing an email (above,
+                  still optional) is what would let them access that portal
+                  later. Only shown when an email was actually provided this
+                  time, since that's the precondition for future access.
+                  FINAL PRODUCT COMPLETENESS ROUND (2026-08-25) -- Customer
+                  persona: this note was informational text only, with no
+                  actual link -- a customer who wanted to act on it had
+                  nowhere to click. /login is the safe target (its own
+                  post-auth logic already correctly routes a linked customer
+                  to /portal, unchanged here; an unlinked one lands on the
+                  portal's claim screen, also already correct). */}
+              {customerEmail.trim() && (
+                <p className="text-center text-xs text-text-secondary">
+                  {t('publicBooking.accountAwarenessNote')}{' '}
+                  <Link to="/login" className="text-accent-foreground hover:underline">
+                    {t('publicBooking.accountAwarenessLink')}
+                  </Link>
+                </p>
+              )}
+            </div>
           </div>
         )}
       </main>
