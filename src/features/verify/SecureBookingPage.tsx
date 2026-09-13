@@ -1,5 +1,5 @@
-import { useEffect, useState, type ReactNode } from 'react'
-import { useParams, useSearchParams } from 'react-router-dom'
+import { useEffect, useState } from 'react'
+import { Link, useParams, useSearchParams } from 'react-router-dom'
 import { useMutation, useQuery } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
 import QRCode from 'qrcode'
@@ -10,128 +10,35 @@ import { FormattedCurrency } from '@/components/ui/formatted-currency'
 import { LanguageSwitcher } from '@/components/ui/language-switcher'
 import { StatusBadge } from '@/components/ui/status-badge'
 import { QrCodeViewer } from '@/components/ui/qr-code-viewer'
-import { CheckCircle2, XCircle, Clock, Ban } from 'lucide-react'
+import { Button } from '@/components/ui/button'
+import { CheckCircle2, Clock, CalendarDays, MapPin, Copy, Download, RefreshCw, Ticket, Phone, QrCode as QrIcon } from 'lucide-react'
+import { PaymentMethodsPanel } from '@/features/public-booking/PaymentMethodsPanel'
+import { HoldCountdown } from '@/features/public-booking/HoldCountdown'
+import '@/features/public-booking/public-booking.css'
 
-/**
- * SecureBookingPage -- the Secure Booking Page (directive Sections
- * 28-32). Supersedes the old BookingQrVerifyPage (attendance-QR
- * status card only) as the destination for the WhatsApp booking
- * message's leading link (bookingQrUrl(), unchanged: /qr/:token) --
- * this is now the PRIMARY customer-facing UX for a booking, not the
- * QR image attachment. Directive rule: "WhatsApp QR image must NOT be
- * the Primary UX... the QR should appear inside the Secure Booking
- * Page" -- this page is where the attendance QR now lives, rendered
- * from the token already in the URL (no extra RPC round-trip needed
- * to mint/fetch it, unlike PortalQrPage's authenticated flow).
- *
- * Public (no login) -- same standalone-route pattern as the page it
- * replaces, reachable via verify_booking_qr_public() (anon-granted,
- * opaque-token-only, never a raw booking_id -- directive rule 30).
- * Never mutates anything, never writes qr_scan_events.
- *
- * Bilingual from the start (directive Part V intent, applied here
- * rather than left as new debt): DirectionProvider is mounted
- * globally (App.tsx, above the router), so this standalone page is
- * already inside it and can use useTranslation()/useDirection()
- * directly. An anonymous visitor has no prior localStorage locale on
- * a fresh device/browser, so a one-time `?lang=ar|en` query param
- * (the same WhatsApp link can carry it) seeds the locale on mount --
- * after that, DirectionProvider's own persistence takes over exactly
- * like every other page. Money/date formatting uses formatCurrency()/
- * formatDate() from lib/i18n/config.ts (which take an explicit locale
- * param) rather than formatMoney()/formatInstant() from lib/domain,
- * which are hardcoded to the 'ar-EG' locale regardless of language --
- * a real bug tracked separately for the broader localization sweep,
- * not reproduced in this new page.
- *
- * Production audit finding H-1 (RTL-bidi gap): the formatDate()/
- * formatCurrency() calls below used to render their plain-string
- * output directly, and this file's own InfoRow only isolated it in
- * <bdi> when an explicit `bdi` prop was passed (inconsistently -- the
- * date row had none, the time row and money rows were a mix). Migrated
- * to <FormattedDate>/<FormattedCurrency> (src/components/ui/
- * formatted-date.tsx, formatted-currency.tsx), which always wrap their
- * output in <bdi>, so isolation is no longer a per-call-site opt-in.
- */
-
-type VerifyResult = 'valid' | 'expired' | 'cancelled' | 'already_used' | 'invalid'
-
-interface SecureBookingData {
-  result: VerifyResult
-  bookingRef: string | null
-  fieldName: string | null
-  sport: string | null
-  startAt: string | null
-  endAt: string | null
-  timezone: string | null
-  bookingStatus: string | null
-  clubName: string | null
-  branchName: string | null
-  customerName: string | null
-  total: number | null
-  paid: number | null
-  outstanding: number | null
-  paymentStatus: string | null
-  invoiceTokenAvailable: boolean
-}
-
-async function fetchSecureBooking(token: string): Promise<SecureBookingData> {
-  const { data, error } = await supabase.rpc('verify_booking_qr_public', { p_token: token })
-  if (error) throw error
-  const row = data?.[0]
-  return {
-    result: (row?.result as VerifyResult) ?? 'invalid',
-    bookingRef: row?.booking_ref ?? null,
-    fieldName: row?.field_name ?? null,
-    sport: row?.sport ?? null,
-    startAt: row?.start_at ?? null,
-    endAt: row?.end_at ?? null,
-    timezone: row?.timezone ?? null,
-    bookingStatus: row?.booking_status ?? null,
-    clubName: row?.club_name ?? null,
-    branchName: row?.branch_name ?? null,
-    customerName: row?.customer_name ?? null,
-    total: row?.total !== null && row?.total !== undefined ? Number(row.total) : null,
-    paid: row?.paid !== null && row?.paid !== undefined ? Number(row.paid) : null,
-    outstanding: row?.outstanding !== null && row?.outstanding !== undefined ? Number(row.outstanding) : null,
-    paymentStatus: row?.payment_status ?? null,
-    invoiceTokenAvailable: row?.invoice_token_available ?? false,
-  }
-}
-
-const STATE_ICON: Record<VerifyResult, typeof CheckCircle2> = {
-  valid: CheckCircle2,
-  expired: Clock,
-  cancelled: Ban,
-  already_used: CheckCircle2,
-  invalid: XCircle,
-}
-
-const STATE_TONE: Record<VerifyResult, string> = {
-  valid: 'text-status-success',
-  expired: 'text-status-warning',
-  cancelled: 'text-status-danger',
-  already_used: 'text-text-secondary',
-  invalid: 'text-status-danger',
-}
-
-const BOOKING_STATUS_TONE: Record<string, 'success' | 'warning' | 'danger' | 'neutral'> = {
-  pending_payment: 'warning',
-  confirmed: 'success',
-  checked_in: 'success',
-  completed: 'neutral',
-  cancelled: 'danger',
-  no_show: 'danger',
-}
-
-const PAYMENT_STATUS_TONE: Record<string, 'success' | 'warning' | 'danger' | 'neutral'> = {
-  draft: 'neutral',
-  void: 'neutral',
-  unpaid: 'danger',
-  partially_paid: 'warning',
-  paid: 'success',
-  partially_refunded: 'warning',
-  refunded: 'neutral',
+interface BookingContext {
+  result: 'valid' | 'expired' | 'cancelled' | 'already_used' | 'invalid'
+  booking_id?: string
+  club_id?: string
+  booking_ref?: string
+  club_name?: string
+  club_slug?: string
+  club_phone?: string
+  field_name?: string
+  branch_name?: string
+  start_at?: string
+  end_at?: string
+  timezone?: string
+  currency?: string
+  booking_status?: string
+  total?: number | null
+  paid?: number | null
+  outstanding?: number | null
+  payment_status?: string
+  invoice_token_available?: boolean
+  hold_expires_at?: string | null
+  can_pay?: boolean
+  can_check_in?: boolean
 }
 
 export function SecureBookingPage() {
@@ -141,251 +48,116 @@ export function SecureBookingPage() {
   const { locale, direction, setLocale } = useDirection()
   const [qrDataUrl, setQrDataUrl] = useState<string | null>(null)
   const [qrRevealed, setQrRevealed] = useState(false)
-
-  // Real bug found 2026-08-23 (same investigation as the QR-payload
-  // fix below): "View Invoice" used to build /verify/${token} with
-  // this page's own BOOKING QR token -- but /verify/:token needs an
-  // INVOICE verification token, a different token from a different
-  // table. verify_booking_qr_public() can only ever report a boolean
-  // (an invoice token already exists) since the raw invoice token is
-  // never persisted/recoverable (hash-only storage). Fixed via a new,
-  // narrowly-scoped RPC: possessing a currently-valid booking QR token
-  // is treated as sufficient proof of legitimate access to mint a
-  // fresh invoice link for that same booking's invoice (mirrors this
-  // page's own no-login trust model) -- minting is safe to repeat
-  // (does not revoke the invoice link already sent via WhatsApp, per
-  // the fix in migration 20260822060000).
-  const invoiceLinkMutation = useMutation({
-    mutationFn: async () => {
-      if (!token) throw new Error('no token')
-      const { data, error } = await supabase.rpc('mint_invoice_token_for_booking_qr', { p_booking_qr_token: token })
+  const [copyState, setCopyState] = useState<'idle' | 'copied' | 'error'>('idle')
+  const [qrError, setQrError] = useState(false)
+  const [now, setNow] = useState(Date.now())
+  const { data, isLoading, isError, isFetching, refetch } = useQuery({
+    queryKey: ['secure-booking-context', token],
+    queryFn: async () => {
+      const { data: context, error } = await supabase.rpc('get_public_booking_context', { p_token: token! })
       if (error) throw error
-      return data as string
+      return context as unknown as BookingContext
     },
-    onSuccess: (invoiceToken) => {
-      window.location.assign(`/verify/${invoiceToken}?lang=${locale}`)
-    },
-  })
-
-  // Seed the locale from a one-time ?lang= param on first mount only --
-  // never fights a visitor who then uses the in-page language switcher,
-  // and never overrides a real returning-visitor preference already in
-  // localStorage beyond this first read (DirectionProvider's own
-  // persistence takes over after this).
-  useEffect(() => {
-    const langParam = searchParams.get('lang')
-    if (langParam === 'ar' || langParam === 'en') {
-      if (langParam !== locale) setLocale(langParam)
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
-
-  const { data, isLoading, isError } = useQuery({
-    queryKey: ['secure-booking', token],
-    queryFn: () => fetchSecureBooking(token!),
     enabled: !!token,
     retry: false,
+    refetchInterval: 15000,
+    refetchOnWindowFocus: 'always',
+    staleTime: 0,
   })
-
-  const result: VerifyResult = isError || !data ? 'invalid' : data.result
-
-  const tz = data?.timezone ?? 'Africa/Cairo'
-
-  // WHATSAPP BUSINESS MESSAGING FINAL HARDENING (2026-08-23) -- real
-  // root cause found via the directive's mandated "test the existing
-  // button first" step: this page used to encode a full URL
-  // (`${origin}/qr/${token}`) into the QR image, but the real
-  // production Staff Scanner (ScanPage.tsx) passes whatever raw string
-  // it decodes straight to qr_validate()/qr_confirm_checkin() with NO
-  // URL parsing -- and those RPCs hash `p_token` exactly as given
-  // (`encode(digest(p_token, 'sha256'), 'hex')`) to look it up against
-  // qr_credentials.token_hash, which was computed from the BARE raw
-  // token at mint time. A URL's hash can never match the bare token's
-  // hash, so a QR encoding a URL is structurally unscannable -- this
-  // was proven, not assumed: `ensure_booking_qr()` (the existing
-  // "عرض رمز QR لتسجيل الحضور" button in BookingDetailSheet.tsx, which
-  // already correctly encodes the bare token via
-  // `QRCode.toDataURL(rawToken, ...)`) round-tripped through
-  // qr_validate() successfully against a real confirmed production
-  // booking; the URL-encoding this page used would not have.
-  //
-  // One canonical QR credential contract, one scanner contract (per
-  // this directive's explicit "One QR Source of Truth" requirement) --
-  // this page now encodes the SAME bare token the existing button
-  // already used successfully in production, rather than inventing a
-  // second, incompatible payload shape. The page's own visible link
-  // text/URL bar still shows the full `/qr/:token` address (that part
-  // was never the problem -- only the QR image's own encoded payload
-  // was wrong).
-  //
-  // MAL3ABY QR DISCOVERY + UNIFICATION (2026-08-23), directive Sections
-  // 14/15: this used to render the QR the instant the page loaded (the
-  // effect below ran unconditionally on `result === 'valid'`). That
-  // directly violates "QR لا يظهر مباشرة... يظهر بعد الضغط على الزر
-  // فقط" -- the golden reference (BookingDetailSheet.tsx's "عرض رمز QR
-  // لتسجيل الحضور") only ever shows its QR after an explicit click, and
-  // this page now matches that exactly: `qrRevealed` starts false, the
-  // encode only runs once the visitor taps the button below, mirroring
-  // the same lazy-reveal UX the internal screen has always had.
+  useEffect(() => { document.title = `${data?.club_name ?? 'Mal3aby'} — ${t('secureBooking.title')}` }, [data?.club_name, t])
+  const invoice = useMutation({
+    mutationFn: async () => {
+      const { data: invoiceToken, error } = await supabase.rpc('mint_invoice_token_for_booking_qr', { p_booking_qr_token: token! })
+      if (error || !invoiceToken) throw error ?? new Error('invoice unavailable')
+      return invoiceToken
+    },
+    onSuccess: invoiceToken => window.location.assign(`/verify/${encodeURIComponent(invoiceToken)}?lang=${locale}`),
+  })
   useEffect(() => {
-    if (result !== 'valid' || !token || !qrRevealed) {
-      setQrDataUrl(null)
-      return
-    }
+    const lang = searchParams.get('lang')
+    if (lang === 'ar' || lang === 'en') setLocale(lang)
+    // URL initializes language; subsequent manual changes remain authoritative.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+  useEffect(() => {
+    if (data?.booking_status !== 'pending_payment') return
+    const timer = window.setInterval(() => setNow(Date.now()), 1000)
+    return () => window.clearInterval(timer)
+  }, [data?.booking_status])
+  useEffect(() => { setQrRevealed(false); setCopyState('idle') }, [token])
+  useEffect(() => {
+    setQrDataUrl(null)
+    setQrError(false)
+    if (!qrRevealed || !data?.can_check_in || !token || isError) return
     let cancelled = false
-    void QRCode.toDataURL(token, { width: 480, margin: 1 }).then((url) => {
-      if (!cancelled) setQrDataUrl(url)
-    })
-    return () => {
-      cancelled = true
-    }
-  }, [result, token, qrRevealed])
-
-  // Reset the reveal state whenever we land on a genuinely different
-  // token (a fresh navigation to another booking's secure link) so a
-  // previous booking's QR never lingers visible for the new one.
-  useEffect(() => {
-    setQrRevealed(false)
-  }, [token])
-
-  const Icon = STATE_ICON[result]
-  const tone = STATE_TONE[result]
-
-  return (
-    <div dir={direction} className="flex min-h-screen items-center justify-center bg-page-bg p-4">
-      <div className="w-full max-w-sm rounded-xl border border-border bg-surface p-6 text-center shadow">
-        <div className="mb-4 flex items-center justify-between">
-          <p className="text-sm font-medium text-text-secondary">{t('secureBooking.title')}</p>
-          <LanguageSwitcher />
-        </div>
-
-        {isLoading && <p className="text-sm text-text-secondary">{t('secureBooking.loading')}</p>}
-
-        {!isLoading && result !== 'valid' && (
-          <div className="flex flex-col items-center gap-3">
-            <Icon className={`size-12 ${tone}`} />
-            <p className={`font-medium ${tone}`}>{t(`secureBooking.states.${stateKey(result)}Title`)}</p>
-            <p className="text-sm text-text-secondary">{t(`secureBooking.states.${stateKey(result)}Message`)}</p>
-            {data?.bookingRef && (
-              <p className="text-xs text-text-secondary">
-                {t('secureBooking.bookingRef')}: <bdi>{data.bookingRef}</bdi>
-              </p>
-            )}
-          </div>
-        )}
-
-        {!isLoading && result === 'valid' && data && (
-          <div className="flex flex-col items-center gap-4">
-            <div className="flex flex-col items-center gap-2">
-              <CheckCircle2 className="size-10 text-status-success" />
-              {data.clubName && <p className="text-lg font-semibold">{data.clubName}</p>}
-            </div>
-
-            <div className="w-full rounded-md border border-border p-4 text-start text-sm">
-              {data.branchName && <InfoRow label={t('secureBooking.branch')} value={data.branchName} />}
-              <InfoRow label={t('secureBooking.field')} value={data.fieldName ?? '—'} />
-              {data.sport && <InfoRow label={t('secureBooking.sport')} value={data.sport} />}
-              {data.startAt && (
-                <InfoRow
-                  label={t('secureBooking.date')}
-                  value={<FormattedDate value={data.startAt} timeZone={tz} options={{ day: 'numeric', month: 'long', year: 'numeric' }} />}
-                />
-              )}
-              {data.startAt && (
-                <InfoRow
-                  label={t('secureBooking.time')}
-                  value={<FormattedDate value={data.startAt} timeZone={tz} options={{ hour: '2-digit', minute: '2-digit' }} />}
-                />
-              )}
-              <InfoRow label={t('secureBooking.bookingRef')} value={data.bookingRef ?? '—'} bdi />
-              {data.bookingStatus && (
-                <div className="flex items-center justify-between py-1">
-                  <span className="text-text-secondary">{t('secureBooking.bookingStatus')}</span>
-                  <StatusBadge
-                    tone={BOOKING_STATUS_TONE[data.bookingStatus] ?? 'neutral'}
-                    label={t(`secureBooking.bookingStatusLabels.${data.bookingStatus}`, { defaultValue: data.bookingStatus })}
-                  />
-                </div>
-              )}
-            </div>
-
-            {data.total !== null && (
-              <div className="w-full rounded-md border border-border p-4 text-start text-sm">
-                <p className="mb-2 text-xs font-medium text-text-secondary">{t('secureBooking.paymentSummary')}</p>
-                <InfoRow label={t('secureBooking.total')} value={<FormattedCurrency value={data.total} />} />
-                {data.paid !== null && (
-                  <InfoRow label={t('secureBooking.paid')} value={<FormattedCurrency value={data.paid} />} valueClassName="text-status-success" />
-                )}
-                {data.outstanding !== null && data.outstanding > 0 && (
-                  <InfoRow label={t('secureBooking.outstanding')} value={<FormattedCurrency value={data.outstanding} />} valueClassName="text-status-danger" />
-                )}
-                {data.paymentStatus && (
-                  <div className="flex items-center justify-between py-1">
-                    <span className="text-text-secondary">{t('secureBooking.paymentStatus')}</span>
-                    <StatusBadge
-                      tone={PAYMENT_STATUS_TONE[data.paymentStatus] ?? 'neutral'}
-                      label={t(`secureBooking.paymentStatusLabels.${data.paymentStatus}`, { defaultValue: data.paymentStatus })}
-                    />
-                  </div>
-                )}
-                {data.invoiceTokenAvailable && (
-                  <button
-                    type="button"
-                    onClick={() => invoiceLinkMutation.mutate()}
-                    disabled={invoiceLinkMutation.isPending}
-                    className="mt-2 inline-block text-sm font-medium text-accent-foreground underline disabled:opacity-60"
-                  >
-                    {invoiceLinkMutation.isPending ? t('secureBooking.loadingInvoice') : t('secureBooking.viewInvoice')}
-                  </button>
-                )}
-              </div>
-            )}
-
-            {/* Directive Sections 14/15: hidden by default, only ever
-                shown after this explicit tap -- never auto-revealed on
-                page load. Only offered for a booking that isn't
-                cancelled/no-show (data.bookingStatus already gates the
-                whole `result === 'valid'` branch to non-cancelled
-                bookings via verify_booking_qr_public()'s own 'cancelled'
-                result, so a cancelled booking never reaches this button
-                at all -- Section 24 is enforced upstream, not here). */}
-            {!qrRevealed && (
-              <button
-                type="button"
-                onClick={() => setQrRevealed(true)}
-                className="w-full rounded-md bg-brand-primary px-4 py-2 text-sm font-medium text-white transition hover:opacity-90"
-              >
-                {t('secureBooking.viewQrButton')}
-              </button>
-            )}
-
-            {qrRevealed && !qrDataUrl && (
-              <p className="text-sm text-text-secondary">{t('secureBooking.generatingQr')}</p>
-            )}
-
-            {qrRevealed && qrDataUrl && (
-              <QrCodeViewer
-                qrDataUrl={qrDataUrl}
-                label={t('secureBooking.attendanceQr')}
-                hint={t('secureBooking.attendanceQrHint')}
-              />
-            )}
-          </div>
-        )}
+    // Staff scanners require the bare credential, not the page URL.
+    void QRCode.toDataURL(token, { width: 480, margin: 1 }).then(value => {
+      if (!cancelled) setQrDataUrl(value)
+    }).catch(() => { if (!cancelled) setQrError(true) })
+    return () => { cancelled = true }
+  }, [token, qrRevealed, data?.can_check_in, isError])
+  const accessible = !!data?.booking_id && data.result !== 'invalid' && data.result !== 'expired'
+  const pending = data?.booking_status === 'pending_payment'
+  const holdExpired = pending && !!data?.hold_expires_at && Date.parse(data.hold_expires_at) <= now
+  const canPay = accessible && !isError && !holdExpired && data?.can_pay && Number(data.outstanding ?? 0) > 0
+  const currency = data?.currency ?? 'EGP'
+  const tz = data?.timezone ?? 'Africa/Cairo'
+  const savedUrl = `${window.location.origin}/qr/${encodeURIComponent(token ?? '')}?lang=${locale}`
+  const statusTone = pending ? 'warning' : data?.booking_status === 'cancelled' || data?.booking_status === 'no_show' ? 'danger' : 'success'
+  return <div dir={direction} className="booking-page min-h-screen bg-page-bg">
+    <header className="border-b border-border bg-surface px-4 py-4">
+      <div className="mx-auto flex max-w-6xl items-center justify-between gap-3">
+        <Link to={data?.club_slug ? `/c/${encodeURIComponent(data.club_slug)}` : '/'} className="flex items-center gap-2 font-semibold"><Ticket className="size-5" />{data?.club_name ?? 'Mal3aby'}</Link>
+        <div className="flex items-center gap-3"><Link className="text-sm font-medium" to="/portal/bookings">{t('publicBooking.recovery.account')}</Link><LanguageSwitcher /></div>
       </div>
-    </div>
-  )
-}
-
-function stateKey(result: VerifyResult): string {
-  return result === 'already_used' ? 'alreadyUsed' : result
-}
-
-function InfoRow({ label, value, bdi, valueClassName }: { label: string; value: ReactNode; bdi?: boolean; valueClassName?: string }) {
-  return (
-    <div className="flex items-center justify-between py-1">
-      <span className="text-text-secondary">{label}</span>
-      <span className={`font-medium tabular-nums ${valueClassName ?? ''}`}>{bdi ? <bdi>{value}</bdi> : value}</span>
-    </div>
-  )
+    </header>
+    <main className="mx-auto max-w-6xl px-4 py-8 sm:px-6">
+      {isLoading && <p role="status" className="booking-content">{t('secureBooking.loading')}</p>}
+      {isError && <div role="alert" className="booking-content mb-6"><p>{t('publicBooking.manage.loadError')}</p><Button className="mt-4" disabled={isFetching} onClick={() => void refetch()}>{t('publicBooking.experience.retry')}</Button></div>}
+      {!isLoading && !isError && !accessible && <div className="booking-content mx-auto max-w-lg text-center"><Ticket className="mx-auto mb-4 size-10 text-text-secondary" /><h1 className="text-xl font-semibold">{t(`secureBooking.states.${data?.result === 'expired' ? 'expired' : 'invalid'}Title`)}</h1><p className="mt-3 text-sm leading-7 text-text-secondary">{t('publicBooking.manage.invalidHint')}</p><Button asChild className="mt-5"><Link to="/portal/bookings">{t('publicBooking.recovery.account')}</Link></Button></div>}
+      {accessible && data && <>
+        <section className="booking-venue-banner booking-manage-banner">
+          <div><div className="mb-3 inline-flex items-center gap-2 text-sm text-white/80">{pending ? <Clock className="size-4" /> : <Ticket className="size-4" />}{t(`secureBooking.bookingStatusLabels.${data.booking_status}`, { defaultValue: data.booking_status })}</div>
+            <h1>{t('publicBooking.manage.title')}</h1><p>{data.field_name}</p>
+          </div>
+          <div className="text-start sm:text-end"><span className="block text-xs text-white/60">{t('secureBooking.bookingRef')}</span><bdi className="mt-2 block text-xl font-semibold tracking-wider">{data.booking_ref}</bdi></div>
+        </section>
+        <div className="booking-layout booking-manage-layout">
+          <div className="flex min-w-0 flex-col gap-6">
+            <section className="booking-content">
+              <div className="mb-5 flex flex-wrap items-center justify-between gap-3"><h2 className="text-xl font-semibold">{t('secureBooking.title')}</h2><StatusBadge tone={statusTone} label={t(`secureBooking.bookingStatusLabels.${data.booking_status}`, { defaultValue: data.booking_status })} /></div>
+              <div className="grid gap-5 sm:grid-cols-2">
+                <div className="flex items-start gap-3"><MapPin className="mt-1 size-5 text-text-secondary" /><div><p className="font-semibold">{data.field_name}</p><p className="mt-1 text-sm text-text-secondary">{data.branch_name}</p></div></div>
+                <div className="flex items-start gap-3"><CalendarDays className="mt-1 size-5 text-text-secondary" /><div>{data.start_at && <FormattedDate value={data.start_at} timeZone={tz} options={{ weekday: 'long', day: 'numeric', month: 'long' }} />}<p className="mt-1 text-sm text-text-secondary">{data.start_at && <FormattedDate value={data.start_at} timeZone={tz} options={{ hour: '2-digit', minute: '2-digit' }} />} – {data.end_at && <FormattedDate value={data.end_at} timeZone={tz} options={{ hour: '2-digit', minute: '2-digit' }} />}</p></div></div>
+              </div>
+              {pending && data.hold_expires_at && <div className="mt-6"><HoldCountdown holdExpiresAt={data.hold_expires_at} /></div>}
+            </section>
+            <section className="booking-content" aria-label={t('publicBooking.manage.paymentTitle')}>
+              <div className="mb-5 flex items-center justify-between gap-3"><h2 className="text-xl font-semibold">{t('publicBooking.manage.paymentTitle')}</h2><Button variant="ghost" aria-label={t('publicBooking.manage.refresh')} disabled={isFetching} onClick={() => void refetch()}><RefreshCw className={`size-4 ${isFetching ? 'animate-spin' : ''}`} /></Button></div>
+              {canPay && data.booking_id && data.club_id ? <PaymentMethodsPanel bookingId={data.booking_id} clubId={data.club_id} bookingRef={data.booking_ref ?? null} clubName={data.club_name ?? ''} total={Number(data.outstanding)} currency={currency} locale={locale} /> : <p className="text-sm leading-7 text-text-secondary">{t(isError ? 'publicBooking.manage.loadError' : holdExpired ? 'publicBooking.holdExpiredMessage' : Number(data.outstanding ?? 0) === 0 && data.payment_status === 'paid' ? 'publicBooking.manage.paid' : 'publicBooking.manage.paymentUnavailable')}</p>}
+              {invoice.isError && <p role="alert" className="mt-3 text-sm text-status-danger">{t('publicBooking.manage.invoiceError')}</p>}
+              {data.result === 'valid' && !isError && <Button variant="outline" className="mt-4 min-h-11" disabled={invoice.isPending} onClick={() => invoice.mutate()}>{t(invoice.isPending ? 'secureBooking.loadingInvoice' : 'secureBooking.viewInvoice')}</Button>}
+            </section>
+            {data.can_check_in && !isError && <section className="booking-content">
+              <Button variant="outline" className="min-h-12 w-full gap-2" onClick={() => setQrRevealed(value => !value)}><QrIcon className="size-5" />{t('secureBooking.viewQrButton')}</Button>
+              {qrRevealed && !qrDataUrl && !qrError && <p role="status" className="mt-3 text-sm">{t('secureBooking.generatingQr')}</p>}
+              {qrError && <p role="alert" className="mt-3 text-sm text-status-danger">{t('publicBooking.manage.loadError')}</p>}
+              {qrRevealed && qrDataUrl && <QrCodeViewer qrDataUrl={qrDataUrl} label={t('secureBooking.attendanceQr')} hint={t('secureBooking.attendanceQrHint')} />}
+            </section>}
+          </div>
+          <aside className="booking-summary">
+            <h2 className="mb-5 text-lg font-semibold">{t('secureBooking.paymentSummary')}</h2>
+            <dl className="flex flex-col gap-4 text-sm"><div className="flex justify-between gap-3"><dt>{t('secureBooking.total')}</dt><dd><FormattedCurrency value={Number(data.total ?? 0)} currencyCode={currency} /></dd></div><div className="flex justify-between gap-3"><dt>{t('secureBooking.paid')}</dt><dd><FormattedCurrency value={Number(data.paid ?? 0)} currencyCode={currency} /></dd></div><div className="flex justify-between gap-3 border-t border-border pt-4 text-lg font-semibold"><dt>{t('secureBooking.outstanding')}</dt><dd><FormattedCurrency value={Number(data.outstanding ?? 0)} currencyCode={currency} /></dd></div></dl>
+            <div className="booking-return-card"><h3 className="font-semibold">{t('publicBooking.manage.saveTitle')}</h3><p className="mt-2 text-xs leading-6 text-text-secondary">{t('publicBooking.manage.saveHint')}</p>
+              <Button variant="outline" className="mt-3 min-h-11 w-full gap-2" onClick={async () => { try { await navigator.clipboard.writeText(savedUrl); setCopyState('copied') } catch { setCopyState('error') } }}>{copyState === 'copied' ? <CheckCircle2 className="size-4" /> : <Copy className="size-4" />}{t(copyState === 'copied' ? 'publicBooking.manage.copied' : 'publicBooking.manage.copy')}</Button>
+              {copyState === 'error' && <p role="alert" className="mt-2 break-all text-xs">{savedUrl}</p>}
+              <Button asChild variant="ghost" className="mt-2 min-h-11 w-full gap-2"><a href={`data:text/plain;charset=utf-8,${encodeURIComponent(`${data.club_name}\n${data.booking_ref}\n${savedUrl}`)}`} download={`booking-${data.booking_ref ?? 'link'}.txt`}><Download className="size-4" />{t('publicBooking.manage.download')}</a></Button>
+              {data.club_phone && <a className="mt-4 flex items-center gap-2 text-sm underline underline-offset-4" href={`tel:${data.club_phone}`}><Phone className="size-4" />{t('publicBooking.callClub')}</a>}
+              {data.club_slug && <Link className="mt-4 block text-sm font-medium underline underline-offset-4" to={`/c/${encodeURIComponent(data.club_slug)}`}>{t('publicBooking.manage.newBooking')}</Link>}
+            </div>
+          </aside>
+        </div>
+      </>}
+    </main>
+  </div>
 }

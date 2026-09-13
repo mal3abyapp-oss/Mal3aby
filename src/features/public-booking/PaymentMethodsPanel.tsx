@@ -91,7 +91,7 @@ export function PaymentMethodsPanel({
   const [expandedId, setExpandedId] = useState<string | null>(null)
   const [copiedKey, setCopiedKey] = useState<string | null>(null)
 
-  const { data: methods = [], isLoading } = useQuery({
+  const { data: methods = [], isLoading, isError, refetch } = useQuery({
     queryKey: ['public-payment-methods', bookingId],
     queryFn: () => fetchMethods(bookingId),
   })
@@ -113,8 +113,10 @@ export function PaymentMethodsPanel({
     return <p className="text-sm text-text-secondary">{t('publicBooking.loading')}</p>
   }
 
+  if (isError) return <div role="alert" className="text-sm"><p>{t('publicBooking.manage.methodsError')}</p><Button variant="outline" className="mt-3" onClick={() => void refetch()}>{t('publicBooking.experience.retry')}</Button></div>
+
   if (methods.length === 0) {
-    return null
+    return <p className="text-sm leading-7 text-text-secondary">{t('publicBooking.manage.noMethods')}</p>
   }
 
   const isEn = locale === 'en'
@@ -132,6 +134,7 @@ export function PaymentMethodsPanel({
               <button
                 type="button"
                 className="flex w-full items-center justify-between p-3 text-start text-sm font-medium"
+                aria-expanded={isOpen}
                 onClick={() => setExpandedId(isOpen ? null : m.id)}
               >
                 <span>{name}</span>

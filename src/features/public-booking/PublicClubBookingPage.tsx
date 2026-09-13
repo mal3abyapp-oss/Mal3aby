@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import type { CountryCode } from 'libphonenumber-js'
-import { useParams, useSearchParams, Link } from 'react-router-dom'
+import { useParams, useSearchParams, useNavigate, Link } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
 import { supabase } from '@/lib/supabase/client'
@@ -28,8 +28,11 @@ import {
   CalendarDays,
   Clock,
   Pencil,
+  CircleDot,
+  Ticket,
 } from 'lucide-react'
 import { PaymentMethodsPanel } from './PaymentMethodsPanel'
+import { BookingRecoveryDialog } from './BookingRecoveryDialog'
 import { HoldCountdown } from './HoldCountdown'
 import { normalizePhone } from '@/lib/domain/phone'
 import { toInstant, fromInstant } from '@/lib/domain/time'
@@ -179,88 +182,6 @@ function isPlausibleEmail(value: string): boolean {
   return EMAIL_FORMAT_RE.test(value.trim())
 }
 
-// GAP CLOSURE (2026-09-13, owner report: "لو العميل عمل رفرش للصفحة أو
-// خرج بعد الحجز، مش قادر يرجع يشوف حجزه أو يدفع أو بياناته" -- a
-// customer who refreshes or leaves the confirmation screen after
-// booking has no way back to it): everything the 'confirmed' step
-// needs (confirmedRef/BookingId/HoldExpiresAt/Total/QrToken, PLUS the
-// selectedField/dateKey/selectedTime/selectedDuration/customerEmail
-// this same screen also reads directly) previously lived ONLY in
-// this component's React state -- a refresh, a closed tab, or even
-// just navigating away and back wiped it completely, with no
-// server-side session and no URL parameter carrying any of it. The
-// booking_qr_token this page already receives is the one durable,
-// secure credential (an opaque, anon-granted token -- see /qr/:token's
-// own SecureBookingPage) that could always answer "what did I book,
-// can I still pay" on its own, but a customer who refreshed before
-// ever tapping that link had no way to even reach it. Persist the
-// whole recovery payload to localStorage (keyed per club slug, since
-// a customer could plausibly book at more than one club) the moment a
-// booking succeeds, and restore straight to the confirmed screen on a
-// fresh mount if no other flow is already in progress. This is
-// read/restore only -- never re-submits, never re-validates, never
-// invents data the server didn't actually return.
-const PUBLIC_BOOKING_CONFIRMATION_STORAGE_PREFIX = 'mala3by.publicBooking.confirmation.'
-
-interface PersistedBookingConfirmation {
-  bookingRef: string | null
-  bookingId: string | null
-  holdExpiresAt: string | null
-  total: number | null
-  qrToken: string | null
-  fieldId: string
-  dateKey: string
-  time: string
-  duration: number
-  customerEmail: string
-}
-
-function confirmationStorageKey(slug: string): string {
-  return `${PUBLIC_BOOKING_CONFIRMATION_STORAGE_PREFIX}${slug}`
-}
-
-function savePersistedConfirmation(slug: string, data: PersistedBookingConfirmation): void {
-  try {
-    localStorage.setItem(confirmationStorageKey(slug), JSON.stringify(data))
-  } catch {
-    // Private-browsing/storage-disabled browsers can throw on write --
-    // this is a best-effort recovery aid, never the source of truth
-    // for the booking itself (the server-created row and the
-    // WhatsApp/email notifications remain authoritative regardless),
-    // so a write failure here is silently non-fatal.
-  }
-}
-
-function readPersistedConfirmation(slug: string): PersistedBookingConfirmation | null {
-  try {
-    const raw = localStorage.getItem(confirmationStorageKey(slug))
-    if (!raw) return null
-    const parsed = JSON.parse(raw) as Partial<PersistedBookingConfirmation>
-    // Defensive shape check -- a value written by a future/older app
-    // version, or corrupted by hand-editing localStorage, must never
-    // crash the page. The 3 fields below are the minimum needed to
-    // render a meaningful confirmed screen (entry-code link, field
-    // name, date/time); anything else missing degrades gracefully
-    // (e.g. no price line, no ICS button) rather than being rejected.
-    if (typeof parsed !== 'object' || parsed === null) return null
-    if (typeof parsed.fieldId !== 'string' || typeof parsed.dateKey !== 'string' || typeof parsed.time !== 'string') return null
-    return {
-      bookingRef: parsed.bookingRef ?? null,
-      bookingId: parsed.bookingId ?? null,
-      holdExpiresAt: parsed.holdExpiresAt ?? null,
-      total: parsed.total ?? null,
-      qrToken: parsed.qrToken ?? null,
-      fieldId: parsed.fieldId,
-      dateKey: parsed.dateKey,
-      time: parsed.time,
-      duration: typeof parsed.duration === 'number' ? parsed.duration : DEFAULT_DURATION_MINUTES,
-      customerEmail: typeof parsed.customerEmail === 'string' ? parsed.customerEmail : '',
-    }
-  } catch {
-    return null
-  }
-}
-
 // HIGH-ROI UX PASS 01, item 19 (Add to Calendar): builds a plain .ics
 // data URI from already-known booking fields -- no payment
 // secrets/tokens in the description, per the directive's explicit
@@ -351,6 +272,8 @@ export function PublicClubBookingPage() {
   const { t } = useTranslation()
   const { direction, locale, setLocale } = useDirection()
   const queryClient = useQueryClient()
+  const navigate = useNavigate()
+  const [recoveryOpen, setRecoveryOpen] = useState(false)
 
   const contentRef = useRef<HTMLDivElement>(null)
   const [step, setStep] = useState<Step>('field')
@@ -386,33 +309,6 @@ export function PublicClubBookingPage() {
   // full security reasoning.
   const [confirmedQrToken, setConfirmedQrToken] = useState<string | null>(null)
   const [copiedField, setCopiedField] = useState<string | null>(null)
-
-  // GAP CLOSURE (2026-09-13): restore a just-confirmed booking after a
-  // refresh/reopen, once per mount, only when the wizard is still at
-  // its untouched initial state -- never overwrites an in-progress
-  // selection (e.g. the customer already re-opened the link and
-  // started picking a NEW booking before this effect ran). Reads the
-  // slug-scoped localStorage entry saved by bookMutation's onSuccess
-  // below; a missing/corrupt/mismatched entry is a silent no-op, same
-  // as any first-time visitor.
-  useEffect(() => {
-    if (!slug) return
-    if (step !== 'field' || selectedFieldId !== null) return
-    const persisted = readPersistedConfirmation(slug)
-    if (!persisted) return
-    setSelectedFieldId(persisted.fieldId)
-    setSelectedDate(new Date(`${persisted.dateKey}T12:00:00`))
-    setSelectedDuration(persisted.duration)
-    setSelectedTime(persisted.time)
-    setCustomerEmail(persisted.customerEmail)
-    setConfirmedRef(persisted.bookingRef)
-    setConfirmedBookingId(persisted.bookingId)
-    setConfirmedHoldExpiresAt(persisted.holdExpiresAt)
-    setConfirmedTotal(persisted.total)
-    setConfirmedQrToken(persisted.qrToken)
-    setStep('confirmed')
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [slug])
 
   // HIGH-ROI UX PASS 01, supplementary item 6 (Public Booking language
   // switcher): seed from a one-time ?lang= param on first mount only,
@@ -600,27 +496,9 @@ export function PublicClubBookingPage() {
       setConfirmedTotal(row?.total_price != null ? Number(row.total_price) : null)
       setConfirmedQrToken(row?.booking_qr_token ?? null)
       setStep('confirmed')
-      // GAP CLOSURE (2026-09-13): persist the recovery payload the
-      // instant the booking succeeds, using the exact values just
-      // submitted (selectedFieldId/dateKey/selectedTime/
-      // selectedDuration/customerEmail are still the just-submitted
-      // values here, same reasoning as the ICS-button comment below).
-      // If the customer refreshes or closes the tab from this point
-      // on, the effect above can put them right back on this same
-      // confirmed screen.
-      if (slug && selectedFieldId && dateKey && selectedTime) {
-        savePersistedConfirmation(slug, {
-          bookingRef: row?.booking_ref ?? null,
-          bookingId: row?.booking_id ?? null,
-          holdExpiresAt: row?.hold_expires_at ?? null,
-          total: row?.total_price != null ? Number(row.total_price) : null,
-          qrToken: row?.booking_qr_token ?? null,
-          fieldId: selectedFieldId,
-          dateKey,
-          time: selectedTime,
-          duration: selectedDuration,
-          customerEmail: customerEmail.trim(),
-        })
+      // The success URL is durable; each visit reads the current server state.
+      if (row?.booking_qr_token) {
+        navigate(`/qr/${encodeURIComponent(row.booking_qr_token)}?lang=${locale}`, { replace: true })
       }
     },
     onError: (error: { message?: string }) => {
@@ -723,19 +601,25 @@ export function PublicClubBookingPage() {
               browser/localStorage default was. Only the system UI
               switches; club-owned data (name, address) is never
               machine-translated. */}
-          <LanguageSwitcher />
+          <div className="flex shrink-0 items-center gap-2 sm:gap-4">
+            <Button variant="ghost" className="min-h-11 gap-2" onClick={() => setRecoveryOpen(true)}><Ticket className="size-4" />{t('publicBooking.recovery.entry')}</Button>
+            <LanguageSwitcher />
+          </div>
         </div>
       </header>
 
       <main className="mx-auto max-w-6xl px-4 py-6 sm:px-6 sm:py-10">
-        {step !== 'confirmed' && <div className="mb-7">
-          <p className="mb-2 text-sm font-semibold text-accent-emphasis">{t('publicBooking.bookNow')}</p>
-          <h1 className="text-2xl font-semibold tracking-tight sm:text-3xl">{t('publicBooking.experience.title')}</h1>
-          <p className="mt-2 text-sm leading-7 text-text-secondary">{t('publicBooking.experience.subtitle')}</p>
-        </div>}
+        {step !== 'confirmed' && <section className="booking-venue-banner">
+          <div>
+            <h1>{club.clubName}</h1>
+            <p>{t('publicBooking.experience.title')}</p>
+            {club.address && <span className="mt-3 flex items-center gap-2 text-sm text-white/70"><MapPin className="size-4" />{club.address}</span>}
+          </div>
+          <div className="booking-court" aria-hidden="true"><span /><i /></div>
+        </section>}
         <StepProgress current={step} />
         <div className={step === 'confirmed' ? 'mx-auto max-w-xl' : 'booking-layout'}>
-        <div ref={contentRef} tabIndex={-1} className="booking-content">
+        <div ref={contentRef} tabIndex={-1} className="booking-content" data-step={step}>
 
         {step !== 'field' && step !== 'confirmed' && (
           <button
@@ -754,14 +638,15 @@ export function PublicClubBookingPage() {
         {step === 'field' && (
           <div className="flex flex-col gap-3">
             <h2 className="text-xl font-semibold">{t('publicBooking.chooseField')}</h2>
+            <p className="mb-2 text-sm leading-6 text-text-secondary">{t('publicBooking.experience.fieldHint')}</p>
             {club.fields.length === 0 && <p className="text-sm text-text-secondary">{t('publicBooking.noFields')}</p>}
-            {club.fields.map((f) => {
+            {club.fields.map((f, index) => {
               const branch = club.branches.find((b) => b.id === f.branch_id)
               return (
                 <button
                   key={f.id}
                   type="button"
-                  className="booking-field group flex items-center gap-4 rounded-xl border border-border bg-surface p-5 text-start transition hover:border-accent hover:shadow-sm"
+                  data-selected={selectedFieldId === f.id} className="booking-field group flex items-center gap-4 rounded-xl border border-border bg-surface p-5 text-start transition hover:border-accent hover:shadow-sm"
                   onClick={() => {
                     setSelectedFieldId(f.id)
                     setSelectedTime(null)
@@ -769,7 +654,7 @@ export function PublicClubBookingPage() {
                     setStep('date')
                   }}
                 >
-                  <span className="flex size-12 shrink-0 items-center justify-center rounded-xl bg-page-bg text-text-primary"><MapPin className="size-6" aria-hidden="true" /></span>
+                  <span className="booking-sport-tile" aria-hidden="true"><CircleDot className="size-9" /><span>{String(index + 1).padStart(2, '0')}</span></span>
                   <div className="min-w-0 flex-1">
                     <p className="font-semibold">{f.name}</p>
                     <p className="text-sm text-text-secondary">{t(`publicBooking.sportLabels.${f.sport}`, { defaultValue: f.sport })}</p>
@@ -1063,7 +948,7 @@ export function PublicClubBookingPage() {
                 placeholder={t('publicBooking.emailPlaceholder')}
                 dir="ltr"
               />
-              <p className="text-xs text-text-secondary">{t('publicBooking.emailHelper')}</p>
+              <p className="text-xs text-text-secondary">{t('publicBooking.recovery.emailHint')}</p>
             </div>
 
             {formError && <p role="alert" className="text-sm text-status-danger">{formError}</p>}
@@ -1277,7 +1162,7 @@ export function PublicClubBookingPage() {
         {step !== 'confirmed' && <aside className="booking-summary" aria-label={t('publicBooking.experience.summary')}>
           <div className="border-b border-border pb-5">
             <p className="text-sm text-text-secondary">{club.clubName}</p>
-            <h2 className="mt-1 text-lg font-semibold">{t('publicBooking.experience.summary')}</h2>
+            <h2 className="mt-1 flex items-center gap-2 text-lg font-semibold"><Ticket className="size-5" />{t('publicBooking.experience.summary')}</h2>
           </div>
           <div className="flex flex-col gap-1 py-3">
             {([
@@ -1292,9 +1177,15 @@ export function PublicClubBookingPage() {
           </div>
           <p className="border-t border-border pt-4 text-xs leading-6 text-text-secondary">{t('publicBooking.experience.priceHint')}</p>
           {club.address && <p className="mt-4 flex items-start gap-2 text-xs leading-6 text-text-secondary"><MapPin className="mt-1 size-4 shrink-0" />{club.address}</p>}
+          <div className="booking-return-card">
+            <h3 className="font-semibold">{t('publicBooking.recovery.title')}</h3>
+            <p className="mt-2 text-xs leading-6 text-text-secondary">{t('publicBooking.recovery.shortHint')}</p>
+            <Button variant="outline" className="mt-3 min-h-11 w-full" onClick={() => setRecoveryOpen(true)}>{t('publicBooking.recovery.entry')}</Button>
+          </div>
         </aside>}
         </div>
       </main>
+      <BookingRecoveryDialog open={recoveryOpen} onOpenChange={setRecoveryOpen} slug={slug!} country={club.country ?? 'EG'} phone={club.primaryPhone || club.whatsappNumber} />
     </div>
   )
 }

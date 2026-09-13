@@ -15,6 +15,36 @@
 .booking-summary { position: sticky; top: 24px; padding: 24px; }
 .booking-content input { min-height: 48px; }
 .booking-content > div > button.w-full { min-height: 48px; }
+.booking-venue-banner {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 24px;
+  overflow: hidden;
+  position: relative;
+  padding: 24px 32px;
+  margin-bottom: 28px;
+  border-radius: 16px;
+  background: var(--color-dark-base);
+  color: white;
+}
+.booking-venue-banner h1 { font-size: 28px; font-weight: 600; line-height: 1.6; }
+.booking-venue-banner p { margin-top: 4px; font-size: 18px; color: #e2e8f0; }
+.booking-court { position: relative; width: 240px; height: 112px; flex-shrink: 0; border: 1px solid #64748b; opacity: .5; }
+.booking-court::before { content: ''; position: absolute; height: 100%; border-inline-start: 1px solid #64748b; inset-inline-start: 50%; }
+.booking-court::after { content: ''; position: absolute; width: 64px; height: 64px; border: 1px solid #64748b; border-radius: 50%; inset-inline-start: calc(50% - 32px); top: calc(50% - 32px); }
+.booking-court span, .booking-court i { position: absolute; top: 28%; width: 30px; height: 44%; border: 1px solid #64748b; }
+.booking-court span { inset-inline-start: -1px; }
+.booking-court i { inset-inline-end: -1px; }
+.booking-content[data-step='field'] { padding: 4px 0; border: none; background: transparent; }
+.booking-field { min-height: 152px; }
+.booking-field[data-selected='true'] { border-color: var(--color-accent-emphasis); box-shadow: inset 3px 0 0 var(--color-accent); }
+.booking-sport-tile { display: flex; flex-direction: column; justify-content: center; align-items: center; gap: 8px; width: 80px; height: 96px; flex-shrink: 0; border-radius: 12px; background: #eef5e4; }
+.booking-sport-tile span { font-size: 11px; color: var(--color-text-secondary); font-variant-numeric: tabular-nums; }
+.booking-field p.font-semibold { font-size: 18px; }
+.booking-summary { border-top: 5px solid var(--color-accent); }
+.booking-return-card { border-top: 1px solid hsl(var(--border)); margin-top: 24px; padding-top: 20px; }
+.booking-manage-layout { grid-template-columns: minmax(0, 1fr) 340px; }
 @media (max-width: 767px) {
   .booking-layout { grid-template-columns: minmax(0, 1fr); gap: 20px; }
   .booking-content { padding: 20px 16px; }
@@ -22,4 +52,16 @@
   .booking-progress { gap: 8px; }
   .booking-progress li { flex-direction: column; gap: 8px; font-size: 12px; text-align: center; }
   .booking-field { padding: 16px; }
+  .booking-venue-banner { padding: 24px; min-height: 136px; gap: 16px; }
+  .booking-venue-banner h1 { font-size: 23px; }
+  .booking-venue-banner p { font-size: 15px; }
+  .booking-court { display: none; }
+  .booking-sport-tile { width: 52px; height: 72px; }
+  .booking-field { min-height: 132px; }
+  .booking-field p.font-semibold { font-size: 16px; }
+  .booking-page header > div { flex-wrap: wrap; }
+  .booking-manage-layout .booking-summary { order: 0; }
+  .booking-manage-banner { flex-direction: column; align-items: stretch; padding: 20px; }
+  .booking-manage-banner > div:last-child { display: flex; align-items: center; justify-content: space-between; }
+  .booking-manage-banner bdi { margin-top: 0; white-space: nowrap; }
 }

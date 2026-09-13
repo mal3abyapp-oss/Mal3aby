@@ -711,6 +711,17 @@ check('academy-payment-received includes a /verify/ invoice link, matching the F
   assert.ok(msg.includes('/verify/academytok123'), 'missing the invoice verification link')
 })
 
+check('booking-link includes the recovery credential without claiming a booking or payment status', () => {
+  for (const language of ['ar', 'en']) {
+    const message = renderTemplate('booking-link', language, { ...BASE_VARS, booking_ref: 'MB-1234ABCD', booking_qr_token: 'recoverytoken' })
+    assert.ok(message.includes('/qr/recoverytoken'))
+    assert.ok(message.includes('MB-1234ABCD'))
+    assert.ok(!message.includes('Awaiting confirmation'))
+    assert.ok(!message.includes('بانتظار التأكيد'))
+    assert.ok(!message.includes('undefined'))
+  }
+})
+
 console.log(`\n[templates.test] ${passed} test(s) passed.`)
 if (process.exitCode) {
   console.error('[templates.test] SOME TESTS FAILED.')

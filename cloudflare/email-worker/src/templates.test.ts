@@ -148,6 +148,18 @@ check('every template produces a non-empty plain-text fallback alongside the HTM
   }
 })
 
+check('booking-link provides current-status access in both languages without stale confirmation text', () => {
+  for (const language of ['ar', 'en']) {
+    const result = renderEmailTemplate('booking-link', language, { ...BASE_VARS, club_name: '<script>alert(1)</script>', booking_ref: 'MB-1234ABCD', booking_qr_token: 'recoverytoken' })
+    assert.ok(result.html.includes('/qr/recoverytoken'))
+    assert.ok(result.text.includes('/qr/recoverytoken'))
+    assert.ok(result.text.includes('MB-1234ABCD'))
+    assert.ok(!result.html.includes('<script>'))
+    assert.ok(!result.text.includes('Awaiting confirmation'))
+    assert.ok(!result.text.includes('بانتظار التأكيد'))
+  }
+})
+
 console.log(`\n[templates.test] ${passed} test(s) passed.`)
 if (process.exitCode) {
   console.error('[templates.test] SOME TESTS FAILED.')

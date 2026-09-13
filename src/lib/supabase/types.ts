@@ -20,6 +20,7 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+
       graphql: {
         Args: {
           extensions?: Json
@@ -8931,6 +8932,15 @@ export type Database = {
       }
     }
     Functions: {
+      get_public_booking_context: {
+        Args: { p_token: string }
+        Returns: Json
+      }
+      request_public_booking_link: {
+        Args: { p_club_slug: string; p_booking_ref: string; p_phone_e164: string }
+        Returns: undefined
+      }
+
       _academy_module_active: { Args: { p_club_id: string }; Returns: boolean }
       _activate_club_membership_if_due_internal: {
         Args: { p_membership_subscription_id: string }
