@@ -2431,6 +2431,18 @@
     "genericError": "Something went wrong. Please try again."
   },
   "publicBooking": {
+    "experience": {
+      "title": "Your next game starts here",
+      "subtitle": "Choose your field and day, then review your time and add your details.",
+      "progress": "Booking progress",
+      "summary": "Your booking",
+      "duration": "Booking duration",
+      "priceHint": "Your total appears after selecting a time, before you confirm.",
+      "availabilityError": "We couldn’t load the times. Please try again.",
+      "retry": "Try again",
+      "priceLoading": "Calculating your total…",
+      "priceError": "We couldn’t load the price. Please retry before confirming."
+},
     "loading": "Loading...",
     "notFoundTitle": "Link unavailable",
     "notFoundMessage": "No booking page was found for this link. Make sure the link is correct, or contact the club directly.",

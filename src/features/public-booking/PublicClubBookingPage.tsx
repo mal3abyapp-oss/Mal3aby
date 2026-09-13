@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import type { CountryCode } from 'libphonenumber-js'
 import { useParams, useSearchParams, Link } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
@@ -50,6 +50,8 @@ import { DatePickerButton } from '@/components/ui/date-picker-button'
  * never Mal3aby's), not a disabled/hidden day and not an online-booking
  * form that fails at the last step.
  */
+
+import './public-booking.css'
 
 type Step = 'field' | 'date' | 'time' | 'details' | 'confirmed'
 
@@ -227,23 +229,14 @@ function StepProgress({ current }: { current: Step }) {
   if (current === 'confirmed') return null
   const currentIndex = PROGRESS_STEPS.indexOf(current)
   return (
-    <div className="mb-4 flex flex-col gap-1.5" role="group" aria-label={t(`publicBooking.steps.${current}`)}>
-      <div className="flex items-center gap-1.5">
-        {PROGRESS_STEPS.map((s, i) => (
-          <div
-            key={s}
-            className={`h-1 flex-1 rounded-full transition-colors ${i <= currentIndex ? 'bg-accent' : 'bg-border'}`}
-            aria-hidden="true"
-          />
-        ))}
-      </div>
-      <div className="flex items-center justify-between text-[11px] font-medium text-text-secondary">
-        <span>{t(`publicBooking.steps.${current}`)}</span>
-        <span className="tabular-nums">
-          <bdi>{currentIndex + 1}/{PROGRESS_STEPS.length}</bdi>
-        </span>
-      </div>
-    </div>
+    <ol className="booking-progress" aria-label={t('publicBooking.experience.progress')}>
+      {PROGRESS_STEPS.map((s, i) => (
+        <li key={s} aria-current={s === current ? 'step' : undefined} data-complete={i < currentIndex}>
+          <span className="booking-progress-number" aria-hidden="true">{i < currentIndex ? <Check className="size-4" /> : i + 1}</span>
+          <span>{t(`publicBooking.steps.${s}`)}</span>
+        </li>
+      ))}
+    </ol>
   )
 }
 
@@ -277,7 +270,15 @@ export function PublicClubBookingPage() {
   const { direction, locale, setLocale } = useDirection()
   const queryClient = useQueryClient()
 
+  const contentRef = useRef<HTMLDivElement>(null)
   const [step, setStep] = useState<Step>('field')
+  useEffect(() => {
+    if (contentRef.current) {
+      contentRef.current.focus({ preventScroll: true })
+      window.scrollTo({ top: 0, behavior: 'instant' })
+    }
+  }, [step])
+
   const [selectedFieldId, setSelectedFieldId] = useState<string | null>(null)
   const [selectedDate, setSelectedDate] = useState<Date | null>(null)
   const [selectedDuration, setSelectedDuration] = useState<number>(DEFAULT_DURATION_MINUTES)
@@ -395,7 +396,7 @@ export function PublicClubBookingPage() {
   // create_public_booking() still independently re-validates on submit
   // (see bookMutation's exclusion_violation handling below); this list
   // is UX, not the enforcement boundary.
-  const { data: timeSlotsRaw, isLoading: availabilityLoading } = useQuery({
+  const { data: timeSlotsRaw, isLoading: availabilityLoading, isError: availabilityError, refetch: retryAvailability } = useQuery({
     queryKey: ['public-field-available-starts', selectedFieldId, dateKey, selectedDuration],
     queryFn: () => fetchAvailableStarts(selectedFieldId!, dateKey!, selectedDuration, club!.timezone),
     enabled: !!selectedFieldId && !!dateKey && !!club && (step === 'time' || step === 'date'),
@@ -413,7 +414,7 @@ export function PublicClubBookingPage() {
   // bug only, now fixed by summing the real segmented total via
   // get_public_field_price_total(), the same engine used everywhere
   // else duration-based pricing is shown.
-  const { data: price } = useQuery({
+  const { data: price, isFetching: priceLoading, isError: priceError, refetch: retryPrice } = useQuery({
     queryKey: ['public-field-price-total', selectedFieldId, dateKey, selectedTime, selectedDuration],
     queryFn: async () => {
       const [h, m] = selectedTime!.split(':').map(Number)
@@ -509,7 +510,7 @@ export function PublicClubBookingPage() {
         setSelectedTime(null)
         setFormError(null)
         setStep('time')
-        void queryClient.invalidateQueries({ queryKey: ['public-field-availability', selectedFieldId, dateKey] })
+        void queryClient.invalidateQueries({ queryKey: ['public-field-available-starts', selectedFieldId, dateKey] })
         return
       }
       setFormError(message || t('publicBooking.genericError'))
@@ -550,7 +551,7 @@ export function PublicClubBookingPage() {
   const clubWaNumber = club.whatsappNumber || club.primaryPhone
 
   return (
-    <div dir={direction} className="min-h-screen bg-page-bg pb-24">
+    <div dir={direction} className="booking-page min-h-screen bg-page-bg pb-12">
       <header className="border-b border-border bg-surface px-4 py-4">
         {/* DESIGN PASS (2026-09-13): logo treatment elevated slightly
             (shadow + border ring instead of a bare flat image) --
@@ -561,7 +562,7 @@ export function PublicClubBookingPage() {
             already-fetched data (club.branches), not invented -- only
             shown once a field/branch is actually known, same condition
             as before. */}
-        <div className="mx-auto flex max-w-lg items-center justify-between gap-3">
+        <div className="mx-auto flex max-w-6xl items-center justify-between gap-3">
           <div className="flex items-center gap-3">
             {club.logoUrl ? (
               <img
@@ -595,13 +596,20 @@ export function PublicClubBookingPage() {
         </div>
       </header>
 
-      <main className="mx-auto max-w-lg px-4 py-5">
+      <main className="mx-auto max-w-6xl px-4 py-6 sm:px-6 sm:py-10">
+        {step !== 'confirmed' && <div className="mb-7">
+          <p className="mb-2 text-sm font-semibold text-accent-emphasis">{t('publicBooking.bookNow')}</p>
+          <h1 className="text-2xl font-semibold tracking-tight sm:text-3xl">{t('publicBooking.experience.title')}</h1>
+          <p className="mt-2 text-sm leading-7 text-text-secondary">{t('publicBooking.experience.subtitle')}</p>
+        </div>}
         <StepProgress current={step} />
+        <div className={step === 'confirmed' ? 'mx-auto max-w-xl' : 'booking-layout'}>
+        <div ref={contentRef} tabIndex={-1} className="booking-content">
 
         {step !== 'field' && step !== 'confirmed' && (
           <button
             type="button"
-            className="mb-4 flex items-center gap-1 text-sm text-text-secondary"
+            className="mb-4 flex min-h-11 items-center gap-1 text-sm text-text-secondary"
             onClick={() => {
               if (step === 'date') setStep('field')
               else if (step === 'time') setStep('date')
@@ -612,47 +620,9 @@ export function PublicClubBookingPage() {
           </button>
         )}
 
-        {/* DESIGN PASS (2026-09-13): persistent compact summary once
-            field+date+time are all known -- carried into the details
-            step so the customer never loses context of what they're
-            about to pay for. Deliberately NOT duplicated with the
-            details-step card below: that card was restructured to drop
-            its own field/date/time rows and keep only the price line,
-            since this strip now owns that information. Each segment is
-            a real, focused edit affordance (not just decorative
-            recap) -- tapping a field jumps back to that exact step,
-            same behavior the existing back button already allows, just
-            more direct. */}
-        {step === 'details' && selectedField && selectedDate && selectedTime && (
-          <div className="mb-4 flex flex-col gap-2 rounded-lg border border-border bg-surface p-3 shadow-sm">
-            <button
-              type="button"
-              className="flex items-center justify-between gap-2 text-start text-sm"
-              onClick={() => setStep('field')}
-              aria-label={t('publicBooking.summaryStrip.editField')}
-            >
-              <span className="flex min-w-0 items-center gap-1.5 font-medium">
-                <MapPin className="size-3.5 shrink-0 text-text-secondary" aria-hidden="true" />
-                <span className="truncate">{selectedField.name}</span>
-              </span>
-              <Pencil className="size-3.5 shrink-0 text-text-secondary" aria-hidden="true" />
-            </button>
-            <div className="flex items-center gap-4 border-t border-border pt-2 text-xs text-text-secondary">
-              <button type="button" className="flex items-center gap-1" onClick={() => setStep('date')} aria-label={t('publicBooking.summaryStrip.editDate')}>
-                <CalendarDays className="size-3.5" aria-hidden="true" />
-                <FormattedDate value={selectedDate} timeZone={club.timezone} options={{ day: 'numeric', month: 'short' }} />
-              </button>
-              <button type="button" className="flex items-center gap-1" onClick={() => setStep('time')} aria-label={t('publicBooking.summaryStrip.editTime')}>
-                <Clock className="size-3.5" aria-hidden="true" />
-                <span className="tabular-nums"><bdi>{selectedTime}</bdi></span>
-              </button>
-            </div>
-          </div>
-        )}
-
         {step === 'field' && (
           <div className="flex flex-col gap-3">
-            <h1 className="text-lg font-semibold">{t('publicBooking.chooseField')}</h1>
+            <h2 className="text-xl font-semibold">{t('publicBooking.chooseField')}</h2>
             {club.fields.length === 0 && <p className="text-sm text-text-secondary">{t('publicBooking.noFields')}</p>}
             {club.fields.map((f) => {
               const branch = club.branches.find((b) => b.id === f.branch_id)
@@ -660,14 +630,17 @@ export function PublicClubBookingPage() {
                 <button
                   key={f.id}
                   type="button"
-                  className="flex items-center justify-between gap-3 rounded-lg border border-border bg-surface p-4 text-start shadow-sm transition hover:border-accent hover:shadow"
+                  className="booking-field group flex items-center gap-4 rounded-xl border border-border bg-surface p-5 text-start transition hover:border-accent hover:shadow-sm"
                   onClick={() => {
                     setSelectedFieldId(f.id)
+                    setSelectedTime(null)
+                    setConflictSlot(null)
                     setStep('date')
                   }}
                 >
-                  <div className="min-w-0">
-                    <p className="font-medium">{f.name}</p>
+                  <span className="flex size-12 shrink-0 items-center justify-center rounded-xl bg-page-bg text-text-primary"><MapPin className="size-6" aria-hidden="true" /></span>
+                  <div className="min-w-0 flex-1">
+                    <p className="font-semibold">{f.name}</p>
                     <p className="text-sm text-text-secondary">{t(`publicBooking.sportLabels.${f.sport}`, { defaultValue: f.sport })}</p>
                     {branch && (
                       <p className="mt-1 flex items-center gap-1 text-xs text-text-secondary">
@@ -692,7 +665,7 @@ export function PublicClubBookingPage() {
         {step === 'date' && (
           <div className="flex flex-col gap-3">
             <div className="flex items-center justify-between gap-2">
-              <h1 className="text-lg font-semibold">{t('publicBooking.chooseDate')}</h1>
+              <h2 className="text-xl font-semibold">{t('publicBooking.chooseDate')}</h2>
               {/* FINAL BOOKINGS UX & LIFECYCLE GAP CLOSURE, Section
                   A2/G: the calendar is bounded to EXACTLY the same
                   [today, today+window] range dateOptions itself uses
@@ -714,6 +687,8 @@ export function PublicClubBookingPage() {
                   minDate={publicMinDateKey}
                   maxDate={publicMaxDateKey}
                   onSelect={(key) => {
+                    setSelectedTime(null)
+                    setConflictSlot(null)
                     setSelectedDate(new Date(`${key}T12:00:00`))
                     setStep('time')
                   }}
@@ -721,13 +696,15 @@ export function PublicClubBookingPage() {
                 />
               )}
             </div>
-            <div className="grid grid-cols-3 gap-2">
+            <div className="grid grid-cols-3 gap-3">
               {dateOptions.map((opt) => (
                 <button
                   key={toDateKey(opt.date)}
                   type="button"
                   className="flex flex-col items-center gap-1 rounded-lg border border-border bg-surface p-3 text-center text-sm shadow-sm transition hover:border-accent"
                   onClick={() => {
+                    setSelectedTime(null)
+                    setConflictSlot(null)
                     setSelectedDate(opt.date)
                     setStep('time')
                   }}
@@ -757,7 +734,7 @@ export function PublicClubBookingPage() {
 
         {step === 'time' && (
           <div className="flex flex-col gap-3">
-            <h1 className="text-lg font-semibold">{t('publicBooking.chooseTime')}</h1>
+            <h2 className="text-xl font-semibold">{t('publicBooking.chooseTime')}</h2>
             {selectedDate && <p className="text-sm text-text-secondary"><FormattedDate value={selectedDate} timeZone={club.timezone} options={{ day: 'numeric', month: 'long', year: 'numeric' }} /></p>}
 
             {/* BOOKING ENGINE / AVAILABILITY directive section 3: duration
@@ -769,10 +746,11 @@ export function PublicClubBookingPage() {
                 already picked clears the pick so the customer can't
                 submit a stale start/duration pairing the server never
                 actually validated together. */}
-            <div className="flex flex-wrap gap-2">
+            <div role="group" aria-label={t('publicBooking.experience.duration')} className="flex flex-wrap gap-2">
               {DURATION_OPTIONS_MINUTES.map((mins) => (
                 <button
                   key={mins}
+                  aria-pressed={mins === selectedDuration}
                   type="button"
                   onClick={() => {
                     if (mins !== selectedDuration) {
@@ -781,7 +759,7 @@ export function PublicClubBookingPage() {
                       setConflictSlot(null)
                     }
                   }}
-                  className={`rounded-full border px-3 py-1.5 text-sm font-medium transition ${
+                  className={`min-h-11 rounded-lg border px-4 py-2 text-sm font-medium transition ${
                     mins === selectedDuration
                       ? 'border-accent bg-accent/10 text-accent-foreground'
                       : 'border-border bg-surface text-text-secondary hover:border-accent'
@@ -857,11 +835,12 @@ export function PublicClubBookingPage() {
               </div>
             )}
 
-            {availabilityLoading && <p className="text-sm text-text-secondary">{t('publicBooking.loading')}</p>}
-            {!availabilityLoading && timeSlots.length === 0 && <p className="text-sm text-text-secondary">{t('publicBooking.noSlotsAvailable')}</p>}
+            {availabilityLoading && <div role="status" className="rounded-xl bg-page-bg p-6 text-center text-sm text-text-secondary">{t('publicBooking.loading')}</div>}
+            {availabilityError && <div role="alert" className="rounded-xl border border-status-danger/30 p-4 text-sm"><p>{t('publicBooking.experience.availabilityError')}</p><Button variant="outline" className="mt-3" onClick={() => void retryAvailability()}>{t('publicBooking.experience.retry')}</Button></div>}
+            {!availabilityLoading && !availabilityError && !timeSlots.some(s => s.isAvailable) && <div className="rounded-xl bg-page-bg p-6 text-center"><CalendarDays className="mx-auto mb-3 size-7 text-text-secondary" /><p className="text-sm text-text-secondary">{t('publicBooking.noSlotsAvailable')}</p><Button variant="outline" className="mt-4" onClick={() => setStep('date')}>{t('publicBooking.chooseDate')}</Button></div>}
 
             {!isTodaySelected && (
-              <div className="grid grid-cols-3 gap-2">
+              <div className="grid grid-cols-3 gap-3">
                 {timeSlots.map((s) => (
                   <button
                     key={s.time}
@@ -903,20 +882,11 @@ export function PublicClubBookingPage() {
 
         {step === 'details' && !isTodaySelected && (
           <div className="flex flex-col gap-4">
-            <h1 className="text-lg font-semibold">{t('publicBooking.yourDetails')}</h1>
+            <h2 className="text-xl font-semibold">{t('publicBooking.yourDetails')}</h2>
 
-            {/* DESIGN PASS (2026-09-13): field/date/time were previously
-                repeated here in full -- the exact same three facts
-                already shown one screen-height above by the new
-                persistent summary strip (rendered right under
-                StepProgress once step === 'details'). Kept ONLY the
-                price row here, which the strip deliberately does not
-                carry (price is fetched by a separate query gated on
-                !isTodaySelected && step === 'details', so it belongs
-                with the form it's paid through, not the always-visible
-                strip). This consolidates two summaries into one
-                without losing any information. */}
-            {price != null && (
+            {priceLoading && <p role="status" className="text-sm text-text-secondary">{t('publicBooking.experience.priceLoading')}</p>}
+            {priceError && <div role="alert" className="text-sm text-status-danger"><p>{t('publicBooking.experience.priceError')}</p><Button variant="outline" className="mt-2" onClick={() => void retryPrice()}>{t('publicBooking.experience.retry')}</Button></div>}
+            {price != null && !priceLoading && !priceError && (
               <div className="flex items-center justify-between rounded-lg border border-border bg-surface p-4 text-sm font-semibold">
                 <span>{t('publicBooking.total')}</span>
                 <span className="tabular-nums"><FormattedCurrency value={price} currencyCode={club.currency} /></span>
@@ -924,8 +894,8 @@ export function PublicClubBookingPage() {
             )}
 
             <div className="flex flex-col gap-1.5">
-              <label className="text-sm font-medium text-text-secondary">{t('publicBooking.nameLabel')}</label>
-              <Input value={customerName} onChange={(e) => setCustomerName(e.target.value)} placeholder={t('publicBooking.namePlaceholder')} />
+              <label htmlFor="booking-name" className="text-sm font-medium text-text-secondary">{t('publicBooking.nameLabel')}</label>
+              <Input id="booking-name" autoComplete="name" required value={customerName} onChange={(e) => setCustomerName(e.target.value)} placeholder={t('publicBooking.namePlaceholder')} />
             </div>
             {/* P0 phone identity directive: canonical E.164
                 normalization via the shared PhoneInput/normalizePhone
@@ -952,8 +922,9 @@ export function PublicClubBookingPage() {
                 skipping it costs) so the customer can make an informed
                 choice, without pressuring them. */}
             <div className="flex flex-col gap-1.5">
-              <label className="text-sm font-medium text-text-secondary">{t('publicBooking.emailLabel')}</label>
+              <label htmlFor="booking-email" className="text-sm font-medium text-text-secondary">{t('publicBooking.emailLabel')}</label>
               <Input
+                id="booking-email"
                 type="email"
                 autoComplete="email"
                 value={customerEmail}
@@ -969,6 +940,7 @@ export function PublicClubBookingPage() {
             <Button
               className="w-full"
               disabled={
+                price == null || priceLoading || priceError ||
                 !customerName.trim() ||
                 !customerMobile.trim() ||
                 !phoneValid ||
@@ -999,7 +971,7 @@ export function PublicClubBookingPage() {
           <div className="flex flex-col gap-6">
             <div className="flex flex-col items-center gap-2 text-center">
               <CheckCircle2 className="size-14 text-status-success" />
-              <h1 className="text-lg font-semibold">{t('publicBooking.confirmedTitle')}</h1>
+              <h2 className="text-xl font-semibold">{t('publicBooking.confirmedTitle')}</h2>
               <p className="text-sm text-text-secondary">{t('publicBooking.confirmedMessage')}</p>
               {confirmedRef && (
                 <p className="text-sm">
@@ -1170,6 +1142,27 @@ export function PublicClubBookingPage() {
             </div>
           </div>
         )}
+        </div>
+        {step !== 'confirmed' && <aside className="booking-summary" aria-label={t('publicBooking.experience.summary')}>
+          <div className="border-b border-border pb-5">
+            <p className="text-sm text-text-secondary">{club.clubName}</p>
+            <h2 className="mt-1 text-lg font-semibold">{t('publicBooking.experience.summary')}</h2>
+          </div>
+          <div className="flex flex-col gap-1 py-3">
+            {([
+              { target: 'field' as const, icon: MapPin, value: selectedField?.name, label: t('publicBooking.chooseField') },
+              { target: 'date' as const, icon: CalendarDays, value: selectedDate ? formatDate(selectedDate, locale as SupportedLocale, club.timezone, { weekday: 'short', day: 'numeric', month: 'short' }) : null, label: t('publicBooking.chooseDate') },
+              { target: 'time' as const, icon: Clock, value: selectedTime ? `${selectedTime} · ${t(`publicBooking.durationOptions.${selectedDuration}`)}` : null, label: t('publicBooking.chooseTime') },
+            ]).map(({ target, icon: Icon, value, label }) => <button key={target} type="button" disabled={!value} onClick={() => setStep(target)} className="flex min-h-14 items-center gap-3 rounded-lg py-2 text-start text-sm disabled:cursor-default">
+              <Icon className="size-4 shrink-0 text-text-secondary" aria-hidden="true" />
+              <span className={`flex-1 ${value ? 'font-medium' : 'text-text-secondary'}`}>{value || label}</span>
+              {value && <Pencil className="size-3.5 text-text-secondary" aria-hidden="true" />}
+            </button>)}
+          </div>
+          <p className="border-t border-border pt-4 text-xs leading-6 text-text-secondary">{t('publicBooking.experience.priceHint')}</p>
+          {club.address && <p className="mt-4 flex items-start gap-2 text-xs leading-6 text-text-secondary"><MapPin className="mt-1 size-4 shrink-0" />{club.address}</p>}
+        </aside>}
+        </div>
       </main>
     </div>
   )
