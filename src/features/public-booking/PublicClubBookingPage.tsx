@@ -179,6 +179,88 @@ function isPlausibleEmail(value: string): boolean {
   return EMAIL_FORMAT_RE.test(value.trim())
 }
 
+// GAP CLOSURE (2026-09-13, owner report: "لو العميل عمل رفرش للصفحة أو
+// خرج بعد الحجز، مش قادر يرجع يشوف حجزه أو يدفع أو بياناته" -- a
+// customer who refreshes or leaves the confirmation screen after
+// booking has no way back to it): everything the 'confirmed' step
+// needs (confirmedRef/BookingId/HoldExpiresAt/Total/QrToken, PLUS the
+// selectedField/dateKey/selectedTime/selectedDuration/customerEmail
+// this same screen also reads directly) previously lived ONLY in
+// this component's React state -- a refresh, a closed tab, or even
+// just navigating away and back wiped it completely, with no
+// server-side session and no URL parameter carrying any of it. The
+// booking_qr_token this page already receives is the one durable,
+// secure credential (an opaque, anon-granted token -- see /qr/:token's
+// own SecureBookingPage) that could always answer "what did I book,
+// can I still pay" on its own, but a customer who refreshed before
+// ever tapping that link had no way to even reach it. Persist the
+// whole recovery payload to localStorage (keyed per club slug, since
+// a customer could plausibly book at more than one club) the moment a
+// booking succeeds, and restore straight to the confirmed screen on a
+// fresh mount if no other flow is already in progress. This is
+// read/restore only -- never re-submits, never re-validates, never
+// invents data the server didn't actually return.
+const PUBLIC_BOOKING_CONFIRMATION_STORAGE_PREFIX = 'mala3by.publicBooking.confirmation.'
+
+interface PersistedBookingConfirmation {
+  bookingRef: string | null
+  bookingId: string | null
+  holdExpiresAt: string | null
+  total: number | null
+  qrToken: string | null
+  fieldId: string
+  dateKey: string
+  time: string
+  duration: number
+  customerEmail: string
+}
+
+function confirmationStorageKey(slug: string): string {
+  return `${PUBLIC_BOOKING_CONFIRMATION_STORAGE_PREFIX}${slug}`
+}
+
+function savePersistedConfirmation(slug: string, data: PersistedBookingConfirmation): void {
+  try {
+    localStorage.setItem(confirmationStorageKey(slug), JSON.stringify(data))
+  } catch {
+    // Private-browsing/storage-disabled browsers can throw on write --
+    // this is a best-effort recovery aid, never the source of truth
+    // for the booking itself (the server-created row and the
+    // WhatsApp/email notifications remain authoritative regardless),
+    // so a write failure here is silently non-fatal.
+  }
+}
+
+function readPersistedConfirmation(slug: string): PersistedBookingConfirmation | null {
+  try {
+    const raw = localStorage.getItem(confirmationStorageKey(slug))
+    if (!raw) return null
+    const parsed = JSON.parse(raw) as Partial<PersistedBookingConfirmation>
+    // Defensive shape check -- a value written by a future/older app
+    // version, or corrupted by hand-editing localStorage, must never
+    // crash the page. The 3 fields below are the minimum needed to
+    // render a meaningful confirmed screen (entry-code link, field
+    // name, date/time); anything else missing degrades gracefully
+    // (e.g. no price line, no ICS button) rather than being rejected.
+    if (typeof parsed !== 'object' || parsed === null) return null
+    if (typeof parsed.fieldId !== 'string' || typeof parsed.dateKey !== 'string' || typeof parsed.time !== 'string') return null
+    return {
+      bookingRef: parsed.bookingRef ?? null,
+      bookingId: parsed.bookingId ?? null,
+      holdExpiresAt: parsed.holdExpiresAt ?? null,
+      total: parsed.total ?? null,
+      qrToken: parsed.qrToken ?? null,
+      fieldId: parsed.fieldId,
+      dateKey: parsed.dateKey,
+      time: parsed.time,
+      duration: typeof parsed.duration === 'number' ? parsed.duration : DEFAULT_DURATION_MINUTES,
+      customerEmail: typeof parsed.customerEmail === 'string' ? parsed.customerEmail : '',
+    }
+  } catch {
+    return null
+  }
+}
+
 // HIGH-ROI UX PASS 01, item 19 (Add to Calendar): builds a plain .ics
 // data URI from already-known booking fields -- no payment
 // secrets/tokens in the description, per the directive's explicit
@@ -304,6 +386,33 @@ export function PublicClubBookingPage() {
   // full security reasoning.
   const [confirmedQrToken, setConfirmedQrToken] = useState<string | null>(null)
   const [copiedField, setCopiedField] = useState<string | null>(null)
+
+  // GAP CLOSURE (2026-09-13): restore a just-confirmed booking after a
+  // refresh/reopen, once per mount, only when the wizard is still at
+  // its untouched initial state -- never overwrites an in-progress
+  // selection (e.g. the customer already re-opened the link and
+  // started picking a NEW booking before this effect ran). Reads the
+  // slug-scoped localStorage entry saved by bookMutation's onSuccess
+  // below; a missing/corrupt/mismatched entry is a silent no-op, same
+  // as any first-time visitor.
+  useEffect(() => {
+    if (!slug) return
+    if (step !== 'field' || selectedFieldId !== null) return
+    const persisted = readPersistedConfirmation(slug)
+    if (!persisted) return
+    setSelectedFieldId(persisted.fieldId)
+    setSelectedDate(new Date(`${persisted.dateKey}T12:00:00`))
+    setSelectedDuration(persisted.duration)
+    setSelectedTime(persisted.time)
+    setCustomerEmail(persisted.customerEmail)
+    setConfirmedRef(persisted.bookingRef)
+    setConfirmedBookingId(persisted.bookingId)
+    setConfirmedHoldExpiresAt(persisted.holdExpiresAt)
+    setConfirmedTotal(persisted.total)
+    setConfirmedQrToken(persisted.qrToken)
+    setStep('confirmed')
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [slug])
 
   // HIGH-ROI UX PASS 01, supplementary item 6 (Public Booking language
   // switcher): seed from a one-time ?lang= param on first mount only,
@@ -491,6 +600,28 @@ export function PublicClubBookingPage() {
       setConfirmedTotal(row?.total_price != null ? Number(row.total_price) : null)
       setConfirmedQrToken(row?.booking_qr_token ?? null)
       setStep('confirmed')
+      // GAP CLOSURE (2026-09-13): persist the recovery payload the
+      // instant the booking succeeds, using the exact values just
+      // submitted (selectedFieldId/dateKey/selectedTime/
+      // selectedDuration/customerEmail are still the just-submitted
+      // values here, same reasoning as the ICS-button comment below).
+      // If the customer refreshes or closes the tab from this point
+      // on, the effect above can put them right back on this same
+      // confirmed screen.
+      if (slug && selectedFieldId && dateKey && selectedTime) {
+        savePersistedConfirmation(slug, {
+          bookingRef: row?.booking_ref ?? null,
+          bookingId: row?.booking_id ?? null,
+          holdExpiresAt: row?.hold_expires_at ?? null,
+          total: row?.total_price != null ? Number(row.total_price) : null,
+          qrToken: row?.booking_qr_token ?? null,
+          fieldId: selectedFieldId,
+          dateKey,
+          time: selectedTime,
+          duration: selectedDuration,
+          customerEmail: customerEmail.trim(),
+        })
+      }
     },
     onError: (error: { message?: string }) => {
       const message = error?.message ?? ''
