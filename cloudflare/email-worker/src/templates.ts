@@ -234,6 +234,7 @@ export interface RenderedEmail {
 }
 
 export type TemplateKey =
+  | 'booking-link'
   | 'booking-created'
   | 'booking-confirmed-paid'
   | 'booking-rescheduled'
@@ -244,6 +245,20 @@ export type TemplateKey =
 type Renderer = (v: Vars, language: string) => RenderedEmail
 
 const RENDERERS: Record<TemplateKey, Renderer> = {
+  'booking-link': (v, language) => {
+    const ar = language !== 'en'
+    const headline = ar ? 'رابط متابعة حجزك' : 'Your booking link'
+    const intro = ar ? 'افتح الرابط لعرض الحالة الحالية واستكمال الدفع.' : 'Open this link to see the current status and continue payment.'
+    const rows = [row(ar ? 'النادي' : 'Club', v.club_name), row(ar ? 'رقم الحجز' : 'Booking reference', v.booking_ref)]
+    const ctaLabel = ar ? 'متابعة الحجز والدفع' : 'View booking and payment'
+    const ctaUrl = bookingQrUrl(v.booking_qr_token, language)
+    return {
+      subject: headline,
+      html: renderShell({ language, headline, intro, rows, ctaLabel, ctaUrl, clubName: v.club_name }),
+      text: renderText({ headline, intro, rows, ctaLabel, ctaUrl }),
+    }
+  },
+
   'booking-created': (v, language) => {
     const tz = isPresent(v.timezone) ? String(v.timezone) : DEFAULT_TIMEZONE
     const locale = language === 'en' ? 'en-US' : 'ar-EG'

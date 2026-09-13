@@ -97,7 +97,7 @@ check('deliverability hardening: HTML table structure is well-formed -- every <t
 })
 
 check('Microsoft/Outlook deliverability optimization: every CTA-bearing template shares the fixed renderShell() and renders a balanced table structure -- not just booking-confirmed-paid', () => {
-  const ctaCases: Array<[string, Vars]> = [
+  const ctaCases: Array<[string, Record<string, unknown>]> = [
     ['booking-created', { ...BASE_VARS, booking_qr_token: 'tok1' }],
     ['booking-confirmed-paid', { ...BASE_VARS, amount_paid: 220, method: 'cash', booking_qr_token: 'tok2' }],
     ['booking-rescheduled', { ...BASE_VARS, old_start_at: '2026-08-10T07:00:00+00:00', booking_qr_token: 'tok3' }],
@@ -145,6 +145,18 @@ check('every template produces a non-empty plain-text fallback alongside the HTM
     assert.ok(result.text.trim().length > 0, `${key} produced an empty text fallback`)
     assert.ok(result.html.trim().length > 0, `${key} produced empty HTML`)
     assert.ok(!result.html.includes('<script'), `${key} must never include a <script> tag (directive section 29: no scripts)`)
+  }
+})
+
+check('booking-link provides current-status access in both languages without stale confirmation text', () => {
+  for (const language of ['ar', 'en']) {
+    const result = renderEmailTemplate('booking-link', language, { ...BASE_VARS, club_name: '<script>alert(1)</script>', booking_ref: 'MB-1234ABCD', booking_qr_token: 'recoverytoken' })
+    assert.ok(result.html.includes('/qr/recoverytoken'))
+    assert.ok(result.text.includes('/qr/recoverytoken'))
+    assert.ok(result.text.includes('MB-1234ABCD'))
+    assert.ok(!result.html.includes('<script>'))
+    assert.ok(!result.text.includes('Awaiting confirmation'))
+    assert.ok(!result.text.includes('بانتظار التأكيد'))
   }
 })
 

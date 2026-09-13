@@ -82,6 +82,7 @@
 // closes this gap -- see record_payment()'s new Academy-detection
 // branch (migration 20260822080000) for how this is selected.
 export type TemplateKey =
+  | 'booking-link'
   | 'booking-created'
   | 'booking-confirmed-paid'
   | 'booking-cancelled'
@@ -461,6 +462,13 @@ function joinLines(...lines: (string | null)[]): string {
 // ----------------------------------------------------------------
 
 const AR: Record<TemplateKey, Renderer> = {
+  'booking-link': (v) => joinLines(
+    'رابط متابعة حجزك', '', greeting(v, 'ar'),
+    line('', 'رقم الحجز', v.booking_ref),
+    'افتح الرابط لعرض الحالة الحالية واستكمال الدفع:',
+    bookingQrUrl(v.booking_qr_token, 'ar') ?? '', '', brandLine(v, 'ar'),
+  ),
+
   'booking-created': (v) => {
     const tz = isPresent(v.timezone) ? String(v.timezone) : DEFAULT_TIMEZONE
     const date = isPresent(v.start_at) ? formatDate(String(v.start_at), tz, 'ar-EG') : null
@@ -732,6 +740,13 @@ const AR: Record<TemplateKey, Renderer> = {
 }
 
 const EN: Record<TemplateKey, Renderer> = {
+  'booking-link': (v) => joinLines(
+    'Your booking link', '', greeting(v, 'en'),
+    line('', 'Booking reference', v.booking_ref),
+    'Open this link to see the current status and continue payment:',
+    bookingQrUrl(v.booking_qr_token, 'en') ?? '', '', brandLine(v, 'en'),
+  ),
+
   'booking-created': (v) => {
     const tz = isPresent(v.timezone) ? String(v.timezone) : DEFAULT_TIMEZONE
     const date = isPresent(v.start_at) ? formatDate(String(v.start_at), tz, 'en-US') : null

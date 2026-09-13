@@ -1,6 +1,6 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import type { CountryCode } from 'libphonenumber-js'
-import { useParams, useSearchParams, Link } from 'react-router-dom'
+import { useParams, useSearchParams, useNavigate, Link } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
 import { supabase } from '@/lib/supabase/client'
@@ -12,8 +12,27 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { PhoneInput } from '@/components/ui/phone-input'
 import { LanguageSwitcher } from '@/components/ui/language-switcher'
-import { CheckCircle2, MapPin, ChevronLeft, ChevronRight, Phone, MessageCircle, Copy, Check, CalendarPlus } from 'lucide-react'
+import {
+  CheckCircle2,
+  MapPin,
+  ChevronLeft,
+  ChevronRight,
+  Phone,
+  MessageCircle,
+  Copy,
+  Check,
+  CalendarPlus,
+  Home,
+  Sun,
+  Users,
+  CalendarDays,
+  Clock,
+  Pencil,
+  CircleDot,
+  Ticket,
+} from 'lucide-react'
 import { PaymentMethodsPanel } from './PaymentMethodsPanel'
+import { BookingRecoveryDialog } from './BookingRecoveryDialog'
 import { HoldCountdown } from './HoldCountdown'
 import { normalizePhone } from '@/lib/domain/phone'
 import { toInstant, fromInstant } from '@/lib/domain/time'
@@ -34,6 +53,8 @@ import { DatePickerButton } from '@/components/ui/date-picker-button'
  * never Mal3aby's), not a disabled/hidden day and not an online-booking
  * form that fails at the last step.
  */
+
+import './public-booking.css'
 
 type Step = 'field' | 'date' | 'time' | 'details' | 'confirmed'
 
@@ -195,14 +216,74 @@ function buildIcsDataUri(opts: {
   return `data:text/calendar;charset=utf-8,${encodeURIComponent(lines.join('\r\n'))}`
 }
 
+// DESIGN PASS (2026-09-13, customer "فقيرة جدا" feedback): the wizard
+// previously gave a customer no sense of where they were in a 4-step
+// flow (field/date/time/details) -- this is the ONLY new visual
+// primitive this pass introduces beyond existing tokens/components.
+// Deliberately excludes the 'confirmed' step (that's a distinct
+// end-state, not a step to track progress toward) and uses ONLY the
+// existing --color-accent token for the filled/current segment per
+// the design system's "small touchpoint only, never a full-section
+// fill" rule -- each segment is a thin 4px bar, not a card.
+const PROGRESS_STEPS: Array<Exclude<Step, 'confirmed'>> = ['field', 'date', 'time', 'details']
+
+function StepProgress({ current }: { current: Step }) {
+  const { t } = useTranslation()
+  if (current === 'confirmed') return null
+  const currentIndex = PROGRESS_STEPS.indexOf(current)
+  return (
+    <ol className="booking-progress" aria-label={t('publicBooking.experience.progress')}>
+      {PROGRESS_STEPS.map((s, i) => (
+        <li key={s} aria-current={s === current ? 'step' : undefined} data-complete={i < currentIndex}>
+          <span className="booking-progress-number" aria-hidden="true">{i < currentIndex ? <Check className="size-4" /> : i + 1}</span>
+          <span>{t(`publicBooking.steps.${s}`)}</span>
+        </li>
+      ))}
+    </ol>
+  )
+}
+
+// Real semantic icons (Lucide, per design system -- no emoji) for the
+// indoor/outdoor + capacity metadata that was already fetched
+// (PublicField.indoor / .capacity) but never surfaced on the field-
+// selection cards. Small neutral chips, not full-card color fills.
+function FieldMetaChips({ field }: { field: PublicField }) {
+  const { t } = useTranslation()
+  const IndoorIcon = field.indoor ? Home : Sun
+  return (
+    <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
+      <span className="inline-flex items-center gap-1 rounded-md border border-border bg-page-bg px-1.5 py-0.5 text-[11px] font-medium text-text-secondary">
+        <IndoorIcon className="size-3" aria-hidden="true" />
+        {t(field.indoor ? 'publicBooking.indoor' : 'publicBooking.outdoor')}
+      </span>
+      {field.capacity != null && (
+        <span className="inline-flex items-center gap-1 rounded-md border border-border bg-page-bg px-1.5 py-0.5 text-[11px] font-medium text-text-secondary">
+          <Users className="size-3" aria-hidden="true" />
+          <bdi>{t('publicBooking.capacityLabel', { count: field.capacity })}</bdi>
+        </span>
+      )}
+    </div>
+  )
+}
+
 export function PublicClubBookingPage() {
   const { slug } = useParams<{ slug: string }>()
   const [searchParams] = useSearchParams()
   const { t } = useTranslation()
   const { direction, locale, setLocale } = useDirection()
   const queryClient = useQueryClient()
+  const navigate = useNavigate()
+  const [recoveryOpen, setRecoveryOpen] = useState(false)
 
+  const contentRef = useRef<HTMLDivElement>(null)
   const [step, setStep] = useState<Step>('field')
+  useEffect(() => {
+    if (contentRef.current) {
+      contentRef.current.focus({ preventScroll: true })
+      window.scrollTo({ top: 0, behavior: 'instant' })
+    }
+  }, [step])
+
   const [selectedFieldId, setSelectedFieldId] = useState<string | null>(null)
   const [selectedDate, setSelectedDate] = useState<Date | null>(null)
   const [selectedDuration, setSelectedDuration] = useState<number>(DEFAULT_DURATION_MINUTES)
@@ -320,7 +401,7 @@ export function PublicClubBookingPage() {
   // create_public_booking() still independently re-validates on submit
   // (see bookMutation's exclusion_violation handling below); this list
   // is UX, not the enforcement boundary.
-  const { data: timeSlotsRaw, isLoading: availabilityLoading } = useQuery({
+  const { data: timeSlotsRaw, isLoading: availabilityLoading, isError: availabilityError, refetch: retryAvailability } = useQuery({
     queryKey: ['public-field-available-starts', selectedFieldId, dateKey, selectedDuration],
     queryFn: () => fetchAvailableStarts(selectedFieldId!, dateKey!, selectedDuration, club!.timezone),
     enabled: !!selectedFieldId && !!dateKey && !!club && (step === 'time' || step === 'date'),
@@ -338,7 +419,7 @@ export function PublicClubBookingPage() {
   // bug only, now fixed by summing the real segmented total via
   // get_public_field_price_total(), the same engine used everywhere
   // else duration-based pricing is shown.
-  const { data: price } = useQuery({
+  const { data: price, isFetching: priceLoading, isError: priceError, refetch: retryPrice } = useQuery({
     queryKey: ['public-field-price-total', selectedFieldId, dateKey, selectedTime, selectedDuration],
     queryFn: async () => {
       const [h, m] = selectedTime!.split(':').map(Number)
@@ -415,6 +496,10 @@ export function PublicClubBookingPage() {
       setConfirmedTotal(row?.total_price != null ? Number(row.total_price) : null)
       setConfirmedQrToken(row?.booking_qr_token ?? null)
       setStep('confirmed')
+      // The success URL is durable; each visit reads the current server state.
+      if (row?.booking_qr_token) {
+        navigate(`/qr/${encodeURIComponent(row.booking_qr_token)}?lang=${locale}`, { replace: true })
+      }
     },
     onError: (error: { message?: string }) => {
       const message = error?.message ?? ''
@@ -434,7 +519,7 @@ export function PublicClubBookingPage() {
         setSelectedTime(null)
         setFormError(null)
         setStep('time')
-        void queryClient.invalidateQueries({ queryKey: ['public-field-availability', selectedFieldId, dateKey] })
+        void queryClient.invalidateQueries({ queryKey: ['public-field-available-starts', selectedFieldId, dateKey] })
         return
       }
       setFormError(message || t('publicBooking.genericError'))
@@ -475,14 +560,39 @@ export function PublicClubBookingPage() {
   const clubWaNumber = club.whatsappNumber || club.primaryPhone
 
   return (
-    <div dir={direction} className="min-h-screen bg-page-bg pb-24">
+    <div dir={direction} className="booking-page min-h-screen bg-page-bg pb-12">
       <header className="border-b border-border bg-surface px-4 py-4">
-        <div className="mx-auto flex max-w-lg items-center justify-between gap-3">
+        {/* DESIGN PASS (2026-09-13): logo treatment elevated slightly
+            (shadow + border ring instead of a bare flat image) --
+            still strictly a "logo + name" overlay per DESIGN_SYSTEM.md
+            "Club Branding (V1 Scope)": no new club-configurable field
+            is introduced, this only changes how the two existing ones
+            (logoUrl, clubName) are framed. Branch subline is real,
+            already-fetched data (club.branches), not invented -- only
+            shown once a field/branch is actually known, same condition
+            as before. */}
+        <div className="mx-auto flex max-w-6xl items-center justify-between gap-3">
           <div className="flex items-center gap-3">
-            {club.logoUrl && <img src={club.logoUrl} alt={club.clubName} className="size-10 rounded-full object-cover" />}
+            {club.logoUrl ? (
+              <img
+                src={club.logoUrl}
+                alt={club.clubName}
+                className="size-11 rounded-full border border-border object-cover shadow-sm"
+              />
+            ) : (
+              <div className="flex size-11 items-center justify-center rounded-full border border-border bg-page-bg text-sm font-semibold text-text-secondary">
+                {club.clubName.trim().charAt(0)}
+              </div>
+            )}
             <div>
-              <p className="font-semibold">{club.clubName}</p>
-              {selectedBranch && <p className="text-xs text-text-secondary">{selectedBranch.name}</p>}
+              <p className="font-semibold leading-tight">{club.clubName}</p>
+              {selectedBranch ? (
+                <p className="flex items-center gap-1 text-xs text-text-secondary">
+                  <MapPin className="size-3" aria-hidden="true" /> {selectedBranch.name}
+                </p>
+              ) : (
+                club.address && <p className="text-xs text-text-secondary">{club.address}</p>
+              )}
             </div>
           </div>
           {/* HIGH-ROI UX PASS 01, supplementary item 6: the highest-
@@ -491,15 +601,30 @@ export function PublicClubBookingPage() {
               browser/localStorage default was. Only the system UI
               switches; club-owned data (name, address) is never
               machine-translated. */}
-          <LanguageSwitcher />
+          <div className="flex shrink-0 items-center gap-2 sm:gap-4">
+            <Button variant="ghost" className="min-h-11 gap-2" onClick={() => setRecoveryOpen(true)}><Ticket className="size-4" />{t('publicBooking.recovery.entry')}</Button>
+            <LanguageSwitcher />
+          </div>
         </div>
       </header>
 
-      <main className="mx-auto max-w-lg px-4 py-5">
+      <main className="mx-auto max-w-6xl px-4 py-6 sm:px-6 sm:py-10">
+        {step !== 'confirmed' && <section className="booking-venue-banner">
+          <div>
+            <h1>{club.clubName}</h1>
+            <p>{t('publicBooking.experience.title')}</p>
+            {club.address && <span className="mt-3 flex items-center gap-2 text-sm text-white/70"><MapPin className="size-4" />{club.address}</span>}
+          </div>
+          <div className="booking-court" aria-hidden="true"><span /><i /></div>
+        </section>}
+        <StepProgress current={step} />
+        <div className={step === 'confirmed' ? 'mx-auto max-w-xl' : 'booking-layout'}>
+        <div ref={contentRef} tabIndex={-1} className="booking-content" data-step={step}>
+
         {step !== 'field' && step !== 'confirmed' && (
           <button
             type="button"
-            className="mb-4 flex items-center gap-1 text-sm text-text-secondary"
+            className="mb-4 flex min-h-11 items-center gap-1 text-sm text-text-secondary"
             onClick={() => {
               if (step === 'date') setStep('field')
               else if (step === 'time') setStep('date')
@@ -512,30 +637,41 @@ export function PublicClubBookingPage() {
 
         {step === 'field' && (
           <div className="flex flex-col gap-3">
-            <h1 className="text-lg font-semibold">{t('publicBooking.chooseField')}</h1>
+            <h2 className="text-xl font-semibold">{t('publicBooking.chooseField')}</h2>
+            <p className="mb-2 text-sm leading-6 text-text-secondary">{t('publicBooking.experience.fieldHint')}</p>
             {club.fields.length === 0 && <p className="text-sm text-text-secondary">{t('publicBooking.noFields')}</p>}
-            {club.fields.map((f) => {
+            {club.fields.map((f, index) => {
               const branch = club.branches.find((b) => b.id === f.branch_id)
               return (
                 <button
                   key={f.id}
                   type="button"
-                  className="flex items-center justify-between rounded-lg border border-border bg-surface p-4 text-start shadow-sm transition hover:border-accent"
+                  data-selected={selectedFieldId === f.id} className="booking-field group flex items-center gap-4 rounded-xl border border-border bg-surface p-5 text-start transition hover:border-accent hover:shadow-sm"
                   onClick={() => {
                     setSelectedFieldId(f.id)
+                    setSelectedTime(null)
+                    setConflictSlot(null)
                     setStep('date')
                   }}
                 >
-                  <div>
-                    <p className="font-medium">{f.name}</p>
+                  <span className="booking-sport-tile" aria-hidden="true"><CircleDot className="size-9" /><span>{String(index + 1).padStart(2, '0')}</span></span>
+                  <div className="min-w-0 flex-1">
+                    <p className="font-semibold">{f.name}</p>
                     <p className="text-sm text-text-secondary">{t(`publicBooking.sportLabels.${f.sport}`, { defaultValue: f.sport })}</p>
                     {branch && (
                       <p className="mt-1 flex items-center gap-1 text-xs text-text-secondary">
                         <MapPin className="size-3" /> {branch.name}
                       </p>
                     )}
+                    {/* DESIGN PASS (2026-09-13): PublicField.indoor/
+                        .capacity were already fetched by
+                        fetchPublicClub() but never rendered -- real
+                        server data, real Lucide icons, surfaced here so
+                        a customer can actually tell fields apart before
+                        picking one. */}
+                    <FieldMetaChips field={f} />
                   </div>
-                  <ChevronRight className={direction === 'rtl' ? 'size-4 rotate-180' : 'size-4'} />
+                  <ChevronRight className={direction === 'rtl' ? 'size-4 shrink-0 rotate-180 text-text-secondary' : 'size-4 shrink-0 text-text-secondary'} />
                 </button>
               )
             })}
@@ -545,7 +681,7 @@ export function PublicClubBookingPage() {
         {step === 'date' && (
           <div className="flex flex-col gap-3">
             <div className="flex items-center justify-between gap-2">
-              <h1 className="text-lg font-semibold">{t('publicBooking.chooseDate')}</h1>
+              <h2 className="text-xl font-semibold">{t('publicBooking.chooseDate')}</h2>
               {/* FINAL BOOKINGS UX & LIFECYCLE GAP CLOSURE, Section
                   A2/G: the calendar is bounded to EXACTLY the same
                   [today, today+window] range dateOptions itself uses
@@ -567,6 +703,8 @@ export function PublicClubBookingPage() {
                   minDate={publicMinDateKey}
                   maxDate={publicMaxDateKey}
                   onSelect={(key) => {
+                    setSelectedTime(null)
+                    setConflictSlot(null)
                     setSelectedDate(new Date(`${key}T12:00:00`))
                     setStep('time')
                   }}
@@ -574,13 +712,15 @@ export function PublicClubBookingPage() {
                 />
               )}
             </div>
-            <div className="grid grid-cols-3 gap-2">
+            <div className="grid grid-cols-3 gap-3">
               {dateOptions.map((opt) => (
                 <button
                   key={toDateKey(opt.date)}
                   type="button"
                   className="flex flex-col items-center gap-1 rounded-lg border border-border bg-surface p-3 text-center text-sm shadow-sm transition hover:border-accent"
                   onClick={() => {
+                    setSelectedTime(null)
+                    setConflictSlot(null)
                     setSelectedDate(opt.date)
                     setStep('time')
                   }}
@@ -589,8 +729,16 @@ export function PublicClubBookingPage() {
                     {opt.isToday ? t('publicBooking.today') : <FormattedDate value={opt.date} timeZone={club.timezone} options={{ weekday: 'short' }} />}
                   </p>
                   <p className="text-text-secondary"><FormattedDate value={opt.date} timeZone={club.timezone} options={{ day: 'numeric', month: 'short' }} /></p>
+                  {/* DESIGN PASS (2026-09-13): fixed a latent styling
+                      bug alongside the visual differentiation this
+                      badge needed anyway -- `bg-info`/`text-info`
+                      referenced Tailwind classes that don't exist in
+                      this project's token set (only `status-info` is
+                      defined, see tailwind.config.ts); the badge was
+                      silently rendering unstyled. Now uses the real
+                      semantic token. */}
                   {opt.isToday && (
-                    <span className="rounded-full bg-info/10 px-2 py-0.5 text-[11px] font-medium text-info">
+                    <span className="rounded-full bg-status-info/10 px-2 py-0.5 text-[11px] font-medium text-status-info">
                       {t('publicBooking.todayContactBadge')}
                     </span>
                   )}
@@ -602,7 +750,7 @@ export function PublicClubBookingPage() {
 
         {step === 'time' && (
           <div className="flex flex-col gap-3">
-            <h1 className="text-lg font-semibold">{t('publicBooking.chooseTime')}</h1>
+            <h2 className="text-xl font-semibold">{t('publicBooking.chooseTime')}</h2>
             {selectedDate && <p className="text-sm text-text-secondary"><FormattedDate value={selectedDate} timeZone={club.timezone} options={{ day: 'numeric', month: 'long', year: 'numeric' }} /></p>}
 
             {/* BOOKING ENGINE / AVAILABILITY directive section 3: duration
@@ -614,10 +762,11 @@ export function PublicClubBookingPage() {
                 already picked clears the pick so the customer can't
                 submit a stale start/duration pairing the server never
                 actually validated together. */}
-            <div className="flex flex-wrap gap-2">
+            <div role="group" aria-label={t('publicBooking.experience.duration')} className="flex flex-wrap gap-2">
               {DURATION_OPTIONS_MINUTES.map((mins) => (
                 <button
                   key={mins}
+                  aria-pressed={mins === selectedDuration}
                   type="button"
                   onClick={() => {
                     if (mins !== selectedDuration) {
@@ -626,7 +775,7 @@ export function PublicClubBookingPage() {
                       setConflictSlot(null)
                     }
                   }}
-                  className={`rounded-full border px-3 py-1.5 text-sm font-medium transition ${
+                  className={`min-h-11 rounded-lg border px-4 py-2 text-sm font-medium transition ${
                     mins === selectedDuration
                       ? 'border-accent bg-accent/10 text-accent-foreground'
                       : 'border-border bg-surface text-text-secondary hover:border-accent'
@@ -643,21 +792,30 @@ export function PublicClubBookingPage() {
               </div>
             )}
 
-            {isTodaySelected && (
-              <div className="rounded-lg border border-info/30 bg-info/5 p-3 text-sm text-info">
-                {t('publicBooking.todayContactExplainer')}
-              </div>
-            )}
-
-            {/* HIGH-ROI UX PASS 01, supplementary item 18: the same-day
-                contact card moved above the (possibly long) slot list --
-                a customer in a hurry to reach the club right now no
-                longer has to scroll past every remaining slot first.
-                Not duplicated: this is the ONLY render of this card,
-                just repositioned. */}
+            {/* DESIGN PASS (2026-09-13): the explainer text and contact
+                card previously rendered as two separate, disconnected
+                boxes (a bare tinted paragraph, then an unrelated-
+                looking plain white card) -- reads as two bolted-on
+                afterthoughts rather than one deliberate "this is a
+                different path" experience. Merged into a single
+                info-toned container with an icon header, so the
+                explainer reads as this card's own subtitle instead of
+                a floating disclaimer above it. Still only status-info
+                tokens (also fixes the same bg-info/text-info
+                non-existent-class bug as the date-step badge above),
+                still the exact same content/behavior -- explainer copy,
+                race-condition warning, call + WhatsApp actions, all
+                unchanged. Not duplicated: still the ONLY render of
+                this content, just visually unified. */}
             {isTodaySelected && clubWaNumber && (
-              <div className="flex flex-col gap-2 rounded-lg border border-border bg-surface p-4">
-                <p className="text-sm font-medium">{t('publicBooking.todayContactTitle')}</p>
+              <div className="flex flex-col gap-3 rounded-lg border border-status-info/30 bg-status-info/5 p-4">
+                <div className="flex items-start gap-2">
+                  <Phone className="mt-0.5 size-4 shrink-0 text-status-info" aria-hidden="true" />
+                  <div>
+                    <p className="text-sm font-medium text-status-info">{t('publicBooking.todayContactTitle')}</p>
+                    <p className="mt-0.5 text-xs text-status-info/90">{t('publicBooking.todayContactExplainer')}</p>
+                  </div>
+                </div>
                 <p className="text-xs text-text-secondary">{t('publicBooking.todayRaceWarning')}</p>
                 <div className="flex flex-wrap gap-2">
                   <Button asChild size="sm" variant="outline">
@@ -683,12 +841,22 @@ export function PublicClubBookingPage() {
                 </div>
               </div>
             )}
+            {/* Explainer still shown standalone in the (rare) case a
+                club has no WhatsApp/phone number configured at all --
+                preserves the previous fallback behavior exactly (this
+                text was never conditioned on clubWaNumber before). */}
+            {isTodaySelected && !clubWaNumber && (
+              <div className="rounded-lg border border-status-info/30 bg-status-info/5 p-3 text-sm text-status-info">
+                {t('publicBooking.todayContactExplainer')}
+              </div>
+            )}
 
-            {availabilityLoading && <p className="text-sm text-text-secondary">{t('publicBooking.loading')}</p>}
-            {!availabilityLoading && timeSlots.length === 0 && <p className="text-sm text-text-secondary">{t('publicBooking.noSlotsAvailable')}</p>}
+            {availabilityLoading && <div role="status" className="rounded-xl bg-page-bg p-6 text-center text-sm text-text-secondary">{t('publicBooking.loading')}</div>}
+            {availabilityError && <div role="alert" className="rounded-xl border border-status-danger/30 p-4 text-sm"><p>{t('publicBooking.experience.availabilityError')}</p><Button variant="outline" className="mt-3" onClick={() => void retryAvailability()}>{t('publicBooking.experience.retry')}</Button></div>}
+            {!availabilityLoading && !availabilityError && !timeSlots.some(s => s.isAvailable) && <div className="rounded-xl bg-page-bg p-6 text-center"><CalendarDays className="mx-auto mb-3 size-7 text-text-secondary" /><p className="text-sm text-text-secondary">{t('publicBooking.noSlotsAvailable')}</p><Button variant="outline" className="mt-4" onClick={() => setStep('date')}>{t('publicBooking.chooseDate')}</Button></div>}
 
             {!isTodaySelected && (
-              <div className="grid grid-cols-3 gap-2">
+              <div className="grid grid-cols-3 gap-3">
                 {timeSlots.map((s) => (
                   <button
                     key={s.time}
@@ -730,34 +898,20 @@ export function PublicClubBookingPage() {
 
         {step === 'details' && !isTodaySelected && (
           <div className="flex flex-col gap-4">
-            <h1 className="text-lg font-semibold">{t('publicBooking.yourDetails')}</h1>
+            <h2 className="text-xl font-semibold">{t('publicBooking.yourDetails')}</h2>
 
-            <div className="rounded-lg border border-border bg-surface p-4 text-sm">
-              <div className="flex justify-between py-1">
-                <span className="text-text-secondary">{t('publicBooking.field')}</span>
-                <span className="font-medium">{selectedField?.name}</span>
+            {priceLoading && <p role="status" className="text-sm text-text-secondary">{t('publicBooking.experience.priceLoading')}</p>}
+            {priceError && <div role="alert" className="text-sm text-status-danger"><p>{t('publicBooking.experience.priceError')}</p><Button variant="outline" className="mt-2" onClick={() => void retryPrice()}>{t('publicBooking.experience.retry')}</Button></div>}
+            {price != null && !priceLoading && !priceError && (
+              <div className="flex items-center justify-between rounded-lg border border-border bg-surface p-4 text-sm font-semibold">
+                <span>{t('publicBooking.total')}</span>
+                <span className="tabular-nums"><FormattedCurrency value={price} currencyCode={club.currency} /></span>
               </div>
-              {selectedDate && (
-                <div className="flex justify-between py-1">
-                  <span className="text-text-secondary">{t('publicBooking.date')}</span>
-                  <span className="font-medium"><FormattedDate value={selectedDate} timeZone={club.timezone} options={{ day: 'numeric', month: 'long' }} /></span>
-                </div>
-              )}
-              <div className="flex justify-between py-1">
-                <span className="text-text-secondary">{t('publicBooking.time')}</span>
-                <span className="font-medium tabular-nums"><bdi>{selectedTime}</bdi></span>
-              </div>
-              {price != null && (
-                <div className="mt-1 flex justify-between border-t border-border pt-2 font-semibold">
-                  <span>{t('publicBooking.total')}</span>
-                  <span className="tabular-nums"><FormattedCurrency value={price} currencyCode={club.currency} /></span>
-                </div>
-              )}
-            </div>
+            )}
 
             <div className="flex flex-col gap-1.5">
-              <label className="text-sm font-medium text-text-secondary">{t('publicBooking.nameLabel')}</label>
-              <Input value={customerName} onChange={(e) => setCustomerName(e.target.value)} placeholder={t('publicBooking.namePlaceholder')} />
+              <label htmlFor="booking-name" className="text-sm font-medium text-text-secondary">{t('publicBooking.nameLabel')}</label>
+              <Input id="booking-name" autoComplete="name" required value={customerName} onChange={(e) => setCustomerName(e.target.value)} placeholder={t('publicBooking.namePlaceholder')} />
             </div>
             {/* P0 phone identity directive: canonical E.164
                 normalization via the shared PhoneInput/normalizePhone
@@ -784,8 +938,9 @@ export function PublicClubBookingPage() {
                 skipping it costs) so the customer can make an informed
                 choice, without pressuring them. */}
             <div className="flex flex-col gap-1.5">
-              <label className="text-sm font-medium text-text-secondary">{t('publicBooking.emailLabel')}</label>
+              <label htmlFor="booking-email" className="text-sm font-medium text-text-secondary">{t('publicBooking.emailLabel')}</label>
               <Input
+                id="booking-email"
                 type="email"
                 autoComplete="email"
                 value={customerEmail}
@@ -793,7 +948,7 @@ export function PublicClubBookingPage() {
                 placeholder={t('publicBooking.emailPlaceholder')}
                 dir="ltr"
               />
-              <p className="text-xs text-text-secondary">{t('publicBooking.emailHelper')}</p>
+              <p className="text-xs text-text-secondary">{t('publicBooking.recovery.emailHint')}</p>
             </div>
 
             {formError && <p role="alert" className="text-sm text-status-danger">{formError}</p>}
@@ -801,6 +956,7 @@ export function PublicClubBookingPage() {
             <Button
               className="w-full"
               disabled={
+                price == null || priceLoading || priceError ||
                 !customerName.trim() ||
                 !customerMobile.trim() ||
                 !phoneValid ||
@@ -814,11 +970,24 @@ export function PublicClubBookingPage() {
           </div>
         )}
 
+        {/* DESIGN PASS (2026-09-13): the confirmation screen was one
+            long undifferentiated vertical stack of cards with no visual
+            hierarchy -- everything (success header, entry-code CTA,
+            calendar button, payment panel, contact card, fine print)
+            competed at the same visual weight in reading order only.
+            Regrouped into labeled sections with subtle dividers
+            (border-t + small uppercase-ish section labels, matching the
+            existing Body/Small/Caption type scale -- no new typography
+            tokens introduced) so a customer can scan by *purpose*
+            (what did I book -> what can I do now -> how do I pay -> how
+            do I reach the club) instead of by arbitrary card order.
+            Every existing element, condition, and behavior below is
+            unchanged -- only grouping/visual treatment changed. */}
         {step === 'confirmed' && (
-          <div className="flex flex-col gap-5">
+          <div className="flex flex-col gap-6">
             <div className="flex flex-col items-center gap-2 text-center">
               <CheckCircle2 className="size-14 text-status-success" />
-              <h1 className="text-lg font-semibold">{t('publicBooking.confirmedTitle')}</h1>
+              <h2 className="text-xl font-semibold">{t('publicBooking.confirmedTitle')}</h2>
               <p className="text-sm text-text-secondary">{t('publicBooking.confirmedMessage')}</p>
               {confirmedRef && (
                 <p className="text-sm">
@@ -834,143 +1003,189 @@ export function PublicClubBookingPage() {
               <HoldCountdown holdExpiresAt={confirmedHoldExpiresAt} />
             )}
 
-            {/* FINAL ACCEPTANCE CLOSURE (2026-08-29): the primary,
-                reliable path to the booking/entry-code page -- does not
-                depend on WhatsApp or email delivery succeeding, unlike
-                the notification-only channels below. Rendered directly
-                from the token this page's own browser just received in
-                the booking-creation response, linking to the existing,
-                already-secured /qr/:token page. Prominent placement
-                (right after the reference number, before the calendar/
-                payment panels) since this is now the one guaranteed way
-                every customer can reach their credential. */}
-            {confirmedQrToken && (
-              <Button asChild size="lg" className="w-full">
-                <a href={`/qr/${confirmedQrToken}`}>
-                  {t('publicBooking.viewBookingAndEntryCode')}
-                </a>
-              </Button>
-            )}
-
-            {/* HIGH-ROI UX PASS 01, item 19: a plain .ics download for
-                the just-created booking -- low cost, reduces no-shows.
-                No payment secrets/tokens in the description, per the
-                directive. dateKey/selectedTime are still the values
-                that were just submitted (this step only renders right
-                after a successful mutation, before either could change). */}
-            {selectedField && dateKey && selectedTime && (
-              <Button asChild size="sm" variant="outline" className="w-fit self-center">
-                <a
-                  href={buildIcsDataUri({
-                    clubName: club.clubName,
-                    fieldName: selectedField.name,
-                    address: club.address,
-                    // D1 fix (same as bookMutation above): the previous
-                    // `new Date(`${dateKey}T${selectedTime}:00`)` parsed
-                    // in the browser's local timezone, so a customer
-                    // outside the venue's timezone got a calendar event
-                    // at the wrong wall-clock time. toInstant() resolves
-                    // the true instant in the club's venue timezone first.
-                    startAt: new Date(toInstant(dateKey, selectedTime, club.timezone)),
-                    endAt: new Date(new Date(toInstant(dateKey, selectedTime, club.timezone)).getTime() + selectedDuration * 60000),
-                    bookingRef: confirmedRef,
-                  })}
-                  download={`${confirmedRef ?? 'booking'}.ics`}
-                >
-                  <CalendarPlus className="me-1 size-4" /> {t('publicBooking.addToCalendar')}
-                </a>
-              </Button>
-            )}
-
-            {confirmedBookingId && (
-              <PaymentMethodsPanel
-                bookingId={confirmedBookingId}
-                clubId={club.clubId}
-                bookingRef={confirmedRef}
-                clubName={club.clubName}
-                total={confirmedTotal}
-                currency={club.currency}
-                locale={locale as SupportedLocale}
-              />
-            )}
-
-            {(club.primaryPhone || clubWaNumber || club.address) && (
-              <div className="flex flex-col gap-2 rounded-lg border border-border bg-surface p-4">
-                <p className="text-sm font-medium">{t('publicBooking.contactClubTitle')}</p>
-                {club.primaryPhone && (
-                  <div className="flex items-center justify-between text-sm">
-                    <span dir="ltr" className="tabular-nums">{club.primaryPhone}</span>
-                    <div className="flex gap-1">
-                      <Button asChild size="sm" variant="ghost">
-                        <a href={`tel:${club.primaryPhone}`} aria-label={t('publicBooking.callClub')}><Phone className="size-4" /></a>
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        onClick={() => copyToClipboard(club.primaryPhone!, 'club-phone')}
-                        aria-label={t('publicBooking.copyPhoneNumber')}
-                      >
-                        {copiedField === 'club-phone' ? <Check className="size-4" /> : <Copy className="size-4" />}
-                      </Button>
-                    </div>
-                  </div>
-                )}
-                {clubWaNumber && (
-                  <Button asChild size="sm" variant="outline" className="w-fit">
-                    <a href={`https://wa.me/${toWaDigits(clubWaNumber)}`} target="_blank" rel="noreferrer">
-                      <MessageCircle className="me-1 size-4" /> {t('publicBooking.whatsappClub')}
-                    </a>
-                  </Button>
-                )}
-                {club.address && (
-                  <p className="text-xs text-text-secondary">{club.address}</p>
-                )}
-                {club.mapsUrl && (
-                  <a href={club.mapsUrl} target="_blank" rel="noreferrer" className="text-xs text-accent-foreground underline">
-                    {t('publicBooking.directions')}
+            {/* Section: "Your actions" -- the entry-code CTA and the
+                calendar download are both things the customer DOES
+                right now, grouped together instead of floating as two
+                unrelated standalone buttons. */}
+            <div className="flex flex-col gap-3 border-t border-border pt-5">
+              <p className="text-xs font-medium uppercase tracking-wide text-text-secondary">{t('publicBooking.confirmed.yourActions')}</p>
+              {/* FINAL ACCEPTANCE CLOSURE (2026-08-29): the primary,
+                  reliable path to the booking/entry-code page -- does not
+                  depend on WhatsApp or email delivery succeeding, unlike
+                  the notification-only channels below. Rendered directly
+                  from the token this page's own browser just received in
+                  the booking-creation response, linking to the existing,
+                  already-secured /qr/:token page. Prominent placement
+                  (right after the reference number, before the calendar/
+                  payment panels) since this is now the one guaranteed way
+                  every customer can reach their credential. */}
+              {confirmedQrToken && (
+                <Button asChild size="lg" className="w-full">
+                  <a href={`/qr/${confirmedQrToken}`}>
+                    {t('publicBooking.viewBookingAndEntryCode')}
                   </a>
-                )}
+                </Button>
+              )}
+
+              {/* HIGH-ROI UX PASS 01, item 19: a plain .ics download for
+                  the just-created booking -- low cost, reduces no-shows.
+                  No payment secrets/tokens in the description, per the
+                  directive. dateKey/selectedTime are still the values
+                  that were just submitted (this step only renders right
+                  after a successful mutation, before either could change). */}
+              {selectedField && dateKey && selectedTime && (
+                <Button asChild size="sm" variant="outline" className="w-fit self-center">
+                  <a
+                    href={buildIcsDataUri({
+                      clubName: club.clubName,
+                      fieldName: selectedField.name,
+                      address: club.address,
+                      // D1 fix (same as bookMutation above): the previous
+                      // `new Date(`${dateKey}T${selectedTime}:00`)` parsed
+                      // in the browser's local timezone, so a customer
+                      // outside the venue's timezone got a calendar event
+                      // at the wrong wall-clock time. toInstant() resolves
+                      // the true instant in the club's venue timezone first.
+                      startAt: new Date(toInstant(dateKey, selectedTime, club.timezone)),
+                      endAt: new Date(new Date(toInstant(dateKey, selectedTime, club.timezone)).getTime() + selectedDuration * 60000),
+                      bookingRef: confirmedRef,
+                    })}
+                    download={`${confirmedRef ?? 'booking'}.ics`}
+                  >
+                    <CalendarPlus className="me-1 size-4" /> {t('publicBooking.addToCalendar')}
+                  </a>
+                </Button>
+              )}
+            </div>
+
+            {/* Section: "Payment" -- unchanged internally, just given
+                its own labeled section instead of sitting unlabeled
+                between the calendar button and the contact card. */}
+            {confirmedBookingId && (
+              <div className="flex flex-col gap-3 border-t border-border pt-5">
+                <p className="text-xs font-medium uppercase tracking-wide text-text-secondary">{t('publicBooking.confirmed.payment')}</p>
+                <PaymentMethodsPanel
+                  bookingId={confirmedBookingId}
+                  clubId={club.clubId}
+                  bookingRef={confirmedRef}
+                  clubName={club.clubName}
+                  total={confirmedTotal}
+                  currency={club.currency}
+                  locale={locale as SupportedLocale}
+                />
               </div>
             )}
 
-            {/* FINAL ACCEPTANCE CLOSURE (2026-08-29): reworded from an
-                unconditional "check WhatsApp for your link and code"
-                promise -- WhatsApp delivery silently no-ops when the
-                club's account is disconnected (queue_whatsapp_notification()),
-                so that copy could leave a customer with no working
-                instructions at all. Now describes WhatsApp/email as an
-                additional copy of what the button above already
-                guarantees, not the only path to it. */}
-            <p className="text-center text-xs text-text-secondary">{t('publicBooking.whatsappHintSupplementary')}</p>
-
-            {/* Confirmed gap fix: the confirmation screen previously never
-                mentioned that a self-service account/portal exists at all
-                (see claim_customer_self_service() /
-                customers.user_id -- My Bookings, My Subscriptions, etc).
-                This is a short, informational note only -- no new CTA/flow
-                is invented here; it just tells the customer, at the one
-                moment they'd care most, that providing an email (above,
-                still optional) is what would let them access that portal
-                later. Only shown when an email was actually provided this
-                time, since that's the precondition for future access.
-                FINAL PRODUCT COMPLETENESS ROUND (2026-08-25) -- Customer
-                persona: this note was informational text only, with no
-                actual link -- a customer who wanted to act on it had
-                nowhere to click. /login is the safe target (its own
-                post-auth logic already correctly routes a linked customer
-                to /portal, unchanged here; an unlinked one lands on the
-                portal's claim screen, also already correct). */}
-            {customerEmail.trim() && (
-              <p className="text-center text-xs text-text-secondary">
-                {t('publicBooking.accountAwarenessNote')}{' '}
-                <Link to="/login" className="text-accent-foreground hover:underline">
-                  {t('publicBooking.accountAwarenessLink')}
-                </Link>
-              </p>
+            {/* Section: "Contact & location" -- unchanged content. */}
+            {(club.primaryPhone || clubWaNumber || club.address) && (
+              <div className="flex flex-col gap-2 border-t border-border pt-5">
+                <p className="text-xs font-medium uppercase tracking-wide text-text-secondary">{t('publicBooking.confirmed.clubContact')}</p>
+                <div className="flex flex-col gap-2 rounded-lg border border-border bg-surface p-4">
+                  {club.primaryPhone && (
+                    <div className="flex items-center justify-between text-sm">
+                      <span dir="ltr" className="tabular-nums">{club.primaryPhone}</span>
+                      <div className="flex gap-1">
+                        <Button asChild size="sm" variant="ghost">
+                          <a href={`tel:${club.primaryPhone}`} aria-label={t('publicBooking.callClub')}><Phone className="size-4" /></a>
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          onClick={() => copyToClipboard(club.primaryPhone!, 'club-phone')}
+                          aria-label={t('publicBooking.copyPhoneNumber')}
+                        >
+                          {copiedField === 'club-phone' ? <Check className="size-4" /> : <Copy className="size-4" />}
+                        </Button>
+                      </div>
+                    </div>
+                  )}
+                  {clubWaNumber && (
+                    <Button asChild size="sm" variant="outline" className="w-fit">
+                      <a href={`https://wa.me/${toWaDigits(clubWaNumber)}`} target="_blank" rel="noreferrer">
+                        <MessageCircle className="me-1 size-4" /> {t('publicBooking.whatsappClub')}
+                      </a>
+                    </Button>
+                  )}
+                  {club.address && (
+                    <p className="text-xs text-text-secondary">{club.address}</p>
+                  )}
+                  {club.mapsUrl && (
+                    <a href={club.mapsUrl} target="_blank" rel="noreferrer" className="text-xs text-accent-foreground underline">
+                      {t('publicBooking.directions')}
+                    </a>
+                  )}
+                </div>
+              </div>
             )}
+
+            {/* Fine print -- unchanged content, grouped visually last. */}
+            <div className="flex flex-col gap-2 border-t border-border pt-4">
+              {/* FINAL ACCEPTANCE CLOSURE (2026-08-29): reworded from an
+                  unconditional "check WhatsApp for your link and code"
+                  promise -- WhatsApp delivery silently no-ops when the
+                  club's account is disconnected (queue_whatsapp_notification()),
+                  so that copy could leave a customer with no working
+                  instructions at all. Now describes WhatsApp/email as an
+                  additional copy of what the button above already
+                  guarantees, not the only path to it. */}
+              <p className="text-center text-xs text-text-secondary">{t('publicBooking.whatsappHintSupplementary')}</p>
+
+              {/* Confirmed gap fix: the confirmation screen previously never
+                  mentioned that a self-service account/portal exists at all
+                  (see claim_customer_self_service() /
+                  customers.user_id -- My Bookings, My Subscriptions, etc).
+                  This is a short, informational note only -- no new CTA/flow
+                  is invented here; it just tells the customer, at the one
+                  moment they'd care most, that providing an email (above,
+                  still optional) is what would let them access that portal
+                  later. Only shown when an email was actually provided this
+                  time, since that's the precondition for future access.
+                  FINAL PRODUCT COMPLETENESS ROUND (2026-08-25) -- Customer
+                  persona: this note was informational text only, with no
+                  actual link -- a customer who wanted to act on it had
+                  nowhere to click. /login is the safe target (its own
+                  post-auth logic already correctly routes a linked customer
+                  to /portal, unchanged here; an unlinked one lands on the
+                  portal's claim screen, also already correct). */}
+              {customerEmail.trim() && (
+                <p className="text-center text-xs text-text-secondary">
+                  {t('publicBooking.accountAwarenessNote')}{' '}
+                  <Link to="/login" className="text-accent-foreground hover:underline">
+                    {t('publicBooking.accountAwarenessLink')}
+                  </Link>
+                </p>
+              )}
+            </div>
           </div>
         )}
+        </div>
+        {step !== 'confirmed' && <aside className="booking-summary" aria-label={t('publicBooking.experience.summary')}>
+          <div className="border-b border-border pb-5">
+            <p className="text-sm text-text-secondary">{club.clubName}</p>
+            <h2 className="mt-1 flex items-center gap-2 text-lg font-semibold"><Ticket className="size-5" />{t('publicBooking.experience.summary')}</h2>
+          </div>
+          <div className="flex flex-col gap-1 py-3">
+            {([
+              { target: 'field' as const, icon: MapPin, value: selectedField?.name, label: t('publicBooking.chooseField') },
+              { target: 'date' as const, icon: CalendarDays, value: selectedDate ? formatDate(selectedDate, locale as SupportedLocale, club.timezone, { weekday: 'short', day: 'numeric', month: 'short' }) : null, label: t('publicBooking.chooseDate') },
+              { target: 'time' as const, icon: Clock, value: selectedTime ? `${selectedTime} · ${t(`publicBooking.durationOptions.${selectedDuration}`)}` : null, label: t('publicBooking.chooseTime') },
+            ]).map(({ target, icon: Icon, value, label }) => <button key={target} type="button" disabled={!value} onClick={() => setStep(target)} className="flex min-h-14 items-center gap-3 rounded-lg py-2 text-start text-sm disabled:cursor-default">
+              <Icon className="size-4 shrink-0 text-text-secondary" aria-hidden="true" />
+              <span className={`flex-1 ${value ? 'font-medium' : 'text-text-secondary'}`}>{value || label}</span>
+              {value && <Pencil className="size-3.5 text-text-secondary" aria-hidden="true" />}
+            </button>)}
+          </div>
+          <p className="border-t border-border pt-4 text-xs leading-6 text-text-secondary">{t('publicBooking.experience.priceHint')}</p>
+          {club.address && <p className="mt-4 flex items-start gap-2 text-xs leading-6 text-text-secondary"><MapPin className="mt-1 size-4 shrink-0" />{club.address}</p>}
+          <div className="booking-return-card">
+            <h3 className="font-semibold">{t('publicBooking.recovery.title')}</h3>
+            <p className="mt-2 text-xs leading-6 text-text-secondary">{t('publicBooking.recovery.shortHint')}</p>
+            <Button variant="outline" className="mt-3 min-h-11 w-full" onClick={() => setRecoveryOpen(true)}>{t('publicBooking.recovery.entry')}</Button>
+          </div>
+        </aside>}
+        </div>
       </main>
+      <BookingRecoveryDialog open={recoveryOpen} onOpenChange={setRecoveryOpen} slug={slug!} country={club.country ?? 'EG'} phone={club.primaryPhone || club.whatsappNumber} />
     </div>
   )
 }
