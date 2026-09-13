@@ -525,7 +525,8 @@
       // suites all still pass, plus 10 new regression tests in
       // platformDomainIsolationTest.ts. GitHub Actions run 34669860154,
       // digest sha256:3690a27e938ad36636d060068454487f788b8388fec67c5bcccada48dad72ff5.
-      "image": "registry.cloudflare.com/35ac10727701095866b16c276b4a33d1/mala3by-whatsapp-connector:3a107a1",
+      // Booking recovery template, commit a0db2bb, Actions run 34785198766.
+      "image": "registry.cloudflare.com/35ac10727701095866b16c276b4a33d1/mala3by-whatsapp-connector:booking-resume-a0db2bb",
       // One container instance per WhatsApp account (one Durable
       // Object = one container, directive rule 21's chosen model --
       // NOT a shared container serving multiple clubs, which would
