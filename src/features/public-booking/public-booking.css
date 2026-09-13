@@ -44,6 +44,13 @@
 .booking-field p.font-semibold { font-size: 18px; }
 .booking-summary { border-top: 5px solid var(--color-accent); }
 .booking-return-card { border-top: 1px solid hsl(var(--border)); margin-top: 24px; padding-top: 20px; }
+/* OWNER FEEDBACK (2026-09-14): draw deliberate attention to the booking
+   reference without a glow/pulse (DESIGN_SYSTEM.md explicitly rules out
+   flashing/pulsing/oversized warning treatment) -- same inset accent-
+   stripe idiom already used for a selected field card above, applied to
+   a bordered callout instead of a full-card fill, keeping the lime
+   accent a small touchpoint per the design system's own rule. */
+.booking-ref-callout { border-radius: 12px; border: 1px solid var(--color-border, #e5e7eb); box-shadow: inset 3px 0 0 var(--color-accent); padding: 16px; background: var(--color-page-bg); }
 .booking-manage-layout { grid-template-columns: minmax(0, 1fr) 340px; }
 @media (max-width: 767px) {
   .booking-layout { grid-template-columns: minmax(0, 1fr); gap: 20px; }

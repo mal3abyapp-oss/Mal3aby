@@ -2438,7 +2438,9 @@
       "description": "Request your booking link again, or open the link from your confirmation message.",
       "requestTab": "Recover link",
       "linkTab": "I have a link",
+      "referenceOptionalHint": "Don't know your booking number? Leave it blank and we'll look up every active booking on this phone number.",
       "send": "Send booking link",
+      "sendAny": "Send my booking links",
       "sent": "If these details match an active booking, a link will be sent to its saved contact channels available at the club. Check email and WhatsApp; contact the club if nothing arrives.",
       "error": "Could not request the link. Please retry or contact the club.",
       "linkLabel": "Booking link",
@@ -2465,7 +2467,12 @@
       "copy": "Copy booking link",
       "copied": "Link copied",
       "download": "Save link to a file",
-      "newBooking": "Make another booking"
+      "newBooking": "Make another booking",
+      "refCalloutTitle": "Save your booking number",
+      "refCalloutHint": "If you come back to recover your booking later, this number is the fastest way to confirm it. Take a screenshot or copy it now.",
+      "copyRef": "Copy booking number",
+      "refCopied": "Booking number copied",
+      "refCopyErrorHint": "Couldn't copy automatically. Select the number above manually or take a screenshot."
 },
     "experience": {
       "fieldHint": "Choose an available field, then pick the day and duration that suit you.",

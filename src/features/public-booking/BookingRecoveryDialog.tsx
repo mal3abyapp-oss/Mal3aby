@@ -23,13 +23,26 @@ export function BookingRecoveryDialog({ open, onOpenChange, slug, country, phone
   const [mobile, setMobile] = useState({ raw: '', country: country as CountryCode })
   const [link, setLink] = useState('')
   const [invalidLink, setInvalidLink] = useState(false)
+  // GAP CLOSURE (2026-09-14, owner-reported): the booking reference used
+  // to be mandatory here, so a customer who never wrote it down and
+  // never saved the link had no way back in at all. It's now OPTIONAL --
+  // left blank, this falls through to request_public_booking_links_by_phone(),
+  // which resends every currently-active booking for this phone at this
+  // club (server-side capped, independently rate-limited) instead of one
+  // exact ref match. Same enumeration-safe contract either way: always
+  // void, never reveals whether/how many bookings matched.
+  const hasReference = reference.trim().length > 0
   const request = useMutation({
     mutationFn: async () => {
       const normalized = normalizePhone(mobile.raw, mobile.country)
       if (!normalized.valid || !normalized.e164) throw new Error('invalid phone')
-      const { error } = await supabase.rpc('request_public_booking_link', {
-        p_club_slug: slug, p_booking_ref: reference.trim().toUpperCase(), p_phone_e164: normalized.e164,
-      })
+      const { error } = hasReference
+        ? await supabase.rpc('request_public_booking_link', {
+            p_club_slug: slug, p_booking_ref: reference.trim().toUpperCase(), p_phone_e164: normalized.e164,
+          })
+        : await supabase.rpc('request_public_booking_links_by_phone', {
+            p_club_slug: slug, p_phone_e164: normalized.e164,
+          })
       if (error) throw error
     },
   })
@@ -45,9 +58,13 @@ export function BookingRecoveryDialog({ open, onOpenChange, slug, country, phone
       {mode === 'request' ? <form className="flex flex-col gap-4" onSubmit={e => { e.preventDefault(); request.mutate() }}>
         <div><label htmlFor="recovery-reference" className="mb-2 block text-sm font-medium">{t('secureBooking.bookingRef')}</label>
           <Input id="recovery-reference" dir="ltr" placeholder="MB-1234ABCD" autoComplete="off" maxLength={11} value={reference} onChange={e => setReference(e.target.value.toUpperCase())} />
+          {/* GAP CLOSURE (2026-09-14): reference is now optional -- a
+              customer who genuinely never had it can leave this blank
+              and still recover every active booking on their phone. */}
+          <p className="mt-1.5 text-xs text-text-secondary">{t('publicBooking.recovery.referenceOptionalHint')}</p>
         </div>
         <PhoneInput label={t('publicBooking.mobileLabel')} required value={mobile} onChange={setMobile} />
-        {request.isSuccess ? <p role="status" className="rounded-xl bg-page-bg p-4 text-sm leading-7">{t('publicBooking.recovery.sent')}</p> : <Button type="submit" className="min-h-12" disabled={request.isPending || !/^MB-[A-F0-9]{8}$/i.test(reference.trim()) || !normalizePhone(mobile.raw, mobile.country).valid}>{t(request.isPending ? 'publicBooking.loading' : 'publicBooking.recovery.send')}</Button>}
+        {request.isSuccess ? <p role="status" className="rounded-xl bg-page-bg p-4 text-sm leading-7">{t('publicBooking.recovery.sent')}</p> : <Button type="submit" className="min-h-12" disabled={request.isPending || (hasReference && !/^MB-[A-F0-9]{8}$/i.test(reference.trim())) || !normalizePhone(mobile.raw, mobile.country).valid}>{t(request.isPending ? 'publicBooking.loading' : hasReference ? 'publicBooking.recovery.send' : 'publicBooking.recovery.sendAny')}</Button>}
         {request.isError && <p role="alert" className="text-sm text-status-danger">{t('publicBooking.recovery.error')}</p>}
       </form> : <form className="flex flex-col gap-3" onSubmit={e => {
         e.preventDefault()
