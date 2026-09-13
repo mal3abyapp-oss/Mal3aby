@@ -8940,6 +8940,10 @@ export type Database = {
         Args: { p_club_slug: string; p_booking_ref: string; p_phone_e164: string }
         Returns: undefined
       }
+      request_public_booking_links_by_phone: {
+        Args: { p_club_slug: string; p_phone_e164: string }
+        Returns: undefined
+      }
 
       _academy_module_active: { Args: { p_club_id: string }; Returns: boolean }
       _activate_club_membership_if_due_internal: {
