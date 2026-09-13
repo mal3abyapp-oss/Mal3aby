@@ -97,7 +97,7 @@ check('deliverability hardening: HTML table structure is well-formed -- every <t
 })
 
 check('Microsoft/Outlook deliverability optimization: every CTA-bearing template shares the fixed renderShell() and renders a balanced table structure -- not just booking-confirmed-paid', () => {
-  const ctaCases: Array<[string, Vars]> = [
+  const ctaCases: Array<[string, Record<string, unknown>]> = [
     ['booking-created', { ...BASE_VARS, booking_qr_token: 'tok1' }],
     ['booking-confirmed-paid', { ...BASE_VARS, amount_paid: 220, method: 'cash', booking_qr_token: 'tok2' }],
     ['booking-rescheduled', { ...BASE_VARS, old_start_at: '2026-08-10T07:00:00+00:00', booking_qr_token: 'tok3' }],
