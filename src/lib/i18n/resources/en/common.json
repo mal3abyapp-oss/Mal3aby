@@ -2475,6 +2475,8 @@
       "refCopyErrorHint": "Couldn't copy automatically. Select the number above manually or take a screenshot."
 },
     "experience": {
+      "fieldsLabel": "fields",
+      "chooseFieldAction": "Choose your time",
       "fieldHint": "Choose an available field, then pick the day and duration that suit you.",
       "title": "Choose your field and time",
       "subtitle": "Choose your field and day, then review your time and add your details.",
