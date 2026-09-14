@@ -548,6 +548,7 @@
         "outreachWhatsappNotConnected": "Platform WhatsApp is not connected ({{status}}).",
         "outreachGoToWhatsappSettings": "Go to Platform WhatsApp settings",
         "channels": "Outreach Channels",
+        "channelsLoadError": "Could not load channel eligibility for this lead.",
         "channelEmail": "Email",
         "channelWhatsapp": "WhatsApp",
         "channelCallTask": "Call Task",
@@ -557,10 +558,12 @@
         "createCallTaskButton": "Create Call Task",
         "creatingCallTask": "Creating...",
         "callTasks": "Call Tasks",
+        "callTasksLoadError": "Could not load call tasks for this lead.",
         "noCallTasks": "No call tasks yet",
         "completeCallTaskButton": "Mark Complete",
         "callTaskOutcomePlaceholder": "How did the call go?",
         "events": "Delivery & Reply Events",
+        "eventsLoadError": "Could not load delivery and reply events for this lead.",
         "noEvents": "No delivery or reply events recorded yet",
         "reclassifyEvent": "Reclassify",
         "eventTypeLabels": {
@@ -901,6 +904,9 @@
         "restoreDialog": {
           "title": "Restore \"{{provider}}\" for this club",
           "confirm": "Confirm restore"
+        },
+        "errors": {
+          "policy": "Couldn't update this provider's policy."
         }
       },
       "tabs": {
@@ -997,6 +1003,10 @@
         "title": "Remove the club's entitlement to \"{{module}}\"",
         "impact": "This immediately shuts off the module for the club, while keeping all existing data and records. To restore it later, re-enable entitlement, then activate the module again.",
         "confirm": "Confirm removing entitlement"
+      },
+      "modulesErrors": {
+        "entitlement": "Couldn't update this module's entitlement.",
+        "activation": "Couldn't update this module's activation."
       }
     },
     "clubsPage": {
@@ -1146,6 +1156,7 @@
       "title": "Club Owners",
       "description": "All club owners registered on the platform, and each owner's linked clubs",
       "loadError": "Could not load club owners.",
+      "groupingLoadError": "Could not load owner grouping counts.",
       "platformOwnersHeading": "Platform Owner accounts",
       "alsoClubOwnerOf": "Also owns {{count}} club",
       "alsoClubOwnerOf_plural": "Also owns {{count}} clubs",
@@ -1299,6 +1310,7 @@
       "description": "Platform-wide default values",
       "cardTitle": "Free trial and grace period",
       "loading": "Loading...",
+      "loadError": "Could not load platform settings.",
       "trialDaysLabel": "Default free trial length (days)",
       "trialDaysHint": "Used when any new club starts an automatic or manual free trial, unless a different length is set explicitly.",
       "graceMovedHint": "Grace period is now managed per plan from the Plans page, not as a platform-wide default.",
@@ -1332,7 +1344,8 @@
       "statusActive": "Active",
       "statusExpired": "Expired",
       "emptyTitle": "No free trials yet",
-      "loadError": "Couldn't load the trials list."
+      "loadError": "Couldn't load the trials list.",
+      "resultCount": "{{count}} trials"
     }
   },
   "appShell": {
@@ -4942,6 +4955,7 @@
   "platformRoles": {
     "title": "Platform Roles & Permissions",
     "description": "Manage system platform roles and create custom platform roles with exactly the permissions you choose",
+    "loadError": "Could not load platform roles.",
     "createRole": "Create role",
     "editRole": "Edit role",
     "columns": {

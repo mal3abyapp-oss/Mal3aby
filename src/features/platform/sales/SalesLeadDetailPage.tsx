@@ -716,7 +716,17 @@ export function SalesLeadDetailPage() {
       <Card>
         <CardHeader><CardTitle>{t('platform.sales.leadProfile.channels')}</CardTitle></CardHeader>
         <CardContent className="space-y-3">
-          {eligibilityQuery.data ? (
+          {/* FULL-PLATFORM AUDIT ROUND 2 (finding 6): eligibilityQuery
+              never checked isError -- a failed RPC rendered the same
+              "loading" text forever (since eligibilityQuery.data stays
+              undefined), never resolving into a real error state or a
+              way to retry. */}
+          {eligibilityQuery.isError ? (
+            <ErrorState
+              message={translateSupabaseError(eligibilityQuery.error, t('platform.sales.leadProfile.channelsLoadError'))}
+              onRetry={() => eligibilityQuery.refetch()}
+            />
+          ) : eligibilityQuery.data ? (
             <>
               <ul className="grid grid-cols-1 gap-2 sm:grid-cols-3">
                 {(
@@ -754,7 +764,16 @@ export function SalesLeadDetailPage() {
       <Card>
         <CardHeader><CardTitle>{t('platform.sales.leadProfile.callTasks')}</CardTitle></CardHeader>
         <CardContent>
-          {!callTasksQuery.data || callTasksQuery.data.length === 0 ? (
+          {/* FULL-PLATFORM AUDIT ROUND 2 (finding 6): callTasksQuery
+              never checked isError -- a failed RPC rendered "No call
+              tasks yet", indistinguishable from a lead that genuinely
+              has none. */}
+          {callTasksQuery.isError ? (
+            <ErrorState
+              message={translateSupabaseError(callTasksQuery.error, t('platform.sales.leadProfile.callTasksLoadError'))}
+              onRetry={() => callTasksQuery.refetch()}
+            />
+          ) : !callTasksQuery.data || callTasksQuery.data.length === 0 ? (
             <p className="text-sm text-text-secondary">{t('platform.sales.leadProfile.noCallTasks')}</p>
           ) : (
             <ul className="space-y-2">
@@ -792,7 +811,16 @@ export function SalesLeadDetailPage() {
       <Card>
         <CardHeader><CardTitle>{t('platform.sales.leadProfile.events')}</CardTitle></CardHeader>
         <CardContent>
-          {!outreachEventsQuery.data || outreachEventsQuery.data.length === 0 ? (
+          {/* FULL-PLATFORM AUDIT ROUND 2 (finding 6): outreachEventsQuery
+              never checked isError -- a failed RPC rendered "No delivery
+              or reply events recorded yet", indistinguishable from a
+              lead with genuinely no outreach history. */}
+          {outreachEventsQuery.isError ? (
+            <ErrorState
+              message={translateSupabaseError(outreachEventsQuery.error, t('platform.sales.leadProfile.eventsLoadError'))}
+              onRetry={() => outreachEventsQuery.refetch()}
+            />
+          ) : !outreachEventsQuery.data || outreachEventsQuery.data.length === 0 ? (
             <p className="text-sm text-text-secondary">{t('platform.sales.leadProfile.noEvents')}</p>
           ) : (
             <ul className="space-y-2">

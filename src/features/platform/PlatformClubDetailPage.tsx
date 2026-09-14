@@ -26,7 +26,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import { LIFECYCLE_STATUS_LABELS, SUBSCRIPTION_KIND_LABELS, ACCESS_TONE, ACCESS_LABEL } from './labels'
+import { LIFECYCLE_STATUS_LABELS, SUBSCRIPTION_KIND_LABELS, ACCESS_TONE, ACCESS_LABEL, CLUB_STATUS_LABELS } from './labels'
 import { actionLabel, entityLabel } from '@/lib/domain/audit'
 import { useDirection } from '@/app/providers/DirectionProvider'
 import { ErrorState } from '@/components/ui/error-state'
@@ -739,9 +739,23 @@ export function PlatformClubDetailPage() {
         description={club?.club_code ? <bdi>{club.club_code}</bdi> : undefined}
         actions={
           club && (
+            // FULL-PLATFORM AUDIT ROUND 2 (finding 1c): clubs.status's
+            // real check constraint is ('active', 'suspended', 'closed')
+            // (confirmed via supabase/migrations/
+            // 20260815120000_phase2_identity_multitenant_rls.sql) -- this
+            // badge used to collapse anything non-active into a hardcoded
+            // "Suspended" label, mislabeling a permanently closed club.
+            // Reuses the existing platform.ownersPage.clubStatusLabels/
+            // CLUB_STATUS_LABELS map (already imported above) and the
+            // same danger-tone-for-non-active convention
+            // PlatformClubsPage.tsx's own status column already uses for
+            // this identical enum, instead of inventing a new tone or
+            // label set here.
             <StatusBadge
               tone={club.status === 'active' ? 'success' : 'danger'}
-              label={club.status === 'active' ? t('platform.clubDetailPage.clubStatusActive') : t('platform.clubDetailPage.clubStatusSuspended')}
+              label={t(`platform.ownersPage.clubStatusLabels.${club.status}`, {
+                defaultValue: CLUB_STATUS_LABELS[club.status] ?? club.status,
+              })}
             />
           )
         }
@@ -1717,6 +1731,15 @@ function ModulesPanel({ clubId, subscriptionAccess }: { clubId: string; subscrip
   // copy/impact text below is shared but reads correctly for either
   // case since both describe "the club loses access to this module."
   const [deactivateTarget, setDeactivateTarget] = useState<{ moduleKey: string; reason: string; kind: 'deactivate' | 'disableEntitlement' } | null>(null)
+  // FULL-PLATFORM AUDIT ROUND 2 (finding 1a): entitlementMutation/
+  // activationMutation had no onError at all -- unlike every other
+  // mutation on this page. ModulesPanel is a standalone component with
+  // no access to the outer page's actionError/setActionError (not
+  // passed as a prop), so it owns a local actionError state instead --
+  // same pattern PlatformWhatsAppCard already established below for
+  // the same reason (a self-contained panel component that fetches and
+  // mutates its own data).
+  const [actionError, setActionError] = useState<string | null>(null)
 
   const { data: modules = [], isLoading } = useQuery({
     queryKey: ['platform-club-modules', clubId],
@@ -1731,9 +1754,11 @@ function ModulesPanel({ clubId, subscriptionAccess }: { clubId: string; subscrip
       if (error) throw error
     },
     onSuccess: () => {
+      setActionError(null)
       invalidate()
       setDeactivateTarget(null)
     },
+    onError: (err: unknown) => setActionError(translateSupabaseError(err, t('platform.clubDetailPage.modulesErrors.entitlement'))),
   })
 
   const activationMutation = useMutation({
@@ -1747,9 +1772,11 @@ function ModulesPanel({ clubId, subscriptionAccess }: { clubId: string; subscrip
       if (error) throw error
     },
     onSuccess: () => {
+      setActionError(null)
       invalidate()
       setDeactivateTarget(null)
     },
+    onError: (err: unknown) => setActionError(translateSupabaseError(err, t('platform.clubDetailPage.modulesErrors.activation'))),
   })
 
   if (isLoading) return null
@@ -1757,6 +1784,11 @@ function ModulesPanel({ clubId, subscriptionAccess }: { clubId: string; subscrip
   return (
     <div className="flex flex-col gap-3">
       <p className="text-sm text-text-secondary">{t('platform.clubDetailPage.modulesHint')}</p>
+      {actionError && (
+        <p role="alert" className="text-sm text-status-danger">
+          {actionError}
+        </p>
+      )}
       {modules.map((m) => {
         const effective = computeEffectiveState(m, subscriptionAccess)
         return (
@@ -1930,6 +1962,14 @@ function ProviderPolicyPanel({ clubId }: { clubId: string }) {
   // get_platform_club_gateway_overview but previously never rendered)
   // is shown on a blocked provider.
   const [policyTarget, setPolicyTarget] = useState<{ providerKey: string; providerDisplayName: string; status: 'allowed' | 'policy_blocked'; reason: string } | null>(null)
+  // FULL-PLATFORM AUDIT ROUND 2 (finding 1b): policyMutation had no
+  // onError -- same gap as ModulesPanel's entitlementMutation/
+  // activationMutation above. This component is explicitly modeled on
+  // ModulesPanel (see the header comment above this component), so it
+  // gets the exact same fix: a local actionError state, since
+  // ProviderPolicyPanel is likewise a standalone component with no
+  // access to the outer page's actionError/setActionError.
+  const [actionError, setActionError] = useState<string | null>(null)
 
   const { data: rows = [], isLoading } = useQuery({
     queryKey: ['platform-club-gateway-overview', clubId],
@@ -1947,15 +1987,22 @@ function ProviderPolicyPanel({ clubId }: { clubId: string }) {
       if (error) throw error
     },
     onSuccess: () => {
+      setActionError(null)
       void queryClient.invalidateQueries({ queryKey: ['platform-club-gateway-overview', clubId] })
       setPolicyTarget(null)
     },
+    onError: (err: unknown) => setActionError(translateSupabaseError(err, t('platform.clubDetailPage.providerPolicy.errors.policy'))),
   })
 
   if (isLoading) return null
 
   return (
     <div className="flex flex-col gap-2">
+      {actionError && (
+        <p role="alert" className="text-sm text-status-danger">
+          {actionError}
+        </p>
+      )}
       {rows.map((r) => (
         <div key={r.providerKey} className="flex items-center justify-between rounded-md border border-border p-2.5">
           <div>
