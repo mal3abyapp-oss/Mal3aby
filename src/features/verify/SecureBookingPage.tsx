@@ -14,7 +14,28 @@ import { Button } from '@/components/ui/button'
 import { CheckCircle2, Clock, CalendarDays, MapPin, Copy, Download, RefreshCw, Ticket, Phone, QrCode as QrIcon } from 'lucide-react'
 import { PaymentMethodsPanel } from '@/features/public-booking/PaymentMethodsPanel'
 import { HoldCountdown } from '@/features/public-booking/HoldCountdown'
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog'
 import '@/features/public-booking/public-booking.css'
+
+// GAP CLOSURE (2026-09-14, owner follow-up): "اريد عند عمل رفرش
+// للصفحه ظهور بوب اب فيه عداد 30 ثانيه وزر تجاهل او اغلاق به رقم
+// الحجز ورساله طلب نسخ اذا نسيت" -- a genuine page RELOAD specifically
+// (not the first-ever visit, e.g. arriving fresh from the booking
+// confirmation redirect) should surface a time-boxed popup asking the
+// customer to save the ref, since a reload is the exact moment they
+// might have just lost an unsaved reference. The Navigation Timing
+// API's entry.type is the correct, standards-based way to distinguish
+// "this load was a reload" from "this was a fresh navigation" -- far
+// more reliable than inferring it from sessionStorage presence, which
+// conflates "seen before" with "just reloaded."
+function wasPageReloaded(): boolean {
+  try {
+    const [entry] = performance.getEntriesByType('navigation') as PerformanceNavigationTiming[]
+    return entry?.type === 'reload'
+  } catch {
+    return false
+  }
+}
 
 interface BookingContext {
   result: 'valid' | 'expired' | 'cancelled' | 'already_used' | 'invalid'
@@ -60,6 +81,18 @@ export function SecureBookingPage() {
   // feedback, copying one should never silently reset the other's
   // "copied" confirmation mid-read.
   const [refCopyState, setRefCopyState] = useState<'idle' | 'copied' | 'error'>('idle')
+  // GAP CLOSURE (2026-09-14, owner follow-up): "عايزها تكون بأنيميشن
+  // بطلب صريح بحفظ رقم الحجز" -- copying the ref is a strong signal
+  // the customer saved it, but a customer who already had it written
+  // down (or just glanced at it) never clicks copy at all, and the
+  // callout would otherwise nag forever with no way to dismiss it.
+  // This adds an explicit "نعم، حفظت الرقم" confirmation the customer
+  // can also make directly, in addition to copying. Tracked in
+  // sessionStorage per booking ref (not just component state) so it
+  // survives the page's own 15s background refetch -- the callout
+  // must never silently reset to unconfirmed while the same tab is
+  // still open and nothing about the booking actually changed.
+  const [refConfirmed, setRefConfirmed] = useState(false)
   const [qrError, setQrError] = useState(false)
   const [now, setNow] = useState(Date.now())
   const { data, isLoading, isError, isFetching, refetch } = useQuery({
@@ -96,6 +129,58 @@ export function SecureBookingPage() {
     return () => window.clearInterval(timer)
   }, [data?.booking_status])
   useEffect(() => { setQrRevealed(false); setCopyState('idle') }, [token])
+  // Reads any prior confirmation for THIS booking ref specifically --
+  // scoped to the ref (not the token/page) so it stays correct even
+  // if the same booking is later reached via a re-minted token (the
+  // recovery flow mints a fresh token on each resend, but the
+  // underlying booking/ref is unchanged).
+  useEffect(() => {
+    if (!data?.booking_ref) return
+    try {
+      if (sessionStorage.getItem(`mala3by.bookingRefConfirmed.${data.booking_ref}`) === '1') setRefConfirmed(true)
+    } catch {
+      // Private-browsing/storage-disabled: the callout simply stays
+      // unconfirmed every visit -- never fatal, matches this file's
+      // own clipboard-failure discipline elsewhere.
+    }
+  }, [data?.booking_ref])
+  function confirmRefSaved() {
+    setRefConfirmed(true)
+    if (!data?.booking_ref) return
+    try { sessionStorage.setItem(`mala3by.bookingRefConfirmed.${data.booking_ref}`, '1') } catch { /* best-effort only */ }
+  }
+  // GAP CLOSURE (2026-09-14, owner follow-up): a time-boxed popup
+  // (30s countdown, explicit dismiss) shown only on a genuine page
+  // RELOAD -- not the first-ever visit (arriving fresh from booking
+  // confirmation already shows the same ask via the always-visible
+  // sidebar callout; a second popup on that same first visit would be
+  // redundant nagging) -- and only while the ref is not yet confirmed
+  // saved. Opens at most once per page lifetime (openedRef guards a
+  // second open from a later data refetch re-triggering the effect).
+  const [reloadPopupOpen, setReloadPopupOpen] = useState(false)
+  const [reloadPopupSecondsLeft, setReloadPopupSecondsLeft] = useState(30)
+  // OWNER FOLLOW-UP (2026-09-14): "اجعله يضع رابط الحجز ورقم الحجز
+  // للنسخ واجعل المستخدم يختار بينهم" -- the popup offered only the
+  // ref; the customer should be able to choose which credential to
+  // copy, same choice already offered elsewhere on this page (the
+  // banner/callout copy the ref, the "save your link" card copies the
+  // link) -- just consolidated into the one popup as an explicit
+  // tab switch, mirroring BookingRecoveryDialog.tsx's own
+  // request/link tab pattern for a consistent, already-familiar UI.
+  const [reloadPopupMode, setReloadPopupMode] = useState<'ref' | 'link'>('ref')
+  const [reloadPopupLinkCopyState, setReloadPopupLinkCopyState] = useState<'idle' | 'copied' | 'error'>('idle')
+  useEffect(() => {
+    if (!data?.booking_ref || refConfirmed) return
+    if (!wasPageReloaded()) return
+    setReloadPopupOpen(true)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [!!data?.booking_ref])
+  useEffect(() => {
+    if (!reloadPopupOpen) { setReloadPopupSecondsLeft(30); return }
+    if (reloadPopupSecondsLeft <= 0) { setReloadPopupOpen(false); return }
+    const timer = window.setTimeout(() => setReloadPopupSecondsLeft((s) => s - 1), 1000)
+    return () => window.clearTimeout(timer)
+  }, [reloadPopupOpen, reloadPopupSecondsLeft])
   useEffect(() => {
     setQrDataUrl(null)
     setQrError(false)
@@ -142,7 +227,7 @@ export function SecureBookingPage() {
                 className="text-white/80 hover:bg-white/10 hover:text-white"
                 aria-label={t('publicBooking.manage.copyRef')}
                 onClick={async () => {
-                  try { await navigator.clipboard.writeText(data.booking_ref!); setRefCopyState('copied') } catch { setRefCopyState('error') }
+                  try { await navigator.clipboard.writeText(data.booking_ref!); setRefCopyState('copied'); confirmRefSaved() } catch { setRefCopyState('error') }
                   window.setTimeout(() => setRefCopyState('idle'), 2000)
                 }}
               >
@@ -177,14 +262,23 @@ export function SecureBookingPage() {
           <aside className="booking-summary">
             <h2 className="mb-5 text-lg font-semibold">{t('secureBooking.paymentSummary')}</h2>
             <dl className="flex flex-col gap-4 text-sm"><div className="flex justify-between gap-3"><dt>{t('secureBooking.total')}</dt><dd><FormattedCurrency value={Number(data.total ?? 0)} currencyCode={currency} /></dd></div><div className="flex justify-between gap-3"><dt>{t('secureBooking.paid')}</dt><dd><FormattedCurrency value={Number(data.paid ?? 0)} currencyCode={currency} /></dd></div><div className="flex justify-between gap-3 border-t border-border pt-4 text-lg font-semibold"><dt>{t('secureBooking.outstanding')}</dt><dd><FormattedCurrency value={Number(data.outstanding ?? 0)} currencyCode={currency} /></dd></div></dl>
-            {/* OWNER FEEDBACK (2026-09-14): "من الأفضل وضع إشعار
-                للاحتفاظ برقم الحجز بعلامة مميزة أو أي طريقة تلفت
-                النظر" -- a deliberately distinct, bordered callout
-                (not a full-color fill, not a pulse/flash -- see
+            {/* OWNER FEEDBACK (2026-09-14, then a follow-up asking for
+                an animation AND an explicit save request): a
+                deliberately distinct, bordered callout (not a
+                full-color fill, not a repeating pulse/flash -- see
                 .booking-ref-callout's own comment) right above the
                 existing "save your link" card, since the ref is the
-                one input the exact-match recovery path actually needs. */}
-            <div className="booking-ref-callout mt-6">
+                one input the exact-match recovery path actually
+                needs. Plays a single entrance animation only while
+                unconfirmed (data-confirmed="false"), and asks
+                EXPLICITLY -- a real button, not just passive text --
+                whether the customer saved it. Copying the ref (either
+                button) counts as an implicit yes via confirmRefSaved();
+                a customer who already had it memorized/written down
+                can also just say so directly. Once confirmed, the
+                callout settles into a quiet, low-emphasis confirmed
+                state instead of continuing to ask. */}
+            <div className="booking-ref-callout mt-6" data-confirmed={refConfirmed}>
               <h3 className="text-sm font-semibold">{t('publicBooking.manage.refCalloutTitle')}</h3>
               <p className="mt-1.5 text-xs leading-6 text-text-secondary">{t('publicBooking.manage.refCalloutHint')}</p>
               <div className="mt-3 flex items-center justify-between gap-2 rounded-lg border border-border bg-surface px-3 py-2">
@@ -195,7 +289,7 @@ export function SecureBookingPage() {
                   size="sm"
                   aria-label={t('publicBooking.manage.copyRef')}
                   onClick={async () => {
-                    try { await navigator.clipboard.writeText(data.booking_ref ?? ''); setRefCopyState('copied') } catch { setRefCopyState('error') }
+                    try { await navigator.clipboard.writeText(data.booking_ref ?? ''); setRefCopyState('copied'); confirmRefSaved() } catch { setRefCopyState('error') }
                     window.setTimeout(() => setRefCopyState('idle'), 2000)
                   }}
                 >
@@ -204,6 +298,15 @@ export function SecureBookingPage() {
               </div>
               {refCopyState === 'copied' && <p role="status" className="mt-1.5 text-xs text-status-success">{t('publicBooking.manage.refCopied')}</p>}
               {refCopyState === 'error' && <p role="alert" className="mt-1.5 text-xs text-text-secondary">{t('publicBooking.manage.refCopyErrorHint')}</p>}
+              {refConfirmed ? (
+                <p className="mt-3 flex items-center gap-1.5 text-xs font-medium text-status-success">
+                  <CheckCircle2 className="size-4" aria-hidden="true" />{t('publicBooking.manage.refConfirmed')}
+                </p>
+              ) : (
+                <Button type="button" variant="outline" size="sm" className="mt-3 min-h-9 w-full" onClick={confirmRefSaved}>
+                  {t('publicBooking.manage.refConfirmButton')}
+                </Button>
+              )}
             </div>
             <div className="booking-return-card"><h3 className="font-semibold">{t('publicBooking.manage.saveTitle')}</h3><p className="mt-2 text-xs leading-6 text-text-secondary">{t('publicBooking.manage.saveHint')}</p>
               <Button variant="outline" className="mt-3 min-h-11 w-full gap-2" onClick={async () => { try { await navigator.clipboard.writeText(savedUrl); setCopyState('copied') } catch { setCopyState('error') } }}>{copyState === 'copied' ? <CheckCircle2 className="size-4" /> : <Copy className="size-4" />}{t(copyState === 'copied' ? 'publicBooking.manage.copied' : 'publicBooking.manage.copy')}</Button>
@@ -216,5 +319,81 @@ export function SecureBookingPage() {
         </div>
       </>}
     </main>
+    {/* GAP CLOSURE (2026-09-14): "اريد عند عمل رفرش للصفحه ظهور بوب
+        اب فيه عداد 30 ثانيه وزر تجاهل او اغلاق به رقم الحجز ورساله
+        طلب نسخ اذا نسيت" -- the same Dialog primitive already used by
+        BookingRecoveryDialog.tsx, for visual/behavioral consistency
+        (focus trap, Escape-to-close, overlay click-to-close all come
+        free from Radix). onOpenChange covers every dismissal path
+        (explicit close button, overlay click, Escape) uniformly.
+        OWNER FOLLOW-UP: "اجعله يضع رابط الحجز ورقم الحجز للنسخ واجعل
+        المستخدم يختار بينهم" -- a tab switch (ref/link), reusing
+        BookingRecoveryDialog.tsx's own request/link tab pattern, lets
+        the customer copy whichever credential they actually want;
+        copying either one still counts as confirmRefSaved() -- both
+        are equally valid ways to recover the same booking later. */}
+    {data?.booking_ref && <Dialog open={reloadPopupOpen} onOpenChange={setReloadPopupOpen}>
+      <DialogContent dir={direction} className="booking-page rounded-2xl text-center sm:text-start">
+        <DialogHeader>
+          <DialogTitle>{t('publicBooking.manage.reloadPopupTitle')}</DialogTitle>
+          <DialogDescription className="pt-2 leading-6">{t('publicBooking.manage.reloadPopupHint')}</DialogDescription>
+        </DialogHeader>
+        <div className="flex gap-2">
+          {(['ref', 'link'] as const).map((mode) => (
+            <Button
+              key={mode}
+              type="button"
+              variant={reloadPopupMode === mode ? 'default' : 'outline'}
+              className="min-h-11 flex-1"
+              aria-pressed={reloadPopupMode === mode}
+              onClick={() => setReloadPopupMode(mode)}
+            >
+              {t(`publicBooking.manage.reloadPopup${mode === 'ref' ? 'RefTab' : 'LinkTab'}`)}
+            </Button>
+          ))}
+        </div>
+        {reloadPopupMode === 'ref' ? (
+          <div className="flex items-center justify-between gap-2 rounded-lg border border-border bg-page-bg px-3 py-2">
+            <bdi className="text-lg font-semibold tracking-wider">{data.booking_ref}</bdi>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="gap-1.5"
+              onClick={async () => {
+                try { await navigator.clipboard.writeText(data.booking_ref ?? ''); setRefCopyState('copied'); confirmRefSaved() } catch { setRefCopyState('error') }
+                window.setTimeout(() => setRefCopyState('idle'), 2000)
+              }}
+            >
+              {refCopyState === 'copied' ? <CheckCircle2 className="size-4" /> : <Copy className="size-4" />}
+              {t(refCopyState === 'copied' ? 'publicBooking.manage.refCopied' : 'publicBooking.manage.copyRef')}
+            </Button>
+          </div>
+        ) : (
+          <div className="flex flex-col gap-2 rounded-lg border border-border bg-page-bg px-3 py-2">
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="gap-1.5"
+              onClick={async () => {
+                try { await navigator.clipboard.writeText(savedUrl); setReloadPopupLinkCopyState('copied'); confirmRefSaved() } catch { setReloadPopupLinkCopyState('error') }
+                window.setTimeout(() => setReloadPopupLinkCopyState('idle'), 2000)
+              }}
+            >
+              {reloadPopupLinkCopyState === 'copied' ? <CheckCircle2 className="size-4" /> : <Copy className="size-4" />}
+              {t(reloadPopupLinkCopyState === 'copied' ? 'publicBooking.manage.copied' : 'publicBooking.manage.copy')}
+            </Button>
+            {reloadPopupLinkCopyState === 'error' && <p role="alert" className="break-all text-xs">{savedUrl}</p>}
+          </div>
+        )}
+        <p role="status" className="text-xs text-text-secondary">
+          {t('publicBooking.manage.reloadPopupCountdown', { seconds: reloadPopupSecondsLeft })}
+        </p>
+        <Button type="button" variant="ghost" className="min-h-11" onClick={() => setReloadPopupOpen(false)}>
+          {t('publicBooking.manage.reloadPopupDismiss')}
+        </Button>
+      </DialogContent>
+    </Dialog>}
   </div>
 }

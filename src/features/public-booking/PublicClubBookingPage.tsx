@@ -28,7 +28,9 @@ import {
   CalendarDays,
   Clock,
   Pencil,
-  CircleDot,
+  Goal,
+  Grid2X2,
+  Volleyball,
   Ticket,
 } from 'lucide-react'
 import { PaymentMethodsPanel } from './PaymentMethodsPanel'
@@ -608,11 +610,12 @@ export function PublicClubBookingPage() {
         </div>
       </header>
 
-      <main className="mx-auto max-w-6xl px-4 py-6 sm:px-6 sm:py-10">
-        {step !== 'confirmed' && <section className="booking-venue-banner">
+      <main className="booking-main mx-auto max-w-6xl px-4 py-6 sm:px-6 sm:py-10">
+        {step !== 'confirmed' && <section className="booking-venue-banner booking-discovery-banner">
           <div>
-            <h1>{club.clubName}</h1>
-            <p>{t('publicBooking.experience.title')}</p>
+            <span className="booking-eyebrow"><Ticket className="size-4" />{club.clubName}</span>
+            <h1>{t('publicBooking.experience.title')}</h1>
+            <p>{t('publicBooking.experience.subtitle')}</p>
             {club.address && <span className="mt-3 flex items-center gap-2 text-sm text-white/70"><MapPin className="size-4" />{club.address}</span>}
           </div>
           <div className="booking-court" aria-hidden="true"><span /><i /></div>
@@ -637,16 +640,18 @@ export function PublicClubBookingPage() {
 
         {step === 'field' && (
           <div className="flex flex-col gap-3">
-            <h2 className="text-xl font-semibold">{t('publicBooking.chooseField')}</h2>
+            <div className="flex items-center justify-between gap-3"><h2 className="text-xl font-semibold">{t('publicBooking.chooseField')}</h2><span className="booking-field-count">{club.fields.length} {t('publicBooking.experience.fieldsLabel')}</span></div>
             <p className="mb-2 text-sm leading-6 text-text-secondary">{t('publicBooking.experience.fieldHint')}</p>
             {club.fields.length === 0 && <p className="text-sm text-text-secondary">{t('publicBooking.noFields')}</p>}
-            {club.fields.map((f, index) => {
+            <div className="booking-fields-grid">{club.fields.map((f) => {
               const branch = club.branches.find((b) => b.id === f.branch_id)
+              const courtSport = /football|soccer|قدم/i.test(f.sport) ? 'football' : /padel|tennis|بادل|تنس/i.test(f.sport) ? 'racket' : 'other'
+              const SportIcon = courtSport === 'football' ? Goal : courtSport === 'racket' ? Grid2X2 : Volleyball
               return (
                 <button
                   key={f.id}
                   type="button"
-                  data-selected={selectedFieldId === f.id} className="booking-field group flex items-center gap-4 rounded-xl border border-border bg-surface p-5 text-start transition hover:border-accent hover:shadow-sm"
+                  data-selected={selectedFieldId === f.id} data-sport={courtSport} className="booking-field group rounded-xl border border-border bg-surface text-start transition hover:shadow-sm"
                   onClick={() => {
                     setSelectedFieldId(f.id)
                     setSelectedTime(null)
@@ -654,10 +659,10 @@ export function PublicClubBookingPage() {
                     setStep('date')
                   }}
                 >
-                  <span className="booking-sport-tile" aria-hidden="true"><CircleDot className="size-9" /><span>{String(index + 1).padStart(2, '0')}</span></span>
-                  <div className="min-w-0 flex-1">
+                  <span className="booking-field-art" aria-hidden="true"><span className="booking-mini-court"><i /><b /></span><SportIcon className="booking-field-sport-icon" /></span>
+                  <div className="booking-field-body min-w-0">
+                    <span className="booking-sport-label">{t(`publicBooking.sportLabels.${f.sport}`, { defaultValue: f.sport })}</span>
                     <p className="font-semibold">{f.name}</p>
-                    <p className="text-sm text-text-secondary">{t(`publicBooking.sportLabels.${f.sport}`, { defaultValue: f.sport })}</p>
                     {branch && (
                       <p className="mt-1 flex items-center gap-1 text-xs text-text-secondary">
                         <MapPin className="size-3" /> {branch.name}
@@ -670,11 +675,11 @@ export function PublicClubBookingPage() {
                         a customer can actually tell fields apart before
                         picking one. */}
                     <FieldMetaChips field={f} />
+                    <span className="booking-field-action">{t('publicBooking.experience.chooseFieldAction')}<ChevronRight className={direction === 'rtl' ? 'size-4 rotate-180' : 'size-4'} /></span>
                   </div>
-                  <ChevronRight className={direction === 'rtl' ? 'size-4 shrink-0 rotate-180 text-text-secondary' : 'size-4 shrink-0 text-text-secondary'} />
                 </button>
               )
-            })}
+            })}</div>
           </div>
         )}
 
@@ -1175,7 +1180,9 @@ export function PublicClubBookingPage() {
               {value && <Pencil className="size-3.5 text-text-secondary" aria-hidden="true" />}
             </button>)}
           </div>
-          <p className="border-t border-border pt-4 text-xs leading-6 text-text-secondary">{t('publicBooking.experience.priceHint')}</p>
+          <div className="booking-summary-price">
+            {price != null && selectedTime && !priceLoading && !priceError ? <><span>{t('publicBooking.total')}</span><strong><FormattedCurrency value={price} currencyCode={club.currency} /></strong></> : <p className="text-xs leading-6 text-text-secondary">{t('publicBooking.experience.priceHint')}</p>}
+          </div>
           {club.address && <p className="mt-4 flex items-start gap-2 text-xs leading-6 text-text-secondary"><MapPin className="mt-1 size-4 shrink-0" />{club.address}</p>}
           <div className="booking-return-card">
             <h3 className="font-semibold">{t('publicBooking.recovery.title')}</h3>
