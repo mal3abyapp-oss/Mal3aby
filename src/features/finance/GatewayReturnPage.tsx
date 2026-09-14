@@ -35,7 +35,7 @@ export function GatewayReturnPage() {
   const transactionId = searchParams.get('transaction_id')
   const outcomeParam = searchParams.get('outcome') // display hint ONLY -- never trusted for state.
 
-  const [status, setStatus] = useState<'loading' | 'pending' | 'succeeded' | 'failed' | 'cancelled' | 'error'>('loading')
+  const [status, setStatus] = useState<'loading' | 'pending' | 'succeeded' | 'failed' | 'cancelled' | 'error' | 'timed_out'>('loading')
   const [failureReason, setFailureReason] = useState<string | null>(null)
   const [invoiceId, setInvoiceId] = useState<string | null>(null)
 
@@ -98,9 +98,19 @@ export function GatewayReturnPage() {
       // (the customer can always check Finance > Payments later; the
       // invoice's real status is never lost, only this page's live
       // wait times out).
-      setStatus('pending')
+      //
+      // Audit fix (round-2, finding #6a): MAX_ATTEMPTS being exhausted
+      // while still 'pending' used to fall through with no further
+      // setStatus call at all -- the last setStatus('pending') above
+      // stood forever, leaving the page spinning indefinitely even
+      // though polling itself had silently stopped. Now reaches an
+      // explicit terminal 'timed_out' state that stops the spinner and
+      // tells the user where to check instead.
       if (attempts < MAX_ATTEMPTS) {
+        setStatus('pending')
         pollTimer = setTimeout(poll, Math.min(1000 * attempts, 5000))
+      } else {
+        setStatus('timed_out')
       }
     }
 
@@ -133,16 +143,21 @@ export function GatewayReturnPage() {
             </>
           )}
 
+          {/* Audit fix (round-2, finding #6b): these icons used
+              hardcoded Tailwind colors (text-green-600, text-destructive)
+              instead of the project's semantic status tokens used
+              everywhere else in Finance/Billing (text-status-success/
+              text-status-danger -- see BillingPage.tsx's own usage). */}
           {status === 'succeeded' && (
             <>
-              <CheckCircle2 className="h-10 w-10 text-green-600" />
+              <CheckCircle2 className="h-10 w-10 text-status-success" />
               <p className="text-sm font-medium">{t('finance.gatewayReturn.succeeded', 'Payment confirmed.')}</p>
             </>
           )}
 
           {status === 'failed' && (
             <>
-              <XCircle className="h-10 w-10 text-destructive" />
+              <XCircle className="h-10 w-10 text-status-danger" />
               <p className="text-sm font-medium">{t('finance.gatewayReturn.failed', 'This payment was not completed.')}</p>
               {failureReason && <p className="text-xs text-muted-foreground">{failureReason}</p>}
             </>
@@ -160,6 +175,22 @@ export function GatewayReturnPage() {
               <Clock className="h-10 w-10 text-muted-foreground" />
               <p className="text-sm text-muted-foreground">
                 {t('finance.gatewayReturn.error', 'We could not load this payment\'s status. Please check Finance for the latest status.')}
+              </p>
+            </>
+          )}
+
+          {/* Audit fix (round-2, finding #6a): polling exhausting
+              MAX_ATTEMPTS while still pending now reaches this explicit
+              terminal state instead of leaving the spinner running
+              forever -- guidance points the user at Finance > Payments
+              for the real, authoritative status (never this page's own
+              guess -- see this file's own header comment on the redirect
+              never being authoritative). */}
+          {status === 'timed_out' && (
+            <>
+              <Clock className="h-10 w-10 text-status-warning" />
+              <p className="text-sm text-muted-foreground">
+                {t('finance.gatewayReturn.timedOut', 'This is taking longer than expected. Your payment may still be processing -- please check Finance > Payments in a moment for the final status.')}
               </p>
             </>
           )}

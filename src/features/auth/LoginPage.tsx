@@ -5,6 +5,7 @@ import { supabase } from '@/lib/supabase/client'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { ErrorState } from '@/components/ui/error-state'
 
 // Bug found during Final Pre-Release Verification (2026-08-15): a
 // confirmed user with zero club_memberships (never completed onboarding)
@@ -16,11 +17,19 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 // single post-login membership check closes that gap without touching
 // the route guards themselves (RequireAuth intentionally stays session-only
 // per its own comment -- the real boundary is RLS, not this check).
+// Audit fix (round-2, finding #2): this used to discard `error` from the
+// destructure entirely, so a transient network/RLS hiccup on this count
+// query looked IDENTICAL to "genuinely zero active memberships" -- a real
+// club owner could get silently misrouted to /onboarding (and prompted
+// to create a brand-new club) on what was actually just a failed query,
+// not an empty result. Now throws on error so the caller can tell the two
+// cases apart and show an error state instead of guessing "not found".
 async function hasAnyActiveMembership(): Promise<boolean> {
-  const { count } = await supabase
+  const { count, error } = await supabase
     .from('club_memberships')
     .select('id', { count: 'exact', head: true })
     .eq('status', 'active')
+  if (error) throw error
   return (count ?? 0) > 0
 }
 
@@ -46,10 +55,13 @@ async function isPlatformOwner(): Promise<boolean> {
 // may be a customer/guardian who has claimed (or can claim) a
 // self-service link to their own customer record. Route those to the
 // customer portal instead of club-creation onboarding.
+// Same fix as hasAnyActiveMembership() above -- a failed query must never
+// be treated the same as "no linked customer record".
 async function hasAnyLinkedCustomerRecord(): Promise<boolean> {
-  const { count } = await supabase
+  const { count, error } = await supabase
     .from('customers')
     .select('id', { count: 'exact', head: true })
+  if (error) throw error
   return (count ?? 0) > 0
 }
 
@@ -59,42 +71,18 @@ export function LoginPage() {
   const [password, setPassword] = useState('')
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  // Audit fix (round-2, finding #2): distinct from `error` above -- this
+  // means "you ARE authenticated, but we couldn't determine where to
+  // route you" (a failed hasAnyActiveMembership()/hasAnyLinkedCustomerRecord()
+  // query), never "wrong password". Rendered via ErrorState with a Retry
+  // action instead of the plain inline `error` paragraph, and re-running
+  // the same post-login routing logic on retry (no need to re-enter
+  // credentials -- the session is already established).
+  const [routingCheckFailed, setRoutingCheckFailed] = useState(false)
   const navigate = useNavigate()
   const location = useLocation()
 
-  async function handleSubmit(e: FormEvent) {
-    e.preventDefault()
-    setSubmitting(true)
-    setError(null)
-
-    const { error: signInError } = await supabase.auth.signInWithPassword({ email, password })
-
-    setSubmitting(false)
-
-    if (signInError) {
-      // Never surface the raw provider error string (docs pattern: error-state
-      // never shows raw DB/HTTP errors) — map to a safe, generic localized message.
-      setError(t('auth.loginError'))
-      return
-    }
-
-    // FULL PRODUCT E2E ACCEPTANCE (D-E2E-001, P0 fix, 2026-08-31): a
-    // staff member created via the real staff-invite path
-    // (create_club_staff_membership_service) starts in club_memberships.
-    // status = 'invited' -- the introducing migration's own comment
-    // documented "flipped to active on first login" as the intended
-    // design, but no code anywhere ever performed that flip, so every
-    // invited staff member who actually signed in fell straight through
-    // hasAnyActiveMembership() below (which correctly excludes
-    // 'invited') and landed on /onboarding (create a brand-new club)
-    // instead of reaching their real invited club -- a total block on
-    // the "add staff" capability. activate_my_invited_memberships() is
-    // strictly self-scoped to the caller's own auth.uid() (cannot touch
-    // another user's membership) and idempotent (a no-op returning 0
-    // once nothing is left invited), so it is safe to call
-    // unconditionally on every successful login, not just the first.
-    await supabase.rpc('activate_my_invited_memberships')
-
+  async function resolvePostLoginRoute() {
     // P1 production bug (real account report, 2026-08-19): a platform_owner
     // who is ALSO a club_owner (a real, supported multi-role account --
     // see AuthProvider's own dedupe comment) landed on /app instead of
@@ -129,13 +117,60 @@ export function LoginPage() {
       return
     }
 
-    const hasClub = await hasAnyActiveMembership()
-    if (hasClub) {
-      navigate('/app', { replace: true })
+    // Audit fix (round-2, finding #2): hasAnyActiveMembership() and
+    // hasAnyLinkedCustomerRecord() now throw on a genuine query failure
+    // instead of silently returning false -- catch that here and show an
+    // error state rather than misrouting an already-authenticated real
+    // club owner/staff member/customer to onboarding on what was actually
+    // just a transient network/RLS failure, not "no membership found".
+    try {
+      const hasClub = await hasAnyActiveMembership()
+      if (hasClub) {
+        navigate('/app', { replace: true })
+        return
+      }
+      const hasCustomerRecord = await hasAnyLinkedCustomerRecord()
+      navigate(hasCustomerRecord ? '/portal' : '/onboarding', { replace: true })
+    } catch {
+      setRoutingCheckFailed(true)
+    }
+  }
+
+  async function handleSubmit(e: FormEvent) {
+    e.preventDefault()
+    setSubmitting(true)
+    setError(null)
+    setRoutingCheckFailed(false)
+
+    const { error: signInError } = await supabase.auth.signInWithPassword({ email, password })
+
+    setSubmitting(false)
+
+    if (signInError) {
+      // Never surface the raw provider error string (docs pattern: error-state
+      // never shows raw DB/HTTP errors) — map to a safe, generic localized message.
+      setError(t('auth.loginError'))
       return
     }
-    const hasCustomerRecord = await hasAnyLinkedCustomerRecord()
-    navigate(hasCustomerRecord ? '/portal' : '/onboarding', { replace: true })
+
+    // FULL PRODUCT E2E ACCEPTANCE (D-E2E-001, P0 fix, 2026-08-31): a
+    // staff member created via the real staff-invite path
+    // (create_club_staff_membership_service) starts in club_memberships.
+    // status = 'invited' -- the introducing migration's own comment
+    // documented "flipped to active on first login" as the intended
+    // design, but no code anywhere ever performed that flip, so every
+    // invited staff member who actually signed in fell straight through
+    // hasAnyActiveMembership() below (which correctly excludes
+    // 'invited') and landed on /onboarding (create a brand-new club)
+    // instead of reaching their real invited club -- a total block on
+    // the "add staff" capability. activate_my_invited_memberships() is
+    // strictly self-scoped to the caller's own auth.uid() (cannot touch
+    // another user's membership) and idempotent (a no-op returning 0
+    // once nothing is left invited), so it is safe to call
+    // unconditionally on every successful login, not just the first.
+    await supabase.rpc('activate_my_invited_memberships')
+
+    await resolvePostLoginRoute()
   }
 
   return (
@@ -164,6 +199,16 @@ export function LoginPage() {
           <CardTitle className="text-center text-xl">{t('auth.login')}</CardTitle>
         </CardHeader>
         <CardContent>
+          {routingCheckFailed ? (
+            // Audit fix (round-2, finding #2): the user IS already
+            // authenticated at this point (signInWithPassword succeeded) --
+            // this is not a login-credentials error, so the login form is
+            // replaced with ErrorState + Retry rather than asking them to
+            // re-enter a password they already correctly typed. Retry
+            // re-runs the same post-login routing check without a new
+            // sign-in call.
+            <ErrorState message={t('auth.routingCheckError')} onRetry={() => void resolvePostLoginRoute()} />
+          ) : (
           <form onSubmit={handleSubmit} className="flex flex-col gap-4">
             <div className="flex flex-col gap-1.5">
               <label htmlFor="email" className="text-sm font-medium text-text-secondary">
@@ -219,6 +264,7 @@ export function LoginPage() {
               </Link>
             </div>
           </form>
+          )}
         </CardContent>
       </Card>
       {/* FINAL PRODUCT COMPLETENESS ROUND (2026-08-25) -- Customer

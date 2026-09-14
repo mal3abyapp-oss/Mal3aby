@@ -582,6 +582,7 @@
     "alertsPage": {
       "title": "Alerts",
       "description": "Automatic rule-based alerts -- no external notification service",
+      "loadError": "Could not load alerts. Please try again.",
       "emptyTitle": "No alerts right now",
       "kindLabels": {
         "expiring_soon": "Subscription ending soon",
@@ -1611,6 +1612,7 @@
     "password": "Password",
     "fullName": "Full name",
     "loginError": "Incorrect login details, or the account isn't activated yet.",
+    "routingCheckError": "You're logged in, but we couldn't determine where to take you next. Please check your connection and try again.",
     "signupSubmit": "Create account and start free trial",
     "hasAccount": "Already have an account?",
     "loggingIn": "Logging in...",
@@ -3280,7 +3282,8 @@
     "saveEditError": "Couldn't save the changes, try again.",
     "addError": "Couldn't add the customer, try again.",
     "phoneIssues": {
-      "title": "{{count}} customer phone number(s) need review"
+      "title": "{{count}} customer phone number(s) need review",
+      "loadError": "Couldn't open this customer, try again."
     },
     "relationshipLabels": {
       "father": "Father",
@@ -4378,6 +4381,7 @@
       "failed": "This payment was not completed.",
       "cancelledFinal": "Checkout was cancelled.",
       "error": "We could not load this payment's status. Please check Finance for the latest status.",
+      "timedOut": "This is taking longer than expected. Your payment may still be processing -- please check Finance > Payments in a moment for the final status.",
       "goToInvoice": "Go to Finance"
     },
     "overview": {

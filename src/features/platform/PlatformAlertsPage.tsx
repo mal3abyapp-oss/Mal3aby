@@ -4,10 +4,12 @@ import { useTranslation } from 'react-i18next'
 import { supabase } from '@/lib/supabase/client'
 import { PageHeader } from '@/components/ui/page-header'
 import { EmptyState } from '@/components/ui/empty-state'
+import { ErrorState } from '@/components/ui/error-state'
 import { StatusBadge } from '@/components/ui/status-badge'
 import { Card, CardContent } from '@/components/ui/card'
 import { Skeleton } from '@/components/ui/skeleton'
 import { AlertTriangle, Clock, Sparkles, XCircle } from 'lucide-react'
+import { translateSupabaseError } from '@/lib/errors'
 import { isSubscriptionExpiringSoon } from './labels'
 
 // Rule-based in-app alerts, computed live from platform_subscriptions --
@@ -81,12 +83,21 @@ const KIND_ICON = {
 
 export function PlatformAlertsPage() {
   const { t } = useTranslation()
-  const { data: alerts = [], isLoading } = useQuery({ queryKey: ['platform-alerts'], queryFn: fetchAlerts })
+  // Audit fix (round-2, finding #7): isError/error/refetch were never
+  // destructured -- a failed get_platform_alert_subscriptions() RPC
+  // rendered exactly the same EmptyState as "zero real alerts", so a
+  // genuinely overdue subscription (or any other subscription-health
+  // issue) could go completely unnoticed behind what looked like a
+  // clean "all clear" screen. Now a failed fetch renders ErrorState with
+  // Retry instead, and EmptyState is reserved for the real zero-rows case.
+  const { data: alerts = [], isLoading, isError, error, refetch } = useQuery({ queryKey: ['platform-alerts'], queryFn: fetchAlerts })
 
   return (
     <div>
       <PageHeader title={t('platform.alertsPage.title')} description={t('platform.alertsPage.description')} />
-      {isLoading ? (
+      {isError ? (
+        <ErrorState message={translateSupabaseError(error, t('platform.alertsPage.loadError'))} onRetry={() => void refetch()} />
+      ) : isLoading ? (
         // PERSONA COUNCIL AUDIT (2026-08-25) -- Platform Owner persona
         // finding: this rendered nothing at all during load, the only
         // screen in the platform console without a skeleton, reading as
