@@ -52,6 +52,15 @@ async function searchLeads(params: { search: string; status: string; minScore: s
     p_status: params.status === 'all' ? undefined : params.status,
     p_min_score: params.minScore ? Number(params.minScore) : undefined,
     p_city: params.city || undefined,
+    // FULL-PLATFORM AUDIT ROUND 2 FIX (2026-09-14): the RPC's own
+    // p_exclude_do_not_contact defaults to true (excludes
+    // do_not_contact leads even when no status filter is applied),
+    // so filtering the Status dropdown to exactly "Do Not Contact"
+    // always returned zero rows -- the exclusion ran before the
+    // status match ever had a chance to select them. Only turn the
+    // exclusion off when the operator is specifically asking to see
+    // DNC leads; every other filter keeps the RPC's safer default.
+    p_exclude_do_not_contact: params.status === 'do_not_contact' ? false : undefined,
     p_limit: PAGE_SIZE,
     p_offset: params.page * PAGE_SIZE,
   })

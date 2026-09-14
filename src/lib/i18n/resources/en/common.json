@@ -304,7 +304,9 @@
         "noJobs": "No discovery jobs yet",
         "loadError": "Could not load discovery jobs.",
         "manualEntryTitle": "Or Add a Lead Manually",
-        "manualEntryButton": "Add Lead"
+        "manualEntryButton": "Add Lead",
+        "manualEntryError": "Couldn't add the lead. Try again.",
+        "providerStatusError": "Couldn't load the discovery source status."
       },
       "leads": {
         "title": "Leads",
@@ -5767,7 +5769,8 @@
         "nonzeroOnly": "Non-zero variance only",
         "empty": "No completed stock counts in this period"
       },
-      "permissionDenied": "You do not have permission to view profitability data for this report. Ask a club owner to grant the \"View profit reports\" permission."
+      "permissionDenied": "You do not have permission to view profitability data for this report. Ask a club owner to grant the \"View profit reports\" permission.",
+      "loadError": "Couldn't load this report."
     }
   },
   "help": {
