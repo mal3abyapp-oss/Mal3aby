@@ -4,6 +4,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { BrowserQRCodeReader } from '@zxing/browser'
 import { supabase } from '@/lib/supabase/client'
 import { useAuth } from '@/app/providers/AuthProvider'
+import { translateSupabaseError } from '@/lib/errors'
 import { PageHeader } from '@/components/ui/page-header'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -16,6 +17,27 @@ import {
 } from '@/components/ui/dialog'
 import { CheckCircle2, Circle, ScanLine, XCircle } from 'lucide-react'
 import { AttendanceStatusControl } from './AttendanceStatusControl'
+
+// Round-2 audit findings (this file):
+// (a) markMutation had no onError at all -- a failed manual attendance
+//     mark (e.g. permission revoked mid-session) was silently swallowed,
+//     same class of bug AttendanceSection.tsx's markMutation already had
+//     fixed with a visible onError + local error state.
+// (b) the QR scan result collapsed qr_mark_attendance()'s 5 distinct
+//     outcome codes (wrong_club/permission_denied/module_inactive/
+//     subscription_inactive/invalid, confirmed via
+//     supabase/migrations/20260829210000_fix_qr_attendance_stale_status_
+//     and_reschedule_module_gate.sql) into one generic "Scan failed" --
+//     now maps each outcome to its own label/tone, matching ScanPage.tsx's
+//     own OUTCOME_LABEL_KEYS/OUTCOME_TONES pattern.
+const SCAN_OUTCOME_TONES: Record<string, 'success' | 'danger' | 'warning'> = {
+  success: 'success',
+  wrong_club: 'danger',
+  permission_denied: 'danger',
+  module_inactive: 'danger',
+  subscription_inactive: 'warning',
+  invalid: 'danger',
+}
 
 // Coach Today (sessions list) + session detail + manual/QR attendance
 // marking, per SCREEN_MAP.md ("academy" route group, Mobile/Tablet,
@@ -85,6 +107,7 @@ export function CoachTodayView() {
   const [selectedSession, setSelectedSession] = useState<SessionRow | null>(null)
   const [scanOpen, setScanOpen] = useState(false)
   const [scanResult, setScanResult] = useState<{ result: string } | null>(null)
+  const [markError, setMarkError] = useState<string | null>(null)
 
   const { data: sessions = [], isLoading } = useQuery({
     queryKey: ['coach-today-sessions', currentClubId],
@@ -112,7 +135,8 @@ export function CoachTodayView() {
       })
       if (error) throw error
     },
-    onSuccess: invalidateRoster,
+    onSuccess: () => { setMarkError(null); invalidateRoster() },
+    onError: (error) => setMarkError(translateSupabaseError(error, t('academy.coachToday.markError'))),
   })
 
   async function handleScan() {
@@ -170,6 +194,8 @@ export function CoachTodayView() {
               {t('academy.coachToday.scanQr')}
             </Button>
 
+            {markError && <p role="alert" className="text-sm text-status-danger">{markError}</p>}
+
             {roster.length === 0 ? (
               <p className="text-sm text-text-secondary">{t('academy.coachToday.noRoster')}</p>
             ) : (
@@ -207,8 +233,8 @@ export function CoachTodayView() {
             <video id="coach-qr-video" className="w-full rounded-md" muted playsInline />
             {scanResult && (
               <StatusBadge
-                tone={scanResult.result === 'success' ? 'success' : 'danger'}
-                label={scanResult.result === 'success' ? t('academy.coachToday.checkedIn') : t('academy.coachToday.scanFailed')}
+                tone={SCAN_OUTCOME_TONES[scanResult.result] ?? 'danger'}
+                label={t(`academy.coachToday.scanOutcomes.${scanResult.result}`, { defaultValue: t('academy.coachToday.scanFailed') })}
               />
             )}
           </div>

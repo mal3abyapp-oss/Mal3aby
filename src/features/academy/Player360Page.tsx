@@ -141,6 +141,13 @@ export function Player360Page() {
   // pattern as StaffPage.tsx/RolesPage.tsx's H-3 fixes -- per-row state
   // keyed by guardian_link_id since this is a DataTable row action.
   const [confirmingUnlinkId, setConfirmingUnlinkId] = useState<string | null>(null)
+  // Round-2 audit finding: setPrimaryMutation/unlinkMutation (guardian
+  // actions) had no onError at all -- a failed RPC call (e.g. a stale
+  // guardian_link_id, or a permission revoked mid-session) was silently
+  // swallowed with no visible feedback. Local error state surfaced in
+  // the Guardians tab, same shape as every other mutation error on this
+  // page (EditPlayerDialog/AddGuardianDialog's own `error` state).
+  const [guardianActionError, setGuardianActionError] = useState<string | null>(null)
 
   const { data: summary, isLoading, isError } = useQuery({
     queryKey: ['player-360-summary', currentClubId, playerId],
@@ -178,7 +185,8 @@ export function Player360Page() {
       const { error } = await supabase.rpc('set_primary_guardian', { p_player_id: playerId!, p_customer_id: customerId })
       if (error) throw error
     },
-    onSuccess: invalidateAll,
+    onSuccess: () => { setGuardianActionError(null); invalidateAll() },
+    onError: (err) => setGuardianActionError(translateSupabaseError(err, t('academy.players.setPrimaryError', { defaultValue: "Couldn't set this guardian as primary, please try again." }))),
   })
 
   const unlinkMutation = useMutation({
@@ -187,9 +195,11 @@ export function Player360Page() {
       if (error) throw error
     },
     onSuccess: () => {
+      setGuardianActionError(null)
       setConfirmingUnlinkId(null)
       invalidateAll()
     },
+    onError: (err) => setGuardianActionError(translateSupabaseError(err, t('academy.players.unlinkGuardianError', { defaultValue: "Couldn't remove this guardian, please try again." }))),
   })
 
   if (isError) {
@@ -296,6 +306,7 @@ export function Player360Page() {
             <div className="flex justify-end">
               <Button size="sm" onClick={() => setAddGuardianOpen(true)}>{t('academy.players.linkNewGuardian', { defaultValue: 'Add guardian' })}</Button>
             </div>
+            {guardianActionError && <p role="alert" className="text-sm text-status-danger">{guardianActionError}</p>}
             <DataTable
               columns={[
                 {

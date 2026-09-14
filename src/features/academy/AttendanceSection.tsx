@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '@/lib/supabase/client'
 import { useAuth } from '@/app/providers/AuthProvider'
+import { translateSupabaseError } from '@/lib/errors'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -163,7 +164,11 @@ export function AttendanceSection() {
       })
       void queryClient.invalidateQueries({ queryKey: ['attendance-sessions', currentClubId, date] })
     },
-    onError: (error) => setOpenError(error instanceof Error ? error.message : (error as { message?: string })?.message ?? String(error)),
+    // Finding (round-2 audit): raw Postgres/RPC exception text was
+    // being displayed directly instead of routed through
+    // translateSupabaseError -- matching the established pattern used
+    // everywhere else in this codebase (never surface raw DB error text).
+    onError: (error) => setOpenError(translateSupabaseError(error, t('academy.attendance.openSessionError'))),
   })
 
   const [markError, setMarkError] = useState<string | null>(null)
@@ -187,7 +192,11 @@ export function AttendanceSection() {
     // session" failure (managers lacked attendance.mark, since fixed)
     // was silently swallowed with no visible error, while the button's
     // own visual state made it look like the mark had succeeded.
-    onError: (error) => setMarkError(error instanceof Error ? error.message : (error as { message?: string })?.message ?? String(error)),
+    //
+    // Finding (round-2 audit): the onError added at that time still
+    // displayed the raw exception message directly -- now routed
+    // through translateSupabaseError like the rest of the codebase.
+    onError: (error) => setMarkError(translateSupabaseError(error, t('academy.attendance.markError'))),
   })
 
   return (

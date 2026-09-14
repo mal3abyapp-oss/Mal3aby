@@ -25,6 +25,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog'
 import { translateSupabaseError } from '@/lib/errors'
+import { ErrorState } from '@/components/ui/error-state'
 import { ReportPrintButton, ReportPrintHeader } from '@/components/ui/report-print-header'
 import { fetchFullReport } from '@/lib/fetchFullReport'
 import { ProductThumb } from '@/features/shop/shop-media'
@@ -236,7 +237,12 @@ export function ShopInventoryPage() {
   const [managingSuppliers, setManagingSuppliers] = useState(false)
   const [detailProductId, setDetailProductId] = useState<string | null>(null)
 
-  const { data: summary } = useQuery({
+  // Round-2 audit finding: none of this page's main data queries
+  // exposed isError/error, unlike every other Shop list page (Sales,
+  // Stock Count, Products) which already surfaces isError/error/refetch
+  // via ErrorState -- see ShopSalesPage.tsx's salesIsError/salesError/
+  // refetchSales for the established pattern replicated below.
+  const { data: summary, isError: summaryIsError, error: summaryError, refetch: refetchSummary } = useQuery({
     queryKey: ['shop-inventory-summary', currentClubId],
     queryFn: () => fetchInventorySummary(currentClubId as string),
     enabled: !!currentClubId,
@@ -247,7 +253,7 @@ export function ShopInventoryPage() {
     enabled: !!currentClubId,
     retry: false,
   })
-  const { data: balances = [], isLoading } = useQuery({
+  const { data: balances = [], isLoading, isError: balancesIsError, error: balancesError, refetch: refetchBalances } = useQuery({
     queryKey: ['shop-inventory-balances', currentClubId, lowStockOnly],
     queryFn: () => fetchBalances(currentClubId as string, lowStockOnly),
     enabled: !!currentClubId,
@@ -257,27 +263,27 @@ export function ShopInventoryPage() {
     queryFn: () => fetchProducts(currentClubId as string),
     enabled: !!currentClubId,
   })
-  const { data: movements = [] } = useQuery({
+  const { data: movements = [], isError: movementsIsError, error: movementsError, refetch: refetchMovements } = useQuery({
     queryKey: ['shop-inventory-movements', currentClubId],
     queryFn: () => fetchMovements(currentClubId as string),
     enabled: !!currentClubId,
   })
-  const { data: recentReceipts = [] } = useQuery({
+  const { data: recentReceipts = [], isError: recentReceiptsIsError, error: recentReceiptsError, refetch: refetchRecentReceipts } = useQuery({
     queryKey: ['shop-inventory-recent-receipts', currentClubId],
     queryFn: () => fetchRecentByType(currentClubId as string, ['purchase_receipt'], 4),
     enabled: !!currentClubId,
   })
-  const { data: recentTransfers = [] } = useQuery({
+  const { data: recentTransfers = [], isError: recentTransfersIsError, error: recentTransfersError, refetch: refetchRecentTransfers } = useQuery({
     queryKey: ['shop-inventory-recent-transfers', currentClubId],
     queryFn: () => fetchRecentByType(currentClubId as string, ['transfer_out', 'transfer_in'], 4),
     enabled: !!currentClubId,
   })
-  const { data: recentAdjustments = [] } = useQuery({
+  const { data: recentAdjustments = [], isError: recentAdjustmentsIsError, error: recentAdjustmentsError, refetch: refetchRecentAdjustments } = useQuery({
     queryKey: ['shop-inventory-recent-adjustments', currentClubId],
     queryFn: () => fetchRecentByType(currentClubId as string, ['adjustment_in', 'adjustment_out'], 4),
     enabled: !!currentClubId,
   })
-  const { data: recentDamageLoss = [] } = useQuery({
+  const { data: recentDamageLoss = [], isError: recentDamageLossIsError, error: recentDamageLossError, refetch: refetchRecentDamageLoss } = useQuery({
     queryKey: ['shop-inventory-recent-damage-loss', currentClubId],
     queryFn: () => fetchRecentByType(currentClubId as string, ['damage', 'loss'], 4),
     enabled: !!currentClubId,
@@ -394,26 +400,32 @@ export function ShopInventoryPage() {
             denied, this tile shows a quantity-only fallback rather than a
             money figure, matching the plan's own instruction ("show
             quantity-only info to everyone else"). */}
-        <div className="mb-6 grid grid-cols-2 gap-3 sm:grid-cols-4">
-          <StatCard label={t('shop.inventory.kpis.totalSkus')} value={summary?.activeProducts ?? 0} icon={Boxes} />
-          <StatCard
-            label={t('shop.inventory.kpis.stockValue')}
-            value={stockValueDenied ? t('shop.inventory.kpis.stockValueHidden') : <MoneyDisplay amount={stockValue ?? 0} size="lg" />}
-            icon={Wallet}
-          />
-          <StatCard
-            label={t('shop.inventory.kpis.lowStock')}
-            value={summary?.lowStockCount ?? 0}
-            icon={AlertTriangle}
-            tone={summary && summary.lowStockCount > 0 ? 'warning' : 'default'}
-          />
-          <StatCard
-            label={t('shop.inventory.kpis.outOfStock')}
-            value={summary?.outOfStockCount ?? 0}
-            icon={XCircle}
-            tone={summary && summary.outOfStockCount > 0 ? 'danger' : 'default'}
-          />
-        </div>
+        {summaryIsError ? (
+          <div className="mb-6">
+            <ErrorState message={translateSupabaseError(summaryError, t('shop.inventory.loadError'))} onRetry={() => void refetchSummary()} />
+          </div>
+        ) : (
+          <div className="mb-6 grid grid-cols-2 gap-3 sm:grid-cols-4">
+            <StatCard label={t('shop.inventory.kpis.totalSkus')} value={summary?.activeProducts ?? 0} icon={Boxes} />
+            <StatCard
+              label={t('shop.inventory.kpis.stockValue')}
+              value={stockValueDenied ? t('shop.inventory.kpis.stockValueHidden') : <MoneyDisplay amount={stockValue ?? 0} size="lg" />}
+              icon={Wallet}
+            />
+            <StatCard
+              label={t('shop.inventory.kpis.lowStock')}
+              value={summary?.lowStockCount ?? 0}
+              icon={AlertTriangle}
+              tone={summary && summary.lowStockCount > 0 ? 'warning' : 'default'}
+            />
+            <StatCard
+              label={t('shop.inventory.kpis.outOfStock')}
+              value={summary?.outOfStockCount ?? 0}
+              icon={XCircle}
+              tone={summary && summary.outOfStockCount > 0 ? 'danger' : 'default'}
+            />
+          </div>
+        )}
 
         {/* Recent activity rollups: Recent Receipts / Transfers /
             Adjustments / Damage-Loss, each the last 4 rows of
@@ -421,19 +433,35 @@ export function ShopInventoryPage() {
         <div className="mb-6 grid grid-cols-1 gap-4 lg:grid-cols-2 xl:grid-cols-4">
           <div>
             <h2 className="mb-2 text-sm font-semibold text-text-secondary">{t('shop.inventory.recent.receipts')}</h2>
-            <DataTable columns={recentColumns} rows={recentReceipts} rowKey={(m) => m.movementId} emptyTitle={t('shop.inventory.recent.empty')} />
+            {recentReceiptsIsError ? (
+              <ErrorState message={translateSupabaseError(recentReceiptsError, t('shop.inventory.loadError'))} onRetry={() => void refetchRecentReceipts()} />
+            ) : (
+              <DataTable columns={recentColumns} rows={recentReceipts} rowKey={(m) => m.movementId} emptyTitle={t('shop.inventory.recent.empty')} />
+            )}
           </div>
           <div>
             <h2 className="mb-2 text-sm font-semibold text-text-secondary">{t('shop.inventory.recent.transfers')}</h2>
-            <DataTable columns={recentColumns} rows={recentTransfers} rowKey={(m) => m.movementId} emptyTitle={t('shop.inventory.recent.empty')} />
+            {recentTransfersIsError ? (
+              <ErrorState message={translateSupabaseError(recentTransfersError, t('shop.inventory.loadError'))} onRetry={() => void refetchRecentTransfers()} />
+            ) : (
+              <DataTable columns={recentColumns} rows={recentTransfers} rowKey={(m) => m.movementId} emptyTitle={t('shop.inventory.recent.empty')} />
+            )}
           </div>
           <div>
             <h2 className="mb-2 text-sm font-semibold text-text-secondary">{t('shop.inventory.recent.adjustments')}</h2>
-            <DataTable columns={recentColumns} rows={recentAdjustments} rowKey={(m) => m.movementId} emptyTitle={t('shop.inventory.recent.empty')} />
+            {recentAdjustmentsIsError ? (
+              <ErrorState message={translateSupabaseError(recentAdjustmentsError, t('shop.inventory.loadError'))} onRetry={() => void refetchRecentAdjustments()} />
+            ) : (
+              <DataTable columns={recentColumns} rows={recentAdjustments} rowKey={(m) => m.movementId} emptyTitle={t('shop.inventory.recent.empty')} />
+            )}
           </div>
           <div>
             <h2 className="mb-2 text-sm font-semibold text-text-secondary">{t('shop.inventory.recent.damageLoss')}</h2>
-            <DataTable columns={recentColumns} rows={recentDamageLoss} rowKey={(m) => m.movementId} emptyTitle={t('shop.inventory.recent.empty')} />
+            {recentDamageLossIsError ? (
+              <ErrorState message={translateSupabaseError(recentDamageLossError, t('shop.inventory.loadError'))} onRetry={() => void refetchRecentDamageLoss()} />
+            ) : (
+              <DataTable columns={recentColumns} rows={recentDamageLoss} rowKey={(m) => m.movementId} emptyTitle={t('shop.inventory.recent.empty')} />
+            )}
           </div>
         </div>
 
@@ -461,7 +489,11 @@ export function ShopInventoryPage() {
           reportName={t('shop.inventory.title')}
           filterSummary={lowStockOnly ? t('shop.inventory.lowStockOnly') : undefined}
         />
-        <DataTable columns={balanceColumns} rows={balances} rowKey={(b) => `${b.locationId}-${b.productId}-${b.variantId}`} isLoading={isLoading} emptyTitle={t('shop.inventory.emptyBalancesTitle')} />
+        {balancesIsError ? (
+          <ErrorState message={translateSupabaseError(balancesError, t('shop.inventory.loadError'))} onRetry={() => void refetchBalances()} />
+        ) : (
+          <DataTable columns={balanceColumns} rows={balances} rowKey={(b) => `${b.locationId}-${b.productId}-${b.variantId}`} isLoading={isLoading} emptyTitle={t('shop.inventory.emptyBalancesTitle')} />
+        )}
 
         <h2 className="mb-2 mt-6 text-lg font-semibold">{t('shop.inventory.movementHistory')}</h2>
         {fullMovements !== null && (
@@ -481,7 +513,11 @@ export function ShopInventoryPage() {
         {fullMovements === null && (
           <p className="mb-2 text-xs text-text-secondary">{t('shop.inventory.movementHistoryLimitNote', { count: 50 })}</p>
         )}
-        <DataTable columns={movementColumns} rows={printedMovements} rowKey={(m) => m.movementId} emptyTitle={t('shop.inventory.emptyMovementsTitle')} />
+        {movementsIsError ? (
+          <ErrorState message={translateSupabaseError(movementsError, t('shop.inventory.loadError'))} onRetry={() => void refetchMovements()} />
+        ) : (
+          <DataTable columns={movementColumns} rows={printedMovements} rowKey={(m) => m.movementId} emptyTitle={t('shop.inventory.emptyMovementsTitle')} />
+        )}
       </div>
 
       {receiveOpen && <ReceiveStockDialog clubId={currentClubId as string} onClose={() => setReceiveOpen(false)} onDone={() => { setReceiveOpen(false); invalidate() }} />}

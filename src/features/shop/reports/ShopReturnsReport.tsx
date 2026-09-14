@@ -9,6 +9,8 @@ import { MoneyDisplay } from '@/components/ui/money-display'
 import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { ReportPrintHeader } from '@/components/ui/report-print-header'
+import { ErrorState } from '@/components/ui/error-state'
+import { translateSupabaseError } from '@/lib/errors'
 import { fetchFullReport } from '@/lib/fetchFullReport'
 import { useDateRange } from '@/features/reports/hooks/useDateRangeReport'
 import { PAYMENT_METHOD_LABELS } from '@/lib/domain/billing'
@@ -47,11 +49,16 @@ export function ReportShopReturnsContent() {
 
   const refundedOnlyValue = refundedOnly === REFUND_FILTER_ALL ? undefined : refundedOnly === 'true'
   const args = { p_club_id: currentClubId as string, p_start_date: startDate || undefined, p_end_date: endDate || undefined, p_refunded_only: refundedOnlyValue }
-  const { data: rows = [], isLoading } = useQuery({
+  // Round-2 audit finding: this report was missing isError/error/refetch,
+  // the same gap ShopSalesPage.tsx's list already surfaces via
+  // ErrorState/translateSupabaseError -- a failed fetch previously
+  // rendered as an empty report, indistinguishable from a club with
+  // genuinely no returns in range.
+  const { data: rows = [], isLoading, isError, error, refetch } = useQuery({
     queryKey: ['shop-report-returns', currentClubId, startDate, endDate, refundedOnly, offset],
     queryFn: async () => {
-      const { data, error } = await supabase.rpc('list_shop_sale_returns', { ...args, p_limit: REPORT_PAGE_SIZE, p_offset: offset })
-      if (error) throw error
+      const { data, error: err } = await supabase.rpc('list_shop_sale_returns', { ...args, p_limit: REPORT_PAGE_SIZE, p_offset: offset })
+      if (err) throw err
       return mapReturns((data ?? []) as ReturnApiRow[])
     },
     enabled: !!currentClubId,
@@ -103,9 +110,15 @@ export function ReportShopReturnsContent() {
       </div>
       <div className="print-target visible-for-print">
         <ReportPrintHeader reportName={t('shop.reports.returns.title')} />
-        <FullPrintNote fullCount={fullRows?.length ?? null} truncated={truncated} screenLimit={REPORT_PAGE_SIZE} />
-        <DataTable columns={columns} rows={printed} rowKey={(r) => r.returnId} isLoading={isLoading} emptyTitle={t('reports.shop.emptyTitle')} />
-        {fullRows === null && <PagerControls offset={offset} pageSize={REPORT_PAGE_SIZE} rowCount={rows.length} onPrev={() => setOffset(Math.max(0, offset - REPORT_PAGE_SIZE))} onNext={() => setOffset(offset + REPORT_PAGE_SIZE)} />}
+        {isError ? (
+          <ErrorState message={translateSupabaseError(error, t('reports.shop.loadError'))} onRetry={() => void refetch()} />
+        ) : (
+          <>
+            <FullPrintNote fullCount={fullRows?.length ?? null} truncated={truncated} screenLimit={REPORT_PAGE_SIZE} />
+            <DataTable columns={columns} rows={printed} rowKey={(r) => r.returnId} isLoading={isLoading} emptyTitle={t('reports.shop.emptyTitle')} />
+            {fullRows === null && <PagerControls offset={offset} pageSize={REPORT_PAGE_SIZE} rowCount={rows.length} onPrev={() => setOffset(Math.max(0, offset - REPORT_PAGE_SIZE))} onNext={() => setOffset(offset + REPORT_PAGE_SIZE)} />}
+          </>
+        )}
       </div>
     </div>
   )

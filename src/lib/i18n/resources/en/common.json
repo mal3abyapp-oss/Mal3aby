@@ -1973,7 +1973,9 @@
     "attendance": {
       "recordForMembership": "Record attendance for a membership",
       "open": "Open",
-      "emptyTitle": "No attendance recorded yet"
+      "emptyTitle": "No attendance recorded yet",
+      "openSessionError": "Couldn't open this session, please try again.",
+      "markError": "Couldn't record attendance, please try again."
     },
     "overview": {
       "addPlayer": "Add player",
@@ -1985,7 +1987,8 @@
       "activeSubscriptions": "Active subscriptions",
       "expiringSoon": "Expiring soon",
       "outstandingInvoices": "Outstanding invoices",
-      "groupsNearCapacity": "Groups nearing capacity"
+      "groupsNearCapacity": "Groups nearing capacity",
+      "loadError": "Couldn't load the academy overview."
     },
     "relationshipLabels": {
       "father": "Father",
@@ -2048,7 +2051,9 @@
       "confirmUnlinkGuardian": "Remove this guardian relationship?",
       "confirmUnlinkGuardianButton": "Confirm remove",
       "removingGuardian": "Removing...",
-      "linkGuardianError": "Couldn't add this guardian."
+      "linkGuardianError": "Couldn't add this guardian.",
+      "setPrimaryError": "Couldn't set this guardian as primary, please try again.",
+      "unlinkGuardianError": "Couldn't remove this guardian, please try again."
     },
     "enrollments": {
       "manageSubtitle": "Enroll a player in a group and create their subscription",
@@ -2132,6 +2137,15 @@
       "scanPlayerCard": "Scan player card",
       "checkedIn": "Attendance recorded",
       "scanFailed": "Scan failed",
+      "markError": "Couldn't record attendance, please try again.",
+      "scanOutcomes": {
+        "success": "Attendance recorded",
+        "wrong_club": "This QR code doesn't belong to this club",
+        "permission_denied": "You don't have permission to mark attendance for this session",
+        "module_inactive": "The Academy module isn't active for this club",
+        "subscription_inactive": "This player's subscription isn't active",
+        "invalid": "This QR code isn't valid for this session"
+      },
       "attendanceLabels": {
         "present": "Present",
         "absent": "Absent",
@@ -3761,6 +3775,7 @@
       "outOfStock": "Out of stock",
       "topProducts": "Top products",
       "emptyTitle": "No sales yet",
+      "loadError": "Couldn't load this report, please try again.",
       "columns": {
         "product": "Product",
         "unitsSold": "Units sold",
@@ -5134,6 +5149,7 @@
       "emptySales": "No sales yet today",
       "emptyLowStock": "Nothing is low on stock",
       "emptyReturns": "No returns yet",
+      "loadError": "Couldn't load this section, please try again.",
       "profitability": {
         "title": "Profitability",
         "description": "Cost data not yet tracked -- profitability reporting requires Phase C7's planned cost-at-sale feature."
@@ -5390,6 +5406,7 @@
       },
       "emptyBalancesTitle": "No stock yet",
       "emptyMovementsTitle": "No movements yet",
+      "loadError": "Couldn't load this section, please try again.",
       "movementHistory": "Movement history",
       "columns": {
         "date": "Date",

@@ -1979,7 +1979,9 @@
     "attendance": {
       "recordForMembership": "تسجيل الحضور لعضوية",
       "open": "فتح",
-      "emptyTitle": "لا يوجد حضور مسجل بعد"
+      "emptyTitle": "لا يوجد حضور مسجل بعد",
+      "openSessionError": "تعذر فتح هذه الحصة، حاول مرة أخرى.",
+      "markError": "تعذر تسجيل الحضور، حاول مرة أخرى."
     },
     "overview": {
       "addPlayer": "إضافة لاعب",
@@ -1991,7 +1993,8 @@
       "activeSubscriptions": "اشتراكات نشطة",
       "expiringSoon": "على وشك الانتهاء",
       "outstandingInvoices": "فواتير مستحقة",
-      "groupsNearCapacity": "مجموعات قاربت على الاكتمال"
+      "groupsNearCapacity": "مجموعات قاربت على الاكتمال",
+      "loadError": "تعذر تحميل نظرة عامة الأكاديمية."
     },
     "relationshipLabels": {
       "father": "الأب",
@@ -2054,7 +2057,9 @@
       "confirmUnlinkGuardian": "هل تريد إزالة علاقة ولي الأمر هذا؟",
       "confirmUnlinkGuardianButton": "تأكيد الإزالة",
       "removingGuardian": "جارٍ الإزالة...",
-      "linkGuardianError": "تعذّرت إضافة ولي الأمر هذا."
+      "linkGuardianError": "تعذّرت إضافة ولي الأمر هذا.",
+      "setPrimaryError": "تعذر تعيين ولي الأمر كأساسي، حاول مرة أخرى.",
+      "unlinkGuardianError": "تعذرت إزالة ولي الأمر، حاول مرة أخرى."
     },
     "enrollments": {
       "manageSubtitle": "تسجيل لاعب في مجموعة وإنشاء اشتراكه",
@@ -2138,6 +2143,15 @@
       "scanPlayerCard": "مسح بطاقة اللاعب",
       "checkedIn": "تم تسجيل الحضور",
       "scanFailed": "فشل المسح",
+      "markError": "تعذر تسجيل الحضور، حاول مرة أخرى.",
+      "scanOutcomes": {
+        "success": "تم تسجيل الحضور",
+        "wrong_club": "رمز QR هذا لا يخص هذا النادي",
+        "permission_denied": "ليس لديك صلاحية لتسجيل الحضور لهذه الحصة",
+        "module_inactive": "وحدة الأكاديمية غير مفعّلة لهذا النادي",
+        "subscription_inactive": "اشتراك هذا اللاعب غير نشط",
+        "invalid": "رمز QR هذا غير صالح لهذه الحصة"
+      },
       "attendanceLabels": {
         "present": "حاضر",
         "absent": "غائب",
@@ -3791,6 +3805,7 @@
       "outOfStock": "نفد المخزون",
       "topProducts": "أفضل المنتجات",
       "emptyTitle": "لا توجد مبيعات بعد",
+      "loadError": "تعذر تحميل هذا التقرير، حاول مرة أخرى.",
       "columns": {
         "product": "المنتج",
         "unitsSold": "الوحدات المباعة",
@@ -5166,6 +5181,7 @@
       "emptySales": "لا توجد مبيعات اليوم بعد",
       "emptyLowStock": "لا يوجد مخزون منخفض",
       "emptyReturns": "لا توجد مرتجعات بعد",
+      "loadError": "تعذر تحميل هذا القسم، حاول مرة أخرى.",
       "profitability": {
         "title": "الربحية",
         "description": "بيانات التكلفة غير مسجَّلة بعد -- تقرير الربحية يتطلب ميزة تسجيل التكلفة عند البيع المخطط لها في المرحلة C7."
@@ -5422,6 +5438,7 @@
       },
       "emptyBalancesTitle": "لا يوجد مخزون بعد",
       "emptyMovementsTitle": "لا توجد حركات بعد",
+      "loadError": "تعذر تحميل هذا القسم، حاول مرة أخرى.",
       "movementHistory": "سجل الحركات",
       "columns": {
         "date": "التاريخ",

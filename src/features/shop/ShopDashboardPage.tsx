@@ -11,6 +11,8 @@ import { MoneyDisplay } from '@/components/ui/money-display'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
+import { ErrorState } from '@/components/ui/error-state'
+import { translateSupabaseError } from '@/lib/errors'
 import { PAYMENT_METHOD_LABELS } from '@/lib/domain/billing'
 import {
   Wallet, ShoppingBag, TrendingUp, Package2, Undo2, AlertTriangle, XCircle, Receipt,
@@ -114,6 +116,7 @@ interface RecentReturnRow {
 }
 
 interface CashierSalesRow {
+  soldById: string
   soldByName: string
   transactionCount: number
   total: number
@@ -209,30 +212,39 @@ async function fetchRecentReturns(clubId: string): Promise<RecentReturnRow[]> {
 // "Who sold it" -- derived client-side from list_shop_sales (already
 // fetched for Recent Sales / KPI-adjacent use), grouped by cashier.
 // Checked whether a new RPC was needed first: list_shop_sales already
-// carries sold_by_name and total per sale, and the dashboard only needs
-// today's totals per cashier (not a paginated, filterable breakdown --
-// that already exists on the Sales page's own cashier filter, C5) --
+// carries sold_by/sold_by_name and total per sale, and the dashboard only
+// needs today's totals per cashier (not a paginated, filterable breakdown
+// -- that already exists on the Sales page's own cashier filter, C5) --
 // deriving from a second, slightly larger list_shop_sales call (no
 // p_limit cap needed here since it's for aggregation, not display)
 // avoids a fourth new RPC for a rollup this cheap to compute client-side
 // for a single day's data volume.
+//
+// Round-2 audit finding: this used to group by the display-name STRING
+// (r.sold_by_name), not the cashier's id -- two staff sharing a name
+// (or both with no full_name, falling back to the same '—' placeholder)
+// had their sales silently merged into one row. Groups by r.sold_by
+// (the actual user id list_shop_sales returns, same field
+// ShopSalesReports.tsx's own SaleApiRowForCashier already types) instead
+// -- the display name is only used for the rendered label.
 async function fetchSalesByCashier(clubId: string, start: string, end: string): Promise<CashierSalesRow[]> {
   const { data, error } = await supabase.rpc('list_shop_sales', {
     p_club_id: clubId, p_start_date: start, p_end_date: end, p_limit: 500,
   })
   if (error) throw error
-  const byName = new Map<string, CashierSalesRow>()
+  const byId = new Map<string, CashierSalesRow>()
   for (const r of data ?? []) {
+    const id = r.sold_by ?? '__unknown__'
     const name = r.sold_by_name ?? '—'
-    const existing = byName.get(name)
+    const existing = byId.get(id)
     if (existing) {
       existing.transactionCount += 1
       existing.total += Number(r.total)
     } else {
-      byName.set(name, { soldByName: name, transactionCount: 1, total: Number(r.total) })
+      byId.set(id, { soldById: id, soldByName: name, transactionCount: 1, total: Number(r.total) })
     }
   }
-  return Array.from(byName.values()).sort((a, b) => b.total - a.total)
+  return Array.from(byId.values()).sort((a, b) => b.total - a.total)
 }
 
 export function ShopDashboardPage() {
@@ -240,47 +252,53 @@ export function ShopDashboardPage() {
   const { currentClubId } = useAuth()
   const { start, end } = todayRange()
 
-  const { data: kpis, isLoading: kpisLoading } = useQuery({
+  // Round-2 audit finding: all 8 queries on this dashboard previously
+  // omitted isError/error entirely -- a fetch failure silently rendered
+  // as zeros/empty tables (kpis?.x ?? 0, rows = []), indistinguishable
+  // from a club that genuinely has no data yet. isError/error/refetch
+  // now surfaced for each, matching the established pattern already
+  // used on this page's siblings (ShopSalesPage.tsx's salesIsError).
+  const { data: kpis, isLoading: kpisLoading, isError: kpisIsError, error: kpisError, refetch: refetchKpis } = useQuery({
     queryKey: ['shop-dashboard-kpis', currentClubId, start, end],
     queryFn: () => fetchKpis(currentClubId as string, start, end),
     enabled: !!currentClubId,
   })
-  const { data: topProducts = [], isLoading: topProductsLoading } = useQuery({
+  const { data: topProducts = [], isLoading: topProductsLoading, isError: topProductsIsError, error: topProductsError, refetch: refetchTopProducts } = useQuery({
     queryKey: ['shop-dashboard-top-products', currentClubId, start, end],
     queryFn: () => fetchTopProducts(currentClubId as string, start, end),
     enabled: !!currentClubId,
   })
-  const { data: summary } = useQuery({
+  const { data: summary, isError: summaryIsError, error: summaryError, refetch: refetchSummary } = useQuery({
     queryKey: ['shop-dashboard-inventory-summary', currentClubId],
     queryFn: () => fetchInventorySummary(currentClubId as string),
     enabled: !!currentClubId,
   })
-  const { data: lowStock = [], isLoading: lowStockLoading } = useQuery({
+  const { data: lowStock = [], isLoading: lowStockLoading, isError: lowStockIsError, error: lowStockError, refetch: refetchLowStock } = useQuery({
     queryKey: ['shop-dashboard-low-stock', currentClubId],
     queryFn: () => fetchLowStock(currentClubId as string),
     enabled: !!currentClubId,
   })
-  const { data: categorySales = [], isLoading: categorySalesLoading } = useQuery({
+  const { data: categorySales = [], isLoading: categorySalesLoading, isError: categorySalesIsError, error: categorySalesError, refetch: refetchCategorySales } = useQuery({
     queryKey: ['shop-dashboard-category-sales', currentClubId, start, end],
     queryFn: () => fetchCategorySales(currentClubId as string, start, end),
     enabled: !!currentClubId,
   })
-  const { data: paymentMix = [], isLoading: paymentMixLoading } = useQuery({
+  const { data: paymentMix = [], isLoading: paymentMixLoading, isError: paymentMixIsError, error: paymentMixError, refetch: refetchPaymentMix } = useQuery({
     queryKey: ['shop-dashboard-payment-mix', currentClubId, start, end],
     queryFn: () => fetchPaymentMix(currentClubId as string, start, end),
     enabled: !!currentClubId,
   })
-  const { data: recentSales = [], isLoading: recentSalesLoading } = useQuery({
+  const { data: recentSales = [], isLoading: recentSalesLoading, isError: recentSalesIsError, error: recentSalesError, refetch: refetchRecentSales } = useQuery({
     queryKey: ['shop-dashboard-recent-sales', currentClubId, start, end],
     queryFn: () => fetchRecentSales(currentClubId as string, start, end),
     enabled: !!currentClubId,
   })
-  const { data: recentReturns = [], isLoading: recentReturnsLoading } = useQuery({
+  const { data: recentReturns = [], isLoading: recentReturnsLoading, isError: recentReturnsIsError, error: recentReturnsError, refetch: refetchRecentReturns } = useQuery({
     queryKey: ['shop-dashboard-recent-returns', currentClubId],
     queryFn: () => fetchRecentReturns(currentClubId as string),
     enabled: !!currentClubId,
   })
-  const { data: salesByCashier = [], isLoading: cashierLoading } = useQuery({
+  const { data: salesByCashier = [], isLoading: cashierLoading, isError: cashierIsError, error: cashierError, refetch: refetchCashier } = useQuery({
     queryKey: ['shop-dashboard-by-cashier', currentClubId, start, end],
     queryFn: () => fetchSalesByCashier(currentClubId as string, start, end),
     enabled: !!currentClubId,
@@ -347,21 +365,32 @@ export function ShopDashboardPage() {
           signals (Items Sold, Returns, Low Stock, Out of Stock) --
           same scoped className-only treatment as TodayPage.tsx's
           equivalent fix, no shared StatCard component change. */}
-      <div className="mb-3 grid grid-cols-2 gap-3 sm:grid-cols-4">
-        <StatCard label={t('shop.dashboard.todaySales')} value={kpisLoading ? '—' : <MoneyDisplay amount={kpis?.grossSales ?? 0} size="lg" />} icon={Wallet} />
-        <StatCard label={t('shop.dashboard.todayNetSales')} value={kpisLoading ? '—' : <MoneyDisplay amount={kpis?.netSales ?? 0} size="lg" />} icon={TrendingUp} />
-        <StatCard label={t('shop.dashboard.orders')} value={kpis?.transactionCount ?? 0} icon={ShoppingBag} to="/app/shop/sales" />
-        <StatCard label={t('shop.dashboard.averageOrderValue')} value={kpisLoading ? '—' : <MoneyDisplay amount={kpis?.averageBasket ?? 0} size="lg" />} icon={Receipt} />
-      </div>
-      <div className="mb-6">
-        <p className="mb-2 text-xs font-medium uppercase tracking-wide text-text-secondary">{t('shop.dashboard.inventorySectionLabel')}</p>
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-          <StatCard label={t('shop.dashboard.itemsSold')} value={kpis?.itemsSold ?? 0} icon={Package2} className="border-none bg-muted/30 shadow-none" />
-          <StatCard label={t('shop.dashboard.returns')} value={kpisLoading ? '—' : <MoneyDisplay amount={kpis?.refundTotal ?? 0} size="lg" tone="danger" />} icon={Undo2} tone={kpis && kpis.refundTotal > 0 ? 'danger' : 'default'} to="/app/shop/sales" className="border-none bg-muted/30 shadow-none" />
-          <StatCard label={t('shop.dashboard.lowStock')} value={summary?.lowStockCount ?? 0} icon={AlertTriangle} tone={summary && summary.lowStockCount > 0 ? 'warning' : 'default'} to="/app/shop/inventory" className="border-none bg-muted/30 shadow-none" />
-          <StatCard label={t('shop.dashboard.outOfStock')} value={summary?.outOfStockCount ?? 0} icon={XCircle} tone={summary && summary.outOfStockCount > 0 ? 'danger' : 'default'} to="/app/shop/inventory" className="border-none bg-muted/30 shadow-none" />
+      {kpisIsError || summaryIsError ? (
+        <div className="mb-6">
+          <ErrorState
+            message={translateSupabaseError(kpisIsError ? kpisError : summaryError, t('shop.dashboard.loadError'))}
+            onRetry={() => { if (kpisIsError) void refetchKpis(); if (summaryIsError) void refetchSummary() }}
+          />
         </div>
-      </div>
+      ) : (
+        <>
+          <div className="mb-3 grid grid-cols-2 gap-3 sm:grid-cols-4">
+            <StatCard label={t('shop.dashboard.todaySales')} value={kpisLoading ? '—' : <MoneyDisplay amount={kpis?.grossSales ?? 0} size="lg" />} icon={Wallet} />
+            <StatCard label={t('shop.dashboard.todayNetSales')} value={kpisLoading ? '—' : <MoneyDisplay amount={kpis?.netSales ?? 0} size="lg" />} icon={TrendingUp} />
+            <StatCard label={t('shop.dashboard.orders')} value={kpis?.transactionCount ?? 0} icon={ShoppingBag} to="/app/shop/sales" />
+            <StatCard label={t('shop.dashboard.averageOrderValue')} value={kpisLoading ? '—' : <MoneyDisplay amount={kpis?.averageBasket ?? 0} size="lg" />} icon={Receipt} />
+          </div>
+          <div className="mb-6">
+            <p className="mb-2 text-xs font-medium uppercase tracking-wide text-text-secondary">{t('shop.dashboard.inventorySectionLabel')}</p>
+            <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+              <StatCard label={t('shop.dashboard.itemsSold')} value={kpis?.itemsSold ?? 0} icon={Package2} className="border-none bg-muted/30 shadow-none" />
+              <StatCard label={t('shop.dashboard.returns')} value={kpisLoading ? '—' : <MoneyDisplay amount={kpis?.refundTotal ?? 0} size="lg" tone="danger" />} icon={Undo2} tone={kpis && kpis.refundTotal > 0 ? 'danger' : 'default'} to="/app/shop/sales" className="border-none bg-muted/30 shadow-none" />
+              <StatCard label={t('shop.dashboard.lowStock')} value={summary?.lowStockCount ?? 0} icon={AlertTriangle} tone={summary && summary.lowStockCount > 0 ? 'warning' : 'default'} to="/app/shop/inventory" className="border-none bg-muted/30 shadow-none" />
+              <StatCard label={t('shop.dashboard.outOfStock')} value={summary?.outOfStockCount ?? 0} icon={XCircle} tone={summary && summary.outOfStockCount > 0 ? 'danger' : 'default'} to="/app/shop/inventory" className="border-none bg-muted/30 shadow-none" />
+            </div>
+          </div>
+        </>
+      )}
 
       {/* Profitability -- deliberately honest, not fabricated. No
           cost-at-sale snapshot exists yet (shop_sale_items has no cost
@@ -386,12 +415,18 @@ export function ShopDashboardPage() {
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
         <div>
           <h2 className="mb-2 text-lg font-semibold">{t('shop.dashboard.topProducts')}</h2>
-          <DataTable columns={topProductColumns} rows={topProducts} rowKey={(p) => p.productId} isLoading={topProductsLoading} emptyTitle={t('shop.dashboard.emptySales')} />
+          {topProductsIsError ? (
+            <ErrorState message={translateSupabaseError(topProductsError, t('shop.dashboard.loadError'))} onRetry={() => void refetchTopProducts()} />
+          ) : (
+            <DataTable columns={topProductColumns} rows={topProducts} rowKey={(p) => p.productId} isLoading={topProductsLoading} emptyTitle={t('shop.dashboard.emptySales')} />
+          )}
         </div>
 
         <div>
           <h2 className="mb-2 text-lg font-semibold">{t('shop.dashboard.salesByCategory')}</h2>
-          {categorySalesLoading ? (
+          {categorySalesIsError ? (
+            <ErrorState message={translateSupabaseError(categorySalesError, t('shop.dashboard.loadError'))} onRetry={() => void refetchCategorySales()} />
+          ) : categorySalesLoading ? (
             <Card><CardContent className="p-4"><Skeleton className="h-24 w-full" /></CardContent></Card>
           ) : categorySales.length === 0 ? (
             <Card><CardContent className="p-4 text-sm text-text-secondary">{t('shop.dashboard.emptySales')}</CardContent></Card>
@@ -416,7 +451,9 @@ export function ShopDashboardPage() {
 
         <div>
           <h2 className="mb-2 text-lg font-semibold">{t('shop.dashboard.paymentMethodMix')}</h2>
-          {paymentMixLoading ? (
+          {paymentMixIsError ? (
+            <ErrorState message={translateSupabaseError(paymentMixError, t('shop.dashboard.loadError'))} onRetry={() => void refetchPaymentMix()} />
+          ) : paymentMixLoading ? (
             <Card><CardContent className="p-4"><Skeleton className="h-24 w-full" /></CardContent></Card>
           ) : paymentMix.length === 0 ? (
             <Card><CardContent className="p-4 text-sm text-text-secondary">{t('shop.dashboard.emptySales')}</CardContent></Card>
@@ -444,7 +481,11 @@ export function ShopDashboardPage() {
             <h2 className="text-lg font-semibold">{t('shop.dashboard.lowStockList')}</h2>
             <Button asChild variant="ghost" size="sm"><Link to="/app/shop/inventory">{t('shop.dashboard.viewAll')}</Link></Button>
           </div>
-          <DataTable columns={lowStockColumns} rows={lowStock} rowKey={(r) => `${r.locationId}-${r.productId}-${r.variantId ?? ''}`} isLoading={lowStockLoading} emptyTitle={t('shop.dashboard.emptyLowStock')} />
+          {lowStockIsError ? (
+            <ErrorState message={translateSupabaseError(lowStockError, t('shop.dashboard.loadError'))} onRetry={() => void refetchLowStock()} />
+          ) : (
+            <DataTable columns={lowStockColumns} rows={lowStock} rowKey={(r) => `${r.locationId}-${r.productId}-${r.variantId ?? ''}`} isLoading={lowStockLoading} emptyTitle={t('shop.dashboard.emptyLowStock')} />
+          )}
         </div>
 
         <div>
@@ -452,7 +493,11 @@ export function ShopDashboardPage() {
             <h2 className="text-lg font-semibold">{t('shop.dashboard.recentSales')}</h2>
             <Button asChild variant="ghost" size="sm"><Link to="/app/shop/sales">{t('shop.dashboard.viewAll')}</Link></Button>
           </div>
-          <DataTable columns={recentSalesColumns} rows={recentSales} rowKey={(s) => s.saleId} isLoading={recentSalesLoading} emptyTitle={t('shop.dashboard.emptySales')} />
+          {recentSalesIsError ? (
+            <ErrorState message={translateSupabaseError(recentSalesError, t('shop.dashboard.loadError'))} onRetry={() => void refetchRecentSales()} />
+          ) : (
+            <DataTable columns={recentSalesColumns} rows={recentSales} rowKey={(s) => s.saleId} isLoading={recentSalesLoading} emptyTitle={t('shop.dashboard.emptySales')} />
+          )}
         </div>
 
         <div>
@@ -460,12 +505,20 @@ export function ShopDashboardPage() {
             <h2 className="text-lg font-semibold">{t('shop.dashboard.recentReturns')}</h2>
             <Button asChild variant="ghost" size="sm"><Link to="/app/shop/sales">{t('shop.dashboard.viewAll')}</Link></Button>
           </div>
-          <DataTable columns={recentReturnsColumns} rows={recentReturns} rowKey={(r) => r.returnId} isLoading={recentReturnsLoading} emptyTitle={t('shop.dashboard.emptyReturns')} />
+          {recentReturnsIsError ? (
+            <ErrorState message={translateSupabaseError(recentReturnsError, t('shop.dashboard.loadError'))} onRetry={() => void refetchRecentReturns()} />
+          ) : (
+            <DataTable columns={recentReturnsColumns} rows={recentReturns} rowKey={(r) => r.returnId} isLoading={recentReturnsLoading} emptyTitle={t('shop.dashboard.emptyReturns')} />
+          )}
         </div>
 
         <div className="lg:col-span-2">
           <h2 className="mb-2 text-lg font-semibold">{t('shop.dashboard.salesByCashier')}</h2>
-          <DataTable columns={cashierColumns} rows={salesByCashier} rowKey={(c) => c.soldByName} isLoading={cashierLoading} emptyTitle={t('shop.dashboard.emptySales')} />
+          {cashierIsError ? (
+            <ErrorState message={translateSupabaseError(cashierError, t('shop.dashboard.loadError'))} onRetry={() => void refetchCashier()} />
+          ) : (
+            <DataTable columns={cashierColumns} rows={salesByCashier} rowKey={(c) => c.soldById} isLoading={cashierLoading} emptyTitle={t('shop.dashboard.emptySales')} />
+          )}
         </div>
       </div>
     </div>
