@@ -159,6 +159,16 @@ export function SecureBookingPage() {
   // second open from a later data refetch re-triggering the effect).
   const [reloadPopupOpen, setReloadPopupOpen] = useState(false)
   const [reloadPopupSecondsLeft, setReloadPopupSecondsLeft] = useState(30)
+  // OWNER FOLLOW-UP (2026-09-14): "اجعله يضع رابط الحجز ورقم الحجز
+  // للنسخ واجعل المستخدم يختار بينهم" -- the popup offered only the
+  // ref; the customer should be able to choose which credential to
+  // copy, same choice already offered elsewhere on this page (the
+  // banner/callout copy the ref, the "save your link" card copies the
+  // link) -- just consolidated into the one popup as an explicit
+  // tab switch, mirroring BookingRecoveryDialog.tsx's own
+  // request/link tab pattern for a consistent, already-familiar UI.
+  const [reloadPopupMode, setReloadPopupMode] = useState<'ref' | 'link'>('ref')
+  const [reloadPopupLinkCopyState, setReloadPopupLinkCopyState] = useState<'idle' | 'copied' | 'error'>('idle')
   useEffect(() => {
     if (!data?.booking_ref || refConfirmed) return
     if (!wasPageReloaded()) return
@@ -315,29 +325,68 @@ export function SecureBookingPage() {
         BookingRecoveryDialog.tsx, for visual/behavioral consistency
         (focus trap, Escape-to-close, overlay click-to-close all come
         free from Radix). onOpenChange covers every dismissal path
-        (explicit close button, overlay click, Escape) uniformly. */}
+        (explicit close button, overlay click, Escape) uniformly.
+        OWNER FOLLOW-UP: "اجعله يضع رابط الحجز ورقم الحجز للنسخ واجعل
+        المستخدم يختار بينهم" -- a tab switch (ref/link), reusing
+        BookingRecoveryDialog.tsx's own request/link tab pattern, lets
+        the customer copy whichever credential they actually want;
+        copying either one still counts as confirmRefSaved() -- both
+        are equally valid ways to recover the same booking later. */}
     {data?.booking_ref && <Dialog open={reloadPopupOpen} onOpenChange={setReloadPopupOpen}>
       <DialogContent dir={direction} className="booking-page rounded-2xl text-center sm:text-start">
         <DialogHeader>
           <DialogTitle>{t('publicBooking.manage.reloadPopupTitle')}</DialogTitle>
           <DialogDescription className="pt-2 leading-6">{t('publicBooking.manage.reloadPopupHint')}</DialogDescription>
         </DialogHeader>
-        <div className="flex items-center justify-between gap-2 rounded-lg border border-border bg-page-bg px-3 py-2">
-          <bdi className="text-lg font-semibold tracking-wider">{data.booking_ref}</bdi>
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            className="gap-1.5"
-            onClick={async () => {
-              try { await navigator.clipboard.writeText(data.booking_ref ?? ''); setRefCopyState('copied'); confirmRefSaved() } catch { setRefCopyState('error') }
-              window.setTimeout(() => setRefCopyState('idle'), 2000)
-            }}
-          >
-            {refCopyState === 'copied' ? <CheckCircle2 className="size-4" /> : <Copy className="size-4" />}
-            {t(refCopyState === 'copied' ? 'publicBooking.manage.refCopied' : 'publicBooking.manage.copyRef')}
-          </Button>
+        <div className="flex gap-2">
+          {(['ref', 'link'] as const).map((mode) => (
+            <Button
+              key={mode}
+              type="button"
+              variant={reloadPopupMode === mode ? 'default' : 'outline'}
+              className="min-h-11 flex-1"
+              aria-pressed={reloadPopupMode === mode}
+              onClick={() => setReloadPopupMode(mode)}
+            >
+              {t(`publicBooking.manage.reloadPopup${mode === 'ref' ? 'RefTab' : 'LinkTab'}`)}
+            </Button>
+          ))}
         </div>
+        {reloadPopupMode === 'ref' ? (
+          <div className="flex items-center justify-between gap-2 rounded-lg border border-border bg-page-bg px-3 py-2">
+            <bdi className="text-lg font-semibold tracking-wider">{data.booking_ref}</bdi>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="gap-1.5"
+              onClick={async () => {
+                try { await navigator.clipboard.writeText(data.booking_ref ?? ''); setRefCopyState('copied'); confirmRefSaved() } catch { setRefCopyState('error') }
+                window.setTimeout(() => setRefCopyState('idle'), 2000)
+              }}
+            >
+              {refCopyState === 'copied' ? <CheckCircle2 className="size-4" /> : <Copy className="size-4" />}
+              {t(refCopyState === 'copied' ? 'publicBooking.manage.refCopied' : 'publicBooking.manage.copyRef')}
+            </Button>
+          </div>
+        ) : (
+          <div className="flex flex-col gap-2 rounded-lg border border-border bg-page-bg px-3 py-2">
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="gap-1.5"
+              onClick={async () => {
+                try { await navigator.clipboard.writeText(savedUrl); setReloadPopupLinkCopyState('copied'); confirmRefSaved() } catch { setReloadPopupLinkCopyState('error') }
+                window.setTimeout(() => setReloadPopupLinkCopyState('idle'), 2000)
+              }}
+            >
+              {reloadPopupLinkCopyState === 'copied' ? <CheckCircle2 className="size-4" /> : <Copy className="size-4" />}
+              {t(reloadPopupLinkCopyState === 'copied' ? 'publicBooking.manage.copied' : 'publicBooking.manage.copy')}
+            </Button>
+            {reloadPopupLinkCopyState === 'error' && <p role="alert" className="break-all text-xs">{savedUrl}</p>}
+          </div>
+        )}
         <p role="status" className="text-xs text-text-secondary">
           {t('publicBooking.manage.reloadPopupCountdown', { seconds: reloadPopupSecondsLeft })}
         </p>

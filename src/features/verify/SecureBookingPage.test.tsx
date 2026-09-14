@@ -99,4 +99,19 @@ describe('reload popup (booking ref save reminder)', () => {
     await new Promise((r) => setTimeout(r, 0))
     expect(screen.queryByRole('dialog')).toBeNull()
   })
+  // OWNER FOLLOW-UP: "اجعله يضع رابط الحجز ورقم الحجز للنسخ واجعل
+  // المستخدم يختار بينهم" -- defaults to the ref tab, switches to the
+  // link tab on request, and each tab shows only its own copy target.
+  it('defaults to the booking-number tab and switches to the link tab on request', async () => {
+    stubNavigationType('reload')
+    rpc.mockResolvedValue({ data: context, error: null })
+    page()
+    const dialog = await screen.findByRole('dialog')
+    expect(dialog.textContent).toContain('MB-1234ABCD')
+    expect(dialog.textContent).not.toContain('Copy booking link')
+    screen.getByRole('button', { name: 'Booking link' }).click()
+    await new Promise((r) => setTimeout(r, 0))
+    expect(dialog.textContent).not.toContain('MB-1234ABCD')
+    expect(dialog.textContent).toContain('Copy booking link')
+  })
 })

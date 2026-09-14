@@ -2475,8 +2475,10 @@
       "refCopyErrorHint": "Couldn't copy automatically. Select the number above manually or take a screenshot.",
       "refConfirmButton": "Yes, I've saved it",
       "refConfirmed": "Done — your booking number is saved",
-      "reloadPopupTitle": "Did you save your booking number?",
-      "reloadPopupHint": "If you forget your booking number later, copy it now so you can recover your booking easily.",
+      "reloadPopupTitle": "Did you save your booking details?",
+      "reloadPopupHint": "If you forget your booking number or link later, copy it now so you can recover your booking easily.",
+      "reloadPopupRefTab": "Booking number",
+      "reloadPopupLinkTab": "Booking link",
       "reloadPopupCountdown": "This will close automatically in {{seconds}}s.",
       "reloadPopupDismiss": "Dismiss"
 },

@@ -2491,8 +2491,10 @@
       "refCopyErrorHint": "تعذّر النسخ تلقائيًا. حدد الرقم أعلاه يدويًا أو صوّر الشاشة.",
       "refConfirmButton": "نعم، حفظت الرقم",
       "refConfirmed": "تم — رقم حجزك محفوظ لديك",
-      "reloadPopupTitle": "هل حفظت رقم حجزك؟",
-      "reloadPopupHint": "لو نسيت رقم الحجز لاحقًا، انسخه الآن لتتمكن من استرجاع حجزك بسهولة.",
+      "reloadPopupTitle": "هل حفظت بيانات حجزك؟",
+      "reloadPopupHint": "لو نسيت رقم الحجز أو رابطه لاحقًا، انسخه الآن لتتمكن من استرجاع حجزك بسهولة.",
+      "reloadPopupRefTab": "رقم الحجز",
+      "reloadPopupLinkTab": "رابط الحجز",
       "reloadPopupCountdown": "ستُغلق هذه الرسالة تلقائيًا خلال {{seconds}} ثانية.",
       "reloadPopupDismiss": "تجاهل"
 },
