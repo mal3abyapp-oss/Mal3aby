@@ -105,6 +105,8 @@
       "paid": "المدفوع {{amount}}",
       "outstanding": "المتبقي {{amount}}",
       "payNow": "دفع الآن",
+      "payNowLoading": "جارٍ التحميل...",
+      "payNowError": "تعذّر بدء عملية الدفع. حاول مرة أخرى.",
       "claimDialog": {
         "titlePrefix": "دفع فاتورة",
         "selectMethodError": "اختر طريقة الدفع أولًا",
@@ -3849,6 +3851,9 @@
       "bookingCancelled": "الحجز ملغي — رمز الدخول غير متاح",
       "alreadyCheckedIn": "تم تسجيل الحضور",
       "notEligible": "رمز الدخول غير متاح لهذا الحجز حاليًا",
+      "invalidToken": "هذا الرابط لم يعد صالحًا.",
+      "notABookingInvoice": "هذه الفاتورة غير مرتبطة بحجز ملعب.",
+      "qrGenerationFailed": "تعذّر إنشاء رمز QR. حاول مرة أخرى.",
       "loadError": "تعذّر عرض رمز QR."
     }
   },
@@ -4110,7 +4115,8 @@
       "wrong_club": "لا ينتمي لهذا النادي",
       "permission_denied": "لا تملك صلاحية هذا الإجراء",
       "subscription_inactive": "الاشتراك غير نشط",
-      "payment_required": "لا يمكن تسجيل الحضور — يوجد مبلغ مستحق"
+      "payment_required": "لا يمكن تسجيل الحضور — يوجد مبلغ مستحق",
+      "module_inactive": "وحدة الأكاديمية غير مفعّلة لهذا النادي"
     },
     "membershipOutcomes": {
       "expired": "العضوية منتهية",

@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { BrowserQRCodeReader, type IScannerControls } from '@zxing/browser'
 import { supabase } from '@/lib/supabase/client'
+import { useAuth } from '@/app/providers/AuthProvider'
 import { Button } from '@/components/ui/button'
 import { formatMoney } from '@/lib/domain/billing'
 import { ArrowLeft, CheckCircle2, XCircle, Clock, ShieldAlert } from 'lucide-react'
@@ -58,6 +59,14 @@ const OUTCOME_TONES: Record<string, 'success' | 'danger' | 'warning'> = {
   permission_denied: 'danger',
   subscription_inactive: 'danger',
   payment_required: 'danger',
+  // Finding #6b (audit round 2): qr_mark_attendance's 'module_inactive'
+  // result had no entry here, so it fell through to the generic
+  // 'danger' default anyway -- kept explicit now so the mapping stays
+  // complete and self-documenting, matching every other real outcome
+  // code this scanner branches on. Danger (not warning), same tone as
+  // permission_denied/subscription_inactive -- an inactive module is a
+  // hard "this action cannot proceed" state, not a soft caution.
+  module_inactive: 'danger',
 }
 
 const OUTCOME_LABEL_KEYS: Record<string, string> = {
@@ -69,6 +78,10 @@ const OUTCOME_LABEL_KEYS: Record<string, string> = {
   permission_denied: 'scanner.outcomes.permission_denied',
   subscription_inactive: 'scanner.outcomes.subscription_inactive',
   payment_required: 'scanner.outcomes.payment_required',
+  // Finding #6b: previously missing -- fell back to the raw literal
+  // 'module_inactive' string shown directly to staff (OUTCOME_LABEL_KEYS[
+  // outcomeKey] ?? outcomeKey).
+  module_inactive: 'scanner.outcomes.module_inactive',
 }
 
 // Club Memberships QR integration: qr_validate's `result` field alone
@@ -125,12 +138,22 @@ interface OpenSession {
   group_name: string
 }
 
-async function fetchOpenSessionsForCoach(): Promise<OpenSession[]> {
+// Finding #6a (audit round 2): this query had no club_id filter at all
+// -- a multi-club coach (a real, supported state -- club_memberships
+// allows the same auth.uid() to hold roles at more than one club) saw
+// today's session/group names from EVERY club they belong to mixed
+// together in the session picker, not just the club whose QR they were
+// actually scanning. training_sessions has its own club_id column
+// (20260815330000_phase12_sessions_attendance.sql) -- filtering
+// directly on it, same pattern as every other club-scoped query in this
+// codebase, no join needed.
+async function fetchOpenSessionsForCoach(clubId: string): Promise<OpenSession[]> {
   const today = new Date().toISOString().slice(0, 10)
   const { data, error } = await supabase
     .from('training_sessions')
     .select('id, session_date, groups(name)')
     .eq('session_date', today)
+    .eq('club_id', clubId)
   if (error) throw error
   return (data ?? []).map((s) => ({
     id: s.id,
@@ -141,6 +164,7 @@ async function fetchOpenSessionsForCoach(): Promise<OpenSession[]> {
 export function ScanPage() {
   const { t, i18n } = useTranslation()
   const navigate = useNavigate()
+  const { currentClubId } = useAuth()
   const videoRef = useRef<HTMLVideoElement>(null)
   const controlsRef = useRef<IScannerControls | null>(null)
   const [scanning, setScanning] = useState(true)
@@ -206,8 +230,8 @@ export function ScanPage() {
     const row = data[0] as ValidateResult
     setValidated(row)
     setIdentityConfirmed(false)
-    if (row.reference_type === 'player_membership') {
-      fetchOpenSessionsForCoach().then(setOpenSessions).catch(() => setOpenSessions([]))
+    if (row.reference_type === 'player_membership' && currentClubId) {
+      fetchOpenSessionsForCoach(currentClubId).then(setOpenSessions).catch(() => setOpenSessions([]))
     }
   }
 

@@ -105,6 +105,8 @@
       "paid": "Paid {{amount}}",
       "outstanding": "Outstanding {{amount}}",
       "payNow": "Pay now",
+      "payNowLoading": "Loading...",
+      "payNowError": "Couldn't start the payment. Please try again.",
       "claimDialog": {
         "titlePrefix": "Pay invoice",
         "selectMethodError": "Choose a payment method first",
@@ -3819,6 +3821,9 @@
       "bookingCancelled": "Booking cancelled — entry code not available",
       "alreadyCheckedIn": "Already checked in",
       "notEligible": "Entry code is not currently available for this booking",
+      "invalidToken": "This link is no longer valid.",
+      "notABookingInvoice": "This invoice has no linked field booking.",
+      "qrGenerationFailed": "Couldn't generate the QR code. Please try again.",
       "loadError": "Couldn't show the QR code."
     }
   },
@@ -4080,7 +4085,8 @@
       "wrong_club": "Doesn't belong to this club",
       "permission_denied": "You don't have permission for this action",
       "subscription_inactive": "Subscription isn't active",
-      "payment_required": "Check-in denied — outstanding balance"
+      "payment_required": "Check-in denied — outstanding balance",
+      "module_inactive": "The Academy module isn't active for this club"
     },
     "membershipOutcomes": {
       "expired": "Membership expired",

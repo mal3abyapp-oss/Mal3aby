@@ -10190,6 +10190,7 @@ export type Database = {
         Args: never
         Returns: {
           branch_name: string
+          club_id: string
           enrollment_id: string
           enrollment_status: string
           field_name: string
@@ -10270,6 +10271,7 @@ export type Database = {
           club_id: string
           field_name: string
           start_at: string
+          timezone: string
         }[]
       }
       get_official_receipts_report: {
@@ -10630,6 +10632,7 @@ export type Database = {
           booking_field_name: string
           booking_start_at: string
           club_name: string
+          club_timezone: string
           customer_name: string
           is_expired: boolean
           masked_phone: string

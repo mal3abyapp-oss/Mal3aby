@@ -256,6 +256,14 @@ export function PortalPaymentsPage() {
   // ?invoiceId= can legitimately belong to another linked club now that
   // this query is club-scoped.
   const [wrongClubInvoiceId, setWrongClubInvoiceId] = useState<string | null>(null)
+  // Finding #3 (audit round 2): "Pay Now" fetched the invoice's club_id
+  // via .single() with no error check and no pending/disabled state --
+  // a tap during a network error produced no visible feedback at all.
+  // payNowLoadingId tracks which specific invoice's lookup is in flight
+  // (not a single boolean) so only that invoice's button shows a pending
+  // state while others remain interactive.
+  const [payNowLoadingId, setPayNowLoadingId] = useState<string | null>(null)
+  const [payNowError, setPayNowError] = useState<string | null>(null)
   const { activeCustomerId, isLoading: clubLoading, customerMemberships, setActiveClubId } = usePortalClub()
 
   // Finding H-2 (frozen production audit): this list previously
@@ -279,8 +287,12 @@ export function PortalPaymentsPage() {
     const target = invoices.find((i) => i.id === invoiceId)
     if (target && target.outstanding > 0) {
       setWrongClubInvoiceId(null)
-      void supabase.from('invoices').select('club_id').eq('id', invoiceId).single().then(({ data }) => {
-        setClaimClubId(data?.club_id ?? null)
+      void supabase.from('invoices').select('club_id').eq('id', invoiceId).single().then(({ data, error: clubIdError }) => {
+        if (clubIdError || !data?.club_id) {
+          setPayNowError(t('portal.paymentsPage.payNowError'))
+          return
+        }
+        setClaimClubId(data.club_id)
         setClaimingInvoice(target)
       })
     } else if (!target && customerMemberships.length > 1) {
@@ -309,6 +321,10 @@ export function PortalPaymentsPage() {
       )}
       {isError && (
         <ErrorState message={translateSupabaseError(error, t('portal.paymentsPage.loadError'))} onRetry={() => void refetch()} />
+      )}
+
+      {payNowError && (
+        <p role="alert" className="text-sm text-status-danger">{payNowError}</p>
       )}
 
       {!isLoading && !isError && invoiceNotFound && (
@@ -356,12 +372,23 @@ export function PortalPaymentsPage() {
               {inv.outstanding > 0 && (
                 <div className="flex items-center justify-between">
                   <span className="text-sm font-semibold text-status-danger">{t('portal.paymentsPage.outstanding', { amount: formatMoney(inv.outstanding, 'EGP', locale) })}</span>
-                  <Button size="sm" onClick={async () => {
-                    const { data } = await supabase.from('invoices').select('club_id').eq('id', inv.id).single()
-                    setClaimClubId(data?.club_id ?? null)
-                    setClaimingInvoice(inv)
-                  }}>
-                    <Wallet className="me-1 size-4" /> {t('portal.paymentsPage.payNow')}
+                  <Button
+                    size="sm"
+                    disabled={payNowLoadingId === inv.id}
+                    onClick={async () => {
+                      setPayNowError(null)
+                      setPayNowLoadingId(inv.id)
+                      const { data, error: clubIdError } = await supabase.from('invoices').select('club_id').eq('id', inv.id).single()
+                      setPayNowLoadingId(null)
+                      if (clubIdError || !data?.club_id) {
+                        setPayNowError(t('portal.paymentsPage.payNowError'))
+                        return
+                      }
+                      setClaimClubId(data.club_id)
+                      setClaimingInvoice(inv)
+                    }}
+                  >
+                    <Wallet className="me-1 size-4" /> {payNowLoadingId === inv.id ? t('portal.paymentsPage.payNowLoading') : t('portal.paymentsPage.payNow')}
                   </Button>
                 </div>
               )}

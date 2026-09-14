@@ -9,6 +9,7 @@ import { LanguageSwitcher } from '@/components/ui/language-switcher'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { PhoneInput } from '@/components/ui/phone-input'
+import { FormattedDate } from '@/components/ui/formatted-date'
 import { normalizePhone } from '@/lib/domain/phone'
 import { CheckCircle2, XCircle, ShieldCheck, LogIn } from 'lucide-react'
 
@@ -62,6 +63,7 @@ interface InviteContext {
   bookingFieldName: string | null
   bookingStartAt: string | null
   bookingEndAt: string | null
+  clubTimezone: string | null
 }
 
 async function fetchInviteContext(token: string): Promise<InviteContext> {
@@ -77,6 +79,11 @@ async function fetchInviteContext(token: string): Promise<InviteContext> {
     bookingFieldName: row?.booking_field_name ?? null,
     bookingStartAt: row?.booking_start_at ?? null,
     bookingEndAt: row?.booking_end_at ?? null,
+    // Finding #1 (audit round 2): the club's own venue timezone, now
+    // returned by get_portal_invite_context() (migration 20260914060000)
+    // -- same field SecureBookingPage.tsx's own `tz` variable resolves
+    // from get_public_booking_context(), used the identical way below.
+    clubTimezone: row?.club_timezone ?? null,
   }
 }
 
@@ -353,14 +360,21 @@ export function ActivateAccountPage() {
               <div className="rounded-lg border border-border bg-muted/30 p-3 text-sm">
                 <p className="text-xs text-text-secondary">{t('activate.yourBooking')}</p>
                 <p className="font-medium">{context.bookingFieldName}</p>
+                {/* Finding #1 (audit round 2): formatted against the
+                    club's own venue timezone (club_timezone, now
+                    returned by get_portal_invite_context) instead of the
+                    browser's local timezone -- matching SecureBookingPage/
+                    the staff calendar/the WhatsApp message, which all
+                    correctly use the club's timezone. Falls back to
+                    Africa/Cairo only if the RPC genuinely has no
+                    timezone on file, same fallback SecureBookingPage
+                    itself uses. */}
                 <p className="tabular-nums">
-                  <bdi>
-                    {new Date(context.bookingStartAt).toLocaleDateString(locale === 'en' ? 'en-US' : 'ar-EG', { day: 'numeric', month: 'long' })}
-                    {' · '}
-                    {new Date(context.bookingStartAt).toLocaleTimeString(locale === 'en' ? 'en-US' : 'ar-EG', { hour: '2-digit', minute: '2-digit' })}
-                    {' — '}
-                    {new Date(context.bookingEndAt).toLocaleTimeString(locale === 'en' ? 'en-US' : 'ar-EG', { hour: '2-digit', minute: '2-digit' })}
-                  </bdi>
+                  <FormattedDate value={context.bookingStartAt} timeZone={context.clubTimezone ?? 'Africa/Cairo'} options={{ day: 'numeric', month: 'long' }} />
+                  {' · '}
+                  <FormattedDate value={context.bookingStartAt} timeZone={context.clubTimezone ?? 'Africa/Cairo'} options={{ hour: '2-digit', minute: '2-digit' }} />
+                  {' — '}
+                  <FormattedDate value={context.bookingEndAt} timeZone={context.clubTimezone ?? 'Africa/Cairo'} options={{ hour: '2-digit', minute: '2-digit' }} />
                 </p>
               </div>
             )}

@@ -536,9 +536,20 @@ export function WhatsAppActivityTab({
                           >
                             {isRetryingThis ? t('whatsapp.page.activityTab.actions.retrying') : t('whatsapp.page.activityTab.actions.retry')}
                           </Button>
+                          {/* Finding #9 (audit round 2): previously linked
+                              to the bare bookings list instead of
+                              deep-linking to this specific booking, via
+                              the same ?booking=<id> pattern already used
+                              elsewhere (AttentionNeeded.tsx,
+                              ReportExceptionsPage.tsx, AuditLogPage.tsx).
+                              r.referenceId is this row's own booking id
+                              (confirmed by the referenceType === 'booking'
+                              guard). Falls back to the bare list only if
+                              referenceId is somehow null, rather than
+                              rendering a dead link. */}
                           {r.referenceType === 'booking' && (
                             <Button size="sm" variant="ghost" asChild>
-                              <Link to="/app/bookings">{t('whatsapp.page.activityTab.actions.viewBooking')}</Link>
+                              <Link to={r.referenceId ? `/app/bookings?booking=${r.referenceId}` : '/app/bookings'}>{t('whatsapp.page.activityTab.actions.viewBooking')}</Link>
                             </Button>
                           )}
                           {r.recipientCustomerId && (
