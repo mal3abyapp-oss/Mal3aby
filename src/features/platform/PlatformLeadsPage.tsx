@@ -27,10 +27,26 @@ interface LeadRow {
   created_at: string
 }
 
-async function fetchLeads(): Promise<LeadRow[]> {
-  const { data, error } = await supabase.from('contact_requests').select('*').order('created_at', { ascending: false })
+// P3 fix: this had no LIMIT at all, so it was silently truncated at
+// PostgREST's own default max_rows=1000 with no way to tell. Full
+// server-side pagination (à la PlatformClubsPage's search_platform_clubs
+// RPC) is a larger change than this fix warrants for what has always
+// been a small, internal contact-request inbox; instead this adds an
+// explicit high limit plus truncation detection (fetch LEADS_LIMIT + 1
+// rows, and if more than LEADS_LIMIT come back, the list is known-
+// truncated and the extra row is dropped before returning).
+const LEADS_LIMIT = 1000
+
+async function fetchLeads(): Promise<{ rows: LeadRow[]; truncated: boolean }> {
+  const { data, error } = await supabase
+    .from('contact_requests')
+    .select('*')
+    .order('created_at', { ascending: false })
+    .limit(LEADS_LIMIT + 1)
   if (error) throw error
-  return data ?? []
+  const rows = data ?? []
+  const truncated = rows.length > LEADS_LIMIT
+  return { rows: truncated ? rows.slice(0, LEADS_LIMIT) : rows, truncated }
 }
 
 const STATUS_TONE: Record<string, 'info' | 'warning' | 'success' | 'neutral'> = {
@@ -50,7 +66,9 @@ export function PlatformLeadsPage() {
   // indistinguishable from a genuinely empty inbox. isError/error/
   // refetch are now surfaced so a fetch failure shows an explicit
   // error.
-  const { data: leads = [], isLoading, isError, error, refetch } = useQuery({ queryKey: ['platform-leads'], queryFn: fetchLeads })
+  const { data, isLoading, isError, error, refetch } = useQuery({ queryKey: ['platform-leads'], queryFn: fetchLeads })
+  const leads = data?.rows ?? []
+  const truncated = data?.truncated ?? false
   // Acceptance-sweep fix (2026-08-30): this mutation had no onError at
   // all -- a failed status update (RLS rejection, network blip) left
   // the Select silently reverting to the stale server value on the
@@ -125,6 +143,11 @@ export function PlatformLeadsPage() {
   return (
     <div>
       <PageHeader title={t('platform.leadsPage.title')} description={t('platform.leadsPage.description')} />
+      {truncated && (
+        <p className="mb-3 rounded-md bg-status-warning/10 p-2 text-sm text-status-warning">
+          {t('platform.leadsPage.truncatedWarning', { count: LEADS_LIMIT })}
+        </p>
+      )}
       {statusError && <p role="alert" className="mb-3 text-sm text-status-danger">{statusError}</p>}
       {isError ? (
         <ErrorState message={translateSupabaseError(error, t('platform.leadsPage.loadError'))} onRetry={() => void refetch()} />

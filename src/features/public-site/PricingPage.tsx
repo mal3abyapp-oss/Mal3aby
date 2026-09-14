@@ -5,9 +5,11 @@ import { supabase } from '@/lib/supabase/client'
 import { PageHeader } from '@/components/ui/page-header'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
+import { ErrorState } from '@/components/ui/error-state'
 import { Link } from 'react-router-dom'
 import { cn } from '@/lib/utils'
 import { CheckCircle2 } from 'lucide-react'
+import { translateSupabaseError } from '@/lib/errors'
 import { usePublicPricing } from './usePublicPricing'
 import { PricingCard } from './PricingCard'
 
@@ -56,7 +58,7 @@ export function PricingPage() {
   const { t } = useTranslation()
   const [billingInterval, setBillingInterval] = useState<'month' | 'year'>('month')
 
-  const { isLoading, families, annualDiscountByFamily } = usePublicPricing()
+  const { isLoading, isError, error, refetch, families, annualDiscountByFamily } = usePublicPricing()
   const { data: slotsRemaining } = useQuery({ queryKey: ['founding-slots-remaining'], queryFn: fetchFoundingSlotsRemaining })
 
   return (
@@ -76,7 +78,9 @@ export function PricingPage() {
         </p>
       </div>
 
-      {isLoading ? null : families.length === 0 ? (
+      {isLoading ? null : isError ? (
+        <ErrorState message={translateSupabaseError(error, t('publicSite.pricing.loadError'))} onRetry={refetch} />
+      ) : families.length === 0 ? (
         <p className="text-center text-text-secondary">{t('publicSite.pricing.unavailable')}</p>
       ) : (
         <>

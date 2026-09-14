@@ -69,6 +69,12 @@ export function groupIntoFamilies(rows: readonly PublicPlanRow[]): PlanFamily[] 
 
 export interface UsePublicPricingResult {
   isLoading: boolean
+  /** True when the public_plans fetch itself failed — distinct from a
+   *  genuinely empty `families` array. Callers should render an error
+   *  state (not the "no plans" empty state) when this is true. */
+  isError: boolean
+  error: unknown
+  refetch: () => void
   families: PlanFamily[]
   /** familyName -> rounded annual discount percent (e.g. "Growth" -> 16.4). Never present for a family with no valid discount to show — see computeAnnualDiscountsByFamily. */
   annualDiscountByFamily: Map<string, number>
@@ -79,8 +85,8 @@ export interface UsePublicPricingResult {
 // so there is no risk of one page's copy of the filter/grouping logic
 // silently drifting from the other's.
 export function usePublicPricing(): UsePublicPricingResult {
-  const { data: plans = [], isLoading } = useQuery({ queryKey: ['public-commercial-plans'], queryFn: fetchPublicCommercialPlans })
+  const { data: plans = [], isLoading, isError, error, refetch } = useQuery({ queryKey: ['public-commercial-plans'], queryFn: fetchPublicCommercialPlans })
   const families = groupIntoFamilies(plans)
   const annualDiscountByFamily = computeAnnualDiscountsByFamily(plans)
-  return { isLoading, families, annualDiscountByFamily }
+  return { isLoading, isError, error, refetch: () => void refetch(), families, annualDiscountByFamily }
 }

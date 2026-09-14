@@ -82,8 +82,6 @@ export function SalesLeadsPage() {
   }, [searchInput])
 
   const statusFilter = searchParams.get('status') ?? 'all'
-  const cityFilter = searchParams.get('city') ?? ''
-  const minScoreFilter = searchParams.get('minScore') ?? ''
 
   function updateParam(key: string, value: string) {
     const next = new URLSearchParams(searchParams)
@@ -92,6 +90,30 @@ export function SalesLeadsPage() {
     setSearchParams(next)
     setPage(0)
   }
+
+  // FULL-PLATFORM AUDIT ROUND 2 FIX (2026-09-14): City and Min Score
+  // previously called updateParam directly on every keystroke (a URL-
+  // param write + immediate refetch per character), unlike the
+  // adjacent search box which is already 300ms-debounced. Same local-
+  // input + debounced-commit-to-URL shape as searchInput/debouncedSearch
+  // above, applied identically to both.
+  const [cityInput, setCityInput] = useState(searchParams.get('city') ?? '')
+  const [minScoreInput, setMinScoreInput] = useState(searchParams.get('minScore') ?? '')
+
+  useEffect(() => {
+    const timer = setTimeout(() => updateParam('city', cityInput), 300)
+    return () => clearTimeout(timer)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [cityInput])
+
+  useEffect(() => {
+    const timer = setTimeout(() => updateParam('minScore', minScoreInput), 300)
+    return () => clearTimeout(timer)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [minScoreInput])
+
+  const cityFilter = searchParams.get('city') ?? ''
+  const minScoreFilter = searchParams.get('minScore') ?? ''
 
   const { data, isLoading, isFetching, isError, error, refetch } = useQuery({
     queryKey: ['sales-leads-search', debouncedSearch, statusFilter, cityFilter, minScoreFilter, page],
@@ -165,14 +187,14 @@ export function SalesLeadsPage() {
           </SelectContent>
         </Select>
         <Input
-          value={cityFilter}
-          onChange={(e) => updateParam('city', e.target.value)}
+          value={cityInput}
+          onChange={(e) => setCityInput(e.target.value)}
           placeholder={t('platform.sales.leads.cityLabel')}
         />
         <Input
           type="number"
-          value={minScoreFilter}
-          onChange={(e) => updateParam('minScore', e.target.value)}
+          value={minScoreInput}
+          onChange={(e) => setMinScoreInput(e.target.value)}
           placeholder={t('platform.sales.leads.scoreLabel')}
         />
       </div>

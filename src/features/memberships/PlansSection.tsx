@@ -60,6 +60,13 @@ export function PlansSection() {
   const [includeArchived, setIncludeArchived] = useState(false)
   const [createOpen, setCreateOpen] = useState(false)
   const [editingPlan, setEditingPlan] = useState<PlanRow | null>(null)
+  // P3 fix: archive/restore had no onError -- a rejected archive (e.g.
+  // a business rule blocking it server-side) silently re-enabled the
+  // button with zero explanation. Surfaced via a local error state
+  // rendered near the Plans tab UI, matching this codebase's
+  // translateSupabaseError + local-error-state pattern used elsewhere
+  // (e.g. PricingEditor.tsx's formError).
+  const [actionError, setActionError] = useState<string | null>(null)
 
   const { data: plans = [], isLoading } = useQuery({
     queryKey: ['club-membership-plans', currentClubId, includeArchived],
@@ -84,7 +91,8 @@ export function PlansSection() {
       const { error } = await supabase.rpc('archive_club_membership_plan', { p_plan_id: planId })
       if (error) throw error
     },
-    onSuccess: invalidate,
+    onSuccess: () => { setActionError(null); invalidate() },
+    onError: (err) => setActionError(translateSupabaseError(err, t('clubMemberships.plans.errors.archiveError'))),
   })
 
   const restoreMutation = useMutation({
@@ -92,7 +100,8 @@ export function PlansSection() {
       const { error } = await supabase.rpc('restore_club_membership_plan', { p_plan_id: planId })
       if (error) throw error
     },
-    onSuccess: invalidate,
+    onSuccess: () => { setActionError(null); invalidate() },
+    onError: (err) => setActionError(translateSupabaseError(err, t('clubMemberships.plans.errors.restoreError'))),
   })
 
   const columns: DataTableColumn<PlanRow>[] = [
@@ -151,11 +160,11 @@ export function PlansSection() {
       header: '',
       render: (p) => canManage ? (
         p.archived_at ? (
-          <Button size="sm" variant="outline" disabled={restoreMutation.isPending} onClick={() => restoreMutation.mutate(p.plan_id)}>
+          <Button size="sm" variant="outline" disabled={restoreMutation.isPending} onClick={() => { setActionError(null); restoreMutation.mutate(p.plan_id) }}>
             {t('clubMemberships.plans.restore')}
           </Button>
         ) : (
-          <Button size="sm" variant="outline" disabled={archiveMutation.isPending} onClick={() => archiveMutation.mutate(p.plan_id)}>
+          <Button size="sm" variant="outline" disabled={archiveMutation.isPending} onClick={() => { setActionError(null); archiveMutation.mutate(p.plan_id) }}>
             {t('clubMemberships.plans.archive')}
           </Button>
         )
@@ -185,6 +194,8 @@ export function PlansSection() {
           </Dialog>
         )}
       </div>
+
+      {actionError && <p role="alert" className="text-sm text-status-danger">{actionError}</p>}
 
       <DataTable
         columns={columns}

@@ -25,7 +25,7 @@ function groupWeeklyRules(rules: PricingRuleRow[]) {
   const weekly = rules.filter((r) => r.dayOfWeek !== null).sort((a, b) => (a.dayOfWeek ?? 0) - (b.dayOfWeek ?? 0))
   const byKey = new Map<string, PricingRuleRow[]>()
   for (const r of weekly) {
-    const key = `${r.startTime}-${r.endTime}-${r.pricePerHour}`
+    const key = `${r.startTime}-${r.endTime}-${r.pricePerHour}-${r.priority}`
     const arr = byKey.get(key) ?? []
     arr.push(r)
     byKey.set(key, arr)

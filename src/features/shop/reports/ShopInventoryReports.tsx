@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next'
 import { useMutation, useQuery } from '@tanstack/react-query'
 import { supabase } from '@/lib/supabase/client'
 import { useAuth } from '@/app/providers/AuthProvider'
+import { useClubTimezone } from '@/features/bookings/useFieldPricing'
 import { FormattedDate } from '@/components/ui/formatted-date'
 import { DataTable, type DataTableColumn } from '@/components/ui/data-table'
 import { MoneyDisplay } from '@/components/ui/money-display'
@@ -156,6 +157,11 @@ function mapMovements(rows: MovementApiRow[]): MovementRow[] {
 export function ReportShopStockMovementLedgerContent() {
   const { t } = useTranslation()
   const { currentClubId } = useAuth()
+  // FULL-PLATFORM AUDIT ROUND 2 FIX (2026-09-14): movement timestamps
+  // were hardcoded to Africa/Cairo instead of the club's own timezone.
+  // Falls back to Africa/Cairo only while the club's real timezone
+  // hasn't loaded yet.
+  const { data: clubTimezone } = useClubTimezone(currentClubId)
   const { startDate, setStartDate, endDate, setEndDate } = useDateRange()
   const { offset, setOffset, reset } = useOffsetPager()
   const [movementType, setMovementType] = useState(ALL_VALUE)
@@ -187,7 +193,7 @@ export function ReportShopStockMovementLedgerContent() {
   const printed = fullRows ?? rows
 
   const columns: DataTableColumn<MovementRow>[] = [
-    { key: 'date', header: t('shop.sales.columns.date'), render: (r) => <FormattedDate value={r.createdAt} timeZone="Africa/Cairo" options={{ year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }} /> },
+    { key: 'date', header: t('shop.sales.columns.date'), render: (r) => <FormattedDate value={r.createdAt} timeZone={clubTimezone ?? 'Africa/Cairo'} options={{ year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }} /> },
     { key: 'product', header: t('reports.shop.columns.product'), render: (r) => r.productNameAr + (r.variantLabel ? ` (${r.variantLabel})` : '') },
     { key: 'location', header: t('shop.inventory.columns.location'), render: (r) => r.locationName },
     { key: 'type', header: t('shop.inventory.columns.movementType'), render: (r) => t(`shop.inventory.movementTypes.${r.movementType}`, { defaultValue: r.movementType }) },
@@ -320,6 +326,9 @@ interface SupplierActivityRow { supplierId: string | null; supplierName: string;
 export function ReportShopSupplierActivityContent() {
   const { t } = useTranslation()
   const { currentClubId } = useAuth()
+  // FULL-PLATFORM AUDIT ROUND 2 FIX (2026-09-14): lastReceiptAt was
+  // hardcoded to Africa/Cairo instead of the club's own timezone.
+  const { data: clubTimezone } = useClubTimezone(currentClubId)
   const { startDate, setStartDate, endDate, setEndDate } = useDateRange()
 
   const { data: rows = [], isLoading, isError, error, refetch } = useQuery({
@@ -340,7 +349,7 @@ export function ReportShopSupplierActivityContent() {
     { key: 'receipts', header: t('shop.reports.supplierActivity.receiptCount'), render: (r) => r.receiptCount },
     { key: 'qty', header: t('shop.reports.supplierActivity.totalQuantity'), render: (r) => r.totalQuantity },
     { key: 'value', header: t('shop.reports.supplierActivity.totalCostValue'), render: (r) => <MoneyDisplay amount={r.totalCostValue} size="sm" /> },
-    { key: 'lastReceipt', header: t('shop.reports.supplierActivity.lastReceipt'), render: (r) => r.lastReceiptAt ? <FormattedDate value={r.lastReceiptAt} timeZone="Africa/Cairo" options={{ year: 'numeric', month: 'short', day: 'numeric' }} /> : '—' },
+    { key: 'lastReceipt', header: t('shop.reports.supplierActivity.lastReceipt'), render: (r) => r.lastReceiptAt ? <FormattedDate value={r.lastReceiptAt} timeZone={clubTimezone ?? 'Africa/Cairo'} options={{ year: 'numeric', month: 'short', day: 'numeric' }} /> : '—' },
   ]
 
   return (
@@ -391,6 +400,9 @@ function mapVariance(rows: VarianceApiRow[]): VarianceRow[] {
 export function ReportShopStockCountVarianceContent() {
   const { t } = useTranslation()
   const { currentClubId } = useAuth()
+  // FULL-PLATFORM AUDIT ROUND 2 FIX (2026-09-14): completedAt was
+  // hardcoded to Africa/Cairo instead of the club's own timezone.
+  const { data: clubTimezone } = useClubTimezone(currentClubId)
   const { startDate, setStartDate, endDate, setEndDate } = useDateRange()
   const { offset, setOffset, reset } = useOffsetPager()
   const [nonzeroOnly, setNonzeroOnly] = useState(true)
@@ -415,7 +427,7 @@ export function ReportShopStockCountVarianceContent() {
   const printed = fullRows ?? rows
 
   const columns: DataTableColumn<VarianceRow>[] = [
-    { key: 'date', header: t('shop.reports.stockCountVariance.completedAt'), render: (r) => r.completedAt ? <FormattedDate value={r.completedAt} timeZone="Africa/Cairo" options={{ year: 'numeric', month: 'short', day: 'numeric' }} /> : '—' },
+    { key: 'date', header: t('shop.reports.stockCountVariance.completedAt'), render: (r) => r.completedAt ? <FormattedDate value={r.completedAt} timeZone={clubTimezone ?? 'Africa/Cairo'} options={{ year: 'numeric', month: 'short', day: 'numeric' }} /> : '—' },
     { key: 'location', header: t('shop.inventory.columns.location'), render: (r) => r.locationName },
     { key: 'product', header: t('reports.shop.columns.product'), render: (r) => r.productNameAr + (r.variantLabel ? ` (${r.variantLabel})` : '') },
     { key: 'system', header: t('shop.reports.stockCountVariance.systemQty'), render: (r) => r.systemQuantity },

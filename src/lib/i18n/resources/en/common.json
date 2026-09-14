@@ -369,7 +369,9 @@
           "replied": "Replied",
           "demos": "Demos",
           "won": "Won",
-          "lost": "Lost"
+          "lost": "Lost",
+          "loading": "Loading stats...",
+          "loadError": "Couldn't load stats for this campaign."
         }
       },
       "followups": {
@@ -1042,6 +1044,7 @@
       "loadMore": "Load more",
       "pin": "Pin club",
       "unpin": "Unpin club",
+      "pinError": "Couldn't update this club's pin.",
       "pinnedClubs": "Pinned clubs",
       "recentClubs": "Recently managed",
       "resultCount": "{{count}} clubs",
@@ -1052,6 +1055,7 @@
     "leadsPage": {
       "title": "Leads",
       "description": "Prospective customers from the Mal3aby public site",
+      "truncatedWarning": "Showing the most recent {{count}} requests only — there are more than this list can display.",
       "columns": {
         "name": "Name",
         "phone": "Phone",
@@ -2291,7 +2295,9 @@
       },
       "errors": {
         "branchRequired": "Select at least one branch.",
-        "saveError": "Couldn't save this plan."
+        "saveError": "Couldn't save this plan.",
+        "archiveError": "Couldn't archive this plan.",
+        "restoreError": "Couldn't restore this plan."
       }
     },
     "members": {
@@ -3070,6 +3076,7 @@
       "description": "Review customer-uploaded payment receipts and approve or reject them",
       "loading": "Loading...",
       "empty": "No receipts waiting for review.",
+      "viewInvoice": "View invoice",
       "viewReceipt": "View receipt",
       "approve": "Approve",
       "reject": "Reject",
@@ -4117,6 +4124,7 @@
       "title": "Pricing",
       "description": "Clear subscription plans, no hidden fees",
       "unavailable": "Plans aren't available right now.",
+      "loadError": "Couldn't load pricing plans. Please try again.",
       "startFreeTrial": "Start your free trial",
       "recommended": "Recommended",
       "perMonth": "per month",

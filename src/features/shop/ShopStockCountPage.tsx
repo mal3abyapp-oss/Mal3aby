@@ -620,7 +620,22 @@ function StockCountDetailDialog({ clubId, stockCountId, onClose, onChanged }: {
                                   const raw = countedDrafts[line.itemId]
                                   if (raw === undefined || raw === '') return
                                   const parsed = Number(raw)
-                                  if (Number.isNaN(parsed) || parsed === line.countedQuantity) return
+                                  if (Number.isNaN(parsed)) {
+                                    // P3 fix: a non-numeric value previously
+                                    // no-opped silently here, leaving the
+                                    // invalid text displayed as if it had
+                                    // been recorded. Reset the draft back to
+                                    // the last actually-saved value so the
+                                    // input never disagrees with what was
+                                    // really counted.
+                                    setCountedDrafts((d) => {
+                                      const next = { ...d }
+                                      delete next[line.itemId]
+                                      return next
+                                    })
+                                    return
+                                  }
+                                  if (parsed === line.countedQuantity) return
                                   recordLineMutation.mutate({ productId: line.productId, variantId: line.variantId, counted: parsed })
                                 }}
                               />
