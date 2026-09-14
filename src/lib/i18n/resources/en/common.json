@@ -4388,7 +4388,8 @@
       "officialReceipts": "Official receipts",
       "expenses": "Expenses",
       "employeeLiabilities": "Employee Liabilities",
-      "notApplicable": "N/A"
+      "notApplicable": "N/A",
+      "loadError": "Couldn't load the finance overview."
     },
     "payments": {
       "tabAll": "All payments",

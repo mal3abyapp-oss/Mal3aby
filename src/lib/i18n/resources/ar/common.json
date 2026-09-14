@@ -4420,7 +4420,8 @@
       "officialReceipts": "الإيصالات الرسمية",
       "expenses": "المصروفات",
       "employeeLiabilities": "مديونيات الموظفين",
-      "notApplicable": "غير متاح"
+      "notApplicable": "غير متاح",
+      "loadError": "تعذّر تحميل نظرة عامة المالية."
     },
     "payments": {
       "tabAll": "كل المدفوعات",
