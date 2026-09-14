@@ -1705,7 +1705,18 @@ function ModulesPanel({ clubId, subscriptionAccess }: { clubId: string; subscrip
   const { t } = useTranslation()
   const { locale } = useDirection()
   const queryClient = useQueryClient()
-  const [deactivateTarget, setDeactivateTarget] = useState<{ moduleKey: string; reason: string } | null>(null)
+  // FULL-PLATFORM AUDIT FIX (2026-09-14): "Disable" (entitlement) used
+  // to fire immediately on click with zero confirmation, while
+  // "Deactivate" (activation) was gated behind this same reason-
+  // required dialog -- but set_club_module_entitlement() forces
+  // active=false in the SAME statement whenever entitled is set to
+  // false (see the RPC's own migration), so disabling entitlement is
+  // at least as consequential as deactivating (it does that AND drops
+  // entitlement) yet had none of its safeguards. kind distinguishes
+  // which RPC the confirm button below actually calls; the dialog
+  // copy/impact text below is shared but reads correctly for either
+  // case since both describe "the club loses access to this module."
+  const [deactivateTarget, setDeactivateTarget] = useState<{ moduleKey: string; reason: string; kind: 'deactivate' | 'disableEntitlement' } | null>(null)
 
   const { data: modules = [], isLoading } = useQuery({
     queryKey: ['platform-club-modules', clubId],
@@ -1719,7 +1730,10 @@ function ModulesPanel({ clubId, subscriptionAccess }: { clubId: string; subscrip
       const { error } = await supabase.rpc('set_club_module_entitlement', { p_club_id: clubId, p_module_key: moduleKey, p_entitled: entitled })
       if (error) throw error
     },
-    onSuccess: invalidate,
+    onSuccess: () => {
+      invalidate()
+      setDeactivateTarget(null)
+    },
   })
 
   const activationMutation = useMutation({
@@ -1767,7 +1781,20 @@ function ModulesPanel({ clubId, subscriptionAccess }: { clubId: string; subscrip
                 variant={m.entitled ? 'outline' : 'default'}
                 size="sm"
                 disabled={entitlementMutation.isPending}
-                onClick={() => entitlementMutation.mutate({ moduleKey: m.moduleKey, entitled: !m.entitled })}
+                onClick={() => {
+                  // FULL-PLATFORM AUDIT FIX (2026-09-14): disabling
+                  // entitlement also forces active=false server-side
+                  // (see set_club_module_entitlement) -- at least as
+                  // consequential as "Deactivate" below, so it now
+                  // goes through the same confirm+reason dialog
+                  // instead of firing instantly. Enabling stays
+                  // instant -- it's additive/safe, no access is lost.
+                  if (m.entitled) {
+                    setDeactivateTarget({ moduleKey: m.moduleKey, reason: '', kind: 'disableEntitlement' })
+                  } else {
+                    entitlementMutation.mutate({ moduleKey: m.moduleKey, entitled: true })
+                  }
+                }}
               >
                 {m.entitled ? t('platform.clubDetailPage.modulesDisable') : t('platform.clubDetailPage.modulesEnable')}
               </Button>
@@ -1778,7 +1805,7 @@ function ModulesPanel({ clubId, subscriptionAccess }: { clubId: string; subscrip
                   disabled={activationMutation.isPending}
                   onClick={() => {
                     if (m.active) {
-                      setDeactivateTarget({ moduleKey: m.moduleKey, reason: '' })
+                      setDeactivateTarget({ moduleKey: m.moduleKey, reason: '', kind: 'deactivate' })
                     } else {
                       activationMutation.mutate({ moduleKey: m.moduleKey, active: true })
                     }
@@ -1794,32 +1821,62 @@ function ModulesPanel({ clubId, subscriptionAccess }: { clubId: string; subscrip
 
       {/* High-impact confirmation per directive: deactivation never
           deletes data -- state that explicitly, not a generic
-          destructive-sounding warning. */}
+          destructive-sounding warning. FULL-PLATFORM AUDIT FIX
+          (2026-09-14): this dialog is now shared with the
+          entitlement-disable path too (kind === 'disableEntitlement'),
+          since that action is at least as consequential (it forces
+          active=false in the same server-side write). Title/impact
+          copy branches by kind so it reads correctly for either
+          case; the confirm button calls the correct mutation/RPC. */}
       <Dialog open={deactivateTarget !== null} onOpenChange={(open) => !open && setDeactivateTarget(null)}>
         <DialogContent>
           <DialogHeader>
             <DialogTitle>
-              {t('platform.clubDetailPage.modulesDeactivateDialog.title', {
-                module: deactivateTarget ? t(MODULE_LABELS[deactivateTarget.moduleKey] ?? deactivateTarget.moduleKey) : '',
-              })}
+              {t(
+                deactivateTarget?.kind === 'disableEntitlement'
+                  ? 'platform.clubDetailPage.modulesDisableEntitlementDialog.title'
+                  : 'platform.clubDetailPage.modulesDeactivateDialog.title',
+                { module: deactivateTarget ? t(MODULE_LABELS[deactivateTarget.moduleKey] ?? deactivateTarget.moduleKey) : '' },
+              )}
             </DialogTitle>
           </DialogHeader>
           <div className="flex flex-col gap-3">
-            <p className="text-sm text-status-warning">{t('platform.clubDetailPage.modulesDeactivateDialog.impact')}</p>
-            <Input
-              value={deactivateTarget?.reason ?? ''}
-              onChange={(e) => setDeactivateTarget((prev) => (prev ? { ...prev, reason: e.target.value } : prev))}
-              placeholder={t('platform.clubDetailPage.reasonDialog.reasonPlaceholder')}
-            />
+            <p className="text-sm text-status-warning">
+              {t(
+                deactivateTarget?.kind === 'disableEntitlement'
+                  ? 'platform.clubDetailPage.modulesDisableEntitlementDialog.impact'
+                  : 'platform.clubDetailPage.modulesDeactivateDialog.impact',
+              )}
+            </p>
+            {/* set_club_module_entitlement() has no reason parameter at
+                all (unlike set_club_module_active()) -- showing a
+                reason field the operator fills in, only to have it
+                silently discarded, would be a worse bug than the one
+                being fixed here, so this input is deactivate-only. */}
+            {deactivateTarget?.kind !== 'disableEntitlement' && (
+              <Input
+                value={deactivateTarget?.reason ?? ''}
+                onChange={(e) => setDeactivateTarget((prev) => (prev ? { ...prev, reason: e.target.value } : prev))}
+                placeholder={t('platform.clubDetailPage.reasonDialog.reasonPlaceholder')}
+              />
+            )}
             <Button
               variant="destructive"
-              disabled={activationMutation.isPending}
+              disabled={activationMutation.isPending || entitlementMutation.isPending}
               onClick={() => {
                 if (!deactivateTarget) return
-                activationMutation.mutate({ moduleKey: deactivateTarget.moduleKey, active: false, reason: deactivateTarget.reason })
+                if (deactivateTarget.kind === 'disableEntitlement') {
+                  entitlementMutation.mutate({ moduleKey: deactivateTarget.moduleKey, entitled: false })
+                } else {
+                  activationMutation.mutate({ moduleKey: deactivateTarget.moduleKey, active: false, reason: deactivateTarget.reason })
+                }
               }}
             >
-              {t('platform.clubDetailPage.modulesDeactivateDialog.confirm')}
+              {t(
+                deactivateTarget?.kind === 'disableEntitlement'
+                  ? 'platform.clubDetailPage.modulesDisableEntitlementDialog.confirm'
+                  : 'platform.clubDetailPage.modulesDeactivateDialog.confirm',
+              )}
             </Button>
           </div>
         </DialogContent>

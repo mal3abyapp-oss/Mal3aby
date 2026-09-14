@@ -7,6 +7,8 @@ import { PageHeader } from '@/components/ui/page-header'
 import { DataTable, type DataTableColumn } from '@/components/ui/data-table'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { ErrorState } from '@/components/ui/error-state'
+import { translateSupabaseError } from '@/lib/errors'
 import { actionLabel, entityLabel } from '@/lib/domain/audit'
 import { useDirection } from '@/app/providers/DirectionProvider'
 
@@ -129,8 +131,12 @@ function ChangeDiff({ before, after }: { before: Record<string, unknown> | null;
       <button type="button" className="text-start text-accent-foreground hover:underline" onClick={() => setShowRaw((v) => !v)}>
         {showRaw ? t('platform.auditPage.hideTechnicalDetails') : t('platform.auditPage.showTechnicalDetails')}
       </button>
+      {/* FULL-PLATFORM AUDIT FIX (2026-09-14): text-[10px] was below
+          DESIGN_SYSTEM.md's fixed typography scale (no step goes
+          below Caption/text-xs) -- bumped to the smallest real scale
+          step used elsewhere in this same file. */}
       {showRaw && (
-        <pre className="max-w-xs overflow-x-auto rounded bg-page-bg p-2 text-[10px]">
+        <pre className="max-w-xs overflow-x-auto rounded bg-page-bg p-2 text-xs">
           {JSON.stringify({ before, after }, null, 2)}
         </pre>
       )}
@@ -153,7 +159,11 @@ export function PlatformAuditPage() {
     [actionFilter, entityFilter, fromDate, toDate, actorFilter],
   )
 
-  const { data, isLoading, isFetching } = useQuery({
+  // FULL-PLATFORM AUDIT FIX (2026-09-14): isError/error/refetch were
+  // dropped entirely, so a failed audit fetch rendered as an empty
+  // log -- on a security-sensitive screen, indistinguishable from
+  // "nothing happened" rather than "failed to load."
+  const { data, isLoading, isFetching, isError, error, refetch } = useQuery({
     queryKey: ['platform-audit', page, filters],
     queryFn: () => fetchAudit(page, filters),
     placeholderData: (prev) => prev,
@@ -289,8 +299,12 @@ export function PlatformAuditPage() {
         </div>
       </div>
 
-      <DataTable columns={columns} rows={rows} rowKey={(r) => r.id} isLoading={isLoading} emptyTitle={t('platform.auditPage.emptyTitle')} />
-      {totalCount > 0 && (
+      {isError ? (
+        <ErrorState message={translateSupabaseError(error, t('platform.auditPage.loadError'))} onRetry={() => void refetch()} />
+      ) : (
+        <DataTable columns={columns} rows={rows} rowKey={(r) => r.id} isLoading={isLoading} emptyTitle={t('platform.auditPage.emptyTitle')} />
+      )}
+      {!isError && totalCount > 0 && (
         <div className="mt-4 flex items-center justify-between text-sm text-text-secondary">
           <span>{t('platform.auditPage.resultCount', { count: totalCount })}</span>
           <div className="flex items-center gap-2">

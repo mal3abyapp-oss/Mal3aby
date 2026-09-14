@@ -7,6 +7,7 @@ import { PageHeader } from '@/components/ui/page-header'
 import { ErrorState } from '@/components/ui/error-state'
 import { translateSupabaseError } from '@/lib/errors'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { ListLoadingSkeleton } from './ListLoadingSkeleton'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { FormLabel } from '@/components/ui/form-label'
@@ -115,7 +116,7 @@ export function SalesCampaignsPage() {
       {isError ? (
         <ErrorState message={translateSupabaseError(error, t('platform.sales.campaigns.loadError'))} onRetry={() => refetch()} />
       ) : isLoading ? (
-        <p className="text-sm text-text-secondary">{t('common.loading')}</p>
+        <ListLoadingSkeleton />
       ) : (data ?? []).length === 0 ? (
         <p className="text-sm text-text-secondary">{t('platform.sales.campaigns.emptyTitle')}</p>
       ) : (

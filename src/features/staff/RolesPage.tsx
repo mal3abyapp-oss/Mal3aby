@@ -23,6 +23,7 @@ import {
   type PermissionGroupKey,
 } from '@/lib/domain/permissionCatalog'
 import { canSeeNavDomain, type NavDomain } from '@/lib/domain/navigation'
+import { translateSupabaseError } from '@/lib/errors'
 
 // STAFF ACCESS CONTROL & CUSTOM ROLES (2026-08-25) -- Stage 6.
 //
@@ -503,7 +504,7 @@ function RoleEditorDialog({
       }
     },
     onSuccess: onSaved,
-    onError: () => setError(t('roles.saveError')),
+    onError: (err) => setError(translateSupabaseError(err, t('roles.saveError'))),
   })
 
   function handleSubmit() {
@@ -598,8 +599,23 @@ function RoleEditorDialog({
                     type="button"
                     className="text-accent-foreground hover:underline"
                     onClick={() => {
+                      // FULL-PLATFORM AUDIT FIX (2026-09-14): "Select All"
+                      // was adding the group's ownable keys directly,
+                      // bypassing resolveDependencyClosure -- the same
+                      // closure the individual-checkbox handler above
+                      // always runs -- so bulk-selecting a group could
+                      // leave a permission checked whose own dependency
+                      // wasn't, a state the single-toggle path never
+                      // allows. Route through the same closure per key.
                       const ownable = activeGroupDef.permissions.filter((p) => callerPermissions.has(p.key)).map((p) => p.key)
-                      setSelected((current) => new Set([...current, ...ownable]))
+                      setSelected((current) => {
+                        const next = new Set(current)
+                        for (const key of ownable) {
+                          next.add(key)
+                          for (const dep of resolveDependencyClosure(next, key)) next.add(dep)
+                        }
+                        return next
+                      })
                     }}
                   >
                     {t('roles.selectAllGroup')}

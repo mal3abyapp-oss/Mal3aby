@@ -15,6 +15,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog'
 import { CheckCircle2, Circle, ScanLine, XCircle } from 'lucide-react'
+import { AttendanceStatusControl } from './AttendanceStatusControl'
 
 // Coach Today (sessions list) + session detail + manual/QR attendance
 // marking, per SCREEN_MAP.md ("academy" route group, Mobile/Tablet,
@@ -84,13 +85,6 @@ export function CoachTodayView() {
   const [selectedSession, setSelectedSession] = useState<SessionRow | null>(null)
   const [scanOpen, setScanOpen] = useState(false)
   const [scanResult, setScanResult] = useState<{ result: string } | null>(null)
-
-  const ATTENDANCE_LABELS: Record<string, string> = {
-    present: t('academy.coachToday.attendanceLabels.present'),
-    absent: t('academy.coachToday.attendanceLabels.absent'),
-    excused: t('academy.coachToday.attendanceLabels.excused'),
-    late: t('academy.coachToday.attendanceLabels.late'),
-  }
 
   const { data: sessions = [], isLoading } = useQuery({
     queryKey: ['coach-today-sessions', currentClubId],
@@ -192,18 +186,12 @@ export function CoachTodayView() {
                       )}
                       {p.playerName}
                     </span>
-                    <div className="flex gap-1">
-                      {(['present', 'absent', 'excused', 'late'] as const).map((status) => (
-                        <Button
-                          key={status}
-                          size="sm"
-                          variant={p.attendanceStatus === status ? 'default' : 'outline'}
-                          onClick={() => markMutation.mutate({ playerId: p.playerId, status })}
-                        >
-                          {ATTENDANCE_LABELS[status]}
-                        </Button>
-                      ))}
-                    </div>
+                    <AttendanceStatusControl
+                      playerName={p.playerName}
+                      status={p.attendanceStatus}
+                      disabled={markMutation.isPending}
+                      onChange={(status) => markMutation.mutate({ playerId: p.playerId, status })}
+                    />
                   </li>
                 ))}
               </ul>

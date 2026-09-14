@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next'
 import { supabase } from '@/lib/supabase/client'
 import { useAuth } from '@/app/providers/AuthProvider'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { MoneyDisplay } from '@/components/ui/money-display'
 import { formatMoney } from '@/lib/domain/billing'
 import { useDirection } from '@/app/providers/DirectionProvider'
 import { DASHBOARD_POLL_INTERVAL_MS } from '@/lib/query/dashboardPolling'
@@ -82,9 +83,20 @@ export function OwnerFinanceTransparency() {
             <p className="mb-1 text-xs font-medium text-text-secondary">{t('dashboard.ownerFinanceTransparency.collectionsByEmployee')}</p>
             <ul className="flex flex-col gap-1">
               {data.byEmployee.map((e) => (
-                <li key={e.user_id ?? 'unknown'} className="flex justify-between rounded-md border border-border p-2 text-sm">
+                <li key={e.user_id ?? 'unknown'} className="flex items-center justify-between gap-2 rounded-md border border-border p-2 text-sm">
                   <span>{e.full_name}</span>
-                  <span>{formatMoney(e.amount, 'EGP', locale)} — {t('dashboard.ownerFinanceTransparency.paymentCount', { count: e.payment_count })}</span>
+                  {/* FULL-PLATFORM AUDIT FIX (2026-09-14): this figure
+                      was plain text-sm, not MoneyDisplay -- the shared
+                      component money-display.tsx's own header comment
+                      states the rule explicitly ("Financial figures
+                      must always be immediately legible -- never
+                      buried in small secondary text"), and this
+                      screen is literally the "finance transparency"
+                      panel. */}
+                  <span className="flex items-center gap-1.5">
+                    <MoneyDisplay amount={e.amount} size="sm" />
+                    <span className="text-text-secondary">— {t('dashboard.ownerFinanceTransparency.paymentCount', { count: e.payment_count })}</span>
+                  </span>
                 </li>
               ))}
             </ul>

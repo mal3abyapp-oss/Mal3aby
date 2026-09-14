@@ -286,13 +286,28 @@ export function TodayPage() {
           itemized version in AttentionNeeded below is the real one.
           The remaining 4 cards are informational counts (not
           "needs a decision today" items) but still get drill-down
-          links since they're clickable now rather than dead numbers. */}
+          links since they're clickable now rather than dead numbers.
+
+          FULL-PLATFORM AUDIT FIX (2026-09-14): this Level-2
+          ("Operations") row previously rendered at identical visual
+          weight to the Level-1 ("Immediate") row above -- up to 9
+          StatCards total, none visually distinguished, collapsing
+          DESIGN_SYSTEM.md's documented 3-tier dashboard hierarchy
+          ("Not 15-20 equal-weight KPI cards... three tiers"). Added a
+          real (if minimal) tier distinction: a small section label
+          and a quieter, unbordered card treatment for this row --
+          without touching the shared StatCard component (which
+          Level-1 still uses at full weight), so the change is scoped
+          to this one section. */}
       {isManager && academyRisk && (
-        <div className="mb-6 grid grid-cols-2 gap-3 md:grid-cols-4">
-          <StatCard label={t('dashboard.today.activeSubscriptions')} value={academyRisk.activeSubscriptions} icon={GraduationCap} to="/app/academy" />
-          <StatCard label={t('dashboard.today.unpaidSubscriptions')} value={academyRisk.unpaid} tone={academyRisk.unpaid > 0 ? 'danger' : 'default'} to="/app/academy" />
-          <StatCard label={t('dashboard.today.sessionsToday')} value={academyRisk.sessionsToday} to="/app/academy" />
-          <StatCard label={t('dashboard.today.newCustomersToday')} value={academyRisk.newCustomersToday} tone="success" to="/app/customers" />
+        <div className="mb-6">
+          <p className="mb-2 text-xs font-medium uppercase tracking-wide text-text-secondary">{t('dashboard.today.operationsSectionLabel')}</p>
+          <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
+            <StatCard label={t('dashboard.today.activeSubscriptions')} value={academyRisk.activeSubscriptions} icon={GraduationCap} to="/app/academy" className="border-none bg-muted/30 shadow-none" />
+            <StatCard label={t('dashboard.today.unpaidSubscriptions')} value={academyRisk.unpaid} tone={academyRisk.unpaid > 0 ? 'danger' : 'default'} to="/app/academy" className="border-none bg-muted/30 shadow-none" />
+            <StatCard label={t('dashboard.today.sessionsToday')} value={academyRisk.sessionsToday} to="/app/academy" className="border-none bg-muted/30 shadow-none" />
+            <StatCard label={t('dashboard.today.newCustomersToday')} value={academyRisk.newCustomersToday} tone="success" to="/app/customers" className="border-none bg-muted/30 shadow-none" />
+          </div>
         </div>
       )}
 

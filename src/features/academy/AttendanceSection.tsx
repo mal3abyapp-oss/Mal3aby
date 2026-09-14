@@ -14,6 +14,7 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { CheckCircle2, Circle, XCircle } from 'lucide-react'
+import { AttendanceStatusControl } from './AttendanceStatusControl'
 
 // Academy radical simplification directive section 24: attendance is a
 // real operational function -- kept, but reachable directly from the
@@ -112,13 +113,6 @@ export function AttendanceSection() {
   const [selectedSession, setSelectedSession] = useState<SessionRow | null>(null)
   const [pickMembershipId, setPickMembershipId] = useState('')
   const [openError, setOpenError] = useState<string | null>(null)
-
-  const ATTENDANCE_LABELS: Record<string, string> = {
-    present: t('academy.coachToday.attendanceLabels.present'),
-    absent: t('academy.coachToday.attendanceLabels.absent'),
-    excused: t('academy.coachToday.attendanceLabels.excused'),
-    late: t('academy.coachToday.attendanceLabels.late'),
-  }
 
   const { data: sessions = [], isLoading } = useQuery({
     queryKey: ['attendance-sessions', currentClubId, date],
@@ -260,18 +254,12 @@ export function AttendanceSection() {
                     )}
                     {p.playerName}
                   </span>
-                  <div className="flex gap-1">
-                    {(['present', 'absent', 'excused', 'late'] as const).map((status) => (
-                      <Button
-                        key={status}
-                        size="sm"
-                        variant={p.attendanceStatus === status ? 'default' : 'outline'}
-                        onClick={() => markMutation.mutate({ playerId: p.playerId, status })}
-                      >
-                        {ATTENDANCE_LABELS[status]}
-                      </Button>
-                    ))}
-                  </div>
+                  <AttendanceStatusControl
+                    playerName={p.playerName}
+                    status={p.attendanceStatus}
+                    disabled={markMutation.isPending}
+                    onChange={(status) => markMutation.mutate({ playerId: p.playerId, status })}
+                  />
                 </li>
               ))}
             </ul>

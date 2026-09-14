@@ -1464,19 +1464,27 @@ function CartPanel({
                 </div>
               </div>
               <div className="flex items-center gap-1">
-                <Button variant="outline" size="icon" className="size-9" data-testid={`pos-cart-line-${l.productId}-decrease`} onClick={() => updateQuantity(idx, -1)} aria-label={t('shop.pos.decreaseQty')}><Minus className="size-3.5" /></Button>
+                {/* FULL-PLATFORM AUDIT FIX (2026-09-14): these three
+                    controls are tapped repeatedly through every single
+                    sale by a Reception/POS-role user -- exactly the
+                    DESIGN_SYSTEM.md "Touch Targets" scenario ("any
+                    control a Receptionist ... taps repeatedly through
+                    a shift ... sized for a thumb"). Bumped from the
+                    36px icon default to the 44px size="touch-icon"
+                    variant. */}
+                <Button variant="outline" size="touch-icon" data-testid={`pos-cart-line-${l.productId}-decrease`} onClick={() => updateQuantity(idx, -1)} aria-label={t('shop.pos.decreaseQty')}><Minus className="size-3.5" /></Button>
                 <Input
                   type="number"
                   min="1"
                   step="1"
                   value={l.quantity}
                   onChange={(e) => setQuantityDirect(idx, e.target.value)}
-                  className="h-9 w-14 px-1 text-center tabular-nums"
+                  className="h-11 w-14 px-1 text-center tabular-nums"
                   data-testid={`pos-cart-line-${l.productId}-quantity`}
                   aria-label={t('shop.pos.quantityFor', { name: l.productName })}
                 />
-                <Button variant="outline" size="icon" className="size-9" data-testid={`pos-cart-line-${l.productId}-increase`} onClick={() => updateQuantity(idx, 1)} aria-label={t('shop.pos.increaseQty')}><Plus className="size-3.5" /></Button>
-                <Button variant="ghost" size="icon" className="size-9" data-testid={`pos-cart-line-${l.productId}-remove`} onClick={() => removeLine(idx)} aria-label={t('shop.pos.removeLine')}><Trash2 className="size-3.5" /></Button>
+                <Button variant="outline" size="touch-icon" data-testid={`pos-cart-line-${l.productId}-increase`} onClick={() => updateQuantity(idx, 1)} aria-label={t('shop.pos.increaseQty')}><Plus className="size-3.5" /></Button>
+                <Button variant="ghost" size="touch-icon" data-testid={`pos-cart-line-${l.productId}-remove`} onClick={() => removeLine(idx)} aria-label={t('shop.pos.removeLine')}><Trash2 className="size-3.5" /></Button>
               </div>
             </div>
           )

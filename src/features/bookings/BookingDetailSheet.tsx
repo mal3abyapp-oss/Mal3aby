@@ -320,7 +320,16 @@ export function BookingDetailSheet({
       onOpenChange(false)
       onChanged()
     },
-    onError: () => setActionError(t('bookings.detail.cancelError')),
+    // FULL-PLATFORM AUDIT FIX (2026-09-14): discarded the real server
+    // error, always showing one generic message -- unlike
+    // rescheduleMutation/completeMutation in this same file. cancel_
+    // booking() raises distinct exceptions (a cancellation reason is
+    // required / not found or no permission / not authorized for this
+    // branch / not found or not in a cancellable state -- the exact
+    // message a real race, e.g. two staff acting on the same booking
+    // concurrently, produces), all previously collapsed into one
+    // uninformative string.
+    onError: (error) => setActionError(translateSupabaseError(error, t('bookings.detail.cancelError'))),
   })
 
   const rescheduleMutation = useMutation({
@@ -361,7 +370,10 @@ export function BookingDetailSheet({
       onOpenChange(false)
       onChanged()
     },
-    onError: () => setActionError(t('bookings.detail.noShowError')),
+    // FULL-PLATFORM AUDIT FIX (2026-09-14): same fix as cancelMutation
+    // above -- surface the real server reason instead of one generic
+    // message.
+    onError: (error) => setActionError(translateSupabaseError(error, t('bookings.detail.noShowError'))),
   })
 
   // FINAL BOOKINGS UX & LIFECYCLE GAP CLOSURE, Section B3: manual

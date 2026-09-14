@@ -7,6 +7,7 @@ import { DataTable, type DataTableColumn } from '@/components/ui/data-table'
 import { StatusBadge } from '@/components/ui/status-badge'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
+import { Skeleton } from '@/components/ui/skeleton'
 import { Input } from '@/components/ui/input'
 import {
   Dialog,
@@ -308,7 +309,11 @@ function PlatformSystemRoleViewDialog({
           </div>
 
           {permsLoading ? (
-            <p className="text-sm text-text-secondary">{t('common.loading')}</p>
+            <div className="flex flex-col gap-2">
+              <Skeleton className="h-8 w-full" />
+              <Skeleton className="h-8 w-full" />
+              <Skeleton className="h-8 w-full" />
+            </div>
           ) : (
             <div className="flex flex-col gap-3">
               {PLATFORM_PERMISSION_GROUPS.filter((g) => (byGroup.get(g) ?? []).length > 0).map((g) => (

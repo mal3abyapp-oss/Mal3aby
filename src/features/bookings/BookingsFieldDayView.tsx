@@ -267,9 +267,9 @@ export function BookingsFieldDayView({
                     const { time } = fromInstant(s.startAt, clubTimezone)
                     onSlotSelect({ fieldId: activeField.id, fieldName: activeField.name, branchId: activeField.branch_id, date, startTime: time })
                   }}
-                  className="flex flex-col items-start gap-1 rounded-lg border border-status-success/30 bg-status-success/5 p-3 text-start transition hover:border-status-success/60"
+                  className="flex flex-col items-start gap-1 rounded-lg border border-dashed border-border bg-surface p-3 text-start transition hover:border-status-success/50 hover:bg-status-success/5"
                 >
-                  <span className="text-sm font-medium tabular-nums text-status-success"><bdi>{start}</bdi></span>
+                  <span className="text-sm font-medium tabular-nums text-text-secondary"><bdi>{start}</bdi></span>
                   <StatusBadge tone="success" label={t('bookings.mobile.available')} />
                 </button>
               )

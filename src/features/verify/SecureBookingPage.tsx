@@ -28,6 +28,11 @@ import '@/features/public-booking/public-booking.css'
 // "this load was a reload" from "this was a fresh navigation" -- far
 // more reliable than inferring it from sessionStorage presence, which
 // conflates "seen before" with "just reloaded."
+// FULL-PLATFORM AUDIT FIX (2026-09-14): named so the ring/bar below
+// and the countdown's initial state derive from one source of truth
+// instead of a magic "30" repeated in two places.
+const RELOAD_POPUP_SECONDS = 30
+
 function wasPageReloaded(): boolean {
   try {
     const [entry] = performance.getEntriesByType('navigation') as PerformanceNavigationTiming[]
@@ -158,7 +163,7 @@ export function SecureBookingPage() {
   // saved. Opens at most once per page lifetime (openedRef guards a
   // second open from a later data refetch re-triggering the effect).
   const [reloadPopupOpen, setReloadPopupOpen] = useState(false)
-  const [reloadPopupSecondsLeft, setReloadPopupSecondsLeft] = useState(30)
+  const [reloadPopupSecondsLeft, setReloadPopupSecondsLeft] = useState(RELOAD_POPUP_SECONDS)
   // OWNER FOLLOW-UP (2026-09-14): "اجعله يضع رابط الحجز ورقم الحجز
   // للنسخ واجعل المستخدم يختار بينهم" -- the popup offered only the
   // ref; the customer should be able to choose which credential to
@@ -176,7 +181,7 @@ export function SecureBookingPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [!!data?.booking_ref])
   useEffect(() => {
-    if (!reloadPopupOpen) { setReloadPopupSecondsLeft(30); return }
+    if (!reloadPopupOpen) { setReloadPopupSecondsLeft(RELOAD_POPUP_SECONDS); return }
     if (reloadPopupSecondsLeft <= 0) { setReloadPopupOpen(false); return }
     const timer = window.setTimeout(() => setReloadPopupSecondsLeft((s) => s - 1), 1000)
     return () => window.clearTimeout(timer)
@@ -387,9 +392,17 @@ export function SecureBookingPage() {
             {reloadPopupLinkCopyState === 'error' && <p role="alert" className="break-all text-xs">{savedUrl}</p>}
           </div>
         )}
-        <p role="status" className="text-xs text-text-secondary">
-          {t('publicBooking.manage.reloadPopupCountdown', { seconds: reloadPopupSecondsLeft })}
-        </p>
+        <div className="flex flex-col gap-1.5">
+          <div className="h-1 w-full overflow-hidden rounded-full bg-border" aria-hidden="true">
+            <div
+              className="h-full rounded-full bg-accent transition-[width] duration-1000 ease-linear"
+              style={{ width: `${(reloadPopupSecondsLeft / RELOAD_POPUP_SECONDS) * 100}%` }}
+            />
+          </div>
+          <p role="status" className="text-xs text-text-secondary">
+            {t('publicBooking.manage.reloadPopupCountdown', { seconds: reloadPopupSecondsLeft })}
+          </p>
+        </div>
         <Button type="button" variant="ghost" className="min-h-11" onClick={() => setReloadPopupOpen(false)}>
           {t('publicBooking.manage.reloadPopupDismiss')}
         </Button>
