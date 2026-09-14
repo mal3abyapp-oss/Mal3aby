@@ -25,6 +25,20 @@ const buttonVariants = cva(
         sm: "h-8 rounded-md px-3 text-xs",
         lg: "h-10 rounded-md px-8",
         icon: "h-9 w-9",
+        // FULL-PLATFORM AUDIT FIX (2026-09-14): DESIGN_SYSTEM.md's Touch
+        // Targets rule ("any control a Receptionist/Coach/Scanner-role
+        // user taps repeatedly through a shift... sized for a thumb, not
+        // a mouse cursor") is scoped to those specific
+        // frequently-tapped operational controls -- not every button
+        // app-wide, where the existing 36px default is deliberately
+        // denser for admin/table-dense screens. Added as a NEW opt-in
+        // variant rather than changing the shared defaults (which would
+        // risk breaking dense layouts everywhere else) -- apply this at
+        // the specific repeated-tap call sites the audit identified
+        // (POS cart quantity controls, mobile booking date-nav,
+        // attendance marking), not globally.
+        touch: "h-11 min-w-11 px-4 py-2",
+        "touch-icon": "h-11 w-11",
       },
     },
     defaultVariants: {

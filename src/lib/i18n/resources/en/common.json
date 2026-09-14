@@ -1200,6 +1200,8 @@
       "unpublish": "Unpublish",
       "publish": "Publish",
       "emptyTitle": "No plans",
+      "loadError": "Could not load plans. Please try again.",
+      "toggleError": "Could not change the publish status. Check your permissions and try again.",
       "editDialog": {
         "title": "Edit plan {{name}}",
         "nameLabel": "Plan name",
@@ -1212,7 +1214,8 @@
         "defaultFieldLimitLabel": "Default field limit (optional)",
         "defaultAcademyLimitLabel": "Default academy limit (optional)",
         "saving": "Saving...",
-        "save": "Save"
+        "save": "Save",
+        "saveError": "Could not save changes. Check your permissions and try again."
       }
     },
     "reportsPage": {
@@ -2101,8 +2104,10 @@
         "present": "Present",
         "absent": "Absent",
         "excused": "Excused",
-        "late": "Late"
-      }
+        "late": "Late",
+        "unmarked": "Not marked"
+      },
+      "attendanceCycleAria": "{{name}}'s attendance: {{status}}. Tap to move to the next status."
     },
     "playerStatus": {
       "loading": "Loading...",

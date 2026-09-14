@@ -169,18 +169,23 @@ export function BookingsMobileView({
           club's real timezone via fromInstant/formatDate -- a
           receptionist viewing from outside the club's own timezone
           could have seen a mislabeled weekday/date here. */}
+      {/* FULL-PLATFORM AUDIT FIX (2026-09-14): prev/next/picker are
+          tapped repeatedly by a Reception-role user on this
+          mobile-first booking view -- bumped from the 36px icon
+          default to the 44px size="touch-icon" variant per
+          DESIGN_SYSTEM.md's Touch Targets rule. */}
       <div className="flex items-center gap-2">
-        <Button variant="outline" size="icon" aria-label={t('bookings.page.previousDay')} onClick={() => shiftDate(-1)}><ChevronLeft className="size-4 rtl:rotate-180" /></Button>
-        <Button variant="outline" size="sm" className="flex-1" onClick={() => onDateChange(fromInstant(new Date(), clubTimezone).date)}>
+        <Button variant="outline" size="touch-icon" aria-label={t('bookings.page.previousDay')} onClick={() => shiftDate(-1)}><ChevronLeft className="size-4 rtl:rotate-180" /></Button>
+        <Button variant="outline" size="touch" className="flex-1" onClick={() => onDateChange(fromInstant(new Date(), clubTimezone).date)}>
           {isToday ? t('common.today') : <FormattedDate value={new Date(`${date}T12:00:00`)} timeZone={clubTimezone} options={{ weekday: 'long', day: 'numeric', month: 'long' }} />}
         </Button>
-        <Button variant="outline" size="icon" aria-label={t('bookings.page.nextDay')} onClick={() => shiftDate(1)}><ChevronRight className="size-4 rtl:rotate-180" /></Button>
+        <Button variant="outline" size="touch-icon" aria-label={t('bookings.page.nextDay')} onClick={() => shiftDate(1)}><ChevronRight className="size-4 rtl:rotate-180" /></Button>
         <DatePickerButton
           label=""
           value={date}
           onSelect={onDateChange}
           todayDate={fromInstant(new Date(), clubTimezone).date}
-          className="flex size-9 items-center justify-center rounded-md border border-border bg-surface text-text-secondary transition-colors hover:bg-page-bg"
+          className="flex size-11 items-center justify-center rounded-md border border-border bg-surface text-text-secondary transition-colors hover:bg-page-bg"
         />
       </div>
 

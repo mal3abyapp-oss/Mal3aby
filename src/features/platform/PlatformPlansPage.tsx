@@ -8,6 +8,8 @@ import { MoneyDisplay } from '@/components/ui/money-display'
 import { StatusBadge } from '@/components/ui/status-badge'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { ErrorState } from '@/components/ui/error-state'
+import { translateSupabaseError } from '@/lib/errors'
 import {
   Dialog,
   DialogContent,
@@ -47,7 +49,21 @@ const INTERVAL_LABEL: Record<string, string> = { month: 'شهر', year: 'سنة'
 export function PlatformPlansPage() {
   const { t } = useTranslation()
   const queryClient = useQueryClient()
-  const { data: plans = [], isLoading } = useQuery({ queryKey: ['platform-plans-all'], queryFn: fetchPlans })
+  // FULL-PLATFORM AUDIT FIX (2026-09-14): this useQuery, and both
+  // mutations below, previously dropped isError/error entirely -- a
+  // failed load rendered as an empty table (indistinguishable from
+  // "no plans exist"), and a failed Publish/Unpublish/Save click reset
+  // silently with zero feedback. This is a real, reachable path: both
+  // RPCs (set_plan_publish_status, update_platform_plan) gate on
+  // is_platform_owner() only, with no has_platform_permission()
+  // fallback, so a platform_staff account holding
+  // platform.finance.manage (the exact permission this page's own nav
+  // entry is gated on) can open this page, click an action, and have
+  // it silently rejected server-side with no indication anything went
+  // wrong. Matches the established ErrorState/isError/
+  // translateSupabaseError pattern already used elsewhere (e.g.
+  // PlatformLeadsPage.tsx, PlatformSettingsPage.tsx).
+  const { data: plans = [], isLoading, isError, error, refetch } = useQuery({ queryKey: ['platform-plans-all'], queryFn: fetchPlans })
 
   // V1 Implementation Gap Audit (2026-08-16): platform_plans has full
   // CRUD RLS for platform_owner (platform_plans_platform_owner_full_access,
@@ -73,12 +89,17 @@ export function PlatformPlansPage() {
   // a before/after snapshot; the UI just never collected one.
   const [editReason, setEditReason] = useState('')
 
+  const [toggleErrorPlanId, setToggleErrorPlanId] = useState<string | null>(null)
   const toggleMutation = useMutation({
     mutationFn: async ({ id, isPublic }: { id: string; isPublic: boolean }) => {
       const { error } = await supabase.rpc('set_plan_publish_status', { p_plan_id: id, p_is_public: !isPublic })
       if (error) throw error
     },
-    onSuccess: () => void queryClient.invalidateQueries({ queryKey: ['platform-plans-all'] }),
+    onSuccess: () => {
+      setToggleErrorPlanId(null)
+      void queryClient.invalidateQueries({ queryKey: ['platform-plans-all'] })
+    },
+    onError: (_err, { id }) => setToggleErrorPlanId(id),
   })
 
   const updatePlanMutation = useMutation({
@@ -149,9 +170,14 @@ export function PlatformPlansPage() {
       key: 'actions',
       header: '',
       render: (p) => (
-        <Button size="sm" variant="outline" onClick={() => toggleMutation.mutate({ id: p.id, isPublic: p.is_public })}>
-          {p.is_public ? t('platform.plansPage.unpublish') : t('platform.plansPage.publish')}
-        </Button>
+        <div className="flex flex-col items-end gap-1">
+          <Button size="sm" variant="outline" disabled={toggleMutation.isPending} onClick={() => toggleMutation.mutate({ id: p.id, isPublic: p.is_public })}>
+            {p.is_public ? t('platform.plansPage.unpublish') : t('platform.plansPage.publish')}
+          </Button>
+          {toggleErrorPlanId === p.id && (
+            <span className="text-xs text-status-danger">{translateSupabaseError(toggleMutation.error, t('platform.plansPage.toggleError'))}</span>
+          )}
+        </div>
       ),
     },
   ]
@@ -159,7 +185,11 @@ export function PlatformPlansPage() {
   return (
     <div>
       <PageHeader title={t('platform.plansPage.title')} description={t('platform.plansPage.description')} />
-      <DataTable columns={columns} rows={plans} rowKey={(p) => p.id} isLoading={isLoading} emptyTitle={t('platform.plansPage.emptyTitle')} />
+      {isError ? (
+        <ErrorState message={translateSupabaseError(error, t('platform.plansPage.loadError'))} onRetry={() => void refetch()} />
+      ) : (
+        <DataTable columns={columns} rows={plans} rowKey={(p) => p.id} isLoading={isLoading} emptyTitle={t('platform.plansPage.emptyTitle')} />
+      )}
 
       <Dialog open={!!editingPlan} onOpenChange={(open) => !open && setEditingPlan(null)}>
         <DialogContent>
@@ -219,6 +249,9 @@ export function PlatformPlansPage() {
             <Button disabled={!editName.trim() || !editPrice || Number(editPrice) <= 0 || !editReason.trim() || updatePlanMutation.isPending} onClick={() => updatePlanMutation.mutate()}>
               {updatePlanMutation.isPending ? t('platform.plansPage.editDialog.saving') : t('platform.plansPage.editDialog.save')}
             </Button>
+            {updatePlanMutation.isError && (
+              <p className="text-sm text-status-danger">{translateSupabaseError(updatePlanMutation.error, t('platform.plansPage.editDialog.saveError'))}</p>
+            )}
           </div>
         </DialogContent>
       </Dialog>

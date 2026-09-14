@@ -1203,6 +1203,8 @@
       "unpublish": "إلغاء النشر",
       "publish": "نشر",
       "emptyTitle": "لا توجد خطط",
+      "loadError": "تعذّر تحميل الخطط. حاول مرة أخرى.",
+      "toggleError": "تعذّر تغيير حالة النشر. تأكد من صلاحياتك وحاول مرة أخرى.",
       "editDialog": {
         "title": "تعديل خطة {{name}}",
         "nameLabel": "اسم الخطة",
@@ -1215,7 +1217,8 @@
         "defaultFieldLimitLabel": "حد الملاعب الافتراضي (اختياري)",
         "defaultAcademyLimitLabel": "حد الأكاديمية الافتراضي (اختياري)",
         "saving": "جارٍ الحفظ...",
-        "save": "حفظ"
+        "save": "حفظ",
+        "saveError": "تعذّر حفظ التعديلات. تأكد من صلاحياتك وحاول مرة أخرى."
       }
     },
     "reportsPage": {
@@ -2104,8 +2107,10 @@
         "present": "حاضر",
         "absent": "غائب",
         "excused": "معذور",
-        "late": "متأخر"
-      }
+        "late": "متأخر",
+        "unmarked": "لم يُسجَّل"
+      },
+      "attendanceCycleAria": "حالة حضور {{name}}: {{status}}. اضغط للانتقال للحالة التالية."
     },
     "playerStatus": {
       "loading": "جارٍ التحميل...",
