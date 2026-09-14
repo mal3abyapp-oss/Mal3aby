@@ -13,6 +13,8 @@ import type { ConnectionState, MediaAttachment, SendMessageResult, WhatsAppProvi
 import { recordSendStart, recordSendStage, recordSendOutcome, recordConnectionOpen } from './SendDiagnostics.js'
 import { inspectBaileysLogCall } from './SendProtocolDiagnostics.js'
 import { recordRawMessagesUpdateEvent } from './ReceiptChainDiagnostics.js'
+import { recordForbiddenDisconnect, clearForbiddenDisconnectHistory, describeForbiddenPattern } from './RestrictionSignalDetector.js'
+import { isOptOutKeyword, isKnownBanNoticeShape } from './OptOutKeywordMatcher.js'
 
 /**
  * BaileysProvider -- the ONLY file in this service allowed to import
@@ -391,6 +393,25 @@ export interface BaileysProviderHooks {
     upsertType: string
     timestampMs: number | null
   }) => void
+
+  /**
+   * Ban-protection hardening (2026-09-12) -- see RestrictionSignalDetector.ts's
+   * own doc comment for the full evidence bar (a repeated 403/forbidden
+   * disconnect pattern, or a known-shape system-JID risk notice). `detail`
+   * is a short, pre-classified, non-content string (e.g. "3x 403
+   * forbidden disconnect within 10 minutes" or "WhatsApp system notice
+   * matched a known ban-notice phrase") -- never raw message text.
+   */
+  onRestrictionSignal?: (detail: string) => void
+
+  /**
+   * Ban-protection hardening (2026-09-12) -- fired when a genuine
+   * INCOMING message (never fromMe, never the WhatsApp-system JID) is a
+   * short, unambiguous stop/إيقاف-shaped opt-out keyword. See
+   * OptOutKeywordMatcher.ts's own doc comment for the exact, narrow
+   * pattern list -- this is not a general sentiment classifier.
+   */
+  onOptOutKeyword?: (fromPhoneDigitsOnly: string) => void
 }
 
 export class BaileysProvider implements WhatsAppProvider {
@@ -770,13 +791,44 @@ export class BaileysProvider implements WhatsAppProvider {
       for (const msg of messages) {
         const fromJid = msg.key?.remoteJid ?? null
         const isFromWhatsAppSystem = fromJid === '0@s.whatsapp.net' || fromJid === 'status@broadcast'
+        const fromMe = !!msg.key?.fromMe
         this.hooks.onIncomingMessageMeta?.({
-          fromMe: !!msg.key?.fromMe,
+          fromMe,
           isFromWhatsAppSystem,
           messageType: msg.message ? Object.keys(msg.message)[0] ?? null : null,
           upsertType: type,
           timestampMs: typeof msg.messageTimestamp === 'number' ? msg.messageTimestamp * 1000 : null,
         })
+
+        // Ban-protection hardening (2026-09-12): the only two places in
+        // this whole handler that ever look at actual message TEXT --
+        // both are narrow, both discard the text immediately after the
+        // boolean check, neither passes text to any hook or log line.
+        // See OptOutKeywordMatcher.ts's own doc comment for the exact
+        // pattern lists and why each check is scoped to only the
+        // sender category it applies to (a ban-notice can only
+        // meaningfully come from WhatsApp's own system JID; an opt-out
+        // can only meaningfully come from a real customer, never our
+        // own outgoing message being echoed back via fromMe).
+        const bodyText =
+          msg.message?.conversation ??
+          msg.message?.extendedTextMessage?.text ??
+          null
+
+        if (bodyText && isFromWhatsAppSystem && !fromMe && this.hooks.onRestrictionSignal) {
+          if (isKnownBanNoticeShape(bodyText)) {
+            this.hooks.onRestrictionSignal('WhatsApp system notice matched a known ban-notice phrase')
+          }
+        }
+
+        if (bodyText && !isFromWhatsAppSystem && !fromMe && this.hooks.onOptOutKeyword) {
+          if (isOptOutKeyword(bodyText)) {
+            const senderPhoneDigitsOnly = (fromJid ?? '').split('@')[0]?.replace(/\D/g, '') ?? ''
+            if (senderPhoneDigitsOnly) {
+              this.hooks.onOptOutKeyword(senderPhoneDigitsOnly)
+            }
+          }
+        }
       }
     })
 
@@ -800,6 +852,12 @@ export class BaileysProvider implements WhatsAppProvider {
         const phone = socket.user?.id?.split(':')[0] ?? undefined
         this.setState('connected', { connectedPhoneNumber: phone })
         this.connectedSince = Date.now()
+        // Ban-protection hardening (2026-09-12): a genuinely
+        // re-established connection clears any prior forbidden-
+        // disconnect history for this identity -- that pattern is no
+        // longer live evidence of an ongoing restriction once the
+        // account is demonstrably connected again.
+        clearForbiddenDisconnectHistory(this.clubId)
         // Production A/B test requirement (2026-08-18): a later send
         // attempt's SendDiagnostics record needs to know exactly when
         // THIS generation's connection opened, so a reader can compute
@@ -895,6 +953,24 @@ export class BaileysProvider implements WhatsAppProvider {
           return
         }
 
+        // Ban-protection hardening (2026-09-12): a 403/forbidden
+        // disconnect is recorded as a candidate restriction signal on
+        // EVERY occurrence (recordForbiddenDisconnect() tracks its own
+        // rolling window), but only REPORTED once the pattern crosses
+        // the conservative threshold -- see RestrictionSignalDetector.ts's
+        // own doc comment for why a single occurrence is not
+        // conclusive. This still falls through to the normal bounded
+        // reconnect-with-backoff below (a forbidden disconnect is not,
+        // by itself, treated as terminal the way loggedOut is -- only
+        // the RPC-side status='restricted' write, once the pattern is
+        // confirmed, actually stops future claim/send activity).
+        if (disconnectReasonTag === 'forbidden' && this.hooks.onRestrictionSignal) {
+          const patternConfirmed = recordForbiddenDisconnect(this.clubId)
+          if (patternConfirmed) {
+            this.hooks.onRestrictionSignal(describeForbiddenPattern(this.clubId))
+          }
+        }
+
         // conflict/replaced and every other transient reason ->
         // bounded exponential backoff with jitter, single timer.
         this.reconnectAttempts += 1
@@ -920,12 +996,18 @@ export class BaileysProvider implements WhatsAppProvider {
    * categories the review directive asked for -- fix item 5. Codes per
    * Baileys' own DisconnectReason enum plus the raw stream-level ones
    * (428/440/515) the review specifically named.
+   *
+   * Ban-protection hardening (2026-09-12) adds 'forbidden' (403) as its
+   * own distinct category -- see RestrictionSignalDetector.ts's own
+   * doc comment for why this specific code, and only this code, is
+   * treated as a genuine WhatsApp-side restriction signal candidate.
    */
-  private classifyDisconnectReason(statusCode: number | null): 'loggedOut' | 'restartRequired' | 'conflict' | 'timedOut' | 'transient' {
+  private classifyDisconnectReason(statusCode: number | null): 'loggedOut' | 'restartRequired' | 'conflict' | 'timedOut' | 'forbidden' | 'transient' {
     if (statusCode === DisconnectReason.loggedOut) return 'loggedOut'
     if (statusCode === DisconnectReason.restartRequired) return 'restartRequired'
     if (statusCode === DisconnectReason.connectionReplaced || statusCode === 440) return 'conflict'
     if (statusCode === DisconnectReason.timedOut || statusCode === 408) return 'timedOut'
+    if (statusCode === DisconnectReason.forbidden) return 'forbidden'
     return 'transient'
   }
 

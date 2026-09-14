@@ -8,7 +8,7 @@
     "dev": "tsx watch --env-file=.env src/index.ts",
     "build": "tsc -p tsconfig.json",
     "start": "node --env-file=.env dist/index.js",
-    "test": "npm run test:templates && npm run test:send-reliability && npm run test:root-cause && npm run test:status-fencing && npm run test:auth-dir-cleanup && npm run test:delivery-receipts && npm run test:send-protocol-diagnostics && npm run test:receipt-chain-diagnostics && npm run test:platform-domain-isolation",
+    "test": "npm run test:templates && npm run test:send-reliability && npm run test:root-cause && npm run test:status-fencing && npm run test:auth-dir-cleanup && npm run test:delivery-receipts && npm run test:send-protocol-diagnostics && npm run test:receipt-chain-diagnostics && npm run test:platform-domain-isolation && npm run test:ban-protection",
     "test:connection": "tsx --env-file=.env src/selfTest.ts",
     "test:templates": "tsx src/templates.test.ts",
     "test:media": "tsx src/mediaTest.ts",
@@ -19,6 +19,7 @@
     "test:delivery-receipts": "tsx src/deliveryReceiptExtractionTest.ts",
     "test:send-protocol-diagnostics": "tsx src/sendProtocolDiagnosticsTest.ts",
     "test:platform-domain-isolation": "tsx src/platformDomainIsolationTest.ts",
+    "test:ban-protection": "tsx src/banProtectionTest.ts",
     "test:receipt-chain-diagnostics": "tsx src/receiptChainDiagnosticsTest.ts"
   },
   "dependencies": {
