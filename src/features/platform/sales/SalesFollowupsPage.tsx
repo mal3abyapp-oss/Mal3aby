@@ -7,6 +7,7 @@ import { useTranslation } from 'react-i18next'
 import { supabase } from '@/lib/supabase/client'
 import { PageHeader } from '@/components/ui/page-header'
 import { ErrorState } from '@/components/ui/error-state'
+import { EmptyState } from '@/components/ui/empty-state'
 import { translateSupabaseError } from '@/lib/errors'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -14,6 +15,8 @@ import { StatusBadge } from '@/components/ui/status-badge'
 import { FormattedDate } from '@/components/ui/formatted-date'
 import { SALES_DISPLAY_TIMEZONE } from './salesTimeZone'
 import { Input } from '@/components/ui/input'
+import { CalendarCheck } from 'lucide-react'
+import { ListLoadingSkeleton } from './ListLoadingSkeleton'
 
 interface Followup {
   followup_id: string
@@ -94,9 +97,9 @@ export function SalesFollowupsPage() {
       {isError ? (
         <ErrorState message={translateSupabaseError(error, t('platform.sales.followups.loadError'))} onRetry={() => refetch()} />
       ) : isLoading ? (
-        <p className="text-sm text-text-secondary">{t('common.loading')}</p>
+        <ListLoadingSkeleton />
       ) : (data ?? []).length === 0 ? (
-        <p className="text-sm text-text-secondary">{t('platform.sales.followups.emptyTitle')}</p>
+        <EmptyState icon={CalendarCheck} title={t('platform.sales.followups.emptyTitle')} />
       ) : (
         <div className="space-y-3">
           {(data ?? []).map((f) => (

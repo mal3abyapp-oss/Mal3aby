@@ -15,6 +15,7 @@ import { ErrorState } from '@/components/ui/error-state'
 import { translateSupabaseError } from '@/lib/errors'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
+import { ListLoadingSkeleton } from './ListLoadingSkeleton'
 import { Input } from '@/components/ui/input'
 import { FormLabel } from '@/components/ui/form-label'
 import { StatusBadge } from '@/components/ui/status-badge'
@@ -80,7 +81,7 @@ export function SalesSettingsPage() {
           {isError ? (
             <ErrorState message={translateSupabaseError(error, t('platform.sales.settings.loadError'))} onRetry={() => refetch()} />
           ) : isLoading ? (
-            <p className="text-sm text-text-secondary">{t('common.loading')}</p>
+            <ListLoadingSkeleton />
           ) : (
             <ul className="space-y-3">
               {(data ?? []).map((p) => (
@@ -114,7 +115,7 @@ export function SalesSettingsPage() {
                       (owner decision, 2026-09-04: "Do not display Anthropic as a system
                       failure merely because the owner chose not to purchase credits"). */}
                   {p.provider_key === 'ai_offer_generator' && (
-                    <li className="flex items-center justify-between border-b border-border-subtle pb-3 last:border-0 pl-4">
+                    <li className="flex items-center justify-between border-b border-border-subtle pb-3 last:border-0 ps-4">
                       <div>
                         <p className="text-sm font-medium text-text-secondary">Anthropic ({t('platform.sales.settings.optionalProvider')})</p>
                       </div>

@@ -13,6 +13,7 @@ import { ErrorState } from '@/components/ui/error-state'
 import { translateSupabaseError } from '@/lib/errors'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
+import { ListLoadingSkeleton } from './ListLoadingSkeleton'
 import { Input } from '@/components/ui/input'
 import { FormLabel } from '@/components/ui/form-label'
 import { StatusBadge } from '@/components/ui/status-badge'
@@ -196,7 +197,7 @@ export function SalesDiscoverPage() {
           {jobsQuery.isError ? (
             <ErrorState message={translateSupabaseError(jobsQuery.error, t('platform.sales.discover.loadError'))} onRetry={() => jobsQuery.refetch()} />
           ) : jobsQuery.isLoading ? (
-            <p className="text-sm text-text-secondary">{t('common.loading')}</p>
+            <ListLoadingSkeleton />
           ) : (jobsQuery.data ?? []).length === 0 ? (
             <p className="text-sm text-text-secondary">{t('platform.sales.discover.noJobs')}</p>
           ) : (

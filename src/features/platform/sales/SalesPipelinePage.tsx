@@ -9,6 +9,7 @@ import { PageHeader } from '@/components/ui/page-header'
 import { ErrorState } from '@/components/ui/error-state'
 import { translateSupabaseError } from '@/lib/errors'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { ListLoadingSkeleton } from './ListLoadingSkeleton'
 
 const STAGES = [
   'discovered', 'enriching', 'enriched', 'qualified', 'contact_ready', 'contacted',
@@ -46,7 +47,7 @@ function StageColumn({ stage }: { stage: string }) {
         {isError ? (
           <ErrorState message={translateSupabaseError(error, t('platform.sales.pipeline.loadError'))} onRetry={() => refetch()} />
         ) : isLoading ? (
-          <p className="text-xs text-text-secondary">{t('common.loading')}</p>
+          <ListLoadingSkeleton rows={2} />
         ) : (data ?? []).length === 0 ? (
           <p className="text-xs text-text-secondary">—</p>
         ) : (

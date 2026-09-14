@@ -15,6 +15,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { StatusBadge } from '@/components/ui/status-badge'
 import { FormattedDate } from '@/components/ui/formatted-date'
 import { SALES_DISPLAY_TIMEZONE } from './salesTimeZone'
+import { ListLoadingSkeleton } from './ListLoadingSkeleton'
 
 interface DashboardSummary {
   total_leads: number
@@ -139,7 +140,7 @@ export function SalesDashboardPage() {
             {funnelQuery.isError ? (
               <ErrorState message={translateSupabaseError(funnelQuery.error, t('platform.sales.dashboard.loadError'))} onRetry={() => funnelQuery.refetch()} />
             ) : funnelQuery.isLoading ? (
-              <p className="text-sm text-text-secondary">{t('common.loading')}</p>
+              <ListLoadingSkeleton />
             ) : (
               <ul className="space-y-2">
                 {(funnelQuery.data ?? []).map((s) => (
@@ -159,7 +160,7 @@ export function SalesDashboardPage() {
             {sourceQuery.isError ? (
               <ErrorState message={translateSupabaseError(sourceQuery.error, t('platform.sales.dashboard.loadError'))} onRetry={() => sourceQuery.refetch()} />
             ) : sourceQuery.isLoading ? (
-              <p className="text-sm text-text-secondary">{t('common.loading')}</p>
+              <ListLoadingSkeleton />
             ) : (sourceQuery.data ?? []).length === 0 ? (
               <p className="text-sm text-text-secondary">{t('platform.sales.dashboard.noData')}</p>
             ) : (
@@ -182,7 +183,7 @@ export function SalesDashboardPage() {
           {followupsQuery.isError ? (
             <ErrorState message={translateSupabaseError(followupsQuery.error, t('platform.sales.dashboard.loadError'))} onRetry={() => followupsQuery.refetch()} />
           ) : followupsQuery.isLoading ? (
-            <p className="text-sm text-text-secondary">{t('common.loading')}</p>
+            <ListLoadingSkeleton />
           ) : (followupsQuery.data ?? []).length === 0 ? (
             <p className="text-sm text-text-secondary">{t('platform.sales.dashboard.noFollowups')}</p>
           ) : (
@@ -212,7 +213,7 @@ export function SalesDashboardPage() {
           {upcomingDemosQuery.isError ? (
             <ErrorState message={translateSupabaseError(upcomingDemosQuery.error, t('platform.sales.dashboard.loadError'))} onRetry={() => upcomingDemosQuery.refetch()} />
           ) : upcomingDemosQuery.isLoading ? (
-            <p className="text-sm text-text-secondary">{t('common.loading')}</p>
+            <ListLoadingSkeleton />
           ) : (upcomingDemosQuery.data ?? []).length === 0 ? (
             <p className="text-sm text-text-secondary">{t('platform.sales.dashboard.noUpcomingDemos')}</p>
           ) : (
