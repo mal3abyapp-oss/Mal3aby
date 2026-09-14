@@ -2474,7 +2474,11 @@
       "refCopied": "Booking number copied",
       "refCopyErrorHint": "Couldn't copy automatically. Select the number above manually or take a screenshot.",
       "refConfirmButton": "Yes, I've saved it",
-      "refConfirmed": "Done — your booking number is saved"
+      "refConfirmed": "Done — your booking number is saved",
+      "reloadPopupTitle": "Did you save your booking number?",
+      "reloadPopupHint": "If you forget your booking number later, copy it now so you can recover your booking easily.",
+      "reloadPopupCountdown": "This will close automatically in {{seconds}}s.",
+      "reloadPopupDismiss": "Dismiss"
 },
     "experience": {
       "fieldsLabel": "fields",

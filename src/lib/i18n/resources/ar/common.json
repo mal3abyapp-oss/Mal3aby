@@ -2490,7 +2490,11 @@
       "refCopied": "تم نسخ رقم الحجز",
       "refCopyErrorHint": "تعذّر النسخ تلقائيًا. حدد الرقم أعلاه يدويًا أو صوّر الشاشة.",
       "refConfirmButton": "نعم، حفظت الرقم",
-      "refConfirmed": "تم — رقم حجزك محفوظ لديك"
+      "refConfirmed": "تم — رقم حجزك محفوظ لديك",
+      "reloadPopupTitle": "هل حفظت رقم حجزك؟",
+      "reloadPopupHint": "لو نسيت رقم الحجز لاحقًا، انسخه الآن لتتمكن من استرجاع حجزك بسهولة.",
+      "reloadPopupCountdown": "ستُغلق هذه الرسالة تلقائيًا خلال {{seconds}} ثانية.",
+      "reloadPopupDismiss": "تجاهل"
 },
     "experience": {
       "fieldsLabel": "ملاعب",

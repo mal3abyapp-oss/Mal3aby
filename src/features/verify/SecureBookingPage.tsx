@@ -14,7 +14,28 @@ import { Button } from '@/components/ui/button'
 import { CheckCircle2, Clock, CalendarDays, MapPin, Copy, Download, RefreshCw, Ticket, Phone, QrCode as QrIcon } from 'lucide-react'
 import { PaymentMethodsPanel } from '@/features/public-booking/PaymentMethodsPanel'
 import { HoldCountdown } from '@/features/public-booking/HoldCountdown'
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog'
 import '@/features/public-booking/public-booking.css'
+
+// GAP CLOSURE (2026-09-14, owner follow-up): "اريد عند عمل رفرش
+// للصفحه ظهور بوب اب فيه عداد 30 ثانيه وزر تجاهل او اغلاق به رقم
+// الحجز ورساله طلب نسخ اذا نسيت" -- a genuine page RELOAD specifically
+// (not the first-ever visit, e.g. arriving fresh from the booking
+// confirmation redirect) should surface a time-boxed popup asking the
+// customer to save the ref, since a reload is the exact moment they
+// might have just lost an unsaved reference. The Navigation Timing
+// API's entry.type is the correct, standards-based way to distinguish
+// "this load was a reload" from "this was a fresh navigation" -- far
+// more reliable than inferring it from sessionStorage presence, which
+// conflates "seen before" with "just reloaded."
+function wasPageReloaded(): boolean {
+  try {
+    const [entry] = performance.getEntriesByType('navigation') as PerformanceNavigationTiming[]
+    return entry?.type === 'reload'
+  } catch {
+    return false
+  }
+}
 
 interface BookingContext {
   result: 'valid' | 'expired' | 'cancelled' | 'already_used' | 'invalid'
@@ -128,6 +149,28 @@ export function SecureBookingPage() {
     if (!data?.booking_ref) return
     try { sessionStorage.setItem(`mala3by.bookingRefConfirmed.${data.booking_ref}`, '1') } catch { /* best-effort only */ }
   }
+  // GAP CLOSURE (2026-09-14, owner follow-up): a time-boxed popup
+  // (30s countdown, explicit dismiss) shown only on a genuine page
+  // RELOAD -- not the first-ever visit (arriving fresh from booking
+  // confirmation already shows the same ask via the always-visible
+  // sidebar callout; a second popup on that same first visit would be
+  // redundant nagging) -- and only while the ref is not yet confirmed
+  // saved. Opens at most once per page lifetime (openedRef guards a
+  // second open from a later data refetch re-triggering the effect).
+  const [reloadPopupOpen, setReloadPopupOpen] = useState(false)
+  const [reloadPopupSecondsLeft, setReloadPopupSecondsLeft] = useState(30)
+  useEffect(() => {
+    if (!data?.booking_ref || refConfirmed) return
+    if (!wasPageReloaded()) return
+    setReloadPopupOpen(true)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [!!data?.booking_ref])
+  useEffect(() => {
+    if (!reloadPopupOpen) { setReloadPopupSecondsLeft(30); return }
+    if (reloadPopupSecondsLeft <= 0) { setReloadPopupOpen(false); return }
+    const timer = window.setTimeout(() => setReloadPopupSecondsLeft((s) => s - 1), 1000)
+    return () => window.clearTimeout(timer)
+  }, [reloadPopupOpen, reloadPopupSecondsLeft])
   useEffect(() => {
     setQrDataUrl(null)
     setQrError(false)
@@ -266,5 +309,42 @@ export function SecureBookingPage() {
         </div>
       </>}
     </main>
+    {/* GAP CLOSURE (2026-09-14): "اريد عند عمل رفرش للصفحه ظهور بوب
+        اب فيه عداد 30 ثانيه وزر تجاهل او اغلاق به رقم الحجز ورساله
+        طلب نسخ اذا نسيت" -- the same Dialog primitive already used by
+        BookingRecoveryDialog.tsx, for visual/behavioral consistency
+        (focus trap, Escape-to-close, overlay click-to-close all come
+        free from Radix). onOpenChange covers every dismissal path
+        (explicit close button, overlay click, Escape) uniformly. */}
+    {data?.booking_ref && <Dialog open={reloadPopupOpen} onOpenChange={setReloadPopupOpen}>
+      <DialogContent dir={direction} className="booking-page rounded-2xl text-center sm:text-start">
+        <DialogHeader>
+          <DialogTitle>{t('publicBooking.manage.reloadPopupTitle')}</DialogTitle>
+          <DialogDescription className="pt-2 leading-6">{t('publicBooking.manage.reloadPopupHint')}</DialogDescription>
+        </DialogHeader>
+        <div className="flex items-center justify-between gap-2 rounded-lg border border-border bg-page-bg px-3 py-2">
+          <bdi className="text-lg font-semibold tracking-wider">{data.booking_ref}</bdi>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            className="gap-1.5"
+            onClick={async () => {
+              try { await navigator.clipboard.writeText(data.booking_ref ?? ''); setRefCopyState('copied'); confirmRefSaved() } catch { setRefCopyState('error') }
+              window.setTimeout(() => setRefCopyState('idle'), 2000)
+            }}
+          >
+            {refCopyState === 'copied' ? <CheckCircle2 className="size-4" /> : <Copy className="size-4" />}
+            {t(refCopyState === 'copied' ? 'publicBooking.manage.refCopied' : 'publicBooking.manage.copyRef')}
+          </Button>
+        </div>
+        <p role="status" className="text-xs text-text-secondary">
+          {t('publicBooking.manage.reloadPopupCountdown', { seconds: reloadPopupSecondsLeft })}
+        </p>
+        <Button type="button" variant="ghost" className="min-h-11" onClick={() => setReloadPopupOpen(false)}>
+          {t('publicBooking.manage.reloadPopupDismiss')}
+        </Button>
+      </DialogContent>
+    </Dialog>}
   </div>
 }
