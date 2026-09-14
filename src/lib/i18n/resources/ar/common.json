@@ -590,6 +590,7 @@
     "auditPage": {
       "title": "سجل التدقيق",
       "description": "سجل غير قابل للتعديل لكل إجراء حساس على مستوى المنصة",
+      "loadError": "تعذّر تحميل سجل التدقيق. حاول مرة أخرى.",
       "time": "الوقت",
       "actor": "من قام بالإجراء",
       "systemActor": "النظام",
@@ -986,6 +987,11 @@
         "title": "إيقاف تفعيل وحدة \"{{module}}\"",
         "impact": "إيقاف الوحدة سيمنع العمليات الجديدة داخلها، مع الاحتفاظ بجميع البيانات والسجلات السابقة.",
         "confirm": "تأكيد إيقاف التفعيل"
+      },
+      "modulesDisableEntitlementDialog": {
+        "title": "إلغاء اشتراك النادي في وحدة \"{{module}}\"",
+        "impact": "إلغاء الاشتراك سيوقف الوحدة فورًا للنادي، مع الاحتفاظ بجميع البيانات والسجلات السابقة. لإعادة إتاحتها لاحقًا، فعّل الاشتراك ثم فعّل الوحدة من جديد.",
+        "confirm": "تأكيد إلغاء الاشتراك"
       }
     },
     "clubsPage": {
@@ -1269,7 +1275,12 @@
         "messages7d": "الرسائل (٧ أيام)",
         "delivered30d": "تم التسليم (٣٠ يومًا)",
         "failed30d": "فشل (٣٠ يومًا)",
-        "lastMessage": "آخر رسالة"
+        "lastMessage": "آخر رسالة",
+        "failedCount_one": "فشلت رسالة واحدة",
+        "failedCount_two": "فشلت رسالتان",
+        "failedCount_few": "فشلت {{count}} رسائل",
+        "failedCount_many": "فشلت {{count}} رسالة",
+        "failedCount_other": "فشلت {{count}} رسالة"
       },
       "lifecycleStatusLabels": {
         "trial": "تجربة مجانية",
@@ -1279,7 +1290,8 @@
       "statusExpired": "منتهٍ",
       "daysLeftPlural": "{{count}} أيام متبقية",
       "daysLeftSingular": "{{count}} يوم متبقٍ",
-      "emptyTitle": "لا توجد بيانات"
+      "emptyTitle": "لا توجد بيانات",
+      "loadError": "تعذّر تحميل التقرير. حاول مرة أخرى."
     },
     "settingsPage": {
       "title": "الإعدادات",

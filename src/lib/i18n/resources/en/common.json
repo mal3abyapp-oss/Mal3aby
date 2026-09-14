@@ -590,6 +590,7 @@
     "auditPage": {
       "title": "Audit Log",
       "description": "An immutable record of every sensitive platform-level action",
+      "loadError": "Could not load the audit log. Please try again.",
       "time": "Time",
       "actor": "Actor",
       "systemActor": "System",
@@ -986,6 +987,11 @@
         "title": "Deactivate \"{{module}}\"",
         "impact": "Deactivating this module will block new operations inside it, while keeping all existing data and records.",
         "confirm": "Confirm deactivation"
+      },
+      "modulesDisableEntitlementDialog": {
+        "title": "Remove the club's entitlement to \"{{module}}\"",
+        "impact": "This immediately shuts off the module for the club, while keeping all existing data and records. To restore it later, re-enable entitlement, then activate the module again.",
+        "confirm": "Confirm removing entitlement"
       }
     },
     "clubsPage": {
@@ -1266,7 +1272,9 @@
         "messages7d": "Messages (7d)",
         "delivered30d": "Delivered (30d)",
         "failed30d": "Failed (30d)",
-        "lastMessage": "Last message"
+        "lastMessage": "Last message",
+        "failedCount": "{{count}} failed",
+        "failedCount_other": "{{count}} failed"
       },
       "lifecycleStatusLabels": {
         "trial": "Free trial",
@@ -1276,7 +1284,8 @@
       "statusExpired": "Expired",
       "daysLeftPlural": "{{count}} days left",
       "daysLeftSingular": "{{count}} day left",
-      "emptyTitle": "No data"
+      "emptyTitle": "No data",
+      "loadError": "Could not load the report. Please try again."
     },
     "settingsPage": {
       "title": "Settings",

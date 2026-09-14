@@ -8,6 +8,8 @@ import { DataTable, type DataTableColumn } from '@/components/ui/data-table'
 import { MoneyDisplay } from '@/components/ui/money-display'
 import { StatusBadge } from '@/components/ui/status-badge'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { ErrorState } from '@/components/ui/error-state'
+import { translateSupabaseError } from '@/lib/errors'
 import { LIFECYCLE_STATUS_LABELS, CLUB_STATUS_LABELS, isSubscriptionExpiringSoon } from './labels'
 
 // Five report types per IMPLEMENTATION_PLAN.md Phase 3c: Subscription,
@@ -232,16 +234,23 @@ async function fetchUsageReport() {
 export function PlatformReportsPage() {
   const { t } = useTranslation()
   const { locale } = useDirection()
-  const { data: subReport = [], isLoading: subLoading } = useQuery({ queryKey: ['report-subscriptions'], queryFn: fetchSubscriptionReport })
-  const { data: revenueReport, isLoading: revenueLoading } = useQuery({ queryKey: ['report-revenue', locale], queryFn: () => fetchRevenueReport(locale) })
+  // FULL-PLATFORM AUDIT FIX (2026-09-14): none of these 6 queries
+  // previously destructured isError/error/refetch, so a failed RPC
+  // (network blip, RLS denial, transient error) rendered as an empty
+  // table on every tab -- indistinguishable from a platform that
+  // genuinely has zero rows for that report. Matches the established
+  // isError/ErrorState/translateSupabaseError pattern already used on
+  // PlatformLeadsPage.tsx etc.
+  const { data: subReport = [], isLoading: subLoading, isError: subError, error: subErrorObj, refetch: refetchSub } = useQuery({ queryKey: ['report-subscriptions'], queryFn: fetchSubscriptionReport })
+  const { data: revenueReport, isLoading: revenueLoading, isError: revenueError, error: revenueErrorObj, refetch: refetchRevenue } = useQuery({ queryKey: ['report-revenue', locale], queryFn: () => fetchRevenueReport(locale) })
   const revenueRows = revenueReport?.rows ?? []
   const monthlyTotals = revenueReport?.monthlyTotals ?? []
-  const { data: renewalReport = [], isLoading: renewalLoading } = useQuery({ queryKey: ['report-renewals'], queryFn: fetchRenewalReport })
-  const { data: growthReport, isLoading: growthLoading } = useQuery({ queryKey: ['report-growth', locale], queryFn: () => fetchGrowthReport(locale) })
+  const { data: renewalReport = [], isLoading: renewalLoading, isError: renewalError, error: renewalErrorObj, refetch: refetchRenewal } = useQuery({ queryKey: ['report-renewals'], queryFn: fetchRenewalReport })
+  const { data: growthReport, isLoading: growthLoading, isError: growthError, error: growthErrorObj, refetch: refetchGrowth } = useQuery({ queryKey: ['report-growth', locale], queryFn: () => fetchGrowthReport(locale) })
   const growthRows = growthReport?.rows ?? []
   const monthlyNewClubs = growthReport?.monthlyNewClubs ?? []
-  const { data: usageReport = [], isLoading: usageLoading } = useQuery({ queryKey: ['report-usage'], queryFn: fetchUsageReport })
-  const { data: whatsappUsageReport = [], isLoading: whatsappUsageLoading } = useQuery({
+  const { data: usageReport = [], isLoading: usageLoading, isError: usageError, error: usageErrorObj, refetch: refetchUsage } = useQuery({ queryKey: ['report-usage'], queryFn: fetchUsageReport })
+  const { data: whatsappUsageReport = [], isLoading: whatsappUsageLoading, isError: whatsappUsageError, error: whatsappUsageErrorObj, refetch: refetchWhatsappUsage } = useQuery({
     queryKey: ['report-whatsapp-usage'],
     queryFn: fetchWhatsappUsageReport,
   })
@@ -362,7 +371,11 @@ export function PlatformReportsPage() {
     {
       key: 'failed30d',
       header: t('platform.reportsPage.whatsappUsageColumns.failed30d'),
-      render: (r) => (r.failedLast30d > 0 ? <StatusBadge tone="danger" label={String(r.failedLast30d)} /> : r.failedLast30d),
+      // FULL-PLATFORM AUDIT FIX (2026-09-14): the badge label used to
+      // be a bare number (e.g. "3") with no descriptor -- out of
+      // context (scrolled table, no visible header) a reader can't
+      // tell what "3" counts. Now a real, translated phrase.
+      render: (r) => (r.failedLast30d > 0 ? <StatusBadge tone="danger" label={t('platform.reportsPage.whatsappUsageColumns.failedCount', { count: r.failedLast30d })} /> : r.failedLast30d),
     },
     {
       key: 'lastMessage',
@@ -384,57 +397,85 @@ export function PlatformReportsPage() {
           <TabsTrigger value="whatsapp">{t('platform.reportsPage.tabs.whatsapp')}</TabsTrigger>
         </TabsList>
         <TabsContent value="subscription">
-          <DataTable columns={subColumns} rows={subReport} rowKey={(r) => `${r.club_id}-${r.start_at}`} isLoading={subLoading} emptyTitle={t('platform.reportsPage.emptyTitle')} />
+          {subError ? (
+            <ErrorState message={translateSupabaseError(subErrorObj, t('platform.reportsPage.loadError'))} onRetry={() => void refetchSub()} />
+          ) : (
+            <DataTable columns={subColumns} rows={subReport} rowKey={(r) => `${r.club_id}-${r.start_at}`} isLoading={subLoading} emptyTitle={t('platform.reportsPage.emptyTitle')} />
+          )}
         </TabsContent>
         <TabsContent value="revenue">
           {/* Phase G directive (G1): real monthly aggregation, added
               above the existing raw-payment table (kept for
               transaction-level detail/audit) rather than replacing it. */}
-          {monthlyTotals.length > 0 && (
-            <div className="mb-4 grid gap-3 sm:grid-cols-2 md:grid-cols-3">
-              {monthlyTotals.map((m) => (
-                <div key={m.monthKey} className="rounded-lg border border-border p-3">
-                  <p className="text-sm text-text-secondary">{m.monthLabel}</p>
-                  <MoneyDisplay amount={m.total} size="md" />
+          {revenueError ? (
+            <ErrorState message={translateSupabaseError(revenueErrorObj, t('platform.reportsPage.loadError'))} onRetry={() => void refetchRevenue()} />
+          ) : (
+            <>
+              {monthlyTotals.length > 0 && (
+                <div className="mb-4 grid gap-3 sm:grid-cols-2 md:grid-cols-3">
+                  {monthlyTotals.map((m) => (
+                    <div key={m.monthKey} className="rounded-lg border border-border p-3">
+                      <p className="text-sm text-text-secondary">{m.monthLabel}</p>
+                      <MoneyDisplay amount={m.total} size="md" />
+                    </div>
+                  ))}
                 </div>
-              ))}
-            </div>
+              )}
+              <DataTable
+                columns={revenueColumns}
+                rows={revenueRows}
+                rowKey={(r) => `${r.month}-${r.method}-${r.amount}`}
+                isLoading={revenueLoading}
+                emptyTitle={t('platform.reportsPage.emptyTitle')}
+              />
+            </>
           )}
-          <DataTable
-            columns={revenueColumns}
-            rows={revenueRows}
-            rowKey={(r) => `${r.month}-${r.method}-${r.amount}`}
-            isLoading={revenueLoading}
-            emptyTitle={t('platform.reportsPage.emptyTitle')}
-          />
         </TabsContent>
         <TabsContent value="renewal">
-          <DataTable columns={renewalColumns} rows={renewalReport} rowKey={(r) => `${r.club_id}-${r.end_at}`} isLoading={renewalLoading} emptyTitle={t('platform.reportsPage.emptyTitle')} />
+          {renewalError ? (
+            <ErrorState message={translateSupabaseError(renewalErrorObj, t('platform.reportsPage.loadError'))} onRetry={() => void refetchRenewal()} />
+          ) : (
+            <DataTable columns={renewalColumns} rows={renewalReport} rowKey={(r) => `${r.club_id}-${r.end_at}`} isLoading={renewalLoading} emptyTitle={t('platform.reportsPage.emptyTitle')} />
+          )}
         </TabsContent>
         <TabsContent value="growth">
-          {monthlyNewClubs.length > 0 && (
-            <div className="mb-4 grid gap-3 sm:grid-cols-2 md:grid-cols-3">
-              {monthlyNewClubs.map((m) => (
-                <div key={m.monthKey} className="rounded-lg border border-border p-3">
-                  <p className="text-sm text-text-secondary">{m.monthLabel}</p>
-                  <p className="text-lg font-semibold tabular-nums">{t('platform.reportsPage.newClubsCount', { count: m.count })}</p>
+          {growthError ? (
+            <ErrorState message={translateSupabaseError(growthErrorObj, t('platform.reportsPage.loadError'))} onRetry={() => void refetchGrowth()} />
+          ) : (
+            <>
+              {monthlyNewClubs.length > 0 && (
+                <div className="mb-4 grid gap-3 sm:grid-cols-2 md:grid-cols-3">
+                  {monthlyNewClubs.map((m) => (
+                    <div key={m.monthKey} className="rounded-lg border border-border p-3">
+                      <p className="text-sm text-text-secondary">{m.monthLabel}</p>
+                      <p className="text-lg font-semibold tabular-nums">{t('platform.reportsPage.newClubsCount', { count: m.count })}</p>
+                    </div>
+                  ))}
                 </div>
-              ))}
-            </div>
+              )}
+              <DataTable columns={growthColumns} rows={growthRows} rowKey={(r) => r.id} isLoading={growthLoading} emptyTitle={t('platform.reportsPage.emptyTitle')} />
+            </>
           )}
-          <DataTable columns={growthColumns} rows={growthRows} rowKey={(r) => r.id} isLoading={growthLoading} emptyTitle={t('platform.reportsPage.emptyTitle')} />
         </TabsContent>
         <TabsContent value="usage">
-          <DataTable columns={usageColumns} rows={usageReport} rowKey={(r) => r.club_id} isLoading={usageLoading} emptyTitle={t('platform.reportsPage.emptyTitle')} />
+          {usageError ? (
+            <ErrorState message={translateSupabaseError(usageErrorObj, t('platform.reportsPage.loadError'))} onRetry={() => void refetchUsage()} />
+          ) : (
+            <DataTable columns={usageColumns} rows={usageReport} rowKey={(r) => r.club_id} isLoading={usageLoading} emptyTitle={t('platform.reportsPage.emptyTitle')} />
+          )}
         </TabsContent>
         <TabsContent value="whatsapp">
-          <DataTable
-            columns={whatsappUsageColumns}
-            rows={whatsappUsageReport}
-            rowKey={(r) => r.club_id}
-            isLoading={whatsappUsageLoading}
-            emptyTitle={t('platform.reportsPage.emptyTitle')}
-          />
+          {whatsappUsageError ? (
+            <ErrorState message={translateSupabaseError(whatsappUsageErrorObj, t('platform.reportsPage.loadError'))} onRetry={() => void refetchWhatsappUsage()} />
+          ) : (
+            <DataTable
+              columns={whatsappUsageColumns}
+              rows={whatsappUsageReport}
+              rowKey={(r) => r.club_id}
+              isLoading={whatsappUsageLoading}
+              emptyTitle={t('platform.reportsPage.emptyTitle')}
+            />
+          )}
         </TabsContent>
       </Tabs>
     </div>
