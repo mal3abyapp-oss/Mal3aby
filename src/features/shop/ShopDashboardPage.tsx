@@ -337,17 +337,30 @@ export function ShopDashboardPage() {
     <div>
       <PageHeader title={t('shop.dashboard.title')} description={t('shop.dashboard.description')} />
 
-      {/* KPI row -- Today Sales, Net Sales, Orders, Average Order Value,
-          Items Sold, Returns, Low Stock, Out of Stock. */}
-      <div className="mb-6 grid grid-cols-2 gap-3 sm:grid-cols-4">
+      {/* FULL-PLATFORM AUDIT FIX (2026-09-14): these 8 KPI cards
+          previously rendered as one flat, equal-weight grid --
+          DESIGN_SYSTEM.md's Dashboard Hierarchy rule calls for tiers,
+          not "15-20 equal-weight KPI cards". Split into the genuine
+          Level-1 money/volume signals (Today Sales, Net Sales, Orders,
+          Average Order Value) at full weight, and a second, visually
+          quieter row for the more operational/inventory-status
+          signals (Items Sold, Returns, Low Stock, Out of Stock) --
+          same scoped className-only treatment as TodayPage.tsx's
+          equivalent fix, no shared StatCard component change. */}
+      <div className="mb-3 grid grid-cols-2 gap-3 sm:grid-cols-4">
         <StatCard label={t('shop.dashboard.todaySales')} value={kpisLoading ? '—' : <MoneyDisplay amount={kpis?.grossSales ?? 0} size="lg" />} icon={Wallet} />
         <StatCard label={t('shop.dashboard.todayNetSales')} value={kpisLoading ? '—' : <MoneyDisplay amount={kpis?.netSales ?? 0} size="lg" />} icon={TrendingUp} />
         <StatCard label={t('shop.dashboard.orders')} value={kpis?.transactionCount ?? 0} icon={ShoppingBag} to="/app/shop/sales" />
         <StatCard label={t('shop.dashboard.averageOrderValue')} value={kpisLoading ? '—' : <MoneyDisplay amount={kpis?.averageBasket ?? 0} size="lg" />} icon={Receipt} />
-        <StatCard label={t('shop.dashboard.itemsSold')} value={kpis?.itemsSold ?? 0} icon={Package2} />
-        <StatCard label={t('shop.dashboard.returns')} value={kpisLoading ? '—' : <MoneyDisplay amount={kpis?.refundTotal ?? 0} size="lg" tone="danger" />} icon={Undo2} tone={kpis && kpis.refundTotal > 0 ? 'danger' : 'default'} to="/app/shop/sales" />
-        <StatCard label={t('shop.dashboard.lowStock')} value={summary?.lowStockCount ?? 0} icon={AlertTriangle} tone={summary && summary.lowStockCount > 0 ? 'warning' : 'default'} to="/app/shop/inventory" />
-        <StatCard label={t('shop.dashboard.outOfStock')} value={summary?.outOfStockCount ?? 0} icon={XCircle} tone={summary && summary.outOfStockCount > 0 ? 'danger' : 'default'} to="/app/shop/inventory" />
+      </div>
+      <div className="mb-6">
+        <p className="mb-2 text-xs font-medium uppercase tracking-wide text-text-secondary">{t('shop.dashboard.inventorySectionLabel')}</p>
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+          <StatCard label={t('shop.dashboard.itemsSold')} value={kpis?.itemsSold ?? 0} icon={Package2} className="border-none bg-muted/30 shadow-none" />
+          <StatCard label={t('shop.dashboard.returns')} value={kpisLoading ? '—' : <MoneyDisplay amount={kpis?.refundTotal ?? 0} size="lg" tone="danger" />} icon={Undo2} tone={kpis && kpis.refundTotal > 0 ? 'danger' : 'default'} to="/app/shop/sales" className="border-none bg-muted/30 shadow-none" />
+          <StatCard label={t('shop.dashboard.lowStock')} value={summary?.lowStockCount ?? 0} icon={AlertTriangle} tone={summary && summary.lowStockCount > 0 ? 'warning' : 'default'} to="/app/shop/inventory" className="border-none bg-muted/30 shadow-none" />
+          <StatCard label={t('shop.dashboard.outOfStock')} value={summary?.outOfStockCount ?? 0} icon={XCircle} tone={summary && summary.outOfStockCount > 0 ? 'danger' : 'default'} to="/app/shop/inventory" className="border-none bg-muted/30 shadow-none" />
+        </div>
       </div>
 
       {/* Profitability -- deliberately honest, not fabricated. No

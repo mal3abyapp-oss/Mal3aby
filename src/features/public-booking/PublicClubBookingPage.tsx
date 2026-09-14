@@ -603,8 +603,27 @@ export function PublicClubBookingPage() {
               browser/localStorage default was. Only the system UI
               switches; club-owned data (name, address) is never
               machine-translated. */}
-          <div className="flex shrink-0 items-center gap-2 sm:gap-4">
-            <Button variant="ghost" className="min-h-11 gap-2" onClick={() => setRecoveryOpen(true)}><Ticket className="size-4" />{t('publicBooking.recovery.entry')}</Button>
+          <div className="flex shrink-0 items-center gap-1 sm:gap-4">
+            {/* FULL-PLATFORM AUDIT FIX (2026-09-14): at 375px this row
+                (logo+name on one side, recovery button + language
+                switcher on the other) had no room for both groups on
+                one line -- the CSS's own `flex-wrap: wrap` on this
+                header (public-booking.css:122) then broke the whole
+                right-hand group onto an orphaned second row instead of
+                either group's contents adapting. The label text is
+                the excess width; drop it below sm and keep the button
+                icon-only + labelled via aria-label, same pattern as
+                the rest of the product's icon-only touch targets. */}
+            <Button
+              variant="ghost"
+              size="touch-icon"
+              className="gap-2 sm:h-11 sm:w-auto sm:px-3"
+              onClick={() => setRecoveryOpen(true)}
+              aria-label={t('publicBooking.recovery.entry')}
+            >
+              <Ticket className="size-4" />
+              <span className="hidden sm:inline">{t('publicBooking.recovery.entry')}</span>
+            </Button>
             <LanguageSwitcher />
           </div>
         </div>
@@ -767,7 +786,14 @@ export function PublicClubBookingPage() {
                 already picked clears the pick so the customer can't
                 submit a stale start/duration pairing the server never
                 actually validated together. */}
-            <div role="group" aria-label={t('publicBooking.experience.duration')} className="flex flex-wrap gap-2">
+            {/* FULL-PLATFORM AUDIT FIX (2026-09-14): `flex flex-wrap`
+                let these 4 chips wrap by their own natural text width,
+                which at 375px produced an unbalanced 3-then-1 layout
+                (the "ساعتان" chip orphaned alone on its own row).
+                A 2-column grid gives all 4 options equal width and
+                always resolves to a balanced 2x2, regardless of which
+                label happens to be longest in either locale. */}
+            <div role="group" aria-label={t('publicBooking.experience.duration')} className="grid grid-cols-2 gap-2 sm:grid-cols-4">
               {DURATION_OPTIONS_MINUTES.map((mins) => (
                 <button
                   key={mins}

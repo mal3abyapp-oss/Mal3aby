@@ -3445,7 +3445,8 @@
       "sessionsToday": "حصص اليوم",
       "newCustomersToday": "عملاء جدد اليوم",
       "now": "الآن",
-      "next": "التالي"
+      "next": "التالي",
+      "operationsSectionLabel": "الأكاديمية والعمليات"
     },
     "attentionNeeded": {
       "title": "يحتاج انتباه",
@@ -5111,6 +5112,7 @@
       "todayNetSales": "صافي مبيعات اليوم",
       "orders": "الطلبات",
       "averageOrderValue": "متوسط قيمة الطلب",
+      "inventorySectionLabel": "المخزون والعمليات",
       "itemsSold": "الوحدات المباعة",
       "returns": "المرتجعات",
       "lowStock": "مخزون منخفض",

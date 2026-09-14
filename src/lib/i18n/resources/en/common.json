@@ -3423,7 +3423,8 @@
       "sessionsToday": "Sessions today",
       "newCustomersToday": "New customers today",
       "now": "Now",
-      "next": "Next"
+      "next": "Next",
+      "operationsSectionLabel": "Academy & operations"
     },
     "attentionNeeded": {
       "title": "Needs attention",
@@ -5079,6 +5080,7 @@
       "todayNetSales": "Today Net Sales",
       "orders": "Orders",
       "averageOrderValue": "Average Order Value",
+      "inventorySectionLabel": "Inventory & operations",
       "itemsSold": "Items Sold",
       "returns": "Returns",
       "lowStock": "Low Stock",

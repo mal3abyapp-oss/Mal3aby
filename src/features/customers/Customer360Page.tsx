@@ -459,11 +459,19 @@ export function Customer360Page() {
 
             <div className="rounded-lg border border-border p-4">
               <p className="mb-2 text-sm font-medium text-text-secondary">{t('customers.detail.financialSummary', { defaultValue: 'Financial summary' })}</p>
+              {/* FULL-PLATFORM AUDIT FIX (2026-09-14): these are
+                  exactly the four canonical figures DESIGN_SYSTEM.md's
+                  Billing & Outstanding UX rule names ("Total, Paid,
+                  Outstanding, Refunded... always shown at a size and
+                  weight that's immediately readable -- never buried
+                  in small secondary text") -- size="sm" is
+                  MoneyDisplay's smallest, unbolded tier, the opposite
+                  of that rule. Bumped to size="md" (bold, base size). */}
               <div className="grid grid-cols-2 gap-3 text-sm sm:grid-cols-4">
-                <div><p className="text-text-secondary">{t('customers.detail.totalInvoiced', { defaultValue: 'Invoiced' })}</p><MoneyDisplay amount={summary.financial.total_invoiced} size="sm" /></div>
-                <div><p className="text-text-secondary">{t('customers.detail.totalPaid', { defaultValue: 'Paid' })}</p><MoneyDisplay amount={summary.financial.total_paid} size="sm" /></div>
-                <div><p className="text-text-secondary">{t('customers.detail.totalRefunded', { defaultValue: 'Refunded' })}</p><MoneyDisplay amount={summary.financial.total_refunded} size="sm" /></div>
-                <div><p className="text-text-secondary">{t('customers.detail.outstanding')}</p>{summary.financial.outstanding > 0 ? <MoneyDisplay amount={summary.financial.outstanding} tone="danger" size="sm" /> : <span className="text-status-success">{t('academy.playerStatus.fullyPaid')}</span>}</div>
+                <div><p className="text-text-secondary">{t('customers.detail.totalInvoiced', { defaultValue: 'Invoiced' })}</p><MoneyDisplay amount={summary.financial.total_invoiced} size="md" /></div>
+                <div><p className="text-text-secondary">{t('customers.detail.totalPaid', { defaultValue: 'Paid' })}</p><MoneyDisplay amount={summary.financial.total_paid} size="md" /></div>
+                <div><p className="text-text-secondary">{t('customers.detail.totalRefunded', { defaultValue: 'Refunded' })}</p><MoneyDisplay amount={summary.financial.total_refunded} size="md" /></div>
+                <div><p className="text-text-secondary">{t('customers.detail.outstanding')}</p>{summary.financial.outstanding > 0 ? <MoneyDisplay amount={summary.financial.outstanding} tone="danger" size="md" /> : <span className="text-status-success">{t('academy.playerStatus.fullyPaid')}</span>}</div>
               </div>
             </div>
           </div>

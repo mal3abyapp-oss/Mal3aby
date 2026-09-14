@@ -113,7 +113,7 @@ export function BookingRecoveryDialog({ open, onOpenChange, slug, country, phone
             from a genuine miss by design (same enumeration-safety
             contract as every other recovery path here). */}
         {resolvedNotFound && <p role="alert" className="text-sm text-status-danger">{t('publicBooking.recovery.notFound')}</p>}
-        {request.isError && <p role="alert" className="text-sm text-status-danger">{t('publicBooking.recovery.error')}</p>}
+        {(request.isError || resolve.isError) && <p role="alert" className="text-sm text-status-danger">{t('publicBooking.recovery.error')}</p>}
       </form> : <form className="flex flex-col gap-3" onSubmit={e => {
         e.preventDefault()
         const path = bookingPathFromLink(link, window.location.origin)
