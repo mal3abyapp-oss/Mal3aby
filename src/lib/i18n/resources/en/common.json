@@ -2472,7 +2472,9 @@
       "refCalloutHint": "If you come back to recover your booking later, this number is the fastest way to confirm it. Take a screenshot or copy it now.",
       "copyRef": "Copy booking number",
       "refCopied": "Booking number copied",
-      "refCopyErrorHint": "Couldn't copy automatically. Select the number above manually or take a screenshot."
+      "refCopyErrorHint": "Couldn't copy automatically. Select the number above manually or take a screenshot.",
+      "refConfirmButton": "Yes, I've saved it",
+      "refConfirmed": "Done — your booking number is saved"
 },
     "experience": {
       "fieldsLabel": "fields",
