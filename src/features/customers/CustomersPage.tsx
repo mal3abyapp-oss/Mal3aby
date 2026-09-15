@@ -118,6 +118,33 @@ async function fetchClubCountry(clubId: string): Promise<CountryCode | null> {
   return (data?.country as CountryCode | null) ?? null
 }
 
+// Audit fix (round-2, finding #5): the phone-data-issues banner lists
+// customers club-wide (get_phone_data_issues is unfiltered/unpaginated),
+// but the customers list itself is paginated (CUSTOMERS_PAGE_SIZE).
+// Clicking an issue for a customer outside the currently-loaded page(s)
+// used to silently no-op (customers.find() returned undefined and the
+// dialog never opened, with no feedback at all). Fetches the single
+// customer row directly by id instead of depending on it already being
+// in the loaded/paginated array -- same single-row-by-id fetch shape as
+// ShopPOSPage.tsx's customer lookup.
+async function fetchCustomerById(customerId: string): Promise<CustomerRow | null> {
+  const { data, error } = await supabase
+    .from('customers')
+    .select('id, full_name, mobile_display, phone_e164, email, whatsapp')
+    .eq('id', customerId)
+    .maybeSingle()
+  if (error) throw error
+  if (!data) return null
+  return {
+    id: data.id,
+    fullName: data.full_name,
+    mobileDisplay: data.mobile_display,
+    email: data.email,
+    whatsapp: data.whatsapp,
+    outstanding: 0,
+  }
+}
+
 export function CustomersPage() {
   const { t } = useTranslation()
   const navigate = useNavigate()
@@ -190,6 +217,13 @@ export function CustomersPage() {
   // instead of an insert.
   const [editingCustomer, setEditingCustomer] = useState<CustomerRow | null>(null)
 
+  // Audit fix (round-2, finding #5): tracks which phone-issue row is
+  // currently being fetched (for a per-row pending indicator) and
+  // surfaces a real error if the fetch fails, instead of the previous
+  // silent no-op when the customer wasn't in the loaded page.
+  const [fixingIssueId, setFixingIssueId] = useState<string | null>(null)
+  const [phoneIssueError, setPhoneIssueError] = useState<string | null>(null)
+
   // A new search term must restart pagination at page 1 -- otherwise a
   // stale `pages` count from a previous, larger result set would fetch
   // pages that don't apply to the new search.
@@ -241,6 +275,36 @@ export function CustomersPage() {
     setFormError(null)
     setDuplicateCustomerId(null)
     setDialogOpen(true)
+  }
+
+  // Audit fix (round-2, finding #5): the phone-issues banner lists
+  // customers club-wide/unpaginated, but this page's own customers array
+  // is only the currently-loaded page(s) -- a customer flagged by an
+  // issue outside the loaded page(s) used to silently do nothing on
+  // click. First tries the already-loaded array (avoids a redundant
+  // fetch for the common case), falling back to a direct by-id fetch
+  // otherwise so every issue is always actionable, not just the ones
+  // that happen to already be on screen.
+  async function openIssueCustomer(customerId: string) {
+    const loaded = customers.find((row) => row.id === customerId)
+    if (loaded) {
+      openEditDialog(loaded)
+      return
+    }
+    setPhoneIssueError(null)
+    setFixingIssueId(customerId)
+    try {
+      const fetched = await fetchCustomerById(customerId)
+      if (fetched) {
+        openEditDialog(fetched)
+      } else {
+        setPhoneIssueError(t('customers.phoneIssues.loadError'))
+      }
+    } catch {
+      setPhoneIssueError(t('customers.phoneIssues.loadError'))
+    } finally {
+      setFixingIssueId(null)
+    }
   }
 
   // Only a genuinely new/changed phone number needs a fresh consent
@@ -348,18 +412,21 @@ export function CustomersPage() {
       {phoneIssues.length > 0 && (
         <div className="mb-4 flex flex-col gap-2 rounded-lg border border-status-warning/40 bg-status-warning/10 p-3 text-sm">
           <p className="font-medium">{t('customers.phoneIssues.title', { count: phoneIssues.length })}</p>
+          {phoneIssueError && (
+            <p role="alert" className="text-xs text-status-danger">{phoneIssueError}</p>
+          )}
           <div className="flex flex-col gap-1">
             {phoneIssues.slice(0, 5).map((issue) => (
               <button
                 key={issue.customer_id}
-                className="flex items-center justify-between rounded border border-transparent px-2 py-1 text-start hover:border-border hover:bg-muted/40"
-                onClick={() => {
-                  const c = customers.find((row) => row.id === issue.customer_id)
-                  if (c) openEditDialog(c)
-                }}
+                disabled={fixingIssueId === issue.customer_id}
+                className="flex items-center justify-between rounded border border-transparent px-2 py-1 text-start hover:border-border hover:bg-muted/40 disabled:opacity-60"
+                onClick={() => void openIssueCustomer(issue.customer_id)}
               >
                 <span>{issue.full_name}</span>
-                <span dir="ltr" className="text-xs tabular-nums text-text-secondary">{issue.mobile_display}</span>
+                <span dir="ltr" className="text-xs tabular-nums text-text-secondary">
+                  {fixingIssueId === issue.customer_id ? t('customers.loadingMore') : issue.mobile_display}
+                </span>
               </button>
             ))}
           </div>

@@ -11,6 +11,17 @@ import { ErrorState } from '@/components/ui/error-state'
 import { translateSupabaseError } from '@/lib/errors'
 import { actionLabel, entityLabel } from '@/lib/domain/audit'
 import { useDirection } from '@/app/providers/DirectionProvider'
+import { toInstant } from '@/lib/domain/time'
+
+// Audit fix (round-2, finding #8): platform_audit_log has no single
+// "venue" timezone (it spans every club platform-wide) -- Africa/Cairo
+// is used here purely as a fixed, consistent reference zone for both
+// date-range boundaries, matching the same fallback IANA zone already
+// used platform-wide when no club-specific timezone applies (see
+// report-print-header.tsx / useDateRangeReport.ts / BillingPage.tsx's
+// own 'Africa/Cairo' fallback). The point of this constant is
+// consistency between p_from and p_to, not per-club correctness.
+const PLATFORM_REFERENCE_TIMEZONE = 'Africa/Cairo'
 
 // IA restructuring (Phase 3): two real findings from
 // MAL3ABY_INFORMATION_ARCHITECTURE_AUDIT.md fixed here --
@@ -83,6 +94,20 @@ interface Filters {
 // every club" was unanswerable -- so actor is now filterable the same
 // way club already was: click a name in the table to filter by them
 // (actor_id is already present on every row, no new lookup UI needed).
+// Audit fix (round-2, finding #8): p_from used to be built via
+// `new Date(filters.from).toISOString()` -- a date-only string
+// ("2026-09-14") is parsed by the Date constructor as UTC midnight --
+// while p_to used `new Date(filters.to + 'T23:59:59').toISOString()`, an
+// offset-less datetime string, which the Date constructor parses in the
+// *browser's local* timezone instead. The two boundaries of the exact
+// same "single local day" filter were computed in two different
+// timezones, so filtering to one day could silently exclude actions in
+// the first/last few hours of that day (the exact gap depending on the
+// staff member's own browser timezone relative to UTC). Both boundaries
+// now go through the same toInstant() conversion (src/lib/domain/time.ts
+// -- this project's one established Business Date/Time -> Instant
+// primitive) against the same reference timezone, so p_from and p_to are
+// always consistent with each other.
 async function fetchAudit(page: number, filters: Filters): Promise<{ rows: AuditRow[]; totalCount: number }> {
   const { data, error } = await supabase.rpc('get_platform_audit_log', {
     p_limit: PAGE_SIZE,
@@ -90,8 +115,8 @@ async function fetchAudit(page: number, filters: Filters): Promise<{ rows: Audit
     p_actor_id: filters.actorId || undefined,
     p_action: filters.action || undefined,
     p_entity_type: filters.entityType || undefined,
-    p_from: filters.from ? new Date(filters.from).toISOString() : undefined,
-    p_to: filters.to ? new Date(filters.to + 'T23:59:59').toISOString() : undefined,
+    p_from: filters.from ? toInstant(filters.from, '00:00:00', PLATFORM_REFERENCE_TIMEZONE) : undefined,
+    p_to: filters.to ? toInstant(filters.to, '23:59:59', PLATFORM_REFERENCE_TIMEZONE) : undefined,
   })
   if (error) throw error
   const rows = (data ?? []) as (AuditRow & { total_count?: number })[]

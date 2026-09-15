@@ -168,7 +168,7 @@ export function PendingPaymentsPage() {
                 </div>
                 <div className="flex items-center gap-2">
                   <Button size="sm" variant="ghost" onClick={() => navigate(`/app/finance/payments?invoice=${p.invoiceId}`)}>
-                    {t('billing.pendingPayments.viewInvoice', { defaultValue: 'View invoice' })}
+                    {t('billing.pendingPayments.viewInvoice')}
                   </Button>
                   <Button size="sm" variant="outline" onClick={() => openPreview(p)}>
                     {p.mimeType === 'application/pdf' ? <FileText className="me-1 size-4" /> : <ImageIcon className="me-1 size-4" />}

@@ -255,7 +255,20 @@ export function SecureBookingPage() {
               <div className="mb-5 flex items-center justify-between gap-3"><h2 className="text-xl font-semibold">{t('publicBooking.manage.paymentTitle')}</h2><Button variant="ghost" aria-label={t('publicBooking.manage.refresh')} disabled={isFetching} onClick={() => void refetch()}><RefreshCw className={`size-4 ${isFetching ? 'animate-spin' : ''}`} /></Button></div>
               {canPay && data.booking_id && data.club_id ? <PaymentMethodsPanel bookingId={data.booking_id} clubId={data.club_id} bookingRef={data.booking_ref ?? null} clubName={data.club_name ?? ''} total={Number(data.outstanding)} currency={currency} locale={locale} /> : <p className="text-sm leading-7 text-text-secondary">{t(isError ? 'publicBooking.manage.loadError' : holdExpired ? 'publicBooking.holdExpiredMessage' : Number(data.outstanding ?? 0) === 0 && data.payment_status === 'paid' ? 'publicBooking.manage.paid' : 'publicBooking.manage.paymentUnavailable')}</p>}
               {invoice.isError && <p role="alert" className="mt-3 text-sm text-status-danger">{t('publicBooking.manage.invoiceError')}</p>}
-              {data.result === 'valid' && !isError && <Button variant="outline" className="mt-4 min-h-11" disabled={invoice.isPending} onClick={() => invoice.mutate()}>{t(invoice.isPending ? 'secureBooking.loadingInvoice' : 'secureBooking.viewInvoice')}</Button>}
+              {/* Finding #7 (audit round 2): "View Invoice" previously
+                  showed for any valid booking with no check that an
+                  invoice actually exists -- clicking it on an
+                  invoice-less booking (e.g. one still pending, never
+                  invoiced) always threw a server exception from
+                  mint_invoice_token_for_booking_qr. data.invoice_token_
+                  available is already computed server-side by
+                  get_public_booking_context (booking.invoice_id is not
+                  null and a matching invoice row exists -- see
+                  20260818193000_expand_secure_booking_page_data.sql) --
+                  it was already declared on this page's own data shape
+                  and simply never read, per this codebase's convention
+                  of not recomputing things the RPC already answers. */}
+              {data.result === 'valid' && !isError && data.invoice_token_available && <Button variant="outline" className="mt-4 min-h-11" disabled={invoice.isPending} onClick={() => invoice.mutate()}>{t(invoice.isPending ? 'secureBooking.loadingInvoice' : 'secureBooking.viewInvoice')}</Button>}
             </section>
             {data.can_check_in && !isError && <section className="booking-content">
               <Button variant="outline" className="min-h-12 w-full gap-2" onClick={() => setQrRevealed(value => !value)}><QrIcon className="size-5" />{t('secureBooking.viewQrButton')}</Button>

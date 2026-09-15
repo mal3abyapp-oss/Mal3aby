@@ -5,6 +5,8 @@ import { useAuth } from '@/app/providers/AuthProvider'
 import { useDirection } from '@/app/providers/DirectionProvider'
 import { PageHeader } from '@/components/ui/page-header'
 import { StatCard } from '@/components/ui/stat-card'
+import { ErrorState } from '@/components/ui/error-state'
+import { translateSupabaseError } from '@/lib/errors'
 import { formatMoney } from '@/lib/domain/billing'
 import { useDateRange, useDateRangeReport } from '@/features/reports/hooks/useDateRangeReport'
 import { DateRangeFilter } from '@/features/reports/components/DateRangeFilter'
@@ -132,10 +134,10 @@ export function FinanceOverviewPage() {
   const { currentClubId } = useAuth()
   const { startDate, setStartDate, endDate, setEndDate } = useDateRange()
 
-  const { data: dashboard, isLoading: dashboardLoading } = useDateRangeReport<ExecutiveDashboard>(
+  const { data: dashboard, isLoading: dashboardLoading, isError: dashboardIsError, error: dashboardError, refetch: refetchDashboard } = useDateRangeReport<ExecutiveDashboard>(
     'get_executive_dashboard', startDate, endDate,
   )
-  const { data: methodBreakdown, isLoading: methodLoading } = useDateRangeReport<PaymentMethodBreakdown>(
+  const { data: methodBreakdown, isLoading: methodLoading, isError: methodIsError, error: methodError, refetch: refetchMethod } = useDateRangeReport<PaymentMethodBreakdown>(
     'get_payment_method_report', startDate, endDate,
   )
   const { data: outstandingSplit } = useQuery({
@@ -175,6 +177,17 @@ export function FinanceOverviewPage() {
   })
 
   const isLoading = dashboardLoading || methodLoading
+  // FULL-PLATFORM AUDIT ROUND 2 FIX (2026-09-14): none of this page's
+  // 7 queries checked isError -- the two landing-dashboard sources
+  // (executive dashboard + payment method breakdown) are the ones
+  // that actually gate the whole page's render (`!isLoading &&
+  // dashboard &&`), so a failure on either previously rendered a
+  // blank area with no error/retry, unlike every other report page
+  // in the app. The 5 supplementary direct-table queries keep their
+  // existing `data = 0` fallback (matches their own already-correct
+  // "genuinely zero" semantics) since a failure there degrades one
+  // card, not the whole page.
+  const isError = dashboardIsError || methodIsError
   const cashRow = methodBreakdown?.by_method.find((m) => m.method === 'cash')
   const transferRow = methodBreakdown?.by_method.find((m) => m.method === 'bank_transfer')
   const electronicTotal = (methodBreakdown?.by_method ?? [])
@@ -189,105 +202,137 @@ export function FinanceOverviewPage() {
 
       {isLoading && <p className="text-sm text-text-secondary">{t('reports.loading')}</p>}
 
-      {!isLoading && dashboard && (
-        <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
-          <StatCard
-            label={t('finance.overview.revenue')}
-            value={formatMoney(dashboard.total_revenue, 'EGP', locale)}
-            icon={Wallet}
-            to="/app/finance/reports"
-          />
-          <StatCard
-            label={t('finance.overview.cashCollected')}
-            value={formatMoney(cashRow?.collected ?? 0, 'EGP', locale)}
-            icon={HandCoins}
-            to="/app/finance/cash"
-          />
-          <StatCard
-            label={t('finance.overview.bankTransfers')}
-            value={formatMoney(transferRow?.collected ?? 0, 'EGP', locale)}
-            icon={Banknote}
-            to="/app/finance/reports"
-          />
-          <StatCard
-            label={t('finance.overview.electronicPayments')}
-            value={formatMoney(electronicTotal, 'EGP', locale)}
-            icon={CreditCard}
-            to="/app/finance/reports"
-          />
-          <StatCard
-            label={t('finance.overview.outstanding')}
-            value={formatMoney(dashboard.outstanding_total, 'EGP', locale)}
-            tone={dashboard.outstanding_total > 0 ? 'warning' : undefined}
-            icon={CircleDollarSign}
-            to="/app/finance/payments?status=outstanding"
-          />
-          <StatCard
-            label={t('finance.overview.unpaidInvoices')}
-            value={outstandingSplit?.unpaidCount ?? 0}
-            icon={ReceiptText}
-            to="/app/finance/payments?status=unpaid"
-          />
-          <StatCard
-            label={t('finance.overview.partiallyPaidInvoices')}
-            value={outstandingSplit?.partialCount ?? 0}
-            icon={FileWarning}
-            to="/app/finance/payments?status=partially_paid"
-          />
-          <StatCard
-            label={t('finance.overview.refunds')}
-            value={formatMoney(dashboard.refunds_total, 'EGP', locale)}
-            tone="danger"
-            icon={Undo2}
-            to="/app/finance/payments?status=refunded"
-          />
-          <StatCard
-            label={t('finance.overview.netMovement')}
-            value={formatMoney(netMovement, 'EGP', locale)}
-            tone={netMovement >= 0 ? 'success' : 'danger'}
-            icon={Scale}
-            to="/app/finance/reports"
-          />
-          <StatCard
-            label={t('finance.overview.openShifts')}
-            value={openShiftsCount}
-            tone={openShiftsCount > 0 ? 'success' : undefined}
-            icon={Wallet}
-            to="/app/finance/cash"
-          />
-          <StatCard
-            label={t('finance.overview.expectedCashDrawer')}
-            value={formatMoney(expectedCashNow, 'EGP', locale)}
-            icon={CircleDollarSign}
-            to="/app/finance/cash"
-          />
-          <StatCard
-            label={t('finance.overview.pendingProofs')}
-            value={pendingProofsCount}
-            tone={pendingProofsCount > 0 ? 'warning' : undefined}
-            icon={ImageIcon}
-            to="/app/finance/payments?tab=pending-proofs"
-          />
-          <StatCard
-            label={t('finance.overview.officialReceipts')}
-            value={officialReceiptsCount}
-            icon={ShieldCheck}
-            to="/app/finance/invoices?tab=official-receipts"
-          />
-          <StatCard
-            label={t('finance.overview.expenses')}
-            value={formatMoney(expensesTotal, 'EGP', locale)}
-            icon={Clock}
-            to="/app/finance/expenses"
-          />
-          <StatCard
-            label={t('finance.overview.employeeLiabilities', { defaultValue: 'Employee Liabilities' })}
-            value={formatMoney(employeeLiabilitiesOutstanding, 'EGP', locale)}
-            tone={employeeLiabilitiesOutstanding > 0 ? 'danger' : undefined}
-            icon={UserX}
-            to="/app/reports/employee-liability"
-          />
-        </div>
+      {!isLoading && isError && (
+        <ErrorState
+          message={translateSupabaseError(dashboardError ?? methodError, t('finance.overview.loadError'))}
+          onRetry={() => { void refetchDashboard(); void refetchMethod() }}
+        />
+      )}
+
+      {!isLoading && !isError && dashboard && (
+        <>
+          {/* FULL-PLATFORM AUDIT ROUND 2 FIX (2026-09-14): 15
+              StatCards at equal visual weight contradicted
+              DESIGN_SYSTEM.md's Dashboard Hierarchy rule ("not
+              15-20 equal-weight KPI cards, three tiers"), already
+              applied elsewhere (TodayPage.tsx, ShopDashboardPage.tsx).
+              Level-1: the 4 figures an owner actually needs at a
+              glance (Revenue, Outstanding, Refunds, Net Movement).
+              Level-2: the remaining 11 operational/breakdown cards,
+              de-emphasized with the same scoped className treatment
+              used on those other pages -- no shared StatCard change. */}
+          <div className="mb-3 grid grid-cols-2 gap-3 md:grid-cols-4">
+            <StatCard
+              label={t('finance.overview.revenue')}
+              value={formatMoney(dashboard.total_revenue, 'EGP', locale)}
+              icon={Wallet}
+              to="/app/finance/reports"
+            />
+            <StatCard
+              label={t('finance.overview.outstanding')}
+              value={formatMoney(dashboard.outstanding_total, 'EGP', locale)}
+              tone={dashboard.outstanding_total > 0 ? 'warning' : undefined}
+              icon={CircleDollarSign}
+              to="/app/finance/payments?status=outstanding"
+            />
+            <StatCard
+              label={t('finance.overview.refunds')}
+              value={formatMoney(dashboard.refunds_total, 'EGP', locale)}
+              tone="danger"
+              icon={Undo2}
+              to="/app/finance/payments?status=refunded"
+            />
+            <StatCard
+              label={t('finance.overview.netMovement')}
+              value={formatMoney(netMovement, 'EGP', locale)}
+              tone={netMovement >= 0 ? 'success' : 'danger'}
+              icon={Scale}
+              to="/app/finance/reports"
+            />
+          </div>
+          <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
+            <StatCard
+              className="border-none bg-muted/30 shadow-none"
+              label={t('finance.overview.cashCollected')}
+              value={formatMoney(cashRow?.collected ?? 0, 'EGP', locale)}
+              icon={HandCoins}
+              to="/app/finance/cash"
+            />
+            <StatCard
+              className="border-none bg-muted/30 shadow-none"
+              label={t('finance.overview.bankTransfers')}
+              value={formatMoney(transferRow?.collected ?? 0, 'EGP', locale)}
+              icon={Banknote}
+              to="/app/finance/reports"
+            />
+            <StatCard
+              className="border-none bg-muted/30 shadow-none"
+              label={t('finance.overview.electronicPayments')}
+              value={formatMoney(electronicTotal, 'EGP', locale)}
+              icon={CreditCard}
+              to="/app/finance/reports"
+            />
+            <StatCard
+              className="border-none bg-muted/30 shadow-none"
+              label={t('finance.overview.unpaidInvoices')}
+              value={outstandingSplit?.unpaidCount ?? 0}
+              icon={ReceiptText}
+              to="/app/finance/payments?status=unpaid"
+            />
+            <StatCard
+              className="border-none bg-muted/30 shadow-none"
+              label={t('finance.overview.partiallyPaidInvoices')}
+              value={outstandingSplit?.partialCount ?? 0}
+              icon={FileWarning}
+              to="/app/finance/payments?status=partially_paid"
+            />
+            <StatCard
+              className="border-none bg-muted/30 shadow-none"
+              label={t('finance.overview.openShifts')}
+              value={openShiftsCount}
+              tone={openShiftsCount > 0 ? 'success' : undefined}
+              icon={Wallet}
+              to="/app/finance/cash"
+            />
+            <StatCard
+              className="border-none bg-muted/30 shadow-none"
+              label={t('finance.overview.expectedCashDrawer')}
+              value={formatMoney(expectedCashNow, 'EGP', locale)}
+              icon={CircleDollarSign}
+              to="/app/finance/cash"
+            />
+            <StatCard
+              className="border-none bg-muted/30 shadow-none"
+              label={t('finance.overview.pendingProofs')}
+              value={pendingProofsCount}
+              tone={pendingProofsCount > 0 ? 'warning' : undefined}
+              icon={ImageIcon}
+              to="/app/finance/payments?tab=pending-proofs"
+            />
+            <StatCard
+              className="border-none bg-muted/30 shadow-none"
+              label={t('finance.overview.officialReceipts')}
+              value={officialReceiptsCount}
+              icon={ShieldCheck}
+              to="/app/finance/invoices?tab=official-receipts"
+            />
+            <StatCard
+              className="border-none bg-muted/30 shadow-none"
+              label={t('finance.overview.expenses')}
+              value={formatMoney(expensesTotal, 'EGP', locale)}
+              icon={Clock}
+              to="/app/finance/expenses"
+            />
+            <StatCard
+              className="border-none bg-muted/30 shadow-none"
+              label={t('finance.overview.employeeLiabilities', { defaultValue: 'Employee Liabilities' })}
+              value={formatMoney(employeeLiabilitiesOutstanding, 'EGP', locale)}
+              tone={employeeLiabilitiesOutstanding > 0 ? 'danger' : undefined}
+              icon={UserX}
+              to="/app/reports/employee-liability"
+            />
+          </div>
+        </>
       )}
     </div>
   )

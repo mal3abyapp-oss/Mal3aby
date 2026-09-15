@@ -105,6 +105,8 @@
       "paid": "Paid {{amount}}",
       "outstanding": "Outstanding {{amount}}",
       "payNow": "Pay now",
+      "payNowLoading": "Loading...",
+      "payNowError": "Couldn't start the payment. Please try again.",
       "claimDialog": {
         "titlePrefix": "Pay invoice",
         "selectMethodError": "Choose a payment method first",
@@ -304,7 +306,9 @@
         "noJobs": "No discovery jobs yet",
         "loadError": "Could not load discovery jobs.",
         "manualEntryTitle": "Or Add a Lead Manually",
-        "manualEntryButton": "Add Lead"
+        "manualEntryButton": "Add Lead",
+        "manualEntryError": "Couldn't add the lead. Try again.",
+        "providerStatusError": "Couldn't load the discovery source status."
       },
       "leads": {
         "title": "Leads",
@@ -367,7 +371,9 @@
           "replied": "Replied",
           "demos": "Demos",
           "won": "Won",
-          "lost": "Lost"
+          "lost": "Lost",
+          "loading": "Loading stats...",
+          "loadError": "Couldn't load stats for this campaign."
         }
       },
       "followups": {
@@ -544,6 +550,7 @@
         "outreachWhatsappNotConnected": "Platform WhatsApp is not connected ({{status}}).",
         "outreachGoToWhatsappSettings": "Go to Platform WhatsApp settings",
         "channels": "Outreach Channels",
+        "channelsLoadError": "Could not load channel eligibility for this lead.",
         "channelEmail": "Email",
         "channelWhatsapp": "WhatsApp",
         "channelCallTask": "Call Task",
@@ -553,10 +560,12 @@
         "createCallTaskButton": "Create Call Task",
         "creatingCallTask": "Creating...",
         "callTasks": "Call Tasks",
+        "callTasksLoadError": "Could not load call tasks for this lead.",
         "noCallTasks": "No call tasks yet",
         "completeCallTaskButton": "Mark Complete",
         "callTaskOutcomePlaceholder": "How did the call go?",
         "events": "Delivery & Reply Events",
+        "eventsLoadError": "Could not load delivery and reply events for this lead.",
         "noEvents": "No delivery or reply events recorded yet",
         "reclassifyEvent": "Reclassify",
         "eventTypeLabels": {
@@ -578,6 +587,7 @@
     "alertsPage": {
       "title": "Alerts",
       "description": "Automatic rule-based alerts -- no external notification service",
+      "loadError": "Could not load alerts. Please try again.",
       "emptyTitle": "No alerts right now",
       "kindLabels": {
         "expiring_soon": "Subscription ending soon",
@@ -896,6 +906,9 @@
         "restoreDialog": {
           "title": "Restore \"{{provider}}\" for this club",
           "confirm": "Confirm restore"
+        },
+        "errors": {
+          "policy": "Couldn't update this provider's policy."
         }
       },
       "tabs": {
@@ -992,6 +1005,10 @@
         "title": "Remove the club's entitlement to \"{{module}}\"",
         "impact": "This immediately shuts off the module for the club, while keeping all existing data and records. To restore it later, re-enable entitlement, then activate the module again.",
         "confirm": "Confirm removing entitlement"
+      },
+      "modulesErrors": {
+        "entitlement": "Couldn't update this module's entitlement.",
+        "activation": "Couldn't update this module's activation."
       }
     },
     "clubsPage": {
@@ -1040,6 +1057,7 @@
       "loadMore": "Load more",
       "pin": "Pin club",
       "unpin": "Unpin club",
+      "pinError": "Couldn't update this club's pin.",
       "pinnedClubs": "Pinned clubs",
       "recentClubs": "Recently managed",
       "resultCount": "{{count}} clubs",
@@ -1050,6 +1068,7 @@
     "leadsPage": {
       "title": "Leads",
       "description": "Prospective customers from the Mal3aby public site",
+      "truncatedWarning": "Showing the most recent {{count}} requests only — there are more than this list can display.",
       "columns": {
         "name": "Name",
         "phone": "Phone",
@@ -1139,6 +1158,7 @@
       "title": "Club Owners",
       "description": "All club owners registered on the platform, and each owner's linked clubs",
       "loadError": "Could not load club owners.",
+      "groupingLoadError": "Could not load owner grouping counts.",
       "platformOwnersHeading": "Platform Owner accounts",
       "alsoClubOwnerOf": "Also owns {{count}} club",
       "alsoClubOwnerOf_plural": "Also owns {{count}} clubs",
@@ -1292,6 +1312,7 @@
       "description": "Platform-wide default values",
       "cardTitle": "Free trial and grace period",
       "loading": "Loading...",
+      "loadError": "Could not load platform settings.",
       "trialDaysLabel": "Default free trial length (days)",
       "trialDaysHint": "Used when any new club starts an automatic or manual free trial, unless a different length is set explicitly.",
       "graceMovedHint": "Grace period is now managed per plan from the Plans page, not as a platform-wide default.",
@@ -1325,7 +1346,8 @@
       "statusActive": "Active",
       "statusExpired": "Expired",
       "emptyTitle": "No free trials yet",
-      "loadError": "Couldn't load the trials list."
+      "loadError": "Couldn't load the trials list.",
+      "resultCount": "{{count}} trials"
     }
   },
   "appShell": {
@@ -1605,6 +1627,7 @@
     "password": "Password",
     "fullName": "Full name",
     "loginError": "Incorrect login details, or the account isn't activated yet.",
+    "routingCheckError": "You're logged in, but we couldn't determine where to take you next. Please check your connection and try again.",
     "signupSubmit": "Create account and start free trial",
     "hasAccount": "Already have an account?",
     "loggingIn": "Logging in...",
@@ -1950,7 +1973,9 @@
     "attendance": {
       "recordForMembership": "Record attendance for a membership",
       "open": "Open",
-      "emptyTitle": "No attendance recorded yet"
+      "emptyTitle": "No attendance recorded yet",
+      "openSessionError": "Couldn't open this session, please try again.",
+      "markError": "Couldn't record attendance, please try again."
     },
     "overview": {
       "addPlayer": "Add player",
@@ -1962,7 +1987,8 @@
       "activeSubscriptions": "Active subscriptions",
       "expiringSoon": "Expiring soon",
       "outstandingInvoices": "Outstanding invoices",
-      "groupsNearCapacity": "Groups nearing capacity"
+      "groupsNearCapacity": "Groups nearing capacity",
+      "loadError": "Couldn't load the academy overview."
     },
     "relationshipLabels": {
       "father": "Father",
@@ -2025,7 +2051,9 @@
       "confirmUnlinkGuardian": "Remove this guardian relationship?",
       "confirmUnlinkGuardianButton": "Confirm remove",
       "removingGuardian": "Removing...",
-      "linkGuardianError": "Couldn't add this guardian."
+      "linkGuardianError": "Couldn't add this guardian.",
+      "setPrimaryError": "Couldn't set this guardian as primary, please try again.",
+      "unlinkGuardianError": "Couldn't remove this guardian, please try again."
     },
     "enrollments": {
       "manageSubtitle": "Enroll a player in a group and create their subscription",
@@ -2109,6 +2137,15 @@
       "scanPlayerCard": "Scan player card",
       "checkedIn": "Attendance recorded",
       "scanFailed": "Scan failed",
+      "markError": "Couldn't record attendance, please try again.",
+      "scanOutcomes": {
+        "success": "Attendance recorded",
+        "wrong_club": "This QR code doesn't belong to this club",
+        "permission_denied": "You don't have permission to mark attendance for this session",
+        "module_inactive": "The Academy module isn't active for this club",
+        "subscription_inactive": "This player's subscription isn't active",
+        "invalid": "This QR code isn't valid for this session"
+      },
       "attendanceLabels": {
         "present": "Present",
         "absent": "Absent",
@@ -2289,7 +2326,9 @@
       },
       "errors": {
         "branchRequired": "Select at least one branch.",
-        "saveError": "Couldn't save this plan."
+        "saveError": "Couldn't save this plan.",
+        "archiveError": "Couldn't archive this plan.",
+        "restoreError": "Couldn't restore this plan."
       }
     },
     "members": {
@@ -3068,6 +3107,7 @@
       "description": "Review customer-uploaded payment receipts and approve or reject them",
       "loading": "Loading...",
       "empty": "No receipts waiting for review.",
+      "viewInvoice": "View invoice",
       "viewReceipt": "View receipt",
       "approve": "Approve",
       "reject": "Reject",
@@ -3271,7 +3311,8 @@
     "saveEditError": "Couldn't save the changes, try again.",
     "addError": "Couldn't add the customer, try again.",
     "phoneIssues": {
-      "title": "{{count}} customer phone number(s) need review"
+      "title": "{{count}} customer phone number(s) need review",
+      "loadError": "Couldn't open this customer, try again."
     },
     "relationshipLabels": {
       "father": "Father",
@@ -3734,6 +3775,7 @@
       "outOfStock": "Out of stock",
       "topProducts": "Top products",
       "emptyTitle": "No sales yet",
+      "loadError": "Couldn't load this report, please try again.",
       "columns": {
         "product": "Product",
         "unitsSold": "Units sold",
@@ -3794,6 +3836,9 @@
       "bookingCancelled": "Booking cancelled — entry code not available",
       "alreadyCheckedIn": "Already checked in",
       "notEligible": "Entry code is not currently available for this booking",
+      "invalidToken": "This link is no longer valid.",
+      "notABookingInvoice": "This invoice has no linked field booking.",
+      "qrGenerationFailed": "Couldn't generate the QR code. Please try again.",
       "loadError": "Couldn't show the QR code."
     }
   },
@@ -4055,7 +4100,8 @@
       "wrong_club": "Doesn't belong to this club",
       "permission_denied": "You don't have permission for this action",
       "subscription_inactive": "Subscription isn't active",
-      "payment_required": "Check-in denied — outstanding balance"
+      "payment_required": "Check-in denied — outstanding balance",
+      "module_inactive": "The Academy module isn't active for this club"
     },
     "membershipOutcomes": {
       "expired": "Membership expired",
@@ -4115,6 +4161,7 @@
       "title": "Pricing",
       "description": "Clear subscription plans, no hidden fees",
       "unavailable": "Plans aren't available right now.",
+      "loadError": "Couldn't load pricing plans. Please try again.",
       "startFreeTrial": "Start your free trial",
       "recommended": "Recommended",
       "perMonth": "per month",
@@ -4368,6 +4415,7 @@
       "failed": "This payment was not completed.",
       "cancelledFinal": "Checkout was cancelled.",
       "error": "We could not load this payment's status. Please check Finance for the latest status.",
+      "timedOut": "This is taking longer than expected. Your payment may still be processing -- please check Finance > Payments in a moment for the final status.",
       "goToInvoice": "Go to Finance"
     },
     "overview": {
@@ -4386,7 +4434,8 @@
       "officialReceipts": "Official receipts",
       "expenses": "Expenses",
       "employeeLiabilities": "Employee Liabilities",
-      "notApplicable": "N/A"
+      "notApplicable": "N/A",
+      "loadError": "Couldn't load the finance overview."
     },
     "payments": {
       "tabAll": "All payments",
@@ -4927,6 +4976,7 @@
   "platformRoles": {
     "title": "Platform Roles & Permissions",
     "description": "Manage system platform roles and create custom platform roles with exactly the permissions you choose",
+    "loadError": "Could not load platform roles.",
     "createRole": "Create role",
     "editRole": "Edit role",
     "columns": {
@@ -5099,6 +5149,7 @@
       "emptySales": "No sales yet today",
       "emptyLowStock": "Nothing is low on stock",
       "emptyReturns": "No returns yet",
+      "loadError": "Couldn't load this section, please try again.",
       "profitability": {
         "title": "Profitability",
         "description": "Cost data not yet tracked -- profitability reporting requires Phase C7's planned cost-at-sale feature."
@@ -5355,6 +5406,7 @@
       },
       "emptyBalancesTitle": "No stock yet",
       "emptyMovementsTitle": "No movements yet",
+      "loadError": "Couldn't load this section, please try again.",
       "movementHistory": "Movement history",
       "columns": {
         "date": "Date",
@@ -5767,7 +5819,8 @@
         "nonzeroOnly": "Non-zero variance only",
         "empty": "No completed stock counts in this period"
       },
-      "permissionDenied": "You do not have permission to view profitability data for this report. Ask a club owner to grant the \"View profit reports\" permission."
+      "permissionDenied": "You do not have permission to view profitability data for this report. Ask a club owner to grant the \"View profit reports\" permission.",
+      "loadError": "Couldn't load this report."
     }
   },
   "help": {

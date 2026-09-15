@@ -5,6 +5,8 @@ import { useAuth } from '@/app/providers/AuthProvider'
 import { StatCard } from '@/components/ui/stat-card'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
+import { ErrorState } from '@/components/ui/error-state'
+import { translateSupabaseError } from '@/lib/errors'
 import { UserPlus, ClipboardList, CheckSquare } from 'lucide-react'
 import { fetchInvoicePaymentSummaries } from '@/lib/domain/billing'
 
@@ -96,11 +98,19 @@ export function AcademyOverview({ onNavigateTab }: { onNavigateTab: (tab: 'playe
   const { t } = useTranslation()
   const { currentClubId } = useAuth()
 
-  const { data, isLoading } = useQuery({
+  const { data, isLoading, isError, error, refetch } = useQuery({
     queryKey: ['academy-overview', currentClubId],
     queryFn: () => fetchOverview(currentClubId!),
     enabled: !!currentClubId,
   })
+
+  // Real bug: this default-landing Overview tab had no isError/error/
+  // refetch handling -- a failed parallel fetch left the tab stuck on
+  // "Loading..." forever with no retry (the isLoading || !data guard
+  // below never resolves once the query settles into an error state).
+  if (isError) {
+    return <ErrorState message={translateSupabaseError(error, t('academy.overview.loadError'))} onRetry={() => void refetch()} />
+  }
 
   if (isLoading || !data) return <p className="mt-4 text-sm text-text-secondary">{t('academy.loading')}</p>
 

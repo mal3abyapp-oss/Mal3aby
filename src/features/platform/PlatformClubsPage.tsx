@@ -174,6 +174,13 @@ export function PlatformClubsPage() {
   const [debouncedSearch, setDebouncedSearch] = useState('')
   const [openingClub, setOpeningClub] = useState<{ id: string; name_ar: string } | null>(null)
   const [pinnedIds, setPinnedIds] = useState<Set<string>>(new Set())
+  // P3 fix: pin/unpin had no onError -- a failed toggle (RLS rejection,
+  // network blip) silently reverted the star icon with zero
+  // explanation. No existing toast/banner pattern on this page for a
+  // single-row action, so a minimal local error message is shown right
+  // above the table, matching PlatformLeadsPage's own statusError
+  // pattern for its per-row Select mutation.
+  const [pinError, setPinError] = useState<string | null>(null)
 
   // Debounce search input -- avoid firing a server round trip on every
   // keystroke against a platform that may hold thousands of clubs.
@@ -237,9 +244,11 @@ export function PlatformClubsPage() {
       if (err) throw err
     },
     onSuccess: () => {
+      setPinError(null)
       void refetchPinned()
       void queryClient.invalidateQueries({ queryKey: ['platform-clubs-pinned'] })
     },
+    onError: (err) => setPinError(translateSupabaseError(err, t('platform.clubsPage.pinError'))),
   })
 
   const columns: DataTableColumn<ClubRow>[] = [
@@ -253,7 +262,7 @@ export function PlatformClubsPage() {
       render: (c) => (
         <div className="flex items-center gap-2">
           <button
-            onClick={() => pinMutation.mutate({ clubId: c.id, pinned: pinnedIds.has(c.id) })}
+            onClick={() => { setPinError(null); pinMutation.mutate({ clubId: c.id, pinned: pinnedIds.has(c.id) }) }}
             className="text-text-secondary hover:text-accent-foreground"
             aria-label={pinnedIds.has(c.id) ? t('platform.clubsPage.unpin') : t('platform.clubsPage.pin')}
             title={pinnedIds.has(c.id) ? t('platform.clubsPage.unpin') : t('platform.clubsPage.pin')}
@@ -382,6 +391,8 @@ export function PlatformClubsPage() {
           className="mb-4"
         />
       )}
+
+      {pinError && <p role="alert" className="mb-3 text-sm text-status-danger">{pinError}</p>}
 
       {/* PLATFORM CLUB SELECTOR (2026-08-26) -- "Recent Clubs" and
           "Pinned/Favorite Clubs" for fast repeat access, per the

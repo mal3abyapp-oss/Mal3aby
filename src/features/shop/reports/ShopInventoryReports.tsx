@@ -3,12 +3,15 @@ import { useTranslation } from 'react-i18next'
 import { useMutation, useQuery } from '@tanstack/react-query'
 import { supabase } from '@/lib/supabase/client'
 import { useAuth } from '@/app/providers/AuthProvider'
+import { useClubTimezone } from '@/features/bookings/useFieldPricing'
 import { FormattedDate } from '@/components/ui/formatted-date'
 import { DataTable, type DataTableColumn } from '@/components/ui/data-table'
 import { MoneyDisplay } from '@/components/ui/money-display'
 import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { ReportPrintHeader } from '@/components/ui/report-print-header'
+import { ErrorState } from '@/components/ui/error-state'
+import { translateSupabaseError } from '@/lib/errors'
 import { fetchFullReport } from '@/lib/fetchFullReport'
 import { useDateRange } from '@/features/reports/hooks/useDateRangeReport'
 import { REPORT_PAGE_SIZE, useOffsetPager, PagerControls, ReportHeaderActions, FullPrintNote } from '@/features/shop/reports/shopReportShared'
@@ -40,7 +43,7 @@ function mapBalances(rows: BalanceApiRow[]): BalanceRow[] {
 
 function useBalancesReport(lowStockOnly: boolean, outOfStockOnly: boolean) {
   const { currentClubId } = useAuth()
-  const { data: rows = [], isLoading } = useQuery({
+  const { data: rows = [], isLoading, isError, error, refetch } = useQuery({
     queryKey: ['shop-report-balances', currentClubId, lowStockOnly],
     queryFn: async () => {
       const { data, error } = await supabase.rpc('get_shop_inventory_balances', { p_club_id: currentClubId as string, p_low_stock_only: lowStockOnly })
@@ -50,7 +53,7 @@ function useBalancesReport(lowStockOnly: boolean, outOfStockOnly: boolean) {
     },
     enabled: !!currentClubId,
   })
-  return { rows, isLoading }
+  return { rows, isLoading, isError, error, refetch }
 }
 
 function BalancesTable({ rows, isLoading, emptyKey }: { rows: BalanceRow[]; isLoading: boolean; emptyKey: string }) {
@@ -66,13 +69,17 @@ function BalancesTable({ rows, isLoading, emptyKey }: { rows: BalanceRow[]; isLo
 
 export function ReportShopInventoryOnHandContent() {
   const { t } = useTranslation()
-  const { rows, isLoading } = useBalancesReport(false, false)
+  const { rows, isLoading, isError, error, refetch } = useBalancesReport(false, false)
   return (
     <div data-testid="report-inventory-on-hand" data-row-count={rows.length} data-loading={isLoading}>
       <div className="mb-3 flex justify-end print:hidden"><ReportHeaderActions hasRows={rows.length > 0} /></div>
       <div className="print-target visible-for-print">
         <ReportPrintHeader reportName={t('shop.reports.inventoryOnHand.title')} />
-        <BalancesTable rows={rows} isLoading={isLoading} emptyKey="shop.reports.inventoryOnHand.empty" />
+        {isError ? (
+          <ErrorState message={translateSupabaseError(error, t('shop.reports.loadError'))} onRetry={() => void refetch()} />
+        ) : (
+          <BalancesTable rows={rows} isLoading={isLoading} emptyKey="shop.reports.inventoryOnHand.empty" />
+        )}
       </div>
     </div>
   )
@@ -88,14 +95,20 @@ export function ReportShopInventoryOnHandContent() {
 // ---------------------------------------------------------------------
 export function ReportShopLowStockContent() {
   const { t } = useTranslation()
-  const { rows, isLoading } = useBalancesReport(true, false)
+  const { rows, isLoading, isError, error, refetch } = useBalancesReport(true, false)
   return (
     <div>
       <div className="mb-3 flex justify-end print:hidden"><ReportHeaderActions hasRows={rows.length > 0} /></div>
       <div className="print-target visible-for-print">
         <ReportPrintHeader reportName={t('shop.reports.lowStock.title')} />
-        <p className="mb-2 text-xs text-text-secondary print:hidden">{t('shop.reports.lowStock.knownGapNote')}</p>
-        <BalancesTable rows={rows} isLoading={isLoading} emptyKey="shop.reports.lowStock.empty" />
+        {isError ? (
+          <ErrorState message={translateSupabaseError(error, t('shop.reports.loadError'))} onRetry={() => void refetch()} />
+        ) : (
+          <>
+            <p className="mb-2 text-xs text-text-secondary print:hidden">{t('shop.reports.lowStock.knownGapNote')}</p>
+            <BalancesTable rows={rows} isLoading={isLoading} emptyKey="shop.reports.lowStock.empty" />
+          </>
+        )}
       </div>
     </div>
   )
@@ -111,13 +124,17 @@ export function ReportShopLowStockContent() {
 // ---------------------------------------------------------------------
 export function ReportShopOutOfStockContent() {
   const { t } = useTranslation()
-  const { rows, isLoading } = useBalancesReport(false, true)
+  const { rows, isLoading, isError, error, refetch } = useBalancesReport(false, true)
   return (
     <div>
       <div className="mb-3 flex justify-end print:hidden"><ReportHeaderActions hasRows={rows.length > 0} /></div>
       <div className="print-target visible-for-print">
         <ReportPrintHeader reportName={t('shop.reports.outOfStock.title')} />
-        <BalancesTable rows={rows} isLoading={isLoading} emptyKey="shop.reports.outOfStock.empty" />
+        {isError ? (
+          <ErrorState message={translateSupabaseError(error, t('shop.reports.loadError'))} onRetry={() => void refetch()} />
+        ) : (
+          <BalancesTable rows={rows} isLoading={isLoading} emptyKey="shop.reports.outOfStock.empty" />
+        )}
       </div>
     </div>
   )
@@ -140,6 +157,11 @@ function mapMovements(rows: MovementApiRow[]): MovementRow[] {
 export function ReportShopStockMovementLedgerContent() {
   const { t } = useTranslation()
   const { currentClubId } = useAuth()
+  // FULL-PLATFORM AUDIT ROUND 2 FIX (2026-09-14): movement timestamps
+  // were hardcoded to Africa/Cairo instead of the club's own timezone.
+  // Falls back to Africa/Cairo only while the club's real timezone
+  // hasn't loaded yet.
+  const { data: clubTimezone } = useClubTimezone(currentClubId)
   const { startDate, setStartDate, endDate, setEndDate } = useDateRange()
   const { offset, setOffset, reset } = useOffsetPager()
   const [movementType, setMovementType] = useState(ALL_VALUE)
@@ -152,7 +174,7 @@ export function ReportShopStockMovementLedgerContent() {
     p_movement_type: movementType === ALL_VALUE ? undefined : movementType,
     p_location_id: locationId === ALL_VALUE ? undefined : locationId,
   }
-  const { data: rows = [], isLoading } = useQuery({
+  const { data: rows = [], isLoading, isError, error, refetch } = useQuery({
     queryKey: ['shop-report-movements', currentClubId, startDate, endDate, movementType, locationId, offset],
     queryFn: async () => {
       const { data, error } = await supabase.rpc('list_shop_inventory_movements', { ...args, p_limit: REPORT_PAGE_SIZE, p_offset: offset })
@@ -171,7 +193,7 @@ export function ReportShopStockMovementLedgerContent() {
   const printed = fullRows ?? rows
 
   const columns: DataTableColumn<MovementRow>[] = [
-    { key: 'date', header: t('shop.sales.columns.date'), render: (r) => <FormattedDate value={r.createdAt} timeZone="Africa/Cairo" options={{ year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }} /> },
+    { key: 'date', header: t('shop.sales.columns.date'), render: (r) => <FormattedDate value={r.createdAt} timeZone={clubTimezone ?? 'Africa/Cairo'} options={{ year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }} /> },
     { key: 'product', header: t('reports.shop.columns.product'), render: (r) => r.productNameAr + (r.variantLabel ? ` (${r.variantLabel})` : '') },
     { key: 'location', header: t('shop.inventory.columns.location'), render: (r) => r.locationName },
     { key: 'type', header: t('shop.inventory.columns.movementType'), render: (r) => t(`shop.inventory.movementTypes.${r.movementType}`, { defaultValue: r.movementType }) },
@@ -217,9 +239,15 @@ export function ReportShopStockMovementLedgerContent() {
       </div>
       <div className="print-target visible-for-print">
         <ReportPrintHeader reportName={t('shop.reports.stockMovementLedger.title')} />
-        <FullPrintNote fullCount={fullRows?.length ?? null} truncated={truncated} screenLimit={REPORT_PAGE_SIZE} />
-        <DataTable columns={columns} rows={printed} rowKey={(r) => r.movementId} isLoading={isLoading} emptyTitle={t('shop.reports.stockMovementLedger.empty')} />
-        {fullRows === null && <PagerControls offset={offset} pageSize={REPORT_PAGE_SIZE} rowCount={rows.length} onPrev={() => setOffset(Math.max(0, offset - REPORT_PAGE_SIZE))} onNext={() => setOffset(offset + REPORT_PAGE_SIZE)} />}
+        {isError ? (
+          <ErrorState message={translateSupabaseError(error, t('shop.reports.loadError'))} onRetry={() => void refetch()} />
+        ) : (
+          <>
+            <FullPrintNote fullCount={fullRows?.length ?? null} truncated={truncated} screenLimit={REPORT_PAGE_SIZE} />
+            <DataTable columns={columns} rows={printed} rowKey={(r) => r.movementId} isLoading={isLoading} emptyTitle={t('shop.reports.stockMovementLedger.empty')} />
+            {fullRows === null && <PagerControls offset={offset} pageSize={REPORT_PAGE_SIZE} rowCount={rows.length} onPrev={() => setOffset(Math.max(0, offset - REPORT_PAGE_SIZE))} onNext={() => setOffset(offset + REPORT_PAGE_SIZE)} />}
+          </>
+        )}
       </div>
     </div>
   )
@@ -298,9 +326,12 @@ interface SupplierActivityRow { supplierId: string | null; supplierName: string;
 export function ReportShopSupplierActivityContent() {
   const { t } = useTranslation()
   const { currentClubId } = useAuth()
+  // FULL-PLATFORM AUDIT ROUND 2 FIX (2026-09-14): lastReceiptAt was
+  // hardcoded to Africa/Cairo instead of the club's own timezone.
+  const { data: clubTimezone } = useClubTimezone(currentClubId)
   const { startDate, setStartDate, endDate, setEndDate } = useDateRange()
 
-  const { data: rows = [], isLoading } = useQuery({
+  const { data: rows = [], isLoading, isError, error, refetch } = useQuery({
     queryKey: ['shop-report-supplier-activity', currentClubId, startDate, endDate],
     queryFn: async () => {
       const { data, error } = await supabase.rpc('get_shop_supplier_purchase_activity', { p_club_id: currentClubId as string, p_start_date: startDate || undefined, p_end_date: endDate || undefined })
@@ -318,7 +349,7 @@ export function ReportShopSupplierActivityContent() {
     { key: 'receipts', header: t('shop.reports.supplierActivity.receiptCount'), render: (r) => r.receiptCount },
     { key: 'qty', header: t('shop.reports.supplierActivity.totalQuantity'), render: (r) => r.totalQuantity },
     { key: 'value', header: t('shop.reports.supplierActivity.totalCostValue'), render: (r) => <MoneyDisplay amount={r.totalCostValue} size="sm" /> },
-    { key: 'lastReceipt', header: t('shop.reports.supplierActivity.lastReceipt'), render: (r) => r.lastReceiptAt ? <FormattedDate value={r.lastReceiptAt} timeZone="Africa/Cairo" options={{ year: 'numeric', month: 'short', day: 'numeric' }} /> : '—' },
+    { key: 'lastReceipt', header: t('shop.reports.supplierActivity.lastReceipt'), render: (r) => r.lastReceiptAt ? <FormattedDate value={r.lastReceiptAt} timeZone={clubTimezone ?? 'Africa/Cairo'} options={{ year: 'numeric', month: 'short', day: 'numeric' }} /> : '—' },
   ]
 
   return (
@@ -338,7 +369,11 @@ export function ReportShopSupplierActivityContent() {
       </div>
       <div className="print-target visible-for-print">
         <ReportPrintHeader reportName={t('shop.reports.supplierActivity.title')} />
-        <DataTable columns={columns} rows={rows} rowKey={(r) => r.supplierId ?? '__none__'} isLoading={isLoading} emptyTitle={t('shop.reports.supplierActivity.empty')} />
+        {isError ? (
+          <ErrorState message={translateSupabaseError(error, t('shop.reports.loadError'))} onRetry={() => void refetch()} />
+        ) : (
+          <DataTable columns={columns} rows={rows} rowKey={(r) => r.supplierId ?? '__none__'} isLoading={isLoading} emptyTitle={t('shop.reports.supplierActivity.empty')} />
+        )}
       </div>
     </div>
   )
@@ -365,12 +400,15 @@ function mapVariance(rows: VarianceApiRow[]): VarianceRow[] {
 export function ReportShopStockCountVarianceContent() {
   const { t } = useTranslation()
   const { currentClubId } = useAuth()
+  // FULL-PLATFORM AUDIT ROUND 2 FIX (2026-09-14): completedAt was
+  // hardcoded to Africa/Cairo instead of the club's own timezone.
+  const { data: clubTimezone } = useClubTimezone(currentClubId)
   const { startDate, setStartDate, endDate, setEndDate } = useDateRange()
   const { offset, setOffset, reset } = useOffsetPager()
   const [nonzeroOnly, setNonzeroOnly] = useState(true)
 
   const args = { p_club_id: currentClubId as string, p_start_date: startDate || undefined, p_end_date: endDate || undefined, p_nonzero_only: nonzeroOnly }
-  const { data: rows = [], isLoading } = useQuery({
+  const { data: rows = [], isLoading, isError, error, refetch } = useQuery({
     queryKey: ['shop-report-stock-count-variance', currentClubId, startDate, endDate, nonzeroOnly, offset],
     queryFn: async () => {
       const { data, error } = await supabase.rpc('list_shop_stock_count_variance', { ...args, p_limit: REPORT_PAGE_SIZE, p_offset: offset })
@@ -389,7 +427,7 @@ export function ReportShopStockCountVarianceContent() {
   const printed = fullRows ?? rows
 
   const columns: DataTableColumn<VarianceRow>[] = [
-    { key: 'date', header: t('shop.reports.stockCountVariance.completedAt'), render: (r) => r.completedAt ? <FormattedDate value={r.completedAt} timeZone="Africa/Cairo" options={{ year: 'numeric', month: 'short', day: 'numeric' }} /> : '—' },
+    { key: 'date', header: t('shop.reports.stockCountVariance.completedAt'), render: (r) => r.completedAt ? <FormattedDate value={r.completedAt} timeZone={clubTimezone ?? 'Africa/Cairo'} options={{ year: 'numeric', month: 'short', day: 'numeric' }} /> : '—' },
     { key: 'location', header: t('shop.inventory.columns.location'), render: (r) => r.locationName },
     { key: 'product', header: t('reports.shop.columns.product'), render: (r) => r.productNameAr + (r.variantLabel ? ` (${r.variantLabel})` : '') },
     { key: 'system', header: t('shop.reports.stockCountVariance.systemQty'), render: (r) => r.systemQuantity },
@@ -419,9 +457,15 @@ export function ReportShopStockCountVarianceContent() {
       </div>
       <div className="print-target visible-for-print">
         <ReportPrintHeader reportName={t('shop.reports.stockCountVariance.title')} />
-        <FullPrintNote fullCount={fullRows?.length ?? null} truncated={truncated} screenLimit={REPORT_PAGE_SIZE} />
-        <DataTable columns={columns} rows={printed} rowKey={(r) => `${r.stockCountId}-${r.productNameAr}-${r.variantLabel ?? ''}`} isLoading={isLoading} emptyTitle={t('shop.reports.stockCountVariance.empty')} />
-        {fullRows === null && <PagerControls offset={offset} pageSize={REPORT_PAGE_SIZE} rowCount={rows.length} onPrev={() => setOffset(Math.max(0, offset - REPORT_PAGE_SIZE))} onNext={() => setOffset(offset + REPORT_PAGE_SIZE)} />}
+        {isError ? (
+          <ErrorState message={translateSupabaseError(error, t('shop.reports.loadError'))} onRetry={() => void refetch()} />
+        ) : (
+          <>
+            <FullPrintNote fullCount={fullRows?.length ?? null} truncated={truncated} screenLimit={REPORT_PAGE_SIZE} />
+            <DataTable columns={columns} rows={printed} rowKey={(r) => `${r.stockCountId}-${r.productNameAr}-${r.variantLabel ?? ''}`} isLoading={isLoading} emptyTitle={t('shop.reports.stockCountVariance.empty')} />
+            {fullRows === null && <PagerControls offset={offset} pageSize={REPORT_PAGE_SIZE} rowCount={rows.length} onPrev={() => setOffset(Math.max(0, offset - REPORT_PAGE_SIZE))} onNext={() => setOffset(offset + REPORT_PAGE_SIZE)} />}
+          </>
+        )}
       </div>
     </div>
   )

@@ -8,6 +8,8 @@ import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { PhoneInput } from '@/components/ui/phone-input'
 import { normalizePhone } from '@/lib/domain/phone'
+import { ErrorState } from '@/components/ui/error-state'
+import { translateSupabaseError } from '@/lib/errors'
 
 // IA restructuring (Phase 4): this was a permanent placeholder
 // ("لا توجد إعدادات على مستوى المنصة... غير مُتاحة كشاشة مستقلة في هذا
@@ -73,7 +75,14 @@ async function updateContact(values: { platform_phone: string; platform_email: s
 export function PlatformSettingsPage() {
   const { t } = useTranslation()
   const queryClient = useQueryClient()
-  const { data, isLoading } = useQuery({ queryKey: ['platform-settings'], queryFn: fetchSettings })
+  // FULL-PLATFORM AUDIT ROUND 2 (finding 4): this query had zero error
+  // handling -- a failed read rendered the forms pre-filled with
+  // blank/default-looking values (effectiveTrialDays/
+  // effectiveContactPhone/effectiveContactEmail all fall back to ''
+  // when data is undefined), indistinguishable from "these really are
+  // the platform's current settings". isError/error/refetch now branch
+  // explicitly, same pattern as the rest of this sweep.
+  const { data, isLoading, isError, error, refetch } = useQuery({ queryKey: ['platform-settings'], queryFn: fetchSettings })
   const [trialDays, setTrialDays] = useState<string>('')
   const [saved, setSaved] = useState(false)
   const [contactPhone, setContactPhone] = useState<string>('')
@@ -129,6 +138,11 @@ export function PlatformSettingsPage() {
         <CardContent className="flex flex-col gap-4">
           {isLoading ? (
             <p className="text-sm text-text-secondary">{t('platform.settingsPage.loading')}</p>
+          ) : isError ? (
+            <ErrorState
+              message={translateSupabaseError(error, t('platform.settingsPage.loadError'))}
+              onRetry={() => void refetch()}
+            />
           ) : (
             <>
               <div className="flex flex-col gap-1.5">
@@ -175,6 +189,11 @@ export function PlatformSettingsPage() {
         <CardContent className="flex flex-col gap-4">
           {isLoading ? (
             <p className="text-sm text-text-secondary">{t('platform.settingsPage.loading')}</p>
+          ) : isError ? (
+            <ErrorState
+              message={translateSupabaseError(error, t('platform.settingsPage.loadError'))}
+              onRetry={() => void refetch()}
+            />
           ) : (
             <>
               <PhoneInput

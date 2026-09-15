@@ -384,11 +384,34 @@ export function BookingsPage() {
     return h * 60 + m
   }
 
+  // FULL-PLATFORM AUDIT ROUND 2 FIX (2026-09-14): this grid renders a
+  // single calendar day (SLOTS spans GRID_START_HOUR..GRID_END_HOUR,
+  // i.e. 06:00-23:00), but slotMinutesOf() only ever returns a
+  // 0-1439 minutes-since-local-midnight value. A booking/block that
+  // starts before midnight and ends after it (e.g. 23:00-01:00) then
+  // has end < start (60 < 1380), so `slotMin >= start && slotMin <
+  // end` can never be true for the 23:00 slot -- the entity was
+  // completely invisible in the grid, and a field that's actually
+  // occupied past 23:00 rendered as an empty, clickable, bookable
+  // cell. endMinutesOf treats a numerically-smaller end as "next
+  // day" (+1440); the grid then clamps the rendered end to its own
+  // last boundary (GRID_END_HOUR*60) since there is no next-day row
+  // to span into -- the block/booking is visible starting from its
+  // real start slot through the end of the visible day, instead of
+  // vanishing, and rowSpan stays a valid positive integer.
+  const GRID_END_MINUTES = GRID_END_HOUR * 60
+
+  function endMinutesOf(startIso: string, endIso: string) {
+    const start = slotMinutesOf(startIso)
+    const end = slotMinutesOf(endIso)
+    return end <= start ? end + 24 * 60 : end
+  }
+
   function entityAtSlot(fieldId: string, slotMin: number) {
     const fieldBookings = bookingsByField.get(fieldId) ?? []
     const booking = fieldBookings.find((b) => {
       const start = slotMinutesOf(b.startAt)
-      const end = slotMinutesOf(b.endAt)
+      const end = endMinutesOf(b.startAt, b.endAt)
       return slotMin >= start && slotMin < end
     })
     if (booking) return { kind: 'booking' as const, booking, isStart: slotMinutesOf(booking.startAt) === slotMin }
@@ -396,7 +419,7 @@ export function BookingsPage() {
     const fieldBlocks = blocksByField.get(fieldId) ?? []
     const block = fieldBlocks.find((blk) => {
       const start = slotMinutesOf(blk.startAt)
-      const end = slotMinutesOf(blk.endAt)
+      const end = endMinutesOf(blk.startAt, blk.endAt)
       return slotMin >= start && slotMin < end
     })
     if (block) return { kind: 'block' as const, block, isStart: slotMinutesOf(block.startAt) === slotMin }
@@ -602,7 +625,8 @@ export function BookingsPage() {
                       if (entity?.kind === 'booking') {
                         if (!entity.isStart) return <td key={f.id} className="border-b border-s border-border p-0" />
                         const b = entity.booking
-                        const durationSlots = Math.round((slotMinutesOf(b.endAt) - slotMinutesOf(b.startAt)) / SLOT_MINUTES)
+                        const bClampedEnd = Math.min(endMinutesOf(b.startAt, b.endAt), GRID_END_MINUTES)
+                        const durationSlots = Math.max(1, Math.round((bClampedEnd - slotMinutesOf(b.startAt)) / SLOT_MINUTES))
                         const toneClass = {
                           pending_payment: 'bg-status-warning/15 border-status-warning/40 text-status-warning',
                           confirmed: 'bg-status-success/15 border-status-success/40 text-status-success',
@@ -627,7 +651,8 @@ export function BookingsPage() {
                       if (entity?.kind === 'block') {
                         if (!entity.isStart) return <td key={f.id} className="border-b border-s border-border p-0" />
                         const blk = entity.block
-                        const durationSlots = Math.round((slotMinutesOf(blk.endAt) - slotMinutesOf(blk.startAt)) / SLOT_MINUTES)
+                        const blkClampedEnd = Math.min(endMinutesOf(blk.startAt, blk.endAt), GRID_END_MINUTES)
+                        const durationSlots = Math.max(1, Math.round((blkClampedEnd - slotMinutesOf(blk.startAt)) / SLOT_MINUTES))
                         return (
                           <td key={f.id} rowSpan={durationSlots} className="border-s border-border p-1 align-top">
                             <div className="flex h-full w-full flex-col gap-0.5 rounded-md border border-dashed border-status-danger/40 bg-status-danger/5 p-1.5 text-xs text-status-danger">

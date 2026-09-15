@@ -1,4 +1,4 @@
-import { useState, type FormEvent } from 'react'
+import { useEffect, useState, type FormEvent } from 'react'
 import type { CountryCode } from 'libphonenumber-js'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
@@ -116,6 +116,25 @@ export function PortalProfilePage() {
     setWhatsapp(record.whatsapp ?? '')
     setInitializedForId(record.id)
   }
+
+  // Finding #4 (audit round 2): the render-phase initialization above
+  // runs the instant `record.id` changes (e.g. right after switching
+  // clubs via the selector), but at that exact moment the club-country
+  // query for the NEW record.club_id has virtually never resolved yet
+  // (it's a fresh queryKey -- see the useQuery above) -- so
+  // mobileCountry was seeded from whatever `clubCountry` happened to
+  // hold at that instant (the previous club's country, or the "EG"
+  // fallback on first load) and never re-synced once the real value
+  // arrived, since initializedForId was already set to record.id by
+  // then. This effect re-syncs mobileCountry specifically once
+  // clubCountry resolves/changes for the CURRENTLY initialized record --
+  // scoped to record.id === initializedForId so it never fires again
+  // later purely because the guardian is mid-edit, and never touches
+  // mobile/email/whatsapp (which may already hold unsaved edits).
+  useEffect(() => {
+    if (!record || initializedForId !== record.id || !clubCountry) return
+    setMobileCountry(clubCountry as CountryCode)
+  }, [clubCountry, record, initializedForId])
 
   const saveMutation = useMutation({
     mutationFn: async () => {

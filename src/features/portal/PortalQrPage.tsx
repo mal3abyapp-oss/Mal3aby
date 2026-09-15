@@ -9,8 +9,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { EmptyState } from '@/components/ui/empty-state'
 import { ErrorState } from '@/components/ui/error-state'
 import { Skeleton } from '@/components/ui/skeleton'
+import { FormattedDate } from '@/components/ui/formatted-date'
 import { translateSupabaseError } from '@/lib/errors'
-import { useDirection } from '@/app/providers/DirectionProvider'
 import { usePortalClub } from '@/app/providers/PortalClubProvider'
 import { QrCode } from 'lucide-react'
 
@@ -23,6 +23,7 @@ interface UpcomingBooking {
   id: string
   start_at: string
   club_id: string
+  timezone: string | null
   fields: { name: string } | null
 }
 
@@ -31,6 +32,7 @@ interface PortalQrBookingRpcRow {
   start_at: string
   field_name: string | null
   club_id: string
+  timezone: string | null
 }
 
 // PORTAL PERSONA-SCOPED DATA CONTRACT HARDENING (2026-08-25), follow-up
@@ -52,13 +54,13 @@ async function fetchUpcomingBookings(): Promise<UpcomingBooking[]> {
     id: r.booking_id,
     start_at: r.start_at,
     club_id: r.club_id,
+    timezone: r.timezone,
     fields: r.field_name ? { name: r.field_name } : null,
   }))
 }
 
 export function PortalQrPage() {
   const { t } = useTranslation()
-  const { locale } = useDirection()
   const { activeClubId, activeCustomerId, isLoading: clubLoading } = usePortalClub()
   // Finding H-2 (frozen production audit): this list previously
   // destructured only `data = [], isLoading` -- a failed fetch silently
@@ -214,7 +216,7 @@ export function PortalQrPage() {
           <SelectContent>
             {bookings.map((b) => (
               <SelectItem key={b.id} value={b.id}>
-                {b.fields?.name} — {new Date(b.start_at).toLocaleDateString(locale === 'en' ? 'en-US' : 'ar-EG', { day: 'numeric', month: 'long' })}
+                {b.fields?.name} — <FormattedDate value={b.start_at} timeZone={b.timezone ?? 'Africa/Cairo'} options={{ day: 'numeric', month: 'long' }} />
               </SelectItem>
             ))}
           </SelectContent>

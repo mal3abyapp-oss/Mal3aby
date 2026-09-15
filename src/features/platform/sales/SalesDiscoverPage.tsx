@@ -73,9 +73,17 @@ export function SalesDiscoverPage() {
   const [manualName, setManualName] = useState('')
   const [manualPhone, setManualPhone] = useState('')
   const [manualWebsite, setManualWebsite] = useState('')
+  // FULL-PLATFORM AUDIT ROUND 2 FIX (2026-09-14): Manual Entry used to
+  // silently reuse the Discover form's own `country`/`city` state --
+  // a manually-added lead got saved with whatever country/city was
+  // last typed into the unrelated Google Places search box above
+  // (including its "EG" default), with no field of its own to notice
+  // or correct it. Manual Entry now owns its own country/city state.
+  const [manualCountry, setManualCountry] = useState('EG')
+  const [manualCity, setManualCity] = useState('')
 
   const jobsQuery = useQuery({ queryKey: ['sales-discovery-jobs-recent'], queryFn: fetchRecentJobs, refetchInterval: 10_000 })
-  const providerQuery = useQuery({ queryKey: ['sales-provider-status'], queryFn: fetchProviderStatus })
+  const providerQuery = useQuery({ queryKey: ['sales-provider-status'], queryFn: fetchProviderStatus, retry: 1 })
 
   const googlePlacesStatus = providerQuery.data?.find((p) => p.provider_key === 'google_places')
 
@@ -107,8 +115,8 @@ export function SalesDiscoverPage() {
         p_website: manualWebsite || undefined,
         p_phone: manualPhone || undefined,
         p_email: undefined,
-        p_country: country || undefined,
-        p_city: city || undefined,
+        p_country: manualCountry || undefined,
+        p_city: manualCity || undefined,
         p_area: undefined,
         p_address: undefined,
         p_lat: undefined,
@@ -123,6 +131,9 @@ export function SalesDiscoverPage() {
       if (result?.lead_id) navigate(`/platform/sales/leads/${result.lead_id}`)
     },
   })
+  const manualAddErrorMessage = manualAddMutation.isError
+    ? translateSupabaseError(manualAddMutation.error, t('platform.sales.discover.manualEntryError'))
+    : null
 
   return (
     <div className="space-y-6">
@@ -131,7 +142,12 @@ export function SalesDiscoverPage() {
       <Card>
         <CardHeader><CardTitle>{t('platform.sales.discover.sourceLabel')}: Google Places</CardTitle></CardHeader>
         <CardContent className="space-y-4">
-          {providerQuery.data && !googlePlacesStatus?.is_configured ? (
+          {providerQuery.isError ? (
+            <p className="rounded-md bg-status-danger/10 p-3 text-sm text-status-danger">
+              {translateSupabaseError(providerQuery.error, t('platform.sales.discover.providerStatusError'))}{' '}
+              <button type="button" className="underline" onClick={() => void providerQuery.refetch()}>{t('errorState.retry')}</button>
+            </p>
+          ) : providerQuery.data && !googlePlacesStatus?.is_configured ? (
             <p className="rounded-md bg-status-warning-subtle p-3 text-sm text-status-warning">
               {t('platform.sales.discover.configurationBlocked')}
             </p>
@@ -184,7 +200,16 @@ export function SalesDiscoverPage() {
               <FormLabel htmlFor="manual-website">Website</FormLabel>
               <Input id="manual-website" value={manualWebsite} onChange={(e) => setManualWebsite(e.target.value)} />
             </div>
+            <div>
+              <FormLabel htmlFor="manual-country">{t('platform.sales.discover.countryLabel')}</FormLabel>
+              <Input id="manual-country" value={manualCountry} onChange={(e) => setManualCountry(e.target.value.toUpperCase())} maxLength={2} />
+            </div>
+            <div>
+              <FormLabel htmlFor="manual-city">{t('platform.sales.discover.cityLabel')}</FormLabel>
+              <Input id="manual-city" value={manualCity} onChange={(e) => setManualCity(e.target.value)} />
+            </div>
           </div>
+          {manualAddErrorMessage ? <p className="text-sm text-status-danger">{manualAddErrorMessage}</p> : null}
           <Button variant="outline" onClick={() => manualAddMutation.mutate()} disabled={!manualName || manualAddMutation.isPending}>
             {t('platform.sales.discover.manualEntryButton')}
           </Button>

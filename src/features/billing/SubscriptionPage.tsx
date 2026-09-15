@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useQuery } from '@tanstack/react-query'
 import { supabase } from '@/lib/supabase/client'
@@ -8,7 +9,9 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { StatusBadge } from '@/components/ui/status-badge'
 import { Button } from '@/components/ui/button'
 import { MoneyDisplay } from '@/components/ui/money-display'
-import { filterPublicCommercialPlans } from '@/lib/domain/billing'
+import { cn } from '@/lib/utils'
+import { formatNumberIsolated } from '@/lib/i18n/config'
+import { usePublicPricing } from '@/features/public-site/usePublicPricing'
 
 // Club Owner's own-club subscription view. Scoped to the restricted
 // club_platform_subscription_summary view only — never platform_invoices/
@@ -16,14 +19,16 @@ import { filterPublicCommercialPlans } from '@/lib/domain/billing'
 // only"). No self-service payment recording — "contact us to activate"
 // only, matching the no-online-payment-gateway product decision.
 //
-// P0 fix (2026-09-05): fetchPublicPlans() previously selected every
-// row from public_plans with no filter, so the 2 surviving legacy
-// plans (Monthly 499 EGP, Annual 4499 EGP) rendered mixed into
-// "Available Plans", and since the query ordered by raw price
-// ascending, the cheapest legacy plan (499) rendered FIRST -- ahead of
-// the real Starter/Growth/Pro tiers. Now uses the same shared
-// filterPublicCommercialPlans() helper as PricingPage.tsx/HomePage.tsx
-// (src/lib/domain/billing.ts) so this can't drift back out of sync.
+// P0 fix (2026-09-05): the plans query previously selected every row
+// from public_plans with no filter, so the 2 surviving legacy plans
+// (Monthly 499 EGP, Annual 4499 EGP) rendered mixed into "Available
+// Plans", and since the query ordered by raw price ascending, the
+// cheapest legacy plan (499) rendered FIRST -- ahead of the real
+// Starter/Growth/Pro tiers. Now sourced entirely from usePublicPricing()
+// (src/features/public-site/usePublicPricing.ts), the same shared fetch/
+// filter/family-grouping pipeline PricingPage.tsx/HomePage.tsx use, so
+// this can't drift back out of sync with either the legacy-plan filter
+// or the grouping/toggle presentation (round-2 audit finding #3).
 
 const ACCESS_TONE: Record<string, 'success' | 'warning' | 'danger'> = {
   full: 'success',
@@ -47,17 +52,6 @@ async function fetchSummary(clubId: string) {
   return data
 }
 
-async function fetchPublicPlans() {
-  const { data, error } = await supabase.from('public_plans').select('*').order('display_order')
-  if (error) throw error
-  // Exclude the 2 surviving legacy plans -- this page must never offer
-  // legacy plans as something a customer can switch TO; a legacy
-  // subscriber's own current plan is already shown separately above
-  // via club_platform_subscription_summary (plan_name_snapshot), not
-  // sourced from this list.
-  return filterPublicCommercialPlans(data ?? [])
-}
-
 // P0 fix (2026-09-05): this CTA used to hardcode wa.me/201000000000, a
 // placeholder platform number that drifted from the real one. The one
 // canonical published platform WhatsApp number lives in
@@ -74,14 +68,24 @@ async function fetchPlatformContact() {
 
 export function SubscriptionPage() {
   const { currentClubId } = useAuth()
-  const { t } = useTranslation()
+  const { t, i18n } = useTranslation()
+  const isArabic = i18n.language.startsWith('ar')
   const { locale } = useDirection()
   const { data: summary, isLoading } = useQuery({
     queryKey: ['subscription-summary', currentClubId],
     queryFn: () => fetchSummary(currentClubId!),
     enabled: !!currentClubId,
   })
-  const { data: plans = [] } = useQuery({ queryKey: ['public-plans-subscription'], queryFn: fetchPublicPlans })
+  // Audit fix (round-2, finding #3): this page used to list every
+  // public_plans row flatly (monthly+annual per tier, 6 loose cards)
+  // with no family grouping or billing-cycle toggle -- inconsistent
+  // with the public Pricing page's grouped presentation of the exact
+  // same table. Now reuses usePublicPricing() (the shared fetch/filter/
+  // family-grouping/discount pipeline PricingPage.tsx and HomePage.tsx
+  // already share -- see usePublicPricing.ts's own header comment) so
+  // this can't drift into a third independent grouping implementation.
+  const [billingInterval, setBillingInterval] = useState<'month' | 'year'>('month')
+  const { isLoading: plansLoading, families, annualDiscountByFamily } = usePublicPricing()
   const { data: platformContact } = useQuery({
     queryKey: ['platform-contact'],
     queryFn: fetchPlatformContact,
@@ -121,13 +125,52 @@ export function SubscriptionPage() {
           <CardTitle className="text-base">{t('billing.subscriptionPage.availablePlans')}</CardTitle>
         </CardHeader>
         <CardContent className="flex flex-col gap-3">
-          <div className="grid gap-3 sm:grid-cols-2">
-            {plans.map((p) => (
-              <div key={p.name_ar} className="rounded-md border border-border p-3">
-                <p className="font-medium">{p.name_ar}</p>
-                <MoneyDisplay amount={Number(p.price)} currency={p.currency ?? 'EGP'} size="sm" />
+          {!plansLoading && families.length > 0 && (
+            // Same toggle pattern/copy as PricingPage.tsx -- monthly vs
+            // annual is a single page-level choice, not a per-card
+            // decision, so every family card below reflects the same
+            // selected billing cycle.
+            <div className="flex justify-center">
+              <div className="inline-flex rounded-lg border border-border p-1">
+                <button
+                  type="button"
+                  onClick={() => setBillingInterval('month')}
+                  className={cn('rounded-md px-4 py-1.5 text-sm font-medium transition-colors', billingInterval === 'month' ? 'bg-primary text-primary-foreground' : 'text-text-secondary')}
+                >
+                  {t('publicSite.pricing.billingToggle.monthly')}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setBillingInterval('year')}
+                  className={cn('rounded-md px-4 py-1.5 text-sm font-medium transition-colors', billingInterval === 'year' ? 'bg-primary text-primary-foreground' : 'text-text-secondary')}
+                >
+                  {t('publicSite.pricing.billingToggle.annual')}
+                </button>
               </div>
-            ))}
+            </div>
+          )}
+
+          <div className="grid gap-3 sm:grid-cols-2">
+            {families.map((family) => {
+              const row = billingInterval === 'year' ? (family.annual ?? family.monthly) : (family.monthly ?? family.annual)
+              if (!row) return null
+              const discountPct = billingInterval === 'year' ? annualDiscountByFamily.get(family.familyName) : undefined
+              const displayName = isArabic ? (family.monthly?.name_ar ?? family.annual?.name_ar ?? family.familyName) : family.familyName
+              return (
+                <div key={family.familyName} className="rounded-md border border-border p-3">
+                  <p className="font-medium">{displayName}</p>
+                  <MoneyDisplay amount={Number(row.price)} currency={row.currency ?? 'EGP'} size="sm" />
+                  <p className="text-xs text-text-secondary">
+                    {billingInterval === 'year' ? t('publicSite.pricing.perYear') : t('publicSite.pricing.perMonth')}
+                  </p>
+                  {discountPct != null && (
+                    <p className="text-xs font-medium text-status-success">
+                      {t('publicSite.pricing.saveDiscount', { percent: formatNumberIsolated(discountPct, isArabic ? 'ar' : 'en') })}
+                    </p>
+                  )}
+                </div>
+              )
+            })}
           </div>
           <p className="text-sm text-text-secondary">
             {t('billing.subscriptionPage.contactToActivate')}

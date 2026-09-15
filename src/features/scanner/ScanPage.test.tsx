@@ -52,6 +52,15 @@ vi.mock('@/lib/supabase/client', () => ({
   supabase: { rpc: (...args: unknown[]) => mockRpc(...args) },
 }))
 
+// Round 2 audit fix (finding #6a) added a club_id filter to
+// fetchOpenSessionsForCoach(), which needs useAuth()'s currentClubId
+// -- ScanPage previously had no AuthProvider dependency at all, so
+// this suite never needed to mock it. Same minimal mock shape/pattern
+// as AttentionNeeded.test.tsx.
+vi.mock('@/app/providers/AuthProvider', () => ({
+  useAuth: () => ({ currentClubId: 'club-1' }),
+}))
+
 // Captures the decode callback @zxing/browser's real BrowserQRCodeReader
 // would invoke on a genuine camera frame -- tests call it directly with a
 // fake decoded token, exercising the exact same handleValidate() code path

@@ -31,6 +31,11 @@ async function fetchCampaigns(): Promise<Campaign[]> {
 
 function CampaignCard({ campaign }: { campaign: Campaign }) {
   const { t } = useTranslation()
+  // P3 fix: this per-card stats query had no loading/error handling --
+  // a failed fetch for one campaign's stats left its stats row
+  // permanently absent, indistinguishable from a brand-new campaign
+  // with zero activity. Handled at the card level (not the whole page)
+  // since this is a per-item query in a list.
   const statsQuery = useQuery({
     queryKey: ['sales-campaign-stats', campaign.id],
     queryFn: async () => {
@@ -46,7 +51,16 @@ function CampaignCard({ campaign }: { campaign: Campaign }) {
       <CardHeader><CardTitle>{campaign.name}</CardTitle></CardHeader>
       <CardContent>
         <p className="mb-2 text-sm text-text-secondary">{campaign.description}</p>
-        {stats && (
+        {statsQuery.isLoading ? (
+          <p className="text-sm text-text-secondary">{t('platform.sales.campaigns.stats.loading')}</p>
+        ) : statsQuery.isError ? (
+          <div className="flex items-center justify-between gap-2 text-sm text-status-danger">
+            <span>{translateSupabaseError(statsQuery.error, t('platform.sales.campaigns.stats.loadError'))}</span>
+            <Button size="sm" variant="outline" onClick={() => void statsQuery.refetch()}>
+              {t('errorState.retry')}
+            </Button>
+          </div>
+        ) : stats && (
           <div className="grid grid-cols-3 gap-2 text-sm sm:grid-cols-6">
             <span>{t('platform.sales.campaigns.stats.target')}: {stats.target_count}</span>
             <span>{t('platform.sales.campaigns.stats.queued')}: {stats.queued}</span>

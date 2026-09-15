@@ -19,6 +19,7 @@ interface PortalPlayer {
   id: string
   full_name: string
   photo_url: string | null
+  club_id: string
   enrollments: {
     id: string
     status: string
@@ -31,6 +32,7 @@ interface PortalAcademyRpcRow {
   player_id: string
   player_full_name: string
   player_photo_url: string | null
+  club_id: string
   enrollment_id: string | null
   enrollment_status: string | null
   group_name: string | null
@@ -81,7 +83,7 @@ async function fetchMyPlayers(): Promise<PortalPlayer[]> {
   for (const r of rows) {
     let player = byPlayer.get(r.player_id)
     if (!player) {
-      player = { id: r.player_id, full_name: r.player_full_name, photo_url: r.player_photo_url, enrollments: [] }
+      player = { id: r.player_id, full_name: r.player_full_name, photo_url: r.player_photo_url, club_id: r.club_id, enrollments: [] }
       byPlayer.set(r.player_id, player)
     }
     if (r.enrollment_id && r.enrollment_status) {
@@ -99,12 +101,20 @@ async function fetchMyPlayers(): Promise<PortalPlayer[]> {
 export function PortalAcademyPage() {
   const { t } = useTranslation()
   const { locale } = useDirection()
-  const { isLoading: clubLoading } = usePortalClub()
-  const { data: players = [], isLoading, error, refetch } = useQuery({
+  // Finding #2 (audit round 2): this screen never filtered by the active
+  // club, unlike every sibling portal page (PortalBookingsPage/
+  // PortalPaymentsPage/PortalQrPage) -- a guardian linked to two clubs
+  // saw children/enrollments from both clubs mixed together. Same UX
+  // scoping pattern as those siblings: get_my_portal_academy() now
+  // returns club_id (migration 20260914040000) so the client-side filter
+  // has something real to filter on.
+  const { activeClubId, isLoading: clubLoading } = usePortalClub()
+  const { data: allPlayers = [], isLoading, error, refetch } = useQuery({
     queryKey: ['portal', 'my-players'],
     queryFn: fetchMyPlayers,
     enabled: !clubLoading,
   })
+  const players = allPlayers.filter((p) => p.club_id === activeClubId)
 
   const SUB_STATUS_LABELS: Record<string, string> = {
     pending: t('academy.subscriptionStatusLabels.pending'),
@@ -118,7 +128,7 @@ export function PortalAcademyPage() {
     <div className="flex flex-col gap-5">
       <PageHeader title={t('portal.academyPage.title')} description={t('portal.academyPage.description')} />
 
-      {isLoading && (
+      {(isLoading || clubLoading) && (
         <div className="flex flex-col gap-2">
           <Skeleton className="h-16 w-full rounded-lg" />
           <Skeleton className="h-16 w-full rounded-lg" />
@@ -128,7 +138,7 @@ export function PortalAcademyPage() {
         <ErrorState message={translateSupabaseError(error, t('portal.academyPage.loadError'))} onRetry={() => void refetch()} />
       )}
 
-      {!isLoading && !error && players.length === 0 && (
+      {!isLoading && !clubLoading && !error && players.length === 0 && (
         <EmptyState icon={GraduationCap} title={t('portal.academyPage.emptyTitle')} description={t('portal.academyPage.emptyHint')} />
       )}
 

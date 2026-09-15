@@ -149,7 +149,16 @@ export function OperatingHoursEditor({
                 onClick={() => updateDay(day, { isOpen: !d.isOpen })}
                 className={`relative h-6 w-11 shrink-0 rounded-full transition-colors ${d.isOpen ? 'bg-status-success' : 'bg-muted'}`}
               >
-                <span className={`absolute top-0.5 size-5 rounded-full bg-white shadow transition-transform ${d.isOpen ? 'translate-x-0.5' : 'translate-x-5'}`} />
+                {/* Audit fix (round-2, finding #4): the knob's translate
+                    values were swapped relative to the track's on/off
+                    color -- a green ("on") track rendered with its knob
+                    still at the start (inactive-looking) position, and
+                    the muted ("off") track rendered with its knob at the
+                    end (active-looking) position, reading as an inverted/
+                    broken switch. `translate-x-5` (end position) now
+                    matches isOpen=true (green/on); `translate-x-0.5`
+                    (start position) matches isOpen=false (muted/off). */}
+                <span className={`absolute top-0.5 size-5 rounded-full bg-white shadow transition-transform ${d.isOpen ? 'translate-x-5' : 'translate-x-0.5'}`} />
               </button>
               <span className="w-16 shrink-0 text-sm font-medium">{dayNames[day]}</span>
               {d.isOpen ? (

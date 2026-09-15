@@ -78,6 +78,45 @@ async function fetchOwners(search: string, page: number): Promise<{ rows: OwnerR
   return { rows, totalCount: Number(rows[0]?.total_count ?? 0) }
 }
 
+// FULL-PLATFORM AUDIT ROUND 2 (finding 2): uniqueOwners/multiClubOwners
+// used to be derived from `owners` -- the currently loaded PAGE_SIZE
+// (100) page only -- directly contradicting this page's own stated
+// purpose (grouping owners by how many clubs they run). No aggregate
+// RPC exists for this (confirmed: grepped supabase/migrations for
+// get_platform_club_owners/platform owner aggregation -- the only
+// related RPC, get_platform_owner_accounts, aggregates a different,
+// unrelated population -- platform_owner-role accounts, not club_owner
+// customers). Adding a new RPC is a backend/migration change outside
+// this frontend-only fix's scope, so per the fallback direction: fetch
+// every owner-membership row (not just the displayed page) using the
+// exact same, already-authorized RPC, looping its own p_limit/p_offset
+// until total_count is exhausted. This is a SEPARATE query from the
+// one backing the paginated table below (which must keep showing only
+// PAGE_SIZE rows at a time) -- it exists solely to make the grouping
+// stat cards correct. Capped at a generous bound so a runaway total_count
+// (e.g. a bug elsewhere) can't turn this into an unbounded fetch loop.
+const MAX_OWNER_ROWS_FOR_GROUPING = 20000
+
+async function fetchAllOwnersForGrouping(search: string): Promise<OwnerRow[]> {
+  const all: OwnerRow[] = []
+  let offset = 0
+  for (;;) {
+    const { data, error } = await supabase.rpc('get_platform_club_owners', {
+      p_search: search.trim() || undefined,
+      p_limit: PAGE_SIZE,
+      p_offset: offset,
+    })
+    if (error) throw error
+    const rows = (data ?? []) as (OwnerRow & { total_count?: number })[]
+    if (rows.length === 0) break
+    all.push(...rows)
+    const totalCount = Number(rows[0]?.total_count ?? 0)
+    offset += rows.length
+    if (offset >= totalCount || all.length >= MAX_OWNER_ROWS_FOR_GROUPING) break
+  }
+  return all
+}
+
 export function PlatformOwnersPage() {
   const { t } = useTranslation()
   const { locale } = useDirection()
@@ -110,6 +149,23 @@ export function PlatformOwnersPage() {
   const { data: platformOwnerAccounts = [] } = useQuery({
     queryKey: ['platform-owner-accounts'],
     queryFn: fetchPlatformOwnerAccounts,
+  })
+
+  // FULL-PLATFORM AUDIT ROUND 2 (finding 2): grouping now runs over
+  // every matching owner-membership row (see fetchAllOwnersForGrouping
+  // above), not just the current PAGE_SIZE page -- independent query,
+  // same debouncedSearch so it stays in sync with what the table is
+  // actually filtered to, but its own isLoading/isError so a failure
+  // here doesn't block the (already-working) paginated table below.
+  const {
+    data: allOwnersForGrouping,
+    isLoading: groupingLoading,
+    isError: groupingError,
+    error: groupingErrorObj,
+    refetch: refetchGrouping,
+  } = useQuery({
+    queryKey: ['platform-owners-grouping', debouncedSearch],
+    queryFn: () => fetchAllOwnersForGrouping(debouncedSearch),
   })
 
   // Platform Owner & Password Security directive item 17/18: the
@@ -149,8 +205,14 @@ export function PlatformOwnersPage() {
     },
   })
 
+  // FULL-PLATFORM AUDIT ROUND 2 (finding 2): computed over
+  // allOwnersForGrouping (every matching row) instead of `owners` (the
+  // displayed page only) -- see fetchAllOwnersForGrouping's comment
+  // above. Falls back to an empty map while loading/erroring so the
+  // stat cards render 0 rather than throwing; the loading/error states
+  // are surfaced explicitly on the cards themselves below.
   const ownerClubCounts = new Map<string, number>()
-  for (const o of owners) ownerClubCounts.set(o.user_id, (ownerClubCounts.get(o.user_id) ?? 0) + 1)
+  for (const o of allOwnersForGrouping ?? []) ownerClubCounts.set(o.user_id, (ownerClubCounts.get(o.user_id) ?? 0) + 1)
   const uniqueOwners = ownerClubCounts.size
   const multiClubOwners = [...ownerClubCounts.values()].filter((count) => count > 1).length
 
@@ -300,16 +362,25 @@ export function PlatformOwnersPage() {
         </div>
       )}
 
-      {/* Control Plane V1, Phase 9: these 3 cards are computed from the
-          currently LOADED page only, now that this screen is genuinely
-          page-replace paginated (real server-side total_count) instead
-          of an ever-growing accumulation -- a "+ more" qualifier is
-          shown whenever the true platform-wide total exceeds what's on
-          this page, so the cards never silently understate. */}
+      {/* FULL-PLATFORM AUDIT ROUND 2 (finding 2): these 3 cards now read
+          from allOwnersForGrouping (a dedicated query over every
+          matching row, see fetchAllOwnersForGrouping above), not the
+          currently displayed page -- so the counts are exact rather
+          than an "at least" estimate, and no longer silently
+          understate when an owner's memberships straddle a page
+          boundary. groupingError surfaces distinctly from the table's
+          own isError below (a real Retry, not a silent 0). */}
+      {groupingError && (
+        <ErrorState
+          message={translateSupabaseError(groupingErrorObj, t('platform.ownersPage.groupingLoadError', { defaultValue: 'Could not load owner grouping counts.' }))}
+          onRetry={() => void refetchGrouping()}
+          className="mb-4"
+        />
+      )}
       <div className="mb-4 grid grid-cols-2 gap-4 md:grid-cols-3">
         <StatCard
           label={t('platform.ownersPage.cards.uniqueOwners')}
-          value={totalCount > owners.length ? t('platform.ownersPage.cards.atLeastValue', { count: uniqueOwners }) : String(uniqueOwners)}
+          value={groupingLoading ? '—' : String(uniqueOwners)}
         />
         <StatCard
           label={t('platform.ownersPage.cards.totalMemberships')}
@@ -317,7 +388,7 @@ export function PlatformOwnersPage() {
         />
         <StatCard
           label={t('platform.ownersPage.cards.multiClubOwners')}
-          value={totalCount > owners.length ? t('platform.ownersPage.cards.atLeastValue', { count: multiClubOwners }) : String(multiClubOwners)}
+          value={groupingLoading ? '—' : String(multiClubOwners)}
         />
       </div>
       <div className="mb-4 max-w-sm">

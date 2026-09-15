@@ -370,12 +370,37 @@ export function VerifyInvoicePage() {
                       <p className="text-sm text-text-secondary">{t('verifyInvoice.qrAction.notEligible')}</p>
                     )}
 
+                    {/* Finding #8 (audit round 2): get_booking_qr_for_
+                        invoice_token has six possible statuses
+                        (invalid_invoice_token/not_a_booking_invoice/
+                        booking_cancelled/already_checked_in/
+                        booking_not_eligible/active) -- these two were
+                        previously unhandled, rendering an empty panel
+                        with no message at all. */}
+                    {bookingQr.status === 'invalid_invoice_token' && (
+                      <p className="text-sm text-status-danger">{t('verifyInvoice.qrAction.invalidToken')}</p>
+                    )}
+
+                    {bookingQr.status === 'not_a_booking_invoice' && (
+                      <p className="text-sm text-text-secondary">{t('verifyInvoice.qrAction.notABookingInvoice')}</p>
+                    )}
+
                     {bookingQr.status === 'active' && qrDataUrl && (
                       <QrCodeViewer
                         qrDataUrl={qrDataUrl}
                         label={t('verifyInvoice.qrAction.attendanceQr')}
                         hint={t('verifyInvoice.qrAction.attendanceQrHint')}
                       />
+                    )}
+
+                    {/* Finding #8: the active-but-QR-image-failed case --
+                        the server confirmed the booking is eligible and
+                        minted a raw token, but the client-side
+                        QRCode.toDataURL() call (see the mutation's
+                        onSuccess above) never resolved into qrDataUrl --
+                        previously rendered nothing here either. */}
+                    {bookingQr.status === 'active' && !qrDataUrl && (
+                      <p className="text-sm text-status-danger">{t('verifyInvoice.qrAction.qrGenerationFailed')}</p>
                     )}
                   </div>
                 )}

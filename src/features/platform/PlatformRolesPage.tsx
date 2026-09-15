@@ -15,6 +15,8 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
+import { ErrorState } from '@/components/ui/error-state'
+import { translateSupabaseError } from '@/lib/errors'
 
 // PLATFORM ROLES & PERMISSIONS (2026-08-26) -- the platform-side twin of
 // src/features/staff/RolesPage.tsx, deliberately kept as a SEPARATE
@@ -98,7 +100,13 @@ export function PlatformRolesPage() {
   // state since this is a table action).
   const [confirmingDeleteId, setConfirmingDeleteId] = useState<string | null>(null)
 
-  const { data: roles = [], isLoading } = useQuery({
+  // FULL-PLATFORM AUDIT ROUND 2 (finding 3): this query never
+  // destructured isError/error/refetch -- a failed list_platform_roles()
+  // RPC rendered an empty table, visually identical to "zero roles
+  // configured", on a security-sensitive permissions screen. Same
+  // isError/ErrorState/translateSupabaseError pattern used across the
+  // rest of this codebase (see PlatformOwnersPage.tsx's own read).
+  const { data: roles = [], isLoading, isError, error, refetch } = useQuery({
     queryKey: ['platform-roles'],
     queryFn: fetchPlatformRoles,
   })
@@ -221,14 +229,21 @@ export function PlatformRolesPage() {
         </p>
       )}
 
-      <DataTable
-        columns={columns}
-        rows={roles}
-        rowKey={(r) => r.id}
-        isLoading={isLoading}
-        emptyTitle={t('platformRoles.emptyTitle')}
-        emptyDescription={t('platformRoles.emptyDescription')}
-      />
+      {isError ? (
+        <ErrorState
+          message={translateSupabaseError(error, t('platformRoles.loadError', { defaultValue: 'Could not load platform roles.' }))}
+          onRetry={() => void refetch()}
+        />
+      ) : (
+        <DataTable
+          columns={columns}
+          rows={roles}
+          rowKey={(r) => r.id}
+          isLoading={isLoading}
+          emptyTitle={t('platformRoles.emptyTitle')}
+          emptyDescription={t('platformRoles.emptyDescription')}
+        />
+      )}
 
       {editorOpen && (
         <PlatformRoleEditorDialog
