@@ -114,6 +114,29 @@ Deno.serve(async (req) => {
   // calling the service_role-only linking RPC below.
   const admin = createClient(SUPABASE_URL, SERVICE_ROLE_KEY)
 
+  // AUDIT ROUND 3 (2026-09-15): this call to auth.admin.createUser()
+  // below had no rate limiting at all -- a real cost/quota-bearing
+  // operation. Rate-limited per raw token hash (the same identity
+  // verify_portal_invite_phone/secret already gate their own attempt
+  // caps on), reusing check_rpc_rate_limit() (same fixed-window
+  // pattern as the gateway webhook limiter). This also shrinks the
+  // orphan-auth-user race window described below (concurrent calls
+  // with the same token racing createUser() before either reaches the
+  // claim_portal_invite_service() row lock) without needing a larger,
+  // more invasive change to the invite state machine.
+  const tokenHashForRateLimit = await sha256Hex(rawToken)
+  const { data: rateCheck, error: rateError } = await admin.rpc('check_rpc_rate_limit', {
+    p_rate_key: `activate_portal_account:${tokenHashForRateLimit}`,
+    p_max_requests: 5,
+    p_window_seconds: 300,
+  })
+  if (rateError) {
+    return jsonResponse({ error: 'could not process this request, please try again' }, 500)
+  }
+  if (!rateCheck?.[0]?.allowed) {
+    return jsonResponse({ error: 'too many attempts, please wait a few minutes and try again' }, 429)
+  }
+
   // Re-validate the invite is genuinely claimable BEFORE creating any
   // auth user -- avoids creating an orphan account for a request that
   // was never going to succeed anyway (invalid/expired/not-yet-
@@ -197,7 +220,17 @@ Deno.serve(async (req) => {
     // dangling, never-linked account behind -- amendment section 14's
     // explicit "do not leave Auth User created but Customer link
     // missing" requirement.
-    await admin.auth.admin.deleteUser(newUserId).catch(() => {})
+    // AUDIT ROUND 3 (2026-09-15): this cleanup call used to swallow
+    // its own failure silently (`.catch(() => {})`), so if the delete
+    // itself failed, the resulting orphan auth user was invisible --
+    // nothing surfaced it anywhere. Now logged (not swallowed) so an
+    // orphan is at least discoverable in function logs, without
+    // changing the response the caller gets (the claim itself still
+    // genuinely failed either way).
+    const { error: cleanupError } = await admin.auth.admin.deleteUser(newUserId)
+    if (cleanupError) {
+      console.error(`activate-portal-account: failed to clean up orphan auth user ${newUserId} after claim failure:`, cleanupError.message)
+    }
     return jsonResponse({ error: claimError.message || 'this invite could not be claimed' }, 400)
   }
 
