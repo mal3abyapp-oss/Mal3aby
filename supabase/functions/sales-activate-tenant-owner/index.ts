@@ -100,6 +100,24 @@ Deno.serve(async (req) => {
 
   const admin = createClient(SUPABASE_URL, SERVICE_ROLE_KEY)
 
+  // AUDIT ROUND 3 (2026-09-15): no rate limiting on the
+  // auth.admin.createUser() call below -- same fix as
+  // activate-portal-account, same reasoning (see that function's own
+  // comment for the full rationale). Token-hash-keyed, same shape as
+  // the token-verification steps' own attempt caps.
+  const tokenHashForRateLimit = await sha256Hex(rawToken)
+  const { data: rateCheck, error: rateError } = await admin.rpc('check_rpc_rate_limit', {
+    p_rate_key: `sales_activate_tenant_owner:${tokenHashForRateLimit}`,
+    p_max_requests: 5,
+    p_window_seconds: 300,
+  })
+  if (rateError) {
+    return jsonResponse({ error: 'could not process this request, please try again' }, 500)
+  }
+  if (!rateCheck?.[0]?.allowed) {
+    return jsonResponse({ error: 'too many attempts, please wait a few minutes and try again' }, 429)
+  }
+
   // Re-validate the invite is genuinely claimable BEFORE creating any
   // auth user -- avoids an orphan account for a request that could
   // never succeed anyway. The email itself is read from the invite row
