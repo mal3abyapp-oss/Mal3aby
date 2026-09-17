@@ -1,9 +1,8 @@
 import { Suspense, useState } from 'react'
-import { NavLink, Outlet } from 'react-router-dom'
+import { NavLink, Outlet, useLocation } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { cn } from '@/lib/utils'
 import { Sheet, SheetContent, SheetTitle } from '@/components/ui/sheet'
-import { Button } from '@/components/ui/button'
 import { LanguageSwitcher } from '@/components/ui/language-switcher'
 import { useAuth } from '@/app/providers/AuthProvider'
 import { RouteLoadingFallback } from '@/app/routing/RouteLoadingFallback'
@@ -19,7 +18,6 @@ import {
   Award,
   ShieldCheck,
   Settings,
-  Menu,
   LogOut,
   UserCog,
   KeyRound,
@@ -31,6 +29,7 @@ import {
   CalendarClock,
   SlidersHorizontal,
   MessageCircle,
+  MoreHorizontal,
 } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 
@@ -145,45 +144,51 @@ const navSections: NavSection[] = [
   },
 ]
 
-function PlatformNavList({ onNavigate }: { onNavigate?: () => void }) {
+const allNavItems = navSections.flatMap((section) => section.items)
+const mobilePrimaryPaths = new Set(['/platform', '/platform/clubs', '/platform/sales', '/platform/alerts'])
+const mobilePrimaryNavItems = [...mobilePrimaryPaths]
+  .map((path) => allNavItems.find((item) => item.to === path))
+  .filter((item): item is NavItem => Boolean(item))
+
+function canSeePlatformNavItem(item: NavItem, isPlatformOwner: boolean, permissionSet: ReadonlySet<string>) {
+  return isPlatformOwner || !item.requiredPermissions || item.requiredPermissions.some((key) => permissionSet.has(key))
+}
+
+function PlatformNavList({ onNavigate, excludePaths }: { onNavigate?: () => void; excludePaths?: ReadonlySet<string> }) {
   const { t } = useTranslation()
   const { isPlatformOwner, platformPermissionKeys } = useAuth()
   const permissionSet = new Set(platformPermissionKeys)
-  // A real platform_owner always sees the full nav, exactly as before
-  // this change -- least-privilege filtering only ever applies to a
-  // staff caller (isPlatformOwner === false, isPlatformStaff === true,
-  // per RequirePlatformOwner already having required one or the other
-  // to reach this shell at all).
-  const canSee = (item: NavItem) =>
-    isPlatformOwner || !item.requiredPermissions || item.requiredPermissions.some((key) => permissionSet.has(key))
+
   return (
     <nav className="flex flex-1 flex-col gap-4 px-2">
       {navSections.map((section, i) => {
-        const visibleItems = section.items.filter(canSee)
+        const visibleItems = section.items
+          .filter((item) => canSeePlatformNavItem(item, isPlatformOwner, permissionSet))
+          .filter((item) => !excludePaths?.has(item.to))
         if (visibleItems.length === 0) return null
         return (
-        <div key={section.titleKey ?? `section-${i}`} className="flex flex-col gap-1">
-          {section.titleKey && (
-            <h2 className="px-3 pb-1 text-xs font-semibold text-white/40">{t(section.titleKey)}</h2>
-          )}
-          {visibleItems.map((item) => (
-            <NavLink
-              key={item.to}
-              to={item.to}
-              end={item.to === '/platform' || item.to === '/platform/sales'}
-              onClick={onNavigate}
-              className={({ isActive }) =>
-                cn(
-                  'flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium text-white/70 transition-colors hover:bg-white/10 hover:text-white',
-                  isActive && 'bg-accent text-accent-foreground hover:bg-accent/90',
-                )
-              }
-            >
-              <item.icon className="size-4" />
-              {t(item.labelKey)}
-            </NavLink>
-          ))}
-        </div>
+          <div key={section.titleKey ?? `section-${i}`} className="flex flex-col gap-1">
+            {section.titleKey && (
+              <h2 className="px-3 pb-1 text-xs font-semibold text-white/40">{t(section.titleKey)}</h2>
+            )}
+            {visibleItems.map((item) => (
+              <NavLink
+                key={item.to}
+                to={item.to}
+                end={item.to === '/platform' || item.to === '/platform/sales'}
+                onClick={onNavigate}
+                className={({ isActive }) =>
+                  cn(
+                    'flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium text-white/70 transition-colors hover:bg-white/10 hover:text-white',
+                    isActive && 'bg-accent text-accent-foreground hover:bg-accent/90',
+                  )
+                }
+              >
+                <item.icon className="size-4" />
+                {t(item.labelKey)}
+              </NavLink>
+            ))}
+          </div>
         )
       })}
     </nav>
@@ -191,17 +196,23 @@ function PlatformNavList({ onNavigate }: { onNavigate?: () => void }) {
 }
 
 export function PlatformLayout() {
-  // Owner-level review finding (P1): this shell's sidebar was
-  // `hidden ... md:flex` with NO mobile fallback at all -- below the
-  // md breakpoint (768px) a Platform Owner had literally zero way to
-  // navigate away from whichever page they landed on (no bottom nav,
-  // no hamburger, nothing), unlike AppLayout which has always had a
-  // mobile bottom nav. Fixed with a hamburger + slide-in Sheet reusing
-  // the exact same navSections/NavLink markup as the desktop sidebar
-  // (no navigation model duplicated, just presented in two containers).
   const { t } = useTranslation()
-  const { signOut } = useAuth()
-  const [mobileNavOpen, setMobileNavOpen] = useState(false)
+  const location = useLocation()
+  const { signOut, isPlatformOwner, platformPermissionKeys } = useAuth()
+  const [mobileMoreOpen, setMobileMoreOpen] = useState(false)
+  const permissionSet = new Set(platformPermissionKeys)
+  const visibleMobilePrimaryItems = mobilePrimaryNavItems.filter((item) =>
+    canSeePlatformNavItem(item, isPlatformOwner, permissionSet),
+  )
+
+  const isPrimaryRouteActive = (item: NavItem) => {
+    if (item.to === '/platform') return location.pathname === '/platform'
+    if (item.to === '/platform/clubs') {
+      return location.pathname === '/platform/clubs' || location.pathname.startsWith('/platform/clubs/')
+    }
+    return location.pathname === item.to
+  }
+  const isMoreActive = !visibleMobilePrimaryItems.some(isPrimaryRouteActive)
 
   return (
     <div className="flex min-h-screen bg-page-bg">
@@ -230,19 +241,11 @@ export function PlatformLayout() {
       </aside>
 
       <div className="flex min-w-0 flex-1 flex-col">
+        {/* Mobile header remains intentionally light: primary navigation
+            lives in the persistent bottom bar below. */}
         <header className="flex h-14 items-center justify-between border-b border-border bg-surface px-4 md:hidden">
           <span className="font-bold text-text-primary">Mal3aby — Platform</span>
-          <div className="flex items-center gap-2">
-            <LanguageSwitcher />
-            <Button
-              variant="ghost"
-              size="icon"
-              aria-label={t('platform.openNavAria')}
-              onClick={() => setMobileNavOpen(true)}
-            >
-              <Menu className="size-5" />
-            </Button>
-          </div>
+          <LanguageSwitcher />
         </header>
         {/* PERSONA COUNCIL AUDIT (2026-08-25) -- Platform Owner persona
             finding: this shell had no cross-page search entry point at
@@ -251,29 +254,79 @@ export function PlatformLayout() {
         <header className="hidden h-14 items-center gap-4 border-b border-border bg-surface px-4 md:flex">
           <PlatformGlobalSearch />
         </header>
-        <main className="min-w-0 flex-1 p-4">
+        <main className="min-w-0 flex-1 p-4 pb-[calc(6rem+env(safe-area-inset-bottom))] md:pb-4">
           <Suspense fallback={<RouteLoadingFallback />}>
             <Outlet />
           </Suspense>
         </main>
       </div>
 
-      <Sheet open={mobileNavOpen} onOpenChange={setMobileNavOpen}>
-        {/* Master IA/UX audit (RTL phase): sheet.tsx's `side` variant is
-            now direction-aware (logical CSS under the hood) -- "right"
-            means "the reading-start edge" in both RTL and LTR, matching
-            the sidebar's own `border-e` direction-awareness, so this
-            stays correct if a user toggles to English. */}
-        <SheetContent side="right" className="flex w-64 flex-col bg-dark-secondary p-0 text-white">
-          <SheetTitle className="px-4 py-5 text-lg font-bold text-white">Mal3aby — Platform</SheetTitle>
-          <PlatformNavList onNavigate={() => setMobileNavOpen(false)} />
+      {/* Mobile Platform navigation intentionally mirrors the proven
+          AppLayout pattern: a small set of high-frequency destinations
+          is always one tap away, and every other existing destination
+          remains available under More. navSections stays the single
+          source of truth for routes and permissions. */}
+      <nav
+        aria-label={t('nav.mobileNavAria')}
+        className="fixed inset-x-0 bottom-0 z-40 border-t border-border bg-surface md:hidden"
+        style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
+      >
+        <div className="mx-auto flex max-w-lg items-stretch">
+          {visibleMobilePrimaryItems.map((item) => (
+            <NavLink
+              key={item.to}
+              to={item.to}
+              end={item.to !== '/platform/clubs'}
+              className={({ isActive }) =>
+                cn(
+                  'flex min-h-16 flex-1 flex-col items-center justify-center gap-1 px-1 py-2 text-center text-[11px] font-medium text-text-secondary transition-colors',
+                  isActive && 'bg-accent/10 text-accent-foreground',
+                )
+              }
+            >
+              <item.icon className="size-5" />
+              <span className="max-w-full truncate">{t(item.labelKey)}</span>
+            </NavLink>
+          ))}
           <button
-            onClick={() => void signOut()}
-            className="flex items-center gap-3 border-t border-white/10 px-5 py-4 text-sm font-medium text-white/60 hover:text-white"
+            type="button"
+            aria-label={t('nav.more')}
+            aria-expanded={mobileMoreOpen}
+            onClick={() => setMobileMoreOpen(true)}
+            className={cn(
+              'flex min-h-16 flex-1 flex-col items-center justify-center gap-1 px-1 py-2 text-center text-[11px] font-medium text-text-secondary transition-colors',
+              (mobileMoreOpen || isMoreActive) && 'bg-accent/10 text-accent-foreground',
+            )}
           >
-            <LogOut className="size-4" />
-            {t('nav.logout')}
+            <MoreHorizontal className="size-5" />
+            <span className="max-w-full truncate">{t('nav.more')}</span>
           </button>
+        </div>
+      </nav>
+
+      <Sheet open={mobileMoreOpen} onOpenChange={setMobileMoreOpen}>
+        <SheetContent
+          side="bottom"
+          className="flex max-h-[85dvh] flex-col gap-0 rounded-t-2xl border-t border-border bg-dark-secondary p-0 text-white md:hidden"
+        >
+          <div className="shrink-0 border-b border-white/10 px-4 py-4">
+            <SheetTitle className="text-lg font-bold text-white">{t('nav.more')}</SheetTitle>
+          </div>
+          <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain py-3">
+            <PlatformNavList onNavigate={() => setMobileMoreOpen(false)} excludePaths={mobilePrimaryPaths} />
+          </div>
+          <div
+            className="shrink-0 border-t border-white/10 px-2 pt-2"
+            style={{ paddingBottom: 'max(1rem, env(safe-area-inset-bottom))' }}
+          >
+            <button
+              onClick={() => void signOut()}
+              className="flex w-full items-center gap-3 rounded-md px-3 py-3 text-sm font-medium text-white/70 transition-colors hover:bg-white/10 hover:text-white"
+            >
+              <LogOut className="size-4" />
+              {t('nav.logout')}
+            </button>
+          </div>
         </SheetContent>
       </Sheet>
     </div>
