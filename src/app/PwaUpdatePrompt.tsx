@@ -41,6 +41,26 @@ import { Button } from '@/components/ui/button'
 // appear for a worker that was already waiting before this component
 // ever ran, closing the exact gap that produced the stale-bundle
 // symptom without requiring any manual cache/site-data clearing.
+//
+// SAFE AUTO-ACTIVATION (2026-09-18, owner directive: updates must reach
+// customers/staff without requiring them to notice a toast and click
+// it): still never a blind skipWaiting()/clientsClaim() swap -- the
+// 2026-08-27 fix above documents exactly why that's dangerous in a
+// booking/payment app (code replaced under an in-flight action). A
+// waiting worker is instead activated automatically ONLY when the tab
+// is provably not in the middle of anything:
+//   - the tab is hidden (backgrounded/switched away from) -- nothing
+//     on screen can be disrupted, so it's always safe to swap and
+//     reload the instant this happens; the user simply finds the
+//     current version already loaded next time they look.
+//   - the tab has been visible but genuinely idle (no pointer/
+//     keyboard/touch activity) for IDLE_AUTO_UPDATE_MS -- long enough
+//     that "mid-payment" or "mid-form" is implausible.
+// The manual toast/button stays as a fallback for the remaining case
+// (actively, continuously interacting for the whole session) so no
+// user is ever silently stuck on a stale build indefinitely.
+const IDLE_AUTO_UPDATE_MS = 5 * 60_000
+
 export function PwaUpdatePrompt() {
   const { t } = useTranslation()
   const {
@@ -120,6 +140,51 @@ export function PwaUpdatePrompt() {
     onVisible()
     return () => document.removeEventListener('visibilitychange', onVisible)
   }, [setNeedRefresh])
+
+  // Safe auto-activation (see the block comment above the component):
+  // once a worker is confirmed waiting, activate it the instant it's
+  // provably safe to do so, instead of leaving it entirely up to the
+  // user noticing and clicking the toast below.
+  useEffect(() => {
+    if (!needRefresh) return
+
+    let activated = false
+    const activate = () => {
+      if (activated) return
+      activated = true
+      updateServiceWorker(true)
+    }
+
+    // Hidden tab: nothing on screen can be mid-interaction, so it's
+    // always safe to swap in the background -- the user simply lands
+    // on the current version next time this tab becomes active.
+    if (document.visibilityState === 'hidden') {
+      activate()
+      return
+    }
+    function onHidden() {
+      if (document.visibilityState === 'hidden') activate()
+    }
+    document.addEventListener('visibilitychange', onHidden)
+
+    // Visible tab: only auto-activate after a real idle stretch (no
+    // pointer/keyboard/touch activity) long enough that "mid-payment"
+    // or "mid-form" is implausible. Any activity resets the timer.
+    let idleTimer: ReturnType<typeof setTimeout>
+    const resetIdleTimer = () => {
+      clearTimeout(idleTimer)
+      idleTimer = setTimeout(activate, IDLE_AUTO_UPDATE_MS)
+    }
+    const activityEvents = ['pointerdown', 'keydown', 'touchstart', 'wheel'] as const
+    activityEvents.forEach((event) => window.addEventListener(event, resetIdleTimer, { passive: true }))
+    resetIdleTimer()
+
+    return () => {
+      document.removeEventListener('visibilitychange', onHidden)
+      activityEvents.forEach((event) => window.removeEventListener(event, resetIdleTimer))
+      clearTimeout(idleTimer)
+    }
+  }, [needRefresh, updateServiceWorker])
 
   if (!needRefresh) return null
 
