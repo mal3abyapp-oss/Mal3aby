@@ -526,7 +526,20 @@
       // platformDomainIsolationTest.ts. GitHub Actions run 34669860154,
       // digest sha256:3690a27e938ad36636d060068454487f788b8388fec67c5bcccada48dad72ff5.
       // Booking recovery template, commit a0db2bb, Actions run 34785198766.
-      "image": "registry.cloudflare.com/35ac10727701095866b16c276b4a33d1/mala3by-whatsapp-connector:booking-resume-a0db2bb",
+      // platform-gen-fix, commit a8d385c -- REAL ROOT CAUSE FIX for the
+      // Platform Owner's WhatsApp QR never appearing: PlatformConnectionManager.ts
+      // previously hardcoded generation:0 on every process start,
+      // which was only safe while the platform domain had never run
+      // for real -- once it had (state_seq climbing past 8000 before a
+      // 2026-09-13 outage), every later restart's status writes were
+      // permanently rejected as stale by
+      // whatsapp_connector_report_platform_status()'s own fencing
+      // check, with zero visible error. Now calls a real atomic
+      // claim-and-increment RPC (whatsapp_connector_claim_platform_generation(),
+      // migration 20260918160000), the exact same fix already proven
+      // for the tenant/club domain. GitHub Actions run 35365310978,
+      // digest confirmed via wrangler containers build --push output.
+      "image": "registry.cloudflare.com/35ac10727701095866b16c276b4a33d1/mala3by-whatsapp-connector:platform-gen-fix-a8d385c",
       // One container instance per WhatsApp account (one Durable
       // Object = one container, directive rule 21's chosen model --
       // NOT a shared container serving multiple clubs, which would
