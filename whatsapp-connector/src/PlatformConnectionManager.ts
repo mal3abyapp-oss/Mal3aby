@@ -71,22 +71,20 @@ export class PlatformConnectionManager {
       // for making pairing/sending work at all, and can be layered on
       // later without touching this file's core shape).
     })
-    await provider.claimDbGeneration(async () => {
-      // Platform WhatsApp has no per-club generation-claim RPC (there is
-      // exactly one account, so there is exactly one fencing sequence to
-      // claim) -- reuse whatsapp_connector_report_platform_status()'s
-      // own stale-write rejection (p_generation/p_state_seq compared
-      // against last_generation/last_state_seq) as the fencing
-      // mechanism instead of a dedicated claim RPC. Starting at
-      // generation 0 here is safe: unlike the tenant domain's
-      // now-fixed history (BaileysProvider's doc comment on
-      // dbGeneration explains that incident in full), the Platform
-      // WhatsApp domain is brand new as of this feature -- there is no
-      // accumulated prior-restart generation count in the database to
-      // collide with yet, so 0 is a genuine, correct starting point,
-      // not a repeat of the same bug being fixed elsewhere.
-      return 0
-    })
+    // REAL ROOT CAUSE FIX (2026-09-18, owner-reported QR-never-appears
+    // investigation): this used to hardcode `return 0` here, on the
+    // stated assumption that the Platform WhatsApp domain had never run
+    // for real yet. Confirmed live that assumption was wrong -- the
+    // domain HAD run (2026-09-13, generation 0, state_seq climbing to
+    // 8346 before a reconnect-exhaustion outage), so every later
+    // restart's writes were permanently rejected as stale by
+    // whatsapp_connector_report_platform_status()'s own fencing check,
+    // with zero visible error (status_write_rejected_stale events,
+    // confirmed live). Now uses a real atomic claim-and-increment RPC,
+    // the exact same fix already proven for the tenant/club domain via
+    // whatsapp_connector_claim_generation() -- see
+    // PlatformSupabaseSync.claimGeneration()'s own doc comment.
+    await provider.claimDbGeneration(() => this.sync.claimGeneration())
     this.provider = provider
     this.sessionKey = sessionKey
     return provider
