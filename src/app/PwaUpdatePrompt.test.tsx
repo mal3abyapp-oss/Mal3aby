@@ -29,6 +29,7 @@ const mockRegistration = {
 }
 
 const setNeedRefreshSpy = vi.fn()
+const updateServiceWorkerSpy = vi.fn()
 
 vi.mock('virtual:pwa-register/react', () => ({
   useRegisterSW: (options?: { onRegisteredSW?: (url: string, registration: unknown) => void }) => {
@@ -45,7 +46,7 @@ vi.mock('virtual:pwa-register/react', () => ({
     return {
       needRefresh: [true, setNeedRefreshSpy],
       offlineReady: [false, vi.fn()],
-      updateServiceWorker: vi.fn(),
+      updateServiceWorker: updateServiceWorkerSpy,
     }
   },
 }))
@@ -56,6 +57,7 @@ const { PwaUpdatePrompt } = await import('./PwaUpdatePrompt')
 describe('PwaUpdatePrompt', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    Object.defineProperty(document, 'visibilityState', { value: 'visible', configurable: true, writable: true })
   })
 
   it('shows the update toast when a worker is already waiting at registration time', async () => {
@@ -75,5 +77,46 @@ describe('PwaUpdatePrompt', () => {
     await waitFor(() => {
       expect(mockRegistration.addEventListener).toHaveBeenCalledWith('updatefound', expect.any(Function))
     })
+  })
+
+  // Owner directive (2026-09-18): updates must reach users without
+  // requiring them to notice/click the toast, but never by silently
+  // yanking code out from under an in-flight action (the exact risk
+  // the 2026-08-27 fix above guarded against). These two tests prove
+  // the two provably-safe auto-activation paths this component adds.
+  it('auto-activates the waiting worker the instant the tab is hidden, with no click required', async () => {
+    render(<PwaUpdatePrompt />)
+    await waitFor(() => {
+      expect(screen.getByRole('status')).toBeInTheDocument()
+    })
+
+    expect(updateServiceWorkerSpy).not.toHaveBeenCalled()
+
+    Object.defineProperty(document, 'visibilityState', { value: 'hidden', configurable: true })
+    document.dispatchEvent(new Event('visibilitychange'))
+
+    expect(updateServiceWorkerSpy).toHaveBeenCalledWith(true)
+  })
+
+  it('auto-activates after a real idle stretch on a visible tab, but not while the user is actively interacting', async () => {
+    vi.useFakeTimers()
+    try {
+      render(<PwaUpdatePrompt />)
+      await vi.waitFor(() => {
+        expect(screen.getByRole('status')).toBeInTheDocument()
+      })
+
+      // Activity resets the idle clock -- still not safe to swap.
+      vi.advanceTimersByTime(4 * 60_000)
+      window.dispatchEvent(new Event('pointerdown'))
+      vi.advanceTimersByTime(4 * 60_000)
+      expect(updateServiceWorkerSpy).not.toHaveBeenCalled()
+
+      // A full idle stretch with zero activity: now safe.
+      vi.advanceTimersByTime(60_000 + 1)
+      expect(updateServiceWorkerSpy).toHaveBeenCalledWith(true)
+    } finally {
+      vi.useRealTimers()
+    }
   })
 })
