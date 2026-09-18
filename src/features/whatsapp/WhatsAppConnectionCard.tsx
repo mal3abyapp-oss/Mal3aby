@@ -203,10 +203,34 @@ export function WhatsAppConnectionCard() {
     }
   }, [qrPayload])
 
+  // Owner-reported bug fix (2026-09-18): start_whatsapp_pairing() only
+  // ever writes intent to Postgres -- it never wakes the club's
+  // connector container if it has gone to sleep (an idle container is
+  // allowed to sleep to save cost; see cloudflare/whatsapp-worker's own
+  // docs). Without an explicit wake call, a club whose container was
+  // already asleep would sit on "connecting" forever, with the QR never
+  // appearing, exactly the reported symptom. whatsapp-wake-connector is
+  // a thin, permission-checked Edge Function proxy to the Worker's
+  // /manage/:clubId/start (idempotent -- safe to call on every
+  // connect/retry, never starts a second container). Its failure is
+  // deliberately non-fatal to the pairing flow: the intent is already
+  // written, and the 5s status poll + this card's own QR-wait-timeout
+  // will still surface a real, honest error if the connector truly
+  // never comes up -- this call only removes the common case where it
+  // would have come up fine but nothing told it to.
+  async function wakeConnector() {
+    try {
+      await supabase.functions.invoke('whatsapp-wake-connector', { body: { club_id: currentClubId } })
+    } catch {
+      // Non-fatal -- see comment above.
+    }
+  }
+
   const connectMutation = useMutation({
     mutationFn: async () => {
       const { error } = await supabase.rpc('start_whatsapp_pairing', { p_club_id: currentClubId! })
       if (error) throw error
+      await wakeConnector()
     },
     onSuccess: () => {
       setActionError(null)
@@ -225,6 +249,7 @@ export function WhatsAppConnectionCard() {
     mutationFn: async () => {
       const { error } = await supabase.rpc('start_whatsapp_pairing', { p_club_id: currentClubId! })
       if (error) throw error
+      await wakeConnector()
     },
     onSuccess: () => {
       setActionError(null)
