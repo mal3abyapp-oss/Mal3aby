@@ -394,6 +394,20 @@ export function PublicClubBookingPage() {
     [dateOptions, dateKey],
   )
   const isTodaySelected = selectedDateOption?.isToday ?? false
+  // BUG FIX (2026-09-18, owner-reported): sameDayOnlineBookingEnabled
+  // (fetched into dateOptions[0].isOnlineBookable) was computed but
+  // never actually consumed anywhere -- every branch below gated on
+  // plain isTodaySelected instead, so a club that explicitly enabled
+  // same-day online booking still always got the "contact the club to
+  // book today" fallback UI, with copy flatly stating same-day booking
+  // "is not available online for this club" even when the owner had
+  // just turned it on. The real gate is "today AND same-day online
+  // booking is genuinely disabled for this club" -- every place that
+  // previously branched on isTodaySelected alone for this specific
+  // decision now uses this instead. isTodaySelected itself is
+  // untouched and still used for the parts that are genuinely just
+  // "is this literally today" (e.g. the date option's own label).
+  const todayRequiresClubContact = isTodaySelected && !(selectedDateOption?.isOnlineBookable ?? false)
 
   // BOOKING ENGINE / AVAILABILITY directive: available START TIMES for
   // the chosen duration are now server-computed (get_public_field_available_starts),
@@ -437,7 +451,7 @@ export function PublicClubBookingPage() {
       const total = (data ?? []).reduce((sum, row) => sum + Number(row.segment_total), 0)
       return Math.round(total * 100) / 100
     },
-    enabled: !!selectedFieldId && !!dateKey && !!selectedTime && step === 'details' && !isTodaySelected,
+    enabled: !!selectedFieldId && !!dateKey && !!selectedTime && step === 'details' && !todayRequiresClubContact,
   })
 
   const timeSlots = useMemo(() => {
@@ -761,7 +775,7 @@ export function PublicClubBookingPage() {
                       defined, see tailwind.config.ts); the badge was
                       silently rendering unstyled. Now uses the real
                       semantic token. */}
-                  {opt.isToday && (
+                  {opt.isToday && !opt.isOnlineBookable && (
                     <span className="rounded-full bg-status-info/10 px-2 py-0.5 text-[11px] font-medium text-status-info">
                       {t('publicBooking.todayContactBadge')}
                     </span>
@@ -838,7 +852,7 @@ export function PublicClubBookingPage() {
                 race-condition warning, call + WhatsApp actions, all
                 unchanged. Not duplicated: still the ONLY render of
                 this content, just visually unified. */}
-            {isTodaySelected && clubWaNumber && (
+            {todayRequiresClubContact && clubWaNumber && (
               <div className="flex flex-col gap-3 rounded-lg border border-status-info/30 bg-status-info/5 p-4">
                 <div className="flex items-start gap-2">
                   <Phone className="mt-0.5 size-4 shrink-0 text-status-info" aria-hidden="true" />
@@ -876,7 +890,7 @@ export function PublicClubBookingPage() {
                 club has no WhatsApp/phone number configured at all --
                 preserves the previous fallback behavior exactly (this
                 text was never conditioned on clubWaNumber before). */}
-            {isTodaySelected && !clubWaNumber && (
+            {todayRequiresClubContact && !clubWaNumber && (
               <div className="rounded-lg border border-status-info/30 bg-status-info/5 p-3 text-sm text-status-info">
                 {t('publicBooking.todayContactExplainer')}
               </div>
@@ -886,7 +900,7 @@ export function PublicClubBookingPage() {
             {availabilityError && <div role="alert" className="rounded-xl border border-status-danger/30 p-4 text-sm"><p>{t('publicBooking.experience.availabilityError')}</p><Button variant="outline" className="mt-3" onClick={() => void retryAvailability()}>{t('publicBooking.experience.retry')}</Button></div>}
             {!availabilityLoading && !availabilityError && !timeSlots.some(s => s.isAvailable) && <div className="rounded-xl bg-page-bg p-6 text-center"><CalendarDays className="mx-auto mb-3 size-7 text-text-secondary" /><p className="text-sm text-text-secondary">{t('publicBooking.noSlotsAvailable')}</p><Button variant="outline" className="mt-4" onClick={() => setStep('date')}>{t('publicBooking.chooseDate')}</Button></div>}
 
-            {!isTodaySelected && (
+            {!todayRequiresClubContact && (
               <div className="grid grid-cols-3 gap-3">
                 {timeSlots.map((s) => (
                   <button
@@ -907,7 +921,7 @@ export function PublicClubBookingPage() {
               </div>
             )}
 
-            {isTodaySelected && (
+            {todayRequiresClubContact && (
               <div className="flex flex-col gap-2">
                 {timeSlots.map((s) => (
                   <div
@@ -927,7 +941,7 @@ export function PublicClubBookingPage() {
           </div>
         )}
 
-        {step === 'details' && !isTodaySelected && (
+        {step === 'details' && !todayRequiresClubContact && (
           <div className="flex flex-col gap-4">
             <h2 className="text-xl font-semibold">{t('publicBooking.yourDetails')}</h2>
 
