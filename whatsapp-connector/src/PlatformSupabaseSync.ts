@@ -71,6 +71,26 @@ export class PlatformSupabaseSync {
     if (error) throw new Error(`whatsapp_connector_report_platform_status failed: ${error.message}`)
   }
 
+  /**
+   * Atomically claims this process's DB-fencing generation for the
+   * platform account (2026-09-18 fix, same shape as
+   * SupabaseSync.claimGeneration() -- see that method's own doc comment
+   * and whatsapp_connector_claim_platform_generation()'s SQL-side doc
+   * comment for the full incident this fixes: PlatformConnectionManager
+   * previously hardcoded generation 0 on every process start, which was
+   * only ever safe while the platform domain had never run for real;
+   * once it had (state_seq climbing past 8000 before a 2026-09-13
+   * outage), every later restart's writes were permanently rejected as
+   * stale with zero visible error). Must be called exactly once per
+   * process lifetime, BEFORE the platform provider ever reports a
+   * status transition -- same discipline as the tenant-domain method.
+   */
+  async claimGeneration(): Promise<number> {
+    const { data, error } = await this.client.rpc('whatsapp_connector_claim_platform_generation')
+    if (error) throw new Error(`whatsapp_connector_claim_platform_generation failed: ${error.message}`)
+    return data as number
+  }
+
   async storeSession(encrypted: Buffer): Promise<void> {
     const { error } = await this.client.rpc('whatsapp_connector_store_platform_session', {
       // supabase-js encodes a bytea param from a hex-prefixed string,
