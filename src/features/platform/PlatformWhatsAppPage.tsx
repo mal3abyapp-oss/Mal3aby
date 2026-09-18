@@ -207,10 +207,29 @@ export function PlatformWhatsAppPage() {
     }
   }, [qrPayload])
 
+  // Owner-reported bug fix (2026-09-18): platform_start_whatsapp_own_pairing()/
+  // platform_retry_whatsapp_own_connection() only ever write pairing
+  // intent to Postgres -- they never wake the connector's Cloudflare
+  // Container if it has gone to sleep (an idle container is allowed to
+  // sleep to save cost). Same root cause as the club-scoped connection
+  // card's own fix, just for the separate Platform WhatsApp domain --
+  // see whatsapp-wake-connector's own doc comment for the full
+  // investigation. Deliberately non-fatal: the intent is already
+  // written, and the existing status poll + QR-wait-timeout below still
+  // surface an honest error if the connector truly never comes up.
+  async function wakeConnector() {
+    try {
+      await supabase.functions.invoke('whatsapp-wake-connector', { body: { mode: 'platform' } })
+    } catch {
+      // Non-fatal -- see comment above.
+    }
+  }
+
   const connectMutation = useMutation({
     mutationFn: async () => {
       const { error } = await supabase.rpc('platform_start_whatsapp_own_pairing', {})
       if (error) throw error
+      await wakeConnector()
     },
     onSuccess: () => {
       setActionError(null)
@@ -225,6 +244,7 @@ export function PlatformWhatsAppPage() {
     mutationFn: async () => {
       const { error } = await supabase.rpc('platform_retry_whatsapp_own_connection', {})
       if (error) throw error
+      await wakeConnector()
     },
     onSuccess: () => {
       setActionError(null)
