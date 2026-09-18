@@ -71,6 +71,17 @@ export class PlatformSupabaseSync {
     if (error) throw new Error(`whatsapp_connector_report_platform_status failed: ${error.message}`)
   }
 
+  /**
+   * Ban-protection hardening (2026-09-12): Platform WhatsApp domain
+   * counterpart of SupabaseSync.reportRestrictionSignal().
+   */
+  async reportRestrictionSignal(detail: string): Promise<void> {
+    const { error } = await this.client.rpc('whatsapp_connector_report_platform_restriction_signal', {
+      p_detail: detail,
+    })
+    if (error) throw new Error(`whatsapp_connector_report_platform_restriction_signal failed: ${error.message}`)
+  }
+
   async storeSession(encrypted: Buffer): Promise<void> {
     const { error } = await this.client.rpc('whatsapp_connector_store_platform_session', {
       // supabase-js encodes a bytea param from a hex-prefixed string,

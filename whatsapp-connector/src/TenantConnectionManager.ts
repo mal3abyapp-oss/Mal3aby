@@ -98,6 +98,28 @@ export class TenantConnectionManager {
         onIncomingMessageMeta: (meta) => {
           recordIncomingMessage(meta)
         },
+        // Ban-protection hardening (2026-09-12) -- see
+        // BaileysProviderHooks.onRestrictionSignal's own doc comment.
+        // Reports through to the DB the moment a genuine, conservative-
+        // threshold-confirmed restriction signal is observed -- this is
+        // the ONLY call site that ever sets whatsapp_accounts.status =
+        // 'restricted' for the tenant domain.
+        onRestrictionSignal: (detail) => {
+          void this.sync
+            .reportRestrictionSignal(clubId, detail)
+            .catch((err) => console.error(`[connector] failed to report restriction signal for club ${clubId.slice(0, 8)}:`, err.message))
+        },
+        // Ban-protection hardening (2026-09-12) -- see
+        // BaileysProviderHooks.onOptOutKeyword's own doc comment. This
+        // is the ONLY call site that can suppress a tenant customer's
+        // WhatsApp consent as a DIRECT result of that customer's own
+        // typed message, as opposed to a staff action or a delivery-
+        // failure-driven suppression.
+        onOptOutKeyword: (fromPhoneDigitsOnly) => {
+          void this.sync
+            .recordOptOutKeyword(clubId, fromPhoneDigitsOnly)
+            .catch((err) => console.error(`[connector] failed to record opt-out keyword for club ${clubId.slice(0, 8)}:`, err.message))
+        },
       })
       // Claim BEFORE registering in the map and BEFORE any caller can
       // call initializeConnection()/reconnect() on this instance --

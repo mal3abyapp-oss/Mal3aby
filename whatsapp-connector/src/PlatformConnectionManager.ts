@@ -63,13 +63,29 @@ export class PlatformConnectionManager {
           .then((encrypted) => this.sync.storeSession(encrypted))
           .catch((err) => console.error('[connector] failed to persist platform session:', err.message))
       },
+      // Ban-protection hardening (2026-09-12) -- see
+      // BaileysProviderHooks.onRestrictionSignal's own doc comment. No
+      // onOptOutKeyword wiring here: the Platform WhatsApp domain sends
+      // to Sales Intelligence LEADS, not customers with a
+      // notification_consent row -- there is nothing for a lead's
+      // "stop" message to revoke in this domain's data model. A lead
+      // that replies "stop" is still visible in the Sales pipeline's
+      // own reply/activity timeline; a human decides whether to mark
+      // that lead do_not_contact, matching how every other
+      // lead-status transition in Sales Intelligence already works
+      // (never automated).
+      onRestrictionSignal: (detail) => {
+        void this.sync
+          .reportRestrictionSignal(detail)
+          .catch((err) => console.error('[connector] failed to report platform restriction signal:', err.message))
+      },
       // Platform WhatsApp sends genuine Sales Intelligence outreach
       // text only (sales_queue_platform_whatsapp_message) -- no media,
-      // no delivery-receipt/incoming-message diagnostics wiring needed
-      // yet (that machinery exists for the tenant/club domain's own
-      // production-hardening history; adding it here is out of scope
-      // for making pairing/sending work at all, and can be layered on
-      // later without touching this file's core shape).
+      // no delivery-receipt diagnostics wiring needed yet (that
+      // machinery exists for the tenant/club domain's own production-
+      // hardening history; adding it here is out of scope for making
+      // pairing/sending work at all, and can be layered on later
+      // without touching this file's core shape).
     })
     await provider.claimDbGeneration(async () => {
       // Platform WhatsApp has no per-club generation-claim RPC (there is
