@@ -30,12 +30,41 @@
 // first, short-circuits if already running) -- see its own doc
 // comment -- so calling this on every connect/retry click is always
 // safe, never causes a duplicate container or duplicate Baileys socket.
+//
+// PLATFORM WHATSAPP EXTENSION (2026-09-18, same-day follow-up): the
+// first version of this fix only covered club-scoped
+// whatsapp_accounts. The owner's ACTUAL report was about the Platform
+// Owner's own WhatsApp connection -- a genuinely separate domain
+// (platform_whatsapp_account, platform_start_whatsapp_own_pairing/
+// platform_retry_whatsapp_own_connection), confirmed live to have the
+// exact same symptom (last real connector activity 2026-09-13, 8
+// "retry_requested" events written today with zero effect). The
+// Cloudflare Worker's getAccountObject() maps an arbitrary string key
+// to a Durable Object/container instance -- it has no built-in concept
+// of "the platform account" at all. The connector process itself
+// already resolves the platform account's session under a fixed
+// sentinel key (confirmed live: platform_whatsapp_account.session_key
+// = '00000000-0000-0000-0000-000000000001', matching the constant
+// whatsapp-connector/src/platformDomainIsolationTest.ts uses for the
+// same domain-isolation purpose) -- so waking a container under that
+// SAME name is what lets the connector inside it find and resume the
+// platform account's persisted session, exactly like a club container
+// finds its own club's session. body.mode: 'platform' selects this
+// path instead of a club_id; authorization is is_platform_owner() OR
+// has_platform_permission('platform.whatsapp_platform.manage'),
+// mirroring platform_start_whatsapp_own_pairing()'s own check exactly.
 import { createClient } from 'jsr:@supabase/supabase-js@2'
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!
 const SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
 const WHATSAPP_WORKER_URL = Deno.env.get('WHATSAPP_WORKER_URL')!
 const WHATSAPP_WORKER_MANAGEMENT_TOKEN = Deno.env.get('WHATSAPP_WORKER_MANAGEMENT_TOKEN')!
+
+// Matches platform_whatsapp_account.session_key exactly (confirmed
+// live) and whatsapp-connector's own PLATFORM_SENTINEL_KEY constant --
+// the container "name" the platform account's connector session lives
+// under, distinct from any real club_id.
+const PLATFORM_SESSION_KEY = '00000000-0000-0000-0000-000000000001'
 
 const CORS_HEADERS = {
   'Access-Control-Allow-Origin': '*',
@@ -63,15 +92,17 @@ Deno.serve(async (req) => {
     return jsonResponse({ error: 'authentication required' }, 401)
   }
 
-  let body: { club_id?: string }
+  let body: { club_id?: string; mode?: string }
   try {
     body = await req.json()
   } catch {
     return jsonResponse({ error: 'invalid request body' }, 400)
   }
 
+  const isPlatformMode = body.mode === 'platform'
   const clubId = body.club_id
-  if (!clubId || typeof clubId !== 'string') {
+
+  if (!isPlatformMode && (!clubId || typeof clubId !== 'string')) {
     return jsonResponse({ error: 'club_id is required' }, 400)
   }
 
@@ -87,26 +118,47 @@ Deno.serve(async (req) => {
 
   const admin = createClient(SUPABASE_URL, SERVICE_ROLE_KEY)
 
-  // Same permission key start_whatsapp_pairing()/disconnect_whatsapp()
-  // themselves enforce -- this function grants no capability beyond
-  // "wake a container this caller was already allowed to start".
-  const { data: allowed, error: permError } = await admin.rpc('has_permission_as', {
-    p_user_id: callerData.user.id,
-    p_key: 'manage_whatsapp_connection',
-    p_club_id: clubId,
-  })
-  if (permError || allowed !== true) {
-    return jsonResponse({ error: 'not authorized' }, 403)
+  let targetKey: string
+  if (isPlatformMode) {
+    // Same authorization platform_start_whatsapp_own_pairing()/
+    // platform_retry_whatsapp_own_connection() themselves enforce:
+    // is_platform_owner() OR has_platform_permission('platform.whatsapp_platform.manage').
+    // is_platform_owner() reads auth.uid() from the CALLING session
+    // (no p_user_id parameter), so it must run through callerClient,
+    // not admin (which has no session, so auth.uid() there is always
+    // null) -- has_platform_permission_as() takes an explicit
+    // p_user_id and is safe to run through admin either way.
+    const [{ data: isOwner, error: ownerError }, { data: hasPerm, error: permError }] = await Promise.all([
+      callerClient.rpc('is_platform_owner'),
+      admin.rpc('has_platform_permission_as', { p_user_id: callerData.user.id, p_key: 'platform.whatsapp_platform.manage' }),
+    ])
+    if ((ownerError || isOwner !== true) && (permError || hasPerm !== true)) {
+      return jsonResponse({ error: 'not authorized' }, 403)
+    }
+    targetKey = PLATFORM_SESSION_KEY
+  } else {
+    // Same permission key start_whatsapp_pairing()/disconnect_whatsapp()
+    // themselves enforce -- this function grants no capability beyond
+    // "wake a container this caller was already allowed to start".
+    const { data: allowed, error: permError } = await admin.rpc('has_permission_as', {
+      p_user_id: callerData.user.id,
+      p_key: 'manage_whatsapp_connection',
+      p_club_id: clubId,
+    })
+    if (permError || allowed !== true) {
+      return jsonResponse({ error: 'not authorized' }, 403)
+    }
+    targetKey = clubId!
   }
 
   try {
-    const workerRes = await fetch(`${WHATSAPP_WORKER_URL}/manage/${clubId}/start`, {
+    const workerRes = await fetch(`${WHATSAPP_WORKER_URL}/manage/${targetKey}/start`, {
       method: 'POST',
       headers: { Authorization: `Bearer ${WHATSAPP_WORKER_MANAGEMENT_TOKEN}` },
     })
     if (!workerRes.ok) {
       const text = await workerRes.text().catch(() => '')
-      console.error(`whatsapp-wake-connector: worker returned ${workerRes.status} for club ${clubId}: ${text}`)
+      console.error(`whatsapp-wake-connector: worker returned ${workerRes.status} for target ${targetKey}: ${text}`)
       return jsonResponse({ error: 'could not start the WhatsApp connector, please try again' }, 502)
     }
   } catch (err) {
