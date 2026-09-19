@@ -32,15 +32,46 @@
 
 import { createClient, type SupabaseClient } from '@supabase/supabase-js'
 import { renderEmailTemplate } from './templates.js'
-import { sendEmail } from './resend.js'
+import { sendEmail, type SendEmailResult } from './resend.js'
 
 export interface Env {
   SUPABASE_URL: string
   SUPABASE_SERVICE_ROLE_KEY: string
   RESEND_API_KEY: string
+  SALES_OUTREACH_FROM_ADDRESS?: string
 }
 
 const FROM_ADDRESS = 'Mal3aby <notifications@mal3aby.app>'
+
+// SEND-1 fix (2026-09-19, owner brief): sales_outreach_messages (the
+// Sales Intelligence module's own outreach queue -- a completely
+// separate domain from notification_queue above, never touched by
+// this addition) had a real, correct, one-message-at-a-time sender
+// (supabase/functions/sales-outreach-email-sender) but nothing ever
+// scheduled it -- confirmed live: pg_net is not installed on this
+// project, so the pg_cron -> pg_net trigger design that function's own
+// comment describes was never viable. Rather than add pg_net as a new
+// DB-level dependency, or add a redundant HTTP hop through that Edge
+// Function from here, this Worker's own already-running, already-
+// proven Cron Trigger (once a minute) now ALSO drives sales outreach
+// directly -- same sendEmail() client, same retry/backoff RPC shape
+// (sales_mark_outreach_sent, migration 20260919020000, mirrors
+// email_worker_report_send_result exactly), completely independent
+// queue and independent failure domain from the transactional-email
+// path above (a stall or bug in one can never block the other, since
+// they're two separate claim/send/report calls with no shared state).
+const SALES_OUTREACH_FROM_ADDRESS = 'Mal3aby Sales <sales@mal3aby.app>'
+const SALES_OUTREACH_BATCH_SIZE = 5
+
+interface ClaimedSalesOutreachRow {
+  message_id: string
+  lead_id: string
+  subject: string | null
+  body: string
+  recipient_email: string | null
+  language: string
+  attempts: number
+}
 
 // Directive section 15: "process the queue in reasonable batches" --
 // a small batch per minute is enough headroom for Mal3aby's current
@@ -100,7 +131,132 @@ export default {
     const work = Promise.allSettled(rows.map((row) => processRow(supabase, env, row)))
     ctx.waitUntil(work)
     await work
+
+    // SEND-1 fix: sales outreach, completely independent of the
+    // notification_queue processing above -- its own claim, its own
+    // expire-stale, its own send loop. Never awaited together with the
+    // block above (each already awaits its own work internally) so a
+    // slow/failing run of one never delays the other within this same
+    // once-a-minute invocation.
+    await processSalesOutreachBatch(supabase, env, ctx)
   },
+}
+
+async function processSalesOutreachBatch(supabase: SupabaseClient, env: Env, ctx: ExecutionContext): Promise<void> {
+  const { error: expireError } = await supabase.rpc('sales_expire_stale_outreach_processing')
+  if (expireError) {
+    console.error('sales_expire_stale_outreach_processing failed', expireError.message, expireError.code)
+  }
+
+  // One row per claim call (sales_claim_queued_outreach_message's own
+  // design, unchanged by this fix -- see its migration comment), so
+  // this loops up to SALES_OUTREACH_BATCH_SIZE times per invocation
+  // instead of one RPC call returning a batch.
+  const rows: ClaimedSalesOutreachRow[] = []
+  for (let i = 0; i < SALES_OUTREACH_BATCH_SIZE; i++) {
+    const { data: claimed, error: claimError } = await supabase.rpc('sales_claim_queued_outreach_message')
+    if (claimError) {
+      console.error('sales_claim_queued_outreach_message failed', claimError.message, claimError.code)
+      break
+    }
+    const row = (claimed as ClaimedSalesOutreachRow[] | null)?.[0]
+    if (!row) break
+    rows.push(row)
+  }
+
+  if (rows.length === 0) return
+
+  const work = Promise.allSettled(rows.map((row) => processSalesOutreachRow(supabase, env, row)))
+  ctx.waitUntil(work)
+  await work
+}
+
+interface MarkOutreachSentParams {
+  p_message_id: string
+  p_success: boolean
+  p_provider_reference?: string | null
+  p_error?: string | null
+  p_permanent?: boolean
+  p_retry_after_seconds?: number | null
+}
+
+// Pure decision logic -- a SendEmailResult (or the "no recipient"
+// pre-check) maps to exactly one sales_mark_outreach_sent() call,
+// deterministically, with no side effects. Exported and unit-tested
+// directly (see index.test.ts) rather than only exercised indirectly
+// through a mocked fetch()/SupabaseClient -- this is the actual new
+// SEND-1 logic (which outcomes retry vs. fail permanently, and with
+// what backoff hint), the part most worth protecting with a real test.
+export function decideMarkOutreachSentParams(messageId: string, recipientEmail: string | null, result?: SendEmailResult): MarkOutreachSentParams {
+  if (!recipientEmail) {
+    return { p_message_id: messageId, p_success: false, p_permanent: true, p_error: 'lead has no public_email on file' }
+  }
+  if (!result) {
+    throw new Error('decideMarkOutreachSentParams: result is required when recipientEmail is present')
+  }
+  if (result.outcome === 'sent') {
+    return { p_message_id: messageId, p_success: true, p_provider_reference: result.providerReference || null }
+  }
+  if (result.outcome === 'rate_limited') {
+    return {
+      p_message_id: messageId,
+      p_success: false,
+      p_permanent: false,
+      p_error: 'rate_limited: Resend returned 429',
+      p_retry_after_seconds: result.retryAfterSeconds,
+    }
+  }
+  if (result.outcome === 'permanent_failure') {
+    return {
+      p_message_id: messageId,
+      p_success: false,
+      p_permanent: true,
+      p_error: `permanent_failure: ${result.errorClass} (status ${result.statusCode})`,
+    }
+  }
+  // temporary_failure
+  return {
+    p_message_id: messageId,
+    p_success: false,
+    p_permanent: false,
+    p_error: `temporary_failure: ${result.errorClass} (status ${result.statusCode})`,
+  }
+}
+
+async function processSalesOutreachRow(supabase: SupabaseClient, env: Env, row: ClaimedSalesOutreachRow): Promise<void> {
+  if (!row.recipient_email) {
+    await supabase.rpc('sales_mark_outreach_sent', decideMarkOutreachSentParams(row.message_id, null))
+    return
+  }
+
+  const idempotencyKey = `mal3aby-sales-outreach-${row.message_id}`
+
+  const result = await sendEmail({
+    apiKey: env.RESEND_API_KEY,
+    from: env.SALES_OUTREACH_FROM_ADDRESS || SALES_OUTREACH_FROM_ADDRESS,
+    to: row.recipient_email,
+    subject: row.subject || 'Mal3aby',
+    html: toHtmlParagraphs(row.body),
+    text: row.body,
+    idempotencyKey,
+  })
+
+  if (result.outcome === 'sent') {
+    console.log('sales outreach email sent', row.message_id)
+  }
+
+  await supabase.rpc('sales_mark_outreach_sent', decideMarkOutreachSentParams(row.message_id, row.recipient_email, result))
+}
+
+// Plain-text-ish rendering, matching sales-outreach-email-sender's own
+// toHtml() exactly (B2B sales outreach content, not a branded
+// transactional template) -- kept here rather than importing across
+// Deno/Workers runtime boundaries.
+function toHtmlParagraphs(body: string): string {
+  return body
+    .split('\n\n')
+    .map((para) => `<p>${para.replace(/\n/g, '<br>')}</p>`)
+    .join('\n')
 }
 
 async function processRow(supabase: SupabaseClient, env: Env, row: ClaimedRow): Promise<void> {

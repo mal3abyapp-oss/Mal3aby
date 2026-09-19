@@ -189,24 +189,48 @@ Deno.serve(async (req) => {
       return jsonResponse(req, { processed: 1, message_id: msg.message_id, outcome: 'sent' })
     }
 
-    // Classify like resend.ts: 429/5xx = temporary (leave as failed here;
-    // a future retry mechanism can requeue by resetting status to 'approved'
-    // -- deliberately not auto-retried in this pass to avoid an
-    // uncontrolled resend loop against a real prospect's inbox), 4xx = permanent.
+    // SEND-1 fix (2026-09-19): now classifies exactly like resend.ts
+    // (cloudflare/email-worker's own client) -- 429/5xx = temporary,
+    // retried with backoff via sales_mark_outreach_sent's new
+    // p_permanent=false path; 4xx = permanent, failed immediately.
+    // Previously (kept as documented history) every failure here was
+    // unconditionally permanent -- "deliberately not auto-retried... to
+    // avoid an uncontrolled resend loop" -- that concern is now handled
+    // properly by the same bounded-attempt/backoff ladder already
+    // proven safe for transactional email (max 5 attempts, 1/5/20/60
+    // minute backoff), not by refusing to retry at all.
+    if (res.status === 429) {
+      const retryAfterHeader = res.headers.get('Retry-After')
+      const retryAfterSeconds = retryAfterHeader ? Number(retryAfterHeader) : null
+      await admin.rpc('sales_mark_outreach_sent', {
+        p_message_id: msg.message_id,
+        p_success: false,
+        p_permanent: false,
+        p_error: 'Resend API rate limited (429)',
+        p_retry_after_seconds: Number.isFinite(retryAfterSeconds) ? retryAfterSeconds : null,
+      })
+      return jsonResponse(req, { processed: 1, message_id: msg.message_id, outcome: 'retrying', status: res.status })
+    }
+
     const errorText = await res.text().catch(() => '')
+    const isTemporary = res.status >= 500
     await admin.rpc('sales_mark_outreach_sent', {
       p_message_id: msg.message_id,
       p_success: false,
+      p_permanent: !isTemporary,
       p_error: `Resend API error ${res.status}: ${errorText.slice(0, 300)}`,
     })
-    return jsonResponse(req, { processed: 1, message_id: msg.message_id, outcome: 'failed', status: res.status })
+    return jsonResponse(req, { processed: 1, message_id: msg.message_id, outcome: isTemporary ? 'retrying' : 'failed', status: res.status })
   } catch (err) {
     const detail = err instanceof DOMException && err.name === 'AbortError' ? 'send timed out' : 'send failed unexpectedly'
+    // Network-level/timeout failures are always temporary -- matches
+    // resend.ts's own classification for the same failure class.
     await admin.rpc('sales_mark_outreach_sent', {
       p_message_id: msg.message_id,
       p_success: false,
+      p_permanent: false,
       p_error: detail,
     })
-    return jsonResponse(req, { processed: 1, message_id: msg.message_id, outcome: 'failed', reason: detail })
+    return jsonResponse(req, { processed: 1, message_id: msg.message_id, outcome: 'retrying', reason: detail })
   }
 })
