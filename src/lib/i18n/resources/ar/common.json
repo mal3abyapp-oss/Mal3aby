@@ -364,6 +364,11 @@
         "nameLabel": "اسم الحملة",
         "descriptionLabel": "الوصف",
         "emptyTitle": "لا توجد حملات بعد",
+        "manageLeads": "إدارة العملاء المحتملين",
+        "searchLeadsPlaceholder": "ابحث عن عميل محتمل بالاسم...",
+        "noLeadsFound": "لا يوجد عملاء محتملون مطابقون.",
+        "leadsLoadError": "تعذّر تحميل قائمة العملاء المحتملين.",
+        "addSelectedLeads": "أضف {{count}} للحملة",
         "stats": {
           "target": "المستهدف",
           "queued": "في الانتظار",
@@ -382,6 +387,7 @@
         "loadError": "تعذّر تحميل المتابعات.",
         "emptyTitle": "لا توجد متابعات معلّقة",
         "completeButton": "تحديد كمكتمل",
+        "snoozeButton": "تأجيل",
         "reasonLabel": "السبب",
         "lastActionLabel": "ما حدث"
       },
@@ -562,6 +568,7 @@
         "callTasks": "مهام الاتصال",
         "callTasksLoadError": "تعذّر تحميل مهام الاتصال لهذا العميل المحتمل.",
         "noCallTasks": "لا توجد مهام اتصال بعد",
+        "noCallTaskTalkingPoints": "لا توجد نقاط حديث مُعدّة لهذه المهمة.",
         "completeCallTaskButton": "تحديد كمكتملة",
         "callTaskOutcomePlaceholder": "كيف كانت المكالمة؟",
         "events": "أحداث التسليم والرد",
