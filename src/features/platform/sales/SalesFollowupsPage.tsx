@@ -1,5 +1,14 @@
 // SalesFollowupsPage -- Sales Intelligence Phase 13 (ADR-054). All
 // pending follow-ups across every lead, with a Complete action.
+//
+// SNOOZE FIX (2026-09-18/19, live-verified audit): "Complete" was the
+// ONLY action available, and it REQUIRES a real description of what
+// was actually done -- there was no honest way to just push a
+// follow-up's date out when no real action has happened yet ("call
+// back next week"). Confirmed live: every visible follow-up sat
+// permanently marked overdue with no way to defer it. sales_snooze_followup()
+// (new RPC, migration 20260919000000) moves scheduled_at forward
+// without touching status/last_action -- this is not a completion.
 import { useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Link } from 'react-router-dom'
@@ -38,6 +47,10 @@ function FollowupRow({ followup }: { followup: Followup }) {
   const queryClient = useQueryClient()
   const [lastAction, setLastAction] = useState('')
   const [confirming, setConfirming] = useState(false)
+  const [snoozing, setSnoozing] = useState(false)
+  const [snoozeDate, setSnoozeDate] = useState('')
+
+  const invalidate = () => void queryClient.invalidateQueries({ queryKey: ['sales-followups-all'] })
 
   const completeMutation = useMutation({
     mutationFn: async () => {
@@ -46,7 +59,22 @@ function FollowupRow({ followup }: { followup: Followup }) {
     },
     onSuccess: () => {
       setConfirming(false)
-      void queryClient.invalidateQueries({ queryKey: ['sales-followups-all'] })
+      invalidate()
+    },
+  })
+
+  const snoozeMutation = useMutation({
+    mutationFn: async () => {
+      const { error } = await supabase.rpc('sales_snooze_followup', {
+        p_followup_id: followup.followup_id,
+        p_new_scheduled_at: new Date(snoozeDate).toISOString(),
+      })
+      if (error) throw error
+    },
+    onSuccess: () => {
+      setSnoozing(false)
+      setSnoozeDate('')
+      invalidate()
     },
   })
 
@@ -75,10 +103,28 @@ function FollowupRow({ followup }: { followup: Followup }) {
               </Button>
               <Button size="sm" variant="outline" onClick={() => setConfirming(false)}>{t('common.cancel')}</Button>
             </div>
+          ) : snoozing ? (
+            <div className="flex items-center gap-2">
+              <input
+                type="datetime-local"
+                className="rounded-md border border-border-subtle p-2 text-sm"
+                value={snoozeDate}
+                onChange={(e) => setSnoozeDate(e.target.value)}
+              />
+              <Button size="sm" onClick={() => snoozeMutation.mutate()} disabled={!snoozeDate || snoozeMutation.isPending}>
+                {t('common.confirm')}
+              </Button>
+              <Button size="sm" variant="outline" onClick={() => setSnoozing(false)}>{t('common.cancel')}</Button>
+            </div>
           ) : (
-            <Button size="sm" variant="outline" onClick={() => setConfirming(true)}>
-              {t('platform.sales.followups.completeButton')}
-            </Button>
+            <div className="flex items-center gap-2">
+              <Button size="sm" variant="outline" onClick={() => setSnoozing(true)}>
+                {t('platform.sales.followups.snoozeButton')}
+              </Button>
+              <Button size="sm" variant="outline" onClick={() => setConfirming(true)}>
+                {t('platform.sales.followups.completeButton')}
+              </Button>
+            </div>
           )}
         </div>
       </CardContent>

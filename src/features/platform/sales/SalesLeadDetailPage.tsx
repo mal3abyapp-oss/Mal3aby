@@ -287,9 +287,30 @@ export function SalesLeadDetailPage() {
     queryClient.invalidateQueries({ queryKey: ['sales-lead-outreach-events', leadId] })
   }
 
+  // REAL BUG FIX (2026-09-18, live-verified audit): sales_create_call_task
+  // has always accepted p_talking_points (meant to carry over the
+  // AI-generated phone_script content -- see that RPC's own migration
+  // comment: "reuses the AI-generated ... content ... adapt, don't
+  // regenerate"), but this call never passed it, and the call-task card
+  // below never rendered task.talking_points even though it was always
+  // fetched. Confirmed live: a real generated phone_script draft simply
+  // never reached the resulting call task -- a salesperson got a bare
+  // phone number with zero talking points. Fixed by reusing the most
+  // recent phone_script message for this lead (edited_body ?? body,
+  // same "effective body" precedence already used by the outreach
+  // approval UI elsewhere on this page) as the talking points, and by
+  // actually rendering task.talking_points on the card (see below).
   const createCallTaskMutation = useMutation({
     mutationFn: async () => {
-      const { error } = await supabase.rpc('sales_create_call_task', { p_lead_id: leadId! })
+      const messages = profileQuery.data?.outreach_messages ?? []
+      const latestPhoneScript = messages
+        .filter((m) => m.channel === 'phone_script')
+        .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())[0]
+      const talkingPoints = latestPhoneScript ? (latestPhoneScript.edited_body ?? latestPhoneScript.body) : undefined
+      const { error } = await supabase.rpc('sales_create_call_task', {
+        p_lead_id: leadId!,
+        p_talking_points: talkingPoints,
+      })
       if (error) throw error
     },
     onSuccess: invalidate,
@@ -783,6 +804,11 @@ export function SalesLeadDetailPage() {
                     <span><bdi dir="ltr">{task.phone_number}</bdi></span>
                     <StatusBadge tone={task.status === 'completed' ? 'success' : task.status === 'cancelled' ? 'neutral' : 'info'} label={task.status} />
                   </div>
+                  {task.talking_points ? (
+                    <p className="mt-2 whitespace-pre-wrap rounded-md border border-border-subtle bg-surface p-2 text-text-secondary">{task.talking_points}</p>
+                  ) : (
+                    <p className="mt-2 text-xs text-text-secondary">{t('platform.sales.leadProfile.noCallTaskTalkingPoints')}</p>
+                  )}
                   {task.outcome && <p className="mt-1 text-text-secondary">{task.outcome}</p>}
                   {task.status === 'pending' && (
                     <div className="mt-2 flex gap-2">
