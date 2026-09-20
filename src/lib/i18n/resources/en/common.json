@@ -273,8 +273,17 @@
         "demosScheduled": "Demos Scheduled",
         "converted": "Converted",
         "winRate": "Win Rate",
+        "suppressed": "Suppressed (Do Not Contact)",
         "funnelTitle": "Pipeline Funnel",
         "bySourceTitle": "By Source",
+        "byDimensionTitle": "By Dimension",
+        "dimension": {
+          "country": "Country",
+          "city": "City",
+          "business_type": "Business Type"
+        },
+        "leadCount": "Leads",
+        "exportCsv": "Export CSV",
         "won": "won",
         "noData": "No data yet",
         "followupsTitle": "Upcoming Follow-ups",

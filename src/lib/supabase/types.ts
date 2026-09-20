@@ -11005,7 +11005,7 @@ export type Database = {
         }[]
       }
       get_sales_dashboard_summary: {
-        Args: never
+        Args: { p_end_date?: string; p_start_date?: string }
         Returns: {
           avg_days_to_conversion: number
           cold_leads: number
@@ -11016,13 +11016,14 @@ export type Database = {
           demos_scheduled: number
           hot_leads: number
           reply_rate: number
+          suppressed_count: number
           total_leads: number
           warm_leads: number
           win_rate: number
         }[]
       }
       get_sales_funnel_stats: {
-        Args: never
+        Args: { p_end_date?: string; p_start_date?: string }
         Returns: {
           lead_count: number
           stage: string
@@ -12635,7 +12636,12 @@ export type Database = {
         Returns: string
       }
       sales_edit_outreach_draft: {
-        Args: { p_edited_body: string; p_message_id: string }
+        Args: {
+          p_edited_body: string
+          p_message_id: string
+          p_quality_gate_result?: Json
+          p_quality_status?: string
+        }
         Returns: undefined
       }
       sales_expire_stale_outreach_processing: { Args: never; Returns: number }

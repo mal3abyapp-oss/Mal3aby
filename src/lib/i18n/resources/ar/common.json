@@ -273,8 +273,17 @@
         "demosScheduled": "عروض توضيحية مجدولة",
         "converted": "تم التحويل",
         "winRate": "معدل الفوز",
+        "suppressed": "مستبعَد (ممنوع التواصل)",
         "funnelTitle": "قمع مسار المبيعات",
         "bySourceTitle": "حسب المصدر",
+        "byDimensionTitle": "حسب البُعد",
+        "dimension": {
+          "country": "الدولة",
+          "city": "المدينة",
+          "business_type": "نوع النشاط"
+        },
+        "leadCount": "العملاء المحتملون",
+        "exportCsv": "تصدير CSV",
         "won": "تم الفوز",
         "noData": "لا توجد بيانات بعد",
         "followupsTitle": "المتابعات القادمة",
