@@ -575,22 +575,42 @@ export function SalesLeadDetailPage() {
   // path, unchanged. "Regenerate" calls the same generation Edge Function
   // used everywhere else in this module; the fresh draft goes through the
   // same quality gate and approval flow as any other generation.
+  //
+  // DRAFT-1 fix (2026-09-20, owner brief): this now calls the
+  // sales-edit-outreach-draft Edge Function instead of the RPC directly
+  // -- the RPC is service_role-only as of
+  // 20260920030000_draft1_edit_reruns_quality_gate.sql, so an edit's text
+  // is always re-checked against the same commercial quality gate a
+  // fresh generation goes through before it can be approved/sent. If the
+  // edit was to an already-approved draft, the Edge Function's RPC call
+  // reverts it to 'generated' server-side -- invalidate() below picks
+  // that status change up the same way it already does for every other
+  // mutation on this page.
   const editMessageMutation = useMutation({
     mutationFn: async () => {
-      const { error } = await supabase.rpc('sales_edit_outreach_draft', {
-        p_message_id: editDialogFor!,
-        p_edited_body: editBody,
+      const { data: sessionData } = await supabase.auth.getSession()
+      const token = sessionData.session?.access_token
+      const res = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/sales-edit-outreach-draft`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ message_id: editDialogFor, edited_body: editBody }),
       })
-      if (error) throw error
+      const json = await res.json()
+      if (!res.ok) throw Object.assign(new Error(json.error ?? 'edit failed'), { status: res.status, detail: json })
+      return json as { quality_status: 'approval_ready' | 'quality_rejected' }
     },
-    onSuccess: () => {
+    onSuccess: (data) => {
       setEditDialogFor(null)
       setEditBody('')
-      setEditError(null)
+      setEditError(
+        data.quality_status === 'quality_rejected'
+          ? t('platform.sales.leadProfile.outreachEditQualityRejected')
+          : null,
+      )
       invalidate()
     },
     onError: (error: { message?: string }) => {
-      setEditError(translateSupabaseError(error, t('platform.sales.leadProfile.outreachEditError')))
+      setEditError(error?.message || t('platform.sales.leadProfile.outreachEditError'))
     },
   })
 

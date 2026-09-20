@@ -552,6 +552,7 @@
         "outreachEditSave": "حفظ التعديل",
         "outreachEditSaving": "جارٍ الحفظ...",
         "outreachEditError": "تعذّر حفظ هذا التعديل.",
+        "outreachEditQualityRejected": "تم حفظ التعديل، لكنه لم يجتز فحص الجودة (مثل نص مفقود أو ادعاء غير مدعوم بدليل) — لا يمكن اعتماده أو إرساله حتى تُصلح النص.",
         "outreachSendButton": "إرسال عبر واتساب المنصة",
         "outreachSending": "جارٍ الإرسال...",
         "outreachSendError": "تعذّر إرسال هذه الرسالة.",

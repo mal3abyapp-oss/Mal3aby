@@ -552,6 +552,7 @@
         "outreachEditSave": "Save edit",
         "outreachEditSaving": "Saving...",
         "outreachEditError": "Could not save this edit.",
+        "outreachEditQualityRejected": "Edit saved, but it did not pass the quality check (e.g. missing text or an unsupported claim) — it cannot be approved or sent until you fix the text.",
         "outreachSendButton": "Send via Platform WhatsApp",
         "outreachSending": "Sending...",
         "outreachSendError": "Could not send this message.",
