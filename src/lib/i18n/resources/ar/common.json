@@ -5064,7 +5064,8 @@
       "finance": "الشؤون المالية للمنصة",
       "support": "دعم مدير المنصة",
       "audit": "تدقيق المنصة",
-      "settings": "إعدادات المنصة"
+      "settings": "إعدادات المنصة",
+      "sales": "ذكاء المبيعات"
     }
   },
   "platformPermissions": {
@@ -5155,6 +5156,54 @@
     "platform.settings.manage": {
       "label": "إدارة إعدادات المنصة",
       "description": "تغيير الإعدادات العامة للمنصة"
+    },
+    "platform.sales.view": {
+      "label": "عرض ذكاء المبيعات",
+      "description": "رؤية قمع المبيعات وملفات العملاء المحتملين وسجل التواصل"
+    },
+    "platform.sales.discover": {
+      "label": "اكتشاف عملاء محتملين",
+      "description": "تشغيل مهام اكتشاف العملاء المحتملين وإضافة ما يتم العثور عليه"
+    },
+    "platform.sales.enrich": {
+      "label": "إثراء العملاء المحتملين",
+      "description": "تشغيل إثراء الموقع/الإشارات لعميل محتمل"
+    },
+    "platform.sales.edit": {
+      "label": "تعديل العملاء المحتملين",
+      "description": "إضافة ملاحظات، تعديل بيانات التواصل، وتعديل مسودات التواصل"
+    },
+    "platform.sales.qualify": {
+      "label": "تأهيل العملاء المحتملين",
+      "description": "تقييم العملاء المحتملين وجدولة/إكمال العروض التوضيحية"
+    },
+    "platform.sales.generate_offer": {
+      "label": "توليد مسودات التواصل",
+      "description": "توليد مسودة تواصل جديدة بالذكاء الاصطناعي لعميل محتمل"
+    },
+    "platform.sales.approve_outreach": {
+      "label": "اعتماد مسودات التواصل",
+      "description": "اعتماد أو رفض مسودة تواصل تم توليدها"
+    },
+    "platform.sales.send_outreach": {
+      "label": "إرسال التواصل",
+      "description": "وضع رسالة بريد إلكتروني/واتساب معتمدة في قائمة الانتظار وإدارة مهام الاتصال"
+    },
+    "platform.sales.manage_campaigns": {
+      "label": "إدارة الحملات",
+      "description": "إنشاء حملات وإضافة عملاء محتملين إليها"
+    },
+    "platform.sales.manage_followups": {
+      "label": "إدارة المتابعات",
+      "description": "جدولة وإكمال متابعات العملاء المحتملين"
+    },
+    "platform.sales.convert_to_tenant": {
+      "label": "تحويل العملاء المحتملين إلى أندية",
+      "description": "إرسال دعوة التفعيل التي تحوّل عميلاً محتملاً فائزاً إلى نادٍ"
+    },
+    "platform.sales.manage_settings": {
+      "label": "إدارة إعدادات ذكاء المبيعات",
+      "description": "تهيئة مزودي الذكاء الاصطناعي وحصص التواصل لذكاء المبيعات"
     }
   },
   "shop": {

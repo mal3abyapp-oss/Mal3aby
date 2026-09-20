@@ -5032,7 +5032,8 @@
       "finance": "Platform Finance",
       "support": "Master Admin Support",
       "audit": "Platform Audit",
-      "settings": "Platform Settings"
+      "settings": "Platform Settings",
+      "sales": "Sales Intelligence"
     }
   },
   "platformPermissions": {
@@ -5123,6 +5124,54 @@
     "platform.settings.manage": {
       "label": "Manage platform settings",
       "description": "Change global platform configuration"
+    },
+    "platform.sales.view": {
+      "label": "View Sales Intelligence",
+      "description": "See the sales pipeline, lead profiles, and outreach history"
+    },
+    "platform.sales.discover": {
+      "label": "Discover leads",
+      "description": "Run lead discovery jobs and add newly found leads"
+    },
+    "platform.sales.enrich": {
+      "label": "Enrich leads",
+      "description": "Run website/signal enrichment on a lead"
+    },
+    "platform.sales.edit": {
+      "label": "Edit leads",
+      "description": "Add notes, edit contact details, and edit outreach drafts"
+    },
+    "platform.sales.qualify": {
+      "label": "Qualify leads",
+      "description": "Score leads and schedule/complete demos"
+    },
+    "platform.sales.generate_offer": {
+      "label": "Generate outreach drafts",
+      "description": "Generate a new AI outreach draft for a lead"
+    },
+    "platform.sales.approve_outreach": {
+      "label": "Approve outreach drafts",
+      "description": "Approve or reject a generated outreach draft"
+    },
+    "platform.sales.send_outreach": {
+      "label": "Send outreach",
+      "description": "Queue an approved email/WhatsApp message and manage call tasks"
+    },
+    "platform.sales.manage_campaigns": {
+      "label": "Manage campaigns",
+      "description": "Create campaigns and add leads to them"
+    },
+    "platform.sales.manage_followups": {
+      "label": "Manage follow-ups",
+      "description": "Schedule and complete lead follow-ups"
+    },
+    "platform.sales.convert_to_tenant": {
+      "label": "Convert leads to tenants",
+      "description": "Send the activation invite that converts a won lead into a club"
+    },
+    "platform.sales.manage_settings": {
+      "label": "Manage Sales Intelligence settings",
+      "description": "Configure AI providers and outreach quotas for Sales Intelligence"
     }
   },
   "shop": {
