@@ -195,6 +195,18 @@ export function SalesLeadDetailPage() {
   const [ownerEmail, setOwnerEmail] = useState('')
   const [convertContactPhone, setConvertContactPhone] = useState('')
   const [convertError, setConvertError] = useState<string | null>(null)
+  // INV-1 fix (2026-09-19): the activation LINK is now emailed
+  // automatically (see sales_win_lead_and_invite_owner's own migration
+  // comment, 20260919030000) -- but the short activation SECRET is
+  // deliberately NEVER put in that email (ActivateTenantOwnerPage.tsx's
+  // own doc comment: "delivered out of band by the platform owner,
+  // never in this URL" -- a real two-factor/two-channel design, not an
+  // oversight). This surfaces that secret once, right after minting,
+  // so the platform owner can actually relay it (call/WhatsApp) --
+  // previously the RPC's return value was silently discarded and NO
+  // ONE ever saw the secret at all, so it could never have reached the
+  // prospect through any channel.
+  const [pendingActivationSecret, setPendingActivationSecret] = useState<string | null>(null)
 
   const [callOutcomeDrafts, setCallOutcomeDrafts] = useState<Record<string, string>>({})
 
@@ -595,17 +607,24 @@ export function SalesLeadDetailPage() {
 
   // PHASE 14: sends the secure activation invite -- never creates a
   // tenant directly. The prospect completes activation themselves.
+  // INV-1 fix: the RPC's return value (raw_token, raw_secret) used to
+  // be silently discarded here -- the activation LINK is now actually
+  // emailed server-side (see the RPC's own migration comment), but the
+  // short activation SECRET is deliberately never in that email, so it
+  // must be captured here and shown to the platform owner to relay.
   const sendInviteMutation = useMutation({
     mutationFn: async () => {
-      const { error } = await supabase.rpc('sales_win_lead_and_invite_owner', {
+      const { data, error } = await supabase.rpc('sales_win_lead_and_invite_owner', {
         p_lead_id: leadId!,
         p_owner_email: ownerEmail.trim(),
         p_contact_phone: convertContactPhone.trim() || undefined,
       })
       if (error) throw error
+      return data?.[0] as { raw_token: string; raw_secret: string } | undefined
     },
-    onSuccess: () => {
+    onSuccess: (data) => {
       setConvertError(null)
+      setPendingActivationSecret(data?.raw_secret ?? null)
       invalidate()
     },
     onError: (error: { message?: string }) => {
@@ -615,10 +634,14 @@ export function SalesLeadDetailPage() {
 
   const resendInviteMutation = useMutation({
     mutationFn: async () => {
-      const { error } = await supabase.rpc('resend_sales_activation_invite', { p_lead_id: leadId! })
+      const { data, error } = await supabase.rpc('resend_sales_activation_invite', { p_lead_id: leadId! })
       if (error) throw error
+      return data?.[0] as { raw_token: string; raw_secret: string } | undefined
     },
-    onSuccess: invalidate,
+    onSuccess: (data) => {
+      setPendingActivationSecret(data?.raw_secret ?? null)
+      invalidate()
+    },
     onError: (error: { message?: string }) => {
       setConvertError(error?.message || t('platform.sales.leadProfile.resendError'))
     },
@@ -1286,6 +1309,16 @@ export function SalesLeadDetailPage() {
               </Button>
               {resendInviteMutation.isSuccess && (
                 <p className="text-sm text-status-success">{t('platform.sales.leadProfile.resendSuccess')}</p>
+              )}
+              {pendingActivationSecret && (
+                <div className="rounded-md border border-status-warning/40 bg-status-warning/10 p-3">
+                  <p className="text-sm font-medium">{t('platform.sales.leadProfile.activationSecretTitle')}</p>
+                  <p className="mt-1 text-xs text-text-secondary">{t('platform.sales.leadProfile.activationSecretHint')}</p>
+                  <p className="mt-2 text-lg font-mono font-semibold" dir="ltr">{pendingActivationSecret}</p>
+                  <Button size="sm" variant="outline" className="mt-2" onClick={() => setPendingActivationSecret(null)}>
+                    {t('platform.sales.leadProfile.activationSecretDismiss')}
+                  </Button>
+                </div>
               )}
             </div>
           ) : ['lost', 'do_not_contact', 'won'].includes(lead.status) ? (
