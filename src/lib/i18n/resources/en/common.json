@@ -367,6 +367,11 @@
         "nameLabel": "Campaign name",
         "descriptionLabel": "Description",
         "emptyTitle": "No campaigns yet",
+        "manageLeads": "Manage leads",
+        "searchLeadsPlaceholder": "Search for a lead by name...",
+        "noLeadsFound": "No matching leads found.",
+        "leadsLoadError": "Could not load the leads list.",
+        "addSelectedLeads": "Add {{count}} to campaign",
         "stats": {
           "target": "Target",
           "queued": "Queued",

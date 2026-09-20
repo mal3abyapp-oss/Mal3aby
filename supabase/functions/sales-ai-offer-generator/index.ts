@@ -461,6 +461,28 @@ Deno.serve(async (req) => {
     return jsonResponse(req, { error: 'lead not found' }, 404)
   }
 
+  // CAMP-1 fix (2026-09-21): sales_outreach_messages.campaign_id was
+  // ALWAYS null for every message generated through this function --
+  // never read from the request body (nothing here ever accepted one)
+  // and never looked up either -- which silently broke
+  // get_campaign_stats()'s 'queued' count for every real campaign (that
+  // RPC filters sales_outreach_messages by campaign_id). Derived
+  // server-side from sales_campaign_leads rather than trusted from the
+  // client: a lead can be tagged into a campaign independently of who
+  // is generating its outreach, and trusting a client-supplied
+  // campaign_id would let a caller mislabel a message into a campaign
+  // the lead was never actually added to. Most-recently-added campaign
+  // wins if a lead is in more than one (sales_campaign_leads has no
+  // uniqueness constraint on lead_id alone).
+  const { data: campaignLeadRow } = await admin
+    .from('sales_campaign_leads')
+    .select('campaign_id')
+    .eq('lead_id', leadId)
+    .order('added_at', { ascending: false })
+    .limit(1)
+    .maybeSingle()
+  const campaignId: string | null = campaignLeadRow?.campaign_id ?? null
+
   if (leadRow.status === 'do_not_contact') {
     return jsonResponse(req, { error: 'this lead is marked do_not_contact -- outreach content cannot be generated for it' }, 400)
   }
@@ -638,7 +660,7 @@ Deno.serve(async (req) => {
     p_subject: subject,
     p_body: generatedBody,
     p_grounding: evidence,
-    p_campaign_id: null,
+    p_campaign_id: campaignId,
     p_ai_provider: result.provider,
     p_ai_model: result.model,
     p_ai_usage: result.usage,

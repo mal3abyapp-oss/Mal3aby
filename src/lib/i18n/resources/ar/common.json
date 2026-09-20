@@ -367,6 +367,11 @@
         "nameLabel": "اسم الحملة",
         "descriptionLabel": "الوصف",
         "emptyTitle": "لا توجد حملات بعد",
+        "manageLeads": "إدارة العملاء المحتملين",
+        "searchLeadsPlaceholder": "ابحث عن عميل محتمل بالاسم...",
+        "noLeadsFound": "لا توجد نتائج مطابقة.",
+        "leadsLoadError": "تعذّر تحميل قائمة العملاء المحتملين.",
+        "addSelectedLeads": "إضافة {{count}} إلى الحملة",
         "stats": {
           "target": "المستهدف",
           "queued": "في الانتظار",
