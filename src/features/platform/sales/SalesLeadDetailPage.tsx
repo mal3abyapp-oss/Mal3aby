@@ -179,6 +179,48 @@ function scoreBandTone(band: string | null): 'danger' | 'warning' | 'neutral' {
   return 'neutral'
 }
 
+// AUD-1 fix (2026-09-21): sales_lead_activities.detail was already
+// fetched by get_lead_full_profile() and passed all the way into this
+// component, but the Activity card only ever rendered the bare
+// activity_type string -- every actual piece of evidence (a reason, who
+// was invited, which message, why a signal was rejected) was silently
+// discarded. This turns the already-correct write-side data into an
+// actually reviewable summary, one short line per activity type that
+// has a meaningful `detail` field worth surfacing; returns null (no
+// second line rendered) for activity types with nothing worth adding
+// beyond the type label + timestamp already shown.
+function activityDetailSummary(
+  activityType: string,
+  detail: Record<string, unknown> | null | undefined,
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- i18next's TFunction has too many call-signature overloads to restate here; this helper only ever calls it with (key) or (key, {vars}), both of which real TFunction accepts.
+  t: (key: string, optionsOrDefault?: any) => string,
+): string | null {
+  const d = detail ?? {}
+  const reason = typeof d.reason === 'string' && d.reason.trim() ? d.reason.trim() : null
+  switch (activityType) {
+    case 'won':
+    case 'status_changed':
+    case 'message_rejected':
+      return reason
+    case 'activation_invite_created':
+    case 'activation_invite_resent':
+      return typeof d.owner_email === 'string' ? t('platform.sales.leadProfile.activityDetail.ownerEmail', { email: d.owner_email }) : null
+    case 'contact_details_edited': {
+      const fields = ['business_name_changed', 'phone_changed', 'email_changed', 'website_changed', 'location_changed']
+        .filter((f) => d[f] === true)
+      return fields.length > 0 ? fields.map((f) => t(`platform.sales.leadProfile.activityDetail.field.${f}`, f)).join(t('platform.sales.leadProfile.activityDetail.listSeparator')) : null
+    }
+    case 'note_added':
+      return typeof d.notes === 'string' && d.notes.trim() ? d.notes.trim() : null
+    case 'call_task_completed':
+      return typeof d.outcome_event_type === 'string' ? t('platform.sales.leadProfile.activityDetail.outcome', { outcome: d.outcome_event_type }) : null
+    case 'demo_completed':
+      return typeof d.outcome === 'string' ? t('platform.sales.leadProfile.activityDetail.outcome', { outcome: d.outcome }) : null
+    default:
+      return reason
+  }
+}
+
 async function fetchProfile(leadId: string): Promise<LeadProfile> {
   const { data, error } = await supabase.rpc('get_lead_full_profile', { p_lead_id: leadId })
   if (error) throw error
@@ -1367,12 +1409,18 @@ export function SalesLeadDetailPage() {
         <CardHeader><CardTitle>{t('platform.sales.leadProfile.activity')}</CardTitle></CardHeader>
         <CardContent>
           <ul className="space-y-2">
-            {activities.map((a) => (
-              <li key={a.id} className="flex items-center justify-between text-sm">
-                <span>{a.activity_type}</span>
-                <FormattedDate value={a.created_at} timeZone={SALES_DISPLAY_TIMEZONE} className="text-text-secondary" />
-              </li>
-            ))}
+            {activities.map((a) => {
+              const summary = activityDetailSummary(a.activity_type, a.detail, t)
+              return (
+                <li key={a.id} className="border-b border-border-subtle pb-2 text-sm last:border-0">
+                  <div className="flex items-center justify-between">
+                    <span>{t(`platform.sales.leadProfile.activityType.${a.activity_type}`, a.activity_type)}</span>
+                    <FormattedDate value={a.created_at} timeZone={SALES_DISPLAY_TIMEZONE} className="text-text-secondary" />
+                  </div>
+                  {summary && <p className="mt-1 text-text-secondary">{summary}</p>}
+                </li>
+              )
+            })}
           </ul>
         </CardContent>
       </Card>
