@@ -340,6 +340,7 @@
         "title": "Pipeline",
         "description": "Leads by pipeline stage",
         "loadError": "Could not load pipeline data.",
+        "showMore": "Show more",
         "stage": {
           "discovered": "Discovered",
           "enriching": "Enriching",
