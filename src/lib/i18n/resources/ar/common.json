@@ -601,9 +601,11 @@
         "expiring_soon": "اشتراك ينتهي قريبًا",
         "overdue_grace": "في فترة السماح",
         "trial_ending": "تجربة مجانية تنتهي قريبًا",
-        "no_subscription": "لا يوجد اشتراك مسجّل — يحتاج مراجعة"
+        "no_subscription": "لا يوجد اشتراك مسجّل — يحتاج مراجعة",
+        "sales_followups_overdue": "متابعات مبيعات متأخرة"
       },
-      "daysLeftSuffix": " — {{days}} يوم متبقٍ"
+      "daysLeftSuffix": " — {{days}} يوم متبقٍ",
+      "salesFollowupsOverdueLabel": "{{count}} متابعة مبيعات متأخرة"
     },
     "auditPage": {
       "title": "سجل التدقيق",

@@ -601,9 +601,11 @@
         "expiring_soon": "Subscription ending soon",
         "overdue_grace": "In grace period",
         "trial_ending": "Free trial ending soon",
-        "no_subscription": "No subscription on record -- needs review"
+        "no_subscription": "No subscription on record -- needs review",
+        "sales_followups_overdue": "Overdue sales follow-ups"
       },
-      "daysLeftSuffix": " — {{days}} day(s) left"
+      "daysLeftSuffix": " — {{days}} day(s) left",
+      "salesFollowupsOverdueLabel": "{{count}} overdue sales follow-up(s)"
     },
     "auditPage": {
       "title": "Audit Log",
