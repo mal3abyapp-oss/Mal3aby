@@ -354,6 +354,17 @@ export function SalesLeadDetailPage() {
   // finding zero calls to it. This button is that missing production
   // entrypoint. Requires lead.website to be set (mirrors the Edge
   // Function's own "lead has no website to enrich" 400 guard).
+  //
+  // ENR-1 fix (2026-09-19/20, owner brief): "enrichment runs but does
+  // not compute the score, so enriched leads sit at score 0." Confirmed
+  // real -- onSuccess only ever called invalidate(), never triggered
+  // scoreMutation. Enrichment succeeding is exactly the signal that new
+  // scoring inputs (signals) now exist, so it chains straight into a
+  // score computation. A scoring failure is deliberately non-fatal to
+  // the enrichment result itself (the enrichment DID succeed and its
+  // signals are real/saved regardless -- scoring can always be retried
+  // manually via the existing button below), logged rather than
+  // swallowed silently.
   const enrichMutation = useMutation({
     mutationFn: async () => {
       const { data: sessionData } = await supabase.auth.getSession()
@@ -367,7 +378,14 @@ export function SalesLeadDetailPage() {
       if (!res.ok) throw Object.assign(new Error(json.error ?? 'website enrichment failed'), { status: res.status, detail: json })
       return json
     },
-    onSuccess: invalidate,
+    onSuccess: async () => {
+      try {
+        await supabase.rpc('sales_compute_lead_score', { p_lead_id: leadId! })
+      } catch (err) {
+        console.error('auto-scoring after enrichment failed (enrichment itself succeeded):', err)
+      }
+      invalidate()
+    },
   })
 
   const noteMutation = useMutation({

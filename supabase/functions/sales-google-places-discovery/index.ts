@@ -239,6 +239,19 @@ Deno.serve(async (req) => {
     let newCount = 0
     let duplicateCount = 0
     let failedCount = 0
+    // ENR-1 fix (2026-09-19/20, owner brief): "one job shows 20
+    // discovered and 20 failed without a reason." Confirmed real --
+    // upsertError was captured per-place inside this loop but
+    // completely discarded, never logged or stored anywhere. A job
+    // that failed every single place gave zero diagnostic information
+    // to the operator. sales_finish_discovery_job already accepts
+    // p_error_class/p_last_error (used on the outer exception path
+    // below, just never on this per-place path) -- now also passed
+    // here whenever at least one place failed, capturing the LAST
+    // failure's message (each place can fail for a different reason;
+    // one real message is a real improvement over zero, and matches
+    // this job-level table's own single last_error column shape).
+    let lastUpsertErrorMessage: string | null = null
 
     for (const place of places) {
       const normalized = normalizePlace(place)
@@ -262,6 +275,7 @@ Deno.serve(async (req) => {
 
       if (upsertError || !result || result.length === 0) {
         failedCount++
+        lastUpsertErrorMessage = upsertError?.message?.slice(0, 500) ?? 'sales_upsert_discovered_lead returned no result'
         continue
       }
 
@@ -283,6 +297,8 @@ Deno.serve(async (req) => {
       p_failed_count: failedCount,
       p_skipped_count: 0,
       p_next_page_token: nextPageToken ?? null,
+      p_error_class: failedCount > 0 ? 'per_lead_upsert_error' : null,
+      p_last_error: failedCount > 0 ? lastUpsertErrorMessage : null,
     })
 
     return jsonResponse(req, {

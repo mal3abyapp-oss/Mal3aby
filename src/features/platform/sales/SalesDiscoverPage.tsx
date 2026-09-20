@@ -30,6 +30,9 @@ interface DiscoveryJob {
   failed_count: number
   skipped_count: number
   created_at: string
+  // ENR-1 fix (2026-09-19/20): now actually fetched/displayed -- see
+  // sales-google-places-discovery's own comment on where these are set.
+  last_error: string | null
 }
 
 interface ProviderStatus {
@@ -42,7 +45,7 @@ interface ProviderStatus {
 async function fetchRecentJobs(): Promise<DiscoveryJob[]> {
   const { data, error } = await supabase
     .from('sales_discovery_jobs')
-    .select('id, status, discovered_count, new_count, duplicate_count, enriched_count, failed_count, skipped_count, created_at')
+    .select('id, status, discovered_count, new_count, duplicate_count, enriched_count, failed_count, skipped_count, created_at, last_error')
     .order('created_at', { ascending: false })
     .limit(10)
   if (error) throw error
@@ -246,14 +249,32 @@ export function SalesDiscoverPage() {
                     <StatusBadge tone={jobStatusTone(job.status)} label={job.status} />
                     <FormattedDate value={job.created_at} timeZone={SALES_DISPLAY_TIMEZONE} className="text-sm text-text-secondary" />
                   </div>
-                  <div className="mt-2 grid grid-cols-3 gap-2 text-sm sm:grid-cols-6">
+                  {/* ENR-1 fix (2026-09-19/20, owner brief): "every
+                      discovery job reports 'Enriched: 0'" -- confirmed
+                      real, and not a counting bug: discovery
+                      (sales-google-places-discovery) never performs
+                      website enrichment at all, by design (see its own
+                      header comment -- enrichment is a separate,
+                      per-lead, manually-triggered step:
+                      sales-website-enrichment, run from a lead's own
+                      detail page). enriched_count is a schema column no
+                      code has ever written to. Rather than fabricate a
+                      count for a step this job never runs, or wire
+                      discovery to auto-enrich every lead (a real
+                      architecture change well beyond this bug's scope),
+                      the stat is removed from this job-summary view --
+                      it measured something this screen's own process
+                      structurally cannot report. */}
+                  <div className="mt-2 grid grid-cols-3 gap-2 text-sm sm:grid-cols-5">
                     <span>{t('platform.sales.discover.discovered')}: {job.discovered_count}</span>
                     <span>{t('platform.sales.discover.new')}: {job.new_count}</span>
                     <span>{t('platform.sales.discover.duplicates')}: {job.duplicate_count}</span>
-                    <span>{t('platform.sales.discover.enriched')}: {job.enriched_count}</span>
                     <span>{t('platform.sales.discover.failed')}: {job.failed_count}</span>
                     <span>{t('platform.sales.discover.skipped')}: {job.skipped_count}</span>
                   </div>
+                  {job.failed_count > 0 && job.last_error && (
+                    <p className="mt-2 text-xs text-status-danger">{job.last_error}</p>
+                  )}
                 </div>
               ))}
             </div>
