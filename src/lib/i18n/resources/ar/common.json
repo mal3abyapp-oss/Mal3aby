@@ -306,6 +306,8 @@
         "noJobs": "لا توجد مهام اكتشاف بعد",
         "loadError": "تعذّر تحميل مهام الاكتشاف.",
         "manualEntryTitle": "أو أضف عميلًا محتملًا يدويًا",
+        "manualPhoneLabel": "رقم الهاتف",
+        "manualEmailLabel": "البريد الإلكتروني",
         "manualEntryButton": "إضافة عميل محتمل",
         "manualEntryError": "تعذّرت إضافة العميل المحتمل. حاول مجددًا.",
         "providerStatusError": "تعذّر تحميل حالة مصدر الاكتشاف."
@@ -442,6 +444,9 @@
         "resendSending": "جارٍ إعادة الإرسال...",
         "resendError": "تعذّر إعادة إرسال دعوة التفعيل.",
         "resendSuccess": "تم إرسال دعوة تفعيل جديدة عبر البريد الإلكتروني.",
+        "editContactButton": "تعديل بيانات التواصل",
+        "editContactTitle": "تعديل بيانات التواصل",
+        "editContactError": "تعذّر حفظ التعديلات.",
         "activationSecretTitle": "رمز التفعيل -- أرسله يدويًا",
         "activationSecretHint": "تم إرسال رابط التفعيل بالبريد الإلكتروني تلقائيًا. لكن رمز التفعيل هذا لا يُرسل عبر البريد لحماية الحساب -- أرسله للعميل بنفسك عبر مكالمة أو واتساب.",
         "activationSecretDismiss": "تم النسخ/الإرسال",

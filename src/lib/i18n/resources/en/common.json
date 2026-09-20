@@ -306,6 +306,8 @@
         "noJobs": "No discovery jobs yet",
         "loadError": "Could not load discovery jobs.",
         "manualEntryTitle": "Or Add a Lead Manually",
+        "manualPhoneLabel": "Phone number",
+        "manualEmailLabel": "Email address",
         "manualEntryButton": "Add Lead",
         "manualEntryError": "Couldn't add the lead. Try again.",
         "providerStatusError": "Couldn't load the discovery source status."
@@ -442,6 +444,9 @@
         "resendSending": "Resending...",
         "resendError": "Could not resend the activation invite.",
         "resendSuccess": "A new activation invite was sent by email.",
+        "editContactButton": "Edit contact",
+        "editContactTitle": "Edit contact details",
+        "editContactError": "Could not save the changes.",
         "activationSecretTitle": "Activation code -- relay this yourself",
         "activationSecretHint": "The activation link was emailed automatically. This activation code is deliberately not sent by email to protect the account -- relay it to the prospect yourself, by call or WhatsApp.",
         "activationSecretDismiss": "Copied / sent",

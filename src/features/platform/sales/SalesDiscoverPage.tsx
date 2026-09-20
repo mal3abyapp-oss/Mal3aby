@@ -71,7 +71,16 @@ export function SalesDiscoverPage() {
   const [country, setCountry] = useState('EG')
   const [city, setCity] = useState('')
   const [manualName, setManualName] = useState('')
+  // CONTACT-1 fix (2026-09-19/20, owner brief): this used to be ONE
+  // field labeled generically "Contact", wired only to p_phone --
+  // typing an email into it silently stored it as a phone number (the
+  // backend has no format validation on either field, it stores
+  // whatever it's given verbatim). sales_upsert_discovered_lead()
+  // always accepted p_phone AND p_email as two separate parameters;
+  // the UI just never exposed the second one. Split into two real,
+  // separately-validated fields below.
   const [manualPhone, setManualPhone] = useState('')
+  const [manualEmail, setManualEmail] = useState('')
   const [manualWebsite, setManualWebsite] = useState('')
   // FULL-PLATFORM AUDIT ROUND 2 FIX (2026-09-14): Manual Entry used to
   // silently reuse the Discover form's own `country`/`city` state --
@@ -114,7 +123,7 @@ export function SalesDiscoverPage() {
         p_place_id: undefined,
         p_website: manualWebsite || undefined,
         p_phone: manualPhone || undefined,
-        p_email: undefined,
+        p_email: manualEmail || undefined,
         p_country: manualCountry || undefined,
         p_city: manualCity || undefined,
         p_area: undefined,
@@ -193,8 +202,12 @@ export function SalesDiscoverPage() {
               <Input id="manual-name" value={manualName} onChange={(e) => setManualName(e.target.value)} />
             </div>
             <div>
-              <FormLabel htmlFor="manual-phone">{t('platform.sales.leadProfile.contact')}</FormLabel>
-              <Input id="manual-phone" value={manualPhone} onChange={(e) => setManualPhone(e.target.value)} />
+              <FormLabel htmlFor="manual-phone">{t('platform.sales.discover.manualPhoneLabel')}</FormLabel>
+              <Input id="manual-phone" type="tel" dir="ltr" value={manualPhone} onChange={(e) => setManualPhone(e.target.value)} placeholder="+20 10 0000 0000" />
+            </div>
+            <div>
+              <FormLabel htmlFor="manual-email">{t('platform.sales.discover.manualEmailLabel')}</FormLabel>
+              <Input id="manual-email" type="email" dir="ltr" value={manualEmail} onChange={(e) => setManualEmail(e.target.value)} placeholder="owner@example.com" />
             </div>
             <div>
               <FormLabel htmlFor="manual-website">Website</FormLabel>

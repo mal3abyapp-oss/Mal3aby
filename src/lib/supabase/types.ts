@@ -12754,6 +12754,20 @@ export type Database = {
         Args: { p_followup_id: string; p_new_scheduled_at: string }
         Returns: undefined
       }
+      sales_update_lead_contact: {
+        Args: {
+          p_business_name?: string
+          p_city?: string
+          p_clear_public_email?: boolean
+          p_clear_public_phone?: boolean
+          p_country?: string
+          p_lead_id: string
+          p_public_email?: string
+          p_public_phone?: string
+          p_website?: string
+        }
+        Returns: undefined
+      }
       sales_upsert_discovered_lead: {
         Args: {
           p_address?: string

@@ -208,6 +208,21 @@ export function SalesLeadDetailPage() {
   // prospect through any channel.
   const [pendingActivationSecret, setPendingActivationSecret] = useState<string | null>(null)
 
+  // CONTACT-1 fix, part 2 (2026-09-19/20): there was previously NO way
+  // to edit a lead after creation -- this matters directly because of
+  // CONTACT-1's own part 1 bug (an email typed into the old single
+  // "Contact" field silently stored as a phone number, with no way to
+  // correct it). sales_update_lead_contact() (migration 20260920010000)
+  // is the first lead-editing capability this codebase has.
+  const [editContactOpen, setEditContactOpen] = useState(false)
+  const [editBusinessName, setEditBusinessName] = useState('')
+  const [editPhone, setEditPhone] = useState('')
+  const [editEmail, setEditEmail] = useState('')
+  const [editWebsite, setEditWebsite] = useState('')
+  const [editCountry, setEditCountry] = useState('')
+  const [editCity, setEditCity] = useState('')
+  const [contactEditError, setContactEditError] = useState<string | null>(null)
+
   const [callOutcomeDrafts, setCallOutcomeDrafts] = useState<Record<string, string>>({})
 
   // Item 1: general pipeline status-change control.
@@ -406,6 +421,32 @@ export function SalesLeadDetailPage() {
     },
     onError: (error: { message?: string }) => {
       setStatusChangeError(error?.message || t('platform.sales.leadProfile.changeStatusError'))
+    },
+  })
+
+  const editContactMutation = useMutation({
+    mutationFn: async () => {
+      const currentLead = profileQuery.data?.lead
+      const { error } = await supabase.rpc('sales_update_lead_contact', {
+        p_lead_id: leadId!,
+        p_business_name: editBusinessName.trim() || undefined,
+        p_public_phone: editPhone.trim() || undefined,
+        p_clear_public_phone: editPhone.trim() === '' && currentLead?.public_phone != null,
+        p_public_email: editEmail.trim() || undefined,
+        p_clear_public_email: editEmail.trim() === '' && currentLead?.public_email != null,
+        p_website: editWebsite.trim() || undefined,
+        p_country: editCountry.trim() || undefined,
+        p_city: editCity.trim() || undefined,
+      })
+      if (error) throw error
+    },
+    onSuccess: () => {
+      setEditContactOpen(false)
+      setContactEditError(null)
+      invalidate()
+    },
+    onError: (error: { message?: string }) => {
+      setContactEditError(error?.message || t('platform.sales.leadProfile.editContactError'))
     },
   })
 
@@ -718,7 +759,25 @@ export function SalesLeadDetailPage() {
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
         <Card>
-          <CardHeader><CardTitle>{t('platform.sales.leadProfile.contact')}</CardTitle></CardHeader>
+          <CardHeader className="flex flex-row items-center justify-between">
+            <CardTitle>{t('platform.sales.leadProfile.contact')}</CardTitle>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => {
+                setEditBusinessName(lead.business_name ?? '')
+                setEditPhone(lead.public_phone ?? '')
+                setEditEmail(lead.public_email ?? '')
+                setEditWebsite(lead.website ?? '')
+                setEditCountry(lead.country ?? '')
+                setEditCity(lead.city ?? '')
+                setContactEditError(null)
+                setEditContactOpen(true)
+              }}
+            >
+              {t('platform.sales.leadProfile.editContactButton')}
+            </Button>
+          </CardHeader>
           <CardContent className="space-y-1 text-sm">
             <p><bdi>{lead.public_phone ?? '—'}</bdi></p>
             <p><bdi>{lead.public_email ?? '—'}</bdi></p>
@@ -1397,6 +1456,54 @@ export function SalesLeadDetailPage() {
                   onClick={() => changeStatusMutation.mutate()}
                 >
                   {changeStatusMutation.isPending ? t('platform.sales.leadProfile.changeStatusSaving') : t('platform.sales.leadProfile.changeStatusSave')}
+                </Button>
+              </div>
+            </div>
+          </DialogContent>
+        </Dialog>
+      )}
+
+      {editContactOpen && (
+        <Dialog open onOpenChange={(open) => { if (!open) setEditContactOpen(false) }}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>{t('platform.sales.leadProfile.editContactTitle')}</DialogTitle>
+            </DialogHeader>
+            <div className="flex flex-col gap-4">
+              <div className="flex flex-col gap-1">
+                <FormLabel htmlFor="edit-contact-name">{t('platform.sales.leads.columns.business')}</FormLabel>
+                <Input id="edit-contact-name" value={editBusinessName} onChange={(e) => setEditBusinessName(e.target.value)} />
+              </div>
+              <div className="flex flex-col gap-1">
+                <FormLabel htmlFor="edit-contact-phone">{t('platform.sales.discover.manualPhoneLabel')}</FormLabel>
+                <Input id="edit-contact-phone" type="tel" dir="ltr" value={editPhone} onChange={(e) => setEditPhone(e.target.value)} placeholder="+20 10 0000 0000" />
+              </div>
+              <div className="flex flex-col gap-1">
+                <FormLabel htmlFor="edit-contact-email">{t('platform.sales.discover.manualEmailLabel')}</FormLabel>
+                <Input id="edit-contact-email" type="email" dir="ltr" value={editEmail} onChange={(e) => setEditEmail(e.target.value)} placeholder="owner@example.com" />
+              </div>
+              <div className="flex flex-col gap-1">
+                <FormLabel htmlFor="edit-contact-website">Website</FormLabel>
+                <Input id="edit-contact-website" dir="ltr" value={editWebsite} onChange={(e) => setEditWebsite(e.target.value)} />
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="flex flex-col gap-1">
+                  <FormLabel htmlFor="edit-contact-country">{t('platform.sales.discover.countryLabel')}</FormLabel>
+                  <Input id="edit-contact-country" value={editCountry} onChange={(e) => setEditCountry(e.target.value.toUpperCase())} maxLength={2} />
+                </div>
+                <div className="flex flex-col gap-1">
+                  <FormLabel htmlFor="edit-contact-city">{t('platform.sales.discover.cityLabel')}</FormLabel>
+                  <Input id="edit-contact-city" value={editCity} onChange={(e) => setEditCity(e.target.value)} />
+                </div>
+              </div>
+              {contactEditError && <p role="alert" className="text-sm text-status-danger">{contactEditError}</p>}
+              <div className="flex justify-end gap-2">
+                <Button variant="outline" onClick={() => setEditContactOpen(false)}>{t('common.cancel')}</Button>
+                <Button
+                  disabled={!editBusinessName.trim() || editContactMutation.isPending}
+                  onClick={() => editContactMutation.mutate()}
+                >
+                  {editContactMutation.isPending ? t('common.saving') : t('common.save')}
                 </Button>
               </div>
             </div>
