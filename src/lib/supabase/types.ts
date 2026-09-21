@@ -20,7 +20,6 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-
       graphql: {
         Args: {
           extensions?: Json
@@ -372,6 +371,91 @@ export type Database = {
           },
           {
             foreignKeyName: "automatic_trial_entitlements_club_id_fkey"
+            columns: ["club_id"]
+            isOneToOne: false
+            referencedRelation: "commercial_entitlements_usage"
+            referencedColumns: ["club_id"]
+          },
+        ]
+      }
+      booking_link_requests: {
+        Row: {
+          booking_id: string
+          club_id: string
+          last_requested_at: string
+          request_count: number
+          window_started_at: string
+        }
+        Insert: {
+          booking_id: string
+          club_id: string
+          last_requested_at: string
+          request_count?: number
+          window_started_at: string
+        }
+        Update: {
+          booking_id?: string
+          club_id?: string
+          last_requested_at?: string
+          request_count?: number
+          window_started_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "booking_link_requests_booking_id_fkey"
+            columns: ["booking_id"]
+            isOneToOne: true
+            referencedRelation: "bookings"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "booking_link_requests_club_id_fkey"
+            columns: ["club_id"]
+            isOneToOne: false
+            referencedRelation: "clubs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "booking_link_requests_club_id_fkey"
+            columns: ["club_id"]
+            isOneToOne: false
+            referencedRelation: "commercial_entitlements_usage"
+            referencedColumns: ["club_id"]
+          },
+        ]
+      }
+      booking_phone_recovery_requests: {
+        Row: {
+          club_id: string
+          last_requested_at: string
+          phone_e164: string
+          request_count: number
+          window_started_at: string
+        }
+        Insert: {
+          club_id: string
+          last_requested_at: string
+          phone_e164: string
+          request_count?: number
+          window_started_at: string
+        }
+        Update: {
+          club_id?: string
+          last_requested_at?: string
+          phone_e164?: string
+          request_count?: number
+          window_started_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "booking_phone_recovery_requests_club_id_fkey"
+            columns: ["club_id"]
+            isOneToOne: false
+            referencedRelation: "clubs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "booking_phone_recovery_requests_club_id_fkey"
             columns: ["club_id"]
             isOneToOne: false
             referencedRelation: "commercial_entitlements_usage"
@@ -3195,6 +3279,8 @@ export type Database = {
           circuit_breaker_window_minutes: number
           club_id: string
           default_language: string
+          max_sends_per_day_per_account: number
+          max_sends_per_day_per_recipient: number
           max_sends_per_hour_per_account: number
           max_sends_per_minute_per_account: number
           min_minutes_between_recipient_sends: number
@@ -3204,6 +3290,9 @@ export type Database = {
           quiet_hours_start: string
           updated_at: string
           updated_by: string | null
+          warm_up_days: number
+          warm_up_enabled: boolean
+          warm_up_rate_multiplier: number
         }
         Insert: {
           circuit_breaker_cooldown_minutes?: number
@@ -3213,6 +3302,8 @@ export type Database = {
           circuit_breaker_window_minutes?: number
           club_id: string
           default_language?: string
+          max_sends_per_day_per_account?: number
+          max_sends_per_day_per_recipient?: number
           max_sends_per_hour_per_account?: number
           max_sends_per_minute_per_account?: number
           min_minutes_between_recipient_sends?: number
@@ -3222,6 +3313,9 @@ export type Database = {
           quiet_hours_start?: string
           updated_at?: string
           updated_by?: string | null
+          warm_up_days?: number
+          warm_up_enabled?: boolean
+          warm_up_rate_multiplier?: number
         }
         Update: {
           circuit_breaker_cooldown_minutes?: number
@@ -3231,6 +3325,8 @@ export type Database = {
           circuit_breaker_window_minutes?: number
           club_id?: string
           default_language?: string
+          max_sends_per_day_per_account?: number
+          max_sends_per_day_per_recipient?: number
           max_sends_per_hour_per_account?: number
           max_sends_per_minute_per_account?: number
           min_minutes_between_recipient_sends?: number
@@ -3240,6 +3336,9 @@ export type Database = {
           quiet_hours_start?: string
           updated_at?: string
           updated_by?: string | null
+          warm_up_days?: number
+          warm_up_enabled?: boolean
+          warm_up_rate_multiplier?: number
         }
         Relationships: [
           {
@@ -3747,6 +3846,48 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "payments"
             referencedColumns: ["id"]
+          },
+        ]
+      }
+      operational_checklist_completions: {
+        Row: {
+          club_id: string | null
+          completed_at: string
+          completed_by: string
+          id: string
+          item_key: string
+          period_key: string | null
+        }
+        Insert: {
+          club_id?: string | null
+          completed_at?: string
+          completed_by: string
+          id?: string
+          item_key: string
+          period_key?: string | null
+        }
+        Update: {
+          club_id?: string | null
+          completed_at?: string
+          completed_by?: string
+          id?: string
+          item_key?: string
+          period_key?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "operational_checklist_completions_club_id_fkey"
+            columns: ["club_id"]
+            isOneToOne: false
+            referencedRelation: "clubs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "operational_checklist_completions_club_id_fkey"
+            columns: ["club_id"]
+            isOneToOne: false
+            referencedRelation: "commercial_entitlements_usage"
+            referencedColumns: ["club_id"]
           },
         ]
       }
@@ -5072,6 +5213,8 @@ export type Database = {
           last_successful_send_at: string | null
           qr_expires_at: string | null
           qr_payload: string | null
+          restriction_signal_detail: string | null
+          restriction_signal_detected_at: string | null
           session_credentials_encrypted: string | null
           session_key: string
           singleton_guard: number
@@ -5091,6 +5234,8 @@ export type Database = {
           last_successful_send_at?: string | null
           qr_expires_at?: string | null
           qr_payload?: string | null
+          restriction_signal_detail?: string | null
+          restriction_signal_detected_at?: string | null
           session_credentials_encrypted?: string | null
           session_key?: string
           singleton_guard?: number
@@ -5110,6 +5255,8 @@ export type Database = {
           last_successful_send_at?: string | null
           qr_expires_at?: string | null
           qr_payload?: string | null
+          restriction_signal_detail?: string | null
+          restriction_signal_detected_at?: string | null
           session_credentials_encrypted?: string | null
           session_key?: string
           singleton_guard?: number
@@ -5218,30 +5365,45 @@ export type Database = {
           circuit_breaker_failure_rate_threshold: number
           circuit_breaker_min_sample_size: number
           circuit_breaker_window_minutes: number
+          max_sends_per_day: number
+          max_sends_per_day_per_recipient: number
           max_sends_per_hour: number
           max_sends_per_minute: number
           min_minutes_between_recipient_sends: number
           singleton_guard: number
+          warm_up_days: number
+          warm_up_enabled: boolean
+          warm_up_rate_multiplier: number
         }
         Insert: {
           circuit_breaker_cooldown_minutes?: number
           circuit_breaker_failure_rate_threshold?: number
           circuit_breaker_min_sample_size?: number
           circuit_breaker_window_minutes?: number
+          max_sends_per_day?: number
+          max_sends_per_day_per_recipient?: number
           max_sends_per_hour?: number
           max_sends_per_minute?: number
           min_minutes_between_recipient_sends?: number
           singleton_guard?: number
+          warm_up_days?: number
+          warm_up_enabled?: boolean
+          warm_up_rate_multiplier?: number
         }
         Update: {
           circuit_breaker_cooldown_minutes?: number
           circuit_breaker_failure_rate_threshold?: number
           circuit_breaker_min_sample_size?: number
           circuit_breaker_window_minutes?: number
+          max_sends_per_day?: number
+          max_sends_per_day_per_recipient?: number
           max_sends_per_hour?: number
           max_sends_per_minute?: number
           min_minutes_between_recipient_sends?: number
           singleton_guard?: number
+          warm_up_days?: number
+          warm_up_enabled?: boolean
+          warm_up_rate_multiplier?: number
         }
         Relationships: []
       }
@@ -5759,6 +5921,24 @@ export type Database = {
           key?: string
           name?: string
           name_ar?: string
+        }
+        Relationships: []
+      }
+      rpc_rate_limit_state: {
+        Row: {
+          rate_key: string
+          request_count: number
+          window_started_at: string
+        }
+        Insert: {
+          rate_key: string
+          request_count?: number
+          window_started_at?: string
+        }
+        Update: {
+          rate_key?: string
+          request_count?: number
+          window_started_at?: string
         }
         Relationships: []
       }
@@ -6781,6 +6961,7 @@ export type Database = {
           ai_usage: Json | null
           approved_at: string | null
           approved_by: string | null
+          attempts: number
           body: string
           campaign_id: string | null
           channel: string
@@ -6792,9 +6973,11 @@ export type Database = {
           grounding: Json
           id: string
           language: string
+          last_attempt_at: string | null
           last_error: string | null
           lead_id: string
           message_type: string
+          next_attempt_at: string | null
           provider_reference: string | null
           quality_gate_result: Json | null
           quality_status: string
@@ -6809,6 +6992,7 @@ export type Database = {
           ai_usage?: Json | null
           approved_at?: string | null
           approved_by?: string | null
+          attempts?: number
           body: string
           campaign_id?: string | null
           channel: string
@@ -6820,9 +7004,11 @@ export type Database = {
           grounding?: Json
           id?: string
           language: string
+          last_attempt_at?: string | null
           last_error?: string | null
           lead_id: string
           message_type: string
+          next_attempt_at?: string | null
           provider_reference?: string | null
           quality_gate_result?: Json | null
           quality_status?: string
@@ -6837,6 +7023,7 @@ export type Database = {
           ai_usage?: Json | null
           approved_at?: string | null
           approved_by?: string | null
+          attempts?: number
           body?: string
           campaign_id?: string | null
           channel?: string
@@ -6848,9 +7035,11 @@ export type Database = {
           grounding?: Json
           id?: string
           language?: string
+          last_attempt_at?: string | null
           last_error?: string | null
           lead_id?: string
           message_type?: string
+          next_attempt_at?: string | null
           provider_reference?: string | null
           quality_gate_result?: Json | null
           quality_status?: string
@@ -8317,6 +8506,8 @@ export type Database = {
           last_successful_send_at: string | null
           qr_expires_at: string | null
           qr_payload: string | null
+          restriction_signal_detail: string | null
+          restriction_signal_detected_at: string | null
           session_credentials_encrypted: string | null
           status: string
           updated_at: string
@@ -8335,6 +8526,8 @@ export type Database = {
           last_successful_send_at?: string | null
           qr_expires_at?: string | null
           qr_payload?: string | null
+          restriction_signal_detail?: string | null
+          restriction_signal_detected_at?: string | null
           session_credentials_encrypted?: string | null
           status?: string
           updated_at?: string
@@ -8353,6 +8546,8 @@ export type Database = {
           last_successful_send_at?: string | null
           qr_expires_at?: string | null
           qr_payload?: string | null
+          restriction_signal_detail?: string | null
+          restriction_signal_detected_at?: string | null
           session_credentials_encrypted?: string | null
           status?: string
           updated_at?: string
@@ -8932,23 +9127,6 @@ export type Database = {
       }
     }
     Functions: {
-      get_public_booking_context: {
-        Args: { p_token: string }
-        Returns: Json
-      }
-      request_public_booking_link: {
-        Args: { p_club_slug: string; p_booking_ref: string; p_phone_e164: string }
-        Returns: undefined
-      }
-      request_public_booking_links_by_phone: {
-        Args: { p_club_slug: string; p_phone_e164: string }
-        Returns: undefined
-      }
-      resolve_public_booking_by_ref_and_phone: {
-        Args: { p_club_slug: string; p_booking_ref: string; p_phone_e164: string }
-        Returns: Json
-      }
-
       _academy_module_active: { Args: { p_club_id: string }; Returns: boolean }
       _activate_club_membership_if_due_internal: {
         Args: { p_membership_subscription_id: string }
@@ -9111,6 +9289,18 @@ export type Database = {
         Args: { p_club_id: string }
         Returns: string
       }
+      _queue_sales_activation_invite_email: {
+        Args: {
+          p_business_name: string
+          p_business_name_ar: string
+          p_expires_at: string
+          p_lead_id: string
+          p_owner_email: string
+          p_raw_token: string
+        }
+        Returns: undefined
+      }
+      _redact_whatsapp_audit_snapshot: { Args: { p_row: Json }; Returns: Json }
       _resolve_field_price_segments_internal: {
         Args: {
           p_date: string
@@ -9205,6 +9395,17 @@ export type Database = {
         Args: {
           p_max_requests?: number
           p_provider_key: string
+          p_window_seconds?: number
+        }
+        Returns: {
+          allowed: boolean
+          retry_after_seconds: number
+        }[]
+      }
+      check_rpc_rate_limit: {
+        Args: {
+          p_max_requests?: number
+          p_rate_key: string
           p_window_seconds?: number
         }
         Returns: {
@@ -10608,7 +10809,33 @@ export type Database = {
           failed_count_7d: number
           last_seen_at: string
           pending_count: number
+          restriction_signal_detail: string
+          restriction_signal_detected_at: string
         }[]
+      }
+      get_platform_whatsapp_safety_settings: {
+        Args: never
+        Returns: {
+          circuit_breaker_cooldown_minutes: number
+          circuit_breaker_failure_rate_threshold: number
+          circuit_breaker_min_sample_size: number
+          circuit_breaker_window_minutes: number
+          max_sends_per_day: number
+          max_sends_per_day_per_recipient: number
+          max_sends_per_hour: number
+          max_sends_per_minute: number
+          min_minutes_between_recipient_sends: number
+          singleton_guard: number
+          warm_up_days: number
+          warm_up_enabled: boolean
+          warm_up_rate_multiplier: number
+        }
+        SetofOptions: {
+          from: "*"
+          to: "platform_whatsapp_safety_settings"
+          isOneToOne: true
+          isSetofReturn: false
+        }
       }
       get_platform_whatsapp_sender_identity: {
         Args: never
@@ -10639,6 +10866,7 @@ export type Database = {
           status: string
         }[]
       }
+      get_public_booking_context: { Args: { p_token: string }; Returns: Json }
       get_public_booking_receipt_contact: {
         Args: { p_booking_id: string }
         Returns: {
@@ -10777,7 +11005,7 @@ export type Database = {
         }[]
       }
       get_sales_dashboard_summary: {
-        Args: never
+        Args: { p_end_date?: string; p_start_date?: string }
         Returns: {
           avg_days_to_conversion: number
           cold_leads: number
@@ -10788,13 +11016,14 @@ export type Database = {
           demos_scheduled: number
           hot_leads: number
           reply_rate: number
+          suppressed_count: number
           total_leads: number
           warm_leads: number
           win_rate: number
         }[]
       }
       get_sales_funnel_stats: {
-        Args: never
+        Args: { p_end_date?: string; p_start_date?: string }
         Returns: {
           lead_count: number
           stage: string
@@ -11159,6 +11388,8 @@ export type Database = {
           last_seen_at: string
           last_successful_send_at: string
           qr_expires_at: string
+          restriction_signal_detail: string
+          restriction_signal_detected_at: string
           status: string
         }[]
       }
@@ -11883,6 +12114,8 @@ export type Database = {
           last_seen_at: string
           last_successful_send_at: string
           qr_expires_at: string
+          restriction_signal_detail: string
+          restriction_signal_detected_at: string
           status: string
         }[]
       }
@@ -12186,6 +12419,18 @@ export type Database = {
         }
         Returns: string
       }
+      request_public_booking_link: {
+        Args: {
+          p_booking_ref: string
+          p_club_slug: string
+          p_phone_e164: string
+        }
+        Returns: undefined
+      }
+      request_public_booking_links_by_phone: {
+        Args: { p_club_slug: string; p_phone_e164: string }
+        Returns: undefined
+      }
       reschedule_booking: {
         Args: {
           p_booking_id: string
@@ -12246,6 +12491,14 @@ export type Database = {
           segment_start: string
           segment_total: number
         }[]
+      }
+      resolve_public_booking_by_ref_and_phone: {
+        Args: {
+          p_booking_ref: string
+          p_club_slug: string
+          p_phone_e164: string
+        }
+        Returns: Json
       }
       restore_club_membership_plan: {
         Args: { p_plan_id: string }
@@ -12315,6 +12568,10 @@ export type Database = {
         Args: { p_message_id: string }
         Returns: undefined
       }
+      sales_archive_campaign: {
+        Args: { p_campaign_id: string }
+        Returns: undefined
+      }
       sales_change_lead_status: {
         Args: { p_lead_id: string; p_new_status: string; p_reason?: string }
         Returns: undefined
@@ -12340,6 +12597,7 @@ export type Database = {
       sales_claim_queued_outreach_message: {
         Args: never
         Returns: {
+          attempts: number
           body: string
           language: string
           lead_id: string
@@ -12382,9 +12640,15 @@ export type Database = {
         Returns: string
       }
       sales_edit_outreach_draft: {
-        Args: { p_edited_body: string; p_message_id: string }
+        Args: {
+          p_edited_body: string
+          p_message_id: string
+          p_quality_gate_result?: Json
+          p_quality_status?: string
+        }
         Returns: undefined
       }
+      sales_expire_stale_outreach_processing: { Args: never; Returns: number }
       sales_find_duplicate_candidates: {
         Args: {
           p_city: string
@@ -12440,7 +12704,9 @@ export type Database = {
         Args: {
           p_error?: string
           p_message_id: string
+          p_permanent?: boolean
           p_provider_reference?: string
+          p_retry_after_seconds?: number
           p_success: boolean
         }
         Returns: undefined
@@ -12481,6 +12747,10 @@ export type Database = {
         Args: { p_message_id: string; p_reason?: string }
         Returns: undefined
       }
+      sales_restore_campaign: {
+        Args: { p_campaign_id: string }
+        Returns: undefined
+      }
       sales_schedule_demo: {
         Args: { p_lead_id: string; p_notes?: string; p_scheduled_at: string }
         Returns: string
@@ -12493,6 +12763,24 @@ export type Database = {
           p_scheduled_at: string
         }
         Returns: string
+      }
+      sales_snooze_followup: {
+        Args: { p_followup_id: string; p_new_scheduled_at: string }
+        Returns: undefined
+      }
+      sales_update_lead_contact: {
+        Args: {
+          p_business_name?: string
+          p_city?: string
+          p_clear_public_email?: boolean
+          p_clear_public_phone?: boolean
+          p_country?: string
+          p_lead_id: string
+          p_public_email?: string
+          p_public_phone?: string
+          p_website?: string
+        }
+        Returns: undefined
       }
       sales_upsert_discovered_lead: {
         Args: {
@@ -12999,6 +13287,39 @@ export type Database = {
         Args: { p_default_trial_days: number }
         Returns: undefined
       }
+      update_platform_whatsapp_safety_settings: {
+        Args: {
+          p_circuit_breaker_enabled?: boolean
+          p_max_sends_per_day?: number
+          p_max_sends_per_day_per_recipient?: number
+          p_max_sends_per_hour?: number
+          p_max_sends_per_minute?: number
+          p_min_minutes_between_recipient_sends?: number
+          p_warm_up_days?: number
+          p_warm_up_enabled?: boolean
+        }
+        Returns: {
+          circuit_breaker_cooldown_minutes: number
+          circuit_breaker_failure_rate_threshold: number
+          circuit_breaker_min_sample_size: number
+          circuit_breaker_window_minutes: number
+          max_sends_per_day: number
+          max_sends_per_day_per_recipient: number
+          max_sends_per_hour: number
+          max_sends_per_minute: number
+          min_minutes_between_recipient_sends: number
+          singleton_guard: number
+          warm_up_days: number
+          warm_up_enabled: boolean
+          warm_up_rate_multiplier: number
+        }
+        SetofOptions: {
+          from: "*"
+          to: "platform_whatsapp_safety_settings"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
       update_player: {
         Args: {
           p_date_of_birth?: string
@@ -13200,6 +13521,10 @@ export type Database = {
           recipient_phone: string
         }[]
       }
+      whatsapp_connector_claim_platform_generation: {
+        Args: never
+        Returns: number
+      }
       whatsapp_connector_expire_stale: { Args: never; Returns: number }
       whatsapp_connector_get_invoice_document_data: {
         Args: { p_invoice_id: string }
@@ -13255,8 +13580,16 @@ export type Database = {
         Args: { p_provider_reference: string; p_queue_id: string }
         Returns: undefined
       }
+      whatsapp_connector_record_opt_out_keyword: {
+        Args: { p_club_id: string; p_from_phone_digits_only: string }
+        Returns: undefined
+      }
       whatsapp_connector_report_delivery_receipt: {
         Args: { p_provider_reference: string; p_status_level: number }
+        Returns: undefined
+      }
+      whatsapp_connector_report_platform_restriction_signal: {
+        Args: { p_detail: string }
         Returns: undefined
       }
       whatsapp_connector_report_platform_send_result: {
@@ -13278,6 +13611,10 @@ export type Database = {
           p_state_seq?: number
           p_status: string
         }
+        Returns: undefined
+      }
+      whatsapp_connector_report_restriction_signal: {
+        Args: { p_club_id: string; p_detail: string }
         Returns: undefined
       }
       whatsapp_connector_report_send_result: {
@@ -13355,6 +13692,15 @@ export type Database = {
       whatsapp_observability_retention_cleanup: {
         Args: never
         Returns: undefined
+      }
+      whatsapp_warm_up_multiplier: {
+        Args: {
+          p_connected_at: string
+          p_warm_up_days: number
+          p_warm_up_enabled: boolean
+          p_warm_up_floor: number
+        }
+        Returns: number
       }
       write_audit_log: {
         Args: {

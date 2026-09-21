@@ -84,7 +84,20 @@ describe('SalesLeadDetailPage — channel eligibility, call tasks, outreach even
     await i18n.changeLanguage('en')
   })
 
-  it('shows email eligible, WhatsApp always not-eligible with its structural reason, and the recommended channel', async () => {
+  // WA-1 fix (owner brief, 2026-09-21): this test used to assert
+  // "WhatsApp always not-eligible" as a permanent invariant, mirroring
+  // get_lead_channel_eligibility()'s own hardcoded whatsapp_eligible =
+  // false. That was true only until 2026-09-10, when
+  // sales_queue_platform_whatsapp_message() shipped a real, working,
+  // human-approved Platform WhatsApp send path -- the eligibility RPC
+  // was never updated to match, leaving a live self-contradiction (this
+  // same page's own Send button worked for a lead the Channels panel
+  // simultaneously called "not eligible... structural, not a bug").
+  // Fixed at the RPC layer (20260921040000_wa1_fix_stale_whatsapp_
+  // ineligibility.sql); this test now locks in BOTH real outcomes --
+  // eligible when a phone number exists, not eligible when it doesn't
+  // -- instead of a single hardcoded-false case.
+  it('shows email eligible, WhatsApp eligible when a phone number is on file, and the recommended channel', async () => {
     mockRpc.mockImplementation((fnName: string) => {
       if (fnName === 'get_lead_full_profile') return Promise.resolve({ data: profileFor(baseLead()), error: null })
       if (fnName === 'get_lead_channel_eligibility') {
@@ -93,8 +106,8 @@ describe('SalesLeadDetailPage — channel eligibility, call tasks, outreach even
             lead_id: 'lead-1',
             email_eligible: true,
             email_reason: 'verified public_email on file',
-            whatsapp_eligible: false,
-            whatsapp_reason: 'WhatsApp connector is club-scoped -- a sales lead is not yet a club',
+            whatsapp_eligible: true,
+            whatsapp_reason: 'verified phone number on file (whatsapp_public_number or public_phone) -- eligible for a human-approved Platform WhatsApp send once a draft is generated and approved',
             call_task_eligible: true,
             call_task_reason: 'verified public_phone on file',
             recommended_channel: 'EMAIL',
@@ -111,13 +124,11 @@ describe('SalesLeadDetailPage — channel eligibility, call tasks, outreach even
 
     await screen.findByText(i18n.t('platform.sales.leadProfile.channels'))
 
-    // WhatsApp always rendered as NOT eligible, with the real structural reason visible.
-    expect(screen.getByText(/WhatsApp connector is club-scoped/)).toBeInTheDocument()
-    const notEligibleLabels = screen.getAllByText(i18n.t('platform.sales.leadProfile.channelNotEligible'))
-    expect(notEligibleLabels.length).toBeGreaterThan(0)
+    // WhatsApp now shown ELIGIBLE, with the real phone-based reason visible.
+    expect(screen.getByText(/human-approved Platform WhatsApp send/)).toBeInTheDocument()
 
-    // Email shown eligible.
-    expect(screen.getAllByText(i18n.t('platform.sales.leadProfile.channelEligible')).length).toBeGreaterThan(0)
+    // Email AND WhatsApp both shown eligible (2 of the 3 channel rows).
+    expect(screen.getAllByText(i18n.t('platform.sales.leadProfile.channelEligible')).length).toBeGreaterThanOrEqual(2)
 
     // Recommended channel + reason rendered.
     expect(screen.getByText(/EMAIL/)).toBeInTheDocument()
@@ -125,6 +136,35 @@ describe('SalesLeadDetailPage — channel eligibility, call tasks, outreach even
 
     // Create Call Task button appears since call_task_eligible is true.
     expect(screen.getByRole('button', { name: i18n.t('platform.sales.leadProfile.createCallTaskButton') })).toBeInTheDocument()
+  })
+
+  it('shows WhatsApp NOT eligible with the real reason when a lead has no phone number at all', async () => {
+    mockRpc.mockImplementation((fnName: string) => {
+      if (fnName === 'get_lead_full_profile') return Promise.resolve({ data: profileFor(baseLead({ public_phone: null, whatsapp_public_number: null })), error: null })
+      if (fnName === 'get_lead_channel_eligibility') {
+        return Promise.resolve({
+          data: [{
+            lead_id: 'lead-1',
+            email_eligible: true,
+            email_reason: 'verified public_email on file',
+            whatsapp_eligible: false,
+            whatsapp_reason: 'no whatsapp_public_number or public_phone on file for this lead',
+            call_task_eligible: false,
+            call_task_reason: 'no public_phone on file for this lead',
+            recommended_channel: 'EMAIL',
+            recommended_reason: 'email is the only channel with an automated, approval-gated send pipeline',
+          }],
+          error: null,
+        })
+      }
+      if (fnName === 'get_lead_call_tasks') return Promise.resolve({ data: [], error: null })
+      if (fnName === 'get_lead_outreach_events') return Promise.resolve({ data: [], error: null })
+      return Promise.resolve({ data: null, error: null })
+    })
+    renderPage()
+
+    await screen.findByText(i18n.t('platform.sales.leadProfile.channels'))
+    expect(screen.getByText(/no whatsapp_public_number or public_phone on file/)).toBeInTheDocument()
   })
 
   it('creates a call task via sales_create_call_task when the button is clicked', async () => {

@@ -33,7 +33,15 @@ import { translateSupabaseError } from '@/lib/errors'
 // club_id, no branch scope, no custom-role-vs-system split via
 // club_memberships.custom_role_id).
 
-const PLATFORM_PERMISSION_GROUPS = ['clubs', 'staff', 'roles', 'finance', 'support', 'audit', 'settings'] as const
+// RBAC-1 fix (owner brief, 2026-09-21): 'sales' was missing from this
+// list even though the platform_permissions catalog has always had 12
+// real platform.sales.* keys (group_key='sales',
+// 20260904090100_sales_intelligence_rls_and_permissions.sql) and the
+// backend (RLS/RPCs) fully enforces them -- a Platform Owner simply had
+// no tab/checkboxes to grant any of them to a custom role through this
+// screen, since every render here (tab list, checkbox pane, group
+// label) is driven off this array, not off the DB catalog directly.
+const PLATFORM_PERMISSION_GROUPS = ['clubs', 'staff', 'roles', 'finance', 'support', 'audit', 'settings', 'sales'] as const
 type PlatformPermissionGroupKey = (typeof PLATFORM_PERMISSION_GROUPS)[number]
 
 interface PlatformRoleRow {

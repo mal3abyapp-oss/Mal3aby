@@ -4,18 +4,42 @@
 // PlatformOverviewPage-style dashboard-card layout, extended with the
 // isError/ErrorState pattern the app's own prior remediation
 // established as the app-wide standard for financial/admin screens.
+//
+// REP-1 fix (owner brief, 2026-09-21): every reporting RPC here was
+// previously all-time cumulative only -- a Platform Owner asking "how
+// did we do this month" had no way to answer that. get_sales_funnel_
+// stats()/get_sales_dashboard_summary() now accept an optional
+// p_start_date/p_end_date (the same pattern already proven in the Shop
+// module's own reports), wired to a simple local date-range filter
+// (DateRangeFilter is the existing shared component, reused as-is --
+// its props are plain strings, not club-scoped, so it composes cleanly
+// here despite Sales Intelligence having no club/tenant concept). Also
+// closed: do_not_contact leads were silently counted in total_leads/
+// the 'discovered' funnel stage but invisible everywhere else --
+// suppressed_count now surfaces that number honestly instead, and
+// get_sales_stats_by_dimension() (fully built server-side, zero prior
+// frontend call sites -- confirmed via repo-wide grep) is wired up as a
+// country/city/business_type breakdown card with CSV export, reusing
+// this project's own established src/lib/csv.ts utility (already used
+// on 11 other report pages) rather than inventing a new one.
+import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { Link } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
+import { Download } from 'lucide-react'
 import { supabase } from '@/lib/supabase/client'
 import { PageHeader } from '@/components/ui/page-header'
 import { ErrorState } from '@/components/ui/error-state'
 import { translateSupabaseError } from '@/lib/errors'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Button } from '@/components/ui/button'
 import { StatusBadge } from '@/components/ui/status-badge'
 import { FormattedDate } from '@/components/ui/formatted-date'
 import { SALES_DISPLAY_TIMEZONE } from './salesTimeZone'
 import { ListLoadingSkeleton } from './ListLoadingSkeleton'
+import { DateRangeFilter } from '@/features/reports/components/DateRangeFilter'
+import { rowsToCsv, downloadCsv } from '@/lib/csv'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 
 interface DashboardSummary {
   total_leads: number
@@ -30,6 +54,14 @@ interface DashboardSummary {
   demo_rate: number | null
   win_rate: number | null
   avg_days_to_conversion: number | null
+  suppressed_count: number
+}
+
+interface DimensionStat {
+  dimension_value: string
+  lead_count: number
+  won_count: number
+  [key: string]: unknown
 }
 
 interface FunnelStage {
@@ -61,18 +93,24 @@ interface UpcomingDemo {
   notes: string | null
 }
 
-async function fetchSummary(): Promise<DashboardSummary> {
-  const { data, error } = await supabase.rpc('get_sales_dashboard_summary')
+async function fetchSummary(startDate: string, endDate: string): Promise<DashboardSummary> {
+  const { data, error } = await supabase.rpc('get_sales_dashboard_summary', { p_start_date: startDate || undefined, p_end_date: endDate || undefined })
   if (error) throw error
   return data?.[0] ?? {
     total_leads: 0, hot_leads: 0, warm_leads: 0, cold_leads: 0, contact_ready: 0,
     contacted: 0, demos_scheduled: 0, converted: 0, reply_rate: null, demo_rate: null,
-    win_rate: null, avg_days_to_conversion: null,
+    win_rate: null, avg_days_to_conversion: null, suppressed_count: 0,
   }
 }
 
-async function fetchFunnel(): Promise<FunnelStage[]> {
-  const { data, error } = await supabase.rpc('get_sales_funnel_stats')
+async function fetchFunnel(startDate: string, endDate: string): Promise<FunnelStage[]> {
+  const { data, error } = await supabase.rpc('get_sales_funnel_stats', { p_start_date: startDate || undefined, p_end_date: endDate || undefined })
+  if (error) throw error
+  return data ?? []
+}
+
+async function fetchByDimension(dimension: 'country' | 'city' | 'business_type'): Promise<DimensionStat[]> {
+  const { data, error } = await supabase.rpc('get_sales_stats_by_dimension', { p_dimension: dimension })
   if (error) throw error
   return data ?? []
 }
@@ -101,10 +139,14 @@ async function fetchUpcomingDemos(): Promise<UpcomingDemo[]> {
 
 export function SalesDashboardPage() {
   const { t } = useTranslation()
+  const [startDate, setStartDate] = useState('')
+  const [endDate, setEndDate] = useState('')
+  const [dimension, setDimension] = useState<'country' | 'city' | 'business_type'>('country')
 
-  const summaryQuery = useQuery({ queryKey: ['sales-dashboard-summary'], queryFn: fetchSummary })
-  const funnelQuery = useQuery({ queryKey: ['sales-funnel-stats'], queryFn: fetchFunnel })
+  const summaryQuery = useQuery({ queryKey: ['sales-dashboard-summary', startDate, endDate], queryFn: () => fetchSummary(startDate, endDate) })
+  const funnelQuery = useQuery({ queryKey: ['sales-funnel-stats', startDate, endDate], queryFn: () => fetchFunnel(startDate, endDate) })
   const sourceQuery = useQuery({ queryKey: ['sales-stats-by-source'], queryFn: fetchBySource })
+  const dimensionQuery = useQuery({ queryKey: ['sales-stats-by-dimension', dimension], queryFn: () => fetchByDimension(dimension) })
   const followupsQuery = useQuery({ queryKey: ['sales-pending-followups'], queryFn: fetchFollowups })
   const upcomingDemosQuery = useQuery({ queryKey: ['sales-upcoming-demos'], queryFn: fetchUpcomingDemos })
 
@@ -113,6 +155,8 @@ export function SalesDashboardPage() {
   return (
     <div className="space-y-6">
       <PageHeader title={t('platform.sales.dashboard.title')} description={t('platform.sales.dashboard.description')} />
+
+      <DateRangeFilter startDate={startDate} endDate={endDate} onStart={setStartDate} onEnd={setEndDate} />
 
       {summaryQuery.isError ? (
         <ErrorState message={translateSupabaseError(summaryQuery.error, t('platform.sales.dashboard.loadError'))} onRetry={() => summaryQuery.refetch()} />
@@ -130,6 +174,10 @@ export function SalesDashboardPage() {
             value={summary?.win_rate != null ? `${summary.win_rate}%` : undefined}
             loading={summaryQuery.isLoading}
           />
+          {/* REP-1 fix: do_not_contact leads were silently counted in
+              total_leads but invisible everywhere else -- now excluded
+              from total_leads and shown honestly as their own stat. */}
+          <StatCard label={t('platform.sales.dashboard.suppressed')} value={summary?.suppressed_count} loading={summaryQuery.isLoading} tone="neutral" />
         </div>
       )}
 
@@ -176,6 +224,63 @@ export function SalesDashboardPage() {
           </CardContent>
         </Card>
       </div>
+
+      {/* REP-1 fix: get_sales_stats_by_dimension() was fully built
+          server-side (permission-gated, SQL-injection-safe via a
+          whitelisted format(%I) call) but had zero frontend call sites
+          anywhere in this codebase -- confirmed by repo-wide grep. */}
+      <Card>
+        <CardHeader className="flex flex-row items-center justify-between gap-2">
+          <CardTitle>{t('platform.sales.dashboard.byDimensionTitle')}</CardTitle>
+          <div className="flex items-center gap-2">
+            <Select value={dimension} onValueChange={(v) => setDimension(v as typeof dimension)}>
+              <SelectTrigger className="w-40"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="country">{t('platform.sales.dashboard.dimension.country')}</SelectItem>
+                <SelectItem value="city">{t('platform.sales.dashboard.dimension.city')}</SelectItem>
+                <SelectItem value="business_type">{t('platform.sales.dashboard.dimension.business_type')}</SelectItem>
+              </SelectContent>
+            </Select>
+            {(dimensionQuery.data ?? []).length > 0 && (
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() =>
+                  downloadCsv(
+                    `sales-by-${dimension}.csv`,
+                    rowsToCsv(dimensionQuery.data ?? [], {
+                      dimension_value: t(`platform.sales.dashboard.dimension.${dimension}`),
+                      lead_count: t('platform.sales.dashboard.leadCount'),
+                      won_count: t('platform.sales.dashboard.won'),
+                    }),
+                  )
+                }
+              >
+                <Download className="me-1 size-4" />
+                {t('platform.sales.dashboard.exportCsv')}
+              </Button>
+            )}
+          </div>
+        </CardHeader>
+        <CardContent>
+          {dimensionQuery.isError ? (
+            <ErrorState message={translateSupabaseError(dimensionQuery.error, t('platform.sales.dashboard.loadError'))} onRetry={() => dimensionQuery.refetch()} />
+          ) : dimensionQuery.isLoading ? (
+            <ListLoadingSkeleton />
+          ) : (dimensionQuery.data ?? []).length === 0 ? (
+            <p className="text-sm text-text-secondary">{t('platform.sales.dashboard.noData')}</p>
+          ) : (
+            <ul className="space-y-2">
+              {(dimensionQuery.data ?? []).map((s) => (
+                <li key={s.dimension_value} className="flex items-center justify-between">
+                  <span className="text-sm text-text-secondary">{s.dimension_value}</span>
+                  <span className="text-sm tabular-nums">{s.lead_count} ({s.won_count} {t('platform.sales.dashboard.won')})</span>
+                </li>
+              ))}
+            </ul>
+          )}
+        </CardContent>
+      </Card>
 
       <Card>
         <CardHeader><CardTitle>{t('platform.sales.dashboard.followupsTitle')}</CardTitle></CardHeader>

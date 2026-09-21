@@ -8,19 +8,35 @@ import { ErrorState } from '@/components/ui/error-state'
 import { StatusBadge } from '@/components/ui/status-badge'
 import { Card, CardContent } from '@/components/ui/card'
 import { Skeleton } from '@/components/ui/skeleton'
-import { AlertTriangle, Clock, Sparkles, XCircle } from 'lucide-react'
+import { AlertTriangle, Clock, Sparkles, XCircle, CalendarClock } from 'lucide-react'
 import { translateSupabaseError } from '@/lib/errors'
 import { isSubscriptionExpiringSoon } from './labels'
 
 // Rule-based in-app alerts, computed live from platform_subscriptions --
 // no external notification service (see IMPLEMENTATION_PLAN.md Phase 3c:
 // "rule-based, no external notification service").
+//
+// FU-1 fix (2026-09-19/20, owner brief): "The Alerts page says 'no
+// alerts currently' despite 20 overdue items" -- confirmed real, this
+// page only ever queried platform_subscriptions, structurally blind to
+// the entire separate Sales Intelligence domain. `linkTo` is new
+// (every pre-existing alert kind still points at /platform/clubs/:id,
+// unchanged) -- a sales lead has no club yet, so this alert kind needs
+// its own destination (the Followups screen itself, not a single
+// lead) rather than forcing it into the club-link shape.
 interface AlertItem {
   id: string
-  clubId: string
+  clubId: string | null
   clubName: string
-  kind: 'expiring_soon' | 'overdue_grace' | 'trial_ending' | 'no_subscription'
+  kind: 'expiring_soon' | 'overdue_grace' | 'trial_ending' | 'no_subscription' | 'sales_followups_overdue'
   daysLeft: number | null
+  linkTo?: string
+}
+
+async function fetchOverdueSalesFollowupCount(): Promise<number> {
+  const { data, error } = await supabase.rpc('get_pending_followups', { p_limit: 200 })
+  if (error) throw error
+  return (data ?? []).filter((f) => f.is_overdue).length
 }
 
 async function fetchAlerts(): Promise<AlertItem[]> {
@@ -79,6 +95,7 @@ const KIND_ICON = {
   overdue_grace: { icon: AlertTriangle, tone: 'danger' as const },
   trial_ending: { icon: Sparkles, tone: 'info' as const },
   no_subscription: { icon: XCircle, tone: 'danger' as const },
+  sales_followups_overdue: { icon: CalendarClock, tone: 'warning' as const },
 }
 
 export function PlatformAlertsPage() {
@@ -91,6 +108,31 @@ export function PlatformAlertsPage() {
   // clean "all clear" screen. Now a failed fetch renders ErrorState with
   // Retry instead, and EmptyState is reserved for the real zero-rows case.
   const { data: alerts = [], isLoading, isError, error, refetch } = useQuery({ queryKey: ['platform-alerts'], queryFn: fetchAlerts })
+
+  // FU-1 fix: a separate, independent query -- a failure fetching
+  // sales follow-up counts must never blank out the (already working)
+  // subscription alerts above, and vice versa. Deliberately not
+  // thrown into the same alerts array/query as fetchAlerts()'s own
+  // internal loop.
+  const { data: overdueSalesCount = 0 } = useQuery({
+    queryKey: ['platform-alerts-sales-followups-overdue'],
+    queryFn: fetchOverdueSalesFollowupCount,
+    retry: 1,
+  })
+
+  const allAlerts: AlertItem[] = [
+    ...alerts,
+    ...(overdueSalesCount > 0
+      ? [{
+          id: 'sales-followups-overdue',
+          clubId: null,
+          clubName: t('platform.alertsPage.salesFollowupsOverdueLabel', { count: overdueSalesCount }),
+          kind: 'sales_followups_overdue' as const,
+          daysLeft: null,
+          linkTo: '/platform/sales/followups',
+        }]
+      : []),
+  ]
 
   return (
     <div>
@@ -109,11 +151,11 @@ export function PlatformAlertsPage() {
             <Skeleton key={i} className="h-16 w-full" />
           ))}
         </div>
-      ) : alerts.length === 0 ? (
+      ) : allAlerts.length === 0 ? (
         <EmptyState title={t('platform.alertsPage.emptyTitle')} />
       ) : (
         <div className="flex flex-col gap-2">
-          {alerts.map((a) => {
+          {allAlerts.map((a) => {
             const config = KIND_ICON[a.kind]
             const label = t(`platform.alertsPage.kindLabels.${a.kind}`)
             return (
@@ -122,7 +164,7 @@ export function PlatformAlertsPage() {
                   <div className="flex items-center gap-3">
                     <config.icon className="size-5 text-text-secondary" />
                     <div>
-                      <Link to={`/platform/clubs/${a.clubId}`} className="font-medium hover:underline">
+                      <Link to={a.linkTo ?? `/platform/clubs/${a.clubId}`} className="font-medium hover:underline">
                         {a.clubName}
                       </Link>
                       <p className="text-sm text-text-secondary">

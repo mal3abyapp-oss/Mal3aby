@@ -179,6 +179,48 @@ function scoreBandTone(band: string | null): 'danger' | 'warning' | 'neutral' {
   return 'neutral'
 }
 
+// AUD-1 fix (2026-09-21): sales_lead_activities.detail was already
+// fetched by get_lead_full_profile() and passed all the way into this
+// component, but the Activity card only ever rendered the bare
+// activity_type string -- every actual piece of evidence (a reason, who
+// was invited, which message, why a signal was rejected) was silently
+// discarded. This turns the already-correct write-side data into an
+// actually reviewable summary, one short line per activity type that
+// has a meaningful `detail` field worth surfacing; returns null (no
+// second line rendered) for activity types with nothing worth adding
+// beyond the type label + timestamp already shown.
+function activityDetailSummary(
+  activityType: string,
+  detail: Record<string, unknown> | null | undefined,
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- i18next's TFunction has too many call-signature overloads to restate here; this helper only ever calls it with (key) or (key, {vars}), both of which real TFunction accepts.
+  t: (key: string, optionsOrDefault?: any) => string,
+): string | null {
+  const d = detail ?? {}
+  const reason = typeof d.reason === 'string' && d.reason.trim() ? d.reason.trim() : null
+  switch (activityType) {
+    case 'won':
+    case 'status_changed':
+    case 'message_rejected':
+      return reason
+    case 'activation_invite_created':
+    case 'activation_invite_resent':
+      return typeof d.owner_email === 'string' ? t('platform.sales.leadProfile.activityDetail.ownerEmail', { email: d.owner_email }) : null
+    case 'contact_details_edited': {
+      const fields = ['business_name_changed', 'phone_changed', 'email_changed', 'website_changed', 'location_changed']
+        .filter((f) => d[f] === true)
+      return fields.length > 0 ? fields.map((f) => t(`platform.sales.leadProfile.activityDetail.field.${f}`, f)).join(t('platform.sales.leadProfile.activityDetail.listSeparator')) : null
+    }
+    case 'note_added':
+      return typeof d.notes === 'string' && d.notes.trim() ? d.notes.trim() : null
+    case 'call_task_completed':
+      return typeof d.outcome_event_type === 'string' ? t('platform.sales.leadProfile.activityDetail.outcome', { outcome: d.outcome_event_type }) : null
+    case 'demo_completed':
+      return typeof d.outcome === 'string' ? t('platform.sales.leadProfile.activityDetail.outcome', { outcome: d.outcome }) : null
+    default:
+      return reason
+  }
+}
+
 async function fetchProfile(leadId: string): Promise<LeadProfile> {
   const { data, error } = await supabase.rpc('get_lead_full_profile', { p_lead_id: leadId })
   if (error) throw error
@@ -195,6 +237,33 @@ export function SalesLeadDetailPage() {
   const [ownerEmail, setOwnerEmail] = useState('')
   const [convertContactPhone, setConvertContactPhone] = useState('')
   const [convertError, setConvertError] = useState<string | null>(null)
+  // INV-1 fix (2026-09-19): the activation LINK is now emailed
+  // automatically (see sales_win_lead_and_invite_owner's own migration
+  // comment, 20260919030000) -- but the short activation SECRET is
+  // deliberately NEVER put in that email (ActivateTenantOwnerPage.tsx's
+  // own doc comment: "delivered out of band by the platform owner,
+  // never in this URL" -- a real two-factor/two-channel design, not an
+  // oversight). This surfaces that secret once, right after minting,
+  // so the platform owner can actually relay it (call/WhatsApp) --
+  // previously the RPC's return value was silently discarded and NO
+  // ONE ever saw the secret at all, so it could never have reached the
+  // prospect through any channel.
+  const [pendingActivationSecret, setPendingActivationSecret] = useState<string | null>(null)
+
+  // CONTACT-1 fix, part 2 (2026-09-19/20): there was previously NO way
+  // to edit a lead after creation -- this matters directly because of
+  // CONTACT-1's own part 1 bug (an email typed into the old single
+  // "Contact" field silently stored as a phone number, with no way to
+  // correct it). sales_update_lead_contact() (migration 20260920010000)
+  // is the first lead-editing capability this codebase has.
+  const [editContactOpen, setEditContactOpen] = useState(false)
+  const [editBusinessName, setEditBusinessName] = useState('')
+  const [editPhone, setEditPhone] = useState('')
+  const [editEmail, setEditEmail] = useState('')
+  const [editWebsite, setEditWebsite] = useState('')
+  const [editCountry, setEditCountry] = useState('')
+  const [editCity, setEditCity] = useState('')
+  const [contactEditError, setContactEditError] = useState<string | null>(null)
 
   const [callOutcomeDrafts, setCallOutcomeDrafts] = useState<Record<string, string>>({})
 
@@ -327,6 +396,17 @@ export function SalesLeadDetailPage() {
   // finding zero calls to it. This button is that missing production
   // entrypoint. Requires lead.website to be set (mirrors the Edge
   // Function's own "lead has no website to enrich" 400 guard).
+  //
+  // ENR-1 fix (2026-09-19/20, owner brief): "enrichment runs but does
+  // not compute the score, so enriched leads sit at score 0." Confirmed
+  // real -- onSuccess only ever called invalidate(), never triggered
+  // scoreMutation. Enrichment succeeding is exactly the signal that new
+  // scoring inputs (signals) now exist, so it chains straight into a
+  // score computation. A scoring failure is deliberately non-fatal to
+  // the enrichment result itself (the enrichment DID succeed and its
+  // signals are real/saved regardless -- scoring can always be retried
+  // manually via the existing button below), logged rather than
+  // swallowed silently.
   const enrichMutation = useMutation({
     mutationFn: async () => {
       const { data: sessionData } = await supabase.auth.getSession()
@@ -340,7 +420,14 @@ export function SalesLeadDetailPage() {
       if (!res.ok) throw Object.assign(new Error(json.error ?? 'website enrichment failed'), { status: res.status, detail: json })
       return json
     },
-    onSuccess: invalidate,
+    onSuccess: async () => {
+      try {
+        await supabase.rpc('sales_compute_lead_score', { p_lead_id: leadId! })
+      } catch (err) {
+        console.error('auto-scoring after enrichment failed (enrichment itself succeeded):', err)
+      }
+      invalidate()
+    },
   })
 
   const noteMutation = useMutation({
@@ -394,6 +481,32 @@ export function SalesLeadDetailPage() {
     },
     onError: (error: { message?: string }) => {
       setStatusChangeError(error?.message || t('platform.sales.leadProfile.changeStatusError'))
+    },
+  })
+
+  const editContactMutation = useMutation({
+    mutationFn: async () => {
+      const currentLead = profileQuery.data?.lead
+      const { error } = await supabase.rpc('sales_update_lead_contact', {
+        p_lead_id: leadId!,
+        p_business_name: editBusinessName.trim() || undefined,
+        p_public_phone: editPhone.trim() || undefined,
+        p_clear_public_phone: editPhone.trim() === '' && currentLead?.public_phone != null,
+        p_public_email: editEmail.trim() || undefined,
+        p_clear_public_email: editEmail.trim() === '' && currentLead?.public_email != null,
+        p_website: editWebsite.trim() || undefined,
+        p_country: editCountry.trim() || undefined,
+        p_city: editCity.trim() || undefined,
+      })
+      if (error) throw error
+    },
+    onSuccess: () => {
+      setEditContactOpen(false)
+      setContactEditError(null)
+      invalidate()
+    },
+    onError: (error: { message?: string }) => {
+      setContactEditError(error?.message || t('platform.sales.leadProfile.editContactError'))
     },
   })
 
@@ -504,22 +617,42 @@ export function SalesLeadDetailPage() {
   // path, unchanged. "Regenerate" calls the same generation Edge Function
   // used everywhere else in this module; the fresh draft goes through the
   // same quality gate and approval flow as any other generation.
+  //
+  // DRAFT-1 fix (2026-09-20, owner brief): this now calls the
+  // sales-edit-outreach-draft Edge Function instead of the RPC directly
+  // -- the RPC is service_role-only as of
+  // 20260920030000_draft1_edit_reruns_quality_gate.sql, so an edit's text
+  // is always re-checked against the same commercial quality gate a
+  // fresh generation goes through before it can be approved/sent. If the
+  // edit was to an already-approved draft, the Edge Function's RPC call
+  // reverts it to 'generated' server-side -- invalidate() below picks
+  // that status change up the same way it already does for every other
+  // mutation on this page.
   const editMessageMutation = useMutation({
     mutationFn: async () => {
-      const { error } = await supabase.rpc('sales_edit_outreach_draft', {
-        p_message_id: editDialogFor!,
-        p_edited_body: editBody,
+      const { data: sessionData } = await supabase.auth.getSession()
+      const token = sessionData.session?.access_token
+      const res = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/sales-edit-outreach-draft`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ message_id: editDialogFor, edited_body: editBody }),
       })
-      if (error) throw error
+      const json = await res.json()
+      if (!res.ok) throw Object.assign(new Error(json.error ?? 'edit failed'), { status: res.status, detail: json })
+      return json as { quality_status: 'approval_ready' | 'quality_rejected' }
     },
-    onSuccess: () => {
+    onSuccess: (data) => {
       setEditDialogFor(null)
       setEditBody('')
-      setEditError(null)
+      setEditError(
+        data.quality_status === 'quality_rejected'
+          ? t('platform.sales.leadProfile.outreachEditQualityRejected')
+          : null,
+      )
       invalidate()
     },
     onError: (error: { message?: string }) => {
-      setEditError(translateSupabaseError(error, t('platform.sales.leadProfile.outreachEditError')))
+      setEditError(error?.message || t('platform.sales.leadProfile.outreachEditError'))
     },
   })
 
@@ -595,17 +728,24 @@ export function SalesLeadDetailPage() {
 
   // PHASE 14: sends the secure activation invite -- never creates a
   // tenant directly. The prospect completes activation themselves.
+  // INV-1 fix: the RPC's return value (raw_token, raw_secret) used to
+  // be silently discarded here -- the activation LINK is now actually
+  // emailed server-side (see the RPC's own migration comment), but the
+  // short activation SECRET is deliberately never in that email, so it
+  // must be captured here and shown to the platform owner to relay.
   const sendInviteMutation = useMutation({
     mutationFn: async () => {
-      const { error } = await supabase.rpc('sales_win_lead_and_invite_owner', {
+      const { data, error } = await supabase.rpc('sales_win_lead_and_invite_owner', {
         p_lead_id: leadId!,
         p_owner_email: ownerEmail.trim(),
         p_contact_phone: convertContactPhone.trim() || undefined,
       })
       if (error) throw error
+      return data?.[0] as { raw_token: string; raw_secret: string } | undefined
     },
-    onSuccess: () => {
+    onSuccess: (data) => {
       setConvertError(null)
+      setPendingActivationSecret(data?.raw_secret ?? null)
       invalidate()
     },
     onError: (error: { message?: string }) => {
@@ -615,10 +755,14 @@ export function SalesLeadDetailPage() {
 
   const resendInviteMutation = useMutation({
     mutationFn: async () => {
-      const { error } = await supabase.rpc('resend_sales_activation_invite', { p_lead_id: leadId! })
+      const { data, error } = await supabase.rpc('resend_sales_activation_invite', { p_lead_id: leadId! })
       if (error) throw error
+      return data?.[0] as { raw_token: string; raw_secret: string } | undefined
     },
-    onSuccess: invalidate,
+    onSuccess: (data) => {
+      setPendingActivationSecret(data?.raw_secret ?? null)
+      invalidate()
+    },
     onError: (error: { message?: string }) => {
       setConvertError(error?.message || t('platform.sales.leadProfile.resendError'))
     },
@@ -695,7 +839,25 @@ export function SalesLeadDetailPage() {
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
         <Card>
-          <CardHeader><CardTitle>{t('platform.sales.leadProfile.contact')}</CardTitle></CardHeader>
+          <CardHeader className="flex flex-row items-center justify-between">
+            <CardTitle>{t('platform.sales.leadProfile.contact')}</CardTitle>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => {
+                setEditBusinessName(lead.business_name ?? '')
+                setEditPhone(lead.public_phone ?? '')
+                setEditEmail(lead.public_email ?? '')
+                setEditWebsite(lead.website ?? '')
+                setEditCountry(lead.country ?? '')
+                setEditCity(lead.city ?? '')
+                setContactEditError(null)
+                setEditContactOpen(true)
+              }}
+            >
+              {t('platform.sales.leadProfile.editContactButton')}
+            </Button>
+          </CardHeader>
           <CardContent className="space-y-1 text-sm">
             <p><bdi>{lead.public_phone ?? '—'}</bdi></p>
             <p><bdi>{lead.public_email ?? '—'}</bdi></p>
@@ -1067,7 +1229,26 @@ export function SalesLeadDetailPage() {
                         >
                           {t('platform.sales.leadProfile.outreachEditButton')}
                         </Button>
-                        {whatsappSenderQuery.isLoading ? (
+                        {/* MISC-1 fix (owner brief, 2026-09-21): this query had
+                            no isError handling -- a transient fetch failure
+                            (network blip, timeout during the 15s poll) fell
+                            straight into the "not connected" branch below,
+                            showing the owner a false disconnection message
+                            for what was really just a failed read. Same bug
+                            class this page's own comments already document
+                            fixing three times over for eligibilityQuery/
+                            callTasksQuery/outreachEventsQuery -- this one
+                            query was simply missed. */}
+                        {whatsappSenderQuery.isError ? (
+                          <div className="space-y-1">
+                            <p className="text-xs text-status-danger">
+                              {translateSupabaseError(whatsappSenderQuery.error, t('platform.sales.leadProfile.whatsappSenderLoadError'))}
+                            </p>
+                            <Button size="sm" variant="outline" onClick={() => void whatsappSenderQuery.refetch()}>
+                              {t('errorState.retry')}
+                            </Button>
+                          </div>
+                        ) : whatsappSenderQuery.isLoading ? (
                           <p className="text-xs text-text-secondary">{t('common.loading')}</p>
                         ) : isPlatformWhatsAppConnected ? (
                           <>
@@ -1247,12 +1428,18 @@ export function SalesLeadDetailPage() {
         <CardHeader><CardTitle>{t('platform.sales.leadProfile.activity')}</CardTitle></CardHeader>
         <CardContent>
           <ul className="space-y-2">
-            {activities.map((a) => (
-              <li key={a.id} className="flex items-center justify-between text-sm">
-                <span>{a.activity_type}</span>
-                <FormattedDate value={a.created_at} timeZone={SALES_DISPLAY_TIMEZONE} className="text-text-secondary" />
-              </li>
-            ))}
+            {activities.map((a) => {
+              const summary = activityDetailSummary(a.activity_type, a.detail, t)
+              return (
+                <li key={a.id} className="border-b border-border-subtle pb-2 text-sm last:border-0">
+                  <div className="flex items-center justify-between">
+                    <span>{t(`platform.sales.leadProfile.activityType.${a.activity_type}`, a.activity_type)}</span>
+                    <FormattedDate value={a.created_at} timeZone={SALES_DISPLAY_TIMEZONE} className="text-text-secondary" />
+                  </div>
+                  {summary && <p className="mt-1 text-text-secondary">{summary}</p>}
+                </li>
+              )
+            })}
           </ul>
         </CardContent>
       </Card>
@@ -1286,6 +1473,16 @@ export function SalesLeadDetailPage() {
               </Button>
               {resendInviteMutation.isSuccess && (
                 <p className="text-sm text-status-success">{t('platform.sales.leadProfile.resendSuccess')}</p>
+              )}
+              {pendingActivationSecret && (
+                <div className="rounded-md border border-status-warning/40 bg-status-warning/10 p-3">
+                  <p className="text-sm font-medium">{t('platform.sales.leadProfile.activationSecretTitle')}</p>
+                  <p className="mt-1 text-xs text-text-secondary">{t('platform.sales.leadProfile.activationSecretHint')}</p>
+                  <p className="mt-2 text-lg font-mono font-semibold" dir="ltr">{pendingActivationSecret}</p>
+                  <Button size="sm" variant="outline" className="mt-2" onClick={() => setPendingActivationSecret(null)}>
+                    {t('platform.sales.leadProfile.activationSecretDismiss')}
+                  </Button>
+                </div>
               )}
             </div>
           ) : ['lost', 'do_not_contact', 'won'].includes(lead.status) ? (
@@ -1364,6 +1561,54 @@ export function SalesLeadDetailPage() {
                   onClick={() => changeStatusMutation.mutate()}
                 >
                   {changeStatusMutation.isPending ? t('platform.sales.leadProfile.changeStatusSaving') : t('platform.sales.leadProfile.changeStatusSave')}
+                </Button>
+              </div>
+            </div>
+          </DialogContent>
+        </Dialog>
+      )}
+
+      {editContactOpen && (
+        <Dialog open onOpenChange={(open) => { if (!open) setEditContactOpen(false) }}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>{t('platform.sales.leadProfile.editContactTitle')}</DialogTitle>
+            </DialogHeader>
+            <div className="flex flex-col gap-4">
+              <div className="flex flex-col gap-1">
+                <FormLabel htmlFor="edit-contact-name">{t('platform.sales.leads.columns.business')}</FormLabel>
+                <Input id="edit-contact-name" value={editBusinessName} onChange={(e) => setEditBusinessName(e.target.value)} />
+              </div>
+              <div className="flex flex-col gap-1">
+                <FormLabel htmlFor="edit-contact-phone">{t('platform.sales.discover.manualPhoneLabel')}</FormLabel>
+                <Input id="edit-contact-phone" type="tel" dir="ltr" value={editPhone} onChange={(e) => setEditPhone(e.target.value)} placeholder="+20 10 0000 0000" />
+              </div>
+              <div className="flex flex-col gap-1">
+                <FormLabel htmlFor="edit-contact-email">{t('platform.sales.discover.manualEmailLabel')}</FormLabel>
+                <Input id="edit-contact-email" type="email" dir="ltr" value={editEmail} onChange={(e) => setEditEmail(e.target.value)} placeholder="owner@example.com" />
+              </div>
+              <div className="flex flex-col gap-1">
+                <FormLabel htmlFor="edit-contact-website">{t('platform.sales.discover.manualWebsiteLabel')}</FormLabel>
+                <Input id="edit-contact-website" dir="ltr" value={editWebsite} onChange={(e) => setEditWebsite(e.target.value)} />
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="flex flex-col gap-1">
+                  <FormLabel htmlFor="edit-contact-country">{t('platform.sales.discover.countryLabel')}</FormLabel>
+                  <Input id="edit-contact-country" value={editCountry} onChange={(e) => setEditCountry(e.target.value.toUpperCase())} maxLength={2} />
+                </div>
+                <div className="flex flex-col gap-1">
+                  <FormLabel htmlFor="edit-contact-city">{t('platform.sales.discover.cityLabel')}</FormLabel>
+                  <Input id="edit-contact-city" value={editCity} onChange={(e) => setEditCity(e.target.value)} />
+                </div>
+              </div>
+              {contactEditError && <p role="alert" className="text-sm text-status-danger">{contactEditError}</p>}
+              <div className="flex justify-end gap-2">
+                <Button variant="outline" onClick={() => setEditContactOpen(false)}>{t('common.cancel')}</Button>
+                <Button
+                  disabled={!editBusinessName.trim() || editContactMutation.isPending}
+                  onClick={() => editContactMutation.mutate()}
+                >
+                  {editContactMutation.isPending ? t('common.saving') : t('common.save')}
                 </Button>
               </div>
             </div>

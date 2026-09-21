@@ -273,8 +273,17 @@
         "demosScheduled": "Demos Scheduled",
         "converted": "Converted",
         "winRate": "Win Rate",
+        "suppressed": "Suppressed (Do Not Contact)",
         "funnelTitle": "Pipeline Funnel",
         "bySourceTitle": "By Source",
+        "byDimensionTitle": "By Dimension",
+        "dimension": {
+          "country": "Country",
+          "city": "City",
+          "business_type": "Business Type"
+        },
+        "leadCount": "Leads",
+        "exportCsv": "Export CSV",
         "won": "won",
         "noData": "No data yet",
         "followupsTitle": "Upcoming Follow-ups",
@@ -306,6 +315,9 @@
         "noJobs": "No discovery jobs yet",
         "loadError": "Could not load discovery jobs.",
         "manualEntryTitle": "Or Add a Lead Manually",
+        "manualPhoneLabel": "Phone number",
+        "manualEmailLabel": "Email address",
+        "manualWebsiteLabel": "Website",
         "manualEntryButton": "Add Lead",
         "manualEntryError": "Couldn't add the lead. Try again.",
         "providerStatusError": "Couldn't load the discovery source status."
@@ -338,6 +350,7 @@
         "title": "Pipeline",
         "description": "Leads by pipeline stage",
         "loadError": "Could not load pipeline data.",
+        "showMore": "Show more",
         "stage": {
           "discovered": "Discovered",
           "enriching": "Enriching",
@@ -364,6 +377,17 @@
         "nameLabel": "Campaign name",
         "descriptionLabel": "Description",
         "emptyTitle": "No campaigns yet",
+        "manageLeads": "Manage leads",
+        "searchLeadsPlaceholder": "Search for a lead by name...",
+        "noLeadsFound": "No matching leads found.",
+        "leadsLoadError": "Could not load the leads list.",
+        "addSelectedLeads": "Add {{count}} to campaign",
+        "statusArchived": "Archived",
+        "archiveButton": "Archive",
+        "restoreButton": "Restore",
+        "archiving": "Archiving...",
+        "restoring": "Restoring...",
+        "archiveError": "Could not update this campaign's archive status.",
         "stats": {
           "target": "Target",
           "queued": "Queued",
@@ -394,6 +418,8 @@
         "notConfigured": "Configuration Required",
         "dailyCap": "Daily cap",
         "configureButton": "Configure",
+        "vaultSecretIdLabel": "Vault Secret ID",
+        "vaultSecretIdHelp": "Create a Supabase Vault secret for this provider's API key first (via the Supabase dashboard), then paste its Vault secret UUID below.",
         "activeProvider": "Active provider",
         "freeTier": "free tier",
         "optionalProvider": "optional, not required",
@@ -416,6 +442,43 @@
         "noScore": "Not yet scored",
         "computeScoreButton": "Compute Score",
         "activity": "Activity Timeline",
+        "activityType": {
+          "discovered": "Discovered",
+          "won": "Won",
+          "status_changed": "Status changed",
+          "note_added": "Note added",
+          "contact_details_edited": "Contact info updated",
+          "message_generated": "Outreach draft generated",
+          "message_edited": "Outreach draft edited",
+          "message_rejected": "Outreach draft rejected",
+          "message_sent": "Message sent",
+          "message_queued": "Message queued",
+          "activation_invite_created": "Activation invite sent",
+          "activation_invite_resent": "Activation invite resent",
+          "activation_invite_consumed": "Activation invite claimed",
+          "activation_failed": "Activation failed",
+          "owner_linked": "Owner linked",
+          "tenant_created": "Tenant created",
+          "conversion_completed": "Conversion completed",
+          "call_task_created": "Call task created",
+          "call_task_completed": "Call task completed",
+          "demo_scheduled": "Demo scheduled",
+          "demo_completed": "Demo completed",
+          "scored": "Score computed",
+          "outreach_event": "Outreach event recorded"
+        },
+        "activityDetail": {
+          "ownerEmail": "Sent to: {{email}}",
+          "outcome": "Outcome: {{outcome}}",
+          "listSeparator": ", ",
+          "field": {
+            "business_name_changed": "business name",
+            "phone_changed": "phone",
+            "email_changed": "email",
+            "website_changed": "website",
+            "location_changed": "location"
+          }
+        },
         "notes": "Notes",
         "addNoteButton": "Add Note",
         "notePlaceholder": "Add a note about this lead…",
@@ -441,7 +504,13 @@
         "resendInviteButton": "Resend Activation Invite",
         "resendSending": "Resending...",
         "resendError": "Could not resend the activation invite.",
-        "resendSuccess": "A new activation invite was sent.",
+        "resendSuccess": "A new activation invite was sent by email.",
+        "editContactButton": "Edit contact",
+        "editContactTitle": "Edit contact details",
+        "editContactError": "Could not save the changes.",
+        "activationSecretTitle": "Activation code -- relay this yourself",
+        "activationSecretHint": "The activation link was emailed automatically. This activation code is deliberately not sent by email to protect the account -- relay it to the prospect yourself, by call or WhatsApp.",
+        "activationSecretDismiss": "Copied / sent",
         "tenantActivatedMessage": "This lead's tenant has been created and the owner has activated their account.",
         "viewClubLink": "View club",
         "possibleDuplicates": "Possible Duplicates",
@@ -543,11 +612,13 @@
         "outreachEditSave": "Save edit",
         "outreachEditSaving": "Saving...",
         "outreachEditError": "Could not save this edit.",
+        "outreachEditQualityRejected": "Edit saved, but it did not pass the quality check (e.g. missing text or an unsupported claim) — it cannot be approved or sent until you fix the text.",
         "outreachSendButton": "Send via Platform WhatsApp",
         "outreachSending": "Sending...",
         "outreachSendError": "Could not send this message.",
         "outreachSendFrom": "Will send from: {{number}}",
         "outreachWhatsappNotConnected": "Platform WhatsApp is not connected ({{status}}).",
+        "whatsappSenderLoadError": "Could not check the Platform WhatsApp connection status.",
         "outreachGoToWhatsappSettings": "Go to Platform WhatsApp settings",
         "channels": "Outreach Channels",
         "channelsLoadError": "Could not load channel eligibility for this lead.",
@@ -593,9 +664,11 @@
         "expiring_soon": "Subscription ending soon",
         "overdue_grace": "In grace period",
         "trial_ending": "Free trial ending soon",
-        "no_subscription": "No subscription on record -- needs review"
+        "no_subscription": "No subscription on record -- needs review",
+        "sales_followups_overdue": "Overdue sales follow-ups"
       },
-      "daysLeftSuffix": " — {{days}} day(s) left"
+      "daysLeftSuffix": " — {{days}} day(s) left",
+      "salesFollowupsOverdueLabel": "{{count}} overdue sales follow-up(s)"
     },
     "auditPage": {
       "title": "Audit Log",
@@ -5020,7 +5093,8 @@
       "finance": "Platform Finance",
       "support": "Master Admin Support",
       "audit": "Platform Audit",
-      "settings": "Platform Settings"
+      "settings": "Platform Settings",
+      "sales": "Sales Intelligence"
     }
   },
   "platformPermissions": {
@@ -5111,6 +5185,58 @@
     "platform.settings.manage": {
       "label": "Manage platform settings",
       "description": "Change global platform configuration"
+    },
+    "platform.sales.view": {
+      "label": "View Sales Intelligence",
+      "description": "See the sales pipeline, lead profiles, and outreach history"
+    },
+    "platform.sales.discover": {
+      "label": "Discover leads",
+      "description": "Run lead discovery jobs and add newly found leads"
+    },
+    "platform.sales.enrich": {
+      "label": "Enrich leads",
+      "description": "Run website/signal enrichment on a lead"
+    },
+    "platform.sales.edit": {
+      "label": "Edit leads",
+      "description": "Add notes, edit contact details, and edit outreach drafts"
+    },
+    "platform.sales.qualify": {
+      "label": "Qualify leads",
+      "description": "Score leads and schedule/complete demos"
+    },
+    "platform.sales.generate_offer": {
+      "label": "Generate outreach drafts",
+      "description": "Generate a new AI outreach draft for a lead"
+    },
+    "platform.sales.approve_outreach": {
+      "label": "Approve outreach drafts",
+      "description": "Approve or reject a generated outreach draft"
+    },
+    "platform.sales.send_outreach": {
+      "label": "Send outreach",
+      "description": "Queue an approved email/WhatsApp message and manage call tasks"
+    },
+    "platform.sales.manage_campaigns": {
+      "label": "Manage campaigns",
+      "description": "Create campaigns and add leads to them"
+    },
+    "platform.sales.manage_followups": {
+      "label": "Manage follow-ups",
+      "description": "Schedule and complete lead follow-ups"
+    },
+    "platform.sales.convert_to_tenant": {
+      "label": "Convert leads to tenants",
+      "description": "Send the activation invite that converts a won lead into a club"
+    },
+    "platform.sales.manage_settings": {
+      "label": "Manage Sales Intelligence settings",
+      "description": "Configure AI providers and outreach quotas for Sales Intelligence"
+    },
+    "platform.sales.archive": {
+      "label": "Archive campaigns",
+      "description": "Archive or restore a sales campaign"
     }
   },
   "shop": {

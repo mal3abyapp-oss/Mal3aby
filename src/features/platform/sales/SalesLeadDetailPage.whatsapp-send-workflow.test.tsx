@@ -90,6 +90,7 @@ const eligibilityRow = {
 vi.mock('@/lib/supabase/client', () => ({
   supabase: {
     rpc: (...args: unknown[]) => mockRpc(...args),
+    auth: { getSession: () => Promise.resolve({ data: { session: { access_token: 'test-token' } } }) },
   },
 }))
 
@@ -159,6 +160,34 @@ describe('SalesLeadDetailPage — whatsapp_message Send workflow (Platform Whats
     expect(screen.getByRole('link', { name: i18n.t('platform.sales.leadProfile.outreachGoToWhatsappSettings') })).toHaveAttribute('href', '/platform/whatsapp')
   })
 
+  // MISC-1 (owner brief, 2026-09-21): whatsappSenderQuery had no
+  // isError handling -- a failed fetch fell straight into the same
+  // "not connected" branch a genuine disconnection uses, showing the
+  // owner a false disconnection message for what was really just a
+  // failed read. Same bug class this page's own comments already
+  // document fixing three times over for the sibling eligibility/call-
+  // tasks/outreach-events queries.
+  it('shows a distinct load-error message (not the false "not connected" message) when the WhatsApp sender-identity fetch itself fails', async () => {
+    const profile = profileWithMessages(baseLead(), [whatsappDraft()])
+    mockRpc.mockImplementation((fnName: string) => {
+      if (fnName === 'get_lead_full_profile') return Promise.resolve({ data: profile, error: null })
+      if (fnName === 'get_lead_channel_eligibility') return Promise.resolve({ data: [eligibilityRow], error: null })
+      if (fnName === 'get_lead_call_tasks') return Promise.resolve({ data: [], error: null })
+      if (fnName === 'get_lead_outreach_events') return Promise.resolve({ data: [], error: null })
+      if (fnName === 'get_platform_whatsapp_sender_identity') return Promise.resolve({ data: null, error: { message: 'network error' } })
+      return Promise.resolve({ data: null, error: null })
+    })
+    renderPage()
+
+    await screen.findByText(/فريق ملعبي|AI original/)
+
+    expect(await screen.findByText(i18n.t('platform.sales.leadProfile.whatsappSenderLoadError'))).toBeInTheDocument()
+    // The false "not connected" message must NOT appear for a fetch
+    // failure -- that message is reserved for a genuine disconnection.
+    expect(screen.queryByText(i18n.t('platform.sales.leadProfile.outreachGoToWhatsappSettings'))).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: i18n.t('errorState.retry') })).toBeInTheDocument()
+  })
+
   it('does not offer Send at all when the draft is only generated (not yet approved), even if Platform WhatsApp is connected', async () => {
     const profile = profileWithMessages(baseLead(), [whatsappDraft({ status: 'generated' })])
     mockCommonRpcs(profile, { status: 'connected', connected_phone_number: '+201112223333' })
@@ -170,9 +199,14 @@ describe('SalesLeadDetailPage — whatsapp_message Send workflow (Platform Whats
     expect(screen.getByRole('button', { name: i18n.t('platform.sales.leadProfile.outreachApproveButton') })).toBeInTheDocument()
   })
 
-  it('Edit dialog saves via sales_edit_outreach_draft and preserves the AI-original body untouched (edited_body is additive, not a body overwrite)', async () => {
+  it('Edit dialog saves via the sales-edit-outreach-draft Edge Function (DRAFT-1: re-runs the quality gate on the edited text server-side)', async () => {
     const profile = profileWithMessages(baseLead(), [whatsappDraft()])
     mockCommonRpcs(profile, { status: 'connected', connected_phone_number: '+201112223333' })
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      json: () => Promise.resolve({ message_id: 'msg-wa-1', quality_status: 'approval_ready', quality_gate_result: {} }),
+    })
+    vi.stubGlobal('fetch', fetchMock)
     renderPage()
 
     await screen.findByText(/فريق ملعبي|AI original/)
@@ -187,15 +221,45 @@ describe('SalesLeadDetailPage — whatsapp_message Send workflow (Platform Whats
     fireEvent.click(saveButton)
 
     await waitFor(() => {
-      expect(mockRpc).toHaveBeenCalledWith('sales_edit_outreach_draft', {
-        p_message_id: 'msg-wa-1',
-        p_edited_body: 'نص معدَّل من صاحب المنصة',
-      })
+      expect(fetchMock).toHaveBeenCalledWith(
+        expect.stringContaining('/functions/v1/sales-edit-outreach-draft'),
+        expect.objectContaining({
+          method: 'POST',
+          body: JSON.stringify({ message_id: 'msg-wa-1', edited_body: 'نص معدَّل من صاحب المنصة' }),
+        }),
+      )
     })
-    // The RPC call itself never touches `body` -- only p_edited_body is
-    // sent, confirming the frontend never attempts to overwrite the AI
-    // original through this path (the server-side additive-only
-    // behavior is proven separately at the SQL layer).
+    // The Edge Function call carries only message_id/edited_body -- the
+    // AI-generated `body` column itself is never sent, confirming this
+    // path still never attempts to overwrite the AI original (proven
+    // separately, additively, at the SQL layer). Unlike the raw RPC
+    // call this replaces, the Edge Function re-runs the commercial
+    // quality gate against the edited text server-side before persisting
+    // quality_status -- see sales-edit-outreach-draft/index.ts.
+    vi.unstubAllGlobals()
+  })
+
+  it('shows a quality-rejected warning when the Edge Function reports the edit failed the commercial quality gate (DRAFT-1)', async () => {
+    const profile = profileWithMessages(baseLead(), [whatsappDraft()])
+    mockCommonRpcs(profile, { status: 'connected', connected_phone_number: '+201112223333' })
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      json: () => Promise.resolve({ message_id: 'msg-wa-1', quality_status: 'quality_rejected', quality_gate_result: { rejection_reasons: ['PLACEHOLDER_TEXT'] } }),
+    })
+    vi.stubGlobal('fetch', fetchMock)
+    renderPage()
+
+    await screen.findByText(/فريق ملعبي|AI original/)
+
+    const editButtons = screen.getAllByRole('button', { name: i18n.t('platform.sales.leadProfile.outreachEditButton') })
+    fireEvent.click(editButtons[0]!)
+
+    const textarea = await screen.findByLabelText(i18n.t('platform.sales.leadProfile.outreachEditBodyLabel'))
+    fireEvent.change(textarea, { target: { value: '[placeholder]' } })
+    fireEvent.click(screen.getByRole('button', { name: i18n.t('platform.sales.leadProfile.outreachEditSave') }))
+
+    expect(await screen.findByText(i18n.t('platform.sales.leadProfile.outreachEditQualityRejected'))).toBeInTheDocument()
+    vi.unstubAllGlobals()
   })
 
   it('shows the "Edited by owner" badge and the edited text (not the AI original) once a draft has edited_body set', async () => {

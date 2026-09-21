@@ -273,8 +273,17 @@
         "demosScheduled": "عروض توضيحية مجدولة",
         "converted": "تم التحويل",
         "winRate": "معدل الفوز",
+        "suppressed": "مستبعَد (ممنوع التواصل)",
         "funnelTitle": "قمع مسار المبيعات",
         "bySourceTitle": "حسب المصدر",
+        "byDimensionTitle": "حسب البُعد",
+        "dimension": {
+          "country": "الدولة",
+          "city": "المدينة",
+          "business_type": "نوع النشاط"
+        },
+        "leadCount": "العملاء المحتملون",
+        "exportCsv": "تصدير CSV",
         "won": "تم الفوز",
         "noData": "لا توجد بيانات بعد",
         "followupsTitle": "المتابعات القادمة",
@@ -306,6 +315,9 @@
         "noJobs": "لا توجد مهام اكتشاف بعد",
         "loadError": "تعذّر تحميل مهام الاكتشاف.",
         "manualEntryTitle": "أو أضف عميلًا محتملًا يدويًا",
+        "manualPhoneLabel": "رقم الهاتف",
+        "manualEmailLabel": "البريد الإلكتروني",
+        "manualWebsiteLabel": "الموقع الإلكتروني",
         "manualEntryButton": "إضافة عميل محتمل",
         "manualEntryError": "تعذّرت إضافة العميل المحتمل. حاول مجددًا.",
         "providerStatusError": "تعذّر تحميل حالة مصدر الاكتشاف."
@@ -338,6 +350,7 @@
         "title": "مسار المبيعات",
         "description": "العملاء المحتملون حسب مرحلة المسار",
         "loadError": "تعذّر تحميل بيانات المسار.",
+        "showMore": "عرض المزيد",
         "stage": {
           "discovered": "تم اكتشافه",
           "enriching": "قيد الإثراء",
@@ -364,6 +377,17 @@
         "nameLabel": "اسم الحملة",
         "descriptionLabel": "الوصف",
         "emptyTitle": "لا توجد حملات بعد",
+        "manageLeads": "إدارة العملاء المحتملين",
+        "searchLeadsPlaceholder": "ابحث عن عميل محتمل بالاسم...",
+        "noLeadsFound": "لا توجد نتائج مطابقة.",
+        "leadsLoadError": "تعذّر تحميل قائمة العملاء المحتملين.",
+        "addSelectedLeads": "إضافة {{count}} إلى الحملة",
+        "statusArchived": "مؤرشفة",
+        "archiveButton": "أرشفة",
+        "restoreButton": "استعادة",
+        "archiving": "جارٍ الأرشفة...",
+        "restoring": "جارٍ الاستعادة...",
+        "archiveError": "تعذّر تحديث حالة أرشفة هذه الحملة.",
         "stats": {
           "target": "المستهدف",
           "queued": "في الانتظار",
@@ -394,6 +418,8 @@
         "notConfigured": "يتطلب التهيئة",
         "dailyCap": "الحد اليومي",
         "configureButton": "تهيئة",
+        "vaultSecretIdLabel": "معرّف سرّ الخزنة (Vault Secret ID)",
+        "vaultSecretIdHelp": "أنشئ أولًا سرًّا في خزنة Supabase Vault لمفتاح API الخاص بهذا المزوّد (عبر لوحة تحكم Supabase)، ثم الصق معرّف السرّ (UUID) أدناه.",
         "activeProvider": "المزوّد النشط",
         "freeTier": "خطة مجانية",
         "optionalProvider": "اختياري، غير مطلوب",
@@ -416,6 +442,43 @@
         "noScore": "لم يتم تقييمه بعد",
         "computeScoreButton": "احسب النتيجة",
         "activity": "الجدول الزمني للنشاط",
+        "activityType": {
+          "discovered": "تم الاكتشاف",
+          "won": "فوز بالعميل",
+          "status_changed": "تغيّرت الحالة",
+          "note_added": "أُضيفت ملاحظة",
+          "contact_details_edited": "تحديث بيانات التواصل",
+          "message_generated": "تم توليد مسودة تواصل",
+          "message_edited": "تم تعديل مسودة التواصل",
+          "message_rejected": "تم رفض مسودة التواصل",
+          "message_sent": "تم إرسال الرسالة",
+          "message_queued": "تم وضع الرسالة في قائمة الانتظار",
+          "activation_invite_created": "تم إرسال دعوة التفعيل",
+          "activation_invite_resent": "تمت إعادة إرسال دعوة التفعيل",
+          "activation_invite_consumed": "تم قبول دعوة التفعيل",
+          "activation_failed": "فشل التفعيل",
+          "owner_linked": "تم ربط المالك",
+          "tenant_created": "تم إنشاء النادي",
+          "conversion_completed": "اكتمل التحويل",
+          "call_task_created": "تم إنشاء مهمة اتصال",
+          "call_task_completed": "تم إكمال مهمة الاتصال",
+          "demo_scheduled": "تمت جدولة عرض توضيحي",
+          "demo_completed": "تم إكمال العرض التوضيحي",
+          "scored": "تم احتساب النتيجة",
+          "outreach_event": "تم تسجيل حدث تواصل"
+        },
+        "activityDetail": {
+          "ownerEmail": "أُرسل إلى: {{email}}",
+          "outcome": "النتيجة: {{outcome}}",
+          "listSeparator": "، ",
+          "field": {
+            "business_name_changed": "اسم النشاط",
+            "phone_changed": "الهاتف",
+            "email_changed": "البريد الإلكتروني",
+            "website_changed": "الموقع الإلكتروني",
+            "location_changed": "الموقع الجغرافي"
+          }
+        },
         "notes": "الملاحظات",
         "addNoteButton": "إضافة ملاحظة",
         "notePlaceholder": "أضف ملاحظة حول هذا العميل المحتمل…",
@@ -441,7 +504,13 @@
         "resendInviteButton": "إعادة إرسال دعوة التفعيل",
         "resendSending": "جارٍ إعادة الإرسال...",
         "resendError": "تعذّر إعادة إرسال دعوة التفعيل.",
-        "resendSuccess": "تم إرسال دعوة تفعيل جديدة.",
+        "resendSuccess": "تم إرسال دعوة تفعيل جديدة عبر البريد الإلكتروني.",
+        "editContactButton": "تعديل بيانات التواصل",
+        "editContactTitle": "تعديل بيانات التواصل",
+        "editContactError": "تعذّر حفظ التعديلات.",
+        "activationSecretTitle": "رمز التفعيل -- أرسله يدويًا",
+        "activationSecretHint": "تم إرسال رابط التفعيل بالبريد الإلكتروني تلقائيًا. لكن رمز التفعيل هذا لا يُرسل عبر البريد لحماية الحساب -- أرسله للعميل بنفسك عبر مكالمة أو واتساب.",
+        "activationSecretDismiss": "تم النسخ/الإرسال",
         "tenantActivatedMessage": "تم إنشاء نادي هذا العميل المحتمل وقام المالك بتفعيل حسابه.",
         "viewClubLink": "عرض النادي",
         "possibleDuplicates": "احتمالات تكرار",
@@ -543,11 +612,13 @@
         "outreachEditSave": "حفظ التعديل",
         "outreachEditSaving": "جارٍ الحفظ...",
         "outreachEditError": "تعذّر حفظ هذا التعديل.",
+        "outreachEditQualityRejected": "تم حفظ التعديل، لكنه لم يجتز فحص الجودة (مثل نص مفقود أو ادعاء غير مدعوم بدليل) — لا يمكن اعتماده أو إرساله حتى تُصلح النص.",
         "outreachSendButton": "إرسال عبر واتساب المنصة",
         "outreachSending": "جارٍ الإرسال...",
         "outreachSendError": "تعذّر إرسال هذه الرسالة.",
         "outreachSendFrom": "سيتم الإرسال من: {{number}}",
         "outreachWhatsappNotConnected": "واتساب المنصة غير متصل ({{status}}).",
+        "whatsappSenderLoadError": "تعذّر التحقق من حالة اتصال واتساب المنصة.",
         "outreachGoToWhatsappSettings": "الانتقال إلى إعدادات واتساب المنصة",
         "channels": "قنوات التواصل",
         "channelsLoadError": "تعذّر تحميل أهلية القنوات لهذا العميل المحتمل.",
@@ -593,9 +664,11 @@
         "expiring_soon": "اشتراك ينتهي قريبًا",
         "overdue_grace": "في فترة السماح",
         "trial_ending": "تجربة مجانية تنتهي قريبًا",
-        "no_subscription": "لا يوجد اشتراك مسجّل — يحتاج مراجعة"
+        "no_subscription": "لا يوجد اشتراك مسجّل — يحتاج مراجعة",
+        "sales_followups_overdue": "متابعات مبيعات متأخرة"
       },
-      "daysLeftSuffix": " — {{days}} يوم متبقٍ"
+      "daysLeftSuffix": " — {{days}} يوم متبقٍ",
+      "salesFollowupsOverdueLabel": "{{count}} متابعة مبيعات متأخرة"
     },
     "auditPage": {
       "title": "سجل التدقيق",
@@ -5052,7 +5125,8 @@
       "finance": "الشؤون المالية للمنصة",
       "support": "دعم مدير المنصة",
       "audit": "تدقيق المنصة",
-      "settings": "إعدادات المنصة"
+      "settings": "إعدادات المنصة",
+      "sales": "ذكاء المبيعات"
     }
   },
   "platformPermissions": {
@@ -5143,6 +5217,58 @@
     "platform.settings.manage": {
       "label": "إدارة إعدادات المنصة",
       "description": "تغيير الإعدادات العامة للمنصة"
+    },
+    "platform.sales.view": {
+      "label": "عرض ذكاء المبيعات",
+      "description": "رؤية قمع المبيعات وملفات العملاء المحتملين وسجل التواصل"
+    },
+    "platform.sales.discover": {
+      "label": "اكتشاف عملاء محتملين",
+      "description": "تشغيل مهام اكتشاف العملاء المحتملين وإضافة ما يتم العثور عليه"
+    },
+    "platform.sales.enrich": {
+      "label": "إثراء العملاء المحتملين",
+      "description": "تشغيل إثراء الموقع/الإشارات لعميل محتمل"
+    },
+    "platform.sales.edit": {
+      "label": "تعديل العملاء المحتملين",
+      "description": "إضافة ملاحظات، تعديل بيانات التواصل، وتعديل مسودات التواصل"
+    },
+    "platform.sales.qualify": {
+      "label": "تأهيل العملاء المحتملين",
+      "description": "تقييم العملاء المحتملين وجدولة/إكمال العروض التوضيحية"
+    },
+    "platform.sales.generate_offer": {
+      "label": "توليد مسودات التواصل",
+      "description": "توليد مسودة تواصل جديدة بالذكاء الاصطناعي لعميل محتمل"
+    },
+    "platform.sales.approve_outreach": {
+      "label": "اعتماد مسودات التواصل",
+      "description": "اعتماد أو رفض مسودة تواصل تم توليدها"
+    },
+    "platform.sales.send_outreach": {
+      "label": "إرسال التواصل",
+      "description": "وضع رسالة بريد إلكتروني/واتساب معتمدة في قائمة الانتظار وإدارة مهام الاتصال"
+    },
+    "platform.sales.manage_campaigns": {
+      "label": "إدارة الحملات",
+      "description": "إنشاء حملات وإضافة عملاء محتملين إليها"
+    },
+    "platform.sales.manage_followups": {
+      "label": "إدارة المتابعات",
+      "description": "جدولة وإكمال متابعات العملاء المحتملين"
+    },
+    "platform.sales.convert_to_tenant": {
+      "label": "تحويل العملاء المحتملين إلى أندية",
+      "description": "إرسال دعوة التفعيل التي تحوّل عميلاً محتملاً فائزاً إلى نادٍ"
+    },
+    "platform.sales.manage_settings": {
+      "label": "إدارة إعدادات ذكاء المبيعات",
+      "description": "تهيئة مزودي الذكاء الاصطناعي وحصص التواصل لذكاء المبيعات"
+    },
+    "platform.sales.archive": {
+      "label": "أرشفة الحملات",
+      "description": "أرشفة حملة مبيعات أو استعادتها"
     }
   },
   "shop": {

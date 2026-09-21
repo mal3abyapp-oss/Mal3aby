@@ -59,10 +59,48 @@ interface GooglePlaceResult {
   types?: string[]
 }
 
+// DISC-1 fix (2026-09-19/20, owner brief): "The discovered list
+// contains irrelevant foreign venues (San Siro Stadium, Allianz Suisse
+// Stadium, Wankdorf Stadium, St. Jakob-Park...)". Confirmed live and
+// worse than "not filtered" -- these are REAL European stadiums
+// (Milan/Zurich/Bern/Basel, confirmed via their own stored
+// `address` field: "...Milano MI, Italy", "...Switzerland") that had
+// been silently mislabeled country='EG' in this database, because
+// sales_upsert_discovered_lead was always called with
+// p_country: searchParams.country -- the SEARCH REQUEST's own input
+// parameter, blindly assigned to every result regardless of where
+// Google Places actually said the place is. Text Search has no
+// geo-fence by default, so an unconstrained query like "stadium" can
+// legitimately return results anywhere in the world.
+//
+// Two-layer fix: (1) regionCode, a documented Places API (New) Text
+// Search request field that biases results toward the given region --
+// NOT independently re-verified against live Google API docs in this
+// session (no network doc access), included as a best-effort signal
+// only; (2) a real hard filter in the caller below, checking each
+// result's own formattedAddress against the expected country's
+// English name -- the exact field this investigation confirmed LIVE
+// already correctly contains the right country per result ("...Egypt"
+// / "...Italy" / "...Switzerland", read directly from this database's
+// own stored leads). Layer (2) is the actual guarantee this fix
+// depends on -- correct regardless of whether layer (1) does anything
+// at all, since it checks Google's own returned data rather than
+// trusting a request-time hint to have worked.
+const COUNTRY_CODE_TO_ENGLISH_NAME: Record<string, string> = {
+  EG: 'Egypt',
+  SA: 'Saudi Arabia',
+  AE: 'United Arab Emirates',
+  QA: 'Qatar',
+  KW: 'Kuwait',
+  BH: 'Bahrain',
+  OM: 'Oman',
+  JO: 'Jordan',
+}
+
 // search(): LeadSourceProvider.search() -- calls Places API (New) Text
 // Search. p_query is the free-text query (e.g. "football fields in
 // Cairo"), matching Phase 3's example searches directly.
-async function searchPlaces(apiKey: string, query: string, pageToken?: string): Promise<{ places: GooglePlaceResult[]; nextPageToken?: string }> {
+async function searchPlaces(apiKey: string, query: string, regionCode: string | undefined, pageToken?: string): Promise<{ places: GooglePlaceResult[]; nextPageToken?: string }> {
   const res = await fetch('https://places.googleapis.com/v1/places:searchText', {
     method: 'POST',
     headers: {
@@ -73,6 +111,7 @@ async function searchPlaces(apiKey: string, query: string, pageToken?: string): 
     body: JSON.stringify({
       textQuery: query,
       pageSize: MAX_RESULTS_PER_RUN,
+      ...(regionCode ? { regionCode } : {}),
       ...(pageToken ? { pageToken } : {}),
     }),
     signal: AbortSignal.timeout(PLACES_API_TIMEOUT_MS),
@@ -232,16 +271,51 @@ Deno.serve(async (req) => {
 
   const searchParams = job.search_params as { query?: string; country?: string; city?: string }
   const query = searchParams.query ?? ''
+  // DISC-1 fix: country is no longer optional-and-silently-trusted --
+  // defaults to EG (this platform's own stated market, matching every
+  // other country default already in this codebase, e.g.
+  // SalesDiscoverPage.tsx's own manual-entry form) when the caller
+  // didn't specify one, and is now the single source of truth checked
+  // against each real result below rather than blindly stamped onto
+  // every row.
+  const expectedCountryCode = (searchParams.country || 'EG').toUpperCase()
+  const expectedCountryName = COUNTRY_CODE_TO_ENGLISH_NAME[expectedCountryCode]
 
   try {
-    const { places, nextPageToken } = await searchPlaces(decryptedSecret, query, job.next_page_token ?? undefined)
+    const { places, nextPageToken } = await searchPlaces(decryptedSecret, query, expectedCountryCode, job.next_page_token ?? undefined)
 
     let newCount = 0
     let duplicateCount = 0
     let failedCount = 0
+    let irrelevantCount = 0
+    // ENR-1 fix (2026-09-19/20, owner brief): "one job shows 20
+    // discovered and 20 failed without a reason." Confirmed real --
+    // upsertError was captured per-place inside this loop but
+    // completely discarded, never logged or stored anywhere. A job
+    // that failed every single place gave zero diagnostic information
+    // to the operator. sales_finish_discovery_job already accepts
+    // p_error_class/p_last_error (used on the outer exception path
+    // below, just never on this per-place path) -- now also passed
+    // here whenever at least one place failed, capturing the LAST
+    // failure's message (each place can fail for a different reason;
+    // one real message is a real improvement over zero, and matches
+    // this job-level table's own single last_error column shape).
+    let lastUpsertErrorMessage: string | null = null
 
     for (const place of places) {
       const normalized = normalizePlace(place)
+
+      // DISC-1 hard filter: regionCode above is a bias, not a
+      // guarantee (Google's own documented behavior) -- this is the
+      // real enforcement. Only applied when we know the expected
+      // country's English name (COUNTRY_CODE_TO_ENGLISH_NAME); an
+      // unmapped country code skips this check rather than rejecting
+      // every result, since we cannot verify what we cannot recognize.
+      if (expectedCountryName && normalized.address && !normalized.address.toLowerCase().includes(expectedCountryName.toLowerCase())) {
+        irrelevantCount++
+        continue
+      }
+
       const { data: result, error: upsertError } = await admin.rpc('sales_upsert_discovered_lead', {
         p_source_key: 'google_places',
         p_business_name: normalized.business_name,
@@ -250,7 +324,12 @@ Deno.serve(async (req) => {
         p_website: normalized.website,
         p_phone: normalized.phone,
         p_email: null,
-        p_country: searchParams.country ?? null,
+        // DISC-1 fix: previously the search REQUEST's own input
+        // parameter was blindly stamped onto every result regardless
+        // of where the place actually is -- now the verified expected
+        // country (the result already passed the address check above,
+        // so this is no longer an unverified assumption).
+        p_country: expectedCountryCode,
         p_city: searchParams.city ?? null,
         p_area: null,
         p_address: normalized.address,
@@ -262,6 +341,7 @@ Deno.serve(async (req) => {
 
       if (upsertError || !result || result.length === 0) {
         failedCount++
+        lastUpsertErrorMessage = upsertError?.message?.slice(0, 500) ?? 'sales_upsert_discovered_lead returned no result'
         continue
       }
 
@@ -281,8 +361,17 @@ Deno.serve(async (req) => {
       p_new_count: newCount,
       p_duplicate_count: duplicateCount,
       p_failed_count: failedCount,
-      p_skipped_count: 0,
+      // DISC-1 fix: irrelevantCount (results whose own address didn't
+      // match the expected country -- rejected before ever reaching
+      // sales_upsert_discovered_lead) now surfaces as skipped_count
+      // instead of the previous hardcoded 0, so an operator can see
+      // discovery genuinely filtered something rather than either
+      // silently keeping it (the original bug) or the count looking
+      // identical to "nothing was ever skipped".
+      p_skipped_count: irrelevantCount,
       p_next_page_token: nextPageToken ?? null,
+      p_error_class: failedCount > 0 ? 'per_lead_upsert_error' : null,
+      p_last_error: failedCount > 0 ? lastUpsertErrorMessage : null,
     })
 
     return jsonResponse(req, {
