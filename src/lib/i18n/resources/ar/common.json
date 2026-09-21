@@ -382,6 +382,12 @@
         "noLeadsFound": "لا توجد نتائج مطابقة.",
         "leadsLoadError": "تعذّر تحميل قائمة العملاء المحتملين.",
         "addSelectedLeads": "إضافة {{count}} إلى الحملة",
+        "statusArchived": "مؤرشفة",
+        "archiveButton": "أرشفة",
+        "restoreButton": "استعادة",
+        "archiving": "جارٍ الأرشفة...",
+        "restoring": "جارٍ الاستعادة...",
+        "archiveError": "تعذّر تحديث حالة أرشفة هذه الحملة.",
         "stats": {
           "target": "المستهدف",
           "queued": "في الانتظار",
@@ -5258,6 +5264,10 @@
     "platform.sales.manage_settings": {
       "label": "إدارة إعدادات ذكاء المبيعات",
       "description": "تهيئة مزودي الذكاء الاصطناعي وحصص التواصل لذكاء المبيعات"
+    },
+    "platform.sales.archive": {
+      "label": "أرشفة الحملات",
+      "description": "أرشفة حملة مبيعات أو استعادتها"
     }
   },
   "shop": {

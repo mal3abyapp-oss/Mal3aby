@@ -18,6 +18,7 @@ import { PageHeader } from '@/components/ui/page-header'
 import { ErrorState } from '@/components/ui/error-state'
 import { translateSupabaseError } from '@/lib/errors'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { StatusBadge } from '@/components/ui/status-badge'
 import { ListLoadingSkeleton } from './ListLoadingSkeleton'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -158,6 +159,7 @@ async function fetchCampaigns(): Promise<Campaign[]> {
 
 function CampaignCard({ campaign }: { campaign: Campaign }) {
   const { t } = useTranslation()
+  const queryClient = useQueryClient()
   // P3 fix: this per-card stats query had no loading/error handling --
   // a failed fetch for one campaign's stats left its stats row
   // permanently absent, indistinguishable from a brand-new campaign
@@ -172,14 +174,65 @@ function CampaignCard({ campaign }: { campaign: Campaign }) {
     },
   })
   const stats = statsQuery.data
+  const isArchived = campaign.status === 'archived'
+
+  // DEL-1 fix (owner brief, 2026-09-21): sales_campaigns had no
+  // archive/restore capability anywhere -- a real, unguarded RLS/grant
+  // gap closed at the database layer by this same fix (see
+  // 20260921050000_del1_close_unguarded_campaign_delete.sql). This is
+  // the UI for the new sales_archive_campaign/sales_restore_campaign
+  // RPCs, gated by a dedicated platform.sales.archive permission.
+  const archiveMutation = useMutation({
+    mutationFn: async () => {
+      const { error: err } = await supabase.rpc('sales_archive_campaign', { p_campaign_id: campaign.id })
+      if (err) throw err
+    },
+    onSuccess: () => void queryClient.invalidateQueries({ queryKey: ['sales-campaigns'] }),
+  })
+  const restoreMutation = useMutation({
+    mutationFn: async () => {
+      const { error: err } = await supabase.rpc('sales_restore_campaign', { p_campaign_id: campaign.id })
+      if (err) throw err
+    },
+    onSuccess: () => void queryClient.invalidateQueries({ queryKey: ['sales-campaigns'] }),
+  })
 
   return (
     <Card>
       <CardHeader className="flex flex-row items-center justify-between gap-2">
-        <CardTitle>{campaign.name}</CardTitle>
-        <CampaignLeadsDialog campaignId={campaign.id} />
+        <div className="flex items-center gap-2">
+          <CardTitle>{campaign.name}</CardTitle>
+          {isArchived && <StatusBadge tone="neutral" label={t('platform.sales.campaigns.statusArchived')} />}
+        </div>
+        <div className="flex items-center gap-2">
+          <CampaignLeadsDialog campaignId={campaign.id} />
+          {isArchived ? (
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => restoreMutation.mutate()}
+              disabled={restoreMutation.isPending}
+            >
+              {restoreMutation.isPending ? t('platform.sales.campaigns.restoring') : t('platform.sales.campaigns.restoreButton')}
+            </Button>
+          ) : (
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => archiveMutation.mutate()}
+              disabled={archiveMutation.isPending}
+            >
+              {archiveMutation.isPending ? t('platform.sales.campaigns.archiving') : t('platform.sales.campaigns.archiveButton')}
+            </Button>
+          )}
+        </div>
       </CardHeader>
       <CardContent>
+        {(archiveMutation.isError || restoreMutation.isError) && (
+          <p className="mb-2 text-sm text-status-danger">
+            {translateSupabaseError(archiveMutation.error ?? restoreMutation.error, t('platform.sales.campaigns.archiveError'))}
+          </p>
+        )}
         <p className="mb-2 text-sm text-text-secondary">{campaign.description}</p>
         {statsQuery.isLoading ? (
           <p className="text-sm text-text-secondary">{t('platform.sales.campaigns.stats.loading')}</p>

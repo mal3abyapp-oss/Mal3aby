@@ -382,6 +382,12 @@
         "noLeadsFound": "No matching leads found.",
         "leadsLoadError": "Could not load the leads list.",
         "addSelectedLeads": "Add {{count}} to campaign",
+        "statusArchived": "Archived",
+        "archiveButton": "Archive",
+        "restoreButton": "Restore",
+        "archiving": "Archiving...",
+        "restoring": "Restoring...",
+        "archiveError": "Could not update this campaign's archive status.",
         "stats": {
           "target": "Target",
           "queued": "Queued",
@@ -5226,6 +5232,10 @@
     "platform.sales.manage_settings": {
       "label": "Manage Sales Intelligence settings",
       "description": "Configure AI providers and outreach quotas for Sales Intelligence"
+    },
+    "platform.sales.archive": {
+      "label": "Archive campaigns",
+      "description": "Archive or restore a sales campaign"
     }
   },
   "shop": {

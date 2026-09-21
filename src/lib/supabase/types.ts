@@ -12568,6 +12568,10 @@ export type Database = {
         Args: { p_message_id: string }
         Returns: undefined
       }
+      sales_archive_campaign: {
+        Args: { p_campaign_id: string }
+        Returns: undefined
+      }
       sales_change_lead_status: {
         Args: { p_lead_id: string; p_new_status: string; p_reason?: string }
         Returns: undefined
@@ -12741,6 +12745,10 @@ export type Database = {
       }
       sales_reject_outreach_message: {
         Args: { p_message_id: string; p_reason?: string }
+        Returns: undefined
+      }
+      sales_restore_campaign: {
+        Args: { p_campaign_id: string }
         Returns: undefined
       }
       sales_schedule_demo: {
