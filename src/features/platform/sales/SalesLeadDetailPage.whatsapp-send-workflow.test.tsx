@@ -160,6 +160,34 @@ describe('SalesLeadDetailPage — whatsapp_message Send workflow (Platform Whats
     expect(screen.getByRole('link', { name: i18n.t('platform.sales.leadProfile.outreachGoToWhatsappSettings') })).toHaveAttribute('href', '/platform/whatsapp')
   })
 
+  // MISC-1 (owner brief, 2026-09-21): whatsappSenderQuery had no
+  // isError handling -- a failed fetch fell straight into the same
+  // "not connected" branch a genuine disconnection uses, showing the
+  // owner a false disconnection message for what was really just a
+  // failed read. Same bug class this page's own comments already
+  // document fixing three times over for the sibling eligibility/call-
+  // tasks/outreach-events queries.
+  it('shows a distinct load-error message (not the false "not connected" message) when the WhatsApp sender-identity fetch itself fails', async () => {
+    const profile = profileWithMessages(baseLead(), [whatsappDraft()])
+    mockRpc.mockImplementation((fnName: string) => {
+      if (fnName === 'get_lead_full_profile') return Promise.resolve({ data: profile, error: null })
+      if (fnName === 'get_lead_channel_eligibility') return Promise.resolve({ data: [eligibilityRow], error: null })
+      if (fnName === 'get_lead_call_tasks') return Promise.resolve({ data: [], error: null })
+      if (fnName === 'get_lead_outreach_events') return Promise.resolve({ data: [], error: null })
+      if (fnName === 'get_platform_whatsapp_sender_identity') return Promise.resolve({ data: null, error: { message: 'network error' } })
+      return Promise.resolve({ data: null, error: null })
+    })
+    renderPage()
+
+    await screen.findByText(/فريق ملعبي|AI original/)
+
+    expect(await screen.findByText(i18n.t('platform.sales.leadProfile.whatsappSenderLoadError'))).toBeInTheDocument()
+    // The false "not connected" message must NOT appear for a fetch
+    // failure -- that message is reserved for a genuine disconnection.
+    expect(screen.queryByText(i18n.t('platform.sales.leadProfile.outreachGoToWhatsappSettings'))).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: i18n.t('errorState.retry') })).toBeInTheDocument()
+  })
+
   it('does not offer Send at all when the draft is only generated (not yet approved), even if Platform WhatsApp is connected', async () => {
     const profile = profileWithMessages(baseLead(), [whatsappDraft({ status: 'generated' })])
     mockCommonRpcs(profile, { status: 'connected', connected_phone_number: '+201112223333' })

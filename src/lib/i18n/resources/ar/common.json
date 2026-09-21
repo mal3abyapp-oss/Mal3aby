@@ -618,6 +618,7 @@
         "outreachSendError": "تعذّر إرسال هذه الرسالة.",
         "outreachSendFrom": "سيتم الإرسال من: {{number}}",
         "outreachWhatsappNotConnected": "واتساب المنصة غير متصل ({{status}}).",
+        "whatsappSenderLoadError": "تعذّر التحقق من حالة اتصال واتساب المنصة.",
         "outreachGoToWhatsappSettings": "الانتقال إلى إعدادات واتساب المنصة",
         "channels": "قنوات التواصل",
         "channelsLoadError": "تعذّر تحميل أهلية القنوات لهذا العميل المحتمل.",

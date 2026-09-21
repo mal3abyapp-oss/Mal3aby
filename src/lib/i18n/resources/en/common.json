@@ -618,6 +618,7 @@
         "outreachSendError": "Could not send this message.",
         "outreachSendFrom": "Will send from: {{number}}",
         "outreachWhatsappNotConnected": "Platform WhatsApp is not connected ({{status}}).",
+        "whatsappSenderLoadError": "Could not check the Platform WhatsApp connection status.",
         "outreachGoToWhatsappSettings": "Go to Platform WhatsApp settings",
         "channels": "Outreach Channels",
         "channelsLoadError": "Could not load channel eligibility for this lead.",

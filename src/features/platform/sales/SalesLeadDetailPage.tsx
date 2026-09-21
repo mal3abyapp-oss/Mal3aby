@@ -1229,7 +1229,26 @@ export function SalesLeadDetailPage() {
                         >
                           {t('platform.sales.leadProfile.outreachEditButton')}
                         </Button>
-                        {whatsappSenderQuery.isLoading ? (
+                        {/* MISC-1 fix (owner brief, 2026-09-21): this query had
+                            no isError handling -- a transient fetch failure
+                            (network blip, timeout during the 15s poll) fell
+                            straight into the "not connected" branch below,
+                            showing the owner a false disconnection message
+                            for what was really just a failed read. Same bug
+                            class this page's own comments already document
+                            fixing three times over for eligibilityQuery/
+                            callTasksQuery/outreachEventsQuery -- this one
+                            query was simply missed. */}
+                        {whatsappSenderQuery.isError ? (
+                          <div className="space-y-1">
+                            <p className="text-xs text-status-danger">
+                              {translateSupabaseError(whatsappSenderQuery.error, t('platform.sales.leadProfile.whatsappSenderLoadError'))}
+                            </p>
+                            <Button size="sm" variant="outline" onClick={() => void whatsappSenderQuery.refetch()}>
+                              {t('errorState.retry')}
+                            </Button>
+                          </div>
+                        ) : whatsappSenderQuery.isLoading ? (
                           <p className="text-xs text-text-secondary">{t('common.loading')}</p>
                         ) : isPlatformWhatsAppConnected ? (
                           <>
