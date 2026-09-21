@@ -1,5 +1,9 @@
 name: One-shot Frontend Deploy
 
+# Triggered 2026-09-21: redeploy after PR #49 (Sales Intelligence owner
+# brief, 18 issues + 2 deferred-decision fixes) merged to main -- ships
+# the frontend changes (KAN-1, CONTACT-1, RBAC-1, CAMP-1, REP-1, I18N-1,
+# DEL-1, MISC-1) to the live production domain.
 on:
   push:
     branches: [main]
