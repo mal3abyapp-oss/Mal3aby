@@ -4,6 +4,13 @@ name: One-shot Frontend Deploy
 # brief, 18 issues + 2 deferred-decision fixes) merged to main -- ships
 # the frontend changes (KAN-1, CONTACT-1, RBAC-1, CAMP-1, REP-1, I18N-1,
 # DEL-1, MISC-1) to the live production domain.
+#
+# Retried 2026-09-21: the prior attempt (run 35576389762) failed at the
+# "Deploy frontend Worker" step with a Cloudflare authentication error
+# (code 10000) -- CLOUDFLARE_API_TOKEN had expired/was invalid, same
+# root cause as the two failed runs on 2026-09-17. The repo secret has
+# now been rotated with a fresh token; this second touch re-fires the
+# workflow to retry the deploy against it.
 on:
   push:
     branches: [main]
