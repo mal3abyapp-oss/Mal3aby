@@ -317,6 +317,7 @@
         "manualEntryTitle": "Or Add a Lead Manually",
         "manualPhoneLabel": "Phone number",
         "manualEmailLabel": "Email address",
+        "manualWebsiteLabel": "Website",
         "manualEntryButton": "Add Lead",
         "manualEntryError": "Couldn't add the lead. Try again.",
         "providerStatusError": "Couldn't load the discovery source status."
@@ -411,6 +412,8 @@
         "notConfigured": "Configuration Required",
         "dailyCap": "Daily cap",
         "configureButton": "Configure",
+        "vaultSecretIdLabel": "Vault Secret ID",
+        "vaultSecretIdHelp": "Create a Supabase Vault secret for this provider's API key first (via the Supabase dashboard), then paste its Vault secret UUID below.",
         "activeProvider": "Active provider",
         "freeTier": "free tier",
         "optionalProvider": "optional, not required",

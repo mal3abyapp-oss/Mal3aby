@@ -317,6 +317,7 @@
         "manualEntryTitle": "أو أضف عميلًا محتملًا يدويًا",
         "manualPhoneLabel": "رقم الهاتف",
         "manualEmailLabel": "البريد الإلكتروني",
+        "manualWebsiteLabel": "الموقع الإلكتروني",
         "manualEntryButton": "إضافة عميل محتمل",
         "manualEntryError": "تعذّرت إضافة العميل المحتمل. حاول مجددًا.",
         "providerStatusError": "تعذّر تحميل حالة مصدر الاكتشاف."
@@ -411,6 +412,8 @@
         "notConfigured": "يتطلب التهيئة",
         "dailyCap": "الحد اليومي",
         "configureButton": "تهيئة",
+        "vaultSecretIdLabel": "معرّف سرّ الخزنة (Vault Secret ID)",
+        "vaultSecretIdHelp": "أنشئ أولًا سرًّا في خزنة Supabase Vault لمفتاح API الخاص بهذا المزوّد (عبر لوحة تحكم Supabase)، ثم الصق معرّف السرّ (UUID) أدناه.",
         "activeProvider": "المزوّد النشط",
         "freeTier": "خطة مجانية",
         "optionalProvider": "اختياري، غير مطلوب",

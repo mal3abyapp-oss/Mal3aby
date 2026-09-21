@@ -213,7 +213,7 @@ export function SalesDiscoverPage() {
               <Input id="manual-email" type="email" dir="ltr" value={manualEmail} onChange={(e) => setManualEmail(e.target.value)} placeholder="owner@example.com" />
             </div>
             <div>
-              <FormLabel htmlFor="manual-website">Website</FormLabel>
+              <FormLabel htmlFor="manual-website">{t('platform.sales.discover.manualWebsiteLabel')}</FormLabel>
               <Input id="manual-website" value={manualWebsite} onChange={(e) => setManualWebsite(e.target.value)} />
             </div>
             <div>

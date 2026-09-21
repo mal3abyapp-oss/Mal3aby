@@ -1569,7 +1569,7 @@ export function SalesLeadDetailPage() {
                 <Input id="edit-contact-email" type="email" dir="ltr" value={editEmail} onChange={(e) => setEditEmail(e.target.value)} placeholder="owner@example.com" />
               </div>
               <div className="flex flex-col gap-1">
-                <FormLabel htmlFor="edit-contact-website">Website</FormLabel>
+                <FormLabel htmlFor="edit-contact-website">{t('platform.sales.discover.manualWebsiteLabel')}</FormLabel>
                 <Input id="edit-contact-website" dir="ltr" value={editWebsite} onChange={(e) => setEditWebsite(e.target.value)} />
               </div>
               <div className="grid grid-cols-2 gap-4">

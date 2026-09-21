@@ -137,10 +137,10 @@ export function SalesSettingsPage() {
           <DialogHeader><DialogTitle>{t('platform.sales.settings.configureButton')}: {configuring && (PROVIDER_LABELS[configuring] ?? configuring)}</DialogTitle></DialogHeader>
           <div className="space-y-3">
             <p className="text-sm text-text-secondary">
-              Create a Supabase Vault secret for this provider's API key first (via the Supabase dashboard), then paste its Vault secret UUID below.
+              {t('platform.sales.settings.vaultSecretIdHelp')}
             </p>
             <div>
-              <FormLabel htmlFor="vault-id" required>Vault Secret ID</FormLabel>
+              <FormLabel htmlFor="vault-id" required>{t('platform.sales.settings.vaultSecretIdLabel')}</FormLabel>
               <Input id="vault-id" value={vaultId} onChange={(e) => setVaultId(e.target.value)} placeholder="00000000-0000-0000-0000-000000000000" />
             </div>
             {configureMutation.isError && (
