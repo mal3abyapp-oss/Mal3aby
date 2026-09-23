@@ -19,6 +19,7 @@ import { FormLabel } from '@/components/ui/form-label'
 import { StatusBadge } from '@/components/ui/status-badge'
 import { FormattedDate } from '@/components/ui/formatted-date'
 import { SALES_DISPLAY_TIMEZONE } from './salesTimeZone'
+import { ChevronDown } from 'lucide-react'
 
 interface DiscoveryJob {
   id: string
@@ -29,6 +30,10 @@ interface DiscoveryJob {
   enriched_count: number
   failed_count: number
   skipped_count: number
+  search_params: unknown
+  attempts: number
+  started_at: string | null
+  finished_at: string | null
   created_at: string
   // ENR-1 fix (2026-09-19/20): now actually fetched/displayed -- see
   // sales-google-places-discovery's own comment on where these are set.
@@ -45,7 +50,7 @@ interface ProviderStatus {
 async function fetchRecentJobs(): Promise<DiscoveryJob[]> {
   const { data, error } = await supabase
     .from('sales_discovery_jobs')
-    .select('id, status, discovered_count, new_count, duplicate_count, enriched_count, failed_count, skipped_count, created_at, last_error')
+    .select('id, status, discovered_count, new_count, duplicate_count, enriched_count, failed_count, skipped_count, search_params, attempts, started_at, finished_at, created_at, last_error')
     .order('created_at', { ascending: false })
     .limit(10)
   if (error) throw error
@@ -63,6 +68,12 @@ function jobStatusTone(status: string): 'success' | 'warning' | 'danger' | 'info
   if (status === 'failed') return 'danger'
   if (status === 'running' || status === 'pending') return 'info'
   return 'neutral'
+}
+
+function searchParam(job: DiscoveryJob, key: string): string {
+  if (!job.search_params || typeof job.search_params !== 'object' || Array.isArray(job.search_params)) return ''
+  const value = (job.search_params as Record<string, unknown>)[key]
+  return typeof value === 'string' ? value : ''
 }
 
 export function SalesDiscoverPage() {
@@ -93,6 +104,7 @@ export function SalesDiscoverPage() {
   // or correct it. Manual Entry now owns its own country/city state.
   const [manualCountry, setManualCountry] = useState('EG')
   const [manualCity, setManualCity] = useState('')
+  const [openJobId, setOpenJobId] = useState<string | null>(null)
 
   const jobsQuery = useQuery({ queryKey: ['sales-discovery-jobs-recent'], queryFn: fetchRecentJobs, refetchInterval: 10_000 })
   const providerQuery = useQuery({ queryKey: ['sales-provider-status'], queryFn: fetchProviderStatus, retry: 1 })
@@ -244,11 +256,23 @@ export function SalesDiscoverPage() {
           ) : (
             <div className="space-y-3">
               {(jobsQuery.data ?? []).map((job) => (
-                <div key={job.id} className="rounded-md border border-border-subtle p-3">
-                  <div className="flex items-center justify-between">
-                    <StatusBadge tone={jobStatusTone(job.status)} label={job.status} />
-                    <FormattedDate value={job.created_at} timeZone={SALES_DISPLAY_TIMEZONE} className="text-sm text-text-secondary" />
-                  </div>
+                <div key={job.id} className="rounded-md border border-border-subtle">
+                  <button
+                    type="button"
+                    className="flex w-full items-center justify-between gap-3 rounded-md p-3 text-start hover:bg-surface-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+                    aria-expanded={openJobId === job.id}
+                    aria-controls={`discovery-job-${job.id}`}
+                    onClick={() => setOpenJobId((current) => current === job.id ? null : job.id)}
+                  >
+                    <span className="flex min-w-0 items-center gap-3">
+                      <StatusBadge tone={jobStatusTone(job.status)} label={job.status} />
+                      <FormattedDate value={job.created_at} timeZone={SALES_DISPLAY_TIMEZONE} className="truncate text-sm text-text-secondary" />
+                    </span>
+                    <span className="flex shrink-0 items-center gap-2 text-sm font-medium text-primary">
+                      {openJobId === job.id ? t('platform.sales.discover.closeJob') : t('platform.sales.discover.openJob')}
+                      <ChevronDown className={`h-4 w-4 transition-transform ${openJobId === job.id ? 'rotate-180' : ''}`} aria-hidden="true" />
+                    </span>
+                  </button>
                   {/* ENR-1 fix (2026-09-19/20, owner brief): "every
                       discovery job reports 'Enriched: 0'" -- confirmed
                       real, and not a counting bug: discovery
@@ -265,7 +289,7 @@ export function SalesDiscoverPage() {
                       the stat is removed from this job-summary view --
                       it measured something this screen's own process
                       structurally cannot report. */}
-                  <div className="mt-2 grid grid-cols-3 gap-2 text-sm sm:grid-cols-5">
+                  <div className="grid grid-cols-3 gap-2 px-3 pb-3 text-sm sm:grid-cols-5">
                     <span>{t('platform.sales.discover.discovered')}: {job.discovered_count}</span>
                     <span>{t('platform.sales.discover.new')}: {job.new_count}</span>
                     <span>{t('platform.sales.discover.duplicates')}: {job.duplicate_count}</span>
@@ -273,8 +297,19 @@ export function SalesDiscoverPage() {
                     <span>{t('platform.sales.discover.skipped')}: {job.skipped_count}</span>
                   </div>
                   {job.failed_count > 0 && job.last_error && (
-                    <p className="mt-2 text-xs text-status-danger">{job.last_error}</p>
+                    <p className="px-3 pb-3 text-xs text-status-danger">{job.last_error}</p>
                   )}
+                  {openJobId === job.id ? (
+                    <div id={`discovery-job-${job.id}`} className="grid gap-3 border-t border-border-subtle bg-surface-muted p-3 text-sm sm:grid-cols-2">
+                      <div><span className="text-text-secondary">{t('platform.sales.discover.queryLabel')}:</span> {searchParam(job, 'query') || '—'}</div>
+                      <div><span className="text-text-secondary">{t('platform.sales.discover.location')}:</span> {[searchParam(job, 'city'), searchParam(job, 'country')].filter(Boolean).join('، ') || '—'}</div>
+                      <div><span className="text-text-secondary">{t('platform.sales.discover.attempts')}:</span> {job.attempts}</div>
+                      <div><span className="text-text-secondary">{t('platform.sales.discover.jobId')}:</span> <bdi className="font-mono text-xs">{job.id}</bdi></div>
+                      <div><span className="text-text-secondary">{t('platform.sales.discover.startedAt')}:</span> {job.started_at ? <FormattedDate value={job.started_at} timeZone={SALES_DISPLAY_TIMEZONE} /> : '—'}</div>
+                      <div><span className="text-text-secondary">{t('platform.sales.discover.finishedAt')}:</span> {job.finished_at ? <FormattedDate value={job.finished_at} timeZone={SALES_DISPLAY_TIMEZONE} /> : '—'}</div>
+                      {job.last_error ? <div className="sm:col-span-2"><span className="text-text-secondary">{t('platform.sales.discover.lastError')}:</span> <span className="text-status-danger">{job.last_error}</span></div> : null}
+                    </div>
+                  ) : null}
                 </div>
               ))}
             </div>
