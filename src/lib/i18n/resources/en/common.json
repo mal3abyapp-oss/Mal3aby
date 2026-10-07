@@ -2,7 +2,8 @@
   "app": {
     "name": "Mal3aby",
     "updateAvailable": "A new version is available.",
-    "reload": "Reload"
+    "reload": "Reload",
+    "reloading": "Updating…"
   },
   "whatsappConsent": {
     "question": "Did the customer agree to receive service messages via WhatsApp?",

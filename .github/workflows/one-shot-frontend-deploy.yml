@@ -1,5 +1,8 @@
 name: One-shot Frontend Deploy
 
+# Triggered 2026-10-07 (2): ship the fix for the "new version available"
+# Reload button that activated the update without reloading the page.
+#
 # Triggered 2026-10-07: ship the Rentals module (PR #54, spaces / lease
 # contracts / installments, rentals + revenue-by-source reports). Its
 # database migration was applied to production before this deploy.
