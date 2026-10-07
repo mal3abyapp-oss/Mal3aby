@@ -1,5 +1,9 @@
 name: One-shot Frontend Deploy
 
+# Triggered 2026-10-07: ship the Rentals module (PR #54, spaces / lease
+# contracts / installments, rentals + revenue-by-source reports). Its
+# database migration was applied to production before this deploy.
+#
 # Triggered 2026-09-21: redeploy after PR #49 (Sales Intelligence owner
 # brief, 18 issues + 2 deferred-decision fixes) merged to main -- ships
 # the frontend changes (KAN-1, CONTACT-1, RBAC-1, CAMP-1, REP-1, I18N-1,
