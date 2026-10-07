@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen, waitFor } from '@testing-library/react'
+import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 
 // Real bug reproduced here (found live in production 2026-08-28): a
 // tab whose service worker registration ALREADY has a `.waiting`
@@ -55,9 +55,42 @@ vi.mock('virtual:pwa-register/react', () => ({
 const { PwaUpdatePrompt } = await import('./PwaUpdatePrompt')
 
 describe('PwaUpdatePrompt', () => {
+  const reloadSpy = vi.fn()
+  const swListeners: Record<string, () => void> = {}
+
   beforeEach(() => {
     vi.clearAllMocks()
     Object.defineProperty(document, 'visibilityState', { value: 'visible', configurable: true, writable: true })
+    Object.defineProperty(window, 'location', { value: { ...window.location, reload: reloadSpy }, configurable: true, writable: true })
+    Object.defineProperty(navigator, 'serviceWorker', {
+      configurable: true,
+      value: {
+        getRegistration: vi.fn().mockResolvedValue(mockRegistration),
+        addEventListener: vi.fn((event: string, cb: () => void) => { swListeners[event] = cb }),
+      },
+    })
+  })
+
+  // Live bug (2026-10-07): the toast's Reload button activated the new
+  // worker but never reloaded the page, because the library only wires
+  // its reload for its own 'waiting' event -- not for the toast paths
+  // this component adds. The click must post SKIP_WAITING to the waiting
+  // worker and reload as soon as the new worker takes control.
+  it('reload button activates the waiting worker and reloads when it takes control', async () => {
+    render(<PwaUpdatePrompt />)
+    const button = await screen.findByRole('button')
+
+    fireEvent.click(button)
+
+    await waitFor(() => {
+      expect(mockRegistration.waiting!.postMessage).toHaveBeenCalledWith({ type: 'SKIP_WAITING' })
+    })
+    expect(updateServiceWorkerSpy).toHaveBeenCalledWith(true)
+    expect(button).toBeDisabled()
+    expect(reloadSpy).not.toHaveBeenCalled()
+
+    swListeners.controllerchange?.()
+    expect(reloadSpy).toHaveBeenCalledTimes(1)
   })
 
   it('shows the update toast when a worker is already waiting at registration time', async () => {

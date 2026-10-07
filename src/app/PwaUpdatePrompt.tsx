@@ -1,4 +1,4 @@
-import { useEffect } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useRegisterSW } from 'virtual:pwa-register/react'
 import { Button } from '@/components/ui/button'
@@ -61,8 +61,22 @@ import { Button } from '@/components/ui/button'
 // user is ever silently stuck on a stale build indefinitely.
 const IDLE_AUTO_UPDATE_MS = 5 * 60_000
 
+// RELOAD BUTTON DID NOTHING (2026-10-07, live report after the rentals
+// deploy): vite-plugin-pwa's updateServiceWorker() only posts
+// SKIP_WAITING; the page reload is wired to a Workbox 'controlling'
+// listener that the library attaches ONLY when its own 'waiting' event
+// fires. Every path this component uses to surface the toast itself
+// (registration.waiting at startup, updatefound/statechange, the
+// visibility re-check) bypasses that, so clicking activated the new
+// worker silently and the page never reloaded -- the toast just stayed.
+// activateUpdate() owns the whole sequence instead: post SKIP_WAITING
+// to the waiting worker, reload on the resulting controllerchange, and
+// fall back to a plain reload if no controller change arrives.
+const RELOAD_FALLBACK_MS = 4000
+
 export function PwaUpdatePrompt() {
   const { t } = useTranslation()
+  const [updating, setUpdating] = useState(false)
   const {
     needRefresh: [needRefresh, setNeedRefresh],
     updateServiceWorker,
@@ -141,6 +155,31 @@ export function PwaUpdatePrompt() {
     return () => document.removeEventListener('visibilitychange', onVisible)
   }, [setNeedRefresh])
 
+  const activateUpdate = useCallback(async () => {
+    setUpdating(true)
+    let reloaded = false
+    const reload = () => {
+      if (reloaded) return
+      reloaded = true
+      window.location.reload()
+    }
+    navigator.serviceWorker?.addEventListener('controllerchange', reload, { once: true })
+    window.setTimeout(reload, RELOAD_FALLBACK_MS)
+    updateServiceWorker(true)
+    try {
+      const registration = await navigator.serviceWorker?.getRegistration()
+      if (registration?.waiting) {
+        registration.waiting.postMessage({ type: 'SKIP_WAITING' })
+      } else {
+        // Nothing left waiting (already activated, e.g. by another tab):
+        // the new version is live, the page just needs to load it.
+        reload()
+      }
+    } catch {
+      reload()
+    }
+  }, [updateServiceWorker])
+
   // Safe auto-activation (see the block comment above the component):
   // once a worker is confirmed waiting, activate it the instant it's
   // provably safe to do so, instead of leaving it entirely up to the
@@ -152,7 +191,7 @@ export function PwaUpdatePrompt() {
     const activate = () => {
       if (activated) return
       activated = true
-      updateServiceWorker(true)
+      void activateUpdate()
     }
 
     // Hidden tab: nothing on screen can be mid-interaction, so it's
@@ -184,7 +223,7 @@ export function PwaUpdatePrompt() {
       activityEvents.forEach((event) => window.removeEventListener(event, resetIdleTimer))
       clearTimeout(idleTimer)
     }
-  }, [needRefresh, updateServiceWorker])
+  }, [needRefresh, activateUpdate])
 
   if (!needRefresh) return null
 
@@ -194,8 +233,8 @@ export function PwaUpdatePrompt() {
       className="fixed inset-x-4 bottom-4 z-50 mx-auto flex max-w-sm items-center justify-between gap-3 rounded-lg border border-border bg-background p-3 shadow-lg sm:inset-x-auto sm:end-4"
     >
       <p className="text-sm">{t('app.updateAvailable')}</p>
-      <Button size="sm" onClick={() => updateServiceWorker(true)}>
-        {t('app.reload')}
+      <Button size="sm" disabled={updating} onClick={() => void activateUpdate()}>
+        {updating ? t('app.reloading') : t('app.reload')}
       </Button>
     </div>
   )
