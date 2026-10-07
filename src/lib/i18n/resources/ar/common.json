@@ -53,7 +53,8 @@
     "shop": "المتجر",
     "help": "شرح الأداة",
     "sidebarAria": "التنقل الرئيسي",
-    "mobileNavAria": "التنقل السريع"
+    "mobileNavAria": "التنقل السريع",
+    "rentals": "الإيجارات"
   },
   "portal": {
     "nav": {
@@ -1057,7 +1058,8 @@
         "fields": "الملاعب والحجوزات",
         "academy": "الأكاديمية",
         "shop": "المتجر",
-        "clubMembership": "عضويات النادي"
+        "clubMembership": "عضويات النادي",
+        "rentals": "الإيجارات"
       },
       "modulesHint": "إيقاف وحدة لا يحذف سجلها أبدًا — يحتفظ النادي بكل ما لديه بالفعل، فقط لا يمكنه إنشاء أي شيء جديد في هذه الوحدة حتى تعيد تفعيلها.",
       "modulesEntitled": "متاحة",
@@ -3008,7 +3010,11 @@
     "sourceLabels": {
       "booking": "حجز",
       "subscription": "اشتراك أكاديمية",
-      "other": "أخرى"
+      "other": "أخرى",
+      "registration_fee": "رسوم تسجيل",
+      "club_membership": "عضوية نادي",
+      "shop_sale_item": "مبيعات المتجر",
+      "rental": "إيجار"
     },
     "invoiceStatusLabels": {
       "draft": "مسودة",
@@ -3485,7 +3491,8 @@
         "financial": "الحساب المالي",
         "whatsapp": "واتساب والتواصل",
         "activity": "النشاط والتدقيق",
-        "products": "المنتجات"
+        "products": "المنتجات",
+        "rentals": "الإيجارات"
       },
       "noProductsYet": "لا توجد مشتريات منتجات بعد",
       "productsColumns": {
@@ -3509,7 +3516,14 @@
       "portalInviteManualTitle": "سلّم دعوة التفعيل هذه يدويًا",
       "portalInviteManualHelp": "لم يتم إرسال هذه الدعوة تلقائيًا. انسخ الرابط والرمز أدناه وأرسلهما للعميل بنفسك (مثلاً عبر محادثة واتساب أو رسالة نصية). يجب إرسال الرمز بشكل منفصل عن الرابط.",
       "portalInviteLinkLabel": "رابط التفعيل",
-      "portalInviteSecretLabel": "رمز التفعيل"
+      "portalInviteSecretLabel": "رمز التفعيل",
+      "sourceLabels": {
+        "booking": "حجز",
+        "academy_subscription": "اشتراك أكاديمية",
+        "club_membership": "عضوية نادي",
+        "rental": "إيجار",
+        "other": "أخرى"
+      }
     },
     "duplicates": {
       "title": "عملاء محتمل تكرارهم",
@@ -3550,7 +3564,8 @@
       "staffDesc": "إدارة الموظفين وأدوارهم",
       "auditLogDesc": "سجل كل العمليات الحساسة في النادي",
       "settingsDesc": "هوية النادي، الأكاديمية، المدفوعات، والاشتراك",
-      "helpDesc": "شرح مكتوب لكل جزء في النظام مع صور حقيقية"
+      "helpDesc": "شرح مكتوب لكل جزء في النظام مع صور حقيقية",
+      "rentalsDesc": "تأجير الأماكن: صالات الجيم، قاعات الأفراح، المحلات وغيرها"
     },
     "today": {
       "newBooking": "حجز جديد",
@@ -3591,8 +3606,12 @@
         "startingSoon": "عاجل",
         "expiringSubscription": "تجديد",
         "pendingPaymentProof": "مراجعة",
-        "whatsappFailed": "واتساب"
-      }
+        "whatsappFailed": "واتساب",
+        "rentalOverdue": "إيجار",
+        "rentalExpiring": "تجديد عقد"
+      },
+      "rentalOverdue": "أقساط إيجار متأخرة ({{count}})",
+      "rentalExpiring": "عقود إيجار تنتهي خلال 30 يومًا ({{count}})"
     },
     "quickActionsPalette": {
       "heading": "إجراءات سريعة",
@@ -3633,7 +3652,8 @@
       "sectionAcademyCustomers": "الأكاديمية والعملاء",
       "academy": "الأكاديمية",
       "customers": "العملاء",
-      "shop": "المتجر"
+      "shop": "المتجر",
+      "rentals": "الإيجارات"
     },
     "title": "التقارير",
     "loading": "جارٍ التحميل...",
@@ -3899,7 +3919,40 @@
     "printFull": "طباعة التقرير الكامل",
     "printFullPreparing": "جارٍ تجهيز التقرير الكامل...",
     "printFullRowCount": "عرض جميع الصفوف المطابقة وعددها {{count}}.",
-    "printFullTruncated": "وصل هذا التقرير إلى الحد الأقصى الذي يمكن للنظام طباعته دفعة واحدة. ضيّق نطاق الفلاتر لعرض كل الصفوف."
+    "printFullTruncated": "وصل هذا التقرير إلى الحد الأقصى الذي يمكن للنظام طباعته دفعة واحدة. ضيّق نطاق الفلاتر لعرض كل الصفوف.",
+    "rentals": {
+      "description": "تقرير الإيجارات: الإشغال، المحصل، المستحق والمتأخر",
+      "collected": "المحصّل في الفترة",
+      "dueInRange": "المستحق في الفترة",
+      "outstanding": "المتبقي",
+      "overdue": "المتأخر ({{count}})",
+      "occupancy": "الأماكن المؤجرة اليوم",
+      "activeContracts": "العقود السارية",
+      "newContracts": "عقود جديدة في الفترة",
+      "depositsHeld": "التأمينات المحصلة",
+      "bySpace": "حسب المكان",
+      "byCycle": "العقود السارية حسب نوع الإيجار",
+      "overdueList": "الأقساط المتأخرة",
+      "space": "المكان",
+      "manage": "إدارة الإيجارات"
+    },
+    "bySource": {
+      "title": "التوزيع حسب المصدر",
+      "description": "الإيرادات المحصلة موزعة حسب المصدر",
+      "totalCollected": "إجمالي المحصّل",
+      "totalRefunded": "المسترد",
+      "net": "الصافي",
+      "source": "المصدر",
+      "payments": "عدد المدفوعات: {{count}}",
+      "sources": {
+        "booking": "الحجوزات",
+        "academy": "الأكاديمية",
+        "club_membership": "عضويات النادي",
+        "shop": "المتجر",
+        "rental": "الإيجارات",
+        "other": "أخرى"
+      }
+    }
   },
   "verifyInvoice": {
     "title": "التحقق من فاتورة",
@@ -4657,7 +4710,8 @@
       "officialReceipts": "الإيصالات الرسمية",
       "reconciliation": "المطابقة المالية",
       "gatewayHealth": "سلامة بوابات الدفع",
-      "employeeLiability": "مديونية الموظفين"
+      "employeeLiability": "مديونية الموظفين",
+      "bySource": "الإيرادات حسب المصدر"
     }
   },
   "roles": {
@@ -4733,7 +4787,8 @@
       "settings": "الإعدادات",
       "audit": "سجل النشاط",
       "shop": "المتجر",
-      "inventory": "المخزون"
+      "inventory": "المخزون",
+      "rentals": "الإيجارات"
     }
   },
   "permissions": {
@@ -5048,6 +5103,22 @@
     "inventory.cost.view": {
       "label": "عرض تكلفة المنتج",
       "description": "الاطلاع على بيانات تكلفة وهامش ربح المنتج"
+    },
+    "rental.view": {
+      "label": "عرض الإيجارات",
+      "description": "عرض الأماكن المؤجرة وعقود الإيجار وأقساطها"
+    },
+    "rental.space.manage": {
+      "label": "إدارة الأماكن المؤجرة",
+      "description": "إضافة وتعديل وإيقاف وأرشفة الأماكن القابلة للإيجار"
+    },
+    "rental.contract.create": {
+      "label": "إنشاء عقود الإيجار",
+      "description": "إنشاء عقود إيجار جديدة وإصدار فواتير الأقساط"
+    },
+    "rental.contract.manage": {
+      "label": "إنهاء وإلغاء العقود",
+      "description": "إنهاء عقد إيجار مبكرًا أو إلغاؤه"
     }
   },
   "platformStaff": {
@@ -6182,6 +6253,197 @@
           "كل زرار تعديل هنا بيشتغل حسب صلاحية حقيقية، فلو عندك دور مخصص وأديته الصلاحية المناسبة، هتقدر تعدّل زي أي مدير عادي."
         ]
       }
+    }
+  },
+  "rentals": {
+    "title": "الإيجارات",
+    "description": "إدارة الأماكن القابلة للإيجار وعقودها وأقساطها — صالات الجيم، قاعات الأفراح، المحلات وغيرها",
+    "branch": "الفرع",
+    "save": "حفظ",
+    "saving": "جارٍ الحفظ…",
+    "none": "لا يوجد",
+    "moduleNotActive": {
+      "title": "وحدة الإيجارات غير مفعّلة",
+      "notEntitled": "خطة هذا النادي لا تشمل وحدة الإيجارات بعد. تواصل مع الدعم لتفعيلها.",
+      "notActivated": "وحدة الإيجارات متاحة لهذا النادي لكن لم يتم تفعيلها بعد."
+    },
+    "tabs": {
+      "overview": "نظرة عامة",
+      "spaces": "الأماكن",
+      "contracts": "العقود",
+      "dues": "المستحقات والمتأخرات"
+    },
+    "spaceTypes": {
+      "gym": "صالة جيم",
+      "wedding_hall": "قاعة أفراح",
+      "event_hall": "قاعة مناسبات",
+      "shop": "محل تجاري",
+      "office": "مكتب",
+      "warehouse": "مخزن",
+      "apartment": "شقة / سكن",
+      "sports_facility": "منشأة رياضية",
+      "other": "أخرى",
+      "custom": "نوع مخصص (اكتب الاسم)"
+    },
+    "cycles": {
+      "daily": "يومي",
+      "monthly": "شهري",
+      "quarterly": "ربع سنوي",
+      "semi_annual": "نصف سنوي",
+      "annual": "سنوي",
+      "custom": "مخصص",
+      "customEvery": "كل {{count}} {{unit}}"
+    },
+    "customUnits": {
+      "day": "يوم",
+      "week": "أسبوع",
+      "month": "شهر"
+    },
+    "paymentStates": {
+      "scheduled": "مجدول",
+      "due_not_invoiced": "مستحق ولم تصدر فاتورته",
+      "unpaid": "غير مدفوع",
+      "partial": "مدفوع جزئيًا",
+      "paid": "مدفوع",
+      "overdue": "متأخر",
+      "cancelled": "ملغى"
+    },
+    "overview": {
+      "loadError": "تعذر تحميل ملخص الإيجارات",
+      "spaces": "الأماكن المؤجرة / الإجمالي",
+      "occupancy": "نسبة الإشغال",
+      "activeContracts": "العقود السارية",
+      "collectedThisMonth": "المحصّل هذا الشهر",
+      "dueThisMonth": "المستحق هذا الشهر",
+      "overdue": "المتأخرات ({{count}})",
+      "expiringSoon": "عقود تنتهي خلال 30 يومًا",
+      "bySpace": "المحصّل هذا الشهر حسب المكان",
+      "viewContracts": "كل العقود",
+      "viewSpaces": "كل الأماكن",
+      "reviewDues": "مراجعة الأقساط المتأخرة ({{count}})"
+    },
+    "spaces": {
+      "add": "إضافة مكان",
+      "edit": "تعديل المكان",
+      "name": "اسم المكان",
+      "namePlaceholder": "مثال: صالة الجيم - الدور الأول",
+      "type": "نوع المكان",
+      "customType": "اسم النوع المخصص",
+      "customTypePlaceholder": "مثال: قاعة اجتماعات، حمام سباحة، كافيتريا",
+      "area": "المساحة (م²)",
+      "capacity": "السعة (أفراد)",
+      "defaultRent": "قيمة الإيجار الافتراضية",
+      "descriptionLabel": "وصف / ملاحظات",
+      "allowOverlap": "السماح بأكثر من عقد في نفس الفترة",
+      "allowOverlapHint": "مثلاً لمكان مقسّم أو يؤجَّر لأكثر من مستأجر في نفس الوقت",
+      "occupancy": "الإشغال الحالي",
+      "occupied": "مؤجَّر",
+      "vacant": "متاح",
+      "until": "حتى {{date}}",
+      "showArchived": "إظهار المؤرشف",
+      "deactivate": "إيقاف",
+      "activate": "تفعيل",
+      "archive": "أرشفة",
+      "restore": "استعادة",
+      "statusLabels": {
+        "active": "نشط",
+        "inactive": "موقوف",
+        "archived": "مؤرشف"
+      },
+      "emptyTitle": "لا توجد أماكن بعد",
+      "emptyDescription": "أضف أول مكان قابل للإيجار (جيم، قاعة أفراح، محل...)",
+      "loadError": "تعذر تحميل الأماكن",
+      "saveError": "تعذر حفظ المكان",
+      "statusError": "تعذر تغيير حالة المكان",
+      "errors": {
+        "nameRequired": "اسم المكان مطلوب",
+        "branchRequired": "اختر الفرع",
+        "customTypeRequired": "اكتب اسم النوع المخصص"
+      }
+    },
+    "contracts": {
+      "new": "عقد إيجار جديد",
+      "create": "إنشاء العقد",
+      "number": "رقم العقد",
+      "tenant": "المستأجر",
+      "space": "المكان",
+      "cycle": "نوع الإيجار",
+      "startDate": "تاريخ البداية",
+      "endDate": "تاريخ النهاية",
+      "customEvery": "كل (عدد)",
+      "customUnit": "الوحدة",
+      "cyclesCount": "عدد الفترات",
+      "cycleAmount": "قيمة الإيجار لكل فترة",
+      "deposit": "مبلغ التأمين",
+      "notes": "ملاحظات / شروط العقد",
+      "totalRent": "إجمالي قيمة العقد",
+      "firstInvoice": "أول فاتورة (تأمين + أول فترة)",
+      "showSchedule": "عرض جدول الأقساط ({{count}})",
+      "hideSchedule": "إخفاء جدول الأقساط",
+      "issueFirstInvoice": "إصدار فاتورة أول قسط (والتأمين) الآن والانتقال للتحصيل",
+      "period": "مدة العقد",
+      "paid": "المدفوع",
+      "overdue": "المتأخر",
+      "searchPlaceholder": "بحث بالاسم أو رقم العقد أو المكان",
+      "allStatuses": "كل الحالات",
+      "statusLabels": {
+        "active": "ساري",
+        "upcoming": "لم يبدأ بعد",
+        "expired": "منتهي",
+        "terminated": "منتهي مبكرًا",
+        "cancelled": "ملغى"
+      },
+      "emptyTitle": "لا توجد عقود",
+      "emptyDescription": "أنشئ أول عقد إيجار لمكان من أماكن النادي",
+      "customerEmpty": "هذا العميل ليس لديه عقود إيجار",
+      "loadError": "تعذر تحميل العقود",
+      "errors": {
+        "customerRequired": "اختر المستأجر",
+        "spaceRequired": "اختر المكان",
+        "invalidSchedule": "بيانات مدة الإيجار غير صحيحة",
+        "createError": "تعذر إنشاء العقد"
+      }
+    },
+    "detail": {
+      "title": "عقد إيجار",
+      "terminatedOn": "أُنهي في {{date}}",
+      "reason": "السبب",
+      "schedule": "جدول الأقساط",
+      "periodCol": "الفترة",
+      "dueDate": "تاريخ الاستحقاق",
+      "amount": "القيمة",
+      "paidCol": "المدفوع",
+      "select": "اختيار القسط",
+      "depositShort": "تأمين",
+      "collect": "تحصيل",
+      "viewInvoice": "الفاتورة",
+      "issueSelected": "إصدار فاتورة للأقساط المحددة ({{count}})",
+      "terminate": "إنهاء العقد مبكرًا",
+      "cancel": "إلغاء العقد",
+      "terminateHint": "سيتم إلغاء الأقساط التي لم تصدر فواتيرها بعد تاريخ الإنهاء. الفواتير الصادرة تبقى كما هي.",
+      "cancelHint": "الإلغاء متاح فقط إذا لم يتم تحصيل أي مبلغ على العقد، وسيتم إلغاء فواتيره.",
+      "terminationDate": "تاريخ الإنهاء",
+      "confirmTerminate": "تأكيد الإنهاء",
+      "confirmCancel": "تأكيد الإلغاء",
+      "issueError": "تعذر إصدار الفاتورة",
+      "terminateError": "تعذر إنهاء العقد",
+      "cancelError": "تعذر إلغاء العقد",
+      "totals": {
+        "paid": "المدفوع",
+        "outstanding": "المتبقي على الفواتير",
+        "overdue": "المتأخر",
+        "notInvoiced": "لم تصدر فواتيره بعد"
+      }
+    },
+    "dues": {
+      "description": "الأقساط التي حل موعدها ولم تُسدَّد بالكامل في كل العقود.",
+      "issueDue": "إصدار فواتير كل الأقساط المستحقة",
+      "issued": "تم إصدار {{count}} فاتورة",
+      "issueError": "تعذر إصدار الفواتير",
+      "installment": "القسط",
+      "emptyTitle": "لا توجد متأخرات",
+      "emptyDescription": "كل الأقساط المستحقة مسددة",
+      "loadError": "تعذر تحميل المستحقات"
     }
   }
 }

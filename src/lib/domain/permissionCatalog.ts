@@ -19,6 +19,7 @@ export type PermissionGroupKey =
   | 'customers'
   | 'academy'
   | 'memberships'
+  | 'rentals'
   | 'shop'
   | 'inventory'
   | 'finance'
@@ -116,6 +117,19 @@ export const PERMISSION_GROUPS: PermissionGroup[] = [
       { key: 'club_membership.freeze', requires: ['club_membership.view'] },
       { key: 'club_membership.cancel', sensitive: true, requires: ['club_membership.view'] },
       { key: 'club_membership.verify' },
+    ],
+  },
+  {
+    // RENTALS MODULE (2026-10-07): leasing club-owned spaces (gym, wedding
+    // hall, shop unit, ... or a custom type). Collection itself stays on
+    // the shared payment.create key -- rental invoices are ordinary
+    // invoices collected through Finance.
+    key: 'rentals',
+    permissions: [
+      { key: 'rental.view' },
+      { key: 'rental.space.manage', requires: ['rental.view'] },
+      { key: 'rental.contract.create', requires: ['rental.view'] },
+      { key: 'rental.contract.manage', sensitive: true, requires: ['rental.view'] },
     ],
   },
   {

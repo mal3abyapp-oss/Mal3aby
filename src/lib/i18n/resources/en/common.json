@@ -53,7 +53,8 @@
     "shop": "Shop",
     "help": "How to Use",
     "sidebarAria": "Main navigation",
-    "mobileNavAria": "Mobile navigation"
+    "mobileNavAria": "Mobile navigation",
+    "rentals": "Rentals"
   },
   "portal": {
     "nav": {
@@ -1057,7 +1058,8 @@
         "fields": "Fields & Bookings",
         "academy": "Academy",
         "shop": "Shop",
-        "clubMembership": "Club Memberships"
+        "clubMembership": "Club Memberships",
+        "rentals": "Rentals"
       },
       "modulesHint": "Turning a module off never deletes its history — the club keeps everything it already has, it just can't create anything new in that module until you turn it back on.",
       "modulesEntitled": "Entitled",
@@ -2986,7 +2988,11 @@
     "sourceLabels": {
       "booking": "Booking",
       "subscription": "Academy subscription",
-      "other": "Other"
+      "other": "Other",
+      "registration_fee": "Registration fee",
+      "club_membership": "Club membership",
+      "shop_sale_item": "Shop sale",
+      "rental": "Rent"
     },
     "invoiceStatusLabels": {
       "draft": "Draft",
@@ -3463,7 +3469,8 @@
         "financial": "Financial Account",
         "whatsapp": "WhatsApp & Communication",
         "activity": "Activity & Audit",
-        "products": "Products"
+        "products": "Products",
+        "rentals": "Rentals"
       },
       "noProductsYet": "No product purchases yet",
       "productsColumns": {
@@ -3487,7 +3494,14 @@
       "portalInviteManualTitle": "Deliver this activation invite manually",
       "portalInviteManualHelp": "This invite was not sent automatically. Copy the link and the code below and send them to the customer yourself (e.g. via WhatsApp chat or SMS). The code must be delivered separately from the link.",
       "portalInviteLinkLabel": "Activation link",
-      "portalInviteSecretLabel": "Activation code"
+      "portalInviteSecretLabel": "Activation code",
+      "sourceLabels": {
+        "booking": "Booking",
+        "academy_subscription": "Academy subscription",
+        "club_membership": "Club membership",
+        "rental": "Rent",
+        "other": "Other"
+      }
     },
     "duplicates": {
       "title": "Possible duplicate customers",
@@ -3528,7 +3542,8 @@
       "staffDesc": "Manage staff and their roles",
       "auditLogDesc": "Log of every sensitive operation in the club",
       "settingsDesc": "Club identity, academy, payments, and subscription",
-      "helpDesc": "A written walkthrough of every part of the system, with real screenshots"
+      "helpDesc": "A written walkthrough of every part of the system, with real screenshots",
+      "rentalsDesc": "Lease spaces: gyms, wedding halls, shops and more"
     },
     "today": {
       "newBooking": "New booking",
@@ -3565,8 +3580,12 @@
         "startingSoon": "Urgent",
         "expiringSubscription": "Renewal",
         "pendingPaymentProof": "Review",
-        "whatsappFailed": "WhatsApp"
-      }
+        "whatsappFailed": "WhatsApp",
+        "rentalOverdue": "Rent",
+        "rentalExpiring": "Lease renewal"
+      },
+      "rentalOverdue": "Overdue rent installments ({{count}})",
+      "rentalExpiring": "Leases ending within 30 days ({{count}})"
     },
     "quickActionsPalette": {
       "heading": "Quick actions",
@@ -3607,7 +3626,8 @@
       "sectionAcademyCustomers": "Academy & Customers",
       "academy": "Academy",
       "customers": "Customers",
-      "shop": "Shop"
+      "shop": "Shop",
+      "rentals": "Rentals"
     },
     "title": "Reports",
     "loading": "Loading...",
@@ -3869,7 +3889,40 @@
     "printFull": "Print Full Report",
     "printFullPreparing": "Preparing full report...",
     "printFullRowCount": "Showing all {{count}} matching rows.",
-    "printFullTruncated": "This report reached the maximum size this system can print at once. Narrow your filters to see every row."
+    "printFullTruncated": "This report reached the maximum size this system can print at once. Narrow your filters to see every row.",
+    "rentals": {
+      "description": "Rentals report: occupancy, collected, due and overdue",
+      "collected": "Collected in period",
+      "dueInRange": "Due in period",
+      "outstanding": "Outstanding",
+      "overdue": "Overdue ({{count}})",
+      "occupancy": "Spaces rented today",
+      "activeContracts": "Active leases",
+      "newContracts": "New leases in period",
+      "depositsHeld": "Deposits collected",
+      "bySpace": "By space",
+      "byCycle": "Active leases by rent cycle",
+      "overdueList": "Overdue installments",
+      "space": "Space",
+      "manage": "Manage rentals"
+    },
+    "bySource": {
+      "title": "Breakdown by source",
+      "description": "Collected revenue broken down by source",
+      "totalCollected": "Total collected",
+      "totalRefunded": "Refunded",
+      "net": "Net",
+      "source": "Source",
+      "payments": "Payments: {{count}}",
+      "sources": {
+        "booking": "Bookings",
+        "academy": "Academy",
+        "club_membership": "Club memberships",
+        "shop": "Shop",
+        "rental": "Rentals",
+        "other": "Other"
+      }
+    }
   },
   "verifyInvoice": {
     "title": "Verify invoice",
@@ -4625,7 +4678,8 @@
       "officialReceipts": "Official receipts",
       "reconciliation": "Reconciliation",
       "gatewayHealth": "Gateway health",
-      "employeeLiability": "Employee liability"
+      "employeeLiability": "Employee liability",
+      "bySource": "Revenue by source"
     }
   },
   "roles": {
@@ -4701,7 +4755,8 @@
       "settings": "Settings",
       "audit": "Activity log",
       "shop": "Store / Shop",
-      "inventory": "Inventory"
+      "inventory": "Inventory",
+      "rentals": "Rentals"
     }
   },
   "permissions": {
@@ -5016,6 +5071,22 @@
     "inventory.cost.view": {
       "label": "View product cost",
       "description": "See product cost and margin data"
+    },
+    "rental.view": {
+      "label": "View rentals",
+      "description": "See rental spaces, lease contracts and their installments"
+    },
+    "rental.space.manage": {
+      "label": "Manage rental spaces",
+      "description": "Add, edit, deactivate and archive rentable spaces"
+    },
+    "rental.contract.create": {
+      "label": "Create lease contracts",
+      "description": "Create new lease contracts and issue installment invoices"
+    },
+    "rental.contract.manage": {
+      "label": "Terminate / cancel leases",
+      "description": "End a lease early or cancel it"
     }
   },
   "platformStaff": {
@@ -6150,6 +6221,197 @@
           "Every edit control here runs off a real permission — so a custom role granted the right permission gets working edit access here too, just like a regular manager."
         ]
       }
+    }
+  },
+  "rentals": {
+    "title": "Rentals",
+    "description": "Manage rentable spaces, their lease contracts and installments — gyms, wedding halls, shops and more",
+    "branch": "Branch",
+    "save": "Save",
+    "saving": "Saving…",
+    "none": "None",
+    "moduleNotActive": {
+      "title": "Rentals isn't available yet",
+      "notEntitled": "This club's plan doesn't include the Rentals module yet. Contact support to enable it.",
+      "notActivated": "The Rentals module has been unlocked for this club but hasn't been turned on yet."
+    },
+    "tabs": {
+      "overview": "Overview",
+      "spaces": "Spaces",
+      "contracts": "Contracts",
+      "dues": "Dues & overdue"
+    },
+    "spaceTypes": {
+      "gym": "Gym",
+      "wedding_hall": "Wedding hall",
+      "event_hall": "Events hall",
+      "shop": "Shop unit",
+      "office": "Office",
+      "warehouse": "Warehouse",
+      "apartment": "Apartment / housing",
+      "sports_facility": "Sports facility",
+      "other": "Other",
+      "custom": "Custom type (type a name)"
+    },
+    "cycles": {
+      "daily": "Daily",
+      "monthly": "Monthly",
+      "quarterly": "Quarterly",
+      "semi_annual": "Semi-annual",
+      "annual": "Annual",
+      "custom": "Custom",
+      "customEvery": "Every {{count}} {{unit}}"
+    },
+    "customUnits": {
+      "day": "day(s)",
+      "week": "week(s)",
+      "month": "month(s)"
+    },
+    "paymentStates": {
+      "scheduled": "Scheduled",
+      "due_not_invoiced": "Due, not invoiced",
+      "unpaid": "Unpaid",
+      "partial": "Partially paid",
+      "paid": "Paid",
+      "overdue": "Overdue",
+      "cancelled": "Cancelled"
+    },
+    "overview": {
+      "loadError": "Couldn't load the rentals summary",
+      "spaces": "Rented / total spaces",
+      "occupancy": "Occupancy",
+      "activeContracts": "Active leases",
+      "collectedThisMonth": "Collected this month",
+      "dueThisMonth": "Due this month",
+      "overdue": "Overdue ({{count}})",
+      "expiringSoon": "Leases ending within 30 days",
+      "bySpace": "Collected this month by space",
+      "viewContracts": "All contracts",
+      "viewSpaces": "All spaces",
+      "reviewDues": "Review overdue installments ({{count}})"
+    },
+    "spaces": {
+      "add": "Add space",
+      "edit": "Edit space",
+      "name": "Space name",
+      "namePlaceholder": "e.g. Gym hall - first floor",
+      "type": "Space type",
+      "customType": "Custom type name",
+      "customTypePlaceholder": "e.g. Meeting room, pool, cafeteria",
+      "area": "Area (m²)",
+      "capacity": "Capacity (people)",
+      "defaultRent": "Default rent",
+      "descriptionLabel": "Description / notes",
+      "allowOverlap": "Allow more than one lease for the same dates",
+      "allowOverlapHint": "e.g. a divided space leased to several tenants at once",
+      "occupancy": "Current occupancy",
+      "occupied": "Rented",
+      "vacant": "Available",
+      "until": "until {{date}}",
+      "showArchived": "Show archived",
+      "deactivate": "Deactivate",
+      "activate": "Activate",
+      "archive": "Archive",
+      "restore": "Restore",
+      "statusLabels": {
+        "active": "Active",
+        "inactive": "Inactive",
+        "archived": "Archived"
+      },
+      "emptyTitle": "No spaces yet",
+      "emptyDescription": "Add your first rentable space (gym, wedding hall, shop...)",
+      "loadError": "Couldn't load spaces",
+      "saveError": "Couldn't save the space",
+      "statusError": "Couldn't change the space status",
+      "errors": {
+        "nameRequired": "Space name is required",
+        "branchRequired": "Choose a branch",
+        "customTypeRequired": "Type the custom type name"
+      }
+    },
+    "contracts": {
+      "new": "New lease",
+      "create": "Create lease",
+      "number": "Contract #",
+      "tenant": "Tenant",
+      "space": "Space",
+      "cycle": "Rent cycle",
+      "startDate": "Start date",
+      "endDate": "End date",
+      "customEvery": "Every (number)",
+      "customUnit": "Unit",
+      "cyclesCount": "Number of periods",
+      "cycleAmount": "Rent per period",
+      "deposit": "Security deposit",
+      "notes": "Notes / lease terms",
+      "totalRent": "Total lease value",
+      "firstInvoice": "First invoice (deposit + first period)",
+      "showSchedule": "Show installment schedule ({{count}})",
+      "hideSchedule": "Hide installment schedule",
+      "issueFirstInvoice": "Issue the first installment (and deposit) invoice now and go to collection",
+      "period": "Lease period",
+      "paid": "Paid",
+      "overdue": "Overdue",
+      "searchPlaceholder": "Search by name, contract # or space",
+      "allStatuses": "All statuses",
+      "statusLabels": {
+        "active": "Active",
+        "upcoming": "Upcoming",
+        "expired": "Ended",
+        "terminated": "Terminated early",
+        "cancelled": "Cancelled"
+      },
+      "emptyTitle": "No leases",
+      "emptyDescription": "Create the first lease for one of the club's spaces",
+      "customerEmpty": "This customer has no leases",
+      "loadError": "Couldn't load leases",
+      "errors": {
+        "customerRequired": "Choose the tenant",
+        "spaceRequired": "Choose the space",
+        "invalidSchedule": "The lease period details are invalid",
+        "createError": "Couldn't create the lease"
+      }
+    },
+    "detail": {
+      "title": "Lease",
+      "terminatedOn": "terminated on {{date}}",
+      "reason": "Reason",
+      "schedule": "Installment schedule",
+      "periodCol": "Period",
+      "dueDate": "Due date",
+      "amount": "Amount",
+      "paidCol": "Paid",
+      "select": "Select installment",
+      "depositShort": "Deposit",
+      "collect": "Collect",
+      "viewInvoice": "Invoice",
+      "issueSelected": "Invoice selected installments ({{count}})",
+      "terminate": "Terminate early",
+      "cancel": "Cancel lease",
+      "terminateHint": "Installments not yet invoiced after the termination date will be cancelled. Issued invoices stay as they are.",
+      "cancelHint": "Cancelling is only possible when nothing has been collected on this lease; its invoices will be voided.",
+      "terminationDate": "Termination date",
+      "confirmTerminate": "Confirm termination",
+      "confirmCancel": "Confirm cancellation",
+      "issueError": "Couldn't issue the invoice",
+      "terminateError": "Couldn't terminate the lease",
+      "cancelError": "Couldn't cancel the lease",
+      "totals": {
+        "paid": "Paid",
+        "outstanding": "Outstanding on invoices",
+        "overdue": "Overdue",
+        "notInvoiced": "Not invoiced yet"
+      }
+    },
+    "dues": {
+      "description": "Installments that are due and not fully paid, across all leases.",
+      "issueDue": "Invoice all due installments",
+      "issued": "{{count}} invoice(s) issued",
+      "issueError": "Couldn't issue the invoices",
+      "installment": "Installment",
+      "emptyTitle": "Nothing overdue",
+      "emptyDescription": "All due installments are paid",
+      "loadError": "Couldn't load dues"
     }
   }
 }
