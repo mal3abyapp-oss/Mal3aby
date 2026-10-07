@@ -40,18 +40,25 @@ import { DASHBOARD_POLL_INTERVAL_MS } from '@/lib/query/dashboardPolling'
 
 interface AttentionItem {
   id: string
-  kind: 'unpaid' | 'starting-soon' | 'expiring-subscription' | 'pending-payment-proof' | 'whatsapp-failed'
+  kind: 'unpaid' | 'starting-soon' | 'expiring-subscription' | 'pending-payment-proof' | 'whatsapp-failed' | 'rental-overdue' | 'rental-expiring'
   label: string
   detail: string
   to: string
 }
 
-async function fetchAttentionItems(clubId: string, t: TFunction, locale: 'ar' | 'en'): Promise<AttentionItem[]> {
+interface RentalAttentionSummary {
+  module_active: boolean
+  overdue_count?: number
+  overdue_amount?: number
+  expiring_30_days_count?: number
+}
+
+async function fetchAttentionItems(clubId: string, t: TFunction, locale: 'ar' | 'en', canViewRentals = false): Promise<AttentionItem[]> {
   const today = new Date().toISOString().slice(0, 10)
   const now = new Date()
   const soonCutoff = new Date(now.getTime() + 60 * 60 * 1000).toISOString() // next 60 min
 
-  const [unpaidRes, soonRes, expiringRes, pendingProofsRes, whatsappDiagRes] = await Promise.all([
+  const [unpaidRes, soonRes, expiringRes, pendingProofsRes, whatsappDiagRes, rentalRes] = await Promise.all([
     supabase
       .from('bookings')
       .select('id, start_at, total_price, invoice_id, customers(full_name)')
@@ -88,6 +95,11 @@ async function fetchAttentionItems(clubId: string, t: TFunction, locale: 'ar' | 
       .select('failed_count')
       .eq('club_id', clubId)
       .maybeSingle(),
+    // RENTALS MODULE: overdue rent + leases ending within 30 days. Only
+    // asked for when the caller can see rentals at all.
+    canViewRentals
+      ? supabase.rpc('get_rental_attention_summary', { p_club_id: clubId })
+      : Promise.resolve({ data: null }),
   ])
 
   const items: AttentionItem[] = []
@@ -164,6 +176,28 @@ async function fetchAttentionItems(clubId: string, t: TFunction, locale: 'ar' | 
   // per failed message -- that level of detail belongs on the WhatsApp
   // Activity tab, which this row links to) when any WhatsApp message
   // has permanently failed for this club.
+  const rental = rentalRes.data as unknown as RentalAttentionSummary | null
+  if (rental?.module_active) {
+    if ((rental.overdue_count ?? 0) > 0) {
+      items.push({
+        id: 'rental-overdue-summary',
+        kind: 'rental-overdue',
+        label: t('dashboard.attentionNeeded.rentalOverdue', { count: rental.overdue_count }),
+        detail: t('dashboard.attentionNeeded.amountEgp', { amount: Number(rental.overdue_amount ?? 0).toFixed(0) }),
+        to: '/app/rentals',
+      })
+    }
+    if ((rental.expiring_30_days_count ?? 0) > 0) {
+      items.push({
+        id: 'rental-expiring-summary',
+        kind: 'rental-expiring',
+        label: t('dashboard.attentionNeeded.rentalExpiring', { count: rental.expiring_30_days_count }),
+        detail: '',
+        to: '/app/rentals',
+      })
+    }
+  }
+
   const failedWhatsappCount = whatsappDiagRes.data?.failed_count ?? 0
   if (failedWhatsappCount > 0) {
     items.push({
@@ -184,11 +218,14 @@ const KIND_TONE = {
   'expiring-subscription': 'warning',
   'pending-payment-proof': 'warning',
   'whatsapp-failed': 'danger',
+  'rental-overdue': 'danger',
+  'rental-expiring': 'warning',
 } as const
 
 export function AttentionNeeded() {
   const { t } = useTranslation()
-  const { currentClubId } = useAuth()
+  const { currentClubId, currentMembership } = useAuth()
+  const canViewRentals = (currentMembership?.permissionKeys ?? []).includes('rental.view')
   const navigate = useNavigate()
   const { locale } = useDirection()
 
@@ -198,11 +235,13 @@ export function AttentionNeeded() {
     'expiring-subscription': t('dashboard.attentionNeeded.chipLabels.expiringSubscription'),
     'pending-payment-proof': t('dashboard.attentionNeeded.chipLabels.pendingPaymentProof'),
     'whatsapp-failed': t('dashboard.attentionNeeded.chipLabels.whatsappFailed'),
+    'rental-overdue': t('dashboard.attentionNeeded.chipLabels.rentalOverdue'),
+    'rental-expiring': t('dashboard.attentionNeeded.chipLabels.rentalExpiring'),
   }
 
   const { data: items = [], isLoading, isError, error, refetch } = useQuery({
-    queryKey: ['attention-needed', currentClubId, locale],
-    queryFn: () => fetchAttentionItems(currentClubId!, t, locale),
+    queryKey: ['attention-needed', currentClubId, locale, canViewRentals],
+    queryFn: () => fetchAttentionItems(currentClubId!, t, locale, canViewRentals),
     enabled: !!currentClubId,
     // PERF-04: shared with TodayPage/OwnerFinanceTransparency so the
     // three same-screen loops share one source of truth for cadence.

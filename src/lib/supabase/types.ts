@@ -9127,6 +9127,105 @@ export type Database = {
       }
     }
     Functions: {
+      // RENTALS MODULE (2026-10-07) -- 20261007100000_rentals_module.sql
+      upsert_rental_space: {
+        Args: {
+          p_allow_overlapping_contracts?: boolean
+          p_area_sqm?: number
+          p_branch_id: string
+          p_capacity?: number
+          p_club_id: string
+          p_custom_type_label?: string
+          p_default_rent_amount?: number
+          p_default_rent_cycle?: string
+          p_description?: string
+          p_name: string
+          p_space_id: string | null
+          p_space_type: string
+        }
+        Returns: string
+      }
+      set_rental_space_status: {
+        Args: { p_space_id: string; p_status: string }
+        Returns: undefined
+      }
+      list_rental_spaces: {
+        Args: { p_club_id: string; p_include_archived?: boolean }
+        Returns: Json
+      }
+      create_rental_contract: {
+        Args: {
+          p_club_id: string
+          p_customer_id: string
+          p_custom_cycle_unit?: string
+          p_custom_cycle_value?: number
+          p_cycle_amount: number
+          p_cycles_count: number
+          p_idempotency_key?: string
+          p_issue_first_invoice?: boolean
+          p_notes?: string
+          p_rent_cycle: string
+          p_security_deposit?: number
+          p_space_id: string
+          p_start_date: string
+        }
+        Returns: {
+          contract_id: string
+          contract_number: string
+          invoice_id: string | null
+        }[]
+      }
+      issue_rental_invoice: {
+        Args: { p_contract_id: string; p_discount?: number; p_installment_ids: string[] }
+        Returns: string
+      }
+      issue_due_rental_invoices: {
+        Args: { p_club_id: string; p_through_date?: string }
+        Returns: number
+      }
+      terminate_rental_contract: {
+        Args: { p_contract_id: string; p_reason: string; p_termination_date: string }
+        Returns: undefined
+      }
+      cancel_rental_contract: {
+        Args: { p_contract_id: string; p_reason: string }
+        Returns: undefined
+      }
+      list_rental_contracts: {
+        Args: {
+          p_club_id: string
+          p_customer_id?: string
+          p_space_id?: string
+          p_status?: string
+        }
+        Returns: Json
+      }
+      get_rental_contract_detail: {
+        Args: { p_contract_id: string }
+        Returns: Json
+      }
+      get_rental_report: {
+        Args: {
+          p_branch_id?: string
+          p_club_id: string
+          p_end_date: string
+          p_start_date: string
+        }
+        Returns: Json
+      }
+      get_revenue_by_source_report: {
+        Args: {
+          p_branch_id?: string
+          p_club_id: string
+          p_end_date: string
+          p_start_date: string
+        }
+        Returns: Json
+      }
+      get_rental_attention_summary: {
+        Args: { p_club_id: string }
+        Returns: Json
+      }
       _academy_module_active: { Args: { p_club_id: string }; Returns: boolean }
       _activate_club_membership_if_due_internal: {
         Args: { p_membership_subscription_id: string }

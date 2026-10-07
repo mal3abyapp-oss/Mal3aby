@@ -2,9 +2,10 @@ import { useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { cn } from '@/lib/utils'
-import { Wallet, HandCoins, Banknote, ReceiptText, ShieldCheck, Scale, UserX, CreditCard } from 'lucide-react'
+import { Wallet, PieChart, HandCoins, Banknote, ReceiptText, ShieldCheck, Scale, UserX, CreditCard } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 import { ReportRevenueContent } from '@/features/reports/ReportRevenuePage'
+import { ReportRevenueBySourceContent } from '@/features/reports/ReportRevenueBySourcePage'
 import { ReportCollectionsContent } from '@/features/reports/ReportCollectionsPage'
 import { ReportPaymentMethodsContent } from '@/features/reports/ReportPaymentMethodsPage'
 import { ReportExceptionsContent } from '@/features/reports/ReportExceptionsPage'
@@ -30,10 +31,11 @@ import { ReportEmployeeLiabilityContent } from '@/features/reports/ReportEmploye
 // reconciliation exceptions + webhook processing failures had no UI
 // consumer anywhere in the app; see ReportGatewayHealthPage.tsx's own
 // header comment for the full gap analysis).
-type ReportKey = 'revenue' | 'collections' | 'payment-methods' | 'exceptions' | 'official-receipts' | 'reconciliation' | 'gateway-health' | 'employee-liability'
+type ReportKey = 'revenue' | 'by-source' | 'collections' | 'payment-methods' | 'exceptions' | 'official-receipts' | 'reconciliation' | 'gateway-health' | 'employee-liability'
 
 const REPORT_TABS: { key: ReportKey; labelKey: string; icon: LucideIcon }[] = [
   { key: 'revenue', labelKey: 'finance.reportsPage.revenue', icon: Wallet },
+  { key: 'by-source', labelKey: 'finance.reportsPage.bySource', icon: PieChart },
   { key: 'collections', labelKey: 'finance.reportsPage.collections', icon: HandCoins },
   { key: 'payment-methods', labelKey: 'finance.reportsPage.paymentMethods', icon: Banknote },
   { key: 'exceptions', labelKey: 'finance.reportsPage.exceptions', icon: ReceiptText },
@@ -106,6 +108,7 @@ export function FinanceReportsPage() {
       </div>
 
       {reportKey === 'revenue' && <ReportRevenueContent />}
+      {reportKey === 'by-source' && <ReportRevenueBySourceContent />}
       {reportKey === 'collections' && <ReportCollectionsContent />}
       {reportKey === 'payment-methods' && <ReportPaymentMethodsContent />}
       {reportKey === 'exceptions' && <ReportExceptionsContent />}

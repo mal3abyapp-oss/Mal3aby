@@ -29,6 +29,7 @@ export type NavDomain =
   | 'customers'
   | 'academy'
   | 'memberships'
+  | 'rentals'
   | 'shop'
   | 'finance'
   | 'reports'
@@ -66,6 +67,10 @@ const NAV_DOMAIN_PERMISSIONS: Record<Exclude<NavDomain, 'today'>, readonly strin
   // design (COMMERCIAL_DOMAIN_ARCHITECTURE.md Section 3), not
   // conflated into one.
   shop: ['shop.view'],
+  // RENTALS MODULE (2026-10-07) -- same split as Shop: permission gates
+  // nav visibility; module entitlement/activation is checked separately
+  // by RequireRentalsModule at the route level.
+  rentals: ['rental.view', 'rental.space.manage', 'rental.contract.create', 'rental.contract.manage'],
   finance: ['payment.view', 'payment.create', 'invoice.view', 'invoice.create', 'payment.refund'],
   reports: ['report.view'],
   whatsapp: ['manage_whatsapp_connection'],

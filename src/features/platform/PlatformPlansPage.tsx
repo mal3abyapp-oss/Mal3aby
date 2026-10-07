@@ -36,7 +36,7 @@ interface PlanRow {
   default_academy_limit: number | null
 }
 
-const DEFAULT_MODULE_OPTIONS = ['fields', 'academy', 'shop', 'club_membership'] as const
+const DEFAULT_MODULE_OPTIONS = ['fields', 'academy', 'shop', 'club_membership', 'rentals'] as const
 
 async function fetchPlans(): Promise<PlanRow[]> {
   const { data, error } = await supabase.from('platform_plans').select('*').order('display_order')

@@ -122,6 +122,20 @@ const MESSAGE_RULES: Array<[RegExp, string, string]> = [
   // understand it's a subscription/entitlement issue, not a bug, and
   // know who to contact -- matching the directive's own example
   // Arabic copy verbatim.
+  // RENTALS MODULE (2026-10-07) -- create/terminate/cancel/invoice RPC
+  // exceptions from 20261007100000_rentals_module.sql.
+  [/the rentals module is not active for this club/i, 'وحدة الإيجارات غير مفعّلة لهذا النادي.', 'The Rentals module is not active for this club.'],
+  [/this space is already rented for overlapping dates/i, 'هذا المكان مؤجَّر بالفعل في فترة متداخلة مع التواريخ المختارة.', 'This space is already rented for overlapping dates.'],
+  [/this rental space is not available for new contracts/i, 'هذا المكان غير متاح لعقود جديدة (موقوف أو مؤرشف).', 'This space is not available for new contracts (inactive or archived).'],
+  [/cannot archive a space with an active contract/i, 'لا يمكن أرشفة مكان عليه عقد إيجار ساري.', "A space with an active lease can't be archived."],
+  [/cannot move a space with contracts to another branch/i, 'لا يمكن نقل مكان له عقود إلى فرع آخر.', "A space that has leases can't be moved to another branch."],
+  [/cannot cancel a contract with recorded payments/i, 'لا يمكن إلغاء عقد تم تحصيل مبالغ عليه — استرد المدفوعات أولًا أو أنهِ العقد بدلًا من الإلغاء.', "A lease with recorded payments can't be cancelled — refund first, or terminate it instead."],
+  [/termination date must fall within the contract period/i, 'تاريخ الإنهاء يجب أن يكون داخل مدة العقد.', 'The termination date must fall within the lease period.'],
+  [/only an active contract can be terminated/i, 'يمكن إنهاء العقود السارية فقط.', 'Only an active lease can be terminated.'],
+  [/one or more installments are not available for invoicing/i, 'بعض الأقساط المختارة صدرت لها فواتير بالفعل أو ملغاة.', 'Some selected installments are already invoiced or cancelled.'],
+  [/a custom space type name is required/i, 'اكتب اسم النوع المخصص للمكان.', 'Type a name for the custom space type.'],
+  [/a custom rent cycle requires a period length and unit/i, 'الإيجار المخصص يحتاج مدة ووحدة (أيام/أسابيع/شهور).', 'A custom rent cycle needs a length and a unit (days/weeks/months).'],
+  [/number of periods must be between 1 and 1000/i, 'عدد الفترات يجب أن يكون بين 1 و1000.', 'The number of periods must be between 1 and 1000.'],
   [/the shop module is not active for this club/i, 'المتجر غير متاح ضمن اشتراك ناديك. تواصل مع إدارة المنصة لتفعيله.', "The Shop isn't available on your club's current plan. Contact the platform team to activate it."],
   // Directive Section 18 ("invalid price" error-state provocation):
   // create_shop_product/update_shop_product/create_shop_product_variant/

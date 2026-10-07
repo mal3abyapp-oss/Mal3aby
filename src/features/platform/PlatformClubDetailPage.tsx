@@ -1664,6 +1664,7 @@ const MODULE_LABELS: Record<string, string> = {
   academy: 'platform.clubDetailPage.modules.academy',
   shop: 'platform.clubDetailPage.modules.shop',
   club_membership: 'platform.clubDetailPage.modules.clubMembership',
+  rentals: 'platform.clubDetailPage.modules.rentals',
 }
 
 async function fetchModules(clubId: string): Promise<ModuleRow[]> {

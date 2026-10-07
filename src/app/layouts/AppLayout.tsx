@@ -30,6 +30,7 @@ import {
   Building2,
   ShieldCheck,
   IdCard,
+  KeyRound,
   ShoppingCart,
   HelpCircle,
 } from 'lucide-react'
@@ -105,6 +106,7 @@ const navSections: NavSection[] = [
       // Club Memberships: a genuine top-level main domain, deliberately
       // never nested under Academy (directive Section 96/111).
       { to: '/app/memberships', labelKey: 'nav.memberships', icon: IdCard, domain: 'memberships' },
+      { to: '/app/rentals', labelKey: 'nav.rentals', icon: KeyRound, domain: 'rentals' },
       { to: '/app/finance', labelKey: 'nav.finance', icon: Receipt, domain: 'finance' },
     ],
   },

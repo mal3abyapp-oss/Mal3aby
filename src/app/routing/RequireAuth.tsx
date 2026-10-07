@@ -431,7 +431,20 @@ function RequireClubMembershipModule({ children }: { children: ReactNode }) {
   )
 }
 
-export { RequireAcademyModule, RequireFieldsModule, RequireClubMembershipModule }
+function RequireRentalsModule({ children }: { children: ReactNode }) {
+  return (
+    <RequireModule
+      moduleKey="rentals"
+      titleKey="rentals.moduleNotActive.title"
+      notEntitledKey="rentals.moduleNotActive.notEntitled"
+      notActivatedKey="rentals.moduleNotActive.notActivated"
+    >
+      {children}
+    </RequireModule>
+  )
+}
+
+export { RequireAcademyModule, RequireFieldsModule, RequireClubMembershipModule, RequireRentalsModule }
 
 // Guards /platform specifically — requires the platform_owner role on at
 // least one active membership. Real enforcement is still server-side

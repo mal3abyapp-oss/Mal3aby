@@ -37,6 +37,7 @@ import { CLUB_MEMBERSHIP_STATUS_TONE } from '@/lib/domain/clubMembership'
 import { actionLabel } from '@/lib/domain/audit'
 import { MemberDetailDialog } from '@/features/memberships/MemberDetailDialog'
 import { SellMembershipWizard } from '@/features/memberships/SellMembershipWizard'
+import { CustomerRentalsTab } from '@/features/rentals/CustomerRentalsTab'
 import { ArrowLeft, Wallet, Calendar, GraduationCap, MessageCircle, AlertTriangle } from 'lucide-react'
 
 // Customer 360 directive: "ONE CUSTOMER, ONE SOURCE OF TRUTH." Replaces
@@ -48,7 +49,7 @@ import { ArrowLeft, Wallet, Calendar, GraduationCap, MessageCircle, AlertTriangl
 // siblings -- never a snapshot field on the customer row itself (the
 // directive's explicit "UI TOTAL = DB AGGREGATION" requirement).
 
-type TabKey = 'overview' | 'bookings' | 'academy' | 'clubMembership' | 'products' | 'financial' | 'whatsapp' | 'activity'
+type TabKey = 'overview' | 'bookings' | 'academy' | 'clubMembership' | 'rentals' | 'products' | 'financial' | 'whatsapp' | 'activity'
 
 interface Summary {
   customer: {
@@ -206,6 +207,7 @@ export function Customer360Page() {
   const [sellMembershipOpen, setSellMembershipOpen] = useState(false)
   const [selectedMembershipId, setSelectedMembershipId] = useState<string | null>(null)
   const canCreateMembership = (currentMembership?.permissionKeys ?? []).includes('club_membership.create')
+  const canViewRentals = (currentMembership?.permissionKeys ?? []).includes('rental.view')
 
   const { data: summary, isLoading: summaryLoading } = useQuery({
     queryKey: ['customer-360-summary', currentClubId, customerId],
@@ -392,6 +394,7 @@ export function Customer360Page() {
           <TabsTrigger value="bookings">{t('customers.detail.tabs.bookings', { defaultValue: 'Bookings' })}</TabsTrigger>
           <TabsTrigger value="academy">{t('customers.detail.tabs.academy', { defaultValue: 'Academy & Players' })}</TabsTrigger>
           <TabsTrigger value="clubMembership">{t('customers.detail.tabs.clubMembership')}</TabsTrigger>
+          {canViewRentals && <TabsTrigger value="rentals">{t('customers.detail.tabs.rentals')}</TabsTrigger>}
           <TabsTrigger value="products">{t('customers.detail.tabs.products')}</TabsTrigger>
           <TabsTrigger value="financial">{t('customers.detail.tabs.financial', { defaultValue: 'Financial Account' })}</TabsTrigger>
           <TabsTrigger value="whatsapp">{t('customers.detail.tabs.whatsapp', { defaultValue: 'WhatsApp & Communication' })}</TabsTrigger>
@@ -568,6 +571,15 @@ export function Customer360Page() {
             />
           </div>
         </TabsContent>
+
+        {canViewRentals && (
+          <TabsContent value="rentals">
+            <CustomerRentalsTab
+              customer={{ id: c.id, fullName: c.full_name, mobileDisplay: c.mobile_display }}
+              onChanged={invalidateAll}
+            />
+          </TabsContent>
+        )}
 
         <TabsContent value="products">
           <div className="mt-4">

@@ -4,7 +4,7 @@ import { PublicLayout } from '@/app/layouts/PublicLayout'
 import { AppLayout } from '@/app/layouts/AppLayout'
 import { PlatformLayout } from '@/app/layouts/PlatformLayout'
 import { PortalLayout } from '@/app/layouts/PortalLayout'
-import { RequireAuth, RequireGuest, RequireNavDomain, RequirePlatformOwner, RequirePortalAuth, RequirePortalCustomer, RequireShopModule, RequireAcademyModule, RequireFieldsModule, RequireClubMembershipModule } from '@/app/routing/RequireAuth'
+import { RequireAuth, RequireGuest, RequireNavDomain, RequirePlatformOwner, RequirePortalAuth, RequirePortalCustomer, RequireShopModule, RequireAcademyModule, RequireFieldsModule, RequireClubMembershipModule, RequireRentalsModule } from '@/app/routing/RequireAuth'
 import { RedirectWithSearch } from '@/app/routing/RedirectWithSearch'
 import { RouteLoadingFallback } from '@/app/routing/RouteLoadingFallback'
 
@@ -33,6 +33,7 @@ const MorePage = lazy(() => import('@/features/dashboard/MorePage').then((m) => 
 const BookingsPage = lazy(() => import('@/features/bookings/BookingsPage').then((m) => ({ default: m.BookingsPage })))
 const AcademyPage = lazy(() => import('@/features/academy/AcademyPage').then((m) => ({ default: m.AcademyPage })))
 const MembershipsPage = lazy(() => import('@/features/memberships/MembershipsPage').then((m) => ({ default: m.MembershipsPage })))
+const RentalsPage = lazy(() => import('@/features/rentals/RentalsPage').then((m) => ({ default: m.RentalsPage })))
 const Player360Page = lazy(() => import('@/features/academy/Player360Page').then((m) => ({ default: m.Player360Page })))
 const CustomersPage = lazy(() => import('@/features/customers/CustomersPage').then((m) => ({ default: m.CustomersPage })))
 const Customer360Page = lazy(() => import('@/features/customers/Customer360Page').then((m) => ({ default: m.Customer360Page })))
@@ -75,6 +76,8 @@ const ReportGatewayHealthPage = lazy(() => import('@/features/reports/ReportGate
 const ReportEmployeeLiabilityPage = lazy(() => import('@/features/reports/ReportEmployeeLiabilityPage').then((m) => ({ default: m.ReportEmployeeLiabilityPage })))
 const ReportAcademyPage = lazy(() => import('@/features/reports/ReportAcademyPage').then((m) => ({ default: m.ReportAcademyPage })))
 const ReportCustomersPage = lazy(() => import('@/features/reports/ReportCustomersPage').then((m) => ({ default: m.ReportCustomersPage })))
+const ReportRentalsPage = lazy(() => import('@/features/reports/ReportRentalsPage').then((m) => ({ default: m.ReportRentalsPage })))
+const ReportRevenueBySourcePage = lazy(() => import('@/features/reports/ReportRevenueBySourcePage').then((m) => ({ default: m.ReportRevenueBySourcePage })))
 const StaffPage = lazy(() => import('@/features/staff/StaffPage').then((m) => ({ default: m.StaffPage })))
 const Employee360Page = lazy(() => import('@/features/staff/Employee360Page').then((m) => ({ default: m.Employee360Page })))
 const RolesPage = lazy(() => import('@/features/staff/RolesPage').then((m) => ({ default: m.RolesPage })))
@@ -245,6 +248,7 @@ export const router = createBrowserRouter([
           { path: 'bookings', element: <RequireNavDomain domain="bookings"><RequireFieldsModule><BookingsPage /></RequireFieldsModule></RequireNavDomain> },
           { path: 'academy', element: <RequireNavDomain domain="academy"><RequireAcademyModule><AcademyPage /></RequireAcademyModule></RequireNavDomain> },
           { path: 'memberships', element: <RequireNavDomain domain="memberships"><RequireClubMembershipModule><MembershipsPage /></RequireClubMembershipModule></RequireNavDomain> },
+          { path: 'rentals', element: <RequireNavDomain domain="rentals"><RequireRentalsModule><RentalsPage /></RequireRentalsModule></RequireNavDomain> },
           // Academy Player/Guardian/Customer integrity closure: the
           // canonical Player 360 detail/edit page, same pattern as
           // Customer 360 (/app/customers/:customerId) and Staff 360
@@ -351,6 +355,8 @@ export const router = createBrowserRouter([
           { path: 'reports/employee-liability', element: <RequireNavDomain domain="reports"><ReportEmployeeLiabilityPage /></RequireNavDomain> },
           { path: 'reports/academy', element: <RequireNavDomain domain="reports"><ReportAcademyPage /></RequireNavDomain> },
           { path: 'reports/customers', element: <RequireNavDomain domain="reports"><ReportCustomersPage /></RequireNavDomain> },
+          { path: 'reports/rentals', element: <RequireNavDomain domain="reports"><RequireRentalsModule><ReportRentalsPage /></RequireRentalsModule></RequireNavDomain> },
+          { path: 'reports/revenue-by-source', element: <RequireNavDomain domain="reports"><ReportRevenueBySourcePage /></RequireNavDomain> },
           // COMMERCIAL MODULE ARCHITECTURE (2026-08-26) -- gated on
           // BOTH 'reports' (report.view) and shop being a real module
           // (RequireShopModule) -- a club without Shop entitled/active
