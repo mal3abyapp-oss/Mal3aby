@@ -87,6 +87,14 @@ select public._rentals_migration_patch_function(
   $x$('fields', 'academy', 'shop', 'club_membership', 'rentals')$x$
 );
 
+-- update_platform_plan validates default_modules against its own list;
+-- without this, saving any plan (which now carries 'rentals') fails.
+select public._rentals_migration_patch_function(
+  'public.update_platform_plan(uuid, text, numeric, text, text[], integer, integer, integer)'::regprocedure,
+  $x$('fields', 'academy', 'shop', 'club_membership')$x$,
+  $x$('fields', 'academy', 'shop', 'club_membership', 'rentals')$x$
+);
+
 select public._rentals_migration_patch_function(
   'public.complete_new_club_onboarding(text, text, text, text, text, text, text, text, boolean, text, text)'::regprocedure,
   $x$(v_club_id, 'shop', true, false)$x$,
