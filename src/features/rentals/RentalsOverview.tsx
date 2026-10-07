@@ -33,6 +33,13 @@ export function RentalsOverview({ onNavigateTab }: { onNavigateTab: (tab: 'space
           icon={AlertTriangle}
           tone={Number(data.overdue_total) > 0 ? 'danger' : 'default'}
         />
+        <StatCard label={t('reports.rentals.depositsHeld')} value={<MoneyDisplay amount={Number(data.deposits_held)} size="lg" />} />
+        {Number(data.late_fees_in_range) > 0 && (
+          <StatCard label={t('reports.rentals.lateFees')} value={<MoneyDisplay amount={Number(data.late_fees_in_range)} size="lg" />} />
+        )}
+        {Number(data.expenses_in_range) > 0 && (
+          <StatCard label={t('reports.rentals.net')} value={<MoneyDisplay amount={Number(data.net_in_range)} size="lg" />} tone="success" />
+        )}
       </div>
 
       <div className="grid gap-4 md:grid-cols-2">
@@ -48,7 +55,7 @@ export function RentalsOverview({ onNavigateTab }: { onNavigateTab: (tab: 'space
               {data.expiring_soon.map((c) => (
                 <li key={c.contract_id} className="flex justify-between rounded-md border border-border p-2 text-sm">
                   <span>{c.customer_name} · {c.space_name}</span>
-                  <span className="tabular-nums">{c.end_date}</span>
+                  <span className="tabular-nums">{c.end_date}{c.renewed ? ` · ${t('rentals.renew.renewedBadge')}` : ''}</span>
                 </li>
               ))}
             </ul>
@@ -66,7 +73,14 @@ export function RentalsOverview({ onNavigateTab }: { onNavigateTab: (tab: 'space
               {data.by_space.map((s) => (
                 <li key={s.space_id} className="flex items-center justify-between rounded-md border border-border p-2 text-sm">
                   <span>{s.space_name} <span className="text-xs text-text-secondary">· {s.occupied_today ? t('rentals.spaces.occupied') : t('rentals.spaces.vacant')}</span></span>
-                  <MoneyDisplay amount={Number(s.collected)} size="sm" />
+                  <span className="text-end">
+                    <MoneyDisplay amount={Number(s.collected)} size="sm" />
+                    {Number(s.expenses) > 0 && (
+                      <span className="block text-xs text-text-secondary">
+                        {t('reports.rentals.net')}: <MoneyDisplay amount={Number(s.net)} size="sm" />
+                      </span>
+                    )}
+                  </span>
                 </li>
               ))}
             </ul>

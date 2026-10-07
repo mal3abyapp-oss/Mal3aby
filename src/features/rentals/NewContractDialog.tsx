@@ -12,7 +12,7 @@ import { CustomerSelector, type SelectedCustomer } from '@/components/ui/custome
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import {
-  CUSTOM_CYCLE_UNITS, RENT_CYCLES, previewRentalSchedule, rentalSpaceTypeLabel,
+  CUSTOM_CYCLE_UNITS, RENT_CYCLES, addHoursToTime, previewRentalSchedule, rentalSpaceTypeLabel,
   type CustomCycleUnit, type RentCycle,
 } from '@/lib/domain/rental'
 import { useRentalPermissions, useRentalSpaces } from './hooks'
@@ -23,15 +23,19 @@ import { Field } from './Field'
 // semi-annual / annual / custom every N days|weeks|months) -> number of
 // periods -> amount per period -> optional security deposit. The full
 // installment schedule is previewed live with the same date math the
-// server uses. On success the first invoice (deposit + first period)
-// opens in Finance > Payments for collection, exactly like a membership
-// sale.
+// server uses. Hourly bookings (halls) take a start time and a number of
+// hours on one day; long leases can carry an annual rent increase that
+// compounds every contract year. On success the first rent invoice opens
+// in Finance > Payments for collection; the security deposit is issued
+// on its own invoice (it is a liability, refundable on settlement), so
+// when there is one the contract opens instead and both are collectable
+// from there.
 
 export function NewContractDialog({
   onClose, onCreated, initialSpaceId, initialCustomer,
 }: {
   onClose: () => void
-  onCreated: () => void
+  onCreated: (contractId?: string) => void
   initialSpaceId?: string
   initialCustomer?: SelectedCustomer
 }) {
@@ -52,6 +56,8 @@ export function NewContractDialog({
   const [cyclesCount, setCyclesCount] = useState('12')
   const [amount, setAmount] = useState(space?.default_rent_amount != null ? String(space.default_rent_amount) : '')
   const [deposit, setDeposit] = useState('0')
+  const [increasePct, setIncreasePct] = useState('0')
+  const [startTime, setStartTime] = useState('18:00')
   const [startDate, setStartDate] = useState(() => new Date().toISOString().slice(0, 10))
   const [notes, setNotes] = useState('')
   const [issueFirst, setIssueFirst] = useState(true)
@@ -65,21 +71,29 @@ export function NewContractDialog({
     if (s?.default_rent_amount != null) setAmount(String(s.default_rent_amount))
   }
 
+  const isHourly = cycle === 'hourly'
+  const endTime = isHourly ? addHoursToTime(startTime, Number(cyclesCount)) : null
   const preview = useMemo(
     () => previewRentalSchedule(
       startDate,
       { cycle, customValue: Number(customValue), customUnit },
       Number(cyclesCount),
       Number(amount || 0),
+      cycle === 'hourly' ? 0 : Number(increasePct || 0),
     ),
-    [startDate, cycle, customValue, customUnit, cyclesCount, amount],
+    [startDate, cycle, customValue, customUnit, cyclesCount, amount, increasePct],
   )
+
+  function selectCycle(next: RentCycle) {
+    setCycle(next)
+    if (next === 'hourly' && Number(cyclesCount) > 24) setCyclesCount('4')
+  }
 
   const createMutation = useMutation({
     mutationFn: async () => {
       if (!customer?.id) throw new Error(t('rentals.contracts.errors.customerRequired'))
       if (!spaceId) throw new Error(t('rentals.contracts.errors.spaceRequired'))
-      if (!preview.endDate) throw new Error(t('rentals.contracts.errors.invalidSchedule'))
+      if (!preview.endDate || (isHourly && !endTime)) throw new Error(t('rentals.contracts.errors.invalidSchedule'))
       const { data, error: rpcError } = await supabase.rpc('create_rental_contract', {
         p_club_id: currentClubId!,
         p_space_id: spaceId,
@@ -94,11 +108,19 @@ export function NewContractDialog({
         p_notes: notes.trim() || undefined,
         p_issue_first_invoice: issueFirst,
         p_idempotency_key: idempotencyKey.current,
+        p_annual_increase_pct: isHourly ? 0 : Number(increasePct || 0),
+        p_start_time: isHourly ? startTime : undefined,
       })
       if (rpcError) throw rpcError
       return data?.[0]
     },
     onSuccess: (row) => {
+      if (row?.deposit_invoice_id) {
+        // Rent and deposit are two invoices -- open the contract so both
+        // can be collected from its schedule.
+        onCreated(row.contract_id)
+        return
+      }
       onCreated()
       if (row?.invoice_id && canCollect) {
         navigate(`/app/finance/payments?invoice=${row.invoice_id}`)
@@ -108,6 +130,7 @@ export function NewContractDialog({
   })
 
   const canSubmit = !!customer?.id && !!spaceId && !!preview.endDate && Number(amount) >= 0 && amount !== ''
+    && (!isHourly || !!endTime)
 
   return (
     <Dialog open onOpenChange={(open) => !open && onClose()}>
@@ -135,7 +158,7 @@ export function NewContractDialog({
 
           <div className="flex gap-2">
             <Field label={t('rentals.contracts.cycle')} className="flex-1">
-              <Select value={cycle} onValueChange={(v) => setCycle(v as RentCycle)}>
+              <Select value={cycle} onValueChange={(v) => selectCycle(v as RentCycle)}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
                   {RENT_CYCLES.map((c) => <SelectItem key={c} value={c}>{t(`rentals.cycles.${c}`)}</SelectItem>)}
@@ -163,11 +186,22 @@ export function NewContractDialog({
             </div>
           )}
 
+          {isHourly && (
+            <div className="flex gap-2">
+              <Field label={t('rentals.contracts.startTime')} className="flex-1">
+                <Input type="time" value={startTime} onChange={(e) => setStartTime(e.target.value)} />
+              </Field>
+              <Field label={t('rentals.contracts.endTime')} className="flex-1">
+                <Input disabled value={endTime ?? t('rentals.contracts.errors.pastMidnight')} />
+              </Field>
+            </div>
+          )}
+
           <div className="flex gap-2">
-            <Field label={t('rentals.contracts.cyclesCount')} className="flex-1">
-              <Input type="number" min={1} max={1000} value={cyclesCount} onChange={(e) => setCyclesCount(e.target.value)} />
+            <Field label={isHourly ? t('rentals.contracts.hoursCount') : t('rentals.contracts.cyclesCount')} className="flex-1">
+              <Input type="number" min={1} max={isHourly ? 24 : 1000} value={cyclesCount} onChange={(e) => setCyclesCount(e.target.value)} />
             </Field>
-            <Field label={t('rentals.contracts.cycleAmount')} className="flex-1">
+            <Field label={isHourly ? t('rentals.contracts.hourlyRate') : t('rentals.contracts.cycleAmount')} className="flex-1">
               <Input type="number" min={0} value={amount} onChange={(e) => setAmount(e.target.value)} />
             </Field>
           </div>
@@ -180,6 +214,13 @@ export function NewContractDialog({
               <Input disabled value={preview.endDate ?? '—'} />
             </Field>
           </div>
+
+          {!isHourly && (
+            <Field label={t('rentals.contracts.annualIncrease')}>
+              <Input type="number" min={0} max={100} step="0.5" value={increasePct} onChange={(e) => setIncreasePct(e.target.value)} />
+              {Number(increasePct) > 0 && <span className="text-xs text-text-secondary">{t('rentals.contracts.annualIncreaseHint')}</span>}
+            </Field>
+          )}
 
           <Field label={t('rentals.contracts.notes')}>
             <textarea
@@ -204,8 +245,11 @@ export function NewContractDialog({
               )}
               <div className="mt-1 flex justify-between border-t border-accent/20 pt-1 font-semibold">
                 <span>{t('rentals.contracts.firstInvoice')}</span>
-                <MoneyDisplay amount={Number(amount || 0) + Number(deposit || 0)} size="sm" />
+                <MoneyDisplay amount={preview.rows[0]?.amount ?? 0} size="sm" />
               </div>
+              {Number(deposit) > 0 && (
+                <p className="mt-1 text-xs text-text-secondary">{t('rentals.contracts.depositSeparate')}</p>
+              )}
               <button type="button" className="mt-2 text-xs text-accent-foreground underline" onClick={() => setShowSchedule((v) => !v)}>
                 {showSchedule ? t('rentals.contracts.hideSchedule') : t('rentals.contracts.showSchedule', { count: preview.rows.length })}
               </button>

@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useMutation, useQuery } from '@tanstack/react-query'
-import { Building, Pencil, Plus } from 'lucide-react'
+import { Building, CalendarDays, Pencil, Plus, Wallet } from 'lucide-react'
 import { supabase } from '@/lib/supabase/client'
 import { useAuth } from '@/app/providers/AuthProvider'
 import { translateSupabaseError } from '@/lib/errors'
@@ -17,6 +17,9 @@ import { RENTAL_SPACE_TYPES, RENT_CYCLES, rentalSpaceTypeLabel, rentCycleLabel }
 import { useInvalidateRentals, useRentalPermissions, useRentalSpaces } from './hooks'
 import type { RentalSpaceRow } from './types'
 import { NewContractDialog } from './NewContractDialog'
+import { ContractDetailDialog } from './ContractDetailDialog'
+import { SpaceCalendarDialog } from './SpaceCalendarDialog'
+import { SpaceExpensesDialog } from './SpaceExpensesDialog'
 import { Field } from './Field'
 
 const SPACE_STATUS_TONE = { active: 'success', inactive: 'warning', archived: 'neutral' } as const
@@ -28,6 +31,9 @@ export function SpacesSection() {
   const [showArchived, setShowArchived] = useState(false)
   const [editing, setEditing] = useState<RentalSpaceRow | 'new' | null>(null)
   const [rentSpaceId, setRentSpaceId] = useState<string | null>(null)
+  const [calendarSpace, setCalendarSpace] = useState<RentalSpaceRow | null>(null)
+  const [expensesSpace, setExpensesSpace] = useState<RentalSpaceRow | null>(null)
+  const [openContractId, setOpenContractId] = useState<string | null>(null)
   const [actionError, setActionError] = useState<string | null>(null)
   const { data: spaces = [], isLoading, isError, error, refetch } = useRentalSpaces(showArchived)
 
@@ -46,6 +52,8 @@ export function SpacesSection() {
     hideOnCard: true,
     render: (s) => (
       <div className="flex flex-wrap justify-end gap-1">
+        <Button size="sm" variant="ghost" aria-label={t('rentals.calendar.open')} title={t('rentals.calendar.open')} onClick={() => setCalendarSpace(s)}><CalendarDays /></Button>
+        <Button size="sm" variant="ghost" aria-label={t('rentals.expenses.open')} title={t('rentals.expenses.open')} onClick={() => setExpensesSpace(s)}><Wallet /></Button>
         {canCreateContracts && s.status === 'active' && (
           <Button size="sm" variant="outline" onClick={() => setRentSpaceId(s.id)}>{t('rentals.contracts.new')}</Button>
         )}
@@ -153,8 +161,23 @@ export function SpacesSection() {
         <NewContractDialog
           initialSpaceId={rentSpaceId}
           onClose={() => setRentSpaceId(null)}
-          onCreated={() => { setRentSpaceId(null); invalidate() }}
+          onCreated={(id) => { setRentSpaceId(null); invalidate(); if (id) setOpenContractId(id) }}
         />
+      )}
+
+      {calendarSpace && (
+        <SpaceCalendarDialog
+          space={calendarSpace}
+          onClose={() => setCalendarSpace(null)}
+          onOpenContract={(id) => setOpenContractId(id)}
+          onNewBooking={() => { setRentSpaceId(calendarSpace.id); setCalendarSpace(null) }}
+        />
+      )}
+
+      {expensesSpace && <SpaceExpensesDialog space={expensesSpace} onClose={() => setExpensesSpace(null)} />}
+
+      {openContractId && (
+        <ContractDetailDialog contractId={openContractId} onClose={() => setOpenContractId(null)} onChanged={invalidate} />
       )}
     </div>
   )

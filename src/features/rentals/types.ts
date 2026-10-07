@@ -39,9 +39,16 @@ export interface RentalContractRow {
   cycle_amount: number
   total_rent: number
   security_deposit: number
+  deposit_held: number
+  deposit_settled: boolean
+  annual_increase_pct: number
   start_date: string
   end_date: string
+  start_time: string | null
+  end_time: string | null
   termination_date: string | null
+  renewed_from_contract_id: string | null
+  renewed: boolean
   status: 'active' | 'terminated' | 'cancelled'
   display_status: 'active' | 'upcoming' | 'expired' | 'terminated' | 'cancelled'
   invoiced: number
@@ -55,7 +62,7 @@ export interface RentalContractRow {
 
 export interface RentalInstallmentRow {
   id: string
-  kind: 'rent' | 'deposit'
+  kind: 'rent' | 'deposit' | 'late_fee'
   sequence: number
   period_start: string
   period_end: string
@@ -83,15 +90,31 @@ export interface RentalContractDetail {
     security_deposit: number
     start_date: string
     end_date: string
+    start_time: string | null
+    end_time: string | null
+    annual_increase_pct: number
+    renewed_from_contract_id: string | null
+    deposit_refunded: number
+    deposit_kept: number
+    deposit_settled_at: string | null
+    deposit_settlement_note: string | null
     status: 'active' | 'terminated' | 'cancelled'
     notes: string | null
     termination_date: string | null
     termination_reason: string | null
     cancel_reason: string | null
+    created_at: string
   }
   display_status: string
-  space: { id: string; name: string; space_type: string; custom_type_label: string | null; branch_name: string }
-  customer: { id: string; full_name: string; mobile_display: string | null }
+  today: string
+  club: { name: string; name_ar: string | null; logo_url: string | null } | null
+  space: {
+    id: string; name: string; space_type: string; custom_type_label: string | null; branch_name: string
+    branch_address: string | null; area_sqm: number | null; capacity: number | null
+  }
+  customer: { id: string; full_name: string; mobile_display: string | null; national_id: string | null; address: string | null }
+  renewed_from: { id: string; contract_number: string } | null
+  renewed_to: { id: string; contract_number: string } | null
   installments: RentalInstallmentRow[]
   totals: {
     scheduled_total: number
@@ -100,6 +123,11 @@ export interface RentalContractDetail {
     outstanding: number
     not_invoiced: number
     overdue: number
+    late_fees: number
+    deposit_collected: number
+    deposit_held: number
+    deposit_refunded: number
+    deposit_kept: number
   }
 }
 
@@ -110,12 +138,18 @@ export interface RentalReport {
   new_contracts_in_range: number
   contract_value_in_range: number
   collected_in_range: number
+  deposits_collected_in_range: number
+  late_fees_in_range: number
+  expenses_in_range: number
+  net_in_range: number
   due_in_range: number
   outstanding_total: number
   overdue_total: number
   overdue_count: number
   not_invoiced_due_count: number
   deposits_held: number
+  deposits_refunded: number
+  deposits_kept: number
   by_space: {
     space_id: string
     space_name: string
@@ -123,6 +157,8 @@ export interface RentalReport {
     custom_type_label: string | null
     occupied_today: boolean
     collected: number
+    expenses: number
+    net: number
     outstanding: number
   }[]
   by_cycle: { rent_cycle: string; contracts: number; value: number }[]
@@ -132,7 +168,7 @@ export interface RentalReport {
     contract_number: string
     customer_name: string
     space_name: string
-    kind: 'rent' | 'deposit'
+    kind: 'rent' | 'deposit' | 'late_fee'
     sequence: number
     due_date: string
     amount: number
@@ -146,5 +182,61 @@ export interface RentalReport {
     customer_name: string
     space_name: string
     end_date: string
+    renewed: boolean
+  }[]
+}
+
+export interface RentalSettings {
+  auto_issue_invoices: boolean
+  issue_days_before: number
+  late_fee_type: 'none' | 'fixed' | 'percent'
+  late_fee_value: number
+  late_fee_grace_days: number
+  whatsapp_reminders_enabled: boolean
+  reminder_days_before: number
+  whatsapp_templates_live: boolean
+}
+
+export interface RentalSpaceExpense {
+  id: string
+  amount: number
+  description: string
+  expense_date: string
+  payment_method: string
+  paid_to: string | null
+  status: string
+}
+
+export interface PortalRentalContract {
+  id: string
+  club_id: string
+  club_name: string
+  club_name_ar: string | null
+  contract_number: string
+  space_name: string
+  space_type: string
+  custom_type_label: string | null
+  branch_name: string
+  rent_cycle: string
+  custom_cycle_value: number | null
+  custom_cycle_unit: string | null
+  start_date: string
+  end_date: string
+  start_time: string | null
+  end_time: string | null
+  termination_date: string | null
+  status: 'active' | 'terminated' | 'cancelled'
+  security_deposit: number
+  installments: {
+    kind: 'rent' | 'deposit' | 'late_fee'
+    sequence: number
+    period_start: string
+    period_end: string
+    due_date: string
+    amount: number
+    paid: number
+    outstanding: number
+    payment_state: string
+    invoice_number: string | null
   }[]
 }

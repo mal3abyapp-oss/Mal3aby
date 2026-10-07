@@ -4,6 +4,10 @@ import { supabase } from '@/lib/supabase/client'
 import { useAuth } from '@/app/providers/AuthProvider'
 import { fromInstant } from '@/lib/domain/time'
 
+interface LooseRpcClient {
+  rpc: (fn: string, args: Record<string, string>) => PromiseLike<{ data: unknown; error: unknown }>
+}
+
 // Master IA/UX audit (Reports decomposition phase): every report screen
 // used to hand-write the identical useQuery boilerplate -- same
 // queryKey shape, same `enabled: !!currentClubId`, same
@@ -117,7 +121,9 @@ export function useDateRangeReport<T>(
       // typo-safety on static call sites) -- this hook is intentionally
       // generic over any date-range report RPC, so the literal-union
       // check is cast away here, once, rather than at every call site.
-      const { data, error } = await supabase.rpc(rpcName as Parameters<typeof supabase.rpc>[0], params)
+      // (Cast the client, not the name: indexing the full generated
+      // function union here exceeds TypeScript's instantiation depth.)
+      const { data, error } = await (supabase as unknown as LooseRpcClient).rpc(rpcName, params)
       if (error) throw error
       return data as unknown as T
     },

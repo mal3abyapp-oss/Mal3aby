@@ -1,11 +1,17 @@
 import { useState } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
+import { Settings } from 'lucide-react'
 import { PageHeader } from '@/components/ui/page-header'
+import { Button } from '@/components/ui/button'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { RentalsOverview } from './RentalsOverview'
 import { SpacesSection } from './SpacesSection'
 import { ContractsSection } from './ContractsSection'
 import { DuesSection } from './DuesSection'
+import { RentalSettingsDialog } from './RentalSettingsDialog'
+import { ContractDetailDialog } from './ContractDetailDialog'
+import { useInvalidateRentals, useRentalPermissions } from './hooks'
 
 // Rentals -- staff module for leasing club-owned spaces (gym, wedding
 // hall, shop unit, ... or any custom-named type). Same PageHeader + Tabs
@@ -18,10 +24,31 @@ type RentalsTab = 'overview' | 'spaces' | 'contracts' | 'dues'
 export function RentalsPage() {
   const { t } = useTranslation()
   const [activeTab, setActiveTab] = useState<RentalsTab>('overview')
+  const [settingsOpen, setSettingsOpen] = useState(false)
+  const { canManageContracts } = useRentalPermissions()
+  const invalidate = useInvalidateRentals()
+  // ?contract=<id> (from Global Search) opens that lease directly.
+  const [searchParams, setSearchParams] = useSearchParams()
+  const linkedContractId = searchParams.get('contract')
 
   return (
     <div>
-      <PageHeader title={t('rentals.title')} description={t('rentals.description')} />
+      <PageHeader
+        title={t('rentals.title')}
+        description={t('rentals.description')}
+        actions={canManageContracts ? (
+          <Button variant="outline" size="sm" onClick={() => setSettingsOpen(true)}><Settings />{t('rentals.settings.open')}</Button>
+        ) : undefined}
+      />
+      {settingsOpen && <RentalSettingsDialog onClose={() => setSettingsOpen(false)} />}
+      {linkedContractId && (
+        <ContractDetailDialog
+          key={linkedContractId}
+          contractId={linkedContractId}
+          onClose={() => setSearchParams((p) => { p.delete('contract'); return p }, { replace: true })}
+          onChanged={invalidate}
+        />
+      )}
 
       <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as RentalsTab)}>
         <TabsList>

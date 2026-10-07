@@ -117,7 +117,7 @@ export function ContractsSection() {
       )}
 
       {newOpen && (
-        <NewContractDialog onClose={() => setNewOpen(false)} onCreated={() => { setNewOpen(false); invalidate() }} />
+        <NewContractDialog onClose={() => setNewOpen(false)} onCreated={(id) => { setNewOpen(false); invalidate(); if (id) setSelectedId(id) }} />
       )}
       {selectedId && (
         <ContractDetailDialog contractId={selectedId} onClose={() => setSelectedId(null)} onChanged={invalidate} />

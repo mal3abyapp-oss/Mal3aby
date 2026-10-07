@@ -74,7 +74,7 @@ export function CustomerRentalsTab({ customer, onChanged }: { customer: Selected
         />
       )}
       {newOpen && (
-        <NewContractDialog initialCustomer={customer} onClose={() => setNewOpen(false)} onCreated={() => { setNewOpen(false); invalidate() }} />
+        <NewContractDialog initialCustomer={customer} onClose={() => setNewOpen(false)} onCreated={(id) => { setNewOpen(false); invalidate(); if (id) setSelectedId(id) }} />
       )}
       {selectedId && (
         <ContractDetailDialog contractId={selectedId} onClose={() => setSelectedId(null)} onChanged={invalidate} />

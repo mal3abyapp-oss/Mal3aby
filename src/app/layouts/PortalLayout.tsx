@@ -3,7 +3,9 @@ import { NavLink, Outlet } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { useAuth } from '@/app/providers/AuthProvider'
 import { PortalClubProvider, usePortalClub } from '@/app/providers/PortalClubProvider'
-import { CalendarDays, GraduationCap, IdCard, Wallet, QrCode, User, LogOut } from 'lucide-react'
+import { Building, CalendarDays, GraduationCap, IdCard, Wallet, QrCode, User, LogOut } from 'lucide-react'
+import { useQuery } from '@tanstack/react-query'
+import { fetchMyPortalRentals } from '@/features/portal/portalRentals'
 import type { LucideIcon } from 'lucide-react'
 import { LanguageSwitcher } from '@/components/ui/language-switcher'
 import { RouteLoadingFallback } from '@/app/routing/RouteLoadingFallback'
@@ -40,9 +42,20 @@ const navItems: NavItem[] = [
   { to: '/portal/profile', labelKey: 'portal.nav.profile', icon: User },
 ]
 
+// RENTALS v2: "My rentals" only appears for customers who actually have
+// a lease/booking, so the bottom bar stays at six items for everyone else.
+const rentalsNavItem: NavItem = { to: '/portal/rentals', labelKey: 'portal.nav.rentals', icon: Building }
+
 export function PortalLayout() {
   const { t } = useTranslation()
   const { signOut } = useAuth()
+  const { data: myRentals = [] } = useQuery({
+    queryKey: ['portal', 'my-rentals'],
+    queryFn: fetchMyPortalRentals,
+    staleTime: 5 * 60 * 1000,
+    retry: false,
+  })
+  const items = myRentals.length > 0 ? [...navItems.slice(0, 3), rentalsNavItem, ...navItems.slice(3)] : navItems
 
   return (
     <PortalClubProvider>
@@ -85,7 +98,7 @@ export function PortalLayout() {
         </main>
 
         <nav className="fixed inset-x-0 bottom-0 z-30 flex border-t border-border bg-surface px-1.5 pb-[env(safe-area-inset-bottom)]">
-          {navItems.map((item) => (
+          {items.map((item) => (
             <NavLink
               key={item.to}
               to={item.to}

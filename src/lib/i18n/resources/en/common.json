@@ -64,7 +64,8 @@
       "memberships": "My Memberships",
       "payments": "My Payments",
       "qr": "My QR",
-      "profile": "My Account"
+      "profile": "My Account",
+      "rentals": "My rentals"
     },
     "logout": "Log out",
     "clubSwitcher": {
@@ -178,6 +179,17 @@
       "confirmClaim": "Yes, this is me",
       "claiming": "...",
       "claimGenericError": "Couldn't link the account, please try again."
+    },
+    "rentals": {
+      "title": "My rentals",
+      "description": "Your leases and bookings with their installment schedule",
+      "loadError": "Couldn't load your rentals",
+      "empty": "No rental contracts",
+      "outstanding": "Outstanding",
+      "overdue": "Overdue",
+      "nextDue": "Next installment: {{date}}",
+      "schedule": "Installment schedule ({{count}})",
+      "pay": "Pay"
     }
   },
   "platform": {
@@ -1892,7 +1904,9 @@
           "payment-received": "Payment received",
           "academy-payment-received": "Academy payment received",
           "payment-refunded": "Payment refunded",
-          "invoice-created": "Invoice issued"
+          "invoice-created": "Invoice issued",
+          "rental-payment-reminder": "Rent installment reminder",
+          "rental-payment-overdue": "Overdue rent installment"
         },
         "familyLabels": {
           "field_booking": "Field Booking",
@@ -2993,7 +3007,8 @@
       "registration_fee": "Registration fee",
       "club_membership": "Club membership",
       "shop_sale_item": "Shop sale",
-      "rental": "Rent"
+      "rental": "Rent",
+      "rental_deposit": "Rental deposit"
     },
     "invoiceStatusLabels": {
       "draft": "Draft",
@@ -3866,7 +3881,8 @@
       "csvHeader": {
         "date": "Date",
         "revenue": "Revenue"
-      }
+      },
+      "depositsIncluded": "Includes {{amount}} of rental security deposits (refundable)."
     },
     "shop": {
       "title": "Shop report",
@@ -3905,7 +3921,13 @@
       "byCycle": "Active leases by rent cycle",
       "overdueList": "Overdue installments",
       "space": "Space",
-      "manage": "Manage rentals"
+      "manage": "Manage rentals",
+      "lateFees": "Late fees in period",
+      "expenses": "Space expenses",
+      "net": "Net rent",
+      "depositsCollected": "Deposits collected in period",
+      "depositsSettled": "Deposits settled: refunded {{refunded}} — kept {{kept}}",
+      "depositNote": "Collected and net rent exclude security deposits (held for tenants); only the kept part becomes income on settlement."
     },
     "bySource": {
       "title": "Breakdown by source",
@@ -3921,7 +3943,8 @@
         "club_membership": "Club memberships",
         "shop": "Shop",
         "rental": "Rentals",
-        "other": "Other"
+        "other": "Other",
+        "rental_deposit": "Rental deposits"
       }
     }
   },
@@ -4261,7 +4284,8 @@
     "noResults": "No results",
     "customers": "Customers",
     "players": "Players",
-    "invoices": "Invoices"
+    "invoices": "Invoices",
+    "rentalContracts": "Rental contracts"
   },
   "publicSite": {
     "nav": {
@@ -6221,6 +6245,22 @@
           "\"Account Security\" lets you change your own account password without needing to contact support.",
           "Every edit control here runs off a real permission — so a custom role granted the right permission gets working edit access here too, just like a regular manager."
         ]
+      },
+      "rentals": {
+        "title": "Rentals",
+        "summary": "Lease club spaces (gym, wedding hall, shop, office...) daily, monthly, quarterly, semi-annually, annually, on a custom cycle or by the hour — with installment invoices, deposits and reports.",
+        "screenshotAlt": "The Rentals screen in Mal3aby",
+        "steps": [
+          "In the Spaces tab add each space with its name, type (or a custom type name) and default rent.",
+          "Create a lease -- pick the tenant, space, rent cycle, number of periods and amount -- and the installment schedule is previewed before saving.",
+          "For halls choose \"Hourly\" with a start time and number of hours -- the same hall can be booked several times a day as long as the times don't overlap.",
+          "The security deposit is invoiced on its own since it is held for the tenant -- at the end of the lease use \"Settle deposit\" to refund it fully or partly, noting any deduction.",
+          "The annual increase (%) applies automatically to each new contract year -- \"Renew\" creates the follow-on lease in one click at the new rent.",
+          "\"Edit\" reprices upcoming installments from a date or extends the lease by more periods without touching issued invoices.",
+          "In \"Rental settings\" turn on automatic invoicing, late fees and WhatsApp reminders -- they run daily on their own.",
+          "The calendar button next to each space shows booked days and hours; the expenses button records the space's costs so its profit shows in the rentals report.",
+          "\"Print contract\" prints a lease ready to sign; all installments are collected from Finance > Payments like any invoice."
+        ]
       }
     }
   },
@@ -6261,7 +6301,8 @@
       "semi_annual": "Semi-annual",
       "annual": "Annual",
       "custom": "Custom",
-      "customEvery": "Every {{count}} {{unit}}"
+      "customEvery": "Every {{count}} {{unit}}",
+      "hourly": "Hourly"
     },
     "customUnits": {
       "day": "day(s)",
@@ -6275,7 +6316,8 @@
       "partial": "Partially paid",
       "paid": "Paid",
       "overdue": "Overdue",
-      "cancelled": "Cancelled"
+      "cancelled": "Cancelled",
+      "settled": "Settled"
     },
     "overview": {
       "loadError": "Couldn't load the rentals summary",
@@ -6346,10 +6388,10 @@
       "deposit": "Security deposit",
       "notes": "Notes / lease terms",
       "totalRent": "Total lease value",
-      "firstInvoice": "First invoice (deposit + first period)",
+      "firstInvoice": "First rent invoice",
       "showSchedule": "Show installment schedule ({{count}})",
       "hideSchedule": "Hide installment schedule",
-      "issueFirstInvoice": "Issue the first installment (and deposit) invoice now and go to collection",
+      "issueFirstInvoice": "Issue the first installment (and deposit) invoice now",
       "period": "Lease period",
       "paid": "Paid",
       "overdue": "Overdue",
@@ -6370,8 +6412,18 @@
         "customerRequired": "Choose the tenant",
         "spaceRequired": "Choose the space",
         "invalidSchedule": "The lease period details are invalid",
-        "createError": "Couldn't create the lease"
-      }
+        "createError": "Couldn't create the lease",
+        "pastMidnight": "Goes past midnight"
+      },
+      "startTime": "Start time",
+      "endTime": "End time",
+      "hoursCount": "Number of hours",
+      "hourlyRate": "Rate per hour",
+      "hoursValue": "{{count}} hour(s)",
+      "annualIncrease": "Annual increase (%)",
+      "annualIncreaseHint": "Applied automatically to the installments of each new contract year",
+      "increaseBadge": "{{pct}}% yearly increase",
+      "depositSeparate": "The deposit is invoiced separately — it is held for the tenant and refunded at the end of the lease"
     },
     "detail": {
       "title": "Lease",
@@ -6401,8 +6453,10 @@
         "paid": "Paid",
         "outstanding": "Outstanding on invoices",
         "overdue": "Overdue",
-        "notInvoiced": "Not invoiced yet"
-      }
+        "notInvoiced": "Not invoiced yet",
+        "lateFees": "Late fees"
+      },
+      "lateFeeShort": "Late fee"
     },
     "dues": {
       "description": "Installments that are due and not fully paid, across all leases.",
@@ -6413,6 +6467,109 @@
       "emptyTitle": "Nothing overdue",
       "emptyDescription": "All due installments are paid",
       "loadError": "Couldn't load dues"
+    },
+    "print": {
+      "action": "Print contract",
+      "title": "Lease agreement",
+      "bookingTitle": "Booking agreement",
+      "issuedOn": "Dated {{date}}",
+      "parties": "Parties",
+      "lessor": "First party (lessor)",
+      "lessee": "Second party (tenant)",
+      "nationalId": "National ID",
+      "address": "Address",
+      "subject": "Leased premises",
+      "term": "Term",
+      "termText": "The lease starts on {{start}} and ends on {{end}} ({{count}} periods — {{cycle}}).",
+      "hourlyTerm": "On {{date}} from {{from}} to {{to}} ({{hours}} hours).",
+      "rent": "Rent",
+      "rentText": "Rent is {{amount}} per period, {{total}} in total, payable in advance at the start of each period per the schedule below.",
+      "hourlyRent": "Rate {{rate}} per hour, {{total}} in total.",
+      "increaseText": "Rent increases by {{pct}}% at the start of each contract year.",
+      "depositText": "The tenant paid a security deposit of {{amount}}, refundable at the end of the lease less any damages or dues.",
+      "terms": "Terms",
+      "clause1": "The tenant shall use the premises for the agreed purpose only, keep them in good condition and return them as received.",
+      "clause2": "Late payment of rent makes the tenant liable to the lessor's applicable late fees.",
+      "clause3": "The tenant may not assign the lease or sublet without the lessor's written consent.",
+      "signature": "Signature"
+    },
+    "renew": {
+      "action": "Renew",
+      "title": "Renew lease",
+      "hint": "The new lease starts on {{date}} with the same space, tenant and cycle ({{cycle}}). The current deposit stays held for the new lease.",
+      "issueFirst": "Issue the first installment invoice of the new lease now",
+      "confirm": "Confirm renewal",
+      "error": "Couldn't renew the lease",
+      "chain": "Renewals",
+      "from": "Renewed from {{number}}",
+      "to": "Renewed as {{number}}",
+      "renewedBadge": "Renewed"
+    },
+    "edit": {
+      "action": "Edit",
+      "title": "Edit lease",
+      "reprice": "Change the rent for upcoming periods",
+      "newAmount": "New rent per period",
+      "effectiveFrom": "Effective from",
+      "repriceHint": "Only installments not invoiced yet and starting on/after this date change; issued invoices stay as they are.",
+      "extend": "Extend by additional periods",
+      "error": "Couldn't update the lease"
+    },
+    "deposit": {
+      "settleAction": "Settle deposit",
+      "settleTitle": "Settle security deposit",
+      "settleHint": "Refund the deposit to the tenant in full or in part. Any deduction (damages, dues) is kept as club income. The refund is recorded against the deposit payments.",
+      "held": "Deposit held by the club",
+      "refundAmount": "Refund to tenant",
+      "keptAmount": "Deducted (club income)",
+      "note": "Reason / note",
+      "notePlaceholder": "e.g. floor damage repair",
+      "noteRequired": "Write the reason for the deduction first",
+      "confirm": "Confirm settlement",
+      "settleError": "Couldn't settle the deposit",
+      "heldSummary": "(held: {{held}})",
+      "settledSummary": "(settled — refunded {{refunded}}, kept {{kept}})"
+    },
+    "settings": {
+      "open": "Rental settings",
+      "title": "Rental settings",
+      "autoIssue": "Issue installment invoices automatically",
+      "issueDaysBefore": "Days before the due date",
+      "autoIssueHint": "Runs daily: each rent installment is invoiced as its due date approaches, without manual work.",
+      "lateFees": "Late fees",
+      "lateFeeType": "Fee type",
+      "lateFeeTypes": {
+        "none": "No late fee",
+        "fixed": "Fixed amount",
+        "percent": "Percent of installment"
+      },
+      "lateFeeAmount": "Fee amount",
+      "lateFeePercent": "Percent (%)",
+      "graceDays": "Grace days after due date",
+      "lateFeeHint": "Added once per overdue installment after the grace period, on its own invoice.",
+      "whatsapp": "WhatsApp reminders to tenants",
+      "reminderDaysBefore": "Remind days before due date",
+      "whatsappHint": "One message before an installment is due and one when it becomes overdue.",
+      "whatsappPending": "Rental reminder messages will start automatically after the platform's WhatsApp service update. Your settings are saved.",
+      "saveError": "Couldn't save the settings"
+    },
+    "calendar": {
+      "open": "Bookings calendar",
+      "title": "{{name}} calendar",
+      "prev": "Previous month",
+      "next": "Next month",
+      "newBooking": "New booking / lease",
+      "legend": "Shaded days are booked. Tap a tenant name to open the lease."
+    },
+    "expenses": {
+      "open": "Space expenses",
+      "title": "{{name}} expenses",
+      "hint": "Record the space's costs (maintenance, utilities, cleaning...) so its net profit shows in the rentals report. They are also recorded in Finance > Expenses.",
+      "record": "Record expense",
+      "list": "Recorded expenses",
+      "empty": "No expenses recorded for this space",
+      "descriptionPlaceholder": "e.g. AC maintenance",
+      "noPermission": "Recording expenses requires the add-expense permission."
     }
   }
 }

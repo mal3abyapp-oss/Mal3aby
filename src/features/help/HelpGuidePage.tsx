@@ -18,6 +18,7 @@ import {
   LayoutDashboard,
   ChevronRight,
   ChevronDown,
+  Building,
   type LucideIcon,
 } from 'lucide-react'
 
@@ -113,6 +114,7 @@ const MODULES: HelpModule[] = [
   { key: 'academy', icon: GraduationCap, screenshot: '/help/academy.png' },
   { key: 'memberships', icon: IdCard, screenshot: '/help/memberships.png' },
   { key: 'shop', icon: ShoppingCart, screenshot: '/help/shop-pos.png' },
+  { key: 'rentals', icon: Building },
   { key: 'finance', icon: Receipt, screenshot: '/help/finance-overview.png' },
   { key: 'reports', icon: BarChart3, screenshot: '/help/reports.png' },
   { key: 'whatsapp', icon: MessageCircle, screenshot: '/help/whatsapp.png' },

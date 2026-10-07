@@ -75,7 +75,7 @@ describe('NewContractDialog', () => {
     const today = new Date().toISOString().slice(0, 10)
 
     fireEvent.change(screen.getByDisplayValue(today), { target: { value: '2026-07-29' } })
-    fireEvent.change(screen.getByDisplayValue('0'), { target: { value: '30000' } }) // security deposit
+    fireEvent.change(screen.getAllByDisplayValue('0')[0]!, { target: { value: '30000' } }) // security deposit (first '0' field)
 
     // 12 monthly periods from 2026-07-29 -> inclusive end 2027-07-28
     expect(await screen.findByDisplayValue('2027-07-28')).toBeInTheDocument()
@@ -96,5 +96,23 @@ describe('NewContractDialog', () => {
       p_issue_first_invoice: true,
     })
     expect(mockNavigate).toHaveBeenCalledWith('/app/finance/payments?invoice=inv-1')
+  })
+
+  it('opens the contract (not one invoice) when the deposit is invoiced separately', async () => {
+    mockRpc.mockImplementation((name: string) => {
+      if (name === 'list_rental_spaces') return Promise.resolve({ data: [SPACE], error: null })
+      if (name === 'create_rental_contract') {
+        return Promise.resolve({ data: [{ contract_id: 'c1', contract_number: 'RC-00001', invoice_id: 'inv-1', deposit_invoice_id: 'inv-2' }], error: null })
+      }
+      return Promise.resolve({ data: null, error: null })
+    })
+    const { onCreated } = renderDialog()
+    fireEvent.change(screen.getAllByDisplayValue('0')[0]!, { target: { value: '5000' } })
+    fireEvent.change(screen.getAllByDisplayValue('0')[0]!, { target: { value: '10' } }) // annual increase %
+    fireEvent.click(screen.getByRole('button', { name: 'إنشاء العقد' }))
+    await waitFor(() => expect(onCreated).toHaveBeenCalledWith('c1'))
+    const call = mockRpc.mock.calls.find(([name]) => name === 'create_rental_contract')
+    expect(call?.[1]).toMatchObject({ p_security_deposit: 5000, p_annual_increase_pct: 10, p_start_time: undefined })
+    expect(mockNavigate).not.toHaveBeenCalled()
   })
 })

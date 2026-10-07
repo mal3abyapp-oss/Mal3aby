@@ -52,7 +52,17 @@ export function ReportRentalsPage() {
             <StatCard label={t('reports.rentals.activeContracts')} value={data.active_contracts} icon={FileSignature} to="/app/rentals" />
             <StatCard label={t('reports.rentals.newContracts')} value={`${data.new_contracts_in_range} · ${money(data.contract_value_in_range)}`} />
             <StatCard label={t('reports.rentals.depositsHeld')} value={money(data.deposits_held)} />
+            <StatCard label={t('reports.rentals.lateFees')} value={money(data.late_fees_in_range ?? 0)} />
+            <StatCard label={t('reports.rentals.expenses')} value={money(data.expenses_in_range ?? 0)} tone={Number(data.expenses_in_range) > 0 ? 'danger' : 'default'} />
+            <StatCard label={t('reports.rentals.net')} value={money(data.net_in_range ?? data.collected_in_range)} tone="success" />
+            <StatCard label={t('reports.rentals.depositsCollected')} value={money(data.deposits_collected_in_range ?? 0)} />
           </div>
+          {(Number(data.deposits_refunded) > 0 || Number(data.deposits_kept) > 0) && (
+            <p className="mb-4 text-xs text-text-secondary">
+              {t('reports.rentals.depositsSettled', { refunded: money(data.deposits_refunded ?? 0), kept: money(data.deposits_kept ?? 0) })}
+            </p>
+          )}
+          <p className="mb-4 text-xs text-text-secondary">{t('reports.rentals.depositNote')}</p>
 
           <div className="grid gap-4 md:grid-cols-2">
             <div>
@@ -67,8 +77,8 @@ export function ReportRentalsPage() {
                       downloadCsv(
                         `rentals-${startDate}-${endDate}.csv`,
                         rowsToCsv(
-                          data.by_space.map((s) => ({ space: s.space_name, collected: s.collected, outstanding: s.outstanding })),
-                          { space: t('reports.rentals.space'), collected: t('reports.rentals.collected'), outstanding: t('reports.rentals.outstanding') },
+                          data.by_space.map((s) => ({ space: s.space_name, collected: s.collected, expenses: s.expenses ?? 0, net: s.net ?? s.collected, outstanding: s.outstanding })),
+                          { space: t('reports.rentals.space'), collected: t('reports.rentals.collected'), expenses: t('reports.rentals.expenses'), net: t('reports.rentals.net'), outstanding: t('reports.rentals.outstanding') },
                         ),
                       )
                     }
@@ -87,6 +97,11 @@ export function ReportRentalsPage() {
                       <span>{s.space_name} <span className="text-xs text-text-secondary">· {s.occupied_today ? t('rentals.spaces.occupied') : t('rentals.spaces.vacant')}</span></span>
                       <span className="text-end">
                         {money(s.collected)}
+                        {Number(s.expenses) > 0 && (
+                          <span className="block text-xs text-text-secondary">
+                            {t('reports.rentals.expenses')}: {money(s.expenses)} · {t('reports.rentals.net')}: {money(s.net)}
+                          </span>
+                        )}
                         {Number(s.outstanding) > 0 && <span className="block text-xs text-status-danger">{t('reports.rentals.outstanding')}: {money(s.outstanding)}</span>}
                       </span>
                     </li>
@@ -140,7 +155,7 @@ export function ReportRentalsPage() {
                   {data.expiring_soon.map((c) => (
                     <li key={c.contract_id} className="flex justify-between rounded-md border border-border p-2 text-sm">
                       <span>{c.customer_name} · {c.space_name}</span>
-                      <span className="tabular-nums">{c.end_date}</span>
+                      <span className="tabular-nums">{c.end_date}{c.renewed ? ` · ${t('rentals.renew.renewedBadge')}` : ''}</span>
                     </li>
                   ))}
                 </ul>
