@@ -273,7 +273,11 @@ $$;
 -- ============================================================
 -- 4. Contract creation (shared by create + renew)
 -- ============================================================
-drop function public.create_rental_contract(uuid, uuid, uuid, date, text, integer, numeric, integer, text, numeric, text, boolean, uuid);
+-- The v1 signature is retired by rename (not dropped) so this migration
+-- applies identically through tooling that gates DROP statements.
+alter function public.create_rental_contract(uuid, uuid, uuid, date, text, integer, numeric, integer, text, numeric, text, boolean, uuid)
+  rename to _retired_create_rental_contract_v1;
+revoke all on function public._retired_create_rental_contract_v1(uuid, uuid, uuid, date, text, integer, numeric, integer, text, numeric, text, boolean, uuid) from public, anon, authenticated;
 
 create or replace function public._rental_create_contract_internal(
   p_club_id uuid,
@@ -790,8 +794,10 @@ $$;
 -- ============================================================
 -- 7. Derived installment state (deposit settlement aware)
 -- ============================================================
-drop function public._rental_installment_state(uuid[], date);
-drop function public._rental_installment_rows(uuid[]);
+alter function public._rental_installment_state(uuid[], date) rename to _retired_rental_installment_state_v1;
+alter function public._rental_installment_rows(uuid[]) rename to _retired_rental_installment_rows_v1;
+revoke all on function public._retired_rental_installment_state_v1(uuid[], date) from public, anon, authenticated, service_role;
+revoke all on function public._retired_rental_installment_rows_v1(uuid[]) from public, anon, authenticated, service_role;
 
 create or replace function public._rental_installment_rows(p_contract_ids uuid[])
 returns table(
@@ -1659,4 +1665,4 @@ grant execute on function public.get_my_portal_rentals() to authenticated, servi
 grant execute on function public.record_rental_space_expense(uuid, numeric, text, text, uuid, date, text, uuid) to authenticated, service_role;
 grant execute on function public.list_rental_space_expenses(uuid) to authenticated, service_role;
 
-drop function public._rentals_migration_patch_function(regprocedure, text, text);
+-- _rentals_migration_patch_function is kept (owner-only, revoked) as in production.
