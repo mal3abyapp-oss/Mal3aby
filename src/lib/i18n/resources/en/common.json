@@ -189,7 +189,28 @@
       "overdue": "Overdue",
       "nextDue": "Next installment: {{date}}",
       "schedule": "Installment schedule ({{count}})",
-      "pay": "Pay"
+      "pay": "Pay",
+      "payThis": "Pay",
+      "booking": {
+        "title": "Book a hall",
+        "hint": "Pick the day, start time and hours; the club will confirm after reviewing your request",
+        "capacity": "fits {{count}}",
+        "hour": "hour",
+        "date": "Day",
+        "from": "From",
+        "hours": "Hours",
+        "dayFree": "The whole day is free",
+        "dayBusy": "Booked times that day: {{slots}}",
+        "allDay": "all day",
+        "clash": "This time overlaps another booking — pick a different time",
+        "notes": "Notes (occasion, number of guests…)",
+        "estimate": "Estimated cost",
+        "submit": "Send booking request",
+        "sent": "Request sent — you can follow its status below",
+        "error": "Couldn't send the request",
+        "myRequests": "My booking requests",
+        "cancel": "Cancel request"
+      }
     }
   },
   "platform": {
@@ -3076,7 +3097,10 @@
       "bookingRef": "Booking Reference",
       "bookingQrUnavailable": "Booking QR unavailable for this booking's current status.",
       "printReceipt": "Print Receipt",
-      "paymentReceiptTitle": "Payment Receipt"
+      "paymentReceiptTitle": "Payment Receipt",
+      "subtotal": "Subtotal",
+      "discount": "Discount",
+      "vat": "VAT"
     },
     "recordPayment": {
       "heading": "Record payment",
@@ -3598,10 +3622,12 @@
         "pendingPaymentProof": "Review",
         "whatsappFailed": "WhatsApp",
         "rentalOverdue": "Rent",
-        "rentalExpiring": "Lease renewal"
+        "rentalExpiring": "Lease renewal",
+        "rentalRequest": "Booking request"
       },
       "rentalOverdue": "Overdue rent installments ({{count}})",
-      "rentalExpiring": "Leases ending within 30 days ({{count}})"
+      "rentalExpiring": "Leases ending within 30 days ({{count}})",
+      "rentalRequests": "Hall booking requests awaiting review ({{count}})"
     },
     "quickActionsPalette": {
       "heading": "Quick actions",
@@ -3927,7 +3953,9 @@
       "net": "Net rent",
       "depositsCollected": "Deposits collected in period",
       "depositsSettled": "Deposits settled: refunded {{refunded}} — kept {{kept}}",
-      "depositNote": "Collected and net rent exclude security deposits (held for tenants); only the kept part becomes income on settlement."
+      "depositNote": "Collected and net rent exclude security deposits (held for tenants); only the kept part becomes income on settlement.",
+      "utilities": "Utilities collected in period",
+      "vat": "VAT collected"
     },
     "bySource": {
       "title": "Breakdown by source",
@@ -6259,7 +6287,11 @@
           "\"Edit\" reprices upcoming installments from a date or extends the lease by more periods without touching issued invoices.",
           "In \"Rental settings\" turn on automatic invoicing, late fees and WhatsApp reminders -- they run daily on their own.",
           "The calendar button next to each space shows booked days and hours; the expenses button records the space's costs so its profit shows in the rentals report.",
-          "\"Print contract\" prints a lease ready to sign; all installments are collected from Finance > Payments like any invoice."
+          "\"Print contract\" prints a lease ready to sign; all installments are collected from Finance > Payments like any invoice.",
+          "In Spaces, turn on \"Online booking\" for an hourly hall so customers can request it from the portal; requests appear in the \"Booking requests\" tab to approve or reject.",
+          "Inside a lease: upload the signed contract, ID and check-in/out photos, and add electricity/water meters -- each new reading invoices the consumption automatically.",
+          "For a mid-month start choose \"Pro-rate the first period\", and after settling the deposit print the \"Deposit refund receipt\" for the tenant to sign.",
+          "In settings set VAT (if any) and how many days before lease end to alert; tenants pay each installment from \"My rentals\" in the customer portal."
         ]
       }
     }
@@ -6280,7 +6312,8 @@
       "overview": "Overview",
       "spaces": "Spaces",
       "contracts": "Contracts",
-      "dues": "Dues & overdue"
+      "dues": "Dues & overdue",
+      "requests": "Booking requests"
     },
     "spaceTypes": {
       "gym": "Gym",
@@ -6370,7 +6403,11 @@
         "nameRequired": "Space name is required",
         "branchRequired": "Choose a branch",
         "customTypeRequired": "Type the custom type name"
-      }
+      },
+      "onlineOn": "Online booking: on",
+      "onlineOff": "Online booking",
+      "onlineHint": "Let customers request this hall from the customer portal",
+      "onlineError": "Couldn't change online booking"
     },
     "contracts": {
       "new": "New lease",
@@ -6423,7 +6460,10 @@
       "annualIncrease": "Annual increase (%)",
       "annualIncreaseHint": "Applied automatically to the installments of each new contract year",
       "increaseBadge": "{{pct}}% yearly increase",
-      "depositSeparate": "The deposit is invoiced separately — it is held for the tenant and refunded at the end of the lease"
+      "depositSeparate": "The deposit is invoiced separately — it is held for the tenant and refunded at the end of the lease",
+      "prorate": "Pro-rate the first period to the end of the month",
+      "prorateHint": "The first installment covers only the remaining days of the start month; full periods then start on the 1st of next month",
+      "partialDays": "partial, {{count}} days"
     },
     "detail": {
       "title": "Lease",
@@ -6456,7 +6496,8 @@
         "notInvoiced": "Not invoiced yet",
         "lateFees": "Late fees"
       },
-      "lateFeeShort": "Late fee"
+      "lateFeeShort": "Late fee",
+      "utilityShort": "Utilities"
     },
     "dues": {
       "description": "Installments that are due and not fully paid, across all leases.",
@@ -6551,7 +6592,10 @@
       "reminderDaysBefore": "Remind days before due date",
       "whatsappHint": "One message before an installment is due and one when it becomes overdue.",
       "whatsappPending": "Rental reminder messages will start automatically after the platform's WhatsApp service update. Your settings are saved.",
-      "saveError": "Couldn't save the settings"
+      "saveError": "Couldn't save the settings",
+      "vatRate": "VAT (%)",
+      "expiryAlertDays": "Alert days before lease end",
+      "vatHint": "VAT is added to rent, late-fee and utility invoices (never to deposits). Leave 0 if the club isn't VAT-registered. The alert shows in Rentals and on Today, then again 7 days before and on the last day. Amounts on rental screens are before VAT; the invoice itself includes it."
     },
     "calendar": {
       "open": "Bookings calendar",
@@ -6570,6 +6614,86 @@
       "empty": "No expenses recorded for this space",
       "descriptionPlaceholder": "e.g. AC maintenance",
       "noPermission": "Recording expenses requires the add-expense permission."
+    },
+    "requests": {
+      "description": "Hall booking requests sent from the customer portal. Approving creates the booking and its invoice.",
+      "status": {
+        "pending": "Pending",
+        "approved": "Approved",
+        "rejected": "Rejected",
+        "cancelled": "Cancelled",
+        "all": "All"
+      },
+      "empty": "No requests",
+      "emptyHint": "Turn on \"Online booking\" for a hall in the Spaces tab so customers can request it",
+      "loadError": "Couldn't load requests",
+      "decideError": "Couldn't complete the action",
+      "approve": "Approve & create booking",
+      "reject": "Reject",
+      "notePlaceholder": "Note to the customer (optional)",
+      "conflict": "This time is now booked — it can't be approved",
+      "decisionNote": "Note",
+      "openBooking": "Open booking"
+    },
+    "documents": {
+      "title": "Contract documents",
+      "empty": "No documents uploaded",
+      "upload": "Upload file",
+      "uploading": "Uploading…",
+      "delete": "Delete",
+      "confirmDelete": "Delete this document permanently?",
+      "tooLarge": "The file is larger than 10 MB",
+      "uploadError": "Couldn't upload the file",
+      "deleteError": "Couldn't delete the file",
+      "openError": "Couldn't open the file",
+      "types": {
+        "signed_contract": "Signed contract",
+        "id_document": "ID document",
+        "checkin_photo": "Check-in photos",
+        "checkout_photo": "Check-out photos",
+        "receipt": "Receipt",
+        "other": "Other"
+      }
+    },
+    "meters": {
+      "title": "Utility meters",
+      "add": "Add meter",
+      "type": "Type",
+      "types": {
+        "electricity": "Electricity",
+        "water": "Water",
+        "gas": "Gas",
+        "other": "Other"
+      },
+      "label": "Meter name / number",
+      "unitPrice": "Unit price",
+      "initialReading": "Current reading",
+      "empty": "No meters on this lease",
+      "lastReading": "last reading {{value}}",
+      "perUnit": "{{price}} per unit",
+      "newReading": "New reading",
+      "consumption": "consumption {{value}}",
+      "bill": "Record & invoice",
+      "saveError": "Couldn't save the meter",
+      "readingError": "Couldn't record the reading"
+    },
+    "depositReceipt": {
+      "action": "Deposit refund receipt",
+      "title": "Security deposit settlement receipt",
+      "date": "Settled on {{date}}",
+      "collected": "Deposit collected",
+      "refunded": "Refunded to tenant",
+      "kept": "Deducted",
+      "reason": "Reason for deduction",
+      "statement": "I, the tenant, acknowledge receiving {{amount}} as the deposit refund and that the deposit is fully settled.",
+      "receiver": "Received by (tenant)"
+    },
+    "alerts": {
+      "title": "Leases ending soon",
+      "markRead": "Mark as seen",
+      "endsToday": "Ends today",
+      "endsIn": "Ends in {{count}} days ({{date}})",
+      "renewHint": "Open contracts to renew"
     }
   }
 }

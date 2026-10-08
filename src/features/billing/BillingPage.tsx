@@ -964,6 +964,30 @@ export function BillingPage() {
                   </tbody>
                 </table>
                 <div className="mt-3 flex flex-col items-end gap-1">
+                  {/* Rentals v3: VAT (invoices.tax) and discounts were never
+                      shown, so a taxed invoice's lines didn't add up to its
+                      total. Only rendered when present, so other invoices
+                      look exactly as before. */}
+                  {(Number(detail.tax) > 0 || Number(detail.discount) > 0) && (
+                    <>
+                      <div className="flex items-center gap-2 text-sm">
+                        <span className="text-xs text-text-secondary">{t('billing.detail.subtotal')}</span>
+                        <MoneyDisplay amount={Number(detail.subtotal)} size="sm" />
+                      </div>
+                      {Number(detail.discount) > 0 && (
+                        <div className="flex items-center gap-2 text-sm">
+                          <span className="text-xs text-text-secondary">{t('billing.detail.discount')}</span>
+                          <MoneyDisplay amount={-Number(detail.discount)} size="sm" />
+                        </div>
+                      )}
+                      {Number(detail.tax) > 0 && (
+                        <div className="flex items-center gap-2 text-sm">
+                          <span className="text-xs text-text-secondary">{t('billing.detail.vat')}</span>
+                          <MoneyDisplay amount={Number(detail.tax)} size="sm" />
+                        </div>
+                      )}
+                    </>
+                  )}
                   <div className="flex items-center gap-2">
                     <span className="text-xs text-text-secondary">{t('billing.detail.total')}</span>
                     <MoneyDisplay amount={Number(detail.total)} size="lg" />

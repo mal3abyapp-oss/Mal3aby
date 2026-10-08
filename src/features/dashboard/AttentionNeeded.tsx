@@ -40,7 +40,7 @@ import { DASHBOARD_POLL_INTERVAL_MS } from '@/lib/query/dashboardPolling'
 
 interface AttentionItem {
   id: string
-  kind: 'unpaid' | 'starting-soon' | 'expiring-subscription' | 'pending-payment-proof' | 'whatsapp-failed' | 'rental-overdue' | 'rental-expiring'
+  kind: 'unpaid' | 'starting-soon' | 'expiring-subscription' | 'pending-payment-proof' | 'whatsapp-failed' | 'rental-overdue' | 'rental-expiring' | 'rental-request'
   label: string
   detail: string
   to: string
@@ -51,6 +51,7 @@ interface RentalAttentionSummary {
   overdue_count?: number
   overdue_amount?: number
   expiring_30_days_count?: number
+  pending_booking_requests_count?: number
 }
 
 async function fetchAttentionItems(clubId: string, t: TFunction, locale: 'ar' | 'en', canViewRentals = false): Promise<AttentionItem[]> {
@@ -196,6 +197,15 @@ async function fetchAttentionItems(clubId: string, t: TFunction, locale: 'ar' | 
         to: '/app/rentals',
       })
     }
+    if ((rental.pending_booking_requests_count ?? 0) > 0) {
+      items.push({
+        id: 'rental-request-summary',
+        kind: 'rental-request',
+        label: t('dashboard.attentionNeeded.rentalRequests', { count: rental.pending_booking_requests_count }),
+        detail: '',
+        to: '/app/rentals?tab=requests',
+      })
+    }
   }
 
   const failedWhatsappCount = whatsappDiagRes.data?.failed_count ?? 0
@@ -220,6 +230,7 @@ const KIND_TONE = {
   'whatsapp-failed': 'danger',
   'rental-overdue': 'danger',
   'rental-expiring': 'warning',
+  'rental-request': 'info',
 } as const
 
 export function AttentionNeeded() {
@@ -237,6 +248,7 @@ export function AttentionNeeded() {
     'whatsapp-failed': t('dashboard.attentionNeeded.chipLabels.whatsappFailed'),
     'rental-overdue': t('dashboard.attentionNeeded.chipLabels.rentalOverdue'),
     'rental-expiring': t('dashboard.attentionNeeded.chipLabels.rentalExpiring'),
+    'rental-request': t('dashboard.attentionNeeded.chipLabels.rentalRequest'),
   }
 
   const { data: items = [], isLoading, isError, error, refetch } = useQuery({

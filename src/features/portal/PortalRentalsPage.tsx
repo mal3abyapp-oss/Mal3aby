@@ -13,12 +13,16 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { usePortalClub } from '@/app/providers/PortalClubProvider'
 import { RENTAL_PAYMENT_STATE_TONE, rentalSpaceTypeLabel, rentCycleLabel } from '@/lib/domain/rental'
 import { fetchMyPortalRentals } from './portalRentals'
+import { PortalHallBooking } from './PortalHallBooking'
 
 // Customer Portal -- "My Rentals": the tenant's own leases/hall bookings
 // with the installment schedule and what is paid, due and overdue.
 // Read-only; paying happens on /portal/payments like every other
 // invoice (rental installments are ordinary invoices). Data comes from
-// get_my_portal_rentals() (auth.uid() resolved server-side).
+// get_my_portal_rentals() (auth.uid() resolved server-side). Each unpaid
+// invoiced installment links straight to its invoice's payment claim on
+// /portal/payments?invoiceId=..., and clubs offering online hall booking
+// show a request form on top (PortalHallBooking).
 
 export function PortalRentalsPage() {
   const { t } = useTranslation()
@@ -35,12 +39,14 @@ export function PortalRentalsPage() {
       <PageHeader title={t('portal.rentals.title')} description={t('portal.rentals.description')} />
       {(isLoading || clubLoading) && <Skeleton className="h-40 w-full" />}
       {error && <ErrorState message={translateSupabaseError(error, t('portal.rentals.loadError'))} onRetry={() => void refetch()} />}
+      {activeClubId && <PortalHallBooking clubId={activeClubId} />}
       {!isLoading && !error && contracts.length === 0 && <EmptyState icon={Building} title={t('portal.rentals.empty')} />}
 
       <div className="flex flex-col gap-4">
         {contracts.map((c) => {
           const outstanding = c.installments.reduce((sum, i) => sum + Number(i.outstanding), 0)
           const overdue = c.installments.filter((i) => i.payment_state === 'overdue').reduce((sum, i) => sum + Number(i.outstanding), 0)
+          const firstPayable = c.installments.find((i) => i.invoice_id && Number(i.outstanding) > 0)?.invoice_id ?? null
           const next = c.installments.find((i) => ['scheduled', 'due_not_invoiced', 'unpaid', 'partial', 'overdue'].includes(i.payment_state))
           return (
             <div key={c.id} className="rounded-xl border border-border bg-surface p-4">
@@ -83,13 +89,20 @@ export function PortalRentalsPage() {
                     <li key={`${i.kind}-${i.sequence}`} className="flex items-center justify-between gap-2 py-1.5">
                       <span className="flex flex-col">
                         <span>
-                          {i.kind === 'deposit' ? t('rentals.detail.depositShort') : i.kind === 'late_fee' ? t('rentals.detail.lateFeeShort') : `#${i.sequence}`}
+                          {i.kind === 'deposit' ? t('rentals.detail.depositShort')
+                            : i.kind === 'late_fee' ? t('rentals.detail.lateFeeShort')
+                            : i.kind === 'utility' ? t('rentals.detail.utilityShort') : `#${i.sequence}`}
                           <span className="ms-1 text-xs text-text-secondary tabular-nums">{i.due_date}</span>
                         </span>
                       </span>
                       <span className="flex items-center gap-2">
                         <MoneyDisplay amount={Number(i.amount)} size="sm" />
                         <StatusBadge tone={RENTAL_PAYMENT_STATE_TONE[i.payment_state] ?? 'neutral'} label={t(`rentals.paymentStates.${i.payment_state}`)} />
+                        {i.invoice_id && Number(i.outstanding) > 0 && (
+                          <Link className="text-xs font-medium text-accent-foreground hover:underline" to={`/portal/payments?invoiceId=${i.invoice_id}`}>
+                            {t('portal.rentals.payThis')}
+                          </Link>
+                        )}
                       </span>
                     </li>
                   ))}
@@ -97,7 +110,7 @@ export function PortalRentalsPage() {
               </details>
               {outstanding > 0 && (
                 <Button asChild size="sm" className="mt-3">
-                  <Link to="/portal/payments">{t('portal.rentals.pay')}</Link>
+                  <Link to={firstPayable ? `/portal/payments?invoiceId=${firstPayable}` : '/portal/payments'}>{t('portal.rentals.pay')}</Link>
                 </Button>
               )}
             </div>

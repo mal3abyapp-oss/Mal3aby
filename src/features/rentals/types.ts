@@ -13,6 +13,7 @@ export interface RentalSpaceRow {
   default_rent_cycle: string | null
   default_rent_amount: number | null
   allow_overlapping_contracts: boolean
+  online_booking?: boolean
   status: 'active' | 'inactive' | 'archived'
   created_at: string
   active_contracts_count: number
@@ -62,7 +63,7 @@ export interface RentalContractRow {
 
 export interface RentalInstallmentRow {
   id: string
-  kind: 'rent' | 'deposit' | 'late_fee'
+  kind: 'rent' | 'deposit' | 'late_fee' | 'utility'
   sequence: number
   period_start: string
   period_end: string
@@ -98,6 +99,8 @@ export interface RentalContractDetail {
     deposit_kept: number
     deposit_settled_at: string | null
     deposit_settlement_note: string | null
+    schedule_anchor: string | null
+    prorated_first: boolean
     status: 'active' | 'terminated' | 'cancelled'
     notes: string | null
     termination_date: string | null
@@ -138,6 +141,8 @@ export interface RentalReport {
   new_contracts_in_range: number
   contract_value_in_range: number
   collected_in_range: number
+  utilities_collected_in_range?: number
+  vat_collected_in_range?: number
   deposits_collected_in_range: number
   late_fees_in_range: number
   expenses_in_range: number
@@ -168,7 +173,7 @@ export interface RentalReport {
     contract_number: string
     customer_name: string
     space_name: string
-    kind: 'rent' | 'deposit' | 'late_fee'
+    kind: 'rent' | 'deposit' | 'late_fee' | 'utility'
     sequence: number
     due_date: string
     amount: number
@@ -194,6 +199,8 @@ export interface RentalSettings {
   late_fee_grace_days: number
   whatsapp_reminders_enabled: boolean
   reminder_days_before: number
+  vat_rate: number
+  expiry_alert_days: number
   whatsapp_templates_live: boolean
 }
 
@@ -228,7 +235,7 @@ export interface PortalRentalContract {
   status: 'active' | 'terminated' | 'cancelled'
   security_deposit: number
   installments: {
-    kind: 'rent' | 'deposit' | 'late_fee'
+    kind: 'rent' | 'deposit' | 'late_fee' | 'utility'
     sequence: number
     period_start: string
     period_end: string
@@ -238,5 +245,94 @@ export interface PortalRentalContract {
     outstanding: number
     payment_state: string
     invoice_number: string | null
+    invoice_id?: string | null
   }[]
+}
+
+// RENTALS v3 (20261009100000_rentals_v3.sql)
+export interface RentalBookingRequest {
+  id: string
+  space_id: string
+  space_name: string
+  customer_id: string
+  customer_name: string
+  customer_mobile: string | null
+  booking_date: string
+  start_time: string
+  hours: number
+  hourly_rate: number | null
+  notes: string | null
+  status: 'pending' | 'approved' | 'rejected' | 'cancelled'
+  contract_id: string | null
+  decision_note: string | null
+  created_at: string
+  conflict: boolean
+}
+
+export interface RentalContractDocument {
+  id: string
+  doc_type: 'signed_contract' | 'id_document' | 'checkin_photo' | 'checkout_photo' | 'receipt' | 'other'
+  file_name: string
+  storage_path: string
+  mime_type: string | null
+  size_bytes: number | null
+  created_at: string
+}
+
+export interface RentalMeter {
+  id: string
+  meter_type: 'electricity' | 'water' | 'gas' | 'other'
+  label: string | null
+  unit_price: number
+  last_reading: number
+  active: boolean
+  readings: {
+    id: string
+    reading_date: string
+    previous_reading: number
+    current_reading: number
+    consumption: number
+    amount: number
+    invoice_id: string | null
+  }[]
+}
+
+export interface RentalStaffAlert {
+  id: string
+  kind: 'contract_expiring'
+  days_left: number
+  end_date: string
+  created_at: string
+  read_at: string | null
+  contract_id: string
+  contract_number: string
+  customer_name: string
+  space_name: string
+  renewed: boolean
+}
+
+export interface PortalBookableSpace {
+  id: string
+  name: string
+  space_type: string
+  custom_type_label: string | null
+  description: string | null
+  capacity: number | null
+  branch_name: string
+  hourly_rate: number | null
+  busy: { date: string; end_date: string; start_time: string | null; end_time: string | null }[]
+}
+
+export interface PortalBookingRequest {
+  id: string
+  club_id: string
+  space_name: string
+  booking_date: string
+  start_time: string
+  hours: number
+  status: 'pending' | 'approved' | 'rejected' | 'cancelled'
+  notes: string | null
+  decision_note: string | null
+  created_at: string
+  hourly_rate: number | null
 }

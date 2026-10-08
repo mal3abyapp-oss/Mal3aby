@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useMutation, useQuery } from '@tanstack/react-query'
-import { Building, CalendarDays, Pencil, Plus, Wallet } from 'lucide-react'
+import { Building, CalendarDays, Globe, Pencil, Plus, Wallet } from 'lucide-react'
 import { supabase } from '@/lib/supabase/client'
 import { useAuth } from '@/app/providers/AuthProvider'
 import { translateSupabaseError } from '@/lib/errors'
@@ -46,6 +46,15 @@ export function SpacesSection() {
     onError: (err) => setActionError(translateSupabaseError(err, t('rentals.spaces.statusError'))),
   })
 
+  const onlineMutation = useMutation({
+    mutationFn: async ({ id, enabled }: { id: string; enabled: boolean }) => {
+      const { error: rpcError } = await supabase.rpc('set_rental_space_online_booking', { p_space_id: id, p_enabled: enabled })
+      if (rpcError) throw rpcError
+    },
+    onSuccess: () => { setActionError(null); invalidate() },
+    onError: (err) => setActionError(translateSupabaseError(err, t('rentals.spaces.onlineError'))),
+  })
+
   const actionsColumn: DataTableColumn<RentalSpaceRow> = {
     key: 'actions',
     header: '',
@@ -60,6 +69,17 @@ export function SpacesSection() {
         {canManageSpaces && (
           <>
             <Button size="sm" variant="ghost" aria-label={t('common.edit', { defaultValue: 'Edit' })} onClick={() => setEditing(s)}><Pencil /></Button>
+            {s.status === 'active' && s.default_rent_cycle === 'hourly' && (
+              <Button
+                size="sm"
+                variant={s.online_booking ? 'secondary' : 'ghost'}
+                title={t('rentals.spaces.onlineHint')}
+                disabled={onlineMutation.isPending}
+                onClick={() => onlineMutation.mutate({ id: s.id, enabled: !s.online_booking })}
+              >
+                <Globe />{s.online_booking ? t('rentals.spaces.onlineOn') : t('rentals.spaces.onlineOff')}
+              </Button>
+            )}
             {s.status === 'active' && (
               <Button size="sm" variant="ghost" onClick={() => statusMutation.mutate({ id: s.id, status: 'inactive' })}>{t('rentals.spaces.deactivate')}</Button>
             )}

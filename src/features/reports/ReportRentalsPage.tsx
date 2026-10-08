@@ -56,6 +56,12 @@ export function ReportRentalsPage() {
             <StatCard label={t('reports.rentals.expenses')} value={money(data.expenses_in_range ?? 0)} tone={Number(data.expenses_in_range) > 0 ? 'danger' : 'default'} />
             <StatCard label={t('reports.rentals.net')} value={money(data.net_in_range ?? data.collected_in_range)} tone="success" />
             <StatCard label={t('reports.rentals.depositsCollected')} value={money(data.deposits_collected_in_range ?? 0)} />
+            {Number(data.utilities_collected_in_range ?? 0) > 0 && (
+              <StatCard label={t('reports.rentals.utilities')} value={money(data.utilities_collected_in_range ?? 0)} />
+            )}
+            {Number(data.vat_collected_in_range ?? 0) > 0 && (
+              <StatCard label={t('reports.rentals.vat')} value={money(data.vat_collected_in_range ?? 0)} />
+            )}
           </div>
           {(Number(data.deposits_refunded) > 0 || Number(data.deposits_kept) > 0) && (
             <p className="mb-4 text-xs text-text-secondary">

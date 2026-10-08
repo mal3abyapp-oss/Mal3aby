@@ -12,7 +12,7 @@ import { CustomerSelector, type SelectedCustomer } from '@/components/ui/custome
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import {
-  CUSTOM_CYCLE_UNITS, RENT_CYCLES, addHoursToTime, previewRentalSchedule, rentalSpaceTypeLabel,
+  CUSTOM_CYCLE_UNITS, RENT_CYCLES, addHoursToTime, canProrate, previewRentalSchedule, rentalSpaceTypeLabel,
   type CustomCycleUnit, type RentCycle,
 } from '@/lib/domain/rental'
 import { useRentalPermissions, useRentalSpaces } from './hooks'
@@ -58,6 +58,7 @@ export function NewContractDialog({
   const [deposit, setDeposit] = useState('0')
   const [increasePct, setIncreasePct] = useState('0')
   const [startTime, setStartTime] = useState('18:00')
+  const [prorate, setProrate] = useState(false)
   const [startDate, setStartDate] = useState(() => new Date().toISOString().slice(0, 10))
   const [notes, setNotes] = useState('')
   const [issueFirst, setIssueFirst] = useState(true)
@@ -72,6 +73,8 @@ export function NewContractDialog({
   }
 
   const isHourly = cycle === 'hourly'
+  const prorateAvailable = canProrate(startDate, cycle)
+  const prorateFirst = prorateAvailable && prorate
   const endTime = isHourly ? addHoursToTime(startTime, Number(cyclesCount)) : null
   const preview = useMemo(
     () => previewRentalSchedule(
@@ -80,8 +83,9 @@ export function NewContractDialog({
       Number(cyclesCount),
       Number(amount || 0),
       cycle === 'hourly' ? 0 : Number(increasePct || 0),
+      prorateFirst,
     ),
-    [startDate, cycle, customValue, customUnit, cyclesCount, amount, increasePct],
+    [startDate, cycle, customValue, customUnit, cyclesCount, amount, increasePct, prorateFirst],
   )
 
   function selectCycle(next: RentCycle) {
@@ -110,6 +114,7 @@ export function NewContractDialog({
         p_idempotency_key: idempotencyKey.current,
         p_annual_increase_pct: isHourly ? 0 : Number(increasePct || 0),
         p_start_time: isHourly ? startTime : undefined,
+        p_prorate_first: prorateFirst,
       })
       if (rpcError) throw rpcError
       return data?.[0]
@@ -215,6 +220,16 @@ export function NewContractDialog({
             </Field>
           </div>
 
+          {prorateAvailable && (
+            <label className="flex items-start gap-2 text-sm">
+              <input type="checkbox" className="mt-1" checked={prorate} onChange={(e) => setProrate(e.target.checked)} />
+              <span>
+                {t('rentals.contracts.prorate')}
+                <span className="block text-xs text-text-secondary">{t('rentals.contracts.prorateHint')}</span>
+              </span>
+            </label>
+          )}
+
           {!isHourly && (
             <Field label={t('rentals.contracts.annualIncrease')}>
               <Input type="number" min={0} max={100} step="0.5" value={increasePct} onChange={(e) => setIncreasePct(e.target.value)} />
@@ -257,7 +272,10 @@ export function NewContractDialog({
                 <ul className="mt-2 max-h-48 overflow-y-auto text-xs">
                   {preview.rows.map((r) => (
                     <li key={r.sequence} className="flex justify-between border-b border-border-subtle py-1 last:border-0">
-                      <span className="tabular-nums">#{r.sequence} <bdi>{r.periodStart} → {r.periodEnd}</bdi></span>
+                      <span className="tabular-nums">
+                        #{r.sequence} <bdi>{r.periodStart} → {r.periodEnd}</bdi>
+                        {r.partialDays != null && <span className="ms-1 text-text-secondary">({t('rentals.contracts.partialDays', { count: r.partialDays })})</span>}
+                      </span>
                       <MoneyDisplay amount={r.amount} size="sm" />
                     </li>
                   ))}

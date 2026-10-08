@@ -49,6 +49,8 @@ export function RentalSettingsDialog({ onClose }: { onClose: () => void }) {
         p_late_fee_grace_days: Number(form.late_fee_grace_days),
         p_whatsapp_reminders_enabled: form.whatsapp_reminders_enabled,
         p_reminder_days_before: Number(form.reminder_days_before),
+        p_vat_rate: Number(form.vat_rate || 0),
+        p_expiry_alert_days: Number(form.expiry_alert_days),
       })
       if (rpcError) throw rpcError
     },
@@ -106,6 +108,18 @@ export function RentalSettingsDialog({ onClose }: { onClose: () => void }) {
                 </Field>
               )}
               <p className="text-xs text-text-secondary">{t('rentals.settings.lateFeeHint')}</p>
+            </section>
+
+            <section className="flex flex-col gap-2 border-t border-border pt-3">
+              <div className="flex gap-2">
+                <Field label={t('rentals.settings.vatRate')} className="flex-1">
+                  <Input type="number" min={0} max={100} step="0.5" value={form.vat_rate} onChange={(e) => set('vat_rate', Number(e.target.value))} />
+                </Field>
+                <Field label={t('rentals.settings.expiryAlertDays')} className="flex-1">
+                  <Input type="number" min={0} max={180} value={form.expiry_alert_days} onChange={(e) => set('expiry_alert_days', Number(e.target.value))} />
+                </Field>
+              </div>
+              <p className="text-xs text-text-secondary">{t('rentals.settings.vatHint')}</p>
             </section>
 
             <section className="flex flex-col gap-2 border-t border-border pt-3">

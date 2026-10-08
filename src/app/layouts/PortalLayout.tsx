@@ -5,7 +5,7 @@ import { useAuth } from '@/app/providers/AuthProvider'
 import { PortalClubProvider, usePortalClub } from '@/app/providers/PortalClubProvider'
 import { Building, CalendarDays, GraduationCap, IdCard, Wallet, QrCode, User, LogOut } from 'lucide-react'
 import { useQuery } from '@tanstack/react-query'
-import { fetchMyPortalRentals } from '@/features/portal/portalRentals'
+import { fetchMyPortalRentals, fetchPortalBookableSpaces } from '@/features/portal/portalRentals'
 import type { LucideIcon } from 'lucide-react'
 import { LanguageSwitcher } from '@/components/ui/language-switcher'
 import { RouteLoadingFallback } from '@/app/routing/RouteLoadingFallback'
@@ -49,13 +49,6 @@ const rentalsNavItem: NavItem = { to: '/portal/rentals', labelKey: 'portal.nav.r
 export function PortalLayout() {
   const { t } = useTranslation()
   const { signOut } = useAuth()
-  const { data: myRentals = [] } = useQuery({
-    queryKey: ['portal', 'my-rentals'],
-    queryFn: fetchMyPortalRentals,
-    staleTime: 5 * 60 * 1000,
-    retry: false,
-  })
-  const items = myRentals.length > 0 ? [...navItems.slice(0, 3), rentalsNavItem, ...navItems.slice(3)] : navItems
 
   return (
     <PortalClubProvider>
@@ -97,38 +90,7 @@ export function PortalLayout() {
           </Suspense>
         </main>
 
-        <nav className="fixed inset-x-0 bottom-0 z-30 flex border-t border-border bg-surface px-1.5 pb-[env(safe-area-inset-bottom)]">
-          {items.map((item) => (
-            <NavLink
-              key={item.to}
-              to={item.to}
-              className={({ isActive }) =>
-                `flex flex-1 flex-col items-center gap-1 px-1 py-2.5 text-[11px] font-medium transition-colors ${
-                  isActive ? 'text-accent-foreground' : 'text-text-secondary'
-                }`
-              }
-            >
-              {({ isActive }) => (
-                <>
-                  {/* Bottom nav previously conveyed "active" with a text
-                      color shift only -- easy to miss at a glance and a
-                      weak touch/visual affordance compared to the
-                      pill-highlight pattern common in customer-facing
-                      mobile apps. Kept within the same icon+label
-                      structure/height so no layout/behavior changes. */}
-                  <span
-                    className={`flex items-center justify-center rounded-full px-3 py-1 transition-colors ${
-                      isActive ? 'bg-accent/15' : ''
-                    }`}
-                  >
-                    <item.icon className="size-5" />
-                  </span>
-                  {t(item.labelKey)}
-                </>
-              )}
-            </NavLink>
-          ))}
-        </nav>
+        <PortalBottomNav />
       </div>
     </PortalClubProvider>
   )
@@ -162,5 +124,63 @@ function PortalClubSwitcher() {
         ))}
       </SelectContent>
     </Select>
+  )
+}
+
+// Rendered inside PortalClubProvider so the rentals entry can also appear
+// when the active club offers online hall booking (v3), not only when the
+// customer already has a lease.
+function PortalBottomNav() {
+  const { t } = useTranslation()
+  const { activeClubId } = usePortalClub()
+  const { data: myRentals = [] } = useQuery({
+    queryKey: ['portal', 'my-rentals'],
+    queryFn: fetchMyPortalRentals,
+    staleTime: 5 * 60 * 1000,
+    retry: false,
+  })
+  const { data: bookable = [] } = useQuery({
+    queryKey: ['portal', 'bookable-spaces', activeClubId],
+    queryFn: () => fetchPortalBookableSpaces(activeClubId!),
+    enabled: !!activeClubId,
+    staleTime: 5 * 60 * 1000,
+    retry: false,
+  })
+  const showRentals = myRentals.length > 0 || bookable.length > 0
+  const items = showRentals ? [...navItems.slice(0, 3), rentalsNavItem, ...navItems.slice(3)] : navItems
+
+  return (
+      <nav className="fixed inset-x-0 bottom-0 z-30 flex border-t border-border bg-surface px-1.5 pb-[env(safe-area-inset-bottom)]">
+        {items.map((item) => (
+          <NavLink
+            key={item.to}
+            to={item.to}
+            className={({ isActive }) =>
+              `flex flex-1 flex-col items-center gap-1 px-1 py-2.5 text-[11px] font-medium transition-colors ${
+                isActive ? 'text-accent-foreground' : 'text-text-secondary'
+              }`
+            }
+          >
+            {({ isActive }) => (
+              <>
+                {/* Bottom nav previously conveyed "active" with a text
+                    color shift only -- easy to miss at a glance and a
+                    weak touch/visual affordance compared to the
+                    pill-highlight pattern common in customer-facing
+                    mobile apps. Kept within the same icon+label
+                    structure/height so no layout/behavior changes. */}
+                <span
+                  className={`flex items-center justify-center rounded-full px-3 py-1 transition-colors ${
+                    isActive ? 'bg-accent/15' : ''
+                  }`}
+                >
+                  <item.icon className="size-5" />
+                </span>
+                {t(item.labelKey)}
+              </>
+            )}
+          </NavLink>
+        ))}
+      </nav>
   )
 }

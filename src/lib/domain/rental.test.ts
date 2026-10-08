@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { addHoursToTime, escalatedAmount, fullYearsBetween, previewRentalSchedule, rentalPeriodStart } from './rental'
+import { addHoursToTime, canProrate, escalatedAmount, fullYearsBetween, previewRentalSchedule, rentalPeriodStart } from './rental'
 
 describe('rentalPeriodStart', () => {
   it('computes each cycle type from the contract start', () => {
@@ -70,5 +70,17 @@ describe('rentals v2 helpers', () => {
     expect(addHoursToTime('18:00', 4)).toBe('22:00')
     expect(addHoursToTime('20:00', 4)).toBe('24:00')
     expect(addHoursToTime('21:30', 4)).toBeNull()
+  })
+})
+
+describe('pro-rated first period', () => {
+  it('bills the partial start month by days, then full periods from the 1st', () => {
+    const p = previewRentalSchedule('2026-11-16', { cycle: 'monthly' }, 3, 3000, 0, true)
+    expect(p.rows[0]).toMatchObject({ sequence: 1, periodStart: '2026-11-16', periodEnd: '2026-11-30', amount: 1500, partialDays: 15 })
+    expect(p.rows[1]).toMatchObject({ sequence: 2, periodStart: '2026-12-01', periodEnd: '2026-12-31', amount: 3000 })
+    expect(p.endDate).toBe('2027-02-28')
+    expect(p.totalRent).toBe(10500)
+    expect(canProrate('2026-11-01', 'monthly')).toBe(false)
+    expect(canProrate('2026-11-16', 'daily')).toBe(false)
   })
 })

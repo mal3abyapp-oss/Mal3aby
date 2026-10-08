@@ -1,5 +1,7 @@
 import { useState, type ReactNode } from 'react'
-import { Pencil, Printer, RefreshCw, Undo2 } from 'lucide-react'
+import { flushSync } from 'react-dom'
+import { useAuth } from '@/app/providers/AuthProvider'
+import { Pencil, Printer, ReceiptText, RefreshCw, Undo2 } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { useMutation, useQuery } from '@tanstack/react-query'
 import { Link, useNavigate } from 'react-router-dom'
@@ -19,6 +21,9 @@ import { useRentalPermissions } from './hooks'
 import type { RentalContractDetail, RentalInstallmentRow } from './types'
 import { Field } from './Field'
 import { ContractPrintView } from './ContractPrintView'
+import { DepositReceiptPrintView } from './DepositReceiptPrintView'
+import { ContractDocuments } from './ContractDocuments'
+import { ContractMeters } from './ContractMeters'
 import { EditContractDialog, RenewContractDialog, SettleDepositDialog } from './ContractActionDialogs'
 
 // Contract 360: schedule with derived payment state per installment.
@@ -39,6 +44,15 @@ export function ContractDetailDialog({ contractId: initialContractId, onClose, o
   // Renewal links jump between the leases of one chain inside the same dialog.
   const [contractId, setContractId] = useState(initialContractId)
   const [action, setAction] = useState<'none' | 'renew' | 'edit' | 'deposit'>('none')
+  // Only one printable document is mounted at a time (both use the
+  // shared .visible-for-print class).
+  const [printDoc, setPrintDoc] = useState<'contract' | 'deposit'>('contract')
+  const { currentClubId } = useAuth()
+
+  function printDocument(doc: 'contract' | 'deposit') {
+    flushSync(() => setPrintDoc(doc))
+    window.print()
+  }
   const navigate = useNavigate()
   const { canCreateContracts, canManageContracts, canCollect } = useRentalPermissions()
   const [selected, setSelected] = useState<Set<string>>(new Set())
@@ -135,12 +149,17 @@ export function ContractDetailDialog({ contractId: initialContractId, onClose, o
         {isLoading && <Skeleton className="h-40 w-full" />}
         {isError && <ErrorState message={translateSupabaseError(error, t('rentals.contracts.loadError'))} onRetry={() => void refetch()} />}
 
-        {data && c && <ContractPrintView detail={data} />}
+        {data && c && (printDoc === 'deposit' && c.deposit_settled_at
+          ? <DepositReceiptPrintView detail={data} />
+          : <ContractPrintView detail={data} />)}
 
         {data && c && (
           <div className="flex flex-col gap-4 print:hidden">
             <div className="flex flex-wrap gap-2">
-              <Button size="sm" variant="outline" onClick={() => window.print()}><Printer />{t('rentals.print.action')}</Button>
+              <Button size="sm" variant="outline" onClick={() => printDocument('contract')}><Printer />{t('rentals.print.action')}</Button>
+              {c.deposit_settled_at && (
+                <Button size="sm" variant="outline" onClick={() => printDocument('deposit')}><ReceiptText />{t('rentals.depositReceipt.action')}</Button>
+              )}
               {canCreateContracts && canRenew && (
                 <Button size="sm" variant="outline" onClick={() => setAction('renew')}><RefreshCw />{t('rentals.renew.action')}</Button>
               )}
@@ -243,7 +262,9 @@ export function ContractDetailDialog({ contractId: initialContractId, onClose, o
                           )}
                         </td>
                         <td className="p-1 tabular-nums">
-                          {i.kind === 'deposit' ? t('rentals.detail.depositShort') : i.kind === 'late_fee' ? t('rentals.detail.lateFeeShort') : i.sequence}
+                          {i.kind === 'deposit' ? t('rentals.detail.depositShort')
+                            : i.kind === 'late_fee' ? t('rentals.detail.lateFeeShort')
+                            : i.kind === 'utility' ? t('rentals.detail.utilityShort') : i.sequence}
                         </td>
                         <td className="p-1 text-xs tabular-nums"><bdi>{i.period_start} → {i.period_end}</bdi></td>
                         <td className="p-1 text-xs tabular-nums">{i.due_date}</td>
@@ -267,6 +288,9 @@ export function ContractDetailDialog({ contractId: initialContractId, onClose, o
                 </table>
               </div>
             </div>
+
+            <ContractMeters contractId={c.id} contractOpen={c.status === 'active'} onBilled={() => { void refetch(); onChanged() }} />
+            {currentClubId && <ContractDocuments clubId={currentClubId} contractId={c.id} />}
 
             {actionError && <p role="alert" className="text-sm text-status-danger">{actionError}</p>}
 
