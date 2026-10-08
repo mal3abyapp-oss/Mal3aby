@@ -75,3 +75,35 @@ Rentals page, or the platform owner toggles it from the club's Modules tab.
 - **Cancel** (entered by mistake): only when nothing was collected; its
   invoices are voided and all installments cancelled.
 - A voided installment invoice can be re-issued.
+
+## v2 (2026-10-08) — `20261008100000_rentals_v2.sql`
+
+- **Security deposit is a liability**: always invoiced on its own invoice
+  (`invoice_items.reference_type = 'rental_deposit'`), excluded from rental
+  "collected"/net figures. **Settle deposit** (contract detail) refunds all or
+  part through the shared refunds ledger (`create_refund`); the deducted part is
+  kept as income and the deposit invoice is reduced so nothing stays outstanding.
+  Revenue by source shows deposits as their own source; the revenue report
+  exposes `deposits_collected` (shown as a note).
+- **Hourly bookings** (`rent_cycle = 'hourly'`): start time + hours on one day;
+  same-day bookings on a space only conflict when their times overlap.
+- **Annual increase %**: compounds per full contract year on each installment.
+- **Renew** (one click, follow-on lease from the day after the old one ends, no
+  new deposit), **Edit** (notes, reprice upcoming un-invoiced periods from a
+  date, extend by N periods), **Print contract** (A4).
+- **Rental settings** (per club): auto-issue invoices N days before due, late
+  fee (none / fixed / percent, grace days, once per installment on its own
+  invoice), WhatsApp reminders. Runs daily via pg_cron job `rental-daily-jobs`
+  (`run_rental_daily_jobs()`, 04:07 UTC).
+- **WhatsApp reminders** use connector templates `rental-payment-reminder` /
+  `rental-payment-overdue` (in `whatsapp-connector/src/templates.ts`). They are
+  only queued once `_rental_whatsapp_templates_live()` returns true — flip it in
+  a follow-up migration **after** the connector image with those templates is
+  deployed, otherwise queued messages would fail on an unknown template.
+- **Space calendar** (month grid per space), **space expenses**
+  (`record_rental_space_expense` → normal `record_expense` + `expenses.rental_space_id`)
+  feeding per-space expenses/net in the rentals report.
+- **Customer portal** `/portal/rentals` (`get_my_portal_rentals()`), shown in the
+  bottom bar only for customers with a lease.
+- Global search finds contracts by number (`/app/rentals?contract=<id>`); Help
+  guide has a Rentals section.

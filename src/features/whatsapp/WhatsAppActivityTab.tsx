@@ -102,6 +102,9 @@ const TEMPLATE_TO_FAMILY: Record<string, MessageFamily> = {
   'payment-received': 'payment',
   'academy-payment-received': 'academy',
   'payment-refunded': 'refund',
+  // Rentals (2026-10-08): rent due / overdue reminders.
+  'rental-payment-reminder': 'payment',
+  'rental-payment-overdue': 'payment',
 }
 
 function messageFamilyOf(templateKey: string): MessageFamily | null {
@@ -165,6 +168,8 @@ const TEMPLATE_LABEL_KEYS = [
   'academy-payment-received',
   'payment-refunded',
   'invoice-created',
+  'rental-payment-reminder',
+  'rental-payment-overdue',
 ] as const
 
 // WHATSAPP DELIVERY TRUTH fix (2026-08-22): 'delivered' was defined in

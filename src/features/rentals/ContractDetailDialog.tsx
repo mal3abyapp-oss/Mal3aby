@@ -1,4 +1,5 @@
 import { useState, type ReactNode } from 'react'
+import { Pencil, Printer, RefreshCw, Undo2 } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { useMutation, useQuery } from '@tanstack/react-query'
 import { Link, useNavigate } from 'react-router-dom'
@@ -17,19 +18,27 @@ import {
 import { useRentalPermissions } from './hooks'
 import type { RentalContractDetail, RentalInstallmentRow } from './types'
 import { Field } from './Field'
+import { ContractPrintView } from './ContractPrintView'
+import { EditContractDialog, RenewContractDialog, SettleDepositDialog } from './ContractActionDialogs'
 
 // Contract 360: schedule with derived payment state per installment.
 // Staff select not-yet-invoiced installments (e.g. "pay 3 months now")
 // and issue ONE invoice for them, then collect it in Finance > Payments
 // (shared record_payment path -> cash shift, official receipt, printing,
 // notifications all behave exactly like any other invoice).
+// v2: renew / edit / settle the security deposit / print the lease;
+// late-fee rows, hourly booking times, annual increase and the renewal
+// chain are shown in place.
 
 function isInvoiceable(i: RentalInstallmentRow): boolean {
   return i.status === 'scheduled' || (i.status === 'invoiced' && i.invoice_status === 'void')
 }
 
-export function ContractDetailDialog({ contractId, onClose, onChanged }: { contractId: string; onClose: () => void; onChanged: () => void }) {
+export function ContractDetailDialog({ contractId: initialContractId, onClose, onChanged }: { contractId: string; onClose: () => void; onChanged: () => void }) {
   const { t } = useTranslation()
+  // Renewal links jump between the leases of one chain inside the same dialog.
+  const [contractId, setContractId] = useState(initialContractId)
+  const [action, setAction] = useState<'none' | 'renew' | 'edit' | 'deposit'>('none')
   const navigate = useNavigate()
   const { canCreateContracts, canManageContracts, canCollect } = useRentalPermissions()
   const [selected, setSelected] = useState<Set<string>>(new Set())
@@ -98,7 +107,19 @@ export function ContractDetailDialog({ contractId, onClose, onChanged }: { contr
     })
   }
 
+  function goTo(id: string) {
+    setSelected(new Set())
+    setMode('none')
+    setActionError(null)
+    setContractId(id)
+  }
+
   const c = data?.contract
+  const isHourly = c?.rent_cycle === 'hourly'
+  const depositInstallment = data?.installments.find((i) => i.kind === 'deposit')
+  const canSettleDeposit = !!c && !!depositInstallment?.invoice_id && depositInstallment.invoice_status === 'issued'
+    && !c.deposit_settled_at && c.status !== 'cancelled'
+  const canRenew = !!c && !!data && c.status === 'active' && !isHourly && !data.renewed_to
   const selectedTotal = (data?.installments ?? []).filter((i) => selected.has(i.id)).reduce((sum, i) => sum + Number(i.amount), 0)
   const isOpen = c?.status === 'active' || c?.status === 'terminated'
 
@@ -114,8 +135,23 @@ export function ContractDetailDialog({ contractId, onClose, onChanged }: { contr
         {isLoading && <Skeleton className="h-40 w-full" />}
         {isError && <ErrorState message={translateSupabaseError(error, t('rentals.contracts.loadError'))} onRetry={() => void refetch()} />}
 
+        {data && c && <ContractPrintView detail={data} />}
+
         {data && c && (
-          <div className="flex flex-col gap-4">
+          <div className="flex flex-col gap-4 print:hidden">
+            <div className="flex flex-wrap gap-2">
+              <Button size="sm" variant="outline" onClick={() => window.print()}><Printer />{t('rentals.print.action')}</Button>
+              {canCreateContracts && canRenew && (
+                <Button size="sm" variant="outline" onClick={() => setAction('renew')}><RefreshCw />{t('rentals.renew.action')}</Button>
+              )}
+              {canManageContracts && c.status === 'active' && (
+                <Button size="sm" variant="outline" onClick={() => setAction('edit')}><Pencil />{t('rentals.edit.action')}</Button>
+              )}
+              {canManageContracts && canSettleDeposit && (
+                <Button size="sm" variant="outline" onClick={() => setAction('deposit')}><Undo2 />{t('rentals.deposit.settleAction')}</Button>
+              )}
+            </div>
+
             <div className="grid gap-2 text-sm sm:grid-cols-2">
               <Info label={t('rentals.contracts.tenant')}>
                 <Link className="text-accent-foreground hover:underline" to={`/app/customers/${data.customer.id}`}>{data.customer.full_name}</Link>
@@ -125,17 +161,46 @@ export function ContractDetailDialog({ contractId, onClose, onChanged }: { contr
                 {data.space.name} · {rentalSpaceTypeLabel(t, data.space.space_type, data.space.custom_type_label)} · {data.space.branch_name}
               </Info>
               <Info label={t('rentals.contracts.cycle')}>
-                {rentCycleLabel(t, c.rent_cycle, c.custom_cycle_value, c.custom_cycle_unit)} × {c.cycles_count} — <MoneyDisplay amount={Number(c.cycle_amount)} size="sm" />
+                {isHourly
+                  ? <>{t('rentals.contracts.hoursValue', { count: c.cycles_count })} × <MoneyDisplay amount={Number(c.cycle_amount)} size="sm" /></>
+                  : <>{rentCycleLabel(t, c.rent_cycle, c.custom_cycle_value, c.custom_cycle_unit)} × {c.cycles_count} — <MoneyDisplay amount={Number(c.cycle_amount)} size="sm" /></>}
+                {Number(c.annual_increase_pct) > 0 && (
+                  <span className="ms-1 text-xs text-text-secondary">({t('rentals.contracts.increaseBadge', { pct: Number(c.annual_increase_pct) })})</span>
+                )}
               </Info>
               <Info label={t('rentals.contracts.period')}>
-                <span className="tabular-nums"><bdi>{c.start_date} → {c.end_date}</bdi></span>
+                {isHourly
+                  ? <span className="tabular-nums"><bdi>{c.start_date} {c.start_time?.slice(0, 5)}–{c.end_time?.slice(0, 5)}</bdi></span>
+                  : <span className="tabular-nums"><bdi>{c.start_date} → {c.end_date}</bdi></span>}
                 {c.termination_date && <span className="ms-1 text-status-warning">({t('rentals.detail.terminatedOn', { date: c.termination_date })})</span>}
               </Info>
               <Info label={t('common.status', { defaultValue: 'Status' })}>
                 <StatusBadge tone={RENTAL_CONTRACT_STATUS_TONE[data.display_status] ?? 'neutral'} label={t(`rentals.contracts.statusLabels.${data.display_status}`)} />
               </Info>
               {Number(c.security_deposit) > 0 && (
-                <Info label={t('rentals.contracts.deposit')}><MoneyDisplay amount={Number(c.security_deposit)} size="sm" /></Info>
+                <Info label={t('rentals.contracts.deposit')}>
+                  <MoneyDisplay amount={Number(c.security_deposit)} size="sm" />
+                  <span className="ms-1 text-xs text-text-secondary">
+                    {c.deposit_settled_at
+                      ? t('rentals.deposit.settledSummary', { refunded: Number(c.deposit_refunded), kept: Number(c.deposit_kept) })
+                      : t('rentals.deposit.heldSummary', { held: Number(data.totals.deposit_held ?? 0) })}
+                  </span>
+                  {c.deposit_settlement_note && <span className="block text-xs text-text-secondary">{c.deposit_settlement_note}</span>}
+                </Info>
+              )}
+              {(data.renewed_from || data.renewed_to) && (
+                <Info label={t('rentals.renew.chain')}>
+                  {data.renewed_from && (
+                    <button type="button" className="me-2 text-accent-foreground hover:underline" onClick={() => goTo(data.renewed_from!.id)}>
+                      {t('rentals.renew.from', { number: data.renewed_from.contract_number })}
+                    </button>
+                  )}
+                  {data.renewed_to && (
+                    <button type="button" className="text-accent-foreground hover:underline" onClick={() => goTo(data.renewed_to!.id)}>
+                      {t('rentals.renew.to', { number: data.renewed_to.contract_number })}
+                    </button>
+                  )}
+                </Info>
               )}
               {c.notes && <Info label={t('rentals.contracts.notes')}>{c.notes}</Info>}
               {(c.termination_reason || c.cancel_reason) && (
@@ -148,6 +213,9 @@ export function ContractDetailDialog({ contractId, onClose, onChanged }: { contr
               <Total label={t('rentals.detail.totals.outstanding')} amount={data.totals.outstanding} />
               <Total label={t('rentals.detail.totals.overdue')} amount={data.totals.overdue} tone="danger" />
               <Total label={t('rentals.detail.totals.notInvoiced')} amount={data.totals.not_invoiced} />
+              {Number(data.totals.late_fees ?? 0) > 0 && (
+                <Total label={t('rentals.detail.totals.lateFees')} amount={data.totals.late_fees} tone="danger" />
+              )}
             </div>
 
             <div>
@@ -174,7 +242,9 @@ export function ContractDetailDialog({ contractId, onClose, onChanged }: { contr
                             <input type="checkbox" aria-label={t('rentals.detail.select')} checked={selected.has(i.id)} onChange={() => toggle(i.id)} />
                           )}
                         </td>
-                        <td className="p-1 tabular-nums">{i.kind === 'deposit' ? t('rentals.detail.depositShort') : i.sequence}</td>
+                        <td className="p-1 tabular-nums">
+                          {i.kind === 'deposit' ? t('rentals.detail.depositShort') : i.kind === 'late_fee' ? t('rentals.detail.lateFeeShort') : i.sequence}
+                        </td>
                         <td className="p-1 text-xs tabular-nums"><bdi>{i.period_start} → {i.period_end}</bdi></td>
                         <td className="p-1 text-xs tabular-nums">{i.due_date}</td>
                         <td className="p-1"><MoneyDisplay amount={Number(i.amount)} size="sm" /></td>
@@ -241,6 +311,16 @@ export function ContractDetailDialog({ contractId, onClose, onChanged }: { contr
               </div>
             )}
           </div>
+        )}
+
+        {data && action === 'renew' && (
+          <RenewContractDialog detail={data} onClose={() => setAction('none')} onDone={(id) => { setAction('none'); onChanged(); goTo(id) }} />
+        )}
+        {data && action === 'edit' && (
+          <EditContractDialog detail={data} onClose={() => setAction('none')} onDone={() => { setAction('none'); afterChange() }} />
+        )}
+        {data && action === 'deposit' && (
+          <SettleDepositDialog detail={data} onClose={() => setAction('none')} onDone={() => { setAction('none'); afterChange() }} />
         )}
       </DialogContent>
     </Dialog>

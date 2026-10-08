@@ -34,6 +34,8 @@ interface RevenueReport {
   by_day: { date: string; revenue: number }[]
   by_method: { method: string; revenue: number }[]
   refunds_total: number
+  /** RENTALS v2: security deposits included in total_revenue (refundable liabilities, not income). */
+  deposits_collected?: number
 }
 
 // Finance IA consolidation directive: content split out so
@@ -82,6 +84,11 @@ export function ReportRevenueContent() {
             <StatCard label={t('reports.revenue.totalRevenue')} value={formatMoney(data.total_revenue, 'EGP', locale)} icon={Wallet} />
             <StatCard label={t('reports.revenue.totalRefunds')} value={formatMoney(data.refunds_total, 'EGP', locale)} tone="danger" />
           </div>
+          {Number(data.deposits_collected ?? 0) > 0 && (
+            <p className="-mt-4 mb-4 text-xs text-text-secondary">
+              {t('reports.revenue.depositsIncluded', { amount: formatMoney(Number(data.deposits_collected), 'EGP', locale) })}
+            </p>
+          )}
           <div className="grid gap-4 md:grid-cols-2">
             <div>
               <p className="mb-2 font-medium">{t('reports.revenue.byMethod')}</p>

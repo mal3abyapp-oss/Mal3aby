@@ -722,6 +722,47 @@ check('booking-link includes the recovery credential without claiming a booking 
   }
 })
 
+// RENTALS (2026-10-08): the two reminder templates the database daily
+// job queues. Must name the space/contract, format money and dates, and
+// never print raw ISO dates or "undefined"/"null".
+const RENTAL_VARS = {
+  club_name: 'نادي الاختبار الشامل',
+  customer_name: 'مصطفى',
+  space_name: 'صالة الجيم',
+  contract_number: 'RC-00007',
+  period_start: '2026-11-01',
+  period_end: '2026-11-30',
+  due_date: '2026-11-01',
+  amount: 15000,
+  invoice_number: 'QAFULL-MAIN-2026-000101',
+}
+
+check('rental-payment-reminder renders space, contract, period and amount in both languages', () => {
+  for (const language of ['ar', 'en']) {
+    const msg = renderTemplate('rental-payment-reminder', language, RENTAL_VARS)
+    assert.ok(msg.includes('صالة الجيم'))
+    assert.ok(msg.includes('RC-00007'))
+    assert.ok(msg.includes('QAFULL-MAIN-2026-000101'))
+    assert.ok(!msg.includes('2026-11-01'), 'raw ISO date leaked')
+    assert.ok(!msg.includes('undefined') && !msg.includes('null'))
+    assert.ok(!msg.includes('15000 '), 'unformatted money leaked')
+  }
+})
+
+check('rental-payment-overdue shows days overdue and drops missing lines', () => {
+  const msg = renderTemplate('rental-payment-overdue', 'ar', { ...RENTAL_VARS, days_late: 7, invoice_number: null })
+  assert.ok(msg.includes('7 يوم'))
+  assert.ok(!msg.includes('رقم الفاتورة'))
+  assert.ok(!msg.includes('undefined') && !msg.includes('null'))
+  const en = renderTemplate('rental-payment-overdue', 'en', { ...RENTAL_VARS, days_late: 0 })
+  assert.ok(!en.includes('Days overdue'))
+})
+
+check('rental-payment-reminder uses the late-fee headline for late-fee installments', () => {
+  const msg = renderTemplate('rental-payment-reminder', 'ar', { ...RENTAL_VARS, is_late_fee: true })
+  assert.ok(msg.includes('غرامة تأخير'))
+})
+
 console.log(`\n[templates.test] ${passed} test(s) passed.`)
 if (process.exitCode) {
   console.error('[templates.test] SOME TESTS FAILED.')

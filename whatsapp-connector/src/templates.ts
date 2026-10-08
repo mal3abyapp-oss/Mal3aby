@@ -90,6 +90,11 @@ export type TemplateKey =
   | 'payment-received'
   | 'payment-refunded'
   | 'academy-payment-received'
+  // RENTALS (2026-10-08): queued by run_rental_daily_jobs() only once
+  // _rental_whatsapp_templates_live() is flipped to true after this
+  // connector image is deployed.
+  | 'rental-payment-reminder'
+  | 'rental-payment-overdue'
 
 type Vars = Record<string, unknown>
 type Renderer = (vars: Vars) => string
@@ -737,6 +742,53 @@ const AR: Record<TemplateKey, Renderer> = {
     )
   },
 
+  'rental-payment-reminder': (v) => {
+    const amount = formatMoney(v.amount, 'ج.م', 'EGP', 'ar')
+    const due = isPresent(v.due_date) ? formatCalendarDate(String(v.due_date), 'ar-EG') : null
+    const from = isPresent(v.period_start) ? formatCalendarDate(String(v.period_start), 'ar-EG') : null
+    const to = isPresent(v.period_end) ? formatCalendarDate(String(v.period_end), 'ar-EG') : null
+    return joinLines(
+      v.is_late_fee ? '⏰ *تذكير بغرامة تأخير الإيجار*' : '⏰ *تذكير بموعد قسط الإيجار*',
+      '',
+      greeting(v, 'ar'),
+      '',
+      due ? `نذكّرك بأن قسط الإيجار يستحق يوم *${due}*.` : 'نذكّرك بموعد قسط الإيجار القادم.',
+      '',
+      line('🏢', 'المكان', v.space_name),
+      line('📄', 'رقم العقد', v.contract_number),
+      from && to ? `📅 *الفترة:* ${from} — ${to}` : '',
+      line('💰', 'المبلغ المستحق', amount),
+      line('🧾', 'رقم الفاتورة', v.invoice_number),
+      '',
+      'شكرًا لالتزامك.',
+      '',
+      brandLine(v, 'ar'),
+    )
+  },
+
+  'rental-payment-overdue': (v) => {
+    const amount = formatMoney(v.amount, 'ج.م', 'EGP', 'ar')
+    const due = isPresent(v.due_date) ? formatCalendarDate(String(v.due_date), 'ar-EG') : null
+    const days = isPresent(v.days_late) ? Number(v.days_late) : null
+    return joinLines(
+      '⚠️ *قسط إيجار متأخر*',
+      '',
+      greeting(v, 'ar'),
+      '',
+      due ? `لم يتم سداد قسط الإيجار المستحق يوم *${due}* حتى الآن.` : 'لم يتم سداد قسط الإيجار المستحق حتى الآن.',
+      '',
+      line('🏢', 'المكان', v.space_name),
+      line('📄', 'رقم العقد', v.contract_number),
+      line('💰', 'المبلغ المتبقي', amount),
+      line('🧾', 'رقم الفاتورة', v.invoice_number),
+      days !== null && days > 0 ? `⏳ *مدة التأخير:* ${days} يوم` : '',
+      '',
+      'يرجى السداد في أقرب وقت أو التواصل مع الإدارة.',
+      '',
+      brandLine(v, 'ar'),
+    )
+  },
+
 }
 
 const EN: Record<TemplateKey, Renderer> = {
@@ -962,6 +1014,53 @@ const EN: Record<TemplateKey, Renderer> = {
       line('🧾', 'Invoice #', v.invoice_number),
       '',
       'The time it takes to appear in your account depends on your payment method.',
+      '',
+      brandLine(v, 'en'),
+    )
+  },
+
+  'rental-payment-reminder': (v) => {
+    const amount = formatMoney(v.amount, 'ج.م', 'EGP', 'en')
+    const due = isPresent(v.due_date) ? formatCalendarDate(String(v.due_date), 'en-US') : null
+    const from = isPresent(v.period_start) ? formatCalendarDate(String(v.period_start), 'en-US') : null
+    const to = isPresent(v.period_end) ? formatCalendarDate(String(v.period_end), 'en-US') : null
+    return joinLines(
+      v.is_late_fee ? '⏰ *Rent late fee reminder*' : '⏰ *Rent installment reminder*',
+      '',
+      greeting(v, 'en'),
+      '',
+      due ? `This is a reminder that your rent installment is due on *${due}*.` : 'This is a reminder that your next rent installment is due.',
+      '',
+      line('🏢', 'Space', v.space_name),
+      line('📄', 'Contract #', v.contract_number),
+      from && to ? `📅 *Period:* ${from} — ${to}` : '',
+      line('💰', 'Amount due', amount),
+      line('🧾', 'Invoice #', v.invoice_number),
+      '',
+      'Thank you.',
+      '',
+      brandLine(v, 'en'),
+    )
+  },
+
+  'rental-payment-overdue': (v) => {
+    const amount = formatMoney(v.amount, 'ج.م', 'EGP', 'en')
+    const due = isPresent(v.due_date) ? formatCalendarDate(String(v.due_date), 'en-US') : null
+    const days = isPresent(v.days_late) ? Number(v.days_late) : null
+    return joinLines(
+      '⚠️ *Overdue rent installment*',
+      '',
+      greeting(v, 'en'),
+      '',
+      due ? `Your rent installment due on *${due}* has not been paid yet.` : 'Your rent installment has not been paid yet.',
+      '',
+      line('🏢', 'Space', v.space_name),
+      line('📄', 'Contract #', v.contract_number),
+      line('💰', 'Amount outstanding', amount),
+      line('🧾', 'Invoice #', v.invoice_number),
+      days !== null && days > 0 ? `⏳ *Days overdue:* ${days}` : '',
+      '',
+      'Please pay as soon as possible or contact the club.',
       '',
       brandLine(v, 'en'),
     )

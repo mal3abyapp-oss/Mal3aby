@@ -55,7 +55,7 @@ interface InvoiceListRow {
   issuedAt: string | null
 }
 
-const SOURCE_KEYS = new Set(['booking', 'subscription', 'registration_fee', 'club_membership', 'shop_sale_item', 'rental'])
+const SOURCE_KEYS = new Set(['booking', 'subscription', 'registration_fee', 'club_membership', 'shop_sale_item', 'rental', 'rental_deposit'])
 
 // Master Payment Directive task #81: was total - sum(payment_allocations)
 // computed locally, missing refund netting -- the primary invoice list

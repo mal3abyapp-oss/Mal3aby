@@ -97,6 +97,7 @@ const PortalAcademyPage = lazy(() => import('@/features/portal/PortalAcademyPage
 const PortalMembershipsPage = lazy(() => import('@/features/portal/PortalMembershipsPage').then((m) => ({ default: m.PortalMembershipsPage })))
 const PortalQrPage = lazy(() => import('@/features/portal/PortalQrPage').then((m) => ({ default: m.PortalQrPage })))
 const PortalPaymentsPage = lazy(() => import('@/features/portal/PortalPaymentsPage').then((m) => ({ default: m.PortalPaymentsPage })))
+const PortalRentalsPage = lazy(() => import('@/features/portal/PortalRentalsPage').then((m) => ({ default: m.PortalRentalsPage })))
 const PortalProfilePage = lazy(() => import('@/features/portal/PortalProfilePage').then((m) => ({ default: m.PortalProfilePage })))
 
 const PlatformOverviewPage = lazy(() => import('@/features/platform/PlatformOverviewPage').then((m) => ({ default: m.PlatformOverviewPage })))
@@ -441,6 +442,7 @@ export const router = createBrowserRouter([
           { path: 'academy', element: <RequirePortalCustomer><PortalAcademyPage /></RequirePortalCustomer> },
           { path: 'memberships', element: <RequirePortalCustomer><PortalMembershipsPage /></RequirePortalCustomer> },
           { path: 'payments', element: <RequirePortalCustomer><PortalPaymentsPage /></RequirePortalCustomer> },
+          { path: 'rentals', element: <RequirePortalCustomer><PortalRentalsPage /></RequirePortalCustomer> },
           { path: 'qr', element: <RequirePortalCustomer><PortalQrPage /></RequirePortalCustomer> },
           { path: 'profile', element: <RequirePortalCustomer><PortalProfilePage /></RequirePortalCustomer> },
         ],

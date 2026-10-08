@@ -1,5 +1,8 @@
 name: One-shot Frontend Deploy
 
+# Triggered 2026-10-08: ship Rentals v2 (deposits, renewal, hourly halls,
+# automation settings, contract printing, calendar, expenses, portal).
+#
 # Triggered 2026-10-07 (2): ship the fix for the "new version available"
 # Reload button that activated the update without reloading the page.
 #

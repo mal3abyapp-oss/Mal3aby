@@ -2205,6 +2205,29 @@ export type Database = {
           },
         ]
       }
+      // RENTALS (2026-10-07): minimal typing for direct reads (global search);
+      // all writes go through the rental RPCs.
+      rental_contracts: {
+        Row: {
+          id: string
+          club_id: string
+          branch_id: string
+          space_id: string
+          customer_id: string
+          contract_number: string
+          status: string
+          start_date: string
+          end_date: string
+          created_at: string
+        }
+        Insert: {
+          id?: string
+        }
+        Update: {
+          id?: string
+        }
+        Relationships: []
+      }
       expense_categories: {
         Row: {
           club_id: string
@@ -9168,12 +9191,84 @@ export type Database = {
           p_security_deposit?: number
           p_space_id: string
           p_start_date: string
+          p_annual_increase_pct?: number
+          p_start_time?: string
         }
         Returns: {
           contract_id: string
           contract_number: string
           invoice_id: string | null
+          deposit_invoice_id: string | null
         }[]
+      }
+      // RENTALS v2 (2026-10-08) -- 20261008100000_rentals_v2.sql
+      renew_rental_contract: {
+        Args: {
+          p_contract_id: string
+          p_cycles_count?: number
+          p_cycle_amount?: number
+          p_annual_increase_pct?: number
+          p_issue_first_invoice?: boolean
+          p_idempotency_key?: string
+        }
+        Returns: {
+          contract_id: string
+          contract_number: string
+          invoice_id: string | null
+          deposit_invoice_id: string | null
+        }[]
+      }
+      update_rental_contract: {
+        Args: {
+          p_contract_id: string
+          p_notes?: string
+          p_new_cycle_amount?: number
+          p_effective_from?: string
+          p_extend_cycles?: number
+        }
+        Returns: undefined
+      }
+      settle_rental_deposit: {
+        Args: { p_contract_id: string; p_refund_amount: number; p_note?: string }
+        Returns: Json
+      }
+      get_rental_settings: {
+        Args: { p_club_id: string }
+        Returns: Json
+      }
+      update_rental_settings: {
+        Args: {
+          p_club_id: string
+          p_auto_issue_invoices: boolean
+          p_issue_days_before: number
+          p_late_fee_type: string
+          p_late_fee_value: number
+          p_late_fee_grace_days: number
+          p_whatsapp_reminders_enabled: boolean
+          p_reminder_days_before: number
+        }
+        Returns: undefined
+      }
+      get_my_portal_rentals: {
+        Args: never
+        Returns: Json
+      }
+      record_rental_space_expense: {
+        Args: {
+          p_space_id: string
+          p_amount: number
+          p_payment_method: string
+          p_description: string
+          p_category_id?: string
+          p_expense_date?: string
+          p_paid_to?: string
+          p_idempotency_key?: string
+        }
+        Returns: string
+      }
+      list_rental_space_expenses: {
+        Args: { p_space_id: string }
+        Returns: Json
       }
       issue_rental_invoice: {
         Args: { p_contract_id: string; p_discount?: number; p_installment_ids: string[] }

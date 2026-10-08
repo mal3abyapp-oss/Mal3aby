@@ -8,12 +8,14 @@ import { Input } from '@/components/ui/input'
 import { Search } from 'lucide-react'
 
 // Global Search: customers, players (via players_safe -- never surfaces
-// medical_notes), invoice number. Grouped results, club-scoped by RLS.
+// medical_notes), invoice number, rental contract number (RLS limits
+// contracts to staff with rental.view). Grouped results, club-scoped by RLS.
 // See ARCHITECTURE.md#performance-principles (indexed ILIKE), DESIGN_SYSTEM.md#search-ux.
 interface SearchResults {
   customers: { id: string; full_name: string; mobile_display: string | null }[]
   players: { id: string; full_name: string }[]
   invoices: { id: string; invoice_number: string }[]
+  contracts: { id: string; contract_number: string }[]
 }
 
 async function search(clubId: string, term: string): Promise<SearchResults> {
@@ -22,16 +24,18 @@ async function search(clubId: string, term: string): Promise<SearchResults> {
   // literal '%' or ',' in the search box) -- same fix as CustomersPage.tsx.
   const escapedTerm = term.replace(/[%,]/g, '\\$&')
   const like = `%${escapedTerm}%`
-  const [customersRes, playersRes, invoicesRes] = await Promise.all([
+  const [customersRes, playersRes, invoicesRes, contractsRes] = await Promise.all([
     supabase.from('customers').select('id, full_name, mobile_display').eq('club_id', clubId).or(`full_name.ilike.${like},mobile_display.ilike.${like}`).limit(5),
     supabase.from('players_safe').select('id, full_name').eq('club_id', clubId).ilike('full_name', like).limit(5),
     supabase.from('invoices').select('id, invoice_number').eq('club_id', clubId).ilike('invoice_number', like).limit(5),
+    supabase.from('rental_contracts').select('id, contract_number').eq('club_id', clubId).ilike('contract_number', like).limit(5),
   ])
 
   return {
     customers: customersRes.data ?? [],
     players: (playersRes.data ?? []).filter((p): p is { id: string; full_name: string } => !!p.id && !!p.full_name),
     invoices: invoicesRes.data ?? [],
+    contracts: contractsRes.data ?? [],
   }
 }
 
@@ -48,7 +52,7 @@ export function GlobalSearch() {
     enabled: !!currentClubId && term.trim().length >= 2,
   })
 
-  const hasResults = data && (data.customers.length > 0 || data.players.length > 0 || data.invoices.length > 0)
+  const hasResults = data && (data.customers.length > 0 || data.players.length > 0 || data.invoices.length > 0 || data.contracts.length > 0)
 
   return (
     <div className="relative w-full max-w-sm">
@@ -107,6 +111,20 @@ export function GlobalSearch() {
                       onClick={() => navigate(`/app/finance/invoices?invoice=${i.id}`)}
                     >
                       {i.invoice_number}
+                    </button>
+                  ))}
+                </div>
+              )}
+              {data.contracts.length > 0 && (
+                <div>
+                  <p className="px-2 text-xs font-medium text-text-secondary">{t('search.rentalContracts')}</p>
+                  {data.contracts.map((c) => (
+                    <button
+                      key={c.id}
+                      className="block w-full rounded px-2 py-1.5 text-start hover:bg-muted/50"
+                      onClick={() => navigate(`/app/rentals?contract=${c.id}`)}
+                    >
+                      {c.contract_number}
                     </button>
                   ))}
                 </div>
