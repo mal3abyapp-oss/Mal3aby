@@ -107,3 +107,29 @@ Rentals page, or the platform owner toggles it from the club's Modules tab.
   bottom bar only for customers with a lease.
 - Global search finds contracts by number (`/app/rentals?contract=<id>`); Help
   guide has a Rentals section.
+
+## v3 (2026-10-09) — `20261009100000_rentals_v3.sql`
+
+- **Pay from the portal**: each unpaid invoiced installment on `/portal/rentals`
+  links to `/portal/payments?invoiceId=…` (the existing payment-claim flow);
+  portal invoice list shows up to 100 invoices.
+- **Online hall booking**: turn on "Online booking" for an hourly space
+  (`set_rental_space_online_booking`). Customers request date/time/hours from
+  the portal (`request_rental_booking`); staff approve/reject in the
+  **Booking requests** tab (`decide_rental_booking_request` → hourly contract +
+  invoice, subscription-gated, overlap re-checked). Pending count shows on Today.
+- **Contract documents**: private bucket `rental-documents`
+  (`<club>/<contract>/<uuid>.<ext>`, branch-scoped storage policies via
+  `_rental_document_path_allowed`), signed-URL downloads.
+- **Deposit refund receipt**: printable A4 receipt after settlement.
+- **Pro-rated first period**: optional for month-based cycles starting
+  mid-month (`schedule_anchor`, `prorated_first`); extensions continue from
+  the anchor.
+- **Utility meters**: per-contract meters; each reading bills
+  consumption × unit price as a `utility` installment invoiced at once.
+- **Expiry alerts**: daily `rental_staff_alerts` at the configured lead time
+  (default 30 days), 7 days and the last day; shown on the Rentals overview.
+- **VAT**: `rental_settings.vat_rate` adds `invoices.tax` to rent, late-fee and
+  utility invoices (never deposits). Rental paid/collected figures are net of
+  VAT; the report shows VAT collected separately; the portal shows amounts
+  including VAT; the invoice view shows subtotal/discount/VAT.

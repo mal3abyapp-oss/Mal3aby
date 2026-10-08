@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { Settings } from 'lucide-react'
@@ -9,9 +9,10 @@ import { RentalsOverview } from './RentalsOverview'
 import { SpacesSection } from './SpacesSection'
 import { ContractsSection } from './ContractsSection'
 import { DuesSection } from './DuesSection'
+import { BookingRequestsSection } from './BookingRequestsSection'
 import { RentalSettingsDialog } from './RentalSettingsDialog'
 import { ContractDetailDialog } from './ContractDetailDialog'
-import { useInvalidateRentals, useRentalPermissions } from './hooks'
+import { useBookingRequests, useInvalidateRentals, useRentalPermissions } from './hooks'
 
 // Rentals -- staff module for leasing club-owned spaces (gym, wedding
 // hall, shop unit, ... or any custom-named type). Same PageHeader + Tabs
@@ -19,16 +20,24 @@ import { useInvalidateRentals, useRentalPermissions } from './hooks'
 // ordinary invoices collected in Finance, so every finance surface and
 // report picks rentals up through the shared invoice/payment ledger.
 
-type RentalsTab = 'overview' | 'spaces' | 'contracts' | 'dues'
+type RentalsTab = 'overview' | 'spaces' | 'contracts' | 'dues' | 'requests'
+const TABS: RentalsTab[] = ['overview', 'spaces', 'contracts', 'dues', 'requests']
 
 export function RentalsPage() {
   const { t } = useTranslation()
-  const [activeTab, setActiveTab] = useState<RentalsTab>('overview')
+  const [searchParams, setSearchParams] = useSearchParams()
+  const tabParam = searchParams.get('tab') as RentalsTab | null
+  const [activeTab, setActiveTab] = useState<RentalsTab>(tabParam && TABS.includes(tabParam) ? tabParam : 'overview')
+  // Follow ?tab= when it changes while the page is mounted (e.g. a
+  // dashboard link to the requests tab).
+  useEffect(() => {
+    if (tabParam && TABS.includes(tabParam)) setActiveTab(tabParam)
+  }, [tabParam])
+  const { data: pendingRequests = [] } = useBookingRequests('pending')
   const [settingsOpen, setSettingsOpen] = useState(false)
   const { canManageContracts } = useRentalPermissions()
   const invalidate = useInvalidateRentals()
   // ?contract=<id> (from Global Search) opens that lease directly.
-  const [searchParams, setSearchParams] = useSearchParams()
   const linkedContractId = searchParams.get('contract')
 
   return (
@@ -56,6 +65,12 @@ export function RentalsPage() {
           <TabsTrigger value="spaces">{t('rentals.tabs.spaces')}</TabsTrigger>
           <TabsTrigger value="contracts">{t('rentals.tabs.contracts')}</TabsTrigger>
           <TabsTrigger value="dues">{t('rentals.tabs.dues')}</TabsTrigger>
+          <TabsTrigger value="requests">
+            {t('rentals.tabs.requests')}
+            {pendingRequests.length > 0 && (
+              <span className="ms-1 rounded-full bg-status-warning px-1.5 text-xs text-white">{pendingRequests.length}</span>
+            )}
+          </TabsTrigger>
         </TabsList>
 
         <TabsContent value="overview">
@@ -69,6 +84,9 @@ export function RentalsPage() {
         </TabsContent>
         <TabsContent value="dues">
           <DuesSection />
+        </TabsContent>
+        <TabsContent value="requests">
+          <BookingRequestsSection />
         </TabsContent>
       </Tabs>
     </div>

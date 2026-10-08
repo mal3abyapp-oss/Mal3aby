@@ -9193,6 +9193,7 @@ export type Database = {
           p_start_date: string
           p_annual_increase_pct?: number
           p_start_time?: string
+          p_prorate_first?: boolean
         }
         Returns: {
           contract_id: string
@@ -9246,8 +9247,92 @@ export type Database = {
           p_late_fee_grace_days: number
           p_whatsapp_reminders_enabled: boolean
           p_reminder_days_before: number
+          p_vat_rate?: number
+          p_expiry_alert_days?: number
         }
         Returns: undefined
+      }
+      // RENTALS v3 (2026-10-09) -- 20261009100000_rentals_v3.sql
+      list_rental_alerts: {
+        Args: { p_club_id: string; p_include_read?: boolean }
+        Returns: Json
+      }
+      mark_rental_alerts_read: {
+        Args: { p_club_id: string; p_alert_ids?: string[] }
+        Returns: number
+      }
+      set_rental_space_online_booking: {
+        Args: { p_space_id: string; p_enabled: boolean }
+        Returns: undefined
+      }
+      get_portal_bookable_spaces: {
+        Args: { p_club_id: string }
+        Returns: Json
+      }
+      request_rental_booking: {
+        Args: { p_space_id: string; p_booking_date: string; p_start_time: string; p_hours: number; p_notes?: string }
+        Returns: string
+      }
+      cancel_my_rental_booking_request: {
+        Args: { p_request_id: string }
+        Returns: undefined
+      }
+      get_my_rental_booking_requests: {
+        Args: never
+        Returns: Json
+      }
+      list_rental_booking_requests: {
+        Args: { p_club_id: string; p_status?: string }
+        Returns: Json
+      }
+      decide_rental_booking_request: {
+        Args: { p_request_id: string; p_approve: boolean; p_note?: string; p_issue_invoice?: boolean }
+        Returns: string | null
+      }
+      add_rental_contract_document: {
+        Args: {
+          p_contract_id: string
+          p_storage_path: string
+          p_file_name: string
+          p_doc_type?: string
+          p_mime_type?: string
+          p_size_bytes?: number
+        }
+        Returns: string
+      }
+      list_rental_contract_documents: {
+        Args: { p_contract_id: string }
+        Returns: Json
+      }
+      delete_rental_contract_document: {
+        Args: { p_document_id: string }
+        Returns: string
+      }
+      upsert_rental_meter: {
+        Args: {
+          p_contract_id: string
+          p_meter_id: string | null
+          p_meter_type: string
+          p_label?: string
+          p_unit_price: number
+          p_initial_reading?: number
+          p_active?: boolean
+        }
+        Returns: string
+      }
+      record_rental_meter_reading: {
+        Args: {
+          p_meter_id: string
+          p_reading: number
+          p_reading_date?: string
+          p_issue_invoice?: boolean
+          p_idempotency_key?: string
+        }
+        Returns: Json
+      }
+      list_rental_meters: {
+        Args: { p_contract_id: string }
+        Returns: Json
       }
       get_my_portal_rentals: {
         Args: never

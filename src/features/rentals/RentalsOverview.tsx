@@ -5,12 +5,42 @@ import { MoneyDisplay } from '@/components/ui/money-display'
 import { ErrorState } from '@/components/ui/error-state'
 import { Skeleton } from '@/components/ui/skeleton'
 import { translateSupabaseError } from '@/lib/errors'
+import { useMutation, useQuery } from '@tanstack/react-query'
+import { BellRing } from 'lucide-react'
+import { supabase } from '@/lib/supabase/client'
+import { useAuth } from '@/app/providers/AuthProvider'
+import { Button } from '@/components/ui/button'
 import { monthRange, useRentalReport } from './hooks'
+import type { RentalStaffAlert } from './types'
+
+function daysUntil(isoDate: string): number {
+  const today = new Date()
+  const start = Date.UTC(today.getFullYear(), today.getMonth(), today.getDate())
+  return Math.round((new Date(`${isoDate}T00:00:00Z`).getTime() - start) / 86400000)
+}
 
 export function RentalsOverview({ onNavigateTab }: { onNavigateTab: (tab: 'spaces' | 'contracts' | 'dues') => void }) {
   const { t } = useTranslation()
   const { startDate, endDate } = monthRange()
   const { data, isLoading, isError, error, refetch } = useRentalReport(startDate, endDate)
+
+  const { currentClubId } = useAuth()
+  const { data: alerts = [], refetch: refetchAlerts } = useQuery({
+    queryKey: ['rental-alerts', currentClubId],
+    queryFn: async () => {
+      const { data: d, error: rpcError } = await supabase.rpc('list_rental_alerts', { p_club_id: currentClubId! })
+      if (rpcError) throw rpcError
+      return (d ?? []) as unknown as RentalStaffAlert[]
+    },
+    enabled: !!currentClubId,
+  })
+  const markRead = useMutation({
+    mutationFn: async () => {
+      const { error: rpcError } = await supabase.rpc('mark_rental_alerts_read', { p_club_id: currentClubId! })
+      if (rpcError) throw rpcError
+    },
+    onSuccess: () => void refetchAlerts(),
+  })
 
   if (isLoading) return <Skeleton className="mt-6 h-40 w-full" />
   if (isError || !data) {
@@ -21,6 +51,26 @@ export function RentalsOverview({ onNavigateTab }: { onNavigateTab: (tab: 'space
 
   return (
     <div className="mt-6 flex flex-col gap-6">
+      {alerts.length > 0 && (
+        <div className="rounded-lg border border-status-warning/40 bg-status-warning/5 p-3">
+          <div className="mb-2 flex items-center justify-between gap-2">
+            <p className="flex items-center gap-1 font-medium"><BellRing className="size-4" />{t('rentals.alerts.title')}</p>
+            <Button size="sm" variant="ghost" disabled={markRead.isPending} onClick={() => markRead.mutate()}>{t('rentals.alerts.markRead')}</Button>
+          </div>
+          <ul className="flex flex-col gap-1 text-sm">
+            {alerts.map((a) => (
+              <li key={a.id} className="flex flex-wrap justify-between gap-2">
+                <span>{a.customer_name} · {a.space_name} · <bdi className="tabular-nums">{a.contract_number}</bdi></span>
+                <span className="tabular-nums text-status-warning">
+                  {daysUntil(a.end_date) <= 0 ? t('rentals.alerts.endsToday') : t('rentals.alerts.endsIn', { count: daysUntil(a.end_date), date: a.end_date })}
+                  {a.renewed && ` · ${t('rentals.renew.renewedBadge')}`}
+                </span>
+              </li>
+            ))}
+          </ul>
+          <button className="mt-2 text-xs text-accent-foreground hover:underline" onClick={() => onNavigateTab('contracts')}>{t('rentals.alerts.renewHint')}</button>
+        </div>
+      )}
       <div className="grid grid-cols-2 gap-3 md:grid-cols-3">
         <StatCard label={t('rentals.overview.spaces')} value={`${data.spaces_occupied_today} / ${data.spaces_total}`} icon={Building} />
         <StatCard label={t('rentals.overview.occupancy')} value={`${occupancy}%`} />

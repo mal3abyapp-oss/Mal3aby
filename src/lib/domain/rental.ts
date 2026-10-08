@@ -90,6 +90,20 @@ export interface RentalSchedulePreviewRow {
   periodStart: string
   periodEnd: string
   amount: number
+  /** Set on a pro-rated (partial) first period: the number of days it covers. */
+  partialDays?: number
+}
+
+const MONTHS_PER_CYCLE: Partial<Record<RentCycle, number>> = { monthly: 1, quarterly: 3, semi_annual: 6, annual: 12 }
+
+/** A mid-month start of a month-based lease can be pro-rated. */
+export function canProrate(startDate: string, cycle: RentCycle): boolean {
+  return cycle in MONTHS_PER_CYCLE && /^\d{4}-\d{2}-\d{2}$/.test(startDate) && !startDate.endsWith('-01')
+}
+
+function firstOfNextMonth(isoDate: string): string {
+  const d = new Date(`${isoDate}T00:00:00Z`)
+  return new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth() + 1, 1)).toISOString().slice(0, 10)
 }
 
 /** Whole years elapsed between two YYYY-MM-DD dates (Postgres extract(year from age(b, a))). */
@@ -123,6 +137,7 @@ export function previewRentalSchedule(
   cyclesCount: number,
   cycleAmount: number,
   annualIncreasePct = 0,
+  prorateFirst = false,
 ): { endDate: string | null; rows: RentalSchedulePreviewRow[]; totalRent: number } {
   const count = Math.floor(cyclesCount)
   if (!startDate || !count || count < 1) return { endDate: null, rows: [], totalRent: 0 }
@@ -135,14 +150,29 @@ export function previewRentalSchedule(
   }
   const rows: RentalSchedulePreviewRow[] = []
   let totalCents = 0
+  // Pro-rated start (server: _rental_create_contract_internal): a partial
+  // first period up to the end of the start month, then full periods from
+  // the 1st of the next month.
+  const anchor = canProrate(startDate, spec.cycle) && prorateFirst ? firstOfNextMonth(startDate) : startDate
+  let offset = 0
+  if (anchor !== startDate) {
+    const start = new Date(`${startDate}T00:00:00Z`)
+    const anchorDate = new Date(`${anchor}T00:00:00Z`)
+    const daysUsed = Math.round((anchorDate.getTime() - start.getTime()) / 86400000)
+    const daysInMonth = new Date(Date.UTC(start.getUTCFullYear(), start.getUTCMonth() + 1, 0)).getUTCDate()
+    const partial = Math.round((amount / MONTHS_PER_CYCLE[spec.cycle]!) * daysUsed / daysInMonth * 100) / 100
+    totalCents += Math.round(partial * 100)
+    rows.push({ sequence: 1, periodStart: startDate, periodEnd: addUtcDays(anchorDate, -1).toISOString().slice(0, 10), amount: partial, partialDays: daysUsed })
+    offset = 1
+  }
   for (let i = 0; i < count; i++) {
-    const ps = rentalPeriodStart(startDate, spec, i)
-    const next = rentalPeriodStart(startDate, spec, i + 1)
+    const ps = rentalPeriodStart(anchor, spec, i)
+    const next = rentalPeriodStart(anchor, spec, i + 1)
     if (!ps || !next) return { endDate: null, rows: [], totalRent: 0 }
     const pe = addUtcDays(new Date(`${next}T00:00:00Z`), -1).toISOString().slice(0, 10)
-    const rowAmount = escalatedAmount(amount, annualIncreasePct, startDate, ps)
+    const rowAmount = escalatedAmount(amount, annualIncreasePct, anchor, ps)
     totalCents += Math.round(rowAmount * 100)
-    rows.push({ sequence: i + 1, periodStart: ps, periodEnd: pe, amount: rowAmount })
+    rows.push({ sequence: i + 1 + offset, periodStart: ps, periodEnd: pe, amount: rowAmount })
   }
   return {
     endDate: rows[rows.length - 1]?.periodEnd ?? null,
