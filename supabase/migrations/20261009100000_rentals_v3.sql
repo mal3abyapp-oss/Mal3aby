@@ -105,7 +105,10 @@ create table public.rental_contract_documents (
   mime_type text,
   size_bytes bigint,
   uploaded_by uuid references auth.users(id),
-  created_at timestamptz not null default now()
+  created_at timestamptz not null default now(),
+  -- removal is a soft delete (the storage object is removed by the client)
+  deleted_at timestamptz,
+  deleted_by uuid references auth.users(id)
 );
 create index rental_contract_documents_contract_idx on public.rental_contract_documents (contract_id);
 alter table public.rental_contract_documents enable row level security;
@@ -207,7 +210,8 @@ declare
   v_contract uuid;
 begin
   if coalesce(array_length(v_parts, 1), 0) < 2
-     or v_parts[1] !~ '^[0-9a-fA-F-]{36}$' or v_parts[2] !~ '^[0-9a-fA-F-]{36}$' then
+     or v_parts[1] !~ '^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$'
+     or v_parts[2] !~ '^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$' then
     return false;
   end if;
   v_club := v_parts[1]::uuid;
@@ -1458,7 +1462,7 @@ begin
     select jsonb_agg(jsonb_build_object('id', d.id, 'doc_type', d.doc_type, 'file_name', d.file_name,
       'storage_path', d.storage_path, 'mime_type', d.mime_type, 'size_bytes', d.size_bytes, 'created_at', d.created_at)
       order by d.created_at desc)
-    from public.rental_contract_documents d where d.contract_id = p_contract_id
+    from public.rental_contract_documents d where d.contract_id = p_contract_id and d.deleted_at is null
   ), '[]'::jsonb);
 end;
 $$;
@@ -1479,11 +1483,12 @@ begin
   join public.rental_contracts rc on rc.id = d.contract_id
   where d.id = p_document_id and d.club_id in (select public.user_club_ids())
     and public.has_permission('rental.contract.manage', d.club_id)
-    and public.user_has_branch_access(rc.club_id, rc.branch_id);
+    and public.user_has_branch_access(rc.club_id, rc.branch_id)
+    and d.deleted_at is null;
   if v_d.id is null then
     raise exception 'document not found';
   end if;
-  delete from public.rental_contract_documents where id = v_d.id;
+  update public.rental_contract_documents set deleted_at = now(), deleted_by = auth.uid() where id = v_d.id;
   perform public.write_audit_log(v_d.club_id, 'rental.document.deleted', 'rental_contract', v_d.contract_id,
     jsonb_build_object('document_id', v_d.id, 'file_name', v_d.file_name), null, null);
   return v_d.storage_path;
